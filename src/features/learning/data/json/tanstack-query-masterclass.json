@@ -1,0 +1,112 @@
+{
+  "id": "track-tanstack-query-masterclass",
+  "slug": "tanstack-query-v5-masterclass",
+  "title": "TanStack Query v5 (React Query) Masterclass",
+  "description": "Tại sao phải dùng TanStack Query? Hậu quả khi KHÔNG có React Query (Waterfall, Race conditions, Stale state, Duplicate requests) và giải pháp Caching/Optimistic Updates.",
+  "iconName": "Zap",
+  "color": "from-red-500 to-orange-600",
+  "totalLessons": 2,
+  "lessons": [
+    {
+      "id": "tq-01",
+      "slug": "why-tanstack-query-consequences-of-manual-fetch",
+      "title": "Tại sao cần TanStack Query? Hậu quả khi KHÔNG sử dụng",
+      "summary": "Phân tích 5 thảm họa khi quản lý Async State bằng useState + useEffect thủ công.",
+      "durationMinutes": 18,
+      "level": "intermediate",
+      "tags": ["TanStack Query v5", "React Query", "Server State", "Caching"],
+      "mentalModel": "Server State thuộc về Server (cần cache, invalidate, retry, dedup). useEffect + useState không sinh ra để quản lý Server State.",
+      "keyPoints": [
+        "Thảm họa 1 - Race Condition: Request chậm trả về sau đè lên dữ liệu của request mới.",
+        "Thảm họa 2 - Duplicate Requests (No Deduplication): 5 component con cùng cần dữ liệu user ➔ gửi 5 HTTP requests trùng lặp lên server.",
+        "Thảm họa 3 - Stale Data: Người dùng chuyển tab rồi quay lại vẫn nhìn thấy dữ liệu cũ hỏng không được tự động refetch.",
+        "Thảm họa 4 - Dual Source of Truth: Copy data từ API vào useState/Redux làm mất tính đồng bộ.",
+        "Giải pháp TanStack Query v5: Tự động Caching, Deduplication, Window focus refetching, và Invalidation cực đỉnh với useQuery."
+      ],
+      "codeRecipes": [
+        {
+          "title": "So sánh: useEffect thủ công vs TanStack Query v5",
+          "language": "tsx",
+          "beforeCode": "// ❌ Thảm họa useState + useEffect thủ công:\n// Khủng hoảng loading, error, race condition, 0 cache, 0 dedup!\nfunction UserProfile({ userId }) {\n  const [data, setData] = useState(null);\n  const [loading, setLoading] = useState(true);\n\n  useEffect(() => {\n    let isMounted = true;\n    fetchUser(userId).then(res => {\n      if (isMounted) { setData(res); setLoading(false); }\n    });\n    return () => { isMounted = false; }; // Phải tự ngắt race condition!\n  }, [userId]);\n\n  if (loading) return <Spinner />;\n  return <div>{data.name}</div>;\n}",
+          "afterCode": "// ✅ Đỉnh cao TanStack Query v5: 1 dòng code giải quyết 100% vấn đề!\nimport { useQuery } from '@tanstack/react-query';\n\nfunction UserProfile({ userId }) {\n  const { data, isLoading } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId),\n    staleTime: 1000 * 60 * 5, // Cache 5 phút, 0 duplicate request!\n  });\n\n  if (isLoading) return <Spinner />;\n  return <div>{data.name}</div>;\n}",
+          "takeaway": "Code ngắn hơn 70%, tự động cache, tự động dedup, tự động background refetch."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-tq-01-1",
+          "question": "Hiện tượng \"Request Deduplication\" trong TanStack Query có ý nghĩa là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Tự động xóa bớt các file hình ảnh trùng lặp"
+            },
+            {
+              "key": "B",
+              "text": "Nếu 5 component cùng gọi useQuery với cùng 1 queryKey tại một thời điểm, TanStack Query chỉ gửi DUY NHẤT 1 HTTP request và chia sẻ kết quả cho cả 5 component"
+            },
+            {
+              "key": "C",
+              "text": "Gửi 2 request cùng lúc để phòng rủi ro"
+            },
+            {
+              "key": "D",
+              "text": "Tự động đổi tên API endpoint"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Deduplication ngăn chặn việc ứng dụng gửi hàng chục HTTP request trùng lặp gây quá tải Server và giật lag Client."
+        }
+      ]
+    },
+    {
+      "id": "tq-02",
+      "slug": "tanstack-query-advanced-mutations-invalidations",
+      "title": "Làm chủ Caching, Invalidation & Optimistic Mutations",
+      "summary": "Kỹ thuật invalidateQueries chính xác và xử lý update 0ms với onMutate.",
+      "durationMinutes": 16,
+      "level": "advanced",
+      "tags": ["TanStack Query v5", "Mutations", "Optimistic UI", "Cache"],
+      "mentalModel": "onMutate hủy fetch đang chạy ➔ ghi dữ liệu giả lập vào cache ➔ onError rollback nếu lỗi ➔ onSettled làm tươi từ server.",
+      "keyPoints": [
+        "staleTime: Thời gian data được coi là còn mới (không refetch ngầm).",
+        "gcTime (Garbage Collection Time): Thời gian giữ cache trong RAM trước khi giải phóng.",
+        "queryClient.invalidateQueries({ queryKey }): Đánh dấu cache là cũ và kích hoạt refetch tức thì."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Mẫu Mutation & Cache Invalidation chuẩn v5",
+          "language": "typescript",
+          "afterCode": "import { useMutation, useQueryClient } from '@tanstack/react-query';\n\nexport function useAddTodo() {\n  const queryClient = useQueryClient();\n\n  return useMutation({\n    mutationFn: addTodoApi,\n    onSuccess: () => {\n      // ✅ Tức thì làm tươi danh sách todos trên toàn bộ ứng dụng!\n      queryClient.invalidateQueries({ queryKey: ['todos'] });\n    },\n  });\n}",
+          "takeaway": "Đồng bộ dữ liệu thời gian thực mượt mà trên toàn bộ các trang."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-tq-02-1",
+          "question": "Sự khác biệt giữa staleTime và gcTime trong TanStack Query v5 là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "staleTime là thời gian data được coi là còn tươi (không refetch), gcTime là thời gian dữ liệu không dùng nữa được giữ trong RAM trước khi bị xóa hẳn"
+            },
+            {
+              "key": "B",
+              "text": "Hai khái niệm này hoàn toàn giống nhau"
+            },
+            {
+              "key": "C",
+              "text": "staleTime chỉ dùng cho mobile app"
+            },
+            {
+              "key": "D",
+              "text": "gcTime chỉ hoạt động khi có kết nối 5G"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "staleTime quyết định KHI NÀO cần refetch ngầm, gcTime (Garbage Collection) quyết định KHI NÀO cần xóa cache khỏi bộ nhớ RAM khi component unmount."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "int-02",
+    "category": "react-19",
+    "level": "middle",
+    "question": "useOptimistic trong React 19 hoạt động như thế nào và giải quyết bài toán gì so với cách làm cũ?",
+    "interviewerIntent": "Đánh giá khả năng tối ưu hóa trải nghiệm người dùng (UX 0ms latency) và nắm bắt API mới nhất của React 19.",
+    "contextOrScenario": "Người dùng bấm nút 'Thích bài viết' hoặc 'Thêm vào giỏ hàng', yêu cầu giao diện nhảy số ngay lập tức trước khi server phản hồi.",
+    "expectedKeywords": [
+      "optimistic update",
+      "rollback",
+      "transition",
+      "pending state",
+      "zero latency"
+    ],
+    "seniorAnswer": {
+      "summary": "useOptimistic tạo ra một state tạm thời hiển thị ngay lập tức giá trị kỳ vọng trong khi async action đang thực thi, và tự động khôi phục (rollback) về state thật nếu server trả về lỗi.",
+      "deepDive": "useOptimistic nhận [passthroughState, updateFn]. Khi được kích hoạt bên trong một Transition hoặc Form Action, React sẽ render giá trị optimistic. Khi Server Action hoàn thành, React tự đồng bộ với state thật từ server mà không cần code try/catch rollback thủ công phức tạp.",
+      "codeExample": "const [optimisticCount, setOptimisticCount] = useOptimistic(\n  actualCount,\n  (current, increment: number) => current + increment\n);\n\nasync function handleLike() {\n  startTransition(async () => {\n    setOptimisticCount(1);\n    await likePostServerAction(postId);\n  });\n}"
+    },
+    "pitfalls": [
+      "Không biết rằng useOptimistic chỉ có tác dụng trong khi có startTransition hoặc Form Action đang pending.",
+      "Nhầm lẫn useOptimistic với useState thông thường."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa useOptimistic trong React 19 và cơ chế onMutate của TanStack Query?"
+    ]
+  },
+  {
+    "id": "int-07",
+    "category": "react-19",
+    "level": "senior",
+    "question": "React 19 đã thay đổi cách xử lý Form, Ref, và Context như thế nào? (So sánh với React 18)",
+    "interviewerIntent": "Đánh giá mức độ cập nhật công nghệ và khả năng viết code hiện đại, loại bỏ boilerplate cũ.",
+    "contextOrScenario": "Dự án nâng cấp từ React 18 lên React 19, team muốn loại bỏ forwardRef và useContext boilerplate.",
+    "expectedKeywords": [
+      "ref as prop",
+      "forwardref deprecated",
+      "use() hook",
+      "useactionstate",
+      "cleanup ref functions"
+    ],
+    "seniorAnswer": {
+      "summary": "React 19 mang đến 3 nâng cấp vượt bậc: (1) 'ref' giờ đây là prop thông thường, không cần forwardRef(); (2) Hook use() có thể đọc Promise và Context ngay trong câu lệnh điều kiện if; (3) useActionState tự động hóa form submission và pending state.",
+      "deepDive": "Ngoài ra, Ref callback trong React 19 hỗ trợ trả về cleanup function (tương tự useEffect cleanup), giúp việc remove event listeners hoặc destroy 3rd party chart/canvas instances trở nên sạch sẽ và an toàn hơn bao giờ hết.",
+      "codeExample": "// 1. Ref as prop (Không cần forwardRef):\nfunction CustomInput({ placeholder, ref }: { placeholder: string; ref: React.Ref<HTMLInputElement> }) {\n  return <input ref={ref} placeholder={placeholder} />;\n}\n\n// 2. use() trong câu lệnh if:\nfunction ConditionalTheme({ isDark }: { isDark: boolean }) {\n  if (!isDark) return <div>Light</div>;\n  const theme = use(ThemeContext); // ✅ Hợp lệ trong React 19!\n  return <div>{theme.accent}</div>;\n}"
+    },
+    "pitfalls": [
+      "Vẫn tiếp tục bọc component bằng forwardRef trong React 19.",
+      "Nghĩ rằng use() chỉ dùng cho Promise mà không biết nó thay thế hoàn hảo cho useContext."
+    ],
+    "followUpQuestions": [
+      "React Compiler (React Forget) ảnh hưởng thế nào đến việc dùng useMemo và useCallback trong tương lai?"
+    ]
+  }
+]

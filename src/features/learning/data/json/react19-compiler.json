@@ -1,0 +1,209 @@
+{
+  "id": "track-react-19-compiler",
+  "slug": "react-19-compiler-path",
+  "title": "React 19 & React Compiler Track (Modern Path)",
+  "description": "Học React 19 theo phong cách hiện đại: Bật React Compiler tự động memoize, làm chủ các Hook mới: useActionState, useOptimistic, use(), useFormStatus.",
+  "iconName": "Atom",
+  "color": "from-cyan-500 to-blue-600",
+  "totalLessons": 4,
+  "lessons": [
+    {
+      "id": "r19-compiler-01",
+      "slug": "react-compiler-setup-guide",
+      "title": "Cấu hình & Hoạt động của React Compiler",
+      "summary": "Hiểu cách React Compiler tự động hóa 99% việc memoize ngầm, loại bỏ cần thiết của useCallback/useMemo.",
+      "durationMinutes": 12,
+      "level": "intermediate",
+      "tags": ["React 19", "React Compiler", "Performance"],
+      "mentalModel": "React Compiler phân tích cây phụ thuộc ở bước build (AST) và tự động bọc memoization vào mọi biến/hàm mà bạn không cần phải viết code thủ công.",
+      "keyPoints": [
+        "Không cần dùng useCallback hay useMemo thủ công khi React Compiler đã được bật.",
+        "Cần cài đặt babel-plugin-react-compiler và cấu hình experimental.reactCompiler: true trong next.config.mjs.",
+        "Nên cài eslint-plugin-react-compiler để bắt các lỗi vi phạm Rules of React (như mutate state trực tiếp).",
+        "Compiler chỉ hoạt động chuẩn xác nếu code tuân thủ tính thuần khiết (Purity) của React Component."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Cấu hình React Compiler trong Next.js 15",
+          "language": "typescript",
+          "beforeCode": "// ❌ Khi CHƯA bật React Compiler: Phải dùng useMemo/useCallback thủ công\nimport { useMemo, useCallback } from 'react';\n\nexport function List({ items, filter }) {\n  const filtered = useMemo(() => items.filter(filter), [items, filter]);\n  const handleClick = useCallback((id) => console.log(id), []);\n  return <div>...</div>;\n}",
+          "afterCode": "// ✅ Khi ĐÃ BẬT React Compiler trong next.config.mjs:\n// next.config.mjs:\n// export default { experimental: { reactCompiler: true } };\n\n// Code React thuần tự nhiên, Compiler tự động memoize ngầm khi build!\nexport function List({ items, filter }) {\n  const filtered = items.filter(filter);\n  const handleClick = (id) => console.log(id);\n  return <div>...</div>;\n}",
+          "takeaway": "Code ngắn hơn 40%, không lo sót dependency array hay tạo bug stale closure."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-r19-c-1",
+          "question": "React Compiler hoạt động ở giai đoạn nào và mang lại lợi ích gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Chạy ở Runtime trình duyệt, làm tăng dung lượng file JS"
+            },
+            {
+              "key": "B",
+              "text": "Chạy ở Build time (biên dịch mã nguồn), tự động memoize biến/hàm mà không cần viết useCallback/useMemo"
+            },
+            {
+              "key": "C",
+              "text": "Thay thế hoàn toàn Redux bằng LocalStorage"
+            },
+            {
+              "key": "D",
+              "text": "Tự động sửa các lỗi syntax JavaScript"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "React Compiler là một build tool (Babel/SWC plugin) tự động tối ưu memoization ở bước biên dịch."
+        }
+      ]
+    },
+    {
+      "id": "r19-01",
+      "slug": "use-action-state-forms",
+      "title": "Form Handling với useActionState & useFormStatus",
+      "summary": "Xử lý submit form async, pending state và server errors đơn giản không cần useState thủ công.",
+      "durationMinutes": 12,
+      "level": "beginner",
+      "tags": ["React 19", "Forms", "useActionState"],
+      "mentalModel": "useActionState tự động nhận kết quả từ async Action và cập nhật state + pending flag cho form.",
+      "keyPoints": [
+        "useActionState nhận vào (actionFn, initialState) và trả về [state, formAction, isPending].",
+        "useFormStatus đọc trạng thái pending của form cha gần nhất từ component con.",
+        "Hỗ trợ Progressive Enhancement khi kết hợp với HTML form action."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Mẫu xử lý Form Submit với useActionState",
+          "language": "tsx",
+          "afterCode": "'use client';\nimport { useActionState } from 'react';\nimport { useFormStatus } from 'react-dom';\n\nfunction SubmitButton() {\n  const { pending } = useFormStatus();\n  return <button disabled={pending}>{pending ? 'Saving...' : 'Submit'}</button>;\n}\n\nexport function ProfileForm() {\n  const [state, formAction, isPending] = useActionState(\n    async (prev: any, formData: FormData) => {\n      const res = await saveProfile(formData.get('username'));\n      return res;\n    },\n    { error: null }\n  );\n\n  return (\n    <form action={formAction}>\n      <input name=\"username\" required />\n      <SubmitButton />\n      {state.error && <p className=\"error\">{state.error}</p>}\n    </form>\n  );\n}",
+          "takeaway": "Không cần preventDefault(), không cần useState loading flag thủ công."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-r19-01-1",
+          "question": "Hook useFormStatus cần được gọi ở vị trí nào để đọc đúng trạng thái pending của form?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Bên ngoài thẻ <form>"
+            },
+            {
+              "key": "B",
+              "text": "Bên trong một Component con nằm trong thẻ <form>"
+            },
+            {
+              "key": "C",
+              "text": "Trực tiếp trong Server Component"
+            },
+            {
+              "key": "D",
+              "text": "Trong file layout.tsx root"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "useFormStatus hoạt động giống Context reader, phải được gọi từ một component con bọc bên trong thẻ <form>."
+        }
+      ]
+    },
+    {
+      "id": "r19-02",
+      "slug": "use-optimistic-updates",
+      "title": "Optimistic UI với useOptimistic",
+      "summary": "Tối ưu trải nghiệm 0ms latency, hiển thị phản hồi tức thì và tự động rollback khi lỗi.",
+      "durationMinutes": 10,
+      "level": "intermediate",
+      "tags": ["React 19", "Optimistic UI", "UX"],
+      "mentalModel": "useOptimistic tạo state tạm thời trong khi async task đang pending và tự khôi phục về state gốc nếu thất bại.",
+      "keyPoints": [
+        "Chỉ hoạt động trong thời gian Transition hoặc Action đang pending.",
+        "Nhận vào [actualState, updateFn].",
+        "Không cần viết try/catch rollback thủ công phức tạp."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Like Button Optimistic Update",
+          "language": "tsx",
+          "afterCode": "'use client';\nimport { useOptimistic, startTransition } from 'react';\n\nexport function LikeBtn({ likes }: { likes: number }) {\n  const [optLikes, setOptLikes] = useOptimistic(likes, (current, inc: number) => current + inc);\n\n  const handleLike = () => {\n    startTransition(async () => {\n      setOptLikes(1);\n      await updateLikesServerAction();\n    });\n  };\n\n  return <button onClick={handleLike}>❤️ {optLikes}</button>;\n}",
+          "takeaway": "UI nhảy số ngay 0ms, tự động đồng bộ lại khi server hoàn tất."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-r19-02-1",
+          "question": "Khi Server Action bị ngắt hoặc throw error, useOptimistic xử lý giao diện như thế nào?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Giữ nguyên giá trị optimistic mãi mãi"
+            },
+            {
+              "key": "B",
+              "text": "Tự động rollback (khôi phục) về giá trị state thật ban đầu"
+            },
+            {
+              "key": "C",
+              "text": "Xóa toàn bộ DOM của trang"
+            },
+            {
+              "key": "D",
+              "text": "Reload lại trình duyệt"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "React tự động hủy bỏ state tạm thời và vẽ lại UI với state gốc từ server khi action kết thúc hoặc có lỗi."
+        }
+      ]
+    },
+    {
+      "id": "r19-03",
+      "slug": "use-hook-promises-context",
+      "title": "Đọc Promise & Context với use() API",
+      "summary": "Sử dụng use() để đọc Promise/Context linh hoạt bên trong câu lệnh điều kiện if.",
+      "durationMinutes": 10,
+      "level": "intermediate",
+      "tags": ["React 19", "use()", "Suspense"],
+      "mentalModel": "Khác với các Hook truyền thống, use() có thể gọi bên trong câu lệnh conditional branches (if) và loops.",
+      "keyPoints": [
+        "use(Promise) tích hợp trực tiếp với React Suspense.",
+        "use(Context) thay thế useContext và cho phép gọi có điều kiện trong if.",
+        "Promise truyền vào use() nên được tạo từ trước render để tránh lặp vô tận."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Đọc Context trong lệnh IF",
+          "language": "tsx",
+          "afterCode": "'use client';\nimport { use } from 'react';\nimport { ThemeContext } from './theme-context';\n\nexport function Card({ hasCustomTheme }: { hasCustomTheme: boolean }) {\n  if (!hasCustomTheme) return <div>Default Card</div>;\n\n  // ✅ Hợp lệ trong React 19!\n  const theme = use(ThemeContext);\n  return <div className={theme.dark}>Custom Card</div>;\n}",
+          "takeaway": "Linh hoạt tuyệt đối, phá vỡ giới hạn Rules of Hooks cũ."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-r19-03-1",
+          "question": "Điểm khác biệt độc đáo nhất của use() so with useContext là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "use() có thể được gọi bên trong câu lệnh điều kiện if"
+            },
+            {
+              "key": "B",
+              "text": "use() chỉ hoạt động trên thiết bị di động"
+            },
+            {
+              "key": "C",
+              "text": "use() bắt buộc dùng Redux"
+            },
+            {
+              "key": "D",
+              "text": "use() không hỗ trợ TypeScript"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "React 19 cho phép use() được gọi bên trong conditional branches (if), trong khi useContext bắt buộc gọi ở top-level."
+        }
+      ]
+    }
+  ]
+}

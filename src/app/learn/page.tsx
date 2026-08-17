@@ -1,7 +1,13 @@
 import * as React from 'react';
 import type { Metadata } from 'next';
 import { BookOpen, GraduationCap } from 'lucide-react';
-import { MOCK_LEARNING_TRACKS, TrackCard, LearningStats } from '@/features/learning';
+import {
+  MOCK_LEARNING_TRACKS,
+  TrackCard,
+  LearningStats,
+  ApiDemoTester,
+  ErrorBoundaryDemo,
+} from '@/features/learning';
 
 export const metadata: Metadata = {
   title: 'Lộ trình Học React 19 & Next.js 15 App Router | NextPro',
@@ -24,13 +30,24 @@ export default function LearnPage() {
         </h1>
         <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
           Tập trung vào 20% kiến trúc và API cốt lõi được sử dụng trong 80% dự án thực tế.
-          Mỗi bài học tích hợp Mental Model, so sánh Code Recipe và 60s Blitz Quiz.
+          Mỗi bài học tích hợp Mental Model, so sánh Code Recipe, Live API Tester, Error
+          Boundary Simulator và 60s Blitz Quiz.
         </p>
       </section>
 
       {/* Progress Stats Summary */}
       <section>
         <LearningStats />
+      </section>
+
+      {/* Interactive Live API Demo Suite */}
+      <section>
+        <ApiDemoTester />
+      </section>
+
+      {/* React Error Boundary & Resilience Simulator */}
+      <section>
+        <ErrorBoundaryDemo />
       </section>
 
       {/* Tracks Grid */}

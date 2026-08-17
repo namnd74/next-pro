@@ -1,0 +1,111 @@
+{
+  "id": "track-next-architecture-rendering",
+  "slug": "nextjs-architecture-rendering-strategies",
+  "title": "Next.js Architecture & Rendering Strategies (CSR, SSR, SSG, ISR, PPR)",
+  "description": "Thấu suốt ranh giới Client vs Server Code và chọn đúng Chiến lược Rendering (CSR/SSR/SSG/ISR/PPR) cho từng dự án thực tế.",
+  "iconName": "Layers",
+  "color": "from-indigo-500 to-purple-600",
+  "totalLessons": 2,
+  "lessons": [
+    {
+      "id": "na-01",
+      "slug": "client-vs-server-code-execution-model",
+      "title": "Phân tách triệt để Client Code vs Server Code",
+      "summary": "Hiểu sâu cơ chế chạy của Server Component (Node.js/Edge) vs Client Component (\"use client\"), và ranh giới Serialization Boundary.",
+      "durationMinutes": 16,
+      "level": "advanced",
+      "tags": ["Next.js 15", "RSC", "Client Boundary", "Architecture"],
+      "mentalModel": "Server Code chạy 100% trên Server (0 KB client bundle). Client Code bắt đầu bằng SSR HTML trên server và tiếp tục Hydrate chạy JS trên browser.",
+      "keyPoints": [
+        "Server Component: Chạy trên Node.js/Edge server. Có thể đọc trực tiếp DB, đọc process.env.SECRET_KEY. Trả về định dạng RSC Payload stream. 0 KB JS gửi về client.",
+        "Client Component (\"use client\"): Đánh dấu ranh giới module sẽ được đóng gói vào client bundle. VẪN ĐƯỢC render ra HTML ban đầu ở Server (SSR initial request), sau đó được Hydrate trên trình duyệt.",
+        "Serialization Boundary: Dữ liệu truyền qua ranh giới từ Server Component vào Client Component phải Serializable (JSON-compatible: String, Number, Array, Plain Object, Date). KHÔNG ĐƯỢC truyền Function/Class instances (trừ Server Actions)."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Mô hình Phân tách An toàn Server & Client Code",
+          "language": "tsx",
+          "afterCode": "// 1. db-service.ts (Server Only - An toàn tuyệt đối)\nimport 'server-only'; // Ném lỗi build nếu lỡ import vào client!\nimport { db } from '@/lib/db';\n\nexport async function getPrivateUserData(userId: string) {\n  return await db.user.findUnique({ where: { id: userId } });\n}\n\n// 2. UserProfilePage.tsx (Server Component - 0 KB bundle)\nimport { getPrivateUserData } from './db-service';\nimport { ClientAvatarMenu } from './ClientAvatarMenu';\n\nexport default async function UserProfilePage({ params }: { params: { id: string } }) {\n  const user = await getPrivateUserData(params.id);\n  \n  // Dữ liệu truyền xuống ClientAvatarMenu phải serializable!\n  return (\n    <div>\n      <h1>Welcome {user.name}</h1>\n      <ClientAvatarMenu user={{ name: user.name, avatarUrl: user.avatarUrl }} />\n    </div>\n  );\n}",
+          "takeaway": "Giữ 100% logic DB & Secrets an toàn trên Server, chỉ truyền dữ liệu tinh gọn xuống Client."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-na-01-1",
+          "question": "Nếu bạn truyền một hàm JavaScript thông thường (không phải Server Action) từ Server Component xuống Client Component dưới dạng prop, điều gì sẽ xảy ra?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Hàm sẽ chạy bình thường trên browser"
+            },
+            {
+              "key": "B",
+              "text": "Next.js sẽ báo lỗi Serialization Error vì hàm không thể serialize qua RSC Boundary"
+            },
+            {
+              "key": "C",
+              "text": "Next.js tự động chuyển thành API REST"
+            },
+            {
+              "key": "D",
+              "text": "Không có lỗi gì xảy ra"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Props truyền từ Server sang Client Component phải hỗ trợ serialization (JSON-serializable). Hàm thường không thể serialize được trừ khi được đánh dấu \"use server\" (Server Action)."
+        }
+      ]
+    },
+    {
+      "id": "na-02",
+      "slug": "rendering-strategies-csr-ssr-ssg-isr-ppr",
+      "title": "Bản đồ Chiến lược Rendering: CSR vs SSR vs SSG vs ISR vs PPR",
+      "summary": "Phân tích toàn diện khi nào nên dùng CSR, SSR, SSG, ISR và PPR với bảng tiêu chí quyết định chuẩn thực tế.",
+      "durationMinutes": 18,
+      "level": "advanced",
+      "tags": ["CSR", "SSR", "SSG", "ISR", "PPR", "Rendering"],
+      "mentalModel": "Mỗi chiến lược rendering đại diện cho một mốc thời gian và vị trí tạo ra HTML: Build time (SSG/ISR), Per-request (SSR), On-browser (CSR), hay Lai ghép (PPR).",
+      "keyPoints": [
+        "CSR (Client-Side Rendering): HTML trống div id=\"root\", JS fetch API trên browser. Dùng cho: Dashboard quản trị nội bộ, ứng dụng canvas/game, trang riêng tư đằng sau login không cần SEO.",
+        "SSR (Server-Side Rendering): Render HTML mới ở MỌI request người dùng gửi lên. Dùng cho: Trang tin tức/sản phẩm thời gian thực cần SEO tối đa.",
+        "SSG (Static Site Generation): Biến trang thành HTML tĩnh ngay tại Build Time. Tốc độ cực đại CDN. Dùng cho: Trang Landing Page, Blogs, Documentation.",
+        "ISR (Incremental Static Regeneration): Cập nhật trang tĩnh ngầm (stale-while-revalidate) theo chu kỳ revalidate giây mà không cần build lại toàn bộ website. Dùng cho: E-commerce có 100,000 sản phẩm.",
+        "PPR (Partial Prerendering - Next.js 15): Gửi trước Static Shell (SSG) ngay lập tức và stream Dynamic Content (SSR) vào đúng khe Suspense."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Bảng Tiêu chí Chọn Chiến lược Rendering",
+          "language": "typescript",
+          "afterCode": "// 1. SSG (Static - Build Time)\nexport const revalidate = false; // Hoặc fetch(url, { cache: 'force-cache' })\n\n// 2. ISR (Incremental - Revalidate ngầm mỗi 60s)\nexport const revalidate = 60; // Hoặc fetch(url, { next: { revalidate: 60 } })\n\n// 3. SSR (Dynamic - Render mỗi Request)\nexport const dynamic = 'force-dynamic'; // Hoặc fetch(url, { cache: 'no-store' })\n\n// 4. PPR (Partial Prerendering - Mixed Static Shell + Dynamic Stream)\n// next.config.mjs: ppr: 'incremental'\nexport default function Page() {\n  return (\n    <div>\n      <StaticHeader /> {/* SSG Static Shell */}\n      <Suspense fallback={<Skeleton />}>\n        <DynamicFeed /> {/* SSR Streamed Content */}\n      </Suspense>\n    </div>\n  );\n}",
+          "takeaway": "Lựa chọn linh hoạt chiến lược phù hợp theo từng route cụ thể."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-na-02-1",
+          "question": "Bạn đang làm một trang E-commerce có 50,000 sản phẩm. Giá và tồn kho cập nhật mỗi 5 phút. Chiến lược rendering nào tối ưu nhất cho tốc độ CDN và server resources?",
+          "options": [
+            {
+              "key": "A",
+              "text": "CSR (Client-Side Rendering) hoàn toàn"
+            },
+            {
+              "key": "B",
+              "text": "ISR (Incremental Static Regeneration) với revalidate = 300 (5 phút)"
+            },
+            {
+              "key": "C",
+              "text": "Build lại toàn bộ trang web (SSG) mỗi khi có đổi giá"
+            },
+            {
+              "key": "D",
+              "text": "Chỉ dùng HTML tĩnh không có JavaScript"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "ISR là sự lựa chọn số 1 cho e-commerce quy mô lớn: phục vụ trang tĩnh từ CDN với tốc độ tối đa, và tự động làm tươi ngầm sau mỗi 300 giây khi người dùng truy cập."
+        }
+      ]
+    }
+  ]
+}

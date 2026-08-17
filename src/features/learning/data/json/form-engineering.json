@@ -1,0 +1,109 @@
+{
+  "id": "track-form-engineering",
+  "slug": "form-engineering-react-hook-form-zod",
+  "title": "Form Engineering: React Hook Form + Zod & React 19 Actions",
+  "description": "Học cách xây dựng Form quy mô Enterprise: Khi nào dùng React Hook Form + Zod, khi nào dùng React 19 Form Actions.",
+  "iconName": "Layers",
+  "color": "from-emerald-500 to-teal-600",
+  "totalLessons": 2,
+  "lessons": [
+    {
+      "id": "fe-01",
+      "slug": "react-hook-form-zod-integration",
+      "title": "Khi nào dùng Thư viện Form? React Hook Form + Zod Schema",
+      "summary": "Tối ưu form phức tạp nhiều trường với React Hook Form, Zod type safety và zero re-render.",
+      "durationMinutes": 16,
+      "level": "intermediate",
+      "tags": ["React Hook Form", "Zod", "Validation", "Forms"],
+      "mentalModel": "React Hook Form sử dụng Uncontrolled Inputs ngầm với Ref Subscription để loại bỏ hoàn toàn re-render khi gõ phím.",
+      "keyPoints": [
+        "Dùng React Hook Form + Zod khi: Form phức tạp (15+ fields), dynamic field arrays, wizard forms nhiều bước, client-side realtime validation.",
+        "Zod cung cấp Schema Validation 2 chiều (Infer TypeScript Type trực tiếp từ Schema).",
+        "Sử dụng resolver: zodResolver(schema) để tự động hóa lỗi validation."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Mẫu React Hook Form + Zod Schema chuẩn Enterprise",
+          "language": "tsx",
+          "afterCode": "'use client';\nimport { useForm } from 'react-hook-form';\nimport { zodResolver } from '@hookform/resolvers/zod';\nimport { z } from 'zod';\n\nconst RegisterSchema = z.object({\n  email: z.string().email('Email không hợp lệ'),\n  password: z.string().min(8, 'Mật khẩu phải từ 8 ký tự'),\n  confirmPassword: z.string(),\n}).refine((data) => data.password === data.confirmPassword, {\n  message: 'Mật khẩu nhập lại không khớp',\n  path: ['confirmPassword'],\n});\n\ntype RegisterFormData = z.infer<typeof RegisterSchema>;\n\nexport function RegisterForm() {\n  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterFormData>({\n    resolver: zodResolver(RegisterSchema),\n  });\n\n  const onSubmit = async (data: RegisterFormData) => {\n    await apiRegister(data);\n  };\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)} className=\"space-y-4\">\n      <div>\n        <input {...register('email')} placeholder=\"Email\" />\n        {errors.email && <p className=\"text-red-500\">{errors.email.message}</p>}\n      </div>\n      <button disabled={isSubmitting}>{isSubmitting ? 'Loading...' : 'Register'}</button>\n    </form>\n  );\n}",
+          "takeaway": "Performance 0ms delay, type safety tuyệt đối từ Zod schema."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-fe-01-1",
+          "question": "Lợi ích lớn nhất khi sử dụng zodResolver với React Hook Form là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Tự động tạo database SQL"
+            },
+            {
+              "key": "B",
+              "text": "Tự động đồng bộ rules validation giữa Client & Server, infer TypeScript types từ Schema"
+            },
+            {
+              "key": "C",
+              "text": "Tự động mã hóa mật khẩu thành MD5"
+            },
+            {
+              "key": "D",
+              "text": "Bắt buộc tất cả inputs phải là số"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Zod Schema đóng vai trò Single Source of Truth cho cả Validation Logic và TypeScript Type Definition."
+        }
+      ]
+    },
+    {
+      "id": "fe-02",
+      "slug": "react-19-server-actions-forms",
+      "title": "Fullstack Next.js 15 Server Actions & Form Validation",
+      "summary": "Xây dựng Form Fullstack bảo mật tuyệt đối với Server Actions và Progressive Enhancement.",
+      "durationMinutes": 15,
+      "level": "advanced",
+      "tags": ["Next.js 15", "Server Actions", "Fullstack Forms"],
+      "mentalModel": "Server Action biến form submit thành HTTP POST RPC an toàn, chạy 100% trên server Node.js.",
+      "keyPoints": [
+        "Khai báo \"use server\" trong Server Action để xử lý data.",
+        "Luôn parse FormData và validate lại bằng Zod trên Server trước khi ghi vào Database.",
+        "Trả về mảng errors theo field để Client hiển thị lỗi chuẩn xác."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Server Action Form Validation Recipe",
+          "language": "typescript",
+          "afterCode": "'use server';\nimport { z } from 'zod';\nimport { db } from '@/lib/db';\n\nconst ProfileSchema = z.object({\n  bio: z.string().max(200, 'Bio tối đa 200 ký tự'),\n});\n\nexport async function updateBioAction(prevState: any, formData: FormData) {\n  const validated = ProfileSchema.safeParse({\n    bio: formData.get('bio'),\n  });\n\n  if (!validated.success) {\n    return { success: false, errors: validated.error.flatten().fieldErrors };\n  }\n\n  await db.user.update({ data: validated.data });\n  return { success: true, errors: null };\n}",
+          "takeaway": "An toàn trước injection, bảo mật thông tin nhạy cảm trên Server."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-fe-02-1",
+          "question": "Tại sao bắt buộc phải validate dữ liệu bằng Zod trên Server Action ngay cả khi đã validate ở Client Form?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Vì client validation có thể bị bỏ qua (bypass) bằng cách sửa code JS hoặc gửi HTTP request trực tiếp qua Postman"
+            },
+            {
+              "key": "B",
+              "text": "Vì Server Action không nhận được dữ liệu từ client"
+            },
+            {
+              "key": "C",
+              "text": "Bắt buộc bởi trình duyệt Chrome"
+            },
+            {
+              "key": "D",
+              "text": "Để làm tăng kích thước file JS"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Nguyên tắc \"Never Trust Client Input\": Client validation chỉ để phục vụ UX, Server validation mới là bức tường bảo vệ dữ liệu thực sự."
+        }
+      ]
+    }
+  ]
+}

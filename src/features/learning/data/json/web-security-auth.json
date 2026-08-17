@@ -1,0 +1,111 @@
+{
+  "id": "track-web-security-auth",
+  "slug": "web-security-and-auth-masterclass",
+  "title": "Web Security & Enterprise Auth Architecture",
+  "description": "Làm chủ Authentication/Authorization, JWT Access Token vs Refresh Token, HttpOnly Cookies, XSS, CSRF, CORS & CSP.",
+  "iconName": "Zap",
+  "color": "from-purple-500 to-indigo-600",
+  "totalLessons": 2,
+  "lessons": [
+    {
+      "id": "ws-01",
+      "slug": "auth-jwt-refresh-tokens-httponly-cookies",
+      "title": "Chuyên sâu Auth: Access Token, Refresh Token & HttpOnly Cookies",
+      "summary": "Tách biệt Authentication vs Authorization, Refresh Token Rotation và giải quyết Race Condition khi 10 API cùng 401.",
+      "durationMinutes": 20,
+      "level": "advanced",
+      "tags": ["Authentication", "JWT", "Cookies", "Security", "Next.js 15"],
+      "mentalModel": "HttpOnly Cookie ngăn JavaScript client đọc token (chống XSS). Khi 10 API cùng bị 401, dùng Mutex Lock / Failed Queue để chỉ gửi 1 request Refresh duy nhất.",
+      "keyPoints": [
+        "Authentication (Xác thực): Ai đang đăng nhập? Authorization (Phân quyền): Người dùng có quyền truy cập tài nguyên này không?",
+        "Lưu JWT trong LocalStorage = Nguy hiểm chết người do XSS (bất kỳ 3rd party script hoặc XSS attack nào cũng đọc được localStorage.getItem(\"token\")).",
+        "Lưu JWT trong HttpOnly SameSite Secure Cookie = Trình duyệt tự động gửi cookie ngầm, JavaScript client KHÔNG THỂ truy cập token.",
+        "Xử lý 10 API cùng bị 401: Dùng biến cờ isRefreshing và hàng chờ failedQueue (Promise Queue). Chỉ API đầu tiên kích hoạt POST /api/refresh. 9 API theo sau xếp hàng chờ rồi retry đồng loạt với Token mới!"
+      ],
+      "codeRecipes": [
+        {
+          "title": "Mẫu Axios / Fetch Interceptor giải quyết 10 API cùng bị 401 (Mutex Lock)",
+          "language": "typescript",
+          "afterCode": "// Axios Interceptor: Xử lý 10 API bị 401 đồng thời (Zero Race Condition!)\nlet isRefreshing = false;\nlet failedQueue: Array<{ resolve: (token: string) => void; reject: (err: any) => void }> = [];\n\nconst processQueue = (error: any, token: string | null = null) => {\n  failedQueue.forEach((promise) => {\n    if (error) promise.reject(error);\n    else promise.resolve(token!);\n  });\n  failedQueue = [];\n};\n\naxiosInstance.interceptors.response.use(\n  (response) => response,\n  async (error) => {\n    const originalRequest = error.config;\n\n    if (error.response?.status === 401 && !originalRequest._retry) {\n      if (isRefreshing) {\n        // 🛑 9 API sau xếp hàng chờ, KHÔNG GỬI request refresh mới!\n        return new Promise((resolve, reject) => {\n          failedQueue.push({ resolve, reject });\n        }).then((newToken) => {\n          originalRequest.headers.Authorization = 'Bearer ' + newToken;\n          return axiosInstance(originalRequest);\n        });\n      }\n\n      originalRequest._retry = true;\n      isRefreshing = true;\n\n      try {\n        // 🚀 Chỉ API đầu tiên gửi 1 request Refresh duy nhất!\n        const { data } = await axios.post('/api/auth/refresh-token');\n        const newToken = data.accessToken;\n        processQueue(null, newToken); // Re-try 9 API còn lại!\n        originalRequest.headers.Authorization = 'Bearer ' + newToken;\n        return axiosInstance(originalRequest);\n      } catch (refreshErr) {\n        processQueue(refreshErr, null);\n        window.location.href = '/login'; // Refresh lỗi ➔ Logout\n        return Promise.reject(refreshErr);\n      } finally {\n        isRefreshing = false;\n      }\n    }\n    return Promise.reject(error);\n  }\n);",
+          "takeaway": "Giải pháp chuẩn 100% Enterprise: Tránh rò rỉ token, tránh spam server và tránh bị logout vô lý."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-ws-01-1",
+          "question": "Nếu 10 API cùng bị 401 mà KHÔNG dùng Mutex Lock / Queue, điều gì nguy hiểm nhất sẽ xảy ra khi Server có bật Refresh Token Rotation?",
+          "options": [
+            {
+              "key": "A",
+              "text": "10 request refresh gửi lên cùng lúc ➔ Request thứ 2 dùng phải Refresh Token đã bị thu hồi ở request 1 ➔ Server coi là token bị đánh cắp và KHÓA TOÀN BỘ SESSION của user!"
+            },
+            {
+              "key": "B",
+              "text": "Trình duyệt tự động tắt máy tính"
+            },
+            {
+              "key": "C",
+              "text": "File JS bị phồng dung lượng lên 10MB"
+            },
+            {
+              "key": "D",
+              "text": "Không có ảnh hưởng gì"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Khi Server xoay vòng Refresh Token (Rotation), Refresh Token cũ lập tức bị vô hiệu hóa. Nếu 10 request cùng gửi Refresh Token cũ đó, Server sẽ báo động an toàn và đăng xuất user ngay lập tức."
+        }
+      ]
+    },
+    {
+      "id": "ws-02",
+      "slug": "fullstack-web-security-xss-csrf-csp-cors",
+      "title": "Bản đồ Bảo mật Web: XSS, CSRF, CORS & CSP",
+      "summary": "Hiểu nguyên lý hoạt động và giải pháp phòng chống các cuộc tấn công phổ biến nhất trên ứng dụng Web.",
+      "durationMinutes": 18,
+      "level": "advanced",
+      "tags": ["Security", "XSS", "CSRF", "CORS", "CSP"],
+      "mentalModel": "Bảo mật Web tuân theo nguyên tắc \"Defense in Depth\" (Phòng thủ nhiều lớp): Escaping HTML + HttpOnly Cookie + Content Security Policy + CORS Rules.",
+      "keyPoints": [
+        "XSS (Cross-Site Scripting): Mã độc JS bị chèn vào trang. Phòng tránh: Auto-escaping của React, tránh dangerouslySetInnerHTML, dùng HttpOnly Cookies, bật CSP header.",
+        "CSRF (Cross-Site Request Forgery): Kẻ tấn công lừa nạn nhân gửi HTTP request trái phép. Phòng tránh: Cookie SameSite=Lax/Strict, Anti-CSRF Token.",
+        "CORS (Cross-Origin Resource Sharing): Cơ chế trình duyệt chặn API request từ Domain khác. Cấu hình Access-Control-Allow-Origin chính xác trên Server.",
+        "CSP (Content Security Policy): HTTP header quy định các nguồn domain được phép tải JS/CSS/Images. Giảm 90% tác hại của XSS."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Cấu hình Security Headers trong next.config.mjs",
+          "language": "typescript",
+          "afterCode": "// next.config.mjs\nconst securityHeaders = [\n  { key: 'X-DNS-Prefetch-Control', value: 'on' },\n  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },\n  { key: 'X-Frame-Options', value: 'DENY' }, // Chống Clickjacking\n  { key: 'X-Content-Type-Options', value: 'nosniff' },\n  { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },\n];\n\nexport default {\n  async headers() {\n    return [{ source: '/:path*', headers: securityHeaders }];\n  },\n};",
+          "takeaway": "Bảo vệ ứng dụng toàn diện khỏi Clickjacking, MIME sniffing và Man-in-the-middle attacks."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-ws-02-1",
+          "question": "Thuộc tính SameSite=\"Lax\" hoặc \"Strict\" của Cookie giúp ngăn chặn cuộc tấn công bảo mật nào?",
+          "options": [
+            {
+              "key": "A",
+              "text": "SQL Injection"
+            },
+            {
+              "key": "B",
+              "text": "CSRF (Cross-Site Request Forgery)"
+            },
+            {
+              "key": "C",
+              "text": "DDoS attack"
+            },
+            {
+              "key": "D",
+              "text": "Memory leak"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "SameSite ngăn trình duyệt tự động gửi cookie khi request xuất phát từ một trang web của bên thứ 3 (cross-site), triệt hạ bản chất của tấn công CSRF."
+        }
+      ]
+    }
+  ]
+}

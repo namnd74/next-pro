@@ -1,0 +1,212 @@
+{
+  "id": "track-standard-react-forms",
+  "slug": "standard-react-form-architecture",
+  "title": "Standard React & Form Architecture Track (Classic Path)",
+  "description": "Lộ trình tiêu chuẩn (Không Compiler): Tối ưu memoization thủ công (useMemo/useCallback), Chuyên sâu Controlled vs Uncontrolled Forms, Custom Component và React Error Boundary.",
+  "iconName": "Code",
+  "color": "from-amber-500 to-orange-600",
+  "totalLessons": 4,
+  "lessons": [
+    {
+      "id": "sr-01",
+      "slug": "manual-memoization-usememo-usecallback",
+      "title": "Tối ưu Memoization thủ công: useMemo & useCallback",
+      "summary": "Khi không có Compiler, học cách dùng useMemo, useCallback và React.memo chuẩn xác để tránh re-render thừa.",
+      "durationMinutes": 15,
+      "level": "intermediate",
+      "tags": ["React Standard", "useMemo", "useCallback", "Performance"],
+      "mentalModel": "Mỗi lần Parent re-render, mọi function literal () => {} đều tạo ra tham chiếu mới. useCallback giữ nguyên tham chiếu giữa các lần render.",
+      "keyPoints": [
+        "Dùng useMemo cho các tính toán nặng (expensive computations) hoặc giữ tham chiếu Object/Array.",
+        "Dùng useCallback giữ tham chiếu callback function khi truyền xuống Component con bọc React.memo.",
+        "Luôn khai báo đúng và đủ mảng dependency array để tránh bug Stale Closure."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Mẫu Tối ưu Re-render cho Danh Sách Nặng",
+          "language": "tsx",
+          "beforeCode": "// ❌ Re-render toàn bộ 1000 items mỗi khi count thay đổi\nfunction Parent() {\n  const [count, setCount] = useState(0);\n  const handleSelect = (id) => console.log(id); // Tham chiếu mới mỗi render!\n  return <ChildList onSelect={handleSelect} />;\n}",
+          "afterCode": "// ✅ Tối ưu chuẩn với useCallback + React.memo\nconst ChildList = React.memo(function ChildList({ onSelect }) {\n  return <div>{/* Render 1000 items */}</div>;\n});\n\nfunction Parent() {\n  const [count, setCount] = useState(0);\n  const handleSelect = useCallback((id) => console.log(id), []);\n  return <ChildList onSelect={handleSelect} />;\n}",
+          "takeaway": "ChildList chỉ re-render khi props thực sự thay đổi, bảo vệ Main Thread."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-sr-01-1",
+          "question": "Điều kiện để useCallback thực sự ngăn được Component con re-render là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Component con cũng phải được bọc trong React.memo"
+            },
+            {
+              "key": "B",
+              "text": "Chỉ cần dùng useCallback ở Component cha là đủ"
+            },
+            {
+              "key": "C",
+              "text": "Phải dùng với Redux"
+            },
+            {
+              "key": "D",
+              "text": "Phải truyền dependency array rỗng []"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Nếu Component con không bọc React.memo, nó vẫn sẽ re-render theo Component cha bất kể prop function có được bọc useCallback hay không."
+        }
+      ]
+    },
+    {
+      "id": "sr-02",
+      "slug": "controlled-vs-uncontrolled-forms-deep-dive",
+      "title": "Chuyên sâu Form: Controlled vs Uncontrolled Components",
+      "summary": "Phân tích ưu/nhược điểm, khi nào dùng useRef vs useState và các bế tắc (Issues) của Form truyền thống.",
+      "durationMinutes": 18,
+      "level": "intermediate",
+      "tags": ["Forms", "Controlled", "Uncontrolled", "useRef"],
+      "mentalModel": "Controlled Form = React giữ quyền kiểm soát State ở từng keystroke. Uncontrolled Form = Trình duyệt (DOM) giữ quyền kiểm soát value, React chỉ đọc qua useRef.",
+      "keyPoints": [
+        "Controlled Component (useState + onChange): Phù hợp cho realtime input validation, dynamic field masking, dependent inputs. Nhược điểm: Re-render component ở MỌI phím gõ.",
+        "Uncontrolled Component (useRef + FormData): Phù hợp cho Form lớn (50-100 inputs), tối ưu hiệu năng 0 re-render khi gõ phím. Nhược điểm: Khó làm live validation realtime.",
+        "Bế tắc của Form truyền thống: (1) Form lớn 100 inputs bị giật lag re-render; (2) Xử lý pending status thủ công tốn code; (3) Server validation error mapping phức tạp; (4) Không có JS thì form hỏng.",
+        "Giải pháp React 19: Dùng Form Actions + useActionState kết hợp ưu điểm của cả 2 mô hình!"
+      ],
+      "codeRecipes": [
+        {
+          "title": "So sánh Controlled vs Uncontrolled Form",
+          "language": "tsx",
+          "beforeCode": "// 🔴 Controlled Form: Re-render ở MỌI phím gõ (100 inputs = giật lag)\nfunction ControlledForm() {\n  const [email, setEmail] = useState('');\n  return <input value={email} onChange={e => setEmail(e.target.value)} />;\n}",
+          "afterCode": "// 🟢 Uncontrolled Form: Zero re-render khi gõ phím!\nfunction UncontrolledForm() {\n  const formRef = useRef<HTMLFormElement>(null);\n  \n  const handleSubmit = (e: React.FormEvent) => {\n    e.preventDefault();\n    const formData = new FormData(formRef.current!);\n    console.log(formData.get('email')); // Đọc trực tiếp từ DOM!\n  };\n\n  return (\n    <form ref={formRef} onSubmit={handleSubmit}>\n      <input name=\"email\" defaultValue=\"\" />\n      <button type=\"submit\">Submit</button>\n    </form>\n  );\n}",
+          "takeaway": "Uncontrolled Form cho hiệu năng vượt trội với form nhiều trường dữ liệu."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-sr-02-1",
+          "question": "Nhược điểm lớn nhất của Controlled Form (useState ở từng onChange) khi xử lý Form cỡ lớn (trên 50 inputs) là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Không gửi được dữ liệu lên Server"
+            },
+            {
+              "key": "B",
+              "text": "Gây ra re-render toàn bộ component ở mỗi phím gõ (keystroke), làm đơ bàn phím và giảm chỉ số INP"
+            },
+            {
+              "key": "C",
+              "text": "Không hỗ trợ thẻ <input type=\"text\">"
+            },
+            {
+              "key": "D",
+              "text": "Không dùng được với Tailwind CSS"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Mỗi lần người dùng gõ 1 ký tự, setState lại trigger re-render toàn bộ cây component, gây lãng phí CPU khổng lồ trên thiết bị yếu."
+        }
+      ]
+    },
+    {
+      "id": "sr-03",
+      "slug": "custom-component-architecture-typescript",
+      "title": "Quy chuẩn Viết Custom Component & Typescript (Enterprise)",
+      "summary": "Hướng dẫn đặt tên Component/Files và quy tắc khi nào chọn `type` vs `interface` cho Props.",
+      "durationMinutes": 15,
+      "level": "intermediate",
+      "tags": ["TypeScript", "Component Design", "Best Practices"],
+      "mentalModel": "Thiết kế Component chuẩn: Tên thể hiện đúng trách nhiệm, Props rõ ràng mã hóa Type/Interface và hỗ trợ mở rộng.",
+      "keyPoints": [
+        "Đặt tên Component: Dùng tên ngắn gọn trực diện như `Button` (trong `src/components/ui/button.tsx`), KHÔNG dùng tiền tố `Custom` thừa thãi.",
+        "Dùng `interface` khi: Định nghĩa Object shapes cần mở rộng (extends) hoặc Declaration Merging (Component Props cho UI Library).",
+        "Dùng `type` khi: Định nghĩa Union types (\"sm\" | \"md\" | \"lg\"), Discriminated Unions (Status = Success | Error), Tuples, Primitives hoặc Mapped types."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Quy chuẩn Props: Type vs Interface",
+          "language": "typescript",
+          "afterCode": "// 1. Dùng Type cho Union Options (Discriminated Union)\nexport type ButtonVariant = 'primary' | 'secondary' | 'outline';\nexport type ButtonSize = 'sm' | 'md' | 'lg';\n\n// 2. Dùng Interface cho Props chính (Extensible)\nexport interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {\n  variant?: ButtonVariant;\n  size?: ButtonSize;\n  isLoading?: boolean;\n}\n\n// 3. Component chuẩn Enterprise (Tên súc tích, không thêm tiền tố 'Custom' thừa)\nexport function Button({\n  variant = 'primary',\n  size = 'md',\n  isLoading = false,\n  children,\n  onClick,\n  ...restProps\n}: ButtonProps) {\n  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {\n    if (isLoading) return;\n    onClick?.(e);\n  };\n\n  return (\n    <button onClick={handleClick} disabled={isLoading} {...restProps}>\n      {isLoading ? <span>Loading...</span> : children}\n    </button>\n  );\n}",
+          "takeaway": "Kết hợp hoàn hảo giữa `type` cho Union giá trị và `interface` cho Props kế thừa HTML."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-sr-03-1",
+          "question": "Trong trường hợp nào sau đây bạn BẮT BUỘC phải dùng `type` thay vì `interface` trong TypeScript?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Khi định nghĩa Props kế thừa từ React.HTMLAttributes"
+            },
+            {
+              "key": "B",
+              "text": "Khi định nghĩa Union Types (ví dụ: type Status = \"idle\" | \"loading\" | \"success\")"
+            },
+            {
+              "key": "C",
+              "text": "Khi tạo một React Server Component"
+            },
+            {
+              "key": "D",
+              "text": "Khi khai báo một async function"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "`interface` chỉ có thể biểu diễn hình dạng Object, không thể biểu diễn trực tiếp Union types (`A | B`). Do đó bắt buộc dùng `type`."
+        }
+      ]
+    },
+    {
+      "id": "sr-04",
+      "slug": "react-error-boundary-nextjs-error-tsx",
+      "title": "Khoanh vùng lỗi với React Error Boundary & Next.js 15 error.tsx",
+      "summary": "Ngăn ngừa White Screen of Death (WSOD), bắt Unhandled Render Errors và khôi phục giao diện mượt mà với reset().",
+      "durationMinutes": 18,
+      "level": "advanced",
+      "tags": ["React Error Boundary", "Next.js 15", "error.tsx", "Resilience"],
+      "mentalModel": "Error Boundary đóng vai trò như cầu chì bảo vệ điện: khi 1 bóng đèn (component con) bị chập cháy, cầu chì ngắt điện khoanh vùng tại chỗ mà KHÔNG làm sập điện toàn bộ tòa nhà.",
+      "keyPoints": [
+        "Tại sao cần Error Boundary: Nếu không có Error Boundary, 1 lỗi JavaScript nhỏ khi render ở component con sẽ khiến React gỡ toàn bộ cây DOM, biến toàn bộ trang web thành màn hình trắng (White Screen of Death).",
+        "React Class Component Error Boundary: Bắt buộc dùng Class Component với static getDerivedStateFromError(error) và componentDidCatch(error, info) (hoặc thư viện react-error-boundary).",
+        "Next.js 15 App Router error.tsx: Tự động bọc route segment trong 1 Client Error Boundary ngầm. Nhận vào props { error, reset } để thử render lại mà không cần reload trang.",
+        "Phạm vi BẮT ĐƯỢC lỗi: Lỗi xảy ra trong khi Render, Lỗi trong Lifecycle methods, Lỗi trong Constructors của cây component con.",
+        "Phạm vi KHÔNG BẮT ĐƯỢC lỗi: Lỗi trong Event Handlers (onClick - dùng try/catch), Lỗi trong mã Asynchronous (setTimeout, requestAnimationFrame), Lỗi phía Server (Server Actions)."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Next.js 15 App Router error.tsx & Custom Class Error Boundary",
+          "language": "tsx",
+          "afterCode": "// 1. app/dashboard/error.tsx (Next.js 15 Client Error Boundary)\n'use client';\nimport { useEffect } from 'react';\n\nexport default function Error({\n  error,\n  reset,\n}: {\n  error: Error & { digest?: string };\n  reset: () => void;\n}) {\n  useEffect(() => {\n    // Gửi log lỗi lên Sentry / LogRocket\n    console.error('Unhandled Route Error:', error);\n  }, [error]);\n\n  return (\n    <div className=\"p-6 rounded-xl border border-red-500/30 bg-red-500/10 space-y-4\">\n      <h2 className=\"text-sm font-bold text-red-400\">⚠️ Đã xảy ra lỗi ở phân hệ này!</h2>\n      <p className=\"text-xs text-muted-foreground\">{error.message}</p>\n      <button onClick={() => reset()} className=\"px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg\">\n        Thử khôi phục (Reset)\n      </button>\n    </div>\n  );\n}",
+          "takeaway": "Khoanh vùng sự cố tại route segment, giữ cho Navigation Bar và Layout chung hoạt động 100%."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-sr-04-1",
+          "question": "Trường hợp lỗi nào sau đây KHÔNG THỂ bắt được bởi React Error Boundary?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Lỗi ném ra trong hàm xử lý sự kiện onClick (Event Handler)"
+            },
+            {
+              "key": "B",
+              "text": "Lỗi ném ra trong quá trình Render JSX của component con"
+            },
+            {
+              "key": "C",
+              "text": "Lỗi trong phương thức constructor của component con"
+            },
+            {
+              "key": "D",
+              "text": "Lỗi trong componentDidMount"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Event Handlers (như onClick) chạy ngoài luồng Render phase của React, do đó Error Boundary không bắt được. Cần dùng khối try/catch thông thường bên trong Event Handler."
+        }
+      ]
+    }
+  ]
+}

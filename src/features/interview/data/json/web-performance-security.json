@@ -1,0 +1,55 @@
+[
+  {
+    "id": "int-09",
+    "category": "performance-optimization",
+    "level": "senior",
+    "question": "INP (Interaction to Next Paint) là gì? Làm thế nào để tối ưu INP trong ứng dụng React 19 / Next.js?",
+    "interviewerIntent": "Kiểm tra kiến thức về Core Web Vitals mới (INP thay thế FID từ 2024) và cách tối ưu main thread responsiveness.",
+    "contextOrScenario": "Google Search Console báo trang web bị 'Poor INP' (>500ms) khi người dùng gõ vào ô tìm kiếm hoặc click vào filter.",
+    "expectedKeywords": [
+      "interaction to next paint",
+      "main thread blocking",
+      "starttransition",
+      "usetransition",
+      "long task (>50ms)",
+      "web workers"
+    ],
+    "seniorAnswer": {
+      "summary": "INP đo lường độ trễ từ lúc người dùng tương tác (click, gõ phím) đến khi khung hình tiếp theo được vẽ lên màn hình. Tối ưu bằng cách bọc các state update nặng trong startTransition, chia nhỏ Long Tasks, và giảm kích thước JavaScript hydration.",
+      "deepDive": "startTransition đánh dấu update là non-urgent (độ ưu tiên thấp). React sẽ cho phép trình duyệt ngắt (interrupt) quá trình render để phản hồi ngay các input của user, tránh làm đơ UI. Kết hợp với RSC để giảm tải JS hydration trên Main Thread.",
+      "codeExample": "const [isPending, startTransition] = useTransition();\n\nconst handleFilterChange = (value: string) => {\n  // Input phản hồi tức thì:\n  setText(value);\n\n  // Lọc 10,000 items được xếp vào transition (không block main thread):\n  startTransition(() => {\n    setFilteredList(hugeList.filter(item => item.includes(value)));\n  });\n};"
+    },
+    "pitfalls": [
+      "Nhầm lẫn INP với LCP hoặc FID.",
+      "Sử dụng setTimeout để hoãn tác vụ thay vì dùng useTransition chuẩn của React."
+    ],
+    "followUpQuestions": ["useDeferredValue khác gì so với useTransition trong React?"]
+  },
+  {
+    "id": "int-03",
+    "category": "performance-optimization",
+    "level": "senior",
+    "question": "Làm thế nào để phát hiện và ngăn chặn hiện tượng Waterfall Data Fetching trong Next.js App Router?",
+    "interviewerIntent": "Kiểm tra tư duy tối ưu hiệu năng I/O, sử dụng Promise.all, React Suspense và Parallel Data Fetching.",
+    "contextOrScenario": "Một trang Dashboard gọi 3 API tuần tự: User Profile (300ms) -> Recent Orders (400ms) -> Notifications (300ms), khiến tổng thời gian chờ lên tới 1000ms.",
+    "expectedKeywords": [
+      "waterfall",
+      "promise.all",
+      "parallel data fetching",
+      "suspense streaming",
+      "independent components"
+    ],
+    "seniorAnswer": {
+      "summary": "Waterfall xảy ra khi các async await bị lồng tuần tự. Khắc phục bằng 2 cách: (1) Gọi song song với Promise.all nếu data phụ thuộc cùng cấp, hoặc (2) Tách thành các Server Components độc lập được bọc bởi React Suspense để stream song song.",
+      "deepDive": "Cách tốt nhất trong App Router là di chuyển data fetching xuống component lá gần nơi sử dụng nhất (Colocate data fetching) và bọc mỗi component bằng <Suspense fallback={<Skeleton />}>. Next.js sẽ kích hoạt fetch song song đồng thời và stream UI từng phần về client ngay khi xong.",
+      "codeExample": "// ✅ Cách 1: Parallel Fetching\nconst [user, orders] = await Promise.all([getUser(), getOrders()]);\n\n// ✅ Cách 2: Colocated Streaming Suspense (Tối ưu nhất)\nexport default function Dashboard() {\n  return (\n    <div>\n      <Suspense fallback={<UserSkeleton />}><UserProfile /></Suspense>\n      <Suspense fallback={<OrdersSkeleton />}><RecentOrders /></Suspense>\n    </div>\n  );\n}"
+    },
+    "pitfalls": [
+      "Gộp tất cả data fetching lên root page rồi await tuần tự từng hàm.",
+      "Không phân biệt được khi nào dữ liệu có phụ thuộc nhau (dependent fetch) và khi nào độc lập."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để deduplicate (chống gọi API trùng lặp) khi nhiều Server Component cùng gọi 1 hàm fetch trong cùng 1 request?"
+    ]
+  }
+]

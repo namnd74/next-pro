@@ -4,6 +4,7 @@ export type InterviewCategory =
   | 'all'
   | 'react-19'
   | 'next-app-router'
+  | 'javascript-typescript'
   | 'state-data'
   | 'performance-optimization'
   | 'frontend-system-design';

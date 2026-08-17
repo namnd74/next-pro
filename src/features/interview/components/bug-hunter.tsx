@@ -1,20 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Bug,
-  Lightbulb,
-  CheckCircle2,
-  Eye,
-  Check,
-  AlertTriangle,
-  Copy,
-} from 'lucide-react';
+import { Bug, Lightbulb, CheckCircle2, Eye, Check, AlertTriangle } from 'lucide-react';
 import { BugHuntChallenge } from '../types';
 import { useInterviewStore } from '../stores/use-interview-store';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CodeBlock } from '@/components/ui/code-block';
 
 interface BugHunterProps {
   challenges: BugHuntChallenge[];
@@ -26,16 +19,9 @@ export function BugHunter({ challenges }: BugHunterProps) {
   const [activeChallengeIndex, setActiveChallengeIndex] = React.useState(0);
   const [showHints, setShowHints] = React.useState(false);
   const [showSolution, setShowSolution] = React.useState(false);
-  const [copied, setCopied] = React.useState(false);
 
   const activeChallenge = challenges[activeChallengeIndex] || challenges[0];
   const isSolved = completedBugHuntIds.includes(activeChallenge.id);
-
-  const handleCopy = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div className="space-y-6">
@@ -129,9 +115,7 @@ export function BugHunter({ challenges }: BugHunterProps) {
             </span>
           </div>
 
-          <pre className="overflow-x-auto rounded-xl border border-destructive/30 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100 dark:bg-black/70">
-            <code>{activeChallenge.buggyCode}</code>
-          </pre>
+          <CodeBlock code={activeChallenge.buggyCode} language="tsx" />
         </div>
 
         {/* Hints Toggle */}
@@ -196,27 +180,10 @@ export function BugHunter({ challenges }: BugHunterProps) {
             </div>
 
             <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-foreground">
-                  Mã nguồn đã được refactor chuẩn:
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(activeChallenge.fixedCode)}
-                  className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/80 p-1.5 text-xs text-slate-300 transition-colors hover:bg-slate-700"
-                >
-                  {copied ? (
-                    <Check className="h-3 w-3 text-emerald-400" />
-                  ) : (
-                    <Copy className="h-3 w-3" />
-                  )}
-                  <span className="text-[10px]">{copied ? 'Copied' : 'Copy Fix'}</span>
-                </button>
-              </div>
-
-              <pre className="overflow-x-auto rounded-xl border border-emerald-500/30 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100 dark:bg-black/70">
-                <code>{activeChallenge.fixedCode}</code>
-              </pre>
+              <span className="text-xs font-bold text-foreground">
+                Mã nguồn đã được refactor chuẩn:
+              </span>
+              <CodeBlock code={activeChallenge.fixedCode} language="tsx" />
             </div>
           </div>
         )}

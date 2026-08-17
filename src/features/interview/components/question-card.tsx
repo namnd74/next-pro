@@ -8,8 +8,6 @@ import {
   Sparkles,
   AlertTriangle,
   HelpCircle,
-  Copy,
-  Check,
 } from 'lucide-react';
 import { InterviewQuestion } from '../types';
 import { useInterviewStore } from '../stores/use-interview-store';
@@ -17,6 +15,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { CodeBlock } from '@/components/ui/code-block';
 
 interface QuestionCardProps {
   question: InterviewQuestion;
@@ -40,16 +39,8 @@ function getLevelBadgeVariant(level: string) {
 export function QuestionCard({ question }: QuestionCardProps) {
   const { bookmarkedQuestionIds, toggleBookmark } = useInterviewStore();
   const [isExpanded, setIsExpanded] = React.useState(false);
-  const [isCopied, setIsCopied] = React.useState(false);
 
   const isBookmarked = bookmarkedQuestionIds.includes(question.id);
-
-  const handleCopyCode = (code?: string) => {
-    if (!code) return;
-    navigator.clipboard.writeText(code);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
 
   return (
     <Card className="glass-card glass-card-hover overflow-hidden p-5 transition-all">
@@ -161,21 +152,8 @@ export function QuestionCard({ question }: QuestionCardProps) {
               </div>
 
               {question.seniorAnswer.codeExample && (
-                <div className="relative mt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleCopyCode(question.seniorAnswer.codeExample)}
-                    className="absolute right-3 top-3 z-10 rounded-lg border border-slate-700 bg-slate-800/80 p-1.5 text-slate-300 transition-colors hover:bg-slate-700"
-                  >
-                    {isCopied ? (
-                      <Check className="h-3 w-3 text-emerald-400" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </button>
-                  <pre className="overflow-x-auto rounded-xl border border-border/80 bg-slate-950 p-3.5 font-mono text-[11px] leading-relaxed text-slate-100 dark:bg-black/70">
-                    <code>{question.seniorAnswer.codeExample}</code>
-                  </pre>
+                <div className="mt-2">
+                  <CodeBlock code={question.seniorAnswer.codeExample} language="tsx" />
                 </div>
               )}
             </TabsContent>

@@ -1,0 +1,87 @@
+[
+  {
+    "id": "int-01",
+    "category": "next-app-router",
+    "level": "senior",
+    "question": "Hãy giải thích sự khác biệt giữa SSR truyền thống của Pages Router (getServerSideProps) và React Server Components (RSC) trong App Router?",
+    "interviewerIntent": "Kiểm tra xem ứng viên có hiểu sâu về cơ chế Hydration, Client Bundle Size và kiến trúc Streaming của RSC hay chỉ biết code bề mặt.",
+    "contextOrScenario": "Hệ thống E-commerce có TTFB khá nhưng TTI (Time to Interactive) bị chậm và tải hơn 1.2MB JS về browser trên thiết bị di động.",
+    "expectedKeywords": [
+      "zero bundle size",
+      "hydration",
+      "rsc payload",
+      "streaming",
+      "server only",
+      "serialization"
+    ],
+    "seniorAnswer": {
+      "summary": "SSR truyền thống render HTML trên server nhưng vẫn phải tải TOÀN BỘ JavaScript code của component về client để chạy quá trình Hydration. Ngược lại, RSC chạy 100% trên server, trả về format RSC Payload stream và đóng góp 0 KB JavaScript vào client bundle.",
+      "deepDive": "Với RSC, các dependencies nặng như date-fns, markdown-parser, hay DB client (Prisma/Drizzle) không bao giờ bị đóng gói gửi về browser. Hydration chỉ diễn ra ở các Client Component lá ('use client'), giúp giải phóng hoàn toàn Main Thread và cải thiện vượt bậc chỉ số INP/TTI.",
+      "codeExample": "// RSC (Server Component): Zero bundle cost\nimport { heavyMarkdownParser } from '@/lib/parser'; // 300KB lib\nimport { db } from '@/lib/db';\n\nexport default async function PostPage({ params }: { params: { id: string } }) {\n  const post = await db.post.findUnique({ where: { id: params.id } });\n  const html = heavyMarkdownParser(post.content);\n  return <div dangerouslySetInnerHTML={{ __html: html }} />;\n}"
+    },
+    "pitfalls": [
+      "Nhầm lẫn rằng RSC thay thế hoàn toàn Client Components.",
+      "Hiểu sai 'use client' là component chỉ chạy ở browser (thực chất vẫn được pre-render HTML trên server ở lần tải đầu).",
+      "Không giải thích được định dạng RSC Payload hay quá trình Hydration diễn ra như thế nào."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để truyền dữ liệu từ Server Component vào Client Component mà không bị vi phạm serialization constraints?",
+      "Server Action khác gì so với Route Handler POST thông thường?"
+    ]
+  },
+  {
+    "id": "int-05",
+    "category": "next-app-router",
+    "level": "middle",
+    "question": "Chỉ thị 'use client' và 'use server' trong Next.js 15 có ý nghĩa chính xác là gì? Khi nào bắt buộc phải dùng?",
+    "interviewerIntent": "Đánh giá sự hiểu biết về boundaries giữa client và server trong kiến trúc hybrid của Next.js.",
+    "contextOrScenario": "Junior dev thêm 'use server' ở đầu mọi Server Component vì nghĩ rằng để chạy trên server thì cần khai báo như vậy.",
+    "expectedKeywords": [
+      "client boundary",
+      "server actions",
+      "rpc endpoint",
+      "default server component",
+      "directive"
+    ],
+    "seniorAnswer": {
+      "summary": "'use client' định nghĩa boundary chuyển giao cho Client Component khi cần React state, hook, hoặc DOM events. Mặc định mọi component trong App Router ĐÃ LÀ Server Component, nên 'use server' KHÔNG DÙNG để đánh dấu Server Component mà dùng để khai báo Server Action (hàm RPC chạy trên server).",
+      "deepDive": "Đặt 'use server' ở đầu file hoặc hàm sẽ biến hàm đó thành một HTTP POST endpoint an toàn có thể gọi trực tiếp từ Client Component. Việc đặt 'use server' ở đầu component file là sai và gây nhầm lẫn vì component mặc định đã chạy trên server rồi.",
+      "codeExample": "// 1. Server Action: actions/auth.ts\n'use server'; // ✅ Khai báo Server Action\nexport async function loginAction(formData: FormData) {\n  const email = formData.get('email');\n  return { success: true };\n}\n\n// 2. Client Component: LoginForm.tsx\n'use client'; // ✅ Cần event onChange, onSubmit\nimport { loginAction } from '@/actions/auth';\nexport function LoginForm() {\n  return <form action={loginAction}>...</form>;\n}"
+    },
+    "pitfalls": [
+      "Nghĩ rằng 'use server' là từ khóa để tạo Server Component.",
+      "Không biết rằng 'use client' vẫn được server render ra HTML ở initial request."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để đảm bảo code nhạy cảm (như API Secret Keys) không bao giờ bị import nhầm vào Client Component?"
+    ]
+  },
+  {
+    "id": "int-06",
+    "category": "next-app-router",
+    "level": "senior",
+    "question": "Hãy phân tích cơ chế Caching trong Next.js 15: revalidatePath vs revalidateTag vs fetch cache options?",
+    "interviewerIntent": "Kiểm tra khả năng kiểm soát cache đa tầng (Request memoization, Data Cache, Full Route Cache, Router Cache).",
+    "contextOrScenario": "Dự án vừa update bài viết qua CMS nhưng người dùng vào trang feed vẫn thấy nội dung cũ do cache chưa được xóa đúng cách.",
+    "expectedKeywords": [
+      "revalidatetag",
+      "revalidatepath",
+      "data cache",
+      "on-demand revalidation",
+      "stale-while-revalidate",
+      "next.js 15 uncached default"
+    ],
+    "seniorAnswer": {
+      "summary": "Next.js 15 chuyển đổi fetch requests mặc định sang 'no-store' (không tự cache nữa). Để cache và làm tươi dữ liệu chủ động, ta dùng fetch({ next: { tags: ['posts'] } }) và gọi revalidateTag('posts') trong Server Action.",
+      "deepDive": "revalidatePath('/') xóa cache theo URL path, nhưng tốn kém vì xóa luôn cả các layout không liên quan. revalidateTag('tag-name') là cơ chế hạt nhân tối ưu nhất: xóa cache của tất cả các fetch queries gắn tag đó trên toàn bộ ứng dụng mà không cần biết chúng nằm ở route nào.",
+      "codeExample": "// Fetch với Tag:\nconst res = await fetch('https://api.example.com/posts', {\n  next: { tags: ['posts-list'], revalidate: 3600 }\n});\n\n// Invalidate trong Server Action:\n'use server';\nimport { revalidateTag } from 'next/cache';\n\nexport async function createPost() {\n  await db.post.create({...});\n  revalidateTag('posts-list'); // ✅ Tức thì làm tươi dữ liệu feed\n}"
+    },
+    "pitfalls": [
+      "Nghĩ rằng Next.js 15 vẫn tự động cache fetch như Next.js 14 (Next 15 mặc định fetch không cache).",
+      "Lạm dụng revalidatePath('/') gây xóa cache hàng loạt không cần thiết."
+    ],
+    "followUpQuestions": [
+      "Partial Prerendering (PPR) trong Next.js hoạt động ra sao và kết hợp Static Shell với Dynamic Stream như thế nào?"
+    ]
+  }
+]

@@ -1,0 +1,31 @@
+[
+  {
+    "id": "int-10",
+    "category": "frontend-system-design",
+    "level": "lead",
+    "question": "Thiết kế kiến trúc xác thực (Authentication & Authorization) cho hệ thống Next.js App Router quy mô Enterprise (Multi-tenant B2B)?",
+    "interviewerIntent": "Đánh giá tư duy thiết kế hệ thống cấp độ Lead/Architect: JWT vs Session, Middleware validation, Server Action security, RBAC.",
+    "contextOrScenario": "Hệ thống SaaS B2B yêu cầu xác thực SSO SAML / OAuth, bảo vệ Route nhạy cảm, cấp quyền RBAC theo Role (Admin, Editor, Viewer), và tránh rò rỉ token.",
+    "expectedKeywords": [
+      "http-only secure cookie",
+      "middleware session check",
+      "server action authorization",
+      "rbac",
+      "csrf protection",
+      "refresh token rotation"
+    ],
+    "seniorAnswer": {
+      "summary": "Kiến trúc 3 lớp an toàn: (1) Lưu Session/JWT trong HttpOnly Secure SameSite Cookie; (2) Next.js Middleware kiểm tra session hợp lệ và tenant routing ở edge; (3) Bắt buộc phân quyền RBAC và tenant isolation tại từng Server Action / Data Access Layer.",
+      "deepDive": "Không bao giờ tin tưởng chỉ kiểm tra auth ở Middleware vì Server Actions có thể bị gọi độc lập. Nguyên tắc 'Defense in Depth': Tạo hàm bọc `withAuth(action, allowedRoles)` để kiểm tra session và role ở Data Access Layer trước khi thực thi truy vấn DB.",
+      "codeExample": "// auth/safe-action.ts\nexport async function authenticatedAction<T>(\n  allowedRoles: Role[],\n  actionFn: (user: User) => Promise<T>\n) {\n  const session = await getSession();\n  if (!session?.user) throw new Error('Unauthorized');\n  if (!allowedRoles.includes(session.user.role)) throw new Error('Forbidden');\n  \n  return await actionFn(session.user);\n}"
+    },
+    "pitfalls": [
+      "Lưu JWT access token trong LocalStorage (dễ bị XSS đánh cắp).",
+      "Chỉ check auth trong Middleware mà quên kiểm tra quyền trong Server Actions.",
+      "Không xử lý CSRF hoặc thiếu tenant_id trong câu lệnh SQL/ORM (lỗi multi-tenant data leak)."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để handle Refresh Token Rotation trong Next.js App Router mà không bị race conditions khi nhiều request đồng thời xảy ra?"
+    ]
+  }
+]

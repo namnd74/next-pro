@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Code,
-  Copy,
   Check,
   Award,
 } from 'lucide-react';
@@ -20,6 +19,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { CodeBlock } from '@/components/ui/code-block';
 
 interface LessonViewerProps {
   track: LearningTrack;
@@ -28,7 +28,6 @@ interface LessonViewerProps {
 
 export function LessonViewer({ track, lesson }: LessonViewerProps) {
   const { completedLessonIds, markLessonCompleted } = useLearningStore();
-  const [copiedIndex, setCopiedIndex] = React.useState<number | null>(null);
 
   const isCompleted = completedLessonIds.includes(lesson.id);
 
@@ -37,12 +36,6 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
   const prevLesson = currentIndex > 0 ? track.lessons[currentIndex - 1] : null;
   const nextLesson =
     currentIndex < track.lessons.length - 1 ? track.lessons[currentIndex + 1] : null;
-
-  const handleCopyCode = (code: string, index: number) => {
-    navigator.clipboard.writeText(code);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
-  };
 
   return (
     <div className="space-y-8">
@@ -143,8 +136,8 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
 
         <div className="space-y-6">
           {lesson.codeRecipes.map((recipe, rIndex) => (
-            <Card key={rIndex} className="glass-card overflow-hidden p-6">
-              <div className="mb-4 flex items-center justify-between">
+            <Card key={rIndex} className="glass-card space-y-3 overflow-hidden p-6">
+              <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-foreground">{recipe.title}</h3>
                 <Badge variant="secondary" className="font-mono text-[10px] uppercase">
                   {recipe.language}
@@ -153,68 +146,30 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
 
               {recipe.beforeCode ? (
                 <Tabs defaultValue="after" className="w-full">
-                  <TabsList className="grid w-full max-w-xs grid-cols-2">
-                    <TabsTrigger value="after">✅ React 19 / App Router</TabsTrigger>
-                    <TabsTrigger value="before">❌ Legacy (React 18 / Pages)</TabsTrigger>
+                  <TabsList className="grid h-auto w-full max-w-md grid-cols-2 p-1">
+                    <TabsTrigger value="after" className="px-3 py-1.5 text-xs">
+                      ✅ React 19 / App Router
+                    </TabsTrigger>
+                    <TabsTrigger value="before" className="px-3 py-1.5 text-xs">
+                      ❌ Legacy (React 18 / Pages)
+                    </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="after" className="relative mt-3">
-                    <button
-                      type="button"
-                      onClick={() => handleCopyCode(recipe.afterCode, rIndex * 2)}
-                      className="absolute right-3 top-3 z-10 rounded-lg border border-slate-700 bg-slate-800/80 p-1.5 text-slate-300 transition-colors hover:bg-slate-700"
-                      title="Copy code"
-                    >
-                      {copiedIndex === rIndex * 2 ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                    <pre className="overflow-x-auto rounded-xl border border-border/80 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100 dark:bg-black/70">
-                      <code>{recipe.afterCode}</code>
-                    </pre>
+                  <TabsContent value="after" className="mt-3">
+                    <CodeBlock code={recipe.afterCode} language={recipe.language} />
                   </TabsContent>
 
-                  <TabsContent value="before" className="relative mt-3">
-                    <button
-                      type="button"
-                      onClick={() => handleCopyCode(recipe.beforeCode!, rIndex * 2 + 1)}
-                      className="absolute right-3 top-3 z-10 rounded-lg border border-slate-700 bg-slate-800/80 p-1.5 text-slate-300 transition-colors hover:bg-slate-700"
-                      title="Copy code"
-                    >
-                      {copiedIndex === rIndex * 2 + 1 ? (
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                    <pre className="overflow-x-auto rounded-xl border border-border/80 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-400 opacity-90 dark:bg-black/70">
-                      <code>{recipe.beforeCode}</code>
-                    </pre>
+                  <TabsContent value="before" className="mt-3">
+                    <CodeBlock code={recipe.beforeCode} language={recipe.language} />
                   </TabsContent>
                 </Tabs>
               ) : (
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => handleCopyCode(recipe.afterCode, rIndex)}
-                    className="absolute right-3 top-3 z-10 rounded-lg border border-slate-700 bg-slate-800/80 p-1.5 text-slate-300 transition-colors hover:bg-slate-700"
-                    title="Copy code"
-                  >
-                    {copiedIndex === rIndex ? (
-                      <Check className="h-3.5 w-3.5 text-emerald-400" />
-                    ) : (
-                      <Copy className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                  <pre className="overflow-x-auto rounded-xl border border-border/80 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-100 dark:bg-black/70">
-                    <code>{recipe.afterCode}</code>
-                  </pre>
+                <div className="mt-3">
+                  <CodeBlock code={recipe.afterCode} language={recipe.language} />
                 </div>
               )}
 
-              <p className="mt-3 text-xs italic text-muted-foreground">
+              <p className="pt-1 text-xs italic text-muted-foreground">
                 <span className="font-semibold text-foreground">Takeaway: </span>
                 {recipe.takeaway}
               </p>

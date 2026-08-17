@@ -5,3 +5,5 @@ export * from './components/track-card';
 export * from './components/lesson-viewer';
 export * from './components/blitz-quiz';
 export * from './components/learning-stats';
+export * from './components/api-demo-tester';
+export * from './components/error-boundary-demo';

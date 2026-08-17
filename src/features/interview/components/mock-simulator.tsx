@@ -15,16 +15,21 @@ import {
 import { MOCK_INTERVIEW_QUESTIONS } from '../data/mock-interview-bank';
 import { MockInterviewResult } from '../types';
 import { useInterviewStore } from '../stores/use-interview-store';
+import { RichTextEditor } from './rich-text-editor';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 
 export function MockSimulator() {
-  const { saveMockResult } = useInterviewStore();
+  const { saveMockResult, customQuestions } = useInterviewStore();
+
+  const allQuestions = React.useMemo(() => {
+    return [...MOCK_INTERVIEW_QUESTIONS, ...customQuestions];
+  }, [customQuestions]);
 
   const [selectedQuestionId, setSelectedQuestionId] = React.useState<string>(
-    MOCK_INTERVIEW_QUESTIONS[0].id
+    allQuestions[0]?.id || MOCK_INTERVIEW_QUESTIONS[0].id
   );
   const [userAnswer, setUserAnswer] = React.useState('');
   const [isRecording, setIsRecording] = React.useState(false);
@@ -33,7 +38,8 @@ export function MockSimulator() {
     React.useState<MockInterviewResult | null>(null);
 
   const activeQuestion =
-    MOCK_INTERVIEW_QUESTIONS.find((q) => q.id === selectedQuestionId) ||
+    allQuestions.find((q) => q.id === selectedQuestionId) ||
+    allQuestions[0] ||
     MOCK_INTERVIEW_QUESTIONS[0];
 
   // Timer effect
@@ -113,39 +119,35 @@ export function MockSimulator() {
   return (
     <div className="space-y-6">
       {/* Question Selector Bar */}
-      <Card className="glass-card p-4">
+      <Card className="glass-card relative z-20 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-muted-foreground">
               Select Question:
             </span>
-            <select
+            <Select
               value={selectedQuestionId}
-              onChange={(e) => {
-                setSelectedQuestionId(e.target.value);
+              onValueChange={(val) => {
+                setSelectedQuestionId(val);
                 setEvaluatedResult(null);
                 setUserAnswer('');
                 setIsRecording(false);
                 setTimeSeconds(0);
               }}
-              className="rounded-xl border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              {MOCK_INTERVIEW_QUESTIONS.map((q, idx) => (
-                <option key={q.id} value={q.id}>
-                  #{idx + 1} - [{q.level.toUpperCase()}] {q.question.slice(0, 55)}...
-                </option>
-              ))}
-            </select>
+              options={allQuestions.map((q, idx) => ({
+                value: q.id,
+                label: `#${idx + 1} - [${q.level.toUpperCase()}] ${q.question.slice(0, 55)}...`,
+              }))}
+              className="max-w-md"
+            />
           </div>
 
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-              const randomIndex = Math.floor(
-                Math.random() * MOCK_INTERVIEW_QUESTIONS.length
-              );
-              setSelectedQuestionId(MOCK_INTERVIEW_QUESTIONS[randomIndex].id);
+              const randomIndex = Math.floor(Math.random() * allQuestions.length);
+              setSelectedQuestionId(allQuestions[randomIndex].id);
               setEvaluatedResult(null);
               setUserAnswer('');
               setIsRecording(false);
@@ -191,24 +193,21 @@ export function MockSimulator() {
           )}
         </div>
 
-        {/* Input Textarea Area */}
+        {/* Rich Text Editor Area */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-            <span>Your Technical Response:</span>
-            <span>{userAnswer.trim().split(/\s+/).filter(Boolean).length} words</span>
+            <span>Your Technical Response (Rich Text Editor):</span>
           </div>
 
-          <Textarea
-            rows={6}
+          <RichTextEditor
+            value={userAnswer}
+            onChange={setUserAnswer}
+            disabled={!isRecording && evaluatedResult !== null}
             placeholder={
               isRecording
                 ? 'Gõ câu trả lời phỏng vấn của bạn tại đây... Hãy giải thích súc tích trong 30 giây đầu và đào sâu vào cơ chế hoạt động bên dưới...'
                 : 'Nhấn "Start Mock Session" bên dưới để bắt đầu bấm giờ và trả lời câu hỏi...'
             }
-            value={userAnswer}
-            onChange={(e) => setUserAnswer(e.target.value)}
-            disabled={!isRecording && evaluatedResult !== null}
-            className="font-sans text-xs leading-relaxed sm:text-sm"
           />
         </div>
 

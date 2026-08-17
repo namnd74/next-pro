@@ -1,0 +1,58 @@
+[
+  {
+    "id": "int-11",
+    "category": "javascript-typescript",
+    "level": "senior",
+    "question": "Hãy giải thích sự khác biệt giữa Event Loop trong Browser và Node.js, đặc biệt là thứ tự ưu tiên giữa Microtask Queue (Promise) và Macrotask Queue (setTimeout)?",
+    "interviewerIntent": "Đánh giá sự am hiểu nền tảng JavaScript engine V8, asynchronous execution order và chống nghẽn Event Loop.",
+    "contextOrScenario": "Ứng dụng xử lý dữ liệu dòng lớn có đoạn code async lồng nhau gây ra hiện tượng UI bị giật lag và Promise phản hồi chậm hơn kỳ vọng.",
+    "expectedKeywords": [
+      "event loop",
+      "microtask queue",
+      "macrotask queue",
+      "process.nexttick",
+      "call stack",
+      "v8 engine"
+    ],
+    "seniorAnswer": {
+      "summary": "Microtask Queue (Promise.then, queueMicrotask, process.nextTick) ĐƯỢC ƯU TIÊN XỬ LÝ TOÀN BỘ cho đến khi cạn sạch (empty) trước khi Event Loop chuyển sang lấy tác vụ tiếp theo trong Macrotask Queue (setTimeout, setInterval, setImmediate).",
+      "deepDive": "Nếu một Microtask lại liên tục đẩy thêm Microtask mới vào hàng chờ (recursive microtask), Event Loop sẽ bị kẹt vĩnh viễn ở Microtask phase và KHÔNG BAO GIỜ chuyển tới Macrotask hay Render phase, gây ra tình trạng đơ UI (Main Thread blocking).",
+      "codeExample": "console.log('1');\nsetTimeout(() => console.log('2 (Macrotask)'), 0);\nPromise.resolve().then(() => console.log('3 (Microtask)'));\nconsole.log('4');\n// Output theo thứ tự: 1 -> 4 -> 3 -> 2"
+    },
+    "pitfalls": [
+      "Nghĩ rằng setTimeout(fn, 0) sẽ chạy ngay lập tức trước Promise.",
+      "Không biết rằng Microtask queue được xả cạn hoàn toàn trước khi chuyển giai đoạn."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa process.nextTick và Promise.then trong Node.js là gì?"
+    ]
+  },
+  {
+    "id": "int-12",
+    "category": "javascript-typescript",
+    "level": "senior",
+    "question": "Khi nào nên dùng `type` và khi nào nên dùng `interface` trong TypeScript? Đưa ra ví dụ thực tế trong thiết kế React Props.",
+    "interviewerIntent": "Kiểm tra tư duy thiết kế Type System, khả năng mở rộng type (extensibility) và phân biệt các tính năng đặc thù.",
+    "contextOrScenario": "Team đang tranh cãi quy chuẩn code (Linter rules): Một bên đòi dùng 100% interface, một bên đòi dùng 100% type.",
+    "expectedKeywords": [
+      "declaration merging",
+      "union type",
+      "intersection type",
+      "discriminated union",
+      "extensibility",
+      "mapped types"
+    ],
+    "seniorAnswer": {
+      "summary": "Dùng `interface` cho Object shapes cần khả năng kế thừa (extends) hoặc Declaration Merging (thường dùng cho Component Props, API Response objects). Dùng `type` cho Union types (A | B), Primitives, Tuples, Mapped Types và Discriminated Unions.",
+      "deepDive": "Trong React, `interface` được ưu tiên cho Component Props tiêu chuẩn để các dev khác có thể extend hoặc merge definition. Tuy nhiên với state complex dạng Discriminated Unions (ví dụ Status = Success | Error | Loading), `type` là bắt buộc vì `interface` không thể biểu diễn Union.",
+      "codeExample": "// 1. Dùng Type cho Discriminated Union (Bắt buộc):\ntype ApiResponse<T> =\n  | { status: 'success'; data: T }\n  | { status: 'error'; message: string };\n\n// 2. Dùng Interface cho Base Component Props (Dễ extend):\ninterface BaseButtonProps {\n  variant?: 'primary' | 'secondary';\n  disabled?: boolean;\n}\ninterface IconButtonProps extends BaseButtonProps {\n  icon: string;\n}"
+    },
+    "pitfalls": [
+      "Cố gắng dùng interface để định nghĩa Union Type (gây lỗi syntax).",
+      "Lạm dụng `any` hoặc `unknown` mà không dùng Type Narrowing."
+    ],
+    "followUpQuestions": [
+      "Discriminated Union giúp Type Narrowing hoạt động như thế nào trong câu lệnh switch/case?"
+    ]
+  }
+]
