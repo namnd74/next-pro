@@ -1,28 +1,19 @@
 import { NextResponse } from 'next/server';
 
-export async function POST() {
-  // Simulate Refresh Token Rotation
-  const newAccessToken = `valid_access_token_${Date.now()}`;
-  const newRefreshToken = `rotated_refresh_token_${Date.now()}`;
+export const dynamic = 'force-static';
 
-  const response = NextResponse.json(
+export async function GET() {
+  const newAccessToken = `valid_access_token_demo`;
+  const newRefreshToken = `rotated_refresh_token_demo`;
+
+  return NextResponse.json(
     {
       status: 'success',
       message: 'Silent Refresh Token thành công! Cấp mới Access Token.',
       accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
       expiresInSeconds: 900,
     },
     { status: 200 }
   );
-
-  // Set rotated HttpOnly Refresh Token Cookie
-  response.cookies.set('nextpro_refresh_token', newRefreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/api/auth/refresh-token',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-  });
-
-  return response;
 }

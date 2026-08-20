@@ -1,0 +1,211 @@
+{
+  "id": "track-react-hooks-mastery",
+  "slug": "react-hooks-deep-dive",
+  "title": "React Hooks Deep Dive & Side Effects (Beginner to Intermediate)",
+  "description": "Làm chủ toàn diện các Hooks quan trọng: useEffect synchronization & cleanup, useRef DOM/Mutable references, useContext + useReducer pattern và kỹ nghệ tạo Custom Hooks.",
+  "iconName": "Zap",
+  "color": "from-blue-500 to-indigo-600",
+  "totalLessons": 4,
+  "lessons": [
+    {
+      "id": "rhm-01",
+      "slug": "useeffect-synchronization-and-cleanup",
+      "title": "Mental Model useEffect: Đồng Bộ Dữ Liệu & Cleanup Chuẩn",
+      "summary": "Từ bỏ thói quen coi useEffect là Lifecycle methods; học cách dùng useEffect để đồng bộ với hệ thống bên ngoài và xử lý race condition.",
+      "durationMinutes": 18,
+      "level": "intermediate",
+      "tags": ["useEffect", "Synchronization", "Cleanup", "Race Conditions"],
+      "mentalModel": "useEffect không phải là 'ComponentDidMount'. useEffect dùng để ĐỒNG BỘ (Synchronize) component với một hệ thống bên ngoài React (Browser API, WebSocket, Third-party widget). Không dùng useEffect cho việc tính toán dữ liệu nội bộ có thể suy ra từ Props/State.",
+      "keyPoints": [
+        "Nếu một biến có thể tính toán được từ Props hoặc State hiện tại, hãy tính trực tiếp trong quá trình render thay vì lưu thêm State và gọi useEffect.",
+        "Cleanup function chạy trước mỗi lần re-run effect và khi component unmount, cực kỳ quan trọng để dọn dẹp timers, event listeners và abort fetch requests.",
+        "Xử lý Race Condition khi fetch dữ liệu bất đồng bộ bằng cờ `ignore = true` hoặc `AbortController`."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Fetch dữ liệu an toàn chống Race Condition với Cleanup",
+          "language": "tsx",
+          "beforeCode": "// ❌ Race Condition: Request chậm có thể ghi đè kết quả của request mới nhất\nuseEffect(() => {\n  fetch(`/api/users/${userId}`)\n    .then(res => res.json())\n    .then(data => setUser(data));\n}, [userId]);",
+          "afterCode": "// ✅ Sử dụng AbortController và cờ boolean để hủy request cũ\nuseEffect(() => {\n  const controller = new AbortController();\n  let isSubscribed = true;\n\n  async function fetchUserData() {\n    try {\n      const res = await fetch(`/api/users/${userId}`, { signal: controller.signal });\n      const data = await res.json();\n      if (isSubscribed) setUser(data);\n    } catch (err: any) {\n      if (err.name !== 'AbortError') setError(err.message);\n    }\n  }\n\n  fetchUserData();\n  return () => {\n    isSubscribed = false;\n    controller.abort(); // Hủy request mạng khi userId thay đổi hoặc unmount\n  };\n}, [userId]);",
+          "takeaway": "Luôn có Cleanup dọn dẹp kết nối mạng để tránh rò rỉ bộ nhớ (memory leak) và dữ liệu cũ ghi đè dữ liệu mới."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rhm-01-1",
+          "question": "Trường hợp nào sau đây KHÔNG NÊN sử dụng useEffect?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Lắng nghe sự kiện scroll của window"
+            },
+            {
+              "key": "B",
+              "text": "Tính toán fullName từ firstName và lastName nhận được từ props"
+            },
+            {
+              "key": "C",
+              "text": "Khởi tạo thư viện bản đồ Mapbox bên thứ ba"
+            },
+            {
+              "key": "D",
+              "text": "Kết nối WebSocket chat room"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Biến fullName có thể tính toán trực tiếp: `const fullName = firstName + ' ' + lastName;` ngay trong thân component ở Render phase mà không cần state hay useEffect thừa."
+        }
+      ]
+    },
+    {
+      "id": "rhm-02",
+      "slug": "useref-dom-manipulation-mutable-values",
+      "title": "useRef: Thao Tác DOM & Giữ Giá Trị Mutable Không Re-render",
+      "summary": "Phân biệt khi nào cần useState vs useRef, cách truy cập phần tử DOM trực tiếp, lưu trữ Timer ID và cú pháp ref trong React 19.",
+      "durationMinutes": 16,
+      "level": "intermediate",
+      "tags": ["useRef", "DOM Access", "Mutable Values", "React 19 Ref"],
+      "mentalModel": "useRef giống như một 'chiếc hộp' bí mật giữ một giá trị JavaScript thuần túy (`ref.current`). Thay đổi `ref.current` KHÔNG kích hoạt Component re-render.",
+      "keyPoints": [
+        "Dùng useRef khi bạn cần lưu thông tin không ảnh hưởng trực tiếp đến hình ảnh hiển thị của UI (ví dụ: timer IDs, previous props, số lần render).",
+        "Dùng useRef gắn vào thẻ JSX để truy cập các hàm DOM của trình duyệt (ví dụ: `inputRef.current.focus()`, `videoRef.current.play()`).",
+        "Trong React 19, `ref` được truyền trực tiếp như một prop thông thường mà không bắt buộc phải bọc hàm `forwardRef()`."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lưu trữ Timer ID và truy cập DOM với useRef",
+          "language": "tsx",
+          "beforeCode": "// ❌ Dùng useState lưu timerId làm kích hoạt re-render thừa không cần thiết\nconst [timerId, setTimerId] = useState<number | null>(null);\nconst [seconds, setSeconds] = useState(0);\n\nconst startTimer = () => {\n  const id = window.setInterval(() => setSeconds(s => s + 1), 1000);\n  setTimerId(id); // Re-render thừa!\n};",
+          "afterCode": "// ✅ Dùng useRef lưu timerId và input focus\nfunction Stopwatch() {\n  const [seconds, setSeconds] = useState(0);\n  const timerRef = useRef<number | null>(null);\n  const inputRef = useRef<HTMLInputElement>(null);\n\n  const start = () => {\n    if (timerRef.current !== null) return;\n    timerRef.current = window.setInterval(() => setSeconds((s) => s + 1), 1000);\n    inputRef.current?.focus();\n  };\n\n  const stop = () => {\n    if (timerRef.current !== null) {\n      clearInterval(timerRef.current);\n      timerRef.current = null;\n    }\n  };\n\n  return (\n    <div>\n      <input ref={inputRef} placeholder=\"Ghi chú...\" />\n      <p>Thời gian: {seconds}s</p>\n      <button onClick={start}>Bắt đầu</button>\n      <button onClick={stop}>Dừng</button>\n    </div>\n  );\n}",
+          "takeaway": "useRef giữ nguyên giá trị qua các lần render mà không gây giật lag UI do render không mong muốn."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rhm-02-1",
+          "question": "Điều gì xảy ra khi bạn gán giá trị mới cho `ref.current` (ví dụ: `countRef.current = 5`)?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Component lập tức re-render với giá trị mới"
+            },
+            {
+              "key": "B",
+              "text": "Giá trị được lưu lại nhưng KHÔNG làm component re-render"
+            },
+            {
+              "key": "C",
+              "text": "React ném ra lỗi Mutation Error"
+            },
+            {
+              "key": "D",
+              "text": "Toàn bộ DOM cây con bị unmount"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "useRef chỉ là một plain JavaScript object `{ current: value }`. Thay đổi thuộc tính current hoàn toàn không kích hoạt chu kỳ render của React."
+        }
+      ]
+    },
+    {
+      "id": "rhm-03",
+      "slug": "usecontext-and-usereducer-architecture",
+      "title": "useContext & Pattern Kết Hợp useReducer",
+      "summary": "Xây dựng hệ thống quản lý State nội bộ mạnh mẽ với Context API + useReducer, phân tách Context để tránh re-render diện rộng.",
+      "durationMinutes": 20,
+      "level": "intermediate",
+      "tags": ["useContext", "useReducer", "State Management", "Performance"],
+      "mentalModel": "Context giống như mạng lưới phát thanh nội bộ cho một nhánh component. useReducer đóng vai trò bộ não tiếp nhận các Action và cập nhật state một cách có dự đoán (Predictable State Machine).",
+      "keyPoints": [
+        "useReducer là sự lựa chọn tối ưu khi State có nhiều logic phức tạp, nhiều giá trị phụ thuộc lẫn nhau hoặc có cấu trúc lồng nhau.",
+        "Cạm bẫy của Context: MỌI component gọi `useContext(MyContext)` đều sẽ re-render khi giá trị Context Value thay đổi.",
+        "Kỹ thuật tối ưu: Tách State Context và Dispatch Context riêng biệt để các component chỉ phát Action không bị re-render khi State đổi."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Mẫu tách State Context và Dispatch Context",
+          "language": "tsx",
+          "beforeCode": "// ❌ Gom chung State & Dispatch vào 1 Context khiến tất cả re-render\nconst CartContext = createContext<{ state: CartState; dispatch: Dispatch } | null>(null);",
+          "afterCode": "// ✅ Tách đôi Context: CartStateContext & CartDispatchContext\nimport { createContext, useContext, useReducer } from 'react';\n\nconst CartStateCtx = createContext<CartState | null>(null);\nconst CartDispatchCtx = createContext<React.Dispatch<CartAction> | null>(null);\n\nexport function CartProvider({ children }: { children: React.ReactNode }) {\n  const [state, dispatch] = useReducer(cartReducer, initialCartState);\n  return (\n    <CartStateCtx.Provider value={state}>\n      <CartDispatchCtx.Provider value={dispatch}>\n        {children}\n      </CartDispatchCtx.Provider>\n    </CartStateCtx.Provider>\n  );\n}\n\n// Custom hooks tiêu chuẩn:\nexport const useCartState = () => {\n  const ctx = useContext(CartStateCtx);\n  if (!ctx) throw new Error('useCartState must be used inside CartProvider');\n  return ctx;\n};\n\nexport const useCartDispatch = () => {\n  const ctx = useContext(CartDispatchCtx);\n  if (!ctx) throw new Error('useCartDispatch must be used inside CartProvider');\n  return ctx;\n};",
+          "takeaway": "Nút bấm 'Thêm vào giỏ' chỉ cần useCartDispatch và sẽ KHÔNG BAO GIỜ bị re-render khi danh sách giỏ hàng thay đổi!"
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rhm-03-1",
+          "question": "Tại sao nên tách `StateContext` và `DispatchContext` thành 2 Provider lồng nhau thay vì để chung 1 Context object?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Để tăng tốc độ load trang ban đầu của Next.js"
+            },
+            {
+              "key": "B",
+              "text": "Để các component chỉ cần gửi Action (Dispatch) không bị re-render mỗi khi State dữ liệu cập nhật"
+            },
+            {
+              "key": "C",
+              "text": "Vì React 19 không cho phép lưu Function trong Context"
+            },
+            {
+              "key": "D",
+              "text": "Để hỗ trợ mã hóa bảo mật token"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Hàm `dispatch` từ useReducer có tham chiếu ổn định tuyệt đối (không đổi qua các lần render). Tách riêng DispatchContext giúp các component tiêu thụ dispatch không bị ảnh hưởng bởi thay đổi của state."
+        }
+      ]
+    },
+    {
+      "id": "rhm-04",
+      "slug": "custom-hooks-architecture-and-abstraction",
+      "title": "Thiết Kế Custom Hooks: Kỹ Nghệ Đóng Gói Headless UI Logic",
+      "summary": "Tạo ra các Custom Hooks tái sử dụng cao, phân biệt trả về Tuple vs Object, xử lý sự kiện trình duyệt và tuân thủ Rules of Hooks.",
+      "durationMinutes": 18,
+      "level": "intermediate",
+      "tags": ["Custom Hooks", "Clean Architecture", "Headless Logic"],
+      "mentalModel": "Custom Hook cho phép bạn chia sẻ LOGIC có trạng thái (Stateful Logic) giữa nhiều component mà không cần chia sẻ giao diện (Headless UI Pattern).",
+      "keyPoints": [
+        "Tên Custom Hook BẮT BUỘC phải bắt đầu bằng tiền tố `use` (ví dụ: `useDebounce`, `useLocalStorage`, `useMediaQuery`).",
+        "Luôn tuân thủ Rules of Hooks: chỉ gọi hook ở top-level của function, không gọi trong vòng lặp if/for.",
+        "Quy chuẩn trả về: Trả về Array Tuple `[value, setValue]` khi hook chỉ có 1-2 giá trị chính (dễ đổi tên khi destruct); Trả về Object `{ value, reset, isValid }` khi hook có từ 3 giá trị/hàm trở lên."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Custom Hook useDebounce & useLocalStorage chuẩn TypeScript",
+          "language": "typescript",
+          "beforeCode": "// ❌ Logic setTimeout bị lặp lại ở mọi ô tìm kiếm\nfunction SearchInput() {\n  const [query, setQuery] = useState('');\n  useEffect(() => {\n    const timer = setTimeout(() => searchAPI(query), 500);\n    return () => clearTimeout(timer);\n  }, [query]);\n}",
+          "afterCode": "// ✅ Đóng gói logic vào Custom Hook useDebounce\nimport { useState, useEffect } from 'react';\n\nexport function useDebounce<T>(value: T, delayMs: number = 300): T {\n  const [debouncedValue, setDebouncedValue] = useState<T>(value);\n\n  useEffect(() => {\n    const handler = setTimeout(() => {\n      setDebouncedValue(value);\n    }, delayMs);\n\n    return () => {\n      clearTimeout(handler);\n    };\n  }, [value, delayMs]);\n\n  return debouncedValue;\n}\n\n// Sử dụng sạch sẽ trong Component:\n// const debouncedSearch = useDebounce(query, 400);",
+          "takeaway": "Custom Hook giúp cô lập side-effects, tái sử dụng 100% qua các dự án và cực kỳ dễ viết Unit Test độc lập."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rhm-04-1",
+          "question": "Khi thiết kế một Custom Hook trả về nhiều hàm xử lý phức tạp (ví dụ: `value`, `setValue`, `reset`, `validate`, `isDirty`), bạn nên trả về kiểu dữ liệu nào?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Mảng Array Tuple để người dùng tự nhớ đúng thứ tự chỉ số"
+            },
+            {
+              "key": "B",
+              "text": "Object `{ value, setValue, reset, validate, isDirty }` để người dùng dễ dàng destructure đúng tên thuộc tính mà không phụ thuộc thứ tự"
+            },
+            {
+              "key": "C",
+              "text": "Chuỗi JSON string hóa"
+            },
+            {
+              "key": "D",
+              "text": "Số nguyên định danh"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Khi số lượng thuộc tính/hàm trả về từ 3 trở lên, sử dụng Object giúp code tự giải thích (self-documenting), không bị nhầm lẫn vị trí tham số như Array Tuple."
+        }
+      ]
+    }
+  ]
+}

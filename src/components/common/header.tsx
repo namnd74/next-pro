@@ -39,7 +39,7 @@ export function Header() {
                 <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               </span>
               <span className="-mt-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-                React 19 & Next 15
+                React & Next
               </span>
             </div>
           </Link>

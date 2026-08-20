@@ -11,6 +11,11 @@ import {
   Clock,
   BookOpen,
   Code2,
+  GraduationCap,
+  Flame,
+  Shield,
+  Lock,
+  Database,
 } from 'lucide-react';
 import { LearningTrack } from '../types';
 import { useLearningStore } from '../stores/use-learning-store';
@@ -25,12 +30,23 @@ interface TrackCardProps {
 
 function getTrackIcon(iconName: string) {
   switch (iconName) {
+    case 'GraduationCap':
+      return <GraduationCap className="h-6 w-6" />;
+    case 'Zap':
+      return <Zap className="h-6 w-6" />;
+    case 'Flame':
+      return <Flame className="h-6 w-6" />;
+    case 'Shield':
+      return <Shield className="h-6 w-6" />;
+    case 'Lock':
+      return <Lock className="h-6 w-6" />;
+    case 'Database':
+      return <Database className="h-6 w-6" />;
     case 'Atom':
+    case 'Code':
       return <Code2 className="h-6 w-6" />;
     case 'Layers':
       return <Layers className="h-6 w-6" />;
-    case 'Zap':
-      return <Zap className="h-6 w-6" />;
     default:
       return <Sparkles className="h-6 w-6" />;
   }

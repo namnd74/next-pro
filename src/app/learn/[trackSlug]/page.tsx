@@ -14,6 +14,12 @@ interface TrackPageProps {
   }>;
 }
 
+export function generateStaticParams() {
+  return MOCK_LEARNING_TRACKS.map((track) => ({
+    trackSlug: track.slug,
+  }));
+}
+
 export async function generateMetadata({ params }: TrackPageProps): Promise<Metadata> {
   const { trackSlug } = await params;
   const track = MOCK_LEARNING_TRACKS.find((t) => t.slug === trackSlug);

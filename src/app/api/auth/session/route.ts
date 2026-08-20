@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-static';
+
 export async function GET() {
   const mockUser = {
     id: 'user-77',
@@ -9,7 +11,7 @@ export async function GET() {
     isAuthenticated: true,
   };
 
-  const response = NextResponse.json(
+  return NextResponse.json(
     {
       status: 'success',
       message: 'Authenticated session active',
@@ -21,19 +23,4 @@ export async function GET() {
     },
     { status: 200 }
   );
-
-  // Set HttpOnly Cookie for security demo
-  response.cookies.set(
-    'nextpro_session_token',
-    'jwt.header.payload.signature_secret_9988',
-    {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 60 * 15,
-    }
-  );
-
-  return response;
 }

@@ -10,6 +10,15 @@ interface LessonPageProps {
   }>;
 }
 
+export function generateStaticParams() {
+  return MOCK_LEARNING_TRACKS.flatMap((track) =>
+    track.lessons.map((lesson) => ({
+      trackSlug: track.slug,
+      lessonSlug: lesson.slug,
+    }))
+  );
+}
+
 export async function generateMetadata({ params }: LessonPageProps): Promise<Metadata> {
   const { trackSlug, lessonSlug } = await params;
   const track = MOCK_LEARNING_TRACKS.find((t) => t.slug === trackSlug);

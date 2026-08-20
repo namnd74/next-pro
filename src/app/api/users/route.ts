@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const delayMs = parseInt(searchParams.get('delay') || '300', 10);
+export const dynamic = 'force-static';
 
-  // Artificial delay to simulate network query
-  await new Promise((resolve) => setTimeout(resolve, delayMs));
-
+export async function GET() {
   const users = [
     { id: '1', name: 'Alice Nguyen', role: 'Lead Architect', category: 'react-19' },
     { id: '2', name: 'Bob Tran', role: 'Senior Engineer', category: 'next-app-router' },

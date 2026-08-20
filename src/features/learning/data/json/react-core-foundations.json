@@ -1,0 +1,211 @@
+{
+  "id": "track-react-core-foundations",
+  "slug": "react-foundations-zero-to-one",
+  "title": "React Core Foundations (Zero to One Path)",
+  "description": "Lộ trình khởi đầu vững chắc: Nắm vững tư duy Component, JSX & Virtual DOM, Immutability của State, quy tắc Render Lifecycle và cơ chế Reconciliation.",
+  "iconName": "GraduationCap",
+  "color": "from-emerald-500 to-teal-600",
+  "totalLessons": 4,
+  "lessons": [
+    {
+      "id": "rcf-01",
+      "slug": "jsx-virtual-dom-rendering-mental-model",
+      "title": "Bản chất của JSX & Mental Model Render trong React",
+      "summary": "Hiểu rõ JSX không phải HTML, cách React biên dịch JSX thành React.createElement và chu kỳ Render Phase vs Commit Phase.",
+      "durationMinutes": 15,
+      "level": "beginner",
+      "tags": ["React Basics", "JSX", "Virtual DOM", "Mental Model"],
+      "mentalModel": "UI trong React là một hàm thuần khiết của State: UI = f(State). Khi State đổi, React gọi hàm Component để tính toán cây Virtual DOM mới (Render Phase), sau đó chỉ cập nhật những Node DOM thực sự khác biệt lên trình duyệt (Commit Phase).",
+      "keyPoints": [
+        "JSX là cú pháp mở rộng (Syntactic Sugar) của JavaScript, được Babel/SWC chuyển đổi thành các hàm React.createElement() hoặc jsxRuntime.",
+        "Component phải luôn giữ tính thuần khiết (Pure Function): cùng một đầu vào (props + state) luôn trả về cùng một JSX mà không gây side-effect trong thân hàm.",
+        "Render Phase diễn ra ngầm trong bộ nhớ (tính toán Virtual DOM), Commit Phase mới thực sự thao tác lên Real DOM của trình duyệt."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Hiểu bản chất JSX chuyển đổi sang JavaScript",
+          "language": "tsx",
+          "beforeCode": "// ❌ Hiểu nhầm JSX là chuỗi HTML thông thường\n// Nhiều người nghĩ React chèn trực tiếp HTML string vào innerHTML\nconst element = <div className=\"box\" id=\"main\"><h1>Hello NextPro</h1></div>;",
+          "afterCode": "// ✅ Bản chất JSX là Object mô tả UI (Virtual DOM Node)\n// Trình biên dịch chuyển đổi JSX thành:\nimport { jsx as _jsx } from 'react/jsx-runtime';\n\nconst element = _jsx('div', {\n  className: 'box',\n  id: 'main',\n  children: _jsx('h1', { children: 'Hello NextPro' })\n});\n// element là một Plain JavaScript Object dạng: { type: 'div', props: { ... } }",
+          "takeaway": "Virtual DOM chỉ là các JS Object lồng nhau, giúp React so sánh (diffing) cực nhanh trong RAM trước khi đụng vào DOM thật."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rcf-01-1",
+          "question": "Trong React, quá trình nào diễn ra khi một Component được kích hoạt re-render?",
+          "options": [
+            {
+              "key": "A",
+              "text": "React xóa sạch toàn bộ cây Real DOM và vẽ lại từ đầu trên màn hình"
+            },
+            {
+              "key": "B",
+              "text": "React thực thi lại hàm Component để tạo Virtual DOM mới (Render phase), so sánh sự khác biệt (Diffing) rồi mới áp dụng thay đổi lên Real DOM (Commit phase)"
+            },
+            {
+              "key": "C",
+              "text": "React chỉ cập nhật trực tiếp thẻ HTML mà không cần tính toán Virtual DOM"
+            },
+            {
+              "key": "D",
+              "text": "React lưu trực tiếp dữ liệu vào LocalStorage trước khi render"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "React tách biệt hoàn toàn giữa Render phase (tính toán Virtual DOM trong bộ nhớ) và Commit phase (cập nhật các thay đổi thực tế lên DOM)."
+        }
+      ]
+    },
+    {
+      "id": "rcf-02",
+      "slug": "props-composition-and-children-pattern",
+      "title": "Props, Tính Bất Biến & Pattern Component Composition",
+      "summary": "Sử dụng Props đúng cách, tuân thủ Read-Only props và áp dụng Component Composition để loại bỏ hoàn toàn Props Drilling.",
+      "durationMinutes": 15,
+      "level": "beginner",
+      "tags": ["Props", "Component Composition", "Children Pattern"],
+      "mentalModel": "Props giống như tham số truyền vào hàm toán học — hoàn toàn Read-Only. Thay vì truyền props qua 5-6 tầng component trung gian (Props Drilling), hãy truyền trực tiếp JSX thông qua children hoặc slot pattern.",
+      "keyPoints": [
+        "Không bao giờ được phép mutate (thay đổi trực tiếp) giá trị của props bên trong component.",
+        "Component Composition (truyền JSX qua prop `children` hoặc các custom slot props) giúp cô lập logic và tăng tính tái sử dụng.",
+        "Props có thể truyền bất kỳ kiểu dữ liệu nào: string, number, function callback, hoặc cả một React Component."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Giải quyết Props Drilling bằng Component Composition",
+          "language": "tsx",
+          "beforeCode": "// ❌ Props Drilling: Truyền user qua Dashboard -> Sidebar -> UserAvatar (3 tầng)\nfunction Dashboard({ user }: { user: User }) {\n  return <Sidebar user={user} />;\n}\nfunction Sidebar({ user }: { user: User }) {\n  return <UserAvatar user={user} />;\n}",
+          "afterCode": "// ✅ Composition với children: Dashboard và Sidebar không cần quan tâm đến user\nfunction Dashboard({ children }: { children: React.ReactNode }) {\n  return <Sidebar>{children}</Sidebar>;\n}\nfunction Sidebar({ children }: { children: React.ReactNode }) {\n  return <aside className=\"p-4\">{children}</aside>;\n}\n\n// Sử dụng ở Root:\n<Dashboard>\n  <UserAvatar user={currentUser} />\n</Dashboard>",
+          "takeaway": "Composition giúp các component ở giữa hoàn toàn decoupling, không cần giữ các props mà chúng không trực tiếp sử dụng."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rcf-02-1",
+          "question": "Tại sao không nên thay đổi (mutate) props trực tiếp bên trong component con (ví dụ: `props.count = 10`)?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Vì JavaScript sẽ báo lỗi cú pháp ngay lập tức"
+            },
+            {
+              "key": "B",
+              "text": "Vì Props là Read-Only, việc mutate phá vỡ tính thuần khiết của React và dẫn đến lỗi không đồng bộ state khó lường"
+            },
+            {
+              "key": "C",
+              "text": "Vì React không cho phép dùng kiểu dữ liệu number làm prop"
+            },
+            {
+              "key": "D",
+              "text": "Vì props chỉ tồn tại ở Server-side"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trong React, props là bất biến (immutable). Khi muốn thay đổi dữ liệu, component con phải gọi callback function do component cha truyền xuống để cập nhật state ở cha."
+        }
+      ]
+    },
+    {
+      "id": "rcf-03",
+      "slug": "state-usestate-immutability-batching",
+      "title": "Làm chủ State với useState & Cơ chế Batching",
+      "summary": "Hiểu rõ cơ chế Snapshot của State, Updater Function và Automatic Batching để tránh các lỗi logic cập nhật state bất đồng bộ.",
+      "durationMinutes": 18,
+      "level": "beginner",
+      "tags": ["useState", "State Immutability", "Batching", "Snapshot"],
+      "mentalModel": "Mỗi lần render có một 'Snapshot' riêng của State. Gọi setState không lập tức làm thay đổi biến state trong lượt render hiện tại, mà lên lịch một lần re-render mới với giá trị state tiếp theo.",
+      "keyPoints": [
+        "Luôn đối xử với State như dữ liệu Bất biến (Immutable): sao chép Object/Array bằng Spread operator (...) hoặc hàm tạo mảng mới.",
+        "Khi cập nhật state dựa trên giá trị state trước đó, luôn dùng Functional Updater: `setCount(prev => prev + 1)`.",
+        "React 18 & 19 tự động gom tất cả các lần gọi setState liên tiếp (Automatic Batching) vào 1 lần re-render duy nhất."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Cập nhật State dạng Object & Updater Function",
+          "language": "tsx",
+          "beforeCode": "// ❌ Mutate trực tiếp Object & Gọi setState liên tiếp không dùng prev\nfunction Counter() {\n  const [user, setUser] = useState({ name: 'Nam', age: 25 });\n  const handleHappyBirthday = () => {\n    user.age += 1; // ❌ Mutate trực tiếp! React không nhận ra thay đổi\n    setUser(user);\n  };\n}",
+          "afterCode": "// ✅ Tạo Object mới với Spread Operator & Functional Updater\nfunction Counter() {\n  const [user, setUser] = useState({ name: 'Nam', age: 25 });\n  const handleHappyBirthday = () => {\n    setUser((prevUser) => ({\n      ...prevUser,\n      age: prevUser.age + 1\n    }));\n  };\n  return <button onClick={handleHappyBirthday}>Tuổi: {user.age}</button>;\n}",
+          "takeaway": "Tạo tham chiếu Object mới giúp React phát hiện thay đổi qua phép so sánh nông (Object.is) và kích hoạt render chính xác."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rcf-03-1",
+          "question": "Nếu bạn gọi `setCount(count + 1)` 3 lần liên tiếp trong một Event Handler với `count` ban đầu là 0, giá trị cuối cùng của `count` ở lần render tiếp theo là bao nhiêu?",
+          "options": [
+            {
+              "key": "A",
+              "text": "3"
+            },
+            {
+              "key": "B",
+              "text": "1 (vì trong snapshot hiện tại, `count` vẫn luôn là 0 ở cả 3 lần gọi)"
+            },
+            {
+              "key": "C",
+              "text": "0"
+            },
+            {
+              "key": "D",
+              "text": "Báo lỗi Runtime Exception"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trong lượt render hiện tại, biến `count` giữ giá trị cố định là 0. Cả 3 lệnh `setCount(0 + 1)` đều yêu cầu đặt state thành 1. Để tăng lên 3, phải dùng updater function: `setCount(prev => prev + 1)`."
+        }
+      ]
+    },
+    {
+      "id": "rcf-04",
+      "slug": "rendering-lists-keys-and-conditionals",
+      "title": "Rendering Danh Sách, Keys & Điều Kiện Hiển Thị Chuẩn",
+      "summary": "Bản chất thuật toán Reconciliation của React khi so sánh Key, cạm bẫy dùng index làm key và cách viết Conditional Rendering sạch.",
+      "durationMinutes": 16,
+      "level": "beginner",
+      "tags": ["List Rendering", "Keys", "Reconciliation", "Conditional"],
+      "mentalModel": "Key là định danh duy nhất (Unique Identity) giúp React biết item nào được thêm, sửa hay xóa giữa các lần render. Dùng Index làm key sẽ làm sai lệch trạng thái nội bộ của item khi danh sách bị sắp xếp lại.",
+      "keyPoints": [
+        "Key phải là giá trị duy nhất và ổn định giữa các lần render (ví dụ: database id `item.id`).",
+        "Tuyệt đối không dùng `Math.random()` hoặc Array `index` làm key cho các danh sách có thể thêm/xóa/sắp xếp.",
+        "Tránh cạm bẫy `items.length && <List />` vì khi `length === 0`, React sẽ render số 0 ra màn hình. Hãy dùng ternary hoặc `items.length > 0`."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Render danh sách chuẩn xác và tránh cạm bẫy toán tử &&",
+          "language": "tsx",
+          "beforeCode": "// ❌ Dùng index làm key & cạm bẫy render số 0 của &&\nfunction TodoList({ items }: { items: Todo[] }) {\n  return (\n    <div>\n      {/* Nếu items rỗng, sẽ in ra số 0 trên màn hình! */}\n      {items.length && <span>Có {items.length} công việc</span>}\n      {items.map((item, idx) => (\n        <TodoItem key={idx} todo={item} /> // ❌ Dễ gây lỗi state khi xóa/sort\n      ))}\n    </div>\n  );\n}",
+          "afterCode": "// ✅ Dùng unique item.id và điều kiện Boolean an toàn\nfunction TodoList({ items }: { items: Todo[] }) {\n  return (\n    <div>\n      {items.length > 0 ? <span>Có {items.length} công việc</span> : null}\n      {items.map((item) => (\n        <TodoItem key={item.id} todo={item} /> // ✅ Key ổn định và duy nhất\n      ))}\n    </div>\n  );\n}",
+          "takeaway": "Luôn dùng ID duy nhất làm key và chuyển điều kiện sang Boolean rõ ràng để UI không bị hiển thị các ký tự thừa."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rcf-04-1",
+          "question": "Điều gì có thể xảy ra nếu bạn dùng Array Index làm `key` cho một danh sách Todo có ô nhập liệu (Input) khi xóa bớt 1 phần tử ở đầu danh sách?",
+          "options": [
+            {
+              "key": "A",
+              "text": "React sẽ crash ứng dụng"
+            },
+            {
+              "key": "B",
+              "text": "Ô input của item tiếp theo có thể bị giữ lại giá trị cũ của item vừa xóa do React nhầm lẫn thứ tự DOM"
+            },
+            {
+              "key": "C",
+              "text": "Dữ liệu được lưu tự động lên server"
+            },
+            {
+              "key": "D",
+              "text": "Không có bất kỳ ảnh hưởng nào"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Vì index thay đổi khi xóa phần tử đầu, React tái sử dụng DOM node theo index cũ và có thể giữ lại uncontrolled state (như giá trị input hoặc focus) của phần tử trước."
+        }
+      ]
+    }
+  ]
+}

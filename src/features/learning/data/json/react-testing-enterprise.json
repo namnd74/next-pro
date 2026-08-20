@@ -1,0 +1,211 @@
+{
+  "id": "track-react-testing-enterprise",
+  "slug": "react-testing-enterprise-mastery",
+  "title": "Enterprise React Testing & Production Readiness (Senior to Hero)",
+  "description": "Bộ kỹ năng chuẩn Enterprise để tự tin bàn giao sản phẩm: Vitest & React Testing Library, Mock Service Worker (MSW), Testing Custom Hooks & Zustand và Accessibility (a11y).",
+  "iconName": "Shield",
+  "color": "from-purple-500 to-pink-600",
+  "totalLessons": 4,
+  "lessons": [
+    {
+      "id": "rte-01",
+      "slug": "vitest-react-testing-library-principles",
+      "title": "Tư Duy Testing Chuẩn với Vitest & React Testing Library (RTL)",
+      "summary": "Nguyên lý 'The more your tests resemble the way your software is used, the more confidence they can give you' và quy tắc chọn Query.",
+      "durationMinutes": 18,
+      "level": "intermediate",
+      "tags": ["Testing", "Vitest", "React Testing Library", "Best Practices"],
+      "mentalModel": "Đừng test cách code hoạt động bên trong (Implementation Details như state nội bộ hay tên biến), hãy test cách người dùng tương tác với giao diện (Click nút, gõ phím, nhìn thấy thông báo).",
+      "keyPoints": [
+        "Quy tắc ưu tiên Query của RTL: `getByRole` (khuyến nghị số 1) -> `getByLabelText` -> `getByPlaceholderText` -> `getByText` -> `getByTestId` (chỉ dùng khi không còn cách khác).",
+        "Sử dụng `@testing-library/user-event` thay vì `fireEvent` để mô phỏng chính xác các chuỗi sự kiện thật của người dùng (hover, focus, keydown, keyup).",
+        "Tránh lạm dụng `shallow rendering` hoặc kiểm tra trực tiếp state nội bộ của component."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Viết Unit Test chuẩn hành vi người dùng với Vitest & RTL",
+          "language": "tsx",
+          "beforeCode": "// ❌ Test chi tiết cài đặt (Implementation details) - dễ vỡ khi refactor\ntest('renders counter', () => {\n  const wrapper = shallow(<Counter />);\n  expect(wrapper.state('count')).toBe(0); // ❌ Kiểm tra trực tiếp state nội bộ\n  wrapper.instance().increment(); // ❌ Gọi trực tiếp hàm class/instance\n});",
+          "afterCode": "// ✅ Test hành vi người dùng bằng userEvent & getByRole\nimport { render, screen } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\nimport { describe, it, expect } from 'vitest';\nimport { Counter } from './Counter';\n\ndescribe('<Counter />', () => {\n  it('tăng số đếm khi người dùng click vào nút Tăng', async () => {\n    const user = userEvent.setup();\n    render(<Counter />);\n\n    const button = screen.getByRole('button', { name: /tăng số/i });\n    const countDisplay = screen.getByText(/giá trị hiện tại: 0/i);\n\n    expect(countDisplay).toBeInTheDocument();\n    await user.click(button);\n\n    expect(screen.getByText(/giá trị hiện tại: 1/i)).toBeInTheDocument();\n  });\n});",
+          "takeaway": "Test theo hành vi giúp bạn tự do refactor lại code bên trong component mà bộ test vẫn xanh (Passing)."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rte-01-1",
+          "question": "Theo khuyến nghị chính thức của React Testing Library, loại Query nào nên được ưu tiên hàng đầu khi tìm kiếm phần tử trên màn hình?",
+          "options": [
+            {
+              "key": "A",
+              "text": "`getByTestId`"
+            },
+            {
+              "key": "B",
+              "text": "`getByRole` (kết hợp với thuộc tính name có thể tiếp cận được như text bên trong nút hoặc aria-label)"
+            },
+            {
+              "key": "C",
+              "text": "`container.querySelector('.my-css-class')`"
+            },
+            {
+              "key": "D",
+              "text": "`getByTitle`"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "`getByRole` kiểm tra cấu trúc Semantic HTML và khả năng hỗ trợ người khiếm thị (Accessibility tree), phản ánh chân thực nhất cách người dùng và thiết bị Screen Reader tương tác với web."
+        }
+      ]
+    },
+    {
+      "id": "rte-02",
+      "slug": "mocking-network-msw-react-query",
+      "title": "Mocking Tầng Mạng với MSW (Mock Service Worker)",
+      "summary": "Chặn bắt request mạng ở tầng Service Worker để kiểm thử các trạng thái Loading, Error, Empty và Success của React Query mà không cần bật backend thật.",
+      "durationMinutes": 20,
+      "level": "advanced",
+      "tags": ["MSW", "Mock Service Worker", "Integration Testing", "TanStack Query"],
+      "mentalModel": "Thay vì mock hàm `fetch` hay `axios` bằng `vi.fn()` (dễ bị sót hoặc giả lập sai cấu trúc HTTP), MSW can thiệp ở tầng mạng trình duyệt (Network Layer) để trả về response chuẩn xác như một máy chủ API thật.",
+      "keyPoints": [
+        "MSW sử dụng các handler khai báo declarative: `http.get('/api/users', () => HttpResponse.json(...))`.",
+        "Dễ dàng giả lập các mã lỗi HTTP thực tế: 401 Unauthorized, 403 Forbidden, 429 Rate Limit, 500 Server Error.",
+        "Kiểm thử trọn vẹn luồng Fetching, Re-fetching, Caching và Invalidation của TanStack Query trong môi trường test cô lập."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Thiết lập MSW Handler và Test Async Component",
+          "language": "tsx",
+          "beforeCode": "// ❌ Mock axios thủ công - khó kiểm soát các trường hợp lỗi mạng phức tạp\nvi.mock('axios');\naxios.get.mockResolvedValue({ data: [{ id: '1', name: 'Nam' }] });",
+          "afterCode": "// ✅ Chuẩn MSW: Intercept tầng HTTP thực thụ\nimport { http, HttpResponse } from 'msw';\nimport { setupServer } from 'msw/node';\nimport { render, screen, waitFor } from '@testing-library/react';\nimport { UserList } from './UserList';\nimport { TestQueryClientProvider } from '@/test/test-utils';\n\nconst server = setupServer(\n  http.get('/api/users', () => {\n    return HttpResponse.json([{ id: '1', name: 'Nguyễn Văn Nam' }]);\n  })\n);\n\nbeforeAll(() => server.listen());\nafterEach(() => server.resetHandlers());\nafterAll(() => server.close());\n\ntest('hiển thị danh sách người dùng khi tải thành công', async () => {\n  render(\n    <TestQueryClientProvider>\n      <UserList />\n    </TestQueryClientProvider>\n  );\n\n  expect(screen.getByText(/đang tải.../i)).toBeInTheDocument();\n  expect(await screen.findByText('Nguyễn Văn Nam')).toBeInTheDocument();\n});",
+          "takeaway": "MSW chạy được trong cả Unit test (Node.js) lẫn Live Browser Development, tiết kiệm 80% thời gian viết mock data."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rte-02-1",
+          "question": "Lợi thế vượt trội của Mock Service Worker (MSW) so với việc `vi.spyOn(global, 'fetch')` là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "MSW bắt chặn ở tầng mạng thực thụ (Network level) giống hệt hành vi trình duyệt, không phụ thuộc vào thư viện HTTP client cụ thể (fetch, axios, ky)"
+            },
+            {
+              "key": "B",
+              "text": "MSW tự động tạo database PostgreSQL trên máy tính"
+            },
+            {
+              "key": "C",
+              "text": "MSW chỉ hỗ trợ các ứng dụng Vue"
+            },
+            {
+              "key": "D",
+              "text": "MSW giúp code chạy không cần cài đặt Node.js"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "MSW can thiệp ở tầng mạng, cho phép code ứng dụng sử dụng bất kỳ thư viện fetch/axios nào mà không phải chỉnh sửa code để phục vụ cho việc testing."
+        }
+      ]
+    },
+    {
+      "id": "rte-03",
+      "slug": "testing-custom-hooks-and-zustand-stores",
+      "title": "Kiểm Thử Custom Hooks & Zustand Store Độc Lập",
+      "summary": "Sử dụng renderHook, act() và test-isolation để kiểm thử các Custom Hooks phức tạp và kiểm tra logic chuyển đổi trạng thái của Zustand Store.",
+      "durationMinutes": 18,
+      "level": "intermediate",
+      "tags": ["Testing Custom Hooks", "renderHook", "act()", "Zustand Testing"],
+      "mentalModel": "Custom Hooks không thể gọi trực tiếp như hàm JS thông thường vì chúng chứa logic React Hooks. Hàm `renderHook` bọc hook vào một component giả lập vô hình để bạn kiểm tra giá trị `result.current`.",
+      "keyPoints": [
+        "`renderHook(() => useCustomHook())` cung cấp biến `result.current` để đọc giá trị mới nhất của hook sau mỗi lần cập nhật.",
+        "Mọi hành động trigger thay đổi state trong hook (như gọi hàm callback) BẮT BUỘC phải được bọc bên trong `act(() => { ... })`.",
+        "Đối với Zustand Store, có thể test trực tiếp các action bằng cách gọi `useStore.getState().myAction()` mà không nhất thiết phải render component."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Kiểm thử Custom Hook useCounter với renderHook & act",
+          "language": "typescript",
+          "beforeCode": "// ❌ Lỗi 'Invalid hook call' khi gọi hook như hàm thông thường\ntest('useCounter', () => {\n  const { count, increment } = useCounter(); // ❌ Báo lỗi vì nằm ngoài React Component!\n});",
+          "afterCode": "// ✅ Dùng renderHook & act từ @testing-library/react\nimport { renderHook, act } from '@testing-library/react';\nimport { describe, it, expect } from 'vitest';\nimport { useCounter } from './useCounter';\n\ndescribe('useCounter', () => {\n  it('khởi tạo giá trị mặc định và tăng đếm chính xác', () => {\n    const { result } = renderHook(() => useCounter(10));\n\n    expect(result.current.count).toBe(10);\n\n    act(() => {\n      result.current.increment();\n    });\n\n    expect(result.current.count).toBe(11);\n  });\n});",
+          "takeaway": "renderHook giúp bạn kiểm thử độc lập 100% logic nghiệp vụ của Hook trước khi ghép vào giao diện UI."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rte-03-1",
+          "question": "Tại sao cần bọc các thao tác gọi hàm thay đổi state của Hook vào hàm `act(() => { ... })` khi test?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Để React hoàn tất toàn bộ chu kỳ tính toán render, flush các effect và cập nhật DOM ảo trước khi chạy câu lệnh expect kiểm tra"
+            },
+            {
+              "key": "B",
+              "text": "Để tăng tốc độ CPU"
+            },
+            {
+              "key": "C",
+              "text": "Để mã hóa dữ liệu nhạy cảm"
+            },
+            {
+              "key": "D",
+              "text": "Vì cú pháp JavaScript yêu cầu bắt buộc"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "`act()` đảm bảo tất cả các cập nhật state bất đồng bộ và effect liên quan đã được áp dụng đầy đủ vào `result.current` trước khi bạn tiến hành assertion."
+        }
+      ]
+    },
+    {
+      "id": "rte-04",
+      "slug": "accessibility-a11y-and-error-resilience",
+      "title": "Accessibility (a11y) & Kiến Trúc Chịu Lỗi (Error Resilience)",
+      "summary": "Tối ưu khả năng tiếp cận WCAG với ARIA roles, điều hướng bàn phím hoàn hảo và thiết lập React Error Boundary đa tầng.",
+      "durationMinutes": 20,
+      "level": "advanced",
+      "tags": ["a11y", "Accessibility", "Error Boundary", "Production Ready"],
+      "mentalModel": "Một ứng dụng cấp Enterprise không bao giờ để toàn bộ trang web bị trắng (White Screen of Death) khi một widget nhỏ gặp sự cố. Error Boundary cô lập lỗi và cung cấp giao diện phục hồi (Graceful Degradation).",
+      "keyPoints": [
+        "Tuân thủ nguyên tắc WCAG: độ tương phản màu sắc đạt chuẩn, luôn có `alt` cho hình ảnh và `aria-label` cho các icon buttons.",
+        "Đảm bảo toàn bộ tương tác có thể thực hiện 100% bằng bàn phím (Focus Trap trong Modal/Dialog, TabIndex, phím Escape để đóng).",
+        "Triển khai Error Boundary đa cấp (Global Error Boundary + Feature Widget Error Boundary) để người dùng có nút 'Thử lại' mà không mất toàn bộ dữ liệu form."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Thiết lập Modal chuẩn Accessibility (Focus Trap & ARIA) & Error Boundary",
+          "language": "tsx",
+          "beforeCode": "// ❌ Thẻ div không thể bấm bằng bàn phím, thiếu ARIA attributes\n<div className=\"modal\" onClick={closeModal}>\n  <div className=\"btn-close\" onClick={closeModal}>X</div>\n  <p>Nội dung modal</p>\n</div>",
+          "afterCode": "// ✅ Chuẩn Accessible Modal & Kháng lỗi\nimport React, { useEffect, useRef } from 'react';\n\ninterface AccessibleModalProps {\n  isOpen: boolean;\n  onClose: () => void;\n  title: string;\n  children: React.ReactNode;\n}\n\nexport function AccessibleModal({ isOpen, onClose, title, children }: AccessibleModalProps) {\n  const dialogRef = useRef<HTMLDivElement>(null);\n\n  useEffect(() => {\n    const handleKeyDown = (e: KeyboardEvent) => {\n      if (e.key === 'Escape') onClose();\n    };\n    if (isOpen) window.addEventListener('keydown', handleKeyDown);\n    return () => window.removeEventListener('keydown', handleKeyDown);\n  }, [isOpen, onClose]);\n\n  if (!isOpen) return null;\n\n  return (\n    <div\n      role=\"dialog\"\n      aria-modal=\"true\"\n      aria-labelledby=\"modal-title\"\n      className=\"fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm\"\n    >\n      <div ref={dialogRef} className=\"w-full max-w-lg rounded-2xl bg-card p-6 shadow-2xl\">\n        <h2 id=\"modal-title\" className=\"text-lg font-bold\">{title}</h2>\n        <div className=\"py-4\">{children}</div>\n        <button onClick={onClose} aria-label=\"Đóng hộp thoại\" className=\"mt-2 rounded-lg bg-primary px-4 py-2 text-primary-foreground\">\n          Đóng\n        </button>\n      </div>\n    </div>\n  );\n}",
+          "takeaway": "Ứng dụng đạt chuẩn Accessibility và Error Boundary là tiêu chí quyết định của lập trình viên mức độ Senior/Lead."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rte-04-1",
+          "question": "Khi một Component con trong React ném ra một lỗi Runtime trong hàm render, điều gì sẽ xảy ra nếu KHÔNG có Error Boundary bao bọc xung quanh?",
+          "options": [
+            {
+              "key": "A",
+              "text": "React sẽ tự động bỏ qua lỗi và render giá trị null"
+            },
+            {
+              "key": "B",
+              "text": "Toàn bộ cây Component của trang web sẽ bị unmount và người dùng sẽ thấy một màn hình trắng tinh (Crash UI)"
+            },
+            {
+              "key": "C",
+              "text": "Trình duyệt tự động reload lại trang"
+            },
+            {
+              "key": "D",
+              "text": "Next.js sẽ chuyển hướng về trang chủ"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Từ React 16 trở đi, các lỗi không được bắt (uncaught errors) trong render phase sẽ khiến toàn bộ cây React unmount hoàn toàn để tránh hiển thị dữ liệu sai lệch."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,216 @@
+{
+  "id": "track-react-performance-patterns",
+  "slug": "react-performance-advanced-patterns",
+  "title": "Advanced React Patterns & Performance Mastery (Intermediate to Senior)",
+  "description": "Làm chủ các mẫu kiến trúc và tối ưu hiệu năng đỉnh cao: React Concurrency (useTransition / useDeferredValue), Compound Components, Zustand v5 Slices Architecture và Virtualization cho 10k+ items.",
+  "iconName": "Flame",
+  "color": "from-amber-500 to-rose-600",
+  "totalLessons": 4,
+  "lessons": [
+    {
+      "id": "rpp-01",
+      "slug": "react-concurrency-usetransition-usedeferredvalue",
+      "title": "React Concurrency: useTransition & useDeferredValue",
+      "summary": "Tạo giao diện mượt mà không bị đơ giật với Concurrent Rendering; phân biệt Urgent vs Non-urgent state transitions.",
+      "durationMinutes": 18,
+      "level": "advanced",
+      "tags": ["React Concurrency", "useTransition", "useDeferredValue", "Performance"],
+      "mentalModel": "Không phải mọi cập nhật state đều có độ ưu tiên như nhau. Nhập phím vào ô input là khẩn cấp (Urgent - cần phản hồi tức thì), còn render lại danh sách 5000 kết quả tìm kiếm là chuyển cảnh không khẩn cấp (Non-urgent Transition - có thể tạm dừng/ngắt quãng để ưu tiên gõ phím).",
+      "keyPoints": [
+        "`useTransition` bọc các tác vụ cập nhật state nặng vào hàm `startTransition()`, cung cấp cờ `isPending` để hiển thị spinner mượt mà.",
+        "`useDeferredValue` nhận vào một giá trị prop/state và tự động tạo ra một bản sao giá trị có độ ưu tiên thấp hơn (trì hoãn render phần nặng).",
+        "Concurrent Rendering giúp React không còn chặn đứng (block) Main Thread khi render các cây component lớn."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Tối ưu danh sách tìm kiếm nặng với useTransition",
+          "language": "tsx",
+          "beforeCode": "// ❌ Ô gõ phím bị đơ, giật lag vì phải render 2000 items cùng lúc với cập nhật input\nfunction SearchDemo() {\n  const [query, setQuery] = useState('');\n  const [filteredList, setFilteredList] = useState(allData);\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    setQuery(e.target.value); // Khẩn cấp\n    setFilteredList(allData.filter(item => item.includes(e.target.value))); // Nặng -> Block UI!\n  };\n}",
+          "afterCode": "// ✅ Tách bạch Urgent State vs Non-Urgent Transition với useTransition\nimport { useState, useTransition } from 'react';\n\nfunction SearchDemo() {\n  const [query, setQuery] = useState('');\n  const [filteredList, setFilteredList] = useState(allData);\n  const [isPending, startTransition] = useTransition();\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    setQuery(e.target.value); // 1. Cập nhật input tức thì (60 FPS)\n\n    startTransition(() => {\n      // 2. Chuyển tác vụ tính toán lọc danh sách vào hàng đợi nền\n      setFilteredList(allData.filter(item => item.includes(e.target.value)));\n    });\n  };\n\n  return (\n    <div>\n      <input value={query} onChange={handleChange} placeholder=\"Tìm kiếm...\" />\n      {isPending && <span className=\"text-xs text-muted-foreground\">Đang lọc kết quả...</span>}\n      <HeavyList items={filteredList} opacity={isPending ? 0.6 : 1} />\n    </div>\n  );\n}",
+          "takeaway": "useTransition giữ cho người dùng gõ phím mượt mà ở 60 FPS dù phía dưới đang render hàng ngàn item phức tạp."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rpp-01-1",
+          "question": "Sự khác biệt cốt lõi giữa `useTransition` và `useDeferredValue` là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "`useTransition` dùng khi bạn có quyền kiểm soát hàm cập nhật setState, còn `useDeferredValue` dùng khi bạn nhận giá trị từ bên ngoài (như Props) mà không trực tiếp gọi setState"
+            },
+            {
+              "key": "B",
+              "text": "`useDeferredValue` chỉ dùng được trên Next.js Server Components"
+            },
+            {
+              "key": "C",
+              "text": "`useTransition` là API cũ của React 16"
+            },
+            {
+              "key": "D",
+              "text": "Cả hai hoàn toàn giống nhau 100% về cú pháp và cách gọi"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "`useTransition` bọc hàm setState bên trong callback `startTransition(() => setState())`. Trong khi đó, `useDeferredValue(value)` nhận vào một giá trị (thường từ props hoặc store bên ngoài) và tạo ra bản sao render trễ."
+        }
+      ]
+    },
+    {
+      "id": "rpp-02",
+      "slug": "compound-components-and-control-inversion",
+      "title": "Pattern Kiến Trúc: Compound Components & Inversion of Control",
+      "summary": "Thiết kế hệ thống UI Component linh hoạt như các thẻ HTML nguyên bản (Select/Tabs/Accordion) bằng Compound Components và Context ngầm.",
+      "durationMinutes": 20,
+      "level": "advanced",
+      "tags": [
+        "Design Patterns",
+        "Compound Components",
+        "Inversion of Control",
+        "UI Architecture"
+      ],
+      "mentalModel": "Compound Components tương tự như cặp thẻ `<select>` và `<option>` trong HTML: chúng chia sẻ state ngầm định với nhau nhưng cho phép lập trình viên tự do sắp xếp layout và JSX con theo ý muốn.",
+      "keyPoints": [
+        "Tránh tạo ra 'God Component' với hàng chục boolean flags (`hasIcon`, `isSmall`, `showHeader`, `footerStyle`).",
+        "Compound Components sử dụng React Context nội bộ để giao tiếp giữa Component cha (Container) và các Component con (Item, Trigger, Content).",
+        "Inversion of Control (IoC) trao quyền quyết định cấu trúc và vị trí render cho người sử dụng component."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Xây dựng Tabs Compound Component chuẩn kiến trúc",
+          "language": "tsx",
+          "beforeCode": "// ❌ God Component: Nhận mảng data cố định, khó tùy biến layout hay thêm icon\n<Tabs\n  data={[{ title: 'Tab 1', content: <p>Nội dung 1</p> }]}\n  theme=\"dark\"\n  showIcon={true}\n/>",
+          "afterCode": "// ✅ Compound Components: Linh hoạt tối đa, tự do cấu trúc JSX\nimport React, { createContext, useContext, useState } from 'react';\n\nconst TabsContext = createContext<{ active: string; setActive: (id: string) => void } | null>(null);\n\nexport function Tabs({ defaultValue, children }: { defaultValue: string; children: React.ReactNode }) {\n  const [active, setActive] = useState(defaultValue);\n  return <TabsContext.Provider value={{ active, setActive }}><div className=\"tabs-root\">{children}</div></TabsContext.Provider>;\n}\n\nTabs.Trigger = function TabTrigger({ value, children }: { value: string; children: React.ReactNode }) {\n  const ctx = useContext(TabsContext)!;\n  return (\n    <button\n      className={ctx.active === value ? 'font-bold border-b-2 text-primary' : 'text-muted-foreground'}\n      onClick={() => ctx.setActive(value)}\n    >\n      {children}\n    </button>\n  );\n};\n\nTabs.Content = function TabContent({ value, children }: { value: string; children: React.ReactNode }) {\n  const ctx = useContext(TabsContext)!;\n  if (ctx.active !== value) return null;\n  return <div className=\"tab-panel p-4\">{children}</div>;\n};",
+          "takeaway": "Người dùng có thể chèn bất kỳ thành phần nào vào giữa các Tab (banner quảng cáo, thanh search, button phụ) mà không bị giới hạn."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rpp-02-1",
+          "question": "Lợi ích lớn nhất của Compound Component Pattern là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Tăng dung lượng bundle JavaScript để bảo mật code"
+            },
+            {
+              "key": "B",
+              "text": "Giúp component linh hoạt, dễ tùy biến giao diện con (Inversion of Control) mà không cần truyền hàng chục config props phức tạp vào component cha"
+            },
+            {
+              "key": "C",
+              "text": "Bắt buộc phải kết hợp với Redux Toolkit"
+            },
+            {
+              "key": "D",
+              "text": "Chỉ chạy được trên hệ điều hành Linux"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Compound Components phân tách trách nhiệm rõ ràng, chia sẻ state nội bộ qua Context và trao quyền sắp xếp giao diện linh hoạt cho lập trình viên."
+        }
+      ]
+    },
+    {
+      "id": "rpp-03",
+      "slug": "zustand-v5-state-slices-architecture",
+      "title": "Kiến Trúc Quản Lý State Toàn Cục với Zustand v5",
+      "summary": "Xây dựng Store chuẩn Enterprise: Atomic Selectors chống re-render, Slice Pattern tách module và Middleware Persist.",
+      "durationMinutes": 20,
+      "level": "intermediate",
+      "tags": ["Zustand v5", "Global State", "Selectors", "Slices Pattern"],
+      "mentalModel": "Zustand hoạt động bên ngoài React (External Store) và sử dụng cơ chế Subscription trực tiếp (`useSyncExternalStore`). Chỉ những component chọn chính xác thuộc tính (qua Selector) mới bị kích hoạt re-render khi thuộc tính đó thay đổi.",
+      "keyPoints": [
+        "Luôn luôn sử dụng Atomic Selectors (ví dụ: `useStore(s => s.user)`) thay vì gọi toàn bộ Store `useStore()` để tránh re-render diện rộng.",
+        "Sử dụng Slices Pattern để chia nhỏ Store thành nhiều tính năng độc lập (AuthSlice, CartSlice, SettingSlice).",
+        "Tích hợp middleware `persist` và `devtools` một cách liền mạch mà không cần boilerplate phức tạp như Redux."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Xây dựng Zustand Store với Atomic Selectors & Persist",
+          "language": "typescript",
+          "beforeCode": "// ❌ Anti-pattern: Destructure trực tiếp từ hook store gây re-render khi bất kỳ state nào đổi\nfunction Header() {\n  const { user, cartItems, notifications, changeTheme } = useAppStore();\n  // Dù chỉ dùng 'user', component này vẫn bị re-render khi cartItems hoặc notifications đổi!\n  return <div>{user.name}</div>;\n}",
+          "afterCode": "// ✅ Chuẩn Zustand v5: Sử dụng Atomic Selectors riêng biệt\nimport { create } from 'zustand';\nimport { persist, createJSONStorage } from 'zustand/middleware';\n\ninterface UserState {\n  user: { name: string; email: string } | null;\n  setUser: (u: { name: string; email: string } | null) => void;\n}\n\nexport const useUserStore = create<UserState>()(\n  persist(\n    (set) => ({\n      user: null,\n      setUser: (user) => set({ user }),\n    }),\n    {\n      name: 'user-storage',\n      storage: createJSONStorage(() => localStorage),\n    }\n  )\n);\n\n// Trong component:\nfunction Header() {\n  const user = useUserStore((state) => state.user); // ✅ Chỉ re-render khi 'user' thay đổi\n  return <div>{user?.name ?? 'Khách'}</div>;\n}",
+          "takeaway": "Atomic Selectors của Zustand đem lại hiệu năng vượt trội và loại bỏ hoàn toàn vấn đề Provider Hell."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rpp-03-1",
+          "question": "Tại sao gọi `const state = useStore()` (không truyền selector) là một Anti-pattern trong Zustand?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Vì nó khiến Component re-render mỗi khi BẤT KỲ thuộc tính nào trong Store thay đổi, kể cả các thuộc tính component không dùng"
+            },
+            {
+              "key": "B",
+              "text": "Vì TypeScript sẽ báo lỗi biên dịch"
+            },
+            {
+              "key": "C",
+              "text": "Vì nó làm mất dữ liệu trong LocalStorage"
+            },
+            {
+              "key": "D",
+              "text": "Vì Zustand chỉ cho phép dùng selector với dữ liệu kiểu chuỗi"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Zustand so sánh kết quả trả về của selector. Nếu không truyền selector, kết quả so sánh luôn là toàn bộ store object (tham chiếu mới khi có bất kỳ thay đổi nào), gây re-render toàn diện."
+        }
+      ]
+    },
+    {
+      "id": "rpp-04",
+      "slug": "react-devtools-profiler-and-virtualization",
+      "title": "Profiling Hiệu Năng & Ảo Hóa Danh Sách (Virtualization)",
+      "summary": "Sử dụng React DevTools Profiler để phát hiện commit nghẽn và ảo hóa danh sách 10,000+ items với TanStack Virtual.",
+      "durationMinutes": 22,
+      "level": "advanced",
+      "tags": ["Profiler", "Virtualization", "TanStack Virtual", "Performance"],
+      "mentalModel": "Trình duyệt chỉ có thể hiển thị tối đa khoảng 15-20 phần tử trên màn hình cùng một lúc. Kỹ thuật Virtualization chỉ render đúng những DOM node nằm trong khung nhìn (Viewport) và tái sử dụng chúng khi cuộn.",
+      "keyPoints": [
+        "Dùng React DevTools Profiler (tab Flamegraph & Ranked chart) để xác định chính xác component nào render lâu và lý do re-render (Why did this render).",
+        "Khi hiển thị danh sách từ 500 phần tử trở lên có giao diện phức tạp, Virtualization là giải pháp bắt buộc để tránh crash bộ nhớ RAM của trình duyệt.",
+        "Sử dụng `@tanstack/react-virtual` để quản lý vị trí cuộn mượt mà với dynamic height."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Ảo hóa danh sách 10,000 items với @tanstack/react-virtual",
+          "language": "tsx",
+          "beforeCode": "// ❌ Render trực tiếp 10,000 DOM Nodes làm trình duyệt đơ và tốn 500MB RAM\nfunction BigList({ items }: { items: string[] }) {\n  return (\n    <div className=\"overflow-auto h-[400px]\">\n      {items.map((item, idx) => (\n        <div key={idx} className=\"h-10 border-b\">{item}</div>\n      ))}\n    </div>\n  );\n}",
+          "afterCode": "// ✅ Áo hóa: Chỉ render ~15 DOM nodes nhìn thấy được trong viewport\nimport { useRef } from 'react';\nimport { useVirtualizer } from '@tanstack/react-virtual';\n\nfunction VirtualizedList({ items }: { items: string[] }) {\n  const parentRef = useRef<HTMLDivElement>(null);\n\n  const rowVirtualizer = useVirtualizer({\n    count: items.length,\n    getScrollElement: () => parentRef.current,\n    estimateSize: () => 40, // Chiều cao ước tính mỗi dòng (px)\n    overscan: 5,\n  });\n\n  return (\n    <div ref={parentRef} className=\"h-[400px] overflow-auto border rounded-xl\">\n      <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>\n        {rowVirtualizer.getVirtualItems().map((virtualRow) => (\n          <div\n            key={virtualRow.index}\n            className=\"absolute left-0 top-0 w-full h-10 px-4 flex items-center border-b\"\n            style={{ transform: `translateY(${virtualRow.start}px)` }}\n          >\n            {items[virtualRow.index]}\n          </div>\n        ))}\n      </div>\n    </div>\n  );\n}",
+          "takeaway": "Dung lượng DOM luôn giữ ở mức tối thiểu (< 30 nodes), cuộn danh sách 100k items vẫn đạt chuẩn 60 FPS mượt mà."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rpp-04-1",
+          "question": "Nguyên lý hoạt động chính của kỹ thuật List Virtualization là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Nén toàn bộ dữ liệu thành ảnh PNG để hiển thị"
+            },
+            {
+              "key": "B",
+              "text": "Chỉ tạo và render các phần tử DOM nằm trong vùng nhìn thấy (Viewport) cộng thêm một lượng đệm nhỏ (overscan), thay vì vẽ hàng ngàn phần tử cùng lúc"
+            },
+            {
+              "key": "C",
+              "text": "Gửi bớt dữ liệu sang Service Worker"
+            },
+            {
+              "key": "D",
+              "text": "Tự động chia trang (pagination) trên URL"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Virtualization tính toán vị trí cuộn và chỉ mount các DOM elements trong khung nhìn người dùng, giúp tiết kiệm bộ nhớ và giữ tốc độ cuộn ở 60 FPS."
+        }
+      ]
+    }
+  ]
+}

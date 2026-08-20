@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { OverviewData } from '@/features/overview/types';
 
-export async function GET() {
-  // Simulate standard network latency (e.g. 150ms)
-  await new Promise((resolve) => setTimeout(resolve, 150));
+export const dynamic = 'force-static';
 
+export async function GET() {
   const mockData: OverviewData = {
     metrics: [
       {
