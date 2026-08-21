@@ -12,7 +12,6 @@ if (isGithubActions && !basePath) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
   basePath: basePath || undefined,
   assetPrefix: assetPrefix || undefined,
   reactStrictMode: true,

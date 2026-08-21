@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { OverviewData } from '@/features/overview/types';
 
-export const dynamic = 'force-static';
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   const mockData: OverviewData = {

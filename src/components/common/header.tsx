@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Layers, Sparkles, BookOpen, Briefcase, Home, Github } from 'lucide-react';
+import { Layers, Sparkles, BookOpen, Briefcase, Home, Github, Cpu } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ export function Header() {
     { href: '/', label: 'Overview', icon: Home },
     { href: '/learn', label: 'Lộ Trình Học', icon: BookOpen },
     { href: '/interview', label: 'Phỏng Vấn', icon: Briefcase },
+    { href: '/system-design', label: 'System Design', icon: Cpu },
   ];
 
   return (

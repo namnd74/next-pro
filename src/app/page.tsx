@@ -11,6 +11,7 @@ import {
   BookOpen,
   Briefcase,
   ArrowRight,
+  Cpu,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -30,7 +31,7 @@ export default function HomePage() {
       <section className="space-y-4 pb-4 pt-4 text-center">
         <div className="mb-2 inline-flex animate-pulse-subtle items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary shadow-sm">
           <Sparkles className="h-3.5 w-3.5" />
-          <span>React 19 & Next.js 15 Fast-Track</span>
+          <span>React 19 & Next.js 16 Full-Stack Studio</span>
           <span className="h-1 w-1 rounded-full bg-primary" />
           <span className="text-muted-foreground">Production & Interview Ready</span>
         </div>
@@ -43,8 +44,8 @@ export default function HomePage() {
         </h1>
 
         <p className="mx-auto max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-          Nền tảng học tập 80/20, trắc nghiệm 60s Blitz Quiz và luyện phỏng vấn kỹ thuật
-          thực chiến dành cho lập trình viên React 19 & Next.js 15 App Router.
+          Nền tảng học tập 80/20, trắc nghiệm 60s Blitz Quiz, luyện phỏng vấn kỹ thuật và
+          Studio System Design tương tác dành cho Senior/Staff Engineers.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -61,49 +62,81 @@ export default function HomePage() {
               <span>Luyện Phỏng Vấn (Mock Simulator)</span>
             </Button>
           </Link>
+
+          <Link href="/system-design">
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2 border-indigo-500/30 font-semibold text-indigo-400 hover:bg-indigo-500/10"
+            >
+              <Cpu className="h-4 w-4 text-indigo-400" />
+              <span>System Design Studio</span>
+            </Button>
+          </Link>
         </div>
       </section>
 
-      {/* 2 Featured Quick Access Cards */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* 3 Featured Quick Access Cards */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Link href="/learn" className="group">
-          <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
+          <Card className="glass-card glass-card-hover relative flex h-full flex-col justify-between overflow-hidden p-6">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-600" />
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-500">
-                  <BookOpen className="h-5 w-5" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground transition-colors group-hover:text-primary">
-                  Lộ Trình Học & Mental Model
-                </h3>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  React 19 Actions, App Router RSC vs Client, Streaming Suspense, TanStack
-                  Query v5 & Zustand.
-                </p>
+            <div className="space-y-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-500">
+                <BookOpen className="h-5 w-5" />
               </div>
-              <ArrowRight className="mt-2 h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+              <h3 className="text-lg font-bold text-foreground transition-colors group-hover:text-primary">
+                Lộ Trình Học & Mental Model
+              </h3>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                React 19 Actions, App Router RSC vs Client, Streaming Suspense, TanStack
+                Query v5 & Zustand.
+              </p>
+            </div>
+            <div className="flex items-center justify-end pt-4">
+              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
             </div>
           </Card>
         </Link>
 
         <Link href="/interview" className="group">
-          <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
+          <Card className="glass-card glass-card-hover relative flex h-full flex-col justify-between overflow-hidden p-6">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-600" />
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500">
-                  <Briefcase className="h-5 w-5" />
-                </div>
-                <h3 className="text-lg font-bold text-foreground transition-colors group-hover:text-primary">
-                  Luyện Phỏng Vấn Kỹ Thuật
-                </h3>
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Mock Interview Simulator bấm giờ & chấm điểm, 100+ Senior Q&A Bank, và
-                  Bug Hunting Challenge.
-                </p>
+            <div className="space-y-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500">
+                <Briefcase className="h-5 w-5" />
               </div>
-              <ArrowRight className="mt-2 h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+              <h3 className="text-lg font-bold text-foreground transition-colors group-hover:text-primary">
+                Luyện Phỏng Vấn Kỹ Thuật
+              </h3>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Mock Interview Simulator bấm giờ & chấm điểm, 100+ Senior Q&A Bank, và Bug
+                Hunting Challenge.
+              </p>
+            </div>
+            <div className="flex items-center justify-end pt-4">
+              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+            </div>
+          </Card>
+        </Link>
+
+        <Link href="/system-design" className="group">
+          <Card className="glass-card glass-card-hover relative flex h-full flex-col justify-between overflow-hidden p-6">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-600" />
+            <div className="space-y-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
+                <Cpu className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground transition-colors group-hover:text-primary">
+                System Design Studio
+              </h3>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Whiteboard tương tác mô phỏng kiến trúc Netflix, Figma & E-Commerce với
+                engine kiểm tra sức khỏe tự động.
+              </p>
+            </div>
+            <div className="flex items-center justify-end pt-4">
+              <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
             </div>
           </Card>
         </Link>
