@@ -1,0 +1,173 @@
+{
+  "trackSlug": "react-19-compiler-path",
+  "missions": [
+    {
+      "id": "r19-mis-01",
+      "slug": "impure-render-sabotage",
+      "title": "Chiến dịch 01 · Phá hợp đồng thuần khiết: khi render đọc thời gian thực",
+      "summary": "Math.random() và Date.now() trong body component vô hiệu hóa toàn bộ memoization của React Compiler. Hiểu hợp đồng purity, thấy hậu quả memo cache miss, và viết code 'sạch' đúng chuẩn compiler.",
+      "objective": "Chứng minh một hàm không thuần trong render phá hủy giả định caching của compiler (giá trị đổi mỗi lần nhưng deps 'không đổi'), dẫn tới UI bất nhất và re-render dại, sau đó tái cấu trúc về nguồn sự thật duy nhất.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 22,
+      "vectorIds": ["r19-vec-01"],
+      "rootCause": "React Compiler tự động memoize bằng giả định RENDER LÀ HÀM THUẦN: cùng input → cùng output, không side-effect, không đọc dữ liệu biến đổi ngoài hệ thống (Date.now, Math.random, module-level mutable). Khi component vi phạm, compiler vẫn cache theo deps nó nhìn thấy — nhưng output thật khác nhau mỗi lần chạy, sinh ra hai loại lỗi: giá trị hiển thị KHÔNG KHỚP với state hiện tại (cache hit trả kết quả cũ), hoặc ngược lại cache miss liên tục khiến tối ưu vô dụng. Gốc rễ: purity không phải quy tắc thẩm mỹ mà là TIỀN ĐỀ VẬT LÝ để 'nhớ kết quả theo input' có nghĩa.",
+      "reconNotes": [
+        "Grep trong body render: Math.random, Date.now, performance.now, new Date().",
+        "Tìm mutation biến module-scope hoặc biến bên ngoài closure trong render.",
+        "Bật eslint-plugin-react-compiler (hoặc Health Check trên App): liệt kê component skip compile.",
+        "So sánh UI giữa StrictMode double-render — giá trị 'random' khác nhau giữa hai lần là dấu hiệu."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Viết component vi phạm",
+          "detail": "Badge 'Cập nhật lúc' gọi Date.now() ngay trong render; compiler memo theo props [updatedAt] — vốn hiếm đổi.",
+          "code": "function FreshnessBadge({ updatedAt }: { updatedAt: string }) {\n  const now = Date.now(); // 💀 impure\n  const diff = Math.floor((now - new Date(updatedAt).getTime()) / 60000);\n  return <span>{diff} phút trước</span>;\n}"
+        },
+        {
+          "title": "2 · Compiler cache hit sai thực tế",
+          "detail": "Props không đổi → compiler trả KẾT QUẢ ĐÃ NHỚ từ lần trước: badge đứng yên ở '5 phút trước' mãi mãi dù đã nửa giờ — vì 'input' nhìn thấy không bao giờ đổi.",
+          "code": "// t=0: render → '5 phút trước' (cached)\n// t=30min: re-render cùng props → cache hit → vẫn '5 phút trước' 💀"
+        },
+        {
+          "title": "3 · Chiều ngược: random phá nhất quán",
+          "detail": "Component A/B test dùng Math.random() chọn variant trong render: mỗi lần compiler re-chạy (do parent đổi) variant NHẢY — user thấy giao diện đổi màu ngẫu nhiên giữa phiên.",
+          "code": "const variant = Math.random() > 0.5 ? 'red' : 'blue';\n// render#1: red, render#7 (parent update): blue 💀"
+        },
+        {
+          "title": "4 · Tái cấu trúc thuần khiết",
+          "detail": "Thời điểm tính toán chuyển sang nơi có vòng đời: derive trong event/effect rồi lưu state; hoặc compute từ props thuần (updatedAt + prop 'nowMinutes' do cha truyền). Compiler giờ cache ĐÚNG.",
+          "code": "// ✅ pure derive từ props\nfunction FreshnessBadge({ updatedAt, nowMinutes }) {\n  const diff = nowMinutes - toMinutes(updatedAt);\n  return <span>{Math.max(0, diff)} phút trước</span>;\n}\n// ✅ hoặc effect cập nhật state theo interval\nuseEffect(() => {\n  const id = setInterval(() => setNow(Date.now()), 60_000);\n  return () => clearInterval(id);\n}, []);"
+        }
+      ],
+      "hardeningChecklist": [
+        "Render chỉ đọc props/state/closure ổn định; cấm Date.now/Math.random/truy cập mutable module var trong JSX path.",
+        "Giá trị thời gian/random cần thiết phải là STATE được cập nhật qua effect/handler, hoặc prop từ tầng trên.",
+        "Bật eslint-plugin-react-compiler trong CI — component skip compile là tín hiệu vi phạm purity.",
+        "StrictMode double-invoke như bài test purity miễn phí: kết quả hai lần render phải giống hệt.",
+        "Side-effect (log/analytics/telemetry) đặt trong useEffect/event handler, không nằm trong render."
+      ],
+      "debrief": [
+        {
+          "question": "Code này trước compiler chạy 'vẫn đúng' mà?",
+          "answer": "Đúng là manual useMemo/useCallback cũ ít khi bọc Date.now nên mỗi render tính mới — 'đúng' nhưng đốt CPU. Compiler chủ động nhớ theo deps, biến thiếu thuần khiết thành bug hiển thị. Nâng cấp tooling siết chặt hợp đồng code cũ."
+        },
+        {
+          "question": "useMemo(() => Date.now(), []) có được coi là thuần?",
+          "answer": "Về mặt hành vi có thể chấp nhận được (một lần tính lúc mount), nhưng vẫn vi phạm chữ nghĩa purity của compiler analysis. Cách sạch: khởi tạo trong useState initializer — chính thức được thiết kế cho one-time computation."
+        }
+      ]
+    },
+    {
+      "id": "r19-mis-02",
+      "slug": "midrender-mutation-strike",
+      "title": "Chiến dịch 02 · Đột biến giữa render: sửa props/ref khi React đang nhìn",
+      "summary": "Ghi ref.current hoặc biến đổi object prop ngay trong render khiến compiler bỏ sót invalidation — UI đóng băng ở trạng thái cũ. Rèn kỷ luật immutability cho thời đại compiler.",
+      "objective": "Tạo stale UI chỉ bằng mutate-during-render, giải thích vì sao compiler không thể phát hiện (mutation vô hình với so sánh tham chiếu), và chuyển toàn bộ mutation sang đúng vị trí (event/effect).",
+      "difficulty": "advanced",
+      "estimatedMinutes": 20,
+      "vectorIds": ["r19-vec-02"],
+      "rootCause": "Compiler quyết định re-render bằng cách theo dõi ĐỌC/GHI qua các kênh reactive (props, state). Mutation tại chỗ (obj.field = x, arr.push) thay đổi NỘI DUNG mà không đổi THAM CHIẾU — với mọi cơ chế so sánh dựa trên identity, đây là thay đổi vô hình. Khi dev mutate trong render (vi phạm cổ điển của class era sống sót sang function era), compiler tin rằng 'không có gì thay đổi' và bỏ qua invalidation: dữ liệu thật mới, màn hình cũ. Đây là lý do React Docs liệt mutate-during-render vào nhóm lỗi compiler KHÔNG thể tự vá — nó phá chính ngôn ngữ mô tả thay đổi.",
+      "reconNotes": [
+        "Grep trong component body: ref.current = , obj.prop = , .push(, .sort( trực tiếp (không qua copy).",
+        "Kiểm tra helper mutate object nhận từ props ('normalize', 'sortList' gọi tại chỗ).",
+        "Bug report kiểu 'phải refresh trang mới thấy cập nhật' — dấu hiệu stale UI kinh điển.",
+        "So sánh data qua DevTools: state đúng, DOM sai."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Mutate trong render",
+          "detail": "Component 'chuẩn hóa' list ngay khi render: sort tại chỗ mảng nhận từ props.",
+          "code": "function SortedList({ items }: { items: Item[] }) {\n  items.sort((a,b) => a.name.localeCompare(b.name)); // 💀 in-place\n  return <ul>{items.map(...)}</ul>;\n}"
+        },
+        {
+          "title": "2 · Ô nhiễm ngược lên cha",
+          "detail": "Mảng là cùng tham chiếu với state của cha — sort con làm thay đổi data cha. Compiler của cha thấy state ref unchanged → KHÔNG re-render các consumer khác.",
+          "code": "// parent state items=[B,A]\n// child sort → cùng reference giờ [A,B]\n// parent's other children using items: NO RE-RENDER 💀"
+        },
+        {
+          "title": "3 · Stale UI lan tỏa",
+          "detail": "Thêm item mới vào cha: push vào cùng mảng rồi setState(sameRef) — không re-render nào xảy ra. Màn hình hiện danh sách cũ; DevTools state đã có item mới.",
+          "code": "items.push(newItem); setItems(items); // same ref\n// screen: old list\n// devtools state: new list 💀"
+        },
+        {
+          "title": "4 · Chuyển mutation về đúng nhà",
+          "detail": "Derive bằng non-mutating operator (toSorted) trong useMemo; mutation thật (thêm item) tạo array mới trong handler. Compiler theo dõi chuẩn, mọi consumer cập nhật đúng nhịp.",
+          "code": "// derive: non-mutating\nconst sorted = useMemo(\n  () => [...items].toSorted((a,b) => a.name.localeCompare(b.name)),\n  [items]\n);\n// mutate: trong event, immutable\nsetItems(prev => [...prev, newItem]);"
+        }
+      ],
+      "hardeningChecklist": [
+        "Render path là vùng cấm: không mutate props/state/ref/module vars; chỉ đọc và derive.",
+        "Toán tử non-mutating mặc định: toSorted/toReversed/toSpliced, spread, filter/map thay push/sort/reverse/splice.",
+        "ref.current chỉ ghi trong useEffect/event handler — không ghi trong render (kể cả lazy init phức tạp).",
+        "ESLint: bật rules cấm assignment tới props/params trong component file; review kỹ helper gọi trong render.",
+        "Test bất biến: sau action, assert object gốc không bị đổi (structuredClone snapshot before/after)."
+      ],
+      "debrief": [
+        {
+          "question": "Trước compiler, mutate trong render đã nguy hiểm chưa?",
+          "answer": "Có, dưới dạng khác: phá memo thủ công (deps unchanged), gây behavior lệch giữa strict-mode double render, và ô nhiễm dữ liệu cha. Compiler chỉ khuếch đại hậu quả thành stale UI rõ ràng hơn."
+        },
+        {
+          "question": "Sao compiler không tự phát hiện mutation và vá giúp?",
+          "answer": "Mutation là thao tác runtime trên tham chiếu — phân tích tĩnh có thể CẢNH BÁO pattern phổ biến nhưng không theo dõi được mọi đường mutate qua helper sâu. React chọn hợp đồng rõ ràng: developer giữ purity, compiler lo memoization."
+        }
+      ]
+    },
+    {
+      "id": "r19-mis-03",
+      "slug": "suspension-blackout",
+      "title": "Chiến dịch 03 · Cúp điện Suspense: use() ném promise không người đỡ",
+      "summary": "Một use(promise) đặt sai chỗ khiến cả route rơi vào fallback — nội dung đã render biến mất trắng. Học cách Suspense boundaries hoạt động như cầu chì và bố trí chúng ở đúng tầng lá.",
+      "objective": "Kích hoạt full-page fallback flash khi promise suspend, hiểu cơ chế bubble của promise lên boundary gần nhất, rồi bố trí granular Suspense giữ nguyên nội dung đã hiển thị.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 20,
+      "vectorIds": ["r19-vec-03"],
+      "rootCause": "use(promise)/component async hoạt động bằng cơ chế THROWING: promise đang pending được ném lên để React tạm dừng subtree và tìm <Suspense> gần nhất phía trên. Boundary nào bắt được thì subtree đó hiện fallback — nếu boundary duy nhất nằm ở root route, TOÀN TRANG thành skeleton dù 95% nội dung đã sẵn sàng. Gốc rễ: vị trí boundary là quyết định UX (granularity), không phải chi tiết kỹ thuật; đặt sai tầng = mất trạng thái hiển thị + layout shift + cảm giác chậm nhân đôi (nội dung biến mất rồi hiện lại).",
+      "reconNotes": [
+        "Tìm use(fetchPromise)/thenable trong client components — promise tạo ở đâu, dùng ở đâu?",
+        "Vẽ cây component: khoảng cách từ điểm suspend đến <Suspense> gần nhất.",
+        "Network throttle: quan sát có khoảnh khắc nội dung BIẾN MẤT thay vì chỉ loading ban đầu?",
+        "Kiểm tra key của Suspense: đổi key = reset boundary, mất cache trạng thái."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Promise bay không người đỡ",
+          "detail": "Widget comment fetch promise rồi use() nó — Suspense duy nhất nằm ở layout root.",
+          "code": "// layout.tsx (root)\n<Suspense fallback={<FullPageSpinner/>}>\n  <Page>\n    <Comments /> {/* use(commentsPromise) */}\n  </Page>\n</Suspense>"
+        },
+        {
+          "title": "2 · Kích hoạt: navigation thứ hai",
+          "detail": "Lần đầu SSR render sẵn nên OK; điều hướng client-side trigger fetch mới → promise pending → throw lên root → TOÀN TRANG spinner.",
+          "code": "// navigate /page-a → /page-b\n// commentsPromise pending → thrown\n// root boundary catches → FULL PAGE SKELETON 💀\n// (header, sidebar, nội dung cũ: tất cả biến mất)"
+        },
+        {
+          "title": "3 · Hậu quả kép",
+          "detail": "Layout shift toàn trang; scroll position reset; các query đã cached của sidebar bị vứt; cảm giác app 'chậm gấp đôi' — chờ lần nhất, rồi chờ lần nữa cho những gì vừa xem.",
+          "code": "CLS spike: 0.42\nuser perception: \"bấm gì cũng ra màn hình trắng\""
+        },
+        {
+          "title": "4 · Bố trí lại cầu chì",
+          "detail": "Đưa Suspense xuống sát phần bất đồng bộ: header/sidebar render tức thì, chỉ khối comment có fallback riêng; skeleton nhỏ giữ layout ổn định.",
+          "code": "<Page>\n  <Header/>                      {/* instant */}\n  <Sidebar/>                     {/* instant */}\n  <Suspense fallback={<CommentsSkeleton/>}>\n    <Comments />\n  </Suspense>\n</Page>\n// navigate: chỉ khung comments nhấp nháy skeleton 🎉"
+        }
+      ],
+      "hardeningChecklist": [
+        "Suspense boundary đặt sát leaf bất đồng bộ — mỗi vùng loading độc lập một boundary riêng.",
+        "Fallback phải giữ layout dimensions (skeleton same-height) chống CLS.",
+        "Không đổi key của Suspense vô tình (key={route.fullPath}) — mất toàn bộ trạng thái bên trong.",
+        "Promise dùng với use() nên được cache/bắt đầu sớm (preload pattern) thay vì tạo trong render.",
+        "Audit flow navigation với Slow 3G: không được có khoảnh khắc content đã hiển thị biến mất hoàn toàn."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao promise phải 'throw'? Thiết kế này để làm gì?",
+          "answer": "Throw là cách JS duy nhất để ngắt giữa chừng hàm sync (render) mà không cần callback. React bắt signal đó để biết subtree chưa sẵn sàng — cùng cơ chế với error boundary (throw Error). Đồng bộ hóa mô hình: render là thuần, chờ đợi được khai báo qua biên giới."
+        },
+        {
+          "question": "use(promise) khác hook await thế nào?",
+          "answer": "use() hoạt động trong render và hợp tác với Suspense (throw lên boundary); nó còn nhận context. Await chỉ hợp lệ trong async function — không thể dùng trong render. use() là cầu nối đưa dữ liệu anync vào cây đồng bộ một cách khai báo."
+        }
+      ]
+    }
+  ]
+}

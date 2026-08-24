@@ -1,0 +1,91 @@
+{
+  "id": "rt-tanstack-query-masterclass",
+  "trackSlug": "tanstack-query-v5-masterclass",
+  "title": "Red Team: TanStack Query v5",
+  "tagline": "Đội đỏ khai thác chính cache của bạn: flood API mỗi lần đổi tab, đầu độc query key và hồi sinh dữ liệu đã xoá.",
+  "missionBriefing": "Nhiệm vụ: lợi dụng 3 vector của tầng cache — refetch storm mỗi lần đổi tab, query key trùng lặp phục vụ dữ liệu sai ngữ cảnh, và mutation quên invalidate khiến 'ghost rows' sống dậy từ cõi chết. Sau mỗi đòn tấn công, đọc Blast Radius để thấy thiệt hại production, chuyển sang tab Defense Patch và vá lại hệ thống cho đến khi toàn bộ vector chuyển sang trạng thái PATCHED.",
+  "difficulty": "intermediate",
+  "vectors": [
+    {
+      "id": "tq-vec-01",
+        "relatedLessons": ["tq-01"],
+      "name": "Stale Cache Ambush",
+      "severity": "high",
+      "category": "Cache Flooding",
+      "target": "Query cache mặc định (staleTime: 0 + refetchOnWindowFocus: true)",
+      "story": "Team cấu hình 'cho chắc': staleTime 0 để dữ liệu luôn tươi và bật refetchOnWindowFocus toàn cục. Nhưng người dùng alt-tab liên tục giữa dashboard và Slack — mỗi lần focus trở lại, mọi useQuery đều coi cache là rác và bắn fetch đồng loạt. Nửa giờ họp online, một user tạo vài trăm request vô nghĩa; API gateway trả 429 và mobile client còn retry nhân đôi lưu lượng.",
+      "payloadCode": "// ❌ Config 'an toàn' mà team tưởng: luôn tươi, không bao giờ stale\nconst queryClient = new QueryClient({\n  defaultOptions: {\n    queries: {\n      staleTime: 0,                // cache cũ NGAY khi nhận về\n      refetchOnWindowFocus: true,  // focus tab = khai hoả fetch\n      refetchOnReconnect: true,\n      retry: 3,                    // gặp 429 còn bắn thêm 3 phát!\n    },\n  },\n});\n\n// 🧨 Người dùng alt-tab liên tục giữa dashboard ↔ Slack ↔ email\nfunction Dashboard() {\n  useQuery({ queryKey: ['posts'], queryFn: fetchPosts });\n  useQuery({ queryKey: ['stats'], queryFn: fetchStats });\n  useQuery({ queryKey: ['notifications'], queryFn: fetchNotifications });\n  // Mỗi lần quay lại tab: 3 request bay đi tức thì,\n  // 50 user trong công ty = 150 req/giây chỉ vì... chuyển tab.\n}",
+      "impactLog": [
+        "$ window 'focus' event fired → refetchOnWindowFocus triggered",
+        "> GET /api/posts ... staleTime=0 → cache ALWAYS stale",
+        "> GET /api/stats ... GET /api/notifications ... (parallel burst)",
+        "WARNING: 1 user alt-tab 37 lần/10 phút = 111 request vô nghĩa",
+        "HIGH: gateway trả 429 Too Many Requests — mobile retry ×3 → thundering herd",
+        "CRITICAL: p95 /api/posts tăng 240ms → 4.8s, autoscaling bill tăng 340%"
+      ],
+      "blastRadius": [
+        "Chi phí hạ tầng tăng vọt: API và autoscaler làm việc cho hành vi giả, không phải người dùng thật.",
+        "Rate-limit kích hoạt oan: user hợp pháp ăn 429, app liên tục báo 'hệ thống bận'.",
+        "UX nhấp nháy: spinner và số liệu nhảy loạn mỗi lần focus trở lại tab.",
+        "Trên mobile: pin và dung lượng 4G tụt vì refetch nền không ngừng nghỉ."
+      ],
+      "defenseName": "Tuned staleTime + Selective Focus Refetch",
+      "defenseCode": "// ✅ Bản vá: dữ liệu 'tươi đúng hạn', focus chỉ refetch chỗ thật sự cần\nconst queryClient = new QueryClient({\n  defaultOptions: {\n    queries: {\n      staleTime: 60_000,           // ✅ 1 phút coi là đủ mới\n      gcTime: 5 * 60_000,          // dọn cache chết sau 5 phút\n      refetchOnWindowFocus: false, // ✅ tắt mặc định — chống flood\n      retry: (failureCount, error) => {\n        const status = (error as { status?: number }).status;\n        if (status === 429 || status === 403) return false; // đừng đấm API đang nổi điên\n        return failureCount < 2;\n      },\n    },\n  },\n});\n\n// Query nóng (thông báo, bảng giá) MỚI được bật focus-refetch có chủ đích\nfunction Notifications() {\n  useQuery({\n    queryKey: ['notifications'],\n    queryFn: fetchNotifications,\n    staleTime: 10_000,\n    refetchOnWindowFocus: true, // ✅ chọn lọc từng query, không bắn đại\n  });\n}",
+      "defenseTakeaway": "Dữ liệu 'luôn mới' đồng nghĩa 'luôn đấm API': đặt staleTime theo độ nhạy cảm dữ liệu và chỉ bật refetchOnWindowFocus chọn lọc cho từng query realtime."
+    },
+    {
+      "id": "tq-vec-02",
+        "relatedLessons": ["tq-02"],
+      "name": "Query Key Collision",
+      "severity": "critical",
+      "category": "Cache Poisoning",
+      "target": "Query key ['posts'] dùng chung cho mọi page/filter/người dùng",
+      "story": "Một key duy nhất ['posts'] được tái sử dụng cho tất cả trạng thái: phân trang, filter, và cả dữ liệu theo vai trò người dùng. Cache không phân biệt ngữ cảnh nên dữ liệu filter này bị ghi đè bởi filter kia — và tệ nhất là dữ liệu của admin bị giao nhầm cho user thường. Không một request trái phép nào xuất hiện trong log, vì 'kẻ tấn công' chính là cache của chính ứng dụng.",
+      "payloadCode": "// ❌ Một key cho vạn trạng thái — biến số nào cũng không có trong key\nfunction PostList({ page }: { page: number }) {\n  const { data } = useQuery({\n    queryKey: ['posts'], // 💀 page & role BIẾN MẤT khỏi định danh cache\n    queryFn: () => fetchPosts({ page }),\n  });\n}\n\n// 🔓 Diễn biến tấn công:\n// 1) User A xem trang 1         → cache['posts'] = danh sách trang 1\n// 2) A bấm trang 5              → vẫn nhận cache TRANG 1 (key trùng nhau!)\n// 3) Admin filter role=admin    → cache['posts'] bị GHI ĐÈ bằng dữ liệu admin\n// 4) User B (role='user') mở app → nhận nguyên bản DANH SÁCH ADMIN\nuseQuery({\n  queryKey: ['posts'],\n  queryFn: () => fetchPosts({ page: 1, role: 'admin' }), // cache không biết đây là ngữ cảnh khác\n}",
+      "impactLog": [
+        "$ GET /api/posts?page=5 → CACHE HIT ['posts'] (đang giữ dữ liệu trang 1)",
+        "> UI render 'Trang 5' với nội dung TRANG 1 — pagination im lặng nói dối",
+        "$ Admin filter role=admin → SET ['posts'] (ghi đè cache chung)",
+        "> User B mount PostList → CACHE HIT ['posts'] (dữ liệu role=admin)",
+        "CRITICAL: Dữ liệu quản trị lộ cho user thường — không qua một request trái phép nào",
+        "FATAL: Audit log sạch bong vì 'kẻ tấn công' là cache của chính app"
+      ],
+      "blastRadius": [
+        "Rò rỉ dữ liệu liên user/admin qua cache — vi phạm GDPR, ISO 27001 ngay khi audit.",
+        "Pagination/filter 'ma quái': user thao tác trên dữ liệu sai mà không có lỗi nào được log.",
+        "Bug tái xuất ngẫu nhiên theo thứ tự click — gần như không thể reproduce trên máy dev.",
+        "Mất niềm tin thảm khốc: khách hàng chụp màn hình 'dữ liệu của người khác' đăng lên mạng xã hội."
+      ],
+      "defenseName": "Query Key Factory + Full Params",
+      "defenseCode": "// ✅ Key là địa chỉ ĐỦ đầy đủ: resource + toàn bộ tham số ngữ cảnh\n\n// 1) Query Key Factory — nguồn sự thật duy nhất cho mọi key\nexport const postKeys = {\n  all: ['posts'] as const,\n  lists: () => [...postKeys.all, 'list'] as const,\n  list: (params: { page: number; role?: string }) =>\n    [...postKeys.lists(), params] as const, // ✅ object được hash ổn định\n  details: () => [...postKeys.all, 'detail'] as const,\n  detail: (id: string) => [...postKeys.details(), id] as const,\n};\n\n// 2) Component luôn gọi factory — cấm hardcode key rời rạc\nfunction PostList({ page }: { page: number }) {\n  const { data } = useQuery({\n    queryKey: postKeys.list({ page, role: currentUser.role }),\n    queryFn: () => fetchPosts({ page, role: currentUser.role }),\n  });\n}\n\n// 3) Invalidate đúng phạm vi: làm mới mọi list nhưng không trúng detail\nqueryClient.invalidateQueries({ queryKey: postKeys.lists() });",
+      "defenseTakeaway": "Mọi biến số ảnh hưởng kết quả — page, filter, userId, locale — phải nằm trong query key; dùng key factory để không ai quên."
+    },
+    {
+      "id": "tq-vec-03",
+        "relatedLessons": ["tq-02"],
+      "name": "Ghost Row Resurrection",
+      "severity": "high",
+      "category": "Cache Desync",
+      "target": "useMutation delete/update không invalidate ['posts'] list",
+      "story": "User bấm xoá, dòng biến mất khỏi màn hình — server xác nhận 200 OK. Nhưng mutation không báo cho cache biết, nên lần sau quay lại trang, dòng 'hồn ma' sống dậy từ cache cũ. Người dùng xoá thêm lần nữa và ăn 404, ticket hỗ trợ dồn dập; tệ hơn, dữ liệu đã xoá (PII) vẫn hiển thị trên máy những user chưa refetch.",
+      "payloadCode": "// ❌ Mutation thành công nhưng cache không hề hay biết\nexport function useDeletePost() {\n  return useMutation({\n    mutationFn: (id: string) => api.delete(`/posts/${id}`),\n    // Không onSuccess — không invalidateQueries\n    // → server xoá rồi, cache client vẫn ôm hồn dữ liệu cũ\n  });\n}\n\nfunction PostRow({ post }: { post: Post }) {\n  const { mutate } = useDeletePost();\n  return (\n    <tr>\n      <td>{post.title}</td>\n      <td>\n        {/* Biến mất khỏi UI... đến khi remount và đọc lại cache cũ */}\n        <button onClick={() => mutate(post.id)}>Delete</button>\n      </td>\n    </tr>\n  );\n}\n// Người dùng phải F5 mới thấy dòng thật sự biến mất — ghost rows ám ảnh sản phẩm.",
+      "impactLog": [
+        "$ DELETE /api/posts/42 → 200 OK (row removed on server)",
+        "> UI optimistic: row #42 removed ✓ ... navigate → quay lại /posts",
+        "> CACHE HIT ['posts'] — id 42 STILL THERE → ghost row rendered",
+        "> User bấm Delete lần nữa → 404 Not Found",
+        "HIGH: 214 ticket 'tôi xoá rồi mà nó vẫn hiện' trong 1 tuần",
+        "CRITICAL: PII đã 'xoá' vẫn hiển thị trên client chưa refetch — rủi ro GDPR"
+      ],
+      "blastRadius": [
+        "Dữ liệu đã xoá tiếp tục hiển thị — vi phạm quyền được quên (right to erasure) theo GDPR.",
+        "User xoá nhiều lần → 404 dồn dập, log nhiễu, đội support kiệt sức.",
+        "Niềm tin sụp đổ âm thầm: 'app này lưu mọi thứ tôi xoá' — churn tăng không cảnh báo.",
+        "Update mutation cùng bệnh: sửa giá xong quay lại vẫn giá cũ → đơn hàng sai tiền."
+      ],
+      "defenseName": "invalidateQueries onSuccess Chain (v5)",
+      "defenseCode": "// ✅ Mutation xong phải 'thông báo' cho cache — chain chuẩn v5\nimport { useMutation, useQueryClient } from '@tanstack/react-query';\n\nexport function useDeletePost() {\n  const queryClient = useQueryClient();\n\n  return useMutation({\n    mutationFn: (id: string) => api.delete(`/posts/${id}`),\n\n    onSuccess: (_data, id) => {\n      // 1) Dọn detail khỏi cache — không còn hồn ma để hồi sinh\n      queryClient.removeQueries({ queryKey: postKeys.detail(id) });\n      // 2) Mọi list chứa nó thành stale → refetch nền tự chạy\n      queryClient.invalidateQueries({ queryKey: postKeys.lists() });\n    },\n\n    onError: () => toast.error('Xoá thất bại — dữ liệu giữ nguyên'),\n  });\n}\n\n// 💡 Enterprise-grade: optimistic update trong onMutate (cancelQueries + setQueryData),\n// trả về { previous } và rollback trong onError nếu server từ chối.\n// ✅ Nguyên tắc: server thay đổi gì → invalidate đúng key đó, ngay trong onSuccess.",
+      "defenseTakeaway": "Server thay đổi gì thì invalidate đúng key đó ngay trong onSuccess — mutation im lặng chính là nguồn gốc của ghost data."
+    }
+  ]
+}

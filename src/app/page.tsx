@@ -10,6 +10,7 @@ import {
   RefreshCw,
   BookOpen,
   Briefcase,
+  Crosshair,
   ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,11 +62,22 @@ export default function HomePage() {
               <span>Luyện Phỏng Vấn (Mock Simulator)</span>
             </Button>
           </Link>
+
+          <Link href="/rt">
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2 border-destructive/30 font-semibold text-destructive hover:bg-destructive/10"
+            >
+              <Crosshair className="h-4 w-4" />
+              <span>Red Team Ops</span>
+            </Button>
+          </Link>
         </div>
       </section>
 
-      {/* 2 Featured Quick Access Cards */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {/* 3 Featured Quick Access Cards */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link href="/learn" className="group">
           <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-600" />
@@ -104,6 +116,27 @@ export default function HomePage() {
                 </p>
               </div>
               <ArrowRight className="mt-2 h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+            </div>
+          </Card>
+        </Link>
+
+        <Link href="/rt" className="group">
+          <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-amber-500" />
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                  <Crosshair className="h-5 w-5" />
+                </div>
+                <h3 className="text-lg font-bold text-foreground transition-colors group-hover:text-destructive">
+                  Red Team Ops
+                </h3>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Mô phỏng tấn công từng chủ đề: XSS, race condition, stale cache... rồi
+                  tự tay vá bằng Defense Patch.
+                </p>
+              </div>
+              <ArrowRight className="mt-2 h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-destructive" />
             </div>
           </Card>
         </Link>

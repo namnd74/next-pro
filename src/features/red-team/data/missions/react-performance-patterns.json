@@ -1,0 +1,174 @@
+{
+  "trackSlug": "react-performance-advanced-patterns",
+  "missions": [
+    {
+      "id": "rpp-mis-01",
+      "slug": "referential-storm-render",
+      "title": "Chiến dịch 01 · Bão tham chiếu: phá React.memo bằng một object inline",
+      "summary": "Memo đã bọc, checklist đã tối ưu — nhưng một style={{}} và một arrow function trong JSX khiến 500 row re-render mỗi keystroke. Truy vết qua Profiler và dựng giao thức tham chiếu ổn định.",
+      "objective": "Vô hiệu hóa hoàn toàn React.memo chỉ bằng props tạo mới mỗi render, đo lường thiệt hại thật qua Profiler, rồi khôi phục hiệu năng bằng useMemo/useCallback đúng chỗ.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 22,
+      "vectorIds": ["rpp-vec-01"],
+      "rootCause": "React.memo so sánh props SHALLOW bằng Object.is. Về mặt kiến trúc, nó tin rằng 'props cùng tham chiếu = dữ liệu không đổi'. Mọi object/function literal trong JSX (style={{}}, onClick={() => …}, data={[...]}) đều là GIÁ TRỊ MỚI mỗi lần render cha — hợp lệ về logic, chết người về hiệu năng. Gốc rễ: JS tạo giá trị phức hợp tại biểu thức; việc 'giống nhau về nội dung' không liên quan gì đến 'cùng địa chỉ bộ nhớ'. Memoization chỉ hoạt động khi chuỗi cung ứng props ổn định từ nguồn đến đích.",
+      "reconNotes": [
+        "Profiler (Record): tìm commit có nhiều component render mà props không đổi.",
+        "Rà JSX các component được memo: có prop dạng {{...}} hoặc {() => …} inline?",
+        "Kiểm tra data từ store: selector trả object mới mỗi call (map/filter trong useSelector)?",
+        "Đếm renders bằng why-did-you-render dev build hoặc React.memo comparator tạm log."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Xác lập nạn nhân",
+          "detail": "Danh sách 500 ProductRow bọc React.memo — tưởng đã an toàn.",
+          "code": "const ProductRow = memo(function ProductRow({ p, onSelect, style }) {\n  return <li style={style} onClick={() => onSelect(p.id)}>{p.name}</li>;\n});"
+        },
+        {
+          "title": "2 · Gieo storm từ component cha",
+          "detail": "Cha truyền onSelect arrow + style object inline. Mỗi keystroke ở search box: 500 cặp props mới → memo so sánh fail toàn bộ.",
+          "code": "{products.map(p => (\n  <ProductRow key={p.id} product={p}\n    onSelect={(id) => addToCart(id)} // 💀 fn mới\n    style={{ margin: 8 }} />          // 💀 obj mới\n))}"
+        },
+        {
+          "title": "3 · Đo thiệt hại thật",
+          "detail": "Profiler ghi nhận 500/500 rows re-render mỗi keystroke, commit ~60ms → typing latency vượt ngưỡng 16ms/frame, input bắt đầu gõ lag.",
+          "code": "Profiler commit #14:\n  ProductRow ×500 rendered (actualDuration 58ms)\n  trigger: \"search change\""
+        },
+        {
+          "title": "4 · Khôi phục trật tự",
+          "detail": "useCallback cho handler (deps rỗng vì chỉ gọi setter ổn định), hằng style ra ngoài component, và product prop vốn ổn định theo id — memo sống lại: chỉ row dữ liệu đổi mới re-render.",
+          "code": "const ROW_STYLE = { margin: 8 };            // module scope\nconst handleSelect = useCallback(addToCart, []);\n{products.map(p => (\n  <ProductRow key={p.id} product={p}\n    onSelect={handleSelect} style={ROW_STYLE} />\n))}\n// commit #15: ProductRow ×1 rendered 🎉"
+        }
+      ],
+      "hardeningChecklist": [
+        "Cấm object/array/function literal làm props của component memo hóa trong code review.",
+        "useCallback/useMemo chỉ khi có memo-consumer phía dưới; bừa bãi còn tốn memory hơn lợi ích.",
+        "Selector từ store trả primitive hoặc object được cache (zustand shallow compare, reselect).",
+        "Định kỳ profile flow nóng (typing/scroll) trước-sau release; đặt budget commit duration (ví dụ <8ms).",
+        "Khi memo vẫn fail dù props ổn định: kiểm tra context consumer bên trong — context thay đổi bỏ qua memo."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao không mặc định deep-compare props trong memo?",
+          "answer": "Deep-equal O(n) mỗi render mỗi component — chi phí thường lớn hơn phần render tiết kiệm. React chọn hợp đồng rẻ (tham chiếu) và để developer giữ tham chiếu ổn định khi cần tối ưu."
+        },
+        {
+          "question": "useCallback bọc mọi thứ có làm app nhanh hơn không?",
+          "answer": "Không. Mỗi callback memo hóa tốn bộ nhớ và so sánh deps. Chỉ dùng khi callback là prop của memoized child HOẶC dependency của hook khác; với DOM element thường thì vô ích."
+        }
+      ]
+    },
+    {
+      "id": "rpp-mis-02",
+      "slug": "render-body-compute-siege",
+      "title": "Chiến dịch 02 · Siege trong thân render: 10.000 dòng tính lại vì một keystroke",
+      "summary": "Filter+sort chạy ngay trong component body biến mọi render thành cơn địa chấn CPU. Đo main thread block, chuyển sang pipeline useMemo + debounce + virtualization chuẩn enterprise.",
+      "objective": "Làm treo tương tác trang bằng phép tính O(n log n) chạy lại mỗi render với cùng kết quả, chứng minh lãng phí qua profiling, và chuyển sang derivation có cache + danh sách ảo hóa.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 22,
+      "vectorIds": ["rpp-vec-02"],
+      "rootCause": "Component body là HÀM được gọi lại toàn phần mỗi render — mọi tính toán viết ở đó chạy lại trừ khi được cache. Derivation nặng (filter/sort/aggregation trên tập lớn) đặt ở body biến state KHÁC (mở dropdown, hover tooltip) thành trigger recompute, dù đầu vào của phép tính không hề đổi. Main thread đơn lẻ: trong lúc compute, mọi input/click/animation xếp hàng. Đây là dạng 'self-inflicted DoS': chính app tấn công trải nghiệm người dùng của mình.",
+      "reconNotes": [
+        "Performance panel: record thao tác đơn giản, tìm task dài >50ms chứa hàm filter/sort.",
+        "Tìm pattern .filter(...).sort(...)/reduce ngay trong component body (không nằm trong useMemo/useCallback).",
+        "Đo kích thước dataset thực tế: bảng bao nhiêu row? API phân trang chưa?",
+        "Kiểm tra UI jank có tỉ lệ thuận với thao tác KHÔNG liên quan đến dữ liệu bảng không."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Đặt pháo vào thân render",
+          "detail": "Bảng sản phẩm filter + sort 10.000 items trực tiếp trong body.",
+          "code": "function ProductTable({ products }) {\n  const [query, setQuery] = useState('');\n  const visible = products\n    .filter(p => p.name.includes(query))\n    .sort((a,b) => a.price - b.price); // 💀 mỗi render\n}"
+        },
+        {
+          "title": "2 · Bắn phát đầu tiên",
+          "detail": "User mở dropdown theme (không dính gì tới products) → re-render → pipeline 42ms chạy LẠI với cùng đầu vào, cùng kết quả.",
+          "code": "// open dropdown → setState(theme)\n// re-render → filter+sort AGAIN (42ms)\n// same input, same output — pure waste"
+        },
+        {
+          "title": "3 · Cảm nhận hậu quả",
+          "detail": "Main thread blocked: gõ chữ mất ký tự, animation rớt frame, scroll giật cục. Task >50ms = long task — trình duyệt không kịp vẽ khung nào trong khoảng đó.",
+          "code": "Performance recording:\n[Long Task] 48ms  ProductTable.render\n[Long Task] 44ms  ProductTable.render\n→ dropped frames during typing"
+        },
+        {
+          "title": "4 · Chuyển sang pipeline có kỷ luật",
+          "detail": "useMemo cache theo [products, query, sortDir]; query debounce 200ms; bảng lớn thêm virtualization chỉ render ~20 row visible. Commit duration giảm từ 48ms xuống dưới 3ms.",
+          "code": "const debouncedQuery = useDebouncedValue(query, 200);\nconst visible = useMemo(\n  () => products\n    .filter(p => p.name.includes(debouncedQuery))\n    .toSorted((a,b) => a.price - b.price),\n  [products, debouncedQuery, sortDir]\n);\n// + @tanstack/react-virtual cho rendering layer"
+        }
+      ],
+      "hardeningChecklist": [
+        "Derivation nặng (>1ms ước lượng) phải nằm trong useMemo với dependency TỐI THIỂU đúng nghĩa.",
+        "Input điều khiển dataset lớn dùng debounce/useDeferredValue để tách nhịp gõ khỏi nhịp tính.",
+        "Dataset > vài nghìn row hiển thị: virtualization là bắt buộc, không phải tối ưu nice-to-have.",
+        "Giữ nguyên dữ liệu gốc: dùng toSorted/toReversed (non-mutating) thay sort/reverse trực tiếp.",
+        "Budget hiệu năng per màn hình: long task >50ms phải zero trong flow chính; đưa vào perf CI."
+      ],
+      "debrief": [
+        {
+          "question": "useMemo đã cache thì còn cần virtualization không?",
+          "answer": "Có, hai tầng khác nhau: useMemo tránh TÍNH LẠI, virtualization tránh RENDER/DOM hóa hàng nghìn node. Cache giúp CPU, virtualization giúp layout/paint/memory — bỏ một bên vẫn chậm."
+        },
+        {
+          "question": "Đưa tính toán ra server/API luôn có tốt hơn?",
+          "answer": "Với dataset cực lớn và logic phức tạp: có (server-side pagination/search). Trade-off: latency mạng, chi phí hạ tầng, phức tạp. Client-side memo hợp cho tập vừa phải (<vài chục nghìn) đã load sẵn."
+        }
+      ]
+    },
+    {
+      "id": "rpp-mis-03",
+      "slug": "monolith-context-blast",
+      "title": "Chiến dịch 03 · Context khổng lồ: một cú đổi theme rung chuyển 312 component",
+      "summary": "Một AppStoreContext ôm tất cả mọi state — đổi theme khiến cả cây re-render. Phẫu thuật tách context theo domain và giới thiệu selector-based subscription.",
+      "objective": "Kích hoạt cascade re-render toàn subtree từ một field thay đổi không liên quan, đo số component vô tình re-render, rồi tái cấu trúc thành nhiều context nhỏ + selectors.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 20,
+      "vectorIds": ["rpp-vec-03"],
+      "rootCause": "Context phát tín hiệu theo NGƯỜI TIÊU THỤ, không theo FIELD: khi value thay đổi tham chiếu, MỌI component useContext() đều re-render — kể cả cái chỉ dùng 1/20 trường. Provider gom toàn bộ store vào một object (value={{...store}}) khiến mọi field đổi đều sinh tham chiếu value mới. Gốc rễ là thiết kế 'tiện một chỗ': ghép các dữ liệu có tốc độ thay đổi RẤT KHÁC NHAU (theme gần như tĩnh, notifications nhảy từng giây) vào chung một kênh phát sóng. Kết quả: độ ồn của kênh quyết định chi phí render của cả hệ thống.",
+      "reconNotes": [
+        "Tìm createContext với type bao nhiều field? Provider value={{ ...spread }}?",
+        "Đếm useContext(AppStore) trong codebase — con số này là 'bán kính nổ'.",
+        "Highlight Updates trong DevTools: đổi theme xem những component nào sáng lên.",
+        "Nhóm field theo tần suất thay đổi: static-ish (locale, theme) vs hot (cart, realtime)."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Nhận diện quả bom context",
+          "detail": "AppStoreContext chứa theme/user/cart/notifications/locale; provider spread toàn bộ thành object mới mỗi update bất kỳ.",
+          "code": "<AppStoreContext.Provider value={{ ...store }}>\n  {children}\n</AppStoreContext.Provider>"
+        },
+        {
+          "title": "2 · Ghiền rồi khó cai",
+          "detail": "300+ component tiêu thụ useAppStore() không selector — tiện lấy mọi thứ, nhưng đăng ký NHẬN TÍN HIỆU CHO TOÀN BỘ store.",
+          "code": "const { cart } = useAppStore();\n// component này chỉ cần cart nhưng sẽ re-render khi theme đổi"
+        },
+        {
+          "title": "3 · Kích nổ: đổi theme",
+          "detail": "setTheme('dark') → value mới → DevTools highlight 312 component flash xanh. Chỉ Header thực sự cần theme. Commit 54ms, cảm giác app 'nặng'.
+",
+          "code": "toggleTheme()\n→ HighlightUpdates: 312 components flash\n→ commit took 54ms"
+        },
+        {
+          "title": "4 · Tách kênh + selector",
+          "detail": "Tách ThemeContext/CartContext riêng biệt (value primitive/memoized); nơi cần phức tạp hơn chuyển zustand selector — component subscribe đúng slice mình dùng.",
+          "code": "<ThemeContext.Provider value={theme}>…</ThemeContext.Provider>\n<CartContext.Provider value={cartItems}>…</CartContext.Provider>\n\n// hoặc zustand:\nconst cart = useStore(s => s.cart);   // ✅ narrow subscription"
+        }
+      ],
+      "hardeningChecklist": [
+        "Chia context theo DOMAIN và tần suất thay đổi; cấm context 'god store' mới.",
+        "Provider value phải là primitive, useMemo hóa object composite, hoặc tách state-setter khỏi state.",
+        "Ưu tiên zustand/Jotai selector subscription cho state global hiện đại — component chỉ re-render khi slice của nó đổi.",
+        "Memo hóa children giữa provider và consumer khi cấu trúc tĩnh (children prop không bị re-render bởi provider).",
+        "Định kỳ Highlight Updates audit các action chính: số component re-render phải tương xứng ý nghĩa."
+      ],
+      "debrief": [
+        {
+          "question": "memo() children có cứu được cascade re-render của context không?",
+          "answer": "Không. useContext đọc trực tiếp qua context — memo chỉ chặn re-render do PROPS. Component consumer sẽ re-render khi value đổi bất kể memo."
+        },
+        {
+          "question": "Vì sao tách nhiều Context provider lồng nhau vẫn OK về hiệu năng?",
+          "answer": "Mỗi context là kênh độc lập: đổi value kênh A chỉ đánh thức consumer của A. Chi phí thêm vài Provider nesting không đáng kể so với lợi ích thu hẹp bán kính re-render."
+        }
+      ]
+    }
+  ]
+}

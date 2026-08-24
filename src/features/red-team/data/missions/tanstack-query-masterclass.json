@@ -1,0 +1,173 @@
+{
+  "trackSlug": "tanstack-query-v5-masterclass",
+  "missions": [
+    {
+      "id": "tq-mis-01",
+      "slug": "refetch-storm-flood",
+      "title": "Chiến dịch 01 · Bão refetch: 96.000 request vô nghĩa mỗi ngày",
+      "summary": "staleTime=0 + refetchOnWindowFocus biến mọi cú alt-tab thành dội pháo API. Trải nghiệm cơn bão từ phía backend, hiểu mô hình stale/fresh thật sự, và tinh chỉnh cấu hình theo bản chất dữ liệu.",
+      "objective": "Flooding backend bằng refetch tự động khi focus window, chứng minh chi phí ẩn của cấu hình mặc định, rồi thiết lập chiến lược staleness hợp lý cho từng loại dữ liệu.",
+      "difficulty": "high",
+      "estimatedMinutes": 20,
+      "vectorIds": ["tq-vec-01"],
+      "rootCause": "TanStack Query coi data là CACHE có hạn sử dụng: staleTime định nghĩa 'data tươi bao lâu', hết hạn thì mọi trigger (mount mới, window focus, reconnect) đều hợp pháp để refetch. Mặc định staleTime=0 + refetchOnWindowFocus=true nghĩa là data HẾT HẠN NGAY khi về — mọi sự kiện focus trở lên lý do fetch lại toàn bộ mounted queries. Gốc rễ: team copy default từ docs không hỏi câu hỏi sản phẩm 'data này được phép cũ bao nhiêu?'. Dashboard 8 widget × 200 user × mỗi lần alt-tab = DoS tự nguyện.",
+      "reconNotes": [
+        "Kiểm tra QueryClient config: staleTime/gcTime/refetchOnWindowFocus đang là gì?",
+        "Đếm số useQuery mounted trên một trang điển hình (widget count).",
+        "Network tab: alt-tab qua lại, đếm request phát sinh mỗi lần focus.",
+        "Hỏi product: dashboard stats chấp nhận trễ bao nhiêu giây/phút?"
+      ],
+      "killChain": [
+        {
+          "title": "1 · Dựng thảm họa mặc định",
+          "detail": "8 widget dùng useQuery với cấu hình mặc định — mọi query stale ngay lập tức.",
+          "code": "// 8 widgets, mỗi widget:\nconst { data } = useQuery({\n  queryKey: ['stats', id],\n  queryFn: () => api.stats(id),\n  // staleTime: 0 (default)\n  // refetchOnWindowFocus: true (default)\n});"
+        },
+        {
+          "title": "2 · Kích hoạt bằng alt-tab",
+          "detail": "User chuyển sang Excel đọc báo cáo rồi quay lại — focus event bắn 8 request ngay lập tức. Lặp lại mỗi lần đổi cửa sổ.",
+          "code": "window blur → focus\n→ 8× GET /api/stats/*\n(alt-tab ×12/ngày/user là bình thường của dân văn phòng)"
+        },
+        {
+          "title": "3 · Backend gục trước mắt",
+          "detail": "200 user × 12 lần focus × 8 request ≈ 19.200 req chỉ tính focus events; giờ cao điểm p95 tăng 6×, connection pool kiệt sức, endpoint KHÁC cũng chậm theo.",
+          "code": "// APM sau 1 tuần bật feature:\np95 /stats: 180ms → 2.3s\npool waiting: 14 (max 20)\nerror rate: 0.2% → 3.1%"
+        },
+        {
+          "title": "4 · Thiết kế staleness đúng",
+          "detail": "Global staleTime 60s; dữ liệu realtime riêng dùng polling chủ động; tắt focus-refetch global, bật selectivity nơi cần.",
+          "code": "new QueryClient({ defaultOptions: { queries: {\n  staleTime: 60_000,\n  gcTime: 5 * 60_000,\n  refetchOnWindowFocus: false,\n}}});\n// realtime riêng:\nuseQuery({ queryKey: ['alerts'], queryFn: fetchAlerts,\n  staleTime: 10_000, refetchInterval: 30_000 });"
+        }
+      ],
+      "hardeningChecklist": [
+        "Đặt staleTime ở QueryClient defaults theo SLA dữ liệu; override per-query chỉ khi cần khác biệt thật.",
+        "refetchOnWindowFocus mặc định false; bật chọn lọc cho query mà freshness-on-focus có giá trị kinh doanh.",
+        "Polling dùng refetchInterval (có refetchIntervalInBackground=false) thay vì dựa vào hành vi tab.",
+        "Giám sát client: đếm request/query/giây; alert khi vượt baseline bất thường.",
+        "Backend đặt rate limit per-session như lớp cuối — đừng để frontend một lỗi config là gục cả cụm."
+      ],
+      "debrief": [
+        {
+          "question": "staleTime và gcTime khác nhau thế nào?",
+          "answer": "staleTime = data TƯƠI trong bao lâu (quyết định có refetch hay không); gcTime = data chết trong cache bao lâu trước khi bị dọn (quyết định cache HIT khi remount). Một cái về freshness, một cái về memory."
+        },
+        {
+          "question": "Tắt focus refetch rồi, làm sao user thấy data mới?",
+          "answer": "Kết hợp: staleTime ngắn vừa phải (data cũ → refetch khi mount/interaction), invalidation sau mutation, và polling/refetchInterval cho dữ liệu thời gian thực. Focus-refetch chỉ là MỘT trigger trong nhiều công cụ."
+        }
+      ]
+    },
+    {
+      "id": "tq-mis-02",
+      "slug": "query-key-collision-heist",
+      "title": "Chiến dịch 02 · Đánh cắp danh tính cache: key thiếu tham số",
+      "summary": "['posts'] chung cho mọi filter và ['profile'] chung cho mọi user — cache trả nhầm dữ liệu giữa tabs và rò rỉ tài khoản. Xây query-key factory và quy tắc scope user.",
+      "objective": "Poison cache bằng key collision để user B nhìn thấy data của user A, sau đó thiết kế key structure chặn tận gốc mọi dạng collision.",
+      "difficulty": "critical",
+      "estimatedMinutes": 22,
+      "vectorIds": ["tq-vec-02"],
+      "rootCause": "Query key là CHỈ MỤC DUY NHẤT của cache entry — TanStack hash key để lưu/truy xuất. Nguyên tắc nền: hai lần fetch cần data KHÁC NHAU thì bắt buộc key KHÁC NHAU, và key phải chứa mọi biến số tạo nên kết quả (filter, pagination, userId, locale...). Thiếu một biến = hai nguồn dữ liệu khác nhau ghi đè nhau trong cùng ngăn kéo. Khi biến số thiếu là USER ID, collision leo thang thành sự cố bảo mật: dữ liệu cá nhân của người này phục vụ người kia, hoàn toàn hợp lệ theo cơ chế cache.",
+      "reconNotes": [
+        "Grep queryKey: tìm key literal mảng không chứa biến ([\"posts\"], [\"profile\"]...).",
+        "Liệt kê các biến tạo nên kết quả queryFn: params, filter, page, current user id.",
+        "So sánh từng biến đó với những gì có mặt trong key — tìm khoảng trống.",
+        "Test cross-account: login 2 user, so data giữa logout/login nhanh."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Phát hiện ngăn kéo chung",
+          "detail": "Hai màn hình dùng ['posts'] nhưng queryFn fetch filter khác nhau — ai mount sau chiếm kho.",
+          "code": "// screen A: useQuery({ queryKey:['posts'], queryFn:()=>fetchPosts('new') })\n// screen B: useQuery({ queryKey:['posts'], queryFn:()=>fetchPosts('hot') })"
+        },
+        {
+          "title": "2 · Chứng minh poisoning",
+          "detail": "Vào B rồi quay lại A: cache hit trả posts HOT trong màn hình NEW — sort order sai hoàn toàn, không request nào được gửi.",
+          "code": "navigate A→B→A\n// A shows HOT posts with 'New' header\n// network: ZERO new requests (cache hit!)"
+        },
+        {
+          "title": "3 · Leo thang bảo mật",
+          "detail": "Cùng bệnh với profile: key không chứa userId. Logout → login user B trong gcTime window → B thấy profile của A.",
+          "code": "useQuery({ queryKey: ['profile'], queryFn: fetchMyProfile })\n// user_A data cached → user_B login → CACHE HIT 💀\n// P0 incident: cross-account data leak"
+        },
+        {
+          "title": "4 · Vá bằng key factory",
+          "detail": "Query key factory chuẩn hóa cách sinh key toàn app + scope userId cho mọi dữ liệu thuộc user + clear cache khi đăng xuất.",
+          "code": "export const postKeys = {\n  all: ['posts'] as const,\n  list: (f: string) => [...postKeys.all, 'list', f] as const,\n};\nuseQuery({ queryKey: postKeys.list('new'), ... });\n// profile:\nqueryKey: ['profile', userId]\n// logout:\nqueryClient.clear();"
+        }
+      ],
+      "hardeningChecklist": [
+        "Mọi biến tham gia queryFn PHẢI xuất hiện trong queryKey — review rule số một cho PR chạm data layer.",
+        "Dùng query key factory tập trung: tránh key string rải rác lệch nhau giữa các file.",
+        "Data per-user scope theo userId trong key + queryClient.clear() khi đăng xuất/đổi user.",
+        "Type-safe key helper hoặc plugin kiểm tra trùng lặp key pattern trong CI.",
+        "Sentry/log gắn userId vào request — giúp phát hiện anomaly data sai user trong production."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao key là mảng vẫn hoạt động hash đúng?",
+          "answer": "TanStack deterministically serialize mảng key (giữ thứ tự, handle nested object). Miễn cấu trúc nhất quán qua các chỗ dùng, cùng key = cùng cache entry."
+        },
+        {
+          "question": "invalidateQueries(['posts']) ảnh hưởng thế nào tới key factory?",
+          "answer": "Nó match PREFIX: hủy mọi key bắt đầu bằng ['posts'] — bao gồm list mọi filter và detail mọi id. Đây là lý do factory đặt 'all' đầu tiên: invalidate theo tầng cây key một cách chủ đích."
+        }
+      ]
+    },
+    {
+      "id": "tq-mis-03",
+      "slug": "ghost-row-resurrection",
+      "title": "Chiến dịch 03 · Ghost rows: mutation thành công nhưng UI không tin",
+      "summary": "Xóa xong row vẫn hiện, refresh lại mất — UI và server kể hai câu chuyện. Khai thác khoảng trống giữa mutation và cache, vá bằng chuỗi invalidation và optimistic updates đúng chuẩn v5.",
+      "objective": "Tạo tình trạng ghost data sau delete/create/update, giải thích vì sao local state vá víu thất bại, rồi tái cấu trúc bằng onSuccess invalidation chain và optimistic update có rollback.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 20,
+      "vectorIds": ["tq-vec-03"],
+      "rootCause": "useMutation cập nhật SERVER nhưng không biết cache nào liên quan — TanStack không đoán hộ. Khoảng trống này được dev lấp bằng state local thủ công (filter mảng visible), sinh ra hai nguồn sự thật song song. Bất kỳ refetch nào (focus, remount, interval) sẽ kéo dữ liệu server về đè lên bản vá local — ghost rows hồi sinh. Gốc rễ kiến trúc: server là SỰ THẬT duy nhất; mọi state client phản ánh sự thật phải đi qua CƠ CHẾ ĐỒNG BỘ duy nhất (cache + invalidation), không phải đường tắt riêng từng component.",
+      "reconNotes": [
+        "Tìm mutation không có onSuccess/onSettled gọi invalidateQueries/setQueryData.",
+        "Grep pattern state local lọc/bổ sung row sau mutate: setVisibleRows(prev => ...).",
+        "Thử flow delete → navigate away → back: ghost có hồi sinh không?",
+        "Quan sát refetch sau focus: dữ liệu nhảy ngược trạng thái cũ?"
+      ],
+      "killChain": [
+        {
+          "title": "1 · Mutation mồ côi",
+          "detail": "Delete gọi API thành công nhưng chẳng nói gì với Query Client.",
+          "code": "const deletePost = useMutation({\n  mutationFn: (id: string) => api.delete(`/posts/${id}`),\n}); // 💀 không onSuccess"
+        },
+        {
+          "title": "2 · Vá víu bằng local state",
+          "detail": "UI tự filter row khỏi mảng hiển thị — trông đúng ngay lúc đó.",
+          "code": "await deletePost.mutateAsync(id);\nsetVisibleRows(prev => prev.filter(r => r.id !== id));"
+        },
+        {
+          "title": "3 · Ghost hồi sinh",
+          "detail": "Refetch xảy ra (focus/remount): server trả list mới không còn id=42, nhưng merge logic giữ bản cũ trong state local → row ma đứng cạnh hàng xóm mới toanh.",
+          "code": "// refetch → fresh server list (no id=42)\n// nhưng merge: [...cachedRows, ...freshRows] dedupe fail\n// → id=42 HIỆN LẠI 💀"
+        },
+        {
+          "title": "4 · Vá bằng invalidation chain",
+          "detail": "onSuccess khai báo cache nào bẩn: invalidate list cha + remove detail entry; thêm optimistic update với rollback cho UX tức thì.",
+          "code": "const qc = useQueryClient();\nuseMutation({\n  mutationFn: (id: string) => api.delete(`/posts/${id}`),\n  onSuccess: (_d, id) => {\n    qc.invalidateQueries({ queryKey: ['posts'] });\n    qc.removeQueries({ queryKey: postKeys.detail(id) });\n  },\n});"
+        }
+      ],
+      "hardeningChecklist": [
+        "Mọi useMutation PHẢI có onSuccess/onSettled cập nhật hoặc invalidate cache liên quan.",
+        "Cấm state local nhân bản dữ liệu đã có trong query cache — single source of truth là cache.",
+        "Delete/update detail: removeQueries/invalidate detail key tương ứng, không chỉ list.",
+        "Optimistic update cần đủ bộ: snapshot previous + onError rollback + invalidate trong onSettled.",
+        "E2E test: delete → điều hướng đi/lại → assert row không quay lại; create → assert hiện ngay không cần F5."
+      ],
+      "debrief": [
+        {
+          "question": "invalidateQueries và setQueryData nên chọn khi nào?",
+          "answer": "Invalidate khi bạn KHÔNG chắc chắn trạng thái server sau mutation (refetch an toàn). setQueryData khi mutation response chứa đầy đủ entity mới và muốn sync tức thì không cần round-trip — thường kết hợp cả hai."
+        },
+        {
+          "question": "Vì sao optimistic update bắt buộc có rollback?",
+          "answer": "Optimistic là CÁ CƯỢC với UI trước khi server xác nhận. Không rollback thì lỗi mạng/403 biến thành ghost ngược (hiện cái đã bị từ chối) — chính là bug ta vừa vá, chiều ngược lại."
+        }
+      ]
+    }
+  ]
+}

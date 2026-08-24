@@ -1,0 +1,91 @@
+{
+  "id": "rt-standard-react-forms",
+  "trackSlug": "standard-react-form-architecture",
+  "title": "Red Team: React Form Architecture",
+  "tagline": "Ba cánh cửa hở của form thuần React: field ma không name, controlled flip giữa chừng và nút submit không khóa.",
+  "missionBriefing": "Nhiệm vụ: tấn công 3 điểm yếu kinh điển của native form — field thiếu name biến mất khỏi FormData, input lật controlled/uncontrolled khi prop đổi, và nút submit cho phép bấm kép tạo đơn trùng. Đọc Blast Radius để thấy thiệt hại doanh thu thực tế, rồi vá bằng Defense Patch cho đến khi toàn bộ vector chuyển sang trạng thái PATCHED.",
+  "difficulty": "intermediate",
+  "vectors": [
+    {
+      "id": "sr-vec-01",
+        "relatedLessons": ["sr-02"],
+      "name": "Ghost Field Vanishing",
+      "severity": "high",
+      "category": "Form Serialization",
+      "target": "FormData builder (name attribute)",
+      "story": "Một input quên thuộc tính name — với FormData, nó KHÔNG TỒN TẠI. User chọn 'Giao nhanh 2 giờ', server lại nhận payload không hề có trường đó và âm thầm fallback về giao thường. Không lỗi, không warning — chỉ có 1.200 đơn mỗi tháng giao sai cam kết cho tới ngày khách doanh nghiệp đòi bồi thường.",
+      "payloadCode": "// ❌ Hai field KHÔNG có name — FormData sẽ bỏ qua chúng\nexport default function OrderForm() {\n  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {\n    e.preventDefault();\n    // Chỉ serialize field CÓ name: 'fullName' & 'shipping' BIẾN MẤT\n    const data = Object.fromEntries(new FormData(e.currentTarget));\n    await fetch('/api/orders', { method: 'POST', body: JSON.stringify(data) });\n  }\n  return (\n    <form onSubmit={handleSubmit}>\n      <input type=\"text\" placeholder=\"Họ tên người nhận\" />   {/* ❌ thiếu name */}\n      <input type=\"tel\" name=\"phone\" placeholder=\"Số điện thoại\" />\n      <select defaultValue=\"express\">                          {/* ❌ thiếu name */}\n        <option value=\"standard\">Giao thường (3-5 ngày)</option>\n        <option value=\"express\">Giao nhanh (2 giờ)</option>\n      </select>\n      <button type=\"submit\">Đặt hàng — COD</button>\n    </form>\n  );\n}",
+      "impactLog": [
+        "$ submit → new FormData(form).entries()",
+        "> [['phone','0912xxx']] — 'fullName', 'shipping' KHÔNG xuất hiện",
+        "> POST /api/orders {phone:'0912xxx'} → 201 Created, im lặng",
+        "WARNING: server fallback shipping='standard' dù user chọn express",
+        "HIGH: 1.203 đơn/tháng giao trễ — ticket CS tăng 34%",
+        "BLOCKED: hợp đồng SLA 2h với khách doanh nghiệp bị vi phạm"
+      ],
+      "blastRadius": [
+        "Dữ liệu user nhập bị vứt bỏ im lặng — không log, không error, không ai hay biết.",
+        "Server fallback ngầm sang giá trị mặc định → sai cam kết vận chuyển và giá.",
+        "CS nhận ticket 'mưa' trong khi dev không tìm được lỗi vì 'mọi thứ vẫn chạy'.",
+        "Lỗi này qua hết code review: input hiển thị hoàn hảo trên màn hình."
+      ],
+      "defenseName": "Name Attribute Contract",
+      "defenseCode": "// ✅ Mọi control tham gia submit PHẢI có name khớp schema API\n\n// 1) Gắn name đúng key backend mong đợi\n<form onSubmit={handleSubmit}>\n  <input type=\"text\" name=\"fullName\" placeholder=\"Họ tên người nhận\" />\n  <input type=\"tel\" name=\"phone\" placeholder=\"Số điện thoại\" />\n  <select name=\"shippingMethod\" defaultValue=\"express\">\n    <option value=\"standard\">Giao thường (3-5 ngày)</option>\n    <option value=\"express\">Giao nhanh (2 giờ)</option>\n  </select>\n  <button type=\"submit\">Đặt hàng — COD</button>\n</form>\n\n// 2) Smoke-test khi review: dump payload ra console\nconst data = Object.fromEntries(new FormData(e.currentTarget));\nconsole.table(data); // đủ key? đúng tên? đúng kiểu?\n\n// 3) Server vẫn validate: thiếu/trường lạ → 400 + log cảnh báo\n// (Client-side check không bao giờ là ranh giới tin cậy cuối cùng)",
+      "defenseTakeaway": "FormData chỉ thu những field có name — audit mọi input/select/textarea trước khi submit và dump payload ra để tự kiểm chứng."
+    },
+    {
+      "id": "sr-vec-02",
+        "relatedLessons": ["sr-02"],
+      "name": "Controlled Mode Flip",
+      "severity": "medium",
+      "category": "Controlled Contract",
+      "target": "Input value binding lifecycle",
+      "story": "Input coupon khởi đầu uncontrolled (value=undefined), rồi khi fetch quyền user xong, parent bật editable=true — input đột ngột Lật sang controlled. React gào lên warning, DOM giữ text user đang gõ trong khi state vẫn rỗng; một nhịp render sau, mã giảm giá 'SALE50' bốc hơi ngay trước mắt khách hàng.",
+      "payloadCode": "// ❌ value đổi giữa controlled ↔ uncontrolled theo prop\nfunction CouponField({ editable }: { editable: boolean }) {\n  const [code, setCode] = useState('');\n\n  return (\n    <input\n      // editable=false → value={undefined} → input thành UNCONTROLLED\n      value={editable ? code : undefined}\n      onChange={(e) => setCode(e.target.value)}\n      disabled={!editable}\n      placeholder=\"Mã giảm giá\"\n    />\n  );\n}\n\n// Parent fetch quyền user xong mới set editable → input FLIP chế độ\n<CouponField editable={isVerified} />\n// React warning + DOM giữ text user gõ trong lúc state code vẫn ''",
+      "impactLog": [
+        "$ mount editable=false → value=undefined → UNCONTROLLED mode",
+        "> user gõ 'SALE50' → DOM value='SALE50', state code='' ",
+        "> verify xong → editable=true → FLIP sang CONTROLLED",
+        "WARNING: 'A component is changing an uncontrolled input to be controlled'",
+        "HIGH: controlled value '' ghi đè DOM → 'SALE50' biến mất trước mắt user",
+        "CRITICAL: đơn qua bước verify đều mất coupon → doanh thu giảm 4,2%"
+      ],
+      "blastRadius": [
+        "Console warning ngập Sentry, che khuất các lỗi thật sự quan trọng hơn.",
+        "Text user đang gõ bốc hơi ngay trên màn hình — trải nghiệm 'app ăn chữ' phá niềm tin.",
+        "State và DOM lệch nhau vĩnh viễn: submit gửi giá trị khác với những gì user thấy.",
+        "Bug chỉ nổ theo đúng trình tự thao tác — gần như không tái hiện được trong test tự động."
+      ],
+      "defenseName": "Single-Mode Input Contract",
+      "defenseCode": "// ✅ Một input chỉ được sống MỘT chế độ suốt vòng đời\n\n// 1) Controlled xuyên suốt: value KHÔNG BAO GIỜ undefined\nfunction CouponField({ editable }: { editable: boolean }) {\n  const [code, setCode] = useState('');\n  return (\n    <input\n      value={code}                     // ✅ luôn string\n      onChange={(e) => setCode(e.target.value)}\n      disabled={!editable}             // khóa tương tác, KHÔNG khóa value\n      placeholder=\"Mã giảm giá\"\n    />\n  );\n}\n\n// 2) Muốn uncontrolled? defaultValue + ref — và KHÔNG truyền value sau đó\n<input defaultValue={initial} ref={couponRef} />\n\n// 3) Data chưa sẵn sàng? Render skeleton thay vì flip prop\nif (!verified) return <FieldSkeleton />;",
+      "defenseTakeaway": "Chọn controlled hoặc uncontrolled NGAY khi viết component — prop value không bao giờ được phép undefined giữa đường đời của input."
+    },
+    {
+      "id": "sr-vec-03",
+        "relatedLessons": ["sr-02"],
+      "name": "Double Submit Fraud",
+      "severity": "critical",
+      "category": "Idempotency",
+      "target": "Order/Payment submission pipeline",
+      "story": "Nút 'Thanh toán' không khóa trong lúc chờ API. Mạng chậm 900ms, khách sốt ruột bấm thêm phát nữa — hai POST song song với cùng payload, hai đơn hàng, hai lần trừ thẻ 12.500.000₫. Chargeback, phạt cổng thanh toán và niềm tin sụp đổ — tất cả chỉ sau một cú double-click 180 mili-giây.",
+      "payloadCode": "// ❌ Submit không có khóa pending — nút luôn nhấn được\nfunction CheckoutForm() {\n  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {\n    e.preventDefault(); // KHÔNG có cờ pending, KHÔNG có guard\n    const res = await fetch('/api/orders', {\n      method: 'POST',\n      body: JSON.stringify(buildPayload()),\n    });\n    const { id } = await res.json();\n    router.push(`/orders/${id}`);\n  }\n\n  return (\n    <form onSubmit={handleSubmit}>\n      <AddressFields />\n      {/* Click #1 t=0ms, click #2 t=180ms → 2 POST song song */}\n      <button type=\"submit\" className=\"w-full bg-emerald-600 py-3 font-bold\">\n        💳 Thanh toán 12.500.000₫\n      </button>\n    </form>\n  );\n}",
+      "impactLog": [
+        "$ click #1 t=0ms → POST /api/orders (req A)",
+        "> mạng lag 900ms — nút VẪN enabled",
+        "$ click #2 t=180ms → POST /api/orders (req B, cùng payload)",
+        "> req A → 201 Created — trừ thẻ 12.500.000₫",
+        "> req B → 201 Created — TRỪ THÊM 12.500.000₫",
+        "CRITICAL: 2 đơn trùng SKU · chargeback + phí gateway · khách gọi tổng đài"
+      ],
+      "blastRadius": [
+        "Khách bị trừ tiền đôi: chargeback cộng phí phạt từ cổng thanh toán, risk score tăng vọt.",
+        "Kho xuất 2 đơn trùng SKU → hoàn kho, ship 2 chiều, chi phí logistics nhân đôi.",
+        "Fraud system flag shop vì tỷ lệ duplicate bất thường — tài khoản gateway bị review.",
+        "Mẫu lỗi lặp lại ở mọi form dính tiền: đăng ký gói, nạp ví, đặt cọc giữ chỗ."
+      ],
+      "defenseName": "Pending Lock + Idempotency Key",
+      "defenseCode": "// ✅ Khóa nút khi pending + Idempotency-Key chống trùng ở server\n\n// 1) Client: cờ isSubmitting chặn mọi submit kế tiếp\nconst [isSubmitting, setIsSubmitting] = useState(false);\n\nasync function handleSubmit(e: React.FormEvent<HTMLFormElement>) {\n  e.preventDefault();\n  if (isSubmitting) return;            // 🔒 cửa vào đã khóa\n  setIsSubmitting(true);\n  try {\n    await fetch('/api/orders', {\n      method: 'POST',\n      headers: { 'Idempotency-Key': crypto.randomUUID() },\n      body: JSON.stringify(buildPayload()),\n    });\n  } finally {\n    setIsSubmitting(false);            // mở khóa cả khi network lỗi\n  }\n}\n\n<button type=\"submit\" disabled={isSubmitting}>\n  {isSubmitting ? 'Đang xử lý…' : '💳 Thanh toán'}\n</button>\n\n// 2) Server: lưu key → trùng key trả kết quả cached, KHÔNG tạo đơn mới\n// 3) RHF cung cấp sẵn formState.isSubmitting — đừng tự chế lại bánh xe",
+      "defenseTakeaway": "Submit dính tiền bạc phải có khóa pending ở client VÀ Idempotency-Key ở server — riêng disabled nút là chưa đủ khi network tự retry."
+    }
+  ]
+}

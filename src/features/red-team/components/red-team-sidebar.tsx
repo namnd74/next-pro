@@ -1,0 +1,288 @@
+'use client';
+
+import * as React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  Crosshair,
+  RotateCcw,
+  GraduationCap,
+  Zap,
+  Flame,
+  Shield,
+  Lock,
+  Database,
+  Code2,
+  Layers,
+  Atom,
+  BookOpen,
+} from 'lucide-react';
+import { RED_TEAM_SCENARIOS } from '../data/json-loader';
+import { getMissionsByTrackSlug } from '../data/mission-loader';
+import { useRedTeamStore } from '../stores/use-red-team-store';
+
+function getTopicIcon(iconName: string) {
+  const cls = 'h-4 w-4';
+  switch (iconName) {
+    case 'GraduationCap':
+      return <GraduationCap className={cls} />;
+    case 'Zap':
+      return <Zap className={cls} />;
+    case 'Flame':
+      return <Flame className={cls} />;
+    case 'Shield':
+      return <Shield className={cls} />;
+    case 'Lock':
+      return <Lock className={cls} />;
+    case 'Database':
+      return <Database className={cls} />;
+    case 'Atom':
+      return <Atom className={cls} />;
+    case 'Layers':
+      return <Layers className={cls} />;
+    case 'Code':
+      return <Code2 className={cls} />;
+    default:
+      return <BookOpen className={cls} />;
+  }
+}
+
+/* Map trackSlug -> icon giống TrackCard để đồng bộ hình ảnh với /learn */
+const TOPIC_ICON: Record<string, string> = {
+  'react-foundations-zero-to-one': 'GraduationCap',
+  'react-hooks-deep-dive': 'Zap',
+  'standard-react-form-architecture': 'Code',
+  'form-engineering-react-hook-form-zod': 'Layers',
+  'react-performance-advanced-patterns': 'Flame',
+  'tanstack-query-v5-masterclass': 'Zap',
+  'web-security-and-auth-masterclass': 'Zap',
+  'react-19-compiler-path': 'Atom',
+  'nextjs-architecture-rendering-strategies': 'Layers',
+  'react-testing-enterprise-mastery': 'Shield',
+};
+
+type LessonStatus = 'idle' | 'breached' | 'patched';
+
+const STATUS_DOT: Record<LessonStatus, string> = {
+  idle: '●',
+  breached: '🔴',
+  patched: '🛡',
+};
+
+function StatusDot({ status }: { status: LessonStatus }) {
+  const cls =
+    status === 'breached'
+      ? ''
+      : status === 'patched'
+        ? ''
+        : 'text-muted-foreground/40';
+  return (
+    <span className={`w-4 shrink-0 text-center text-[9px] ${cls}`}>
+      {STATUS_DOT[status]}
+    </span>
+  );
+}
+
+interface SidebarContentProps {
+  onNavigate?: () => void;
+}
+
+export function SidebarContent({ onNavigate }: SidebarContentProps) {
+  const pathname = usePathname();
+  const segments = pathname.split('/');
+  const activeTrackSlug = segments[2];
+  const activeMissionSlug = segments[3];
+
+  const { resetRedTeamProgress, launchedVectorIds, patchedVectorIds } =
+    useRedTeamStore();
+  const [mounted, setMounted] = React.useState(false);
+  const [manualExpanded, setManualExpanded] = React.useState<string[]>([]);
+
+  React.useEffect(() => setMounted(true), []);
+
+  const totalVectors = RED_TEAM_SCENARIOS.reduce((acc, s) => acc + s.vectors.length, 0);
+  const totalPatched = mounted ? patchedVectorIds.length : 0;
+  const totalBreached = mounted ? launchedVectorIds.length : 0;
+
+  const missionStatus = React.useCallback(
+    (trackSlug: string, mission: { vectorIds: string[] }): LessonStatus => {
+      if (!mounted) return 'idle';
+      if (mission.vectorIds.length === 0) return 'idle';
+      const patched = mission.vectorIds.filter((id) => patchedVectorIds.includes(id)).length;
+      const breached = mission.vectorIds.some((id) => launchedVectorIds.includes(id));
+      return patched === mission.vectorIds.length
+        ? 'patched'
+        : breached
+          ? 'breached'
+          : 'idle';
+    },
+    [mounted, launchedVectorIds, patchedVectorIds]
+  );
+
+  return (
+    <div className="flex h-full flex-col gap-3 overflow-y-auto pb-4">
+      {/* Brand */}
+      <Link
+        href="/rt"
+        onClick={onNavigate}
+        className="flex shrink-0 items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2.5 transition-colors hover:bg-destructive/10"
+      >
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-orange-500 text-white shadow-md">
+          <Crosshair className="h-4 w-4" />
+        </span>
+        <span className="space-y-0.5">
+          <span className="block text-sm font-extrabold tracking-tight text-foreground">
+            Red Team Ops
+          </span>
+          <span className="block font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+            attack · defend · master
+          </span>
+        </span>
+      </Link>
+
+      {/* Topics */}
+      <nav className="space-y-1.5">
+        <p className="px-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          Topics ({RED_TEAM_SCENARIOS.length})
+        </p>
+
+        {RED_TEAM_SCENARIOS.map((scenario) => {
+          const trackSlug = scenario.trackSlug;
+          const isActive = activeTrackSlug === trackSlug;
+          const expanded = isActive || manualExpanded.includes(trackSlug);
+          const shortTitle = scenario.title.replace(/^Red Team:\s*/, '');
+          const missions = getMissionsByTrackSlug(trackSlug);
+
+          return (
+            <div
+              key={scenario.id}
+              className={`overflow-hidden rounded-xl border transition-colors ${
+                isActive
+                  ? 'border-destructive/40 bg-destructive/5'
+                  : 'border-border/60 bg-secondary/20 hover:border-border'
+              }`}
+            >
+              <div className="flex items-stretch">
+                <Link
+                  href={`/rt/${trackSlug}`}
+                  onClick={onNavigate}
+                  className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2"
+                >
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-red-500/15 to-orange-500/15 ${
+                      isActive ? 'text-destructive' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {getTopicIcon(TOPIC_ICON[trackSlug] ?? 'BookOpen')}
+                  </span>
+                  <span
+                    className={`truncate text-xs font-semibold ${
+                      isActive ? 'text-foreground' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {shortTitle}
+                  </span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setManualExpanded((prev) =>
+                      prev.includes(trackSlug)
+                        ? prev.filter((s) => s !== trackSlug)
+                        : [...prev, trackSlug]
+                    )
+                  }
+                  aria-label="Toggle missions"
+                  className="shrink-0 px-2 text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <Chevron expanded={expanded} />
+                </button>
+              </div>
+
+              {expanded && missions.length > 0 && (
+                <ul className="space-y-0.5 border-t border-border/40 px-2 py-1.5">
+                  <li className="px-1 pb-0.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                    Missions ({missions.length})
+                  </li>
+                  {missions.map((mission) => {
+                    const st = missionStatus(trackSlug, mission);
+                    const missionActive = activeMissionSlug === mission.slug;
+                    const minutesLabel = `${mission.estimatedMinutes}′`;
+                    return (
+                      <li key={mission.id}>
+                        <Link
+                          href={`/rt/${trackSlug}/${mission.slug}`}
+                          onClick={onNavigate}
+                          className={`flex items-start gap-1.5 rounded-lg px-1.5 py-1 text-[11px] leading-snug transition-colors ${
+                            missionActive
+                              ? 'bg-primary/10 font-semibold text-primary'
+                              : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+                          }`}
+                        >
+                          <StatusDot status={st} />
+                          <span className="min-w-0 flex-1">
+                            <span className="line-clamp-2 block">{mission.title}</span>
+                            <span className="font-mono text-[9px] text-muted-foreground/70">
+                              {minutesLabel} · {mission.vectorIds.length} vector
+                            </span>
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* Footer stats + reset */}
+      <div className="mt-auto space-y-2 rounded-xl border border-border/60 bg-secondary/30 p-3">
+        <div className="flex items-center justify-between font-mono text-[10px] text-muted-foreground">
+          <span>
+            breached:{' '}
+            <span className="font-bold text-destructive">
+              {totalBreached}/{totalVectors}
+            </span>
+          </span>
+          <span>
+            patched:{' '}
+            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+              {totalPatched}/{totalVectors}
+            </span>
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            resetRedTeamProgress();
+            onNavigate?.();
+          }}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-background/60 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+        >
+          <RotateCcw className="h-3 w-3" />
+          Reset toàn bộ Ops
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Chevron({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-90' : ''}`}
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
