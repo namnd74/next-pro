@@ -1,0 +1,173 @@
+{
+  "trackSlug": "react-foundations-zero-to-one",
+  "missions": [
+    {
+      "id": "rcf-mis-01",
+      "slug": "index-key-reorder-blast",
+      "title": "Chiến dịch 01 · Tráo bài sau lưng user bằng Index-Key",
+      "summary": "Một key={index} vô hại cho đến khi danh sách được chèn/xóa/sắp xếp: walkthrough toàn bộ cách reconciliation nhận nhầm danh tính row và cách dữ liệu user bị 'trút' sang hàng khác.",
+      "objective": "Khiến trạng thái nội bộ của các row (input đang gõ, checkbox tick) gán nhầm sang item khác ngay sau một lần prepend, mà không có bất kỳ lỗi console nào.",
+      "difficulty": "beginner",
+      "estimatedMinutes": 20,
+      "vectorIds": ["rcf-vec-01"],
+      "rootCause": "React đối chiếu cây UI giữa hai lần render bằng key trong cùng một list. Key không phải 'tên hiển thị' mà là DANH TÍNH của element qua thời gian. Khi key=index, danh tính trở thành vị trí trong mảng — một thứ thay đổi theo mọi phép insert/remove. Vấn đề nền tảng: dev nhầm giữa hai khái niệm 'thứ tự hiển thị' (thuộc dữ liệu) và 'định danh' (cũng phải thuộc dữ liệu). Mọi state nội bộ của component row (uncontrolled input, useState cục bộ) bám theo DANH TÍNH, không bám theo nội dung props.",
+      "reconNotes": [
+        "Tìm mọi .map( render component có state riêng: input, checkbox, animation entry.",
+        "Kiểm tra prop key: là index của map hay id từ dữ liệu?",
+        "Xem list có thao tác thêm/xóa/sắp xếp không — list tĩnh thì index-key chỉ là mùi code, chưa phải bom.",
+        "Thử prepend một item rồi quan sát focus/checkbox của hàng đầu tiên."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Dựng list có state per-row",
+          "detail": "Mỗi TodoRow chứa một ô input ghi chú riêng (state cục bộ). User gõ nội dung vào hàng 'Học React' — input này chưa được lưu vào data.",
+          "code": "const [todos, setTodos] = useState([\n  { text: 'Học JavaScript' },\n  { text: 'Học React' },   // ← user đang gõ note ở đây\n  { text: 'Học Next.js' },\n]);"
+        },
+        {
+          "title": "2 · Prepend item mới",
+          "detail": "Thêm việc khẩn lên ĐẦU mảng. Index của mọi item cũ dịch +1 nhưng nội dung dữ liệu không đổi.",
+          "code": "setTodos([{ text: 'Nộp báo cáo' }, ...todos]);"
+        },
+        {
+          "title": "3 · Quan sát reconciliation nhầm người",
+          "detail": "React so key cũ [0,1,2] với key mới [0,1,2,3]: key 0 'vẫn tồn tại' → reuse component instance, chỉ thay props. State ô input của 'Học React' giờ hiển thị cạnh 'Nộp báo cáo'.",
+          "code": "// trước: key0='Học JavaScript' (input rỗng)\n// sau:   key0='Nộp báo cáo'    (NHƯNG giữ nguyên text đã gõ!)\n// → user thấy note của mình 'nhảy' sang task khác"
+        },
+        {
+          "title": "4 · Thu hoạch sự cố",
+          "detail": "User tick 'done' trên hàng đang hiện sai task → dữ liệu lưu xuống DB sai nghĩa. Toàn bộ chuỗi sự kiện không sinh ra một warning nào trong console.",
+          "code": "saveTodo({ text: 'Học React', done: true })\n// 💀 done=true vốn dành cho task KHÁC do user tick nhầm"
+        }
+      ],
+      "hardeningChecklist": [
+        "Mọi item trong list động phải có id bền vững từ lúc tạo (backend id hoặc crypto.randomUUID()).",
+        "key luôn lấy từ dữ liệu; cấm dùng tham số index của map() khi list có thể insert/remove/sort.",
+        "Bật eslint-plugin-react 'react/no-array-index-key' để CI chặn sớm.",
+        "Với list sắp xếp/thêm xóa thường xuyên, viết test tương tác: gõ vào row → prepend → assert text vẫn ở đúng item.",
+        "Code review checklist: mỗi PR chạm vào list rendering phải trả lời câu hỏi 'key này sống sót qua reorder không?'."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao state của input lại 'bám theo key' chứ không theo dòng chữ?",
+          "answer": "Vì DOM node và React state thuộc về element instance được định danh bằng key. Khi key 0 vẫn tồn tại, React giữ nguyên instance (kèm state) và chỉ cập nhật props mới — nó không hề biết 'nội dung' đã đổi chủ."
+        },
+        {
+          "question": "List tĩnh dùng index-key có sao không?",
+          "answer": "Về mặt chạy đúng thì không, vì không có phép biến đổi làm dịch index. Nhưng đó là nạp mìn chậm: chỉ cần ai đó thêm tính năng sort/remove sau này, quả bom kích hoạt. Chi phí đổi sang id gần như bằng 0."
+        }
+      ]
+    },
+    {
+      "id": "rcf-mis-02",
+      "slug": "state-mutation-phantom-ui",
+      "title": "Chiến dịch 02 · Quỷ dữ tham chiếu: mutation khiến UI ngủ đông",
+      "summary": "push() vào state rồi setCart(cart) — dòng code ngắn nhất tạo ra bug phantom dai dẳng nhất: mô phỏng cơ chế Object.is bail-out và xây dựng kỷ luật immutable update.",
+      "objective": "Tạo ra tình trạng data thật đã đổi nhưng UI hoàn toàn không hay biết, và hiểu vì sao React 'chính đáng' bỏ qua re-render đó.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 22,
+      "vectorIds": ["rcf-vec-02"],
+      "rootCause": "React không theo dõi 'ý định' của bạn mà phát hiện thay đổi bằng so sánh tham chiếu: Object.is(oldState, newState). Đây là lựa chọn kiến trúc để render nhanh — so sánh con trỏ O(1) thay vì deep-compare toàn cây. Hệ quả hai mặt: mutation tại chỗ RẺ về hiệu năng nhưng VÔ HÌNH với React; immutable update TỐN một lần copy nhưng đổi tham chiếu thành tín hiệu đáng tin. Mọi tầng phía trên (memo, dependency array của useMemo/useEffect, Redux time-travel) đều xây trên cùng giả định tham chiếu bất biến.",
+      "reconNotes": [
+        "Grep các pattern nguy hiểm: state.push(, state[i] =, obj.field = trong handler.",
+        "Kiểm tra setState có được truyền chính biến state hay không: setCart(cart).",
+        "Xem component có memo/useMemo quanh vùng dữ liệu bị mutate không — chúng khuếch đại hậu quả.",
+        "Đọc flow update→render: click đầu tiên có đổi data mà không đổi màn hình?"
+      ],
+      "killChain": [
+        {
+          "title": "1 · Cài quả mìn",
+          "detail": "Handler thêm sản phẩm mutate mảng trong state rồi truyền chính tham chiếu cũ vào setter.",
+          "code": "cart.items.push(product);\ncart.total += product.price;\nsetCart(cart); // same reference"
+        },
+        {
+          "title": "2 · Kích hoạt: click đầu tiên",
+          "detail": "Data thật đã có 1 món nhưng Object.is(cart, cart) === true nên React kết luận 'nothing changed' và dừng trước khi render.",
+          "code": "click #1 → items.length = 1, screen shows EMPTY\nObject.is(prev, next) === true → bail out"
+        },
+        {
+          "title": "3 · Click thứ hai: phantom kép",
+          "detail": "Click 2 cũng mutate rồi bail-out tiếp — nhưng nếu bất kỳ state KHÁC khiến component render lại, cả hai món xuất hiện cùng lúc. UI nhảy sốt từ 0 lên 2.",
+          "code": "click #2 + unrelated re-render → screen jumps to 2 items\n// badge giỏ hàng: 0 → 2, không bao giờ là 1"
+        },
+        {
+          "title": "4 · Hậu quả dây chuyền",
+          "detail": "memo(ProductRow) so props cũng thấy 'không đổi' → row giá tiền không cập nhật; useEffect phụ thuộc cart không fire. Ba lớp tối ưu đều tê liệt vì cùng vi phạm một hợp đồng.",
+          "code": "useEffect(() => syncCartToServer(cart), [cart])\n// never fires: reference unchanged"
+        }
+      ],
+      "hardeningChecklist": [
+        "Quy ước team: state là read-only; mọi handler tạo bản sao mới bằng spread/toSorted/filter/map.",
+        "Dùng setState dạng functional setCart(prev => next) để tránh stale closure khi update liên tiếp.",
+        "Cấu trúc lồng sâu: chọn Immer (produce) hoặc Zustand với immutable update chuẩn thay vì tự clone tay.",
+        "Thêm rule lint tùy chỉnh hoặc review checklist cấm mutate biến có nguồn gốc từ useState/props.",
+        "Viết regression test: thực hiện action 1 lần → assert UI/data khớp ngay lập tức (chặn bug 'click 2 lần')."
+      ],
+      "debrief": [
+        {
+          "question": "Tại sao React chọn so sánh tham chiếu thay vì deep-equal?",
+          "answer": "Deep-equal mỗi lần setState trên cây lớn là O(n) và vẫn không chắc chắn (cycle, function identity). Tham chiếu O(1), deterministic, và đẩy trách nhiệm 'tạo bản ghi mới' về phía developer — đánh đổi công bằng và dự đoán được."
+        },
+        {
+          "question": "Mutation bên trong setState updater có ổn không?",
+          "answer": "Không. setCart(prev => { prev.items.push(x); return prev; }) vẫn trả về cùng tham chiếu → vẫn bail-out. Updater phải TRẢ VỀ object/array mới; việc mutate prev chỉ phá thêm dữ liệu lịch sử."
+        }
+      ]
+    },
+    {
+      "id": "rcf-mis-03",
+      "slug": "zero-render-trap-exploit",
+      "title": "Chiến dịch 03 · Số 0 ma: khai thác toán tử && trong JSX",
+      "summary": "Cú pháp một ký tự tiết kiệm biến họa giao diện toàn app: giải phẫu tại sao 0 falsy nhưng vẫn được React in ra, và các mẫu phòng tránh triệt để.",
+      "objective": "Làm chữ số 0 xuất hiện trên production ở mọi tài khoản mới, hiểu chính xác ngữ cảnh biểu thức JS quyết định điều đó, và vá bằng pattern an toàn vĩnh viễn.",
+      "difficulty": "beginner",
+      "estimatedMinutes": 18,
+      "vectorIds": ["rcf-vec-03"],
+      "rootCause": "JSX expression container {} render BẤT KỲ giá trị nào hợp lệ làm ReactNode: chuỗi, số, element, mảng. Toán tử && trả về giá trị của toán hạng — không ép về boolean. Vì vậy count=0 (falsy NHƯNG là number) được trả nguyên vẹn và React trung thành in ký tự '0'. Gốc rễ là va chạm giữa truthiness logic của JS (dành cho điều khiển luồng) và render semantics của React (mọi giá trị đều có thể hiển thị). NaN, chuỗi rỗng '' cũng thuộc nhóm này — 0 chỉ là nạn nhân nổi tiếng nhất.",
+      "reconNotes": [
+        "Grep toàn repo mẫu '{count &&', '{items.length &&', '{total &&' trong file .tsx.",
+        "Ưu tiên nơi giá trị bắt nguồn từ length, số đếm API, parseFloat — nhóm hay sinh 0/NaN.",
+        "Kiểm tra trang với dữ liệu rỗng: user mới, giỏ trống, chưa có thông báo.",
+        "Xem Sentry/console: lỗi '0 is a text node' thường không báo — bug chỉ nhìn thấy bằng mắt."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Nhận diện mẫu code mạo hiểm",
+          "detail": "Badge giỏ hàng dùng && với count kiểu number — biên dịch ra biểu thức trả về 0 khi giỏ rỗng.",
+          "code": "{count && <span className=\"badge\">{count}</span>}"
+        },
+        {
+          "title": "2 · Chọn dữ liệu kích hoạt",
+          "detail": "Tài khoản mới: items=[] → items.length=0. Không cần hack gì cả — trạng thái kinh doanh bình thường nhất chính là trigger.",
+          "code": "const items: Product[] = [];\nconst count = items.length; // 0"
+        },
+        {
+          "title": "3 · Quan sát DOM nhiễm bẩn",
+          "detail": "React render text node '0' đè lên icon giỏ hàng. QA mở DevTools thấy <div> ... 0 ... </div> — không phải badge, thuần văn bản.",
+          "code": "<div class=\"relative\">\n  <svg>…bag icon…</svg>\n  0\n</div>"
+        },
+        {
+          "title": "4 · Nhân bản toàn app",
+          "detail": "Cùng mẫu copy-paste ở pagination, notification counter, filter result — mỗi chỗ một ticket bug riêng. Chi phí sửa thấp, chi phí TÌM cao.",
+          "code": "{pageCount && <Pager/>}      // trang trắng: pageCount=0\n{unread && <Bell/>}          // chữ 0 cạnh chuông\n{results && <Grid/>}         // '0' lơ lửng trên grid trống"
+        }
+      ],
+      "hardeningChecklist": [
+        "Chuẩn hóa team convention: && trong JSX chỉ chấp nhận boolean bên trái (count > 0, !!flag, Boolean(x)).",
+        "Với số đếm/chuỗi: dùng ternary tường minh {x ? <A/> : null} — an toàn với mọi kiểu kể cả NaN.",
+        "Đưa mẫu này vào code-review checklist và internal wiki kèm ví dụ DOM thật.",
+        "UI test cho trạng thái RỖNG (empty state) của mọi màn hình có counter/conditional badge.",
+        "Cân bật @typescript-eslint/strict-boolean-expressions ở mức warn để dần siết."
+      ],
+      "debrief": [
+        {
+          "question": "Dùng ?? thay && có giải được vụ này?",
+          "answer": "Không. ?? chỉ coi null/undefined là rỗng — 0 ?? fallback vẫn là 0. Trap nằm ở việc 0 được RENDER, không phải được thay thế."
+        },
+        {
+          "question": "Vì sao false && <A/> lại an toàn còn 0 && <A/> thì không?",
+          "answer": "React bỏ qua false/null/undefined/true khi render (không tạo node), nhưng 0 và '' là giá trị hiển thị hợp lệ. Cùng là falsy với if, khác nhau hoàn toàn với JSX."
+        }
+      ]
+    }
+  ]
+}

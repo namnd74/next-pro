@@ -1,0 +1,91 @@
+{
+  "id": "rt-nextjs-architecture-rendering",
+  "trackSlug": "nextjs-architecture-rendering-strategies",
+  "title": "Red Team: Next.js Architecture & Rendering",
+  "tagline": "Một env key lọt bundle, một chuỗi await xếp hàng, một force-dynamic bừa bãi — ba vết nứt hạ tầng chết người.",
+  "missionBriefing": "Nhiệm vụ: tấn công thẳng vào kiến trúc rendering của app — moi secret từ client bundle, đẩy TTFB nát bằng waterfall tuần tự, và đè bẹp database bằng dynamic rendering storm. Đọc Blast Radius để hiểu hậu quả ở quy mô production, rồi áp dụng Defense Patch cho từng vector cho đến khi toàn bộ chuyển sang trạng thái PATCHED.",
+  "difficulty": "advanced",
+  "vectors": [
+    {
+      "id": "na-vec-01",
+        "relatedLessons": ["na-01"],
+      "name": "Bundle Secret Heist",
+      "severity": "critical",
+      "category": "Secret Exposure",
+      "target": "process.env secret trong module bị 'use client' import / NEXT_PUBLIC misuse",
+      "story": "CheckoutButton báo lỗi secret undefined trong console, và 'bản vá nhanh nhất lịch sử' ra đời: đổi tên biến môi trường thành NEXT_PUBLIC_STRIPE_SECRET_KEY. Bundler trung thành inline chuỗi secret dưới dạng plaintext vào chunk JavaScript public. Vài phút sau khi deploy, bot quét bundle tự động đã moi được sk_live_ và đăng nhập thẳng vào tài khoản payment gateway.",
+      "payloadCode": "// lib/payments.ts — ai đó 'sửa lỗi undefined' bằng cách rẻ nhất:\nexport const STRIPE_SECRET = process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY ?? '';\n\n// components/CheckoutButton.tsx\n'use client';\nimport { STRIPE_SECRET } from '@/lib/payments'; // kéo secret vào client graph\n\nexport function CheckoutButton({ cartId }: { cartId: string }) {\n  async function handlePay() {\n    // ❌ Gọi thẳng Stripe từ trình duyệt VỚI SECRET KEY\n    await fetch('https://api.stripe.com/v1/payment_intents', {\n      method: 'POST',\n      headers: { Authorization: `Bearer ${STRIPE_SECRET}` },\n      body: new URLSearchParams({ cartId, currency: 'vnd' }),\n    });\n  }\n  return <button onClick={handlePay}>Thanh toán</button>;\n}\n\n// 🔓 Attacker: DevTools → Sources → Ctrl+F 'sk_live_'\n// hoặc: curl -s https://myshop.com/_next/static/chunks/checkout-9f2a.js | grep -o \"sk_live_[A-Za-z0-9]*\"",
+      "impactLog": [
+        "$ curl -s .../_next/static/chunks/checkout-9f2a.js | grep sk_live",
+        "> MATCH: sk_live_51NxT…9fQ2 — secret key sitting in PUBLIC bundle",
+        "> key validated: GET api.stripe.com/v1/balance → 200 OK (full account access)",
+        "CRITICAL: attacker tạo refund hàng loạt về tài khoản của mình",
+        "FATAL: 1.2 tỷ VND rút khỏi merchant account lúc 03:14 — key phải xoay toàn cục",
+        "WARNING: bot quét bundle index được key chỉ 6 phút sau khi deploy"
+      ],
+      "blastRadius": [
+        "Mất tiền trực tiếp: charge/refund/payout giả mạo qua payment API với full access.",
+        "Phải xoay key trên mọi môi trường và rà soát audit log — sự cố P1 toàn công ty.",
+        "Vi phạm PCI-DSS: secret nằm trong artifact public là thất bại kiểm soát truy cập.",
+        "Bot quét key hoạt động 24/7 — khoảng cách từ deploy đến bị moi tính bằng phút."
+      ],
+      "defenseName": "server-only Guard + Route Handler Proxy",
+      "defenseCode": "// ✅ Secret sống và chết trên server — client chỉ thấy URL của ta\n\n// 1) Chốt cửa: module này CẤM lọt vào client bundle\n// lib/stripe-server.ts\nimport 'server-only'; // 💥 build FAIL ngay nếu 'use client' import nó\nimport Stripe from 'stripe';\n\nexport const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {\n  apiVersion: '2024-06-20',\n});\n\n// 2) Client gọi Route Handler của ta — KHÔNG gọi Stripe trực tiếp\n// app/api/checkout/route.ts\nexport async function POST(req: Request) {\n  const session = await auth(); // xác thực TRƯỚC, tính tiền SAU\n  if (!session) return Response.json({ error: 'Unauthorized' }, { status: 401 });\n\n  const { cartId } = await req.json();\n  const amount = await priceCart(cartId); // ✅ amount tính server-side — tin client là mất tiền\n  const intent = await stripe.paymentIntents.create({ amount, currency: 'vnd' });\n  return Response.json({ clientSecret: intent.client_secret }); // chỉ lộ clientSecret an toàn\n}",
+      "defenseTakeaway": "Secret server không bao giờ có tiền tố NEXT_PUBLIC, module chứa nó import 'server-only', và client chỉ nói chuyện với Route Handler của bạn."
+    },
+    {
+      "id": "na-vec-02",
+        "relatedLessons": ["na-02"],
+      "name": "Sequential Waterfall Trap",
+      "severity": "high",
+      "category": "Request Waterfall",
+      "target": "RSC awaits fetch tuần tự trong DashboardPage",
+      "story": "Dashboard awaits user, rồi orders, rồi recommendations — ba fetch xếp hàng dù hai cái sau chỉ cần user.id. TTFB bằng TỔNG độ trễ thay vì cái dài nhất: gần 2 giây trước khi byte HTML đầu tiên rời server. Đợt marketing đầu tiên, dashboard trở thành trang chậm nhất hệ thống và Core Web Vitals rơi tự do.",
+      "payloadCode": "// app/dashboard/page.tsx (RSC)\n// ❌ Ba fetch xếp hàng một — tổng độ trễ là CỘNG DỒN, không phải MAX\nexport default async function DashboardPage() {\n  const user = await getUser();                    // ~400ms\n  const orders = await getOrders(user.id);         // ~600ms (chỉ cần user.id)\n  const recos = await getRecommendations(user.id); // ~900ms (cũng chỉ cần user.id)\n\n  // ⏱️ ~1.900ms trước khi byte HTML ĐẦU TIÊN rời server\n  return (\n    <>\n      <ProfileCard user={user} />\n      <OrdersTable orders={orders} />\n      <RecoCarousel items={recos} />\n    </>\n  );\n}\n\n// Trên 3G thật: 1.9s server + 800ms mạng ≈ màn hình trắng gần 3 giây.",
+      "impactLog": [
+        "$ trace: getUser 402ms → getOrders 611ms → getRecos 887ms",
+        "> execution: SEQUENTIAL — zero overlap, mỗi await chờ cái trước nó",
+        "> TTFB /dashboard: 1.94s (ngân sách đề ra: 500ms)",
+        "WARNING: LCP 3.6s — Core Web Vitals FAIL trên mobile",
+        "HIGH: mỗi +100ms latency ≈ −1% conversion (benchmark Akamai)",
+        "CRITICAL: DB cold-start + traffic đột biến → chuỗi await đứt từng đoạn, timeout dây chuyền"
+      ],
+      "blastRadius": [
+        "TTFB bằng tổng các fetch thay vì max: chậm nhân bản, lãng phí hạ tầng vô nghĩa.",
+        "Conversion và SEO tụt thẳng: mỗi trăm mili-giây chậm là doanh thu rơi ra.",
+        "Worker giữ connection lâu hơn → throughput server giảm mạnh đúng lúc tải cao.",
+        "Một fetch chậm làm treo cả page — timeout dây chuyền trên mọi tầng."
+      ],
+      "defenseName": "Promise.all Parallelism + Early Streaming",
+      "defenseCode": "// ✅ Song song hoá những gì có thể — chỉ chờ dependency THẬT SỰ\nexport default async function DashboardPage() {\n  const user = await getUser(); // ~400ms — dependency duy nhất\n\n  // ✅ orders & recos chạy ĐỒNG LÚC: 600ms + 900ms → chỉ tốn ~900ms\n  const [orders, recos] = await Promise.all([\n    getOrders(user.id),\n    getRecommendations(user.id),\n  ]);\n  // ⏱️ TTFB mới: ~1.3s → tối ưu tiếp ở bước 2 nếu vẫn chưa đủ\n\n  return (\n    <>\n      <ProfileCard user={user} />\n      <OrdersTable orders={orders} />\n      <RecoCarousel items={recos} />\n    </>\n  );\n}\n\n// 2) Fetch không phụ thuộc gì? KHÔNG await ở page — nhét component tự fetch\n//    vào <Suspense> để stream riêng: <Suspense><RecoSection /></Suspense>\n// 3) Hoặc preload sớm ở layout với React cache() rồi await/use() ở leaf.",
+      "defenseTakeaway": "Vẽ sơ đồ dependency của các fetch: độc lập thì Promise.all, không chặn nội dung chính thì đẩy xuống Suspense stream."
+    },
+    {
+      "id": "na-vec-03",
+        "relatedLessons": ["na-02"],
+      "name": "Dynamic Rendering Storm",
+      "severity": "medium",
+      "category": "Cache Bypass Flood",
+      "target": "force-dynamic + fetch cache:'no-store' áp dụng toàn cục",
+      "story": "Sau một sự cố dữ liệu cũ, team 'vá' bằng cách rải force-dynamic và no-store khắp app — hết stale, đổi lại MỌI request đều đấm xuống database. Ngày hội sale, 48 nghìn request/phút đổ vào: connection pool cạn trong 90 giây, p99 lên 28 giây và trang sập đúng giờ vàng doanh thu. Chi phí 'giải cứu' là nhân bản DB — thứ mà lớp cache CDN vốn làm miễn phí.",
+      "payloadCode": "// ❌ Hậu quả của nỗi sợ dữ liệu cũ: render động TẤT CẢ\n// app/products/page.tsx\nexport const dynamic = 'force-dynamic'; // static generation bị vô hiệu hoá\nexport const revalidate = 0;\n\nasync function getProducts() {\n  const res = await fetch('https://api.internal/products', {\n    cache: 'no-store',       // 💥 100% request → origin/DB\n    next: { revalidate: 0 },\n  });\n  return res.json();\n}\n\nexport default async function ProductsPage() {\n  const products = await getProducts(); // mỗi user = một lượt SELECT *\n  return <ProductGrid items={products} />;\n}\n\n// 🎯 11:00 chiến dịch mở bán: 48k req/phút\n// → pool 20 connections cạn, queue 1.200+, p99 28s, 5xx 34%",
+      "impactLog": [
+        "$ 11:00 campaign live — traffic 48.000 req/min",
+        "> MỖI request: force-dynamic → render + SELECT * FROM products",
+        "> db pool: 20/20 connections BUSY — queue depth 1.204",
+        "WARNING: p99 28s, error rate 5xx = 34%, health check bắt đầu fail",
+        "CRITICAL: SITE DOWN trong giờ vàng — doanh thu mất ước tính 800 triệu",
+        "FATAL: 'giải pháp' tạm thời = thêm DB replica → hoá đơn infra ×4"
+      ],
+      "blastRadius": [
+        "Sập đúng giờ vàng doanh thu — thiệt hại trực tiếp cộng hậu quả truyền thông.",
+        "Chi phí infra tăng vĩnh viễn: scale DB để bù thứ mà cache CDN làm miễn phí.",
+        "Cold render mọi request: CPU node chạy full chỉ để tái tạo cùng một HTML.",
+        "Sự cố lặp lại theo lịch campaign: mỗi đợt traffic là một đợt downtime."
+      ],
+      "defenseName": "Layered Cache: Static Shell + ISR + Tag Revalidate",
+      "defenseCode": "// ✅ Mặc định tĩnh, ISR làm tươi nền, webhook revalidate đúng chỗ cần\n\n// app/products/page.tsx — KHÔNG có force-dynamic\nasync function getProducts() {\n  const res = await fetch('https://api.internal/products', {\n    next: { revalidate: 300, tags: ['products'] }, // ✅ ISR 5 phút + tag\n  });\n  return res.json();\n}\n\nexport const revalidate = 300; // static shell phục vụ 99% request từ CDN\n\nexport default async function ProductsPage() {\n  const products = await getProducts();\n  return <ProductGrid items={products} />;\n}\n\n// app/api/products/revalidate/route.ts — CMS/webhook chủ động làm tươi\nimport { revalidateTag } from 'next/cache';\nexport async function POST(req: Request) {\n  if (req.headers.get('x-webhook-secret') !== process.env.WEBHOOK_SECRET) {\n    return new Response('Forbidden', { status: 403 });\n  }\n  revalidateTag('products'); // ✅ chỉ đúng những gì thay đổi, không đốt cache vơ vẩn\n  return Response.json({ revalidated: true });\n}",
+      "defenseTakeaway": "Tĩnh khi có thể, ISR khi cần tươi, revalidateTag khi dữ liệu đổi — chỉ nội dung thật sự cá nhân hoá mới đi đường động."
+    }
+  ]
+}

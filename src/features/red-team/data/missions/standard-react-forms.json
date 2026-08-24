@@ -1,0 +1,173 @@
+{
+  "trackSlug": "standard-react-form-architecture",
+  "missions": [
+    {
+      "id": "sr-mis-01",
+      "slug": "ghost-field-vanishing",
+      "title": "Chiến dịch 01 · Bóng ma không tên: field biến mất khỏi FormData",
+      "summary": "Input hiển thị trên UI, user điền đầy đủ — nhưng server nhận payload thiếu trường đó. Truy nguyên quy tắc name attribute của HTML form và hợp đồng serialization ngầm.",
+      "objective": "Tạo form submit thành công nhưng một field hoàn toàn vắng mặt trong payload gửi lên server, không lỗi, không warning nào báo hiệu.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 18,
+      "vectorIds": ["sr-vec-01"],
+      "rootCause": "FormData và cơ chế submit gốc của HTML không đọc từ React state hay DOM 'tổng thể' — nó thu thập theo cặp [name] → value của các control SUCCESSFUL bên trong <form>. name là hợp đồng định danh duy nhất của field trong thế giới serialization. React chỉ quản lý view; khi dev quen controlled component (đọc value qua state) dễ quên hẳn name vì 'dữ liệu đã nằm trong state rồi'. Ranh giới sụp khi team mix hai thế giới: nút submit type=submit + handler đọc FormData/e.target.elements — lúc đó field thiếu name trở thành bóng ma: có thật trên màn hình, không tồn tại trong dữ liệu.",
+      "reconNotes": [
+        "Liệt kê form dùng FormData(target) hoặc new FormData(form) thay vì đọc từng state.",
+        "So từng input giữa UI và payload: field nào có trong JSX nhưng thiếu trong request?",
+        "Kiểm tra custom component wrapper: có forwardRef và truyền {...props} (kể cả name) xuống input thật không?",
+        "Chú ý input disabled/readonly — successful control cũng loại bỏ disabled khỏi FormData."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Dựng form lai",
+          "detail": "Form đăng ký: email dùng controlled (có name), còn 'referralCode' dev thêm sau — quên name vì giá trị đọc qua onChange state.",
+          "code": "<input value={email} name=\"email\" onChange={...} />\n<input value={referral} onChange={...} /> {/* 💀 thiếu name */}"
+        },
+        {
+          "title": "2 · Submit qua cơ chế native",
+          "detail": "onSubmit gọi new FormData(e.currentTarget) — serializer quét form, gặp referral input KHÔNG có name → bỏ qua im lặng theo spec HTML.",
+          "code": "const fd = new FormData(e.currentTarget);\nfd.get('email');    // 'an@x.com'\nfd.get('referral'); // null 💀"
+        },
+        {
+          "title": "3 · Server nhận payload cụt",
+          "detail": "POST /register gửi {email} mà không referral. Backend Zod schema optional nên 200 OK — mã giảm giá của user bay vào hư không.",
+          "code": "// server log\n{ \"email\": \"an@x.com\" }   // referralCode: absent"
+        },
+        {
+          "title": "4 · Vá đúng hợp đồng",
+          "detail": "Thêm name cho mọi control; với custom Field component, đảm bảo props lan xuống input gốc. Chọn MỘT thế giới serialization: hoặc full-controlled đọc state, hoặc native FormData — không trộn.",
+          "code": "<TextField name=\"referral\" value={referral} onChange={...} />\n// TextField phải forward {name,...rest} vào <input/> bên trong"
+        }
+      ],
+      "hardeningChecklist": [
+        "Quy tắc: mọi input bên trong <form> đều phải có name — kể cả khi đang controlled.",
+        "Custom form control bắt buộc forwardRef + spread rest props để name/disabled/aria không bị nuốt.",
+        "Log payload ở tầng API client (dev-only) để lệch giữa UI và request lộ ngay khi test.",
+        "Server schema: những field business-critical nên required thay vì optional lặng lẽ.",
+        "E2E test ít nhất 1 flow submit per form: assert payload đầy đủ field như UI hiển thị."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao controlled input vẫn cần name dù dữ liệu nằm trong state?",
+          "answer": "Vì name phục vụ thế giới SERIALIZATION (FormData, autofill, password manager), không phục vụ React. Hai hệ thống nhìn cùng một DOM nhưng bằng hai hợp đồng khác nhau."
+        },
+        {
+          "question": "Disabled input bị bỏ khỏi FormData — tận dụng thế nào cho đúng?",
+          "answer": "Đó là tính năng: dùng disabled để 'gỡ' field khỏi payload khi business rule yêu cầu (ví dụ khóa mã giảm giá sau khi tính tiền). Nhưng phải chủ động; đừng để disabled xuất hiện do bug state."
+        }
+      ]
+    },
+    {
+      "id": "sr-mis-02",
+      "slug": "controlled-mode-flip",
+      "title": "Chiến dịch 02 · Lật chế độ: controlled ↔ uncontrolled đổi pha giữa chừng",
+      "summary": "Một điều kiện render khiến input đổi from controlled sang uncontrolled: warning đỏ trong console, chữ user gõ bốc hơi, và bài học về hợp đồng nhất quán của value/defaultValue.",
+      "objective": "Kích hoạt cảnh báo 'A component is changing an uncontrolled input to be controlled' và mất dữ liệu nhập, rồi chuẩn hóa contract của form field vĩnh viễn.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 18,
+      "vectorIds": ["sr-vec-02"],
+      "rootCause": "React phân loại input dựa trên prop ĐƯỢC TRUYỀN tại mỗi render: có value → controlled (React sở hữu), không có value (chỉ defaultValue hoặc không gì) → uncontrolled (DOM sở hữu). Việc chuyển mode giữa chừng buộc DOM và React tranh giành nguồn sự thật. Gốc rễ: dev coi value là 'optional prop' trong khi nó là TUYÊN BỐ KIẾN TRÚC về ai giữ state. Khi value đến từ data có thể undefined (API chưa trả, field ẩn theo điều kiện), mode flip xảy ra âm thầm — và lần render đầu tiên với undefined đã khóa input vào uncontrolled world.",
+      "reconNotes": [
+        "Grep input có value= nằm trong điều kiện: {isEdit && <input value=...>} hoặc value={user?.name}.",
+        "Mở console filter Warning: 'changing an uncontrolled input' / 'controlled input to be uncontrolled'.",
+        "Thử flow tạo-mới vs chỉnh-sửa trên cùng form component — nơi hay lộ mode flip.",
+        "Kiểm tra reset form: setValues(undefined) thay vì '' cũng là một cú flip ngược."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Truyền value có thể undefined",
+          "detail": "Form edit profile tái sử dụng cho trang create; user object chưa load nên name prop là undefined.",
+          "code": "<ProfileForm name={user?.name} />\n// lần đầu mount: user === null → name === undefined"
+        },
+        {
+          "title": "2 · Mount ở chế độ uncontrolled",
+          "detail": "value={undefined} ≡ không truyền value → React xem đây uncontrolled input, DOM tự quản. User gõ 'Nguyễn Văn A' — chữ nằm trong DOM node.",
+          "code": "<input value={undefined} onChange={...} defaultValue={undefined} />\n// = uncontrolled; DOM giữ 'Nguyễn Văn A'"
+        },
+        {
+          "title": "3 · Data về, mode lật ngược",
+          "detail": "user load xong → name='An (server)' → input giờ controlled. Console nổ warning; chữ user vừa gõ bị ghi đè bởi giá trị server.",
+          "code": "// Warning: A component is changing an uncontrolled input to be controlled.\n// DOM text bị replace: 'Nguyễn Văn A' → 'An (server)' 💀"
+        },
+        {
+          "title": "4 · Chuẩn hóa hợp đồng",
+          "detail": "Vá bằng giá trị fallback + tách trạng thái loading, bảo đảm input CHỈ thuộc một thế giới suốt vòng đời.",
+          "code": "{!user ? <Spinner/> : (\n  <ProfileForm name={user.name ?? ''} /> // ✅ luôn string, luôn controlled\n)}"
+        }
+      ],
+      "hardeningChecklist": [
+        "Không bao giờ truyền value có khả năng undefined vào input: fallback '' hoặc dùng defaultValue một cách CỐ Ý.",
+        "Chọn chiến lược cho từng field ngay từ thiết kế: controlled (validation động) hay uncontrolled (performance, file input).",
+        "Form chưa sẵn sàng (data loading) thì không render input — render skeleton/spinner thay thế.",
+        "Giám sát console warning trong CI (cypress devtools / testing-library) — coi React warning là failure.",
+        "Reset form dùng setValues(INITIAL_VALUES) với mọi key là string rỗng, không bao giờ undefined/null."
+      ],
+      "debrief": [
+        {
+          "question": "defaultValue khác value chỗ nào về mặt hợp đồng?",
+          "answer": "defaultValue là 'giá trị khởi tạo một lần' cho thế giới uncontrolled — DOM sở hữu sau đó. value là tuyên bố 'mỗi render giá trị là NÀY, DOM không được tự ý đổi'. Trộn hai cái trong vòng đời một input là vi phạm hợp đồng."
+        },
+        {
+          "question": "Warning này có nghiêm trọng không nếu UI 'vẫn chạy'?",
+          "answer": "Có. Nó báo ownership flip — nguồn sự thật đổi tay giữa chừng, kéo theo mất input user, hành vi autofill/password manager khó đoán, và logic validation đọc sai nguồn. Đây là mùi kiến trúc chứ không chỉ warning thẩm mỹ."
+        }
+      ]
+    },
+    {
+      "id": "sr-mis-03",
+      "slug": "double-submit-fraud",
+      "title": "Chiến dịch 03 · Double Submit: đơn hàng nhân bản từ một cú click sốt ruột",
+      "summary": "User bấm nút Thanh toán hai lần vì mạng chậm — hai đơn hàng, hai lần trừ tiền. Xây kịch bản race condition từ UX đến DB idempotency, và lớp vá nhiều tầng chuẩn production.",
+      "objective": "Nhân bản một thao tác ghi dữ liệu chỉ bằng double-click trong khoảng network latency, sau đó dựng hàng rào phòng thủ từ UI tới database.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 22,
+      "vectorIds": ["sr-vec-03"],
+      "rootCause": "Submit không đồng bộ mở ra cửa sổ thời gian giữa CLICK và PHẢN HỒI — trong cửa sổ đó app vẫn ở trạng thái 'chưa làm gì', nên mọi click thêm đều được coi là ý muốn mới. Frontend thường chỉ disable button 'khi đang xử lý' nhưng quên: (1) handler async có thể throw trước khi re-enable, (2) Enter key/double-tap mobile bypass onClick guard, (3) tab khác/retry của trình duyệt gửi lại request. Phòng thủ triệt để phải nhiều tầng: UI lock, single-flight ở client, và IDempotency-Key ở server để hai request GIỐNG HỆT chỉ tính một.",
+      "reconNotes": [
+        "Throttle network xuống Slow 3G rồi double-click nhanh mọi nút submit quan trọng.",
+        "Xem handler có flag isSubmitting/disable không; flag có chắc chắn reset trong finally không?",
+        "Server side: endpoint checkout có kiểm tra trùng (idempotency token, unique constraint) không?",
+        "Test bàn phím: focus nút rồi nhấn Enter ×2 — onClick guard có bao phủ path này?"
+      ],
+      "killChain": [
+        {
+          "title": "1 · Dựng nút không khóa",
+          "detail": "Handler async gọi API nhưng button không biết tiến trình nào đang chạy — mọi click đều phát request mới.",
+          "code": "const handleCheckout = async () => {\n  await api.post('/orders', cart); // 💀 không lock\n  router.push('/thank-you');\n};"
+        },
+        {
+          "title": "2 · Khai thác cửa sổ latency",
+          "detail": "Slow 3G: request đầu mất 2.4s. User sốt ruột click lần nữa ở giây thứ 0.8 — request hai khởi phát khi request một còn trên đường truyền.",
+          "code": "t=0.0s click#1 → POST /orders (in-flight)\nt=0.8s click#2 → POST /orders (in-flight)\n// hai request song song, cùng cart content"
+        },
+        {
+          "title": "3 · Thu hoạch hai đơn hàng",
+          "detail": "Cả hai request 201 Created. User có hai đơn giống hệt, thẻ bị trừ hai lần — support nhận ticket 'tôi chỉ bấm một lần'.",
+          "code": "POST #1 → 201 order_8841\nPOST #2 → 201 order_8842\n// charge ×2, inventory −2"
+        },
+        {
+          "title": "4 · Vá nhiều tầng",
+          "detail": "UI disable + client single-flight + server idempotency-key: ba lớp độc lập, lớp dưới vẫn đứng vững khi lớp trên bị vượt.",
+          "code": "// UI: pending lock\nconst [pending, setPending] = useState(false);\nasync function submit() {\n  if (pending) return;\n  setPending(true);\n  try { await api.post('/orders', cart, {\n    headers: { 'Idempotency-Key': crypto.randomUUID() } }); }\n  finally { setPending(false); }\n}\n// SERVER: lưu key→response, trùng key trả kết quả cũ"
+        }
+      ],
+      "hardeningChecklist": [
+        "Disable nút + hiển thị spinner khi pending; khóa ở mức FORM (không chỉ nút) gồm cả phím Enter.",
+        "Reset lock trong finally — kể cả nhánh lỗi, tránh khóa vĩnh viễn khiến user kẹt.",
+        "Mọi POST tạo tài nguyên: client sinh Idempotency-Key một lần per intent; server cache response theo key.",
+        "DB thêm unique constraint nghiệp vụ (user_id+cart_hash trong 60s) làm lưới cuối.",
+        "Giám sát: alert khi cùng user tạo >1 đơn giống nhau trong cửa sổ ngắn — tín hiệu leak của tầng UI."
+      ],
+      "debrief": [
+        {
+          "question": "Disable button đã đủ chưa, cần Idempotency-Key làm gì?",
+          "answer": "Disable chỉ chặn path UI của một tab. Còn: retry của fetch library, tab thứ hai, script bên ngoài, network replay. Key idempotency là hợp đồng giữa CLIENT INTENT và SERVER — cùng một ý định thì chỉ tính một lần, bất kể request phát mấy lần."
+        },
+        {
+          "question": "Đặt unique index DB có thay được cho idempotency không?",
+          "answer": "Index chống duplicate nhưng phản hồi 500/409 khiến UX xấu và client không nhận lại kết quả mong muốn. Idempotency trả về KẾT QUẢ của request đầu tiên — an toàn và thân thiện. Index là lưới an toàn cuối, không phải lớp chính."
+        }
+      ]
+    }
+  ]
+}

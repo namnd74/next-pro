@@ -1,0 +1,91 @@
+{
+  "id": "rt-react-performance-patterns",
+  "trackSlug": "react-performance-advanced-patterns",
+  "title": "Red Team: Advanced React Performance",
+  "tagline": "Ba đòn đánh vào main thread: props tham chiếu mới, compute nặng ngay trong render và context ô monolith.",
+  "missionBriefing": "Nhiệm vụ: kích hoạt 3 vector phá hoại hiệu năng — bão tham chiếu vô hiệu hóa React.memo, khối filter/sort 10.000 dòng chặn main thread ngay trong thân component, và context monolith phát sóng re-render toàn cây chỉ vì một toast. Đọc Blast Radius để thấy cái giá của wasted renders, rồi vá bằng Defense Patch cho đến khi toàn bộ vector chuyển sang trạng thái PATCHED.",
+  "difficulty": "advanced",
+  "vectors": [
+    {
+      "id": "rpp-vec-01",
+        "relatedLessons": ["rpp-04"],
+      "name": "Referential Identity Storm",
+      "severity": "high",
+      "category": "Memoization Bypass",
+      "target": "React.memo shallow prop comparison",
+      "story": "React.memo đứng gác cổng với shallow compare — nhưng parent mỗi giây lại sinh ra object, mảng, arrow function hoàn toàn mới để đưa xuống. Tham chiếu khác nhau nghĩa là props 'đã đổi': 2000 row memoized đồng loạt re-render mỗi giây như bị lệnh tổng động viên. Cái giá: 43ms paint mỗi nhịp, FPS rơi từ 60 xuống 24 ngay trên laptop dev xịn nhất của team.",
+      "payloadCode": "// ❌ Props object/function LITERAL mới mỗi render → React.memo vô dụng\nconst ProductRow = React.memo(function ProductRow({ product, theme, onSelect }: {\n  product: Product;\n  theme: { fg: string };\n  onSelect: (id: string) => void;\n}) {\n  return <li style={{ color: theme.fg }} onClick={() => onSelect(product.id)}>{product.name}</li>;\n});\n\n// Parent re-render mỗi giây (giá stock) → 3 props MỚI sinh mỗi giây\nfunction ProductBoard() {\n  const [tick, setTick] = useState(0);\n  useEffect(() => {\n    const id = setInterval(() => setTick((t) => t + 1), 1000);\n    return () => clearInterval(id);\n  }, []);\n  const theme = { fg: '#e5e7eb' };              // ❌ object mới mỗi render\n  const handleSelect = (id: string) => buy(id); // ❌ hàm mới mỗi render\n  return products.map((p) => (\n    <ProductRow key={p.id} product={p} onSelect={handleSelect} theme={theme} />\n  ));\n}",
+      "impactLog": [
+        "$ t+1000ms → setTick → ProductBoard re-render",
+        "> theme: {..} !== {..} → shallow compare FAIL",
+        "> onSelect: fn@0x1a2b !== fn@0x9c4d → compare FAIL",
+        "> React.memo BYPASSED ×2000 rows mỗi giây",
+        "HIGH: commit 2000 rows/s — paint 43ms, FPS rơi từ 60 còn 24",
+        "CRITICAL: fan quay điên loạn, user cuộn bảng giật khung hình"
+      ],
+      "blastRadius": [
+        "Mọi bảng/danh sách dài trong app chậm dần theo đúng tỉ lệ số row × tần suất re-render parent.",
+        "Pin laptop/mobile tụt nhanh, máy nóng — user đổ lỗi cho 'app nặng' dù server rất khỏe.",
+        "Memo hóa thủ công trở thành trang trí: team mất niềm tin vào React.memo và bắt đầu tối ưu mù.",
+        "Profiler cho thấy 70-80% commit là wasted renders — công sức render bỏ sông bỏ biển."
+      ],
+      "defenseName": "Stable Reference Discipline",
+      "defenseCode": "// ✅ Khóa tham chiếu: useMemo cache object, useCallback giữ nguyên fn\n\n// 1) useCallback cho handler truyền xuống memo component\nconst handleSelect = useCallback((id: string) => buy(id), []);\n\n// 2) useMemo cho object/config được tạo trong render\nconst theme = useMemo(() => ({ fg: '#e5e7eb' }), []);\n\n// 3) Hằng số tĩnh khai báo NGOÀI component — rẻ nhất, ổn định tuyệt đối\nconst THEME = { fg: '#e5e7eb' };\n\n// 4) Prop có thể suy ra từ primitive? Truyền primitive thay vì object\n<ProductRow selected={p.id === selectedId} />\n\n// 5) React Compiler tự memo hóa — nhưng kỷ luật tham chiếu vẫn cần thiết\n// khi làm việc với thư viện ngoài hoặc code legacy chưa qua compiler\n\n// 6) Đo trước khi tối ưu: React DevTools Profiler → 'Highlight updates'",
+      "defenseTakeaway": "React.memo so sánh bằng tham chiếu: mọi object/function đưa xuống phải được useMemo/useCallback giữ nguyên định danh giữa các lần render."
+    },
+    {
+      "id": "rpp-vec-02",
+        "relatedLessons": ["rpp-04"],
+      "name": "Render-Body Compute Siege",
+      "severity": "high",
+      "category": "Main Thread Block",
+      "target": "Component render phase (filter/sort 10k rows)",
+      "story": "Thân component lọc và sắp xếp 10.000 giao dịch NGAY TRONG lúc render — không cache, không defer. Mỗi phím gõ vào ô tìm kiếm là một đợt O(n log n) quét toàn bộ dữ liệu trên main thread, chặn luôn cả cỗ máy gõ chữ. Trên mobile tầm trung, user gõ trước và... chữ hiện sau nửa giây, INP cháy đỏ trong Core Web Vitals.",
+      "payloadCode": "// ❌ Filter + sort 10.000 dòng NGAY trong thân component\nfunction TransactionsTable({ query }: { query: string }) {\n  const [sortKey, setSortKey] = useState<'date' | 'amount'>('date');\n\n  // Chạy LẠI ở MỌI render — kể cả render do state KHÁC gây ra\n  const rows = allTransactions\n    .filter((tx) => tx.merchant.toLowerCase().includes(query.toLowerCase()))\n    .sort((a, b) =>\n      sortKey === 'date' ? b.date.localeCompare(a.date) : b.amount - a.amount,\n    );\n\n  return (\n    <>\n      <SearchBox onChange={setQuery} />   {/* gõ 1 ký tự = quét lại 10k dòng */}\n      <SortHeader onClick={() => setSortKey('amount')} />\n      {rows.slice(0, 50).map((tx) => (\n        <TxRow key={tx.id} tx={tx} />\n      ))}\n    </>\n  );\n}",
+      "impactLog": [
+        "$ keystroke 'v' → setQuery → render begin",
+        "> filter(10.000) + sort(10.000) = O(n log n) trên main thread",
+        "> blocking 187ms — input echo trễ sau từng ký tự",
+        "WARNING: INP 480ms vượt ngưỡng 'poor' của Core Web Vitals",
+        "HIGH: mobile tầm trung 640ms/block — gõ trước chữ hiện sau",
+        "CRITICAL: dashboard poll 1s × render nặng = pin tụt 18%/giờ"
+      ],
+      "blastRadius": [
+        "Mỗi phím gõ đốt O(n log n) CPU trên main thread — toàn UI đóng băng theo từng lần render.",
+        "Core Web Vitals INP đỏ thẫm: SEO tụt hạng với trang công cụ tìm kiếm nội bộ.",
+        "Trên mobile, pin và nhiệt độ tăng vọt — user buộc đóng tab giữa phiên làm việc.",
+        "Render thừa nhân theo số widget cùng trang: thêm 1 chart là mọi thứ chậm gấp đôi."
+      ],
+      "defenseName": "useMemo Cache + Virtualization",
+      "defenseCode": "// ✅ Cache kết quả tính nặng + chỉ render phần nhìn thấy\n\n// 1) useMemo: chỉ tính lại khi query/sortKey THẬT SỰ đổi\nconst rows = useMemo(() => {\n  const q = query.toLowerCase();\n  return allTransactions\n    .filter((tx) => tx.merchant.toLowerCase().includes(q))\n    .toSorted(comparator(sortKey)); // không mutate mảng gốc\n}, [query, sortKey]);\n\n// 2) Move-down: đẩy state gõ phím xuống con SearchBox\n// → parent (và cả bảng) không re-render khi đang gõ\n\n// 3) Virtualize 10k+ rows — chỉ mount ~20 row đang visible\n// npm i @tanstack/react-virtual\nconst virtualizer = useVirtualizer({\n  count: rows.length,\n  getScrollElement: () => scrollRef.current,\n  estimateSize: () => 48,\n});\n\n// 4) useDeferredValue(query): React ưu tiên keystroke, trì hoãn bảng",
+      "defenseTakeaway": "Compute nặng phải nằm sau useMemo với deps chuẩn xác, state gõ phím đẩy xuống con, và danh sách 10k+ thì virtualize — main thread là tài sản quý."
+    },
+    {
+      "id": "rpp-vec-03",
+        "relatedLessons": ["rpp-03"],
+      "name": "Monolith Context Blast",
+      "severity": "critical",
+      "category": "Context Over-render",
+      "target": "Global context subscriber tree",
+      "story": "Một AppContext duy nhất nhét user, theme, cart, alerts — bốn domain chung sống trong một value object. Chỉ cần một toast notification xuất hiện, value đổi tham chiếu và React phát sóng re-render tới TẤT CẢ 412 consumer. React.memo bất lực trước useContext: đây là đường hầm riêng mà shallow compare không thể canh chừng.",
+      "payloadCode": "// ❌ Một context Ô MON chứa mọi domain state\nconst AppContext = createContext<AppState | null>(null);\n\nfunction AppProvider({ children }: { children: React.ReactNode }) {\n  const [user, setUser] = useState<User>();\n  const [theme, setTheme] = useState<'light' | 'dark'>('dark');\n  const [cart, setCart] = useState<CartItem[]>([]);\n  const [alerts, setAlerts] = useState<Alert[]>([]);\n\n  // value MỚI sau MỖI setState bất kỳ → broadcast toàn cây\n  const value = { user, setUser, theme, setTheme, cart, setCart, alerts, setAlerts };\n  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;\n}\n\n// Mọi consumer re-render khi alerts đổi — kể cả component memo:\nconst PriceTag = React.memo(function PriceTag() {\n  const { cart } = useApp(); // useContext BỎ QUA React.memo\n  return <b>{cart.reduce((s, i) => s + i.price, 0)}₫</b>;\n});",
+      "impactLog": [
+        "$ setAlerts([toast mới]) → value identity changed",
+        "> Context broadcast → MỌI useContext(AppContext) re-render",
+        "> 412 consumers re-render vì 1 toast notification",
+        "HIGH: Header, Sidebar, DataTable... diff lại vô nghĩa hàng loạt",
+        "CRITICAL: interaction latency 320ms — vượt budget 200ms",
+        "FATAL: Profiler kết luận: 78% render time là WASTED renders"
+      ],
+      "blastRadius": [
+        "Một toast hay đổi theme khiến cả dashboard nghìn component vẽ lại từ đầu.",
+        "React.memo vô hiệu trước useContext — mọi nỗ lực memo hóa thủ công thành trang trí.",
+        "Interaction latency vượt mốc 200ms: cảm giác 'app ì' dai dẳng dù cấu hình máy mạnh.",
+        "Nợ kiến trúc tích lũy: mỗi feature mới nhét thêm vào context chung càng phình blast radius."
+      ],
+      "defenseName": "Context Split + Selector Slices",
+      "defenseCode": "// ✅ Tách context theo domain + selector đọc đúng slice\n\n// 1) Split: mỗi domain một context nhỏ, provider lồng nhau\n<UserContext.Provider value={userValue}>       {/* useMemo theo deps */}\n<CartContext.Provider value={cartValue}>\n<AlertsContext.Provider value={alerts}>        {/* đổi hiếm → ít broadcast */}\n\n// 2) Zustand-style selector: component chỉ subscribe đúng field\nconst cartTotal = useCartStore((s) => s.total);     // re-render khi total đổi\nconst unread = useAlertStore((s) => s.unreadCount); // không dính toast khác\n\n// 3) Nguyên tắc chia:\n// - state đổi TẦN SUẤT cao tách khỏi state gần như tĩnh\n// - value và dispatch tách riêng (StateProvider / DispatchProvider)\n\n// 4) Đo lại bằng Profiler: mỗi action chỉ vài consumer re-render là đạt",
+      "defenseTakeaway": "Chia context theo domain hoặc chuyển sang store kiểu zustand với selector — component chỉ nên re-render khi đúng slice dữ liệu nó dùng thực sự thay đổi."
+    }
+  ]
+}

@@ -2,7 +2,7 @@ import * as React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, BookOpen, Clock, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, BookOpen, Clock, ArrowRight, Sparkles, Crosshair } from 'lucide-react';
 import { MOCK_LEARNING_TRACKS } from '@/features/learning';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -77,6 +77,33 @@ export default async function TrackDetailPage({ params }: TrackPageProps) {
           </p>
         </div>
       </Card>
+
+      {/* Red Team Ops Banner */}
+      <Link href={`/rt/${track.slug}`} className="group block">
+        <Card className="glass-card glass-card-hover relative overflow-hidden p-4 sm:p-5">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-amber-500" />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                <Crosshair className="h-5 w-5" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-bold text-foreground transition-colors group-hover:text-destructive">
+                  Red Team Ops: thử phá hủy chủ đề này
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Mô phỏng attack vectors · Blast Radius · Defense Patch · UI Demo tương
+                  tác
+                </p>
+              </div>
+            </div>
+            <Badge variant="destructive" className="gap-1 text-[10px] uppercase tracking-wider">
+              Attack Mode
+              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+            </Badge>
+          </div>
+        </Card>
+      </Link>
 
       {/* Syllabus / Lessons List */}
       <section className="space-y-4">

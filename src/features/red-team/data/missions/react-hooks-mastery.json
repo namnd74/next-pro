@@ -1,0 +1,173 @@
+{
+  "trackSlug": "react-hooks-deep-dive",
+  "missions": [
+    {
+      "id": "rhm-mis-01",
+      "slug": "dependency-avalanche-loop",
+      "title": "Chiến dịch 01 · Tuyết lở dependency: hiệu ứng domino vô hạn",
+      "summary": "Một dependency là object mới mỗi render kéo setState trong effect — và cả trang biến thành vòng lặp fetch/render không đáy. Mổ xẻ cơ chế, dò dấu hiệu trên Profiler và vá chuẩn xác.",
+      "objective": "Tạo vòng lặp effect→state→render→effect chạy vô hạn chỉ từ một object literal trong dependency array, rồi chặn nó bằng đúng nguyên tắc khai báo dependency.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 22,
+      "vectorIds": ["rhm-vec-01"],
+      "rootCause": "useEffect chạy lại khi BẤT KỲ phần tử nào trong mảng dependency đổi theo tham chiếu. Object/array/function inline trong component body được tạo mới mỗi render — so sánh tham chiếu luôn khác. Khi bên trong effect có setState (trực tiếp hoặc qua fetch), chu trình render → effect → state → render tự nuôi itself. Bản chất: dependency array không phải 'khi nào muốn chạy' mà là 'dữ liệu nào tham gia tính toán' — khai báo sai nghĩa là nói dối React về nguồn dữ liệu của side-effect.",
+      "reconNotes": [
+        "Mở Network tab: một API bị gọi lặp liên tục với khoảng cách đều nhau = dấu hiệu kinh điển.",
+        "React DevTools Profiler: commit liên tiếp không tương tác người dùng nào.",
+        "Rà useEffect có setState bên trong + dependency chứa object/array/function inline.",
+        "Console đôi khi cảnh báo 'The final result was equal...' với useReducer/useState giữ nguyên tham chiếu."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Cài trigger: object mới mỗi render",
+          "detail": "Component nhận options mặc định dạng object literal ngay trong body — mỗi render một tham chiếu mới.",
+          "code": "function Dashboard({ userId }: { userId: string }) {\n  const [data, setData] = useState(null);\n  const config = { refresh: true, userId }; // 💀 mới mỗi render\n\n  useEffect(() => {\n    fetchStats(config).then(setData);\n  }, [config]); // deps 'đúng cú pháp, sai bản chất'\n}"
+        },
+        {
+          "title": "2 · Khởi động vòng xoáy",
+          "detail": "Mount → effect chạy → fetch resolve → setData → re-render → config mới → effect chạy lại → fetch… Vòng lặp tự duy trì không cần user thao tác gì.",
+          "code": "// timeline:\n// mount        → GET /stats\n// +120ms data  → setData → render#2\n// render#2     → GET /stats   (config ref changed)\n// +240ms       → render#3 → GET /stats ..."
+        },
+        {
+          "title": "3 · Quan sát hậu quả hệ thống",
+          "detail": "Mỗi giây hàng chục request; backend rate-limit trả 429; UI nhấp nháy vì data set lại liên tục; laptop quạt quay như máy bay.",
+          "code": "Network: /stats ×47 trong 5s → 429 Too Many Requests\nCPU (renderer): 38% ổn định — không crash, chỉ âm thầm đốt"
+        },
+        {
+          "title": "4 · Vá đúng chỗ",
+          "detail": "Ba hướng vá tùy ý định: đưa primitive vào deps, memoize object bằng useMemo, hoặc di chuyển default ra ngoài component.",
+          "code": "// ✅ 1) deps primitives\nuseEffect(() => { fetchStats({ refresh: true, userId }).then(setData); }, [userId]);\n// ✅ 2) nếu buộc dùng object\nconst config = useMemo(() => ({ refresh: true, userId }), [userId]);\n// ✅ 3) hằng số ra module scope\nconst BASE_CONFIG = { refresh: true };"
+        }
+      ],
+      "hardeningChecklist": [
+        "Dependency array phải liệt kê ĐẦY ĐỦ giá trị effect dùng — bật eslint-plugin-react-hooks exhaustive-deps ở mức error.",
+        "Không tạo object/array/function mới trong body nếu chúng chỉ để làm dependency; dùng useMemo/useCallback hoặc đưa ra ngoài.",
+        "Effect chứa fetch nên sống trong custom hook (useStats) kèm AbortController cho cleanup.",
+        "Đặt ngưỡng giám sát client: log warning khi cùng endpoint được gọi >N lần/giây từ một page.",
+        "Review rule: mọi useEffect mới phải trả lời 'điều gì khiến nó chạy lại?' trước khi merge."
+      ],
+      "debrief": [
+        {
+          "question": "Tại sao bỏ dependency array ([] trống) không phải là giải pháp?",
+          "answer": "Nó chỉ đổi loại bug: effect chạy đúng một lần khi mount, bỏ qua mọi thay đổi của userId — stale data. Vấn đề không phải 'deps nhiều quá' mà 'deps không phản ánh dữ liệu thật mà effect dùng'."
+        },
+        {
+          "question": "setState với cùng GIÁ TRỊ có kích hoạt lại loop không?",
+          "answer": "Nếu setState nhận cùng tham chiếu primitive (cùng string/number), React bail-out và loop dừng. Nhưng với object mới từ response JSON, tham chiếu luôn khác → loop tiếp diễn dù nội dung giống hệt."
+        }
+      ]
+    },
+    {
+      "id": "rhm-mis-02",
+      "slug": "stale-closure-heist",
+      "title": "Chiến dịch 02 · Stale Closure: kẻ trộm giá trị cũ trong hàm callback",
+      "summary": "setTimeout đọc count = 0 dù user đã bấm tới 5: giải phẫu cơ chế closure của hook, các biến thể dính (event handler, interval, debounce) và bộ ba vá functional-update / ref / deps.",
+      "objective": "Làm callback đọc giá trị state đã lỗi thời tại thời điểm THỰC THI, gây hành vi lệch pha khó tái hiện, sau đó đóng cửa bằng ba mẫu code chuẩn.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 20,
+      "vectorIds": ["rhm-vec-02"],
+      "rootCause": "Mỗi lần render là một lần GỌI HÀM component: mọi biến local (kể cả state do useState trả về) được 'chụp ảnh' vào closure của các hàm tạo ra trong lần render đó. Callback bạn truyền vào setTimeout/addEventListener là hàm của LẦN RENDER CŨ — nó sẽ mãi nhìn thấy giá trị lúc chụp ảnh, bất kể UI đã cập nhật bao nhiêu lần sau đó. Đây không phải bug của React mà là ngữ nghĩa closure của JavaScript; React chỉ làm nó dễ gặp vì component re-render liên tục.",
+      "reconNotes": [
+        "Tìm callback chạy TRỄ: setTimeout/setInterval, throttle/debounce, event listener gắn một lần, promise .then.",
+        "Trong đó tìm state được đọc trực tiếp (count, cart.length) thay vì qua updater/ref.",
+        "Kiểm tra listener có [] deps không nhưng lại dùng state — combo dính chắc nhất.",
+        "Reproduce: thao tác nhanh rồi dừng, so giá trị hiển thị với kết quả action thực tế."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Dựng bẫy closure",
+          "detail": "Counter với nút 'Auto tăng sau 3 giây' chụp giá trị count tại thời điểm bấm.",
+          "code": "function Counter() {\n  const [count, setCount] = useState(0);\n  const scheduleBonus = () => {\n    setTimeout(() => setCount(count + 10), 3000); // 💀 count bị đóng băng\n  };\n  return <button onClick={scheduleBonus}>+10 sau 3s (hiện: {count})</button>;\n}"
+        },
+        {
+          "title": "2 · Kích hoạt độ trễ",
+          "detail": "User spam nút chính 5 lần trong 3 giây chờ. Mỗi click tạo một timeout CHỨA count=0 riêng — closure đã chụp xong từ render đầu tiên.",
+          "code": "click ×5 → count hiển thị 5\n3 timeouts đang chờ, mỗi cái nhớ 'count = 0'"
+        },
+        {
+          "title": "3 · Thu hoạch sai lệch",
+          "detail": "Timeout nổ: setCount(0 + 10) → count nhảy từ 5 XUỐNG 10 thay vì lên 60. Bonus bị 'ăn mất' một cách hợp pháp về mặt JS.",
+          "code": "// t=3s: setCount(0 + 10) → 10 (mất 5 click)\n// nếu có 3 timeout: cả ba cùng set 10 → vẫn 10"
+        },
+        {
+          "title": "4 · Biến thể nghiêm trọng hơn",
+          "detail": "Cùng lỗi trong giỏ hàng: debounce lưu tổng tiền đọc cart cũ → thanh toán thiếu tiền. Ở đây không còn là counter demo mà là money path.",
+          "code": "const debouncedSave = useMemo(() => debounce(() => {\n  api.save(cart.total); // 💀 total cũ nếu debounce 500ms\n}, 500), []); // deps rỗng chốt closure vĩnh viễn"
+        }
+      ],
+      "hardeningChecklist": [
+        "Mặc định dùng functional updater khi giá trị mới phụ thuộc giá trị cũ: setCount(c => c + 10).",
+        "Với logic cần giá trị MỚI NHẤT ở thời điểm thực thi trong callback dài hạn: dùng useRef làm mirror (countRef.current).",
+        "Callback đăng ký một lần (addEventListener) nên đọc state qua ref hoặc nhận giá trị qua tham số sự kiện.",
+        "Bật exhaustive-deps: deps rỗng cố ý phải có comment giải thích vì sao closure cũ là an toàn.",
+        "Test bất đồng bộ: assert kết quả SAU khi spam thao tác nhanh, không chỉ single-click happy path."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao setCount(c => c + 10) chữa được mà setCount(count + 10) không?",
+          "answer": "Updater function được React gọi với GIÁ TRỊ MỚI NHẤT tại thời điểm xử lý update — nó không nằm trong closure cũ. Còn count trong closure là snapshot của lần render tạo ra callback."
+        },
+        {
+          "question": "useRef giải thế nào và trade-off là gì?",
+          "answer": "countRef.current = count mỗi render; callback đọc countRef.current lúc chạy — luôn mới nhất. Trade-off: mutation ref không kích hoạt re-render, nên chỉ dùng ref để ĐỌC trong async context, không thay thế state cho UI."
+        }
+      ]
+    },
+    {
+      "id": "rhm-mis-03",
+      "slug": "immortal-interval-swarm",
+      "title": "Chiến dịch 03 · Swarm bất tử: interval không cleanup trong StrictMode",
+      "summary": "setInterval thiếu clearInterval nhân bản theo mỗi lần mount — StrictMode biến nó thành x2 ngay dev. Truy vết memory leak bằng Performance monitor và viết cleanup chuẩn công nghiệp.",
+      "objective": "Tạo swarm timer chồng chất làm UI tick nhanh dần bất thường và RAM leo thang, chỉ ra dấu vết trong heap snapshot, rồi vá bằng quy tắc 'mỗi subscription có một unsubscribe'.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 20,
+      "vectorIds": ["rhm-vec-03"],
+      "rootCause": "setInterval trả về một timer sống độc lập với component — không ai clear thì nó chạy MÃI. Effect không return cleanup khiến timer tồn tại sau unmount; cộng thêm cơ chế StrictMode double-mount (mount→unmount→mount) trong dev, mỗi lần vào trang sinh ra 2 timer, rời trang không chết con nào. Nghiêm trọng hơn: closure của interval thường nắm state/dispatch — các instance ma vẫn chạy logic cũ trên data cũ, gây duplicate API call, double toast, tick lệch nhịp. Đây là dạng resource leak kinh điển: không crash ngay, chỉ âm thầm ăn RAM và phá tính đúng đắn.",
+      "reconNotes": [
+        "UI tick/badge cập nhật nhanh dần theo số lần điều hướng qua trang = dấu hiệu swarm.",
+        "Performance Monitor / Task Manager: JS heap tăng sau mỗi navigation, không giảm sau GC.",
+        "DevTools Sources → Event Listener Breakpoints hoặc đếm qua wrapper: setInterval được gọi bao nhiêu lần?",
+        "StrictMode đang bật? Mọi effect thiếu cleanup sẽ bị nhân đôi trong dev."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Viết effect thiếu cleanup",
+          "detail": "Ticker polling notification mỗi 2 giây — effect chỉ có start, không có stop.",
+          "code": "useEffect(() => {\n  setInterval(() => {\n    fetchNotifications().then(setNotifications);\n  }, 2000);\n}, []); // 💀 không return () => clearInterval(...)"
+        },
+        {
+          "title": "2 · Nhân bản trong dev",
+          "detail": "StrictMode mount→unmount→mount để lộ effect không đối xứng: instance đầu KHÔNG được dọn → 2 timer song song sau một lần load trang.",
+          "code": "// dev timeline:\n// mount#1  → timer A (2s)\n// unmount  → (không gì bị kill)\n// mount#2  → timer B (2s)\n// → notifications fetch ×2 mỗi 2s, vĩnh viễn"
+        },
+        {
+          "title": "3 · Tích lũy qua navigation",
+          "detail": "User qua lại giữa các trang: mỗi lần vào thêm 2 timer. Sau 10 lần: 20 interval đồng loạt fetch → backend thấy 10 req/s từ một tab duy nhất.",
+          "code": "// sau 10 navigations:\n// 20 intervals × (1 req / 2s) = 10 req/s\n// heap: +0.8MB, không giảm"
+        },
+        {
+          "title": "4 · Vá bằng hợp đồng đối xứng",
+          "detail": "Cleanup trả về chính nghịch đảo của thiết lập: setup timer ↔ clear timer, subscribe ↔ unsubscribe. StrictMode giờ trở thành CÔNG CỤ kiểm tra thay vì kẻ phá.",
+          "code": "useEffect(() => {\n  const id = setInterval(fetchNotifications, 2000);\n  return () => clearInterval(id); // ✅ đối xứng\n}, []);"
+        }
+      ],
+      "hardeningChecklist": [
+        "Quy tắc vàng: mỗi effect tạo tài nguyên (timer/listener/socket/observer) PHẢI return hàm giải phóng tương ứng.",
+        "Bật StrictMode ở mọi môi trường dev — coi double-mount như unit test miễn phí cho tính đối xứng của effect.",
+        "Timer id luôn gán biến để clear; cấm gọi setInterval trực tiếp không gán.",
+        "Polling data nên đi qua TanStack Query refetchInterval — thư viện tự quản lý vòng đời khi unmount.",
+        "Soi heap snapshot định kỳ: filter chuỗi 'Timer'/'Timeout' so giữa trước-sau navigation để bắt leak sớm."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao bug này chỉ 'thỉnh thoảng' xuất hiện ở production?",
+          "answer": "Production không double-mount nên mức độ nhân bản thấp hơn; leak tích lũy theo hành vi điều hướng, chỉ nổ khi user ở lâu (tab mở cả ngày). Giám sát production hiếm khi đo per-tab heap — nên bug sống khỏe đến khi user than lag."
+        },
+        {
+          "question": "Cleanup có cần dependencies rỗng không?",
+          "answer": "Hai chuyện độc lập: deps quyết định effect CHẠY LẠI khi nào; cleanup chạy trước MỖI lần re-run và trước unmount. Với interval cố định, [] là đủ; nếu interval duration phụ thuộc prop, đưa vào deps và cleanup vẫn đảm bảo không chồng timer."
+        }
+      ]
+    }
+  ]
+}

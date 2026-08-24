@@ -1,0 +1,173 @@
+{
+  "trackSlug": "form-engineering-react-hook-form-zod",
+  "missions": [
+    {
+      "id": "fe-mis-01",
+      "slug": "client-validation-bypass",
+      "title": "Chiến dịch 01 · Vượt trạm: bypass toàn bộ validation phía client",
+      "summary": "Zod schema đẹp trên UI chỉ là trang trí nếu server tin payload từ client. Mô phỏng attacker curl thẳng API với dữ liệu độc, và dựng kiến trúc 'một schema, hai nơi xác thực'.",
+      "objective": "Gửi dữ liệu vi phạm mọi rule (email rác, age âm, role tự gán) thẳng vào API bỏ qua React Hook Form, chứng minh client validation không phải bảo mật, rồi vá bằng server-side re-validation dùng chính schema đó.",
+      "difficulty": "critical",
+      "estimatedMinutes": 22,
+      "vectorIds": ["fe-vec-01"],
+      "rootCause": "Client validation phục vụ TRẢI NGHIỆM (phản hồi nhanh), không phải BẢO MẬT. Mọi thứ trong browser thuộc quyền kiểm soát user: họ xem được source, sửa được state qua devtools, hoặc đơn giản bỏ qua app và gọi curl/postman trực tiếp. Lỗ hổng kiến trúc nằm ở ranh giới trust: server nhận JSON và TIN nó giống như khi form UI gửi — thiếu bước xác thực lại tại biên giới. Nguyên tắc nền: never trust the client; schema là hợp đồng, mà hợp đồng phải được kiểm tra ở nơi có kẻ xấu.",
+      "reconNotes": [
+        "Mở Network tab xem endpoint + payload shape thật của form submit.",
+        "Đọc bundle tìm Zod schema leak (nếu có) để biết đúng rule cần vượt.",
+        "Thử POST trực tiếp bằng curl với body rác: thiếu field, sai kiểu, thừa field nhạy cảm như role.",
+        "Quan sát response: 400 có message chi tiết hay 200 OK nuốt sạch = server không validate."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Chụp request chuẩn",
+          "detail": "Submit form hợp lệ một lần để biết endpoint, header, cấu trúc payload.",
+          "code": "POST /api/register\n{ \"email\": \"an@x.com\", \"password\": \"Str0ng!pass\", \"age\": 25 }"
+        },
+        {
+          "title": "2 · Bỏ form, bắn thẳng",
+          "detail": "Attacker bỏ qua toàn bộ RHF+Zod phía client — chúng chỉ chạy khi đi qua UI.",
+          "code": "$ curl -X POST https://app.com/api/register \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"email\":\"not-an-email\",\"age\":-999,\"role\":\"admin\"}'"
+        },
+        {
+          "title": "3 · Thu hoạch dữ liệu độc",
+          "detail": "Server lưu nguyên trạng thái: email rác vào DB, age âm phá thống kê, role admin leo thang đặc quyền — tất cả vì 'form đã validate' theo tưởng tưởng của dev.",
+          "code": "201 Created\n{ \"id\": 8841, \"email\": \"not-an-email\", \"role\": \"admin\" } 💀"
+        },
+        {
+          "title": "4 · Vá bằng shared schema",
+          "detail": "Cùng một Zod schema dùng ở CẢ hai nơi: client cho UX, server cho an toàn. Schema sống ở thư mục shared import được từ cả route handler.",
+          "code": "// shared/schemas/register.ts\nexport const registerSchema = z.object({\n  email: z.string().email(),\n  password: z.string().min(8),\n  age: z.number().int().positive(),\n});\n// app/api/register/route.ts\nconst parsed = registerSchema.safeParse(await req.json());\nif (!parsed.success) return Response.json({ errors: parsed.error.flatten() }, { status: 400 });"
+        }
+      ],
+      "hardeningChecklist": [
+        "TUYỆT ĐỐI re-validate mọi input ở server dù client đã validate — coi client là kẻ thù không đáng tin.",
+        "Schema Zod đặt ở thư mục shared, import chung cho form UI và route handler — single source of truth.",
+        "Dùng .strict() hoặc strip unknown keys để chặn field thừa (mass assignment) như role/isAdmin.",
+        "Authorization check riêng: field nào user ĐƯỢC phép gửi phải kiểm theo session, không tin từ payload.",
+        "E2E security test: curl payload rác phải nhận 400 — đưa vào CI như regression test bảo mật."
+      ],
+      "debrief": [
+        {
+          "question": "Nếu đã dùng React Hook Form + Zod thì còn thiếu gì?",
+          "answer": "RHF resolver chỉ chạy khi submit QUA form. Nó là tầng UX. Server-side parsing với cùng schema mới là tầng security — hai vai trò khác nhau của cùng một artifact."
+        },
+        {
+          "question": "Trả 400 chi tiết lỗi cho client có nguy hiểm gì?",
+          "answer": "Message quá chi tiết giúp attacker dò cấu trúc. Thực hành tốt: trả lỗi field-level cho lỗi format thông thường, nhưng log chi tiết server-side; với lỗi nhạy cảm chỉ trả thông báo chung."
+        }
+      ]
+    },
+    {
+      "id": "fe-mis-02",
+      "slug": "parse-landmine-crash",
+      "title": "Chiến dịch 02 · Mìn parse(): quả bom nổ chậm trong event handler",
+      "summary": ".parse() ném exception khi dữ liệu không hợp lệ — đặt trong handler không try/catch, một input xấu enough biến thành màn hình trắng. So sánh parse vs safeParse và pattern xử lý lỗi chuẩn.",
+      "objective": "Kích hoạt unhandled exception từ Zod parse làm sập flow submit, hiểu error boundary che giấu đến đâu, và chuyển đổi codebase sang safeParse pipeline có thông báo lỗi thân thiện.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 18,
+      "vectorIds": ["fe-vec-02"],
+      "rootCause": "Zod thiết kế .parse() theo phong cách throw-on-invalid: tiện cho internal pipeline nơi dữ liệu xấu là BUG lập trình (fail fast), nguy hiểm cho USER INPUT nơi dữ liệu xấu là CHUYỆN THƯỜNG. Nhầm lẫn hai ngữ cảnh này là gốc rễ: input user phải đi qua safeParse — hàm trả về { success, data | error } không ném. Khi parse() ném trong async handler mà không ai catch, promise reject → Next.js hiển thị error boundary/toàn trang trắng, và người dùng mất toàn bộ nội dung vừa gõ.",
+      "reconNotes": [
+        "Grep '.parse(' trong component/handler xử lý input user — ứng viên mìn số một.",
+        "Kiểm tra handler async có try/catch bao quanh không; error boundary có tồn tại ở cấp nào?",
+        "Nhập liệu thử các giá trị biên: chuỗi rỗng, chữ vào ô number, null từ autofill.",
+        "Xem telemetry/Sentry: unhandled rejection với stack chứa ZodError."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Đặt mìn",
+          "detail": "Dev chọn .parse() vì gọn: giá trị trả ra dùng luôn, không xử lý error case.",
+          "code": "function onSubmit(values: unknown) {\n  const data = registerSchema.parse(values); // 💀 throws\n  api.register(data);\n}"
+        },
+        {
+          "title": "2 · Kích hoạt bằng input bình thường",
+          "detail": "User dán tuổi từ Excel dạng text '25 ' (có khoảng trắng) hoặc để trống — parse ném ZodError ngay giữa handler.",
+          "code": "{ age: \"25 \" } → ZodError: Expected number, received string"
+        },
+        {
+          "title": "3 · Sập có hệ thống",
+          "detail": "Exception thoát khỏi event handler → React coi là lỗi render/commit → error boundary bắt (nếu có) hoặc trắng trang. Toàn bộ form state mất.",
+          "code": "Unhandled Runtime Error\nZodError: [\n  { path: ['age'], message: 'Expected number...' }\n]\n// form data: GONE 💀"
+        },
+        {
+          "title": "4 · Giải mìn bằng safeParse",
+          "detail": "Chuyển sang safeParse: dữ liệu xấu trở thành NHÁNH CODE bình thường, hiển thị lỗi từng field cạnh input, giữ nguyên công sức gõ của user.",
+          "code": "function onSubmit(raw: unknown) {\n  const result = registerSchema.safeParse(raw);\n  if (!result.success) {\n    setFieldErrors(result.error.flatten().fieldErrors);\n    return;\n  }\n  api.register(result.data); // ✅ typed & validated\n}"
+        }
+      ],
+      "hardeningChecklist": [
+        "Quy ước: .parse() chỉ dành cho dữ liệu TIN CẬY (config, response API đã qua middleware); input user luôn safeParse.",
+        "Mọi async handler submit có try/catch hoặc Promise.catch — không để rejection thoát ra ngoài.",
+        "Hiển thị lỗi theo field (flatten().fieldErrors) thay vì alert chung chung.",
+        "Có error boundary cấp form để dù crash cũng giữ được draft (lưu draft localStorage trước submit).",
+        "Test đường xấu: submit với từng field sai kiểu — assert UI hiện lỗi, không trắng trang."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao Zod không tự 'an toàn' luôn, bỏ parse()?",
+          "answer": "Throw-on-invalid có giá trị riêng: trong pipeline nội bộ, dữ liệu xấu là bug cần nổ NGAY để phát hiện. Hai API cho hai ngữ cảnh — chọn sai ngữ cảnh mới là vấn đề."
+        },
+        {
+          "question": "safeParse trả success:false rồi nên làm gì thêm ngoài hiển thị lỗi?",
+          "answer": "Log telemetry (field nào hay sai để cải thiện UX), giữ state form, disable double-submit, và nếu lỗi do server trả về thì map về cùng cơ chế hiển thị fieldErrors."
+        }
+      ]
+    },
+    {
+      "id": "fe-mis-03",
+      "slug": "last-submit-wins-race",
+      "title": "Chiến dịch 03 · Last-Write-Wins: race condition của nút Lưu",
+      "summary": "Sửa profile hai lần liên tiếp — response của lần chậm hơn ghi đè lên dữ liệu mới hơn. Dựng race condition submit, phát hiện qua network waterfall, vá bằng AbortController và phiên bản hóa dữ liệu.",
+      "objective": "Ghi đè cập nhật MỚI hơn bằng phản hồi cũ trong kịch bản submit liên tục, sau đó đóng cửa sổ race bằng AbortController + khóa pending + optimistic concurrency.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 20,
+      "vectorIds": ["fe-vec-03"],
+      "rootCause": "Mỗi request là một lời hứa hoàn thành KHÔNG ĐẢM BẢO theo thứ tự khởi phát. Latency biến động (cache miss, GC, retry) khiến request#2 có thể về trước #1. Nếu handler cứ 'response về là ghi state', kết quả cuối cùng phụ thuộc THỨ TỰ VỀ, không phải ý muốn user — mô hình last-write-wins ngầm. Gốc rễ: ứng dụng không có khái niệm PHIÊN chỉnh sửa: không hủy phiên cũ khi bắt đầu phiên mới, không đánh dấu phiên bản dữ liệu để server từ chối ghi đè lùi thời gian.",
+      "reconNotes": [
+        "Tìm form cho phép save nhiều lần liên tiếp (profile, settings, comment edit).",
+        "Network tab: submit ×2 nhanh — hai request song song hay tuần tự? Response nào về sau?",
+        "Kiểm tra handler onSuccess: ghi thẳng response.data vào store/cache?",
+        "Xem server có updatedAt/version check không hay chấp nhận mọi PUT."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Tạo cửa sổ race",
+          "detail": "User sửa tên thành 'An (mới)' bấm Save; thấy chậm, sửa tiếp thành 'An (final)' bấm Save nữa. Request #1 mang 'An (mới)', #2 mang 'An (final)' — cùng lúc trên đường truyền.",
+          "code": "t=0.0s PUT /profile { name: 'An (mới)' }   // slow\n t=0.3s PUT /profile { name: 'An (final)' } // fast path"
+        },
+        {
+          "title": "2 · Thứ tự về đảo ngược ý muốn",
+          "detail": "#2 xử lý nhanh về trước; #1 bị backend retry/cache hold thêm 1s rồi mới về sau. Handler không phân biệt — response nào về ghi nấy.",
+          "code": "t=0.5s ← 200 { name: 'An (final)' } → setName ✓\nt=1.4s ← 200 { name: 'An (mới)' }  → setName 💀"
+        },
+        {
+          "title": "3 · Trạng thái cuối sai sự thật",
+          "detail": "UI hiện 'An (mới)' (response về sau), nhưng SERVER lưu 'An (final)' (request về sau). Refresh trang — dữ liệu nhảy lại, user hoang mang không biết mình đã lưu cái gì.",
+          "code": "// UI: 'An (mới)'   DB: 'An (final)'\n// reload → UI flips to 'An (final)'\n// ticket: 'dữ liệu tự đổi sau khi refresh' 🤯"
+        },
+        {
+          "title": "4 · Ba lớp vá",
+          "detail": "(1) AbortController hủy request cũ khi submit mới; (2) khóa isSubmitting cấm submit chồng; (3) server so updatedAt/version — từ chối ghi đè lùi thời gian bằng 409.",
+          "code": "let controller: AbortController | undefined;\nasync function save(values: Profile) {\n  controller?.abort();                 // hủy phiên cũ\n  controller = new AbortController();\n  await api.put('/profile', values, {\n    signal: controller.signal,\n    headers: { 'If-Match': values.updatedAt },\n  });\n}\n// server: nếu updatedAt < current → 409 Conflict"
+        }
+      ],
+      "hardeningChecklist": [
+        "Submit mới PHẢI abort submit cũ (AbortController) — một nguồn sự thật active duy nhất.",
+        "Khóa isSubmitting + disable nút; nhưng vẫn giữ abort vì lock UI không giải quyết retry/replay.",
+        "Optimistic concurrency: gửi version/updatedAt, server trả 409 khi stale — client hỏi user reload.",
+        "Sau mutation, cập nhật cache từ RESPONSE (không từ local variable) hoặc invalidate query để tái đồng bộ.",
+        "Test race có chủ đích: throttle request, submit ×2, assert state cuối khớp submission CUỐI CÙNG."
+      ],
+      "debrief": [
+        {
+          "question": "AbortController hủy được cả thao tác ghi phía server không?",
+          "answer": "Không. Abort chỉ ngắt việc client chờ/nhận response; server vẫn có thể commit. Vì vậy abort giảm race ở UI nhưng concurrency control phía server (If-Match/version) mới đảm bảo đúng đắn tuyệt đối."
+        },
+        {
+          "question": "TanStack Query giúp gì cho bài này?",
+          "answer": "mutation.isPending cho lock chuẩn, signal tích hợp sẵn để cancel khi unmount/mutateAsync mới, và invalidateQueries sau onSuccess ép UI đọc lại trạng thái server thật — xóa khoảng lệch giữa local state và DB."
+        }
+      ]
+    }
+  ]
+}
