@@ -16,7 +16,15 @@ export interface QuizQuestion {
 
 export interface CodeRecipe {
   title: string;
-  language: 'tsx' | 'typescript' | 'bash';
+  language:
+    | 'tsx'
+    | 'typescript'
+    | 'javascript'
+    | 'bash'
+    | 'json'
+    | 'yaml'
+    | 'dockerfile'
+    | 'nginx';
   beforeCode?: string;
   afterCode: string;
   takeaway: string;
@@ -45,6 +53,21 @@ export interface LearningTrack {
   color: string;
   totalLessons: number;
   lessons: Lesson[];
+}
+
+export interface LearningNavigationLesson {
+  id: string;
+  slug: string;
+  title: string;
+  durationMinutes: number;
+  level: DifficultyLevel;
+}
+
+export interface LearningNavigationTrack {
+  id: string;
+  slug: string;
+  title: string;
+  lessons: LearningNavigationLesson[];
 }
 
 export interface QuizResultRecord {

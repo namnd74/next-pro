@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
@@ -57,7 +59,7 @@ export function TabsList({ className, ...props }: React.HTMLAttributes<HTMLDivEl
   return (
     <div
       className={cn(
-        'inline-flex h-11 items-center justify-center rounded-xl bg-secondary/80 p-1 text-muted-foreground backdrop-blur-sm',
+        'bg-secondary/80 text-muted-foreground inline-flex h-11 items-center justify-center rounded-xl p-1 backdrop-blur-sm',
         className
       )}
       {...props}
@@ -80,9 +82,9 @@ export function TabsTrigger({ value, className, children, ...props }: TabsTrigge
       aria-selected={isActive}
       onClick={() => onValueChange(value)}
       className={cn(
-        'inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-semibold ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+        'ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center rounded-lg px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
         isActive
-          ? 'bg-background text-foreground shadow-sm shadow-black/5 dark:bg-card'
+          ? 'bg-background text-foreground dark:bg-card shadow-sm shadow-black/5'
           : 'text-muted-foreground hover:bg-background/40 hover:text-foreground',
         className
       )}
@@ -106,7 +108,7 @@ export function TabsContent({ value, className, children, ...props }: TabsConten
       role="tabpanel"
       tabIndex={0}
       className={cn(
-        'mt-4 ring-offset-background duration-200 animate-in fade-in-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'ring-offset-background animate-in fade-in-50 focus-visible:ring-ring mt-4 duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
         className
       )}
       {...props}

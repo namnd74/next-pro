@@ -2,8 +2,8 @@ import * as React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, BookOpen, Clock, ArrowRight, Sparkles, Crosshair } from 'lucide-react';
-import { MOCK_LEARNING_TRACKS } from '@/features/learning';
+import { ArrowLeft, BookOpen, Clock, ArrowRight, Sparkles } from 'lucide-react';
+import { MOCK_LEARNING_TRACKS } from '@/features/learning/data/mock-courses';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,7 @@ export default async function TrackDetailPage({ params }: TrackPageProps) {
       <div>
         <Link
           href="/learn"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+          className="text-muted-foreground hover:text-primary inline-flex items-center gap-1.5 text-xs font-semibold transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>Quay lại danh sách Lộ trình</span>
@@ -62,54 +62,28 @@ export default async function TrackDetailPage({ params }: TrackPageProps) {
             <Badge variant="secondary" className="text-xs">
               {track.lessons.length} Bài học
             </Badge>
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span className="text-muted-foreground flex items-center gap-1 text-xs">
               <Clock className="h-3.5 w-3.5" />
               Tổng thời lượng: ~{totalMinutes} phút
             </span>
           </div>
 
-          <h1 className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-foreground text-2xl font-extrabold tracking-tight sm:text-3xl">
             {track.title}
           </h1>
 
-          <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+          <p className="text-muted-foreground max-w-3xl text-sm leading-relaxed sm:text-base">
             {track.description}
           </p>
         </div>
       </Card>
 
-      {/* Red Team Ops Banner */}
-      <Link href={`/rt/${track.slug}`} className="group block">
-        <Card className="glass-card glass-card-hover relative overflow-hidden p-4 sm:p-5">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-amber-500" />
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-                <Crosshair className="h-5 w-5" />
-              </div>
-              <div className="space-y-0.5">
-                <p className="text-sm font-bold text-foreground transition-colors group-hover:text-destructive">
-                  Red Team Ops: thử phá hủy chủ đề này
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Mô phỏng attack vectors · Blast Radius · Defense Patch · UI Demo tương
-                  tác
-                </p>
-              </div>
-            </div>
-            <Badge variant="destructive" className="gap-1 text-[10px] uppercase tracking-wider">
-              Attack Mode
-              <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
-            </Badge>
-          </div>
-        </Card>
-      </Link>
-
+      {/* Red Team Ops Banner — chỉ khi track có collection RT (soft-link qua relatedTrackSlug) */}
       {/* Syllabus / Lessons List */}
       <section className="space-y-4">
         <div className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-bold tracking-tight text-foreground">
+          <BookOpen className="text-primary h-5 w-5" />
+          <h2 className="text-foreground text-lg font-bold tracking-tight">
             Danh Sách Bài Học (Syllabus)
           </h2>
         </div>
@@ -121,13 +95,13 @@ export default async function TrackDetailPage({ params }: TrackPageProps) {
               className="glass-card glass-card-hover group flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center"
             >
               <div className="flex items-start gap-4">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-secondary text-xs font-bold text-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                <span className="bg-secondary text-foreground group-hover:bg-primary group-hover:text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-colors">
                   {idx + 1}
                 </span>
 
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-bold text-foreground transition-colors group-hover:text-primary">
+                    <h3 className="text-foreground group-hover:text-primary text-base font-bold transition-colors">
                       {lesson.title}
                     </h3>
                     <Badge variant="outline" className="text-[10px] uppercase">
@@ -135,11 +109,11 @@ export default async function TrackDetailPage({ params }: TrackPageProps) {
                     </Badge>
                   </div>
 
-                  <p className="text-xs leading-relaxed text-muted-foreground">
+                  <p className="text-muted-foreground text-xs leading-relaxed">
                     {lesson.summary}
                   </p>
 
-                  <div className="flex items-center gap-3 pt-1 text-[11px] text-muted-foreground">
+                  <div className="text-muted-foreground flex items-center gap-3 pt-1 text-[11px]">
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       {lesson.durationMinutes} phút

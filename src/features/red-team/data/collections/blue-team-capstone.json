@@ -1,0 +1,323 @@
+{
+  "id": "rt-blue-team-capstone",
+  "slug": "blue-team-capstone",
+  "phaseId": "phase-06",
+  "orderInPhase": 1,
+  "title": "Capstone: Hàng phòng thủ cuối",
+  "tagline": "Phòng thủ cũng có thể bị khai hỏa từ bên trong: timer thật gây flaky, assertion bám chi tiết triển khai gãy khi refactor, MSW handler thiếu bắn request ra staging thật.",
+  "missionBriefing": "Nhiệm vụ tổng kết: đảo vai trò blue team — tìm 3 vết nứt khiến chính bộ test trở thành điểm yếu (flaky timer fuse, selector fragility bomb, unmocked network leak), hiểu vì sao CI xanh vẫn có thể đang rò rỉ, rồi xây hardening checklist + fake timers + handler matrix để chứng minh hàng phòng thủ chịu được chính mình. Toàn bộ vector phải PATCHED.",
+  "difficulty": "intermediate",
+  "iconName": "Shield",
+  "color": "from-purple-500 to-pink-600",
+  "vectors": [
+    {
+      "id": "rte-vec-01",
+      "name": "Real-Timer Flaky Fuse",
+      "severity": "medium",
+      "category": "Timing Race",
+      "target": "setTimeout debounce 300ms được assert bằng thời gian thật",
+      "story": "Test gõ vào ô tìm kiếm rồi assert API được gọi NGAY — nhưng component debounce 300ms bằng setTimeout thật. Trên laptop dev, timer kịp fire; trên CI đang tải nặng, scheduler chậm hơn vài chục mili-giây và test đỏ ngẫu nhiên. Team bôi trơn bằng sleep(500) và retry: 2 — suite chậm gấp 5 lần và những bug thật bắt đầu bị nuốt chửng sau màn xanh giả tạo.",
+      "payloadCode": "// components/SearchBox.tsx — debounce 300ms bằng timer thật\nlet timer: ReturnType<typeof setTimeout>;\nfunction onChange(value: string) {\n  clearTimeout(timer);\n  timer = setTimeout(() => searchApi(value), 300);\n}\n\n// ❌ searchBox.test.tsx — test ĐUA với thời gian thực\ntest('gọi search API sau khi gõ', async () => {\n  render(<SearchBox />);\n  await userEvent.setup().type(screen.getByRole('textbox'), 'react compiler');\n\n  // Assert NGAY khi debounce chưa kịp fire → race với scheduler\n  expect(searchApi).toHaveBeenCalledWith('react compiler'); // 😬 đỏ ngẫu nhiên trên CI\n});\n\n// 🩹 'Bản vá dân gian' còn tệ hơn: ngủ cứng\nawait new Promise((r) => setTimeout(r, 500)); // chậm ×10, CPU CI quá tải VẪN flaky",
+      "impactLog": [
+        "$ vitest run --ci … SearchBox › gọi search API sau khi gõ",
+        "> AssertionError: expected spy to be called with 'react compiler'",
+        "> received 0 calls — debounce timer CHƯA FIRE khi assert chạy",
+        "WARNING: local 5/5 PASS nhưng CI 2/10 PASS — flake rate 80%",
+        "HIGH: bật retry: 2 → suite từ 4 phút thành 11 phút, signal bị pha loãng",
+        "CRITICAL: team quen mắt với đỏ CI — regression thật lọt vào main không ai thấy"
+      ],
+      "blastRadius": [
+        "Pipeline đỏ ngẫu nhiên: engineer re-run đến khi xanh, văn hoá 'đỏ cũng bình thường'.",
+        "Retry nuốt bug thật: lỗi nghiệp vụ lọt vào main sau lớp retry im lặng.",
+        "Suite chậm chết dần: vòng phản hồi TDD kéo dài, developer bỏ test.",
+        "Chi phí compute CI đội lên nhiều lần vì chạy lại và sleep vô ích."
+      ],
+      "defenseName": "vi.useFakeTimers + advanceTimersByTime",
+      "defenseCode": "// ✅ Thời gian nằm dưới quyền kiểm soát của test\nimport { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';\nimport { render, screen, act } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\n\nbeforeEach(() => {\n  vi.useFakeTimers(); // ⏱️ đóng băng setTimeout của component\n});\nafterEach(() => {\n  vi.useRealTimers(); // dọn dẹp — không leak sang test khác\n});\n\ntest('gọi search API sau khi hết debounce 300ms', async () => {\n  // ✅ đồng bộ userEvent với fake clock\n  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });\n  render(<SearchBox />);\n\n  await user.type(screen.getByRole('textbox'), 'react compiler');\n  expect(searchApi).not.toHaveBeenCalled(); // ✅ chắc chắn CHƯA gọi trước 300ms\n\n  act(() => vi.advanceTimersByTime(300));   // tua thời gian thay vì chờ thật\n  expect(searchApi).toHaveBeenCalledTimes(1); // ✅ deterministic 100% — local hay CI đều vậy\n});",
+      "defenseTakeaway": "Không bao giờ test đua với thời gian thực: fake clock kết hợp advanceTimersByTime biến flaky thành deterministic tuyệt đối."
+    },
+    {
+      "id": "rte-vec-02",
+      "name": "Selector Fragility Bomb",
+      "severity": "medium",
+      "category": "Implementation-Detail Coupling",
+      "target": "Assertion bám className/cấu trúc DOM thay vì hành vi người dùng",
+      "story": "Bộ test assert classname Tailwind ('bg-blue-500') và vị trí DOM ('.card > div:nth-child(2)'). Một đợt refactor design system đổi div thành section và migrate sang token màu — hành vi người dùng không đổi tí nào, nhưng 87 test đỏ đồng loạt. Dev bắt đầu sửa COMPONENT cho vừa assertion: test điều khiển design, ngược hoàn toàn đời.",
+      "payloadCode": "// ❌ Test khoá cứng vào cấu trúc DOM + tên class Tailwind\ntest('hiển thị giá sản phẩm', () => {\n  const { container } = render(<ProductCard product={fakeProduct} />);\n\n  const priceNode = container.querySelector('.product-card > div:nth-child(2)');\n  expect(priceNode?.className).toContain('bg-blue-500'); // 💣 class trang trí!\n  expect(priceNode?.textContent).toBe('1.290.000₫');     // format cứng đờ\n});\n\n// 🔨 Refactor 'vô hại' của team UI: div → section, bg-blue-500 → bg-primary\n// → 87 test RED đồng loạt trong khi app chạy HOÀN HẢO trên staging.\n// Dev bắt đầu sửa COMPONENT cho vừa assertion → test điều khiển design, ngược đời.",
+      "impactLog": [
+        "$ git commit 'refactor(ui): migrate to design tokens' ...",
+        "> 87 tests FAILED — className assertions exploded",
+        "> manual QA: app hoạt động hoàn hảo ✓ (tests are lying)",
+        "WARNING: devs revert CSS chỉ để làm hài test — đuôi vẫy con chó",
+        "HIGH: thời gian refactor ×3 vì phải 'sửa lại test' mỗi lần đổi markup",
+        "CRITICAL: suite mất uy tín → team bỏ qua đỏ, coverage 82% nhưng vô dụng"
+      ],
+      "blastRadius": [
+        "Refactor đóng băng vì sợ: mỗi lần đụng UI là một trận địa lại 87 test đỏ.",
+        "Ưu tiên ngược đời: test đòi hỏi CSS cụ thể, design system không thể tiến hoá.",
+        "Đỏ giả lập luyện team phớt lờ CI — khi bug thật xuất hiện, không ai còn nhìn.",
+        "Chi phí bảo trì test vượt chi phí viết feature: suite thành nợ kỹ thuật sống."
+      ],
+      "defenseName": "Role-Based Queries + userEvent",
+      "defenseCode": "// ✅ Test nhìn UI qua mắt người dùng, không phải qua DevTools\nimport { render, screen } from '@testing-library/react';\nimport userEvent from '@testing-library/user-event';\n\ntest('thêm sản phẩm vào giỏ khi bấm nút mua', async () => {\n  const user = userEvent.setup();\n  render(<ProductCard product={fakeProduct} />);\n\n  // ✅ getByRole: ưu tiên số 1 — vừa query vừa audit accessibility miễn phí\n  const buyButton = screen.getByRole('button', { name: /thêm vào giỏ/i });\n  await user.click(buyButton);\n\n  // ✅ Assert thứ người dùng THẤY, không phải class nào được gắn vào DOM\n  expect(await screen.findByRole('status')).toHaveTextContent(/đã thêm vào giỏ/i);\n  expect(screen.getByLabelText(/giỏ hàng/i)).toHaveTextContent('1');\n\n  // Refactor div → section, đổi token màu, đổi font? Bộ test vẫn XANH 🟢\n});",
+      "defenseTakeaway": "Test những gì người dùng thấy và làm — getByRole/getByLabelText kết hợp userEvent — để refactor tự do mà bộ test vẫn xanh."
+    },
+    {
+      "id": "rte-vec-03",
+      "name": "Unmocked Network Leak",
+      "severity": "high",
+      "category": "Mock Escape",
+      "target": "MSW handler registry thiếu + onUnhandledRequest: 'bypass'",
+      "story": "Component thêm một analytics beacon mới nhưng quên đăng ký MSW handler, còn setup để onUnhandledRequest: 'bypass' cho 'dễ chịu'. Request bay thẳng ra staging API thật từ trong unit test: có credential trong env thì ghi rác vào dữ liệu chung, thiếu thì pending mãi đến timeout. Suite bây giờ phụ thuộc VPN, mạng công ty và sự sống còn của staging.",
+      "payloadCode": "// ❌ mocks/handlers.ts — thiếu handler cho analytics beacon mới\nexport const handlers = [\n  http.get('/api/products', () => HttpResponse.json(FIXTURES.products)),\n  http.post('/api/cart', () => HttpResponse.json({ ok: true })),\n  // 💀 /api/analytics/events KHÔNG có handler trong danh sách\n];\n\n// setupTests.ts\nbeforeAll(() => server.listen({ onUnhandledRequest: 'bypass' })); // ❌ bypass = rò rỉ ra mạng thật\n\n// ProductCard.test.tsx\ntest('track view event khi mount', () => {\n  render(<ProductCard product={fakeProduct} />);\n  // fetch('/api/analytics/events') bay thẳng tới staging API THẬT:\n  // • env có cred?  → ghi rác 1.483 events vào dashboard team Growth\n  // • env thiếu cred? → pending mãi → test treo đến timeout 30 giây\n});",
+      "impactLog": [
+        "$ vitest … ProductCard › track view event khi mount",
+        "> unhandled request: POST https://staging-api.internal/analytics/events",
+        "> onUnhandledRequest: 'bypass' → forwarded to REAL staging API",
+        "> wrote 1.483 junk events vào dashboard analytics của team Growth",
+        "WARNING: CI job hung 30s × 214 tests = 107 phút chờ timeout",
+        "CRITICAL: pipeline phụ thuộc VPN/mạng ngoài — staging sập là TOÀN BỘ PR đỏ"
+      ],
+      "blastRadius": [
+        "Unit test ghi dữ liệu thật vào staging dùng chung — ô nhiễm dữ liệu và rủi ro pháp lý.",
+        "Thời lượng CI nổ tung vì chờ timeout mạng thay vì fail nhanh tại chỗ.",
+        "Staging/VPN nghẽn làm đỏ hàng loạt PR không liên quan — mất tín hiệu CI hoàn toàn.",
+        "Credential thật trong máy CI chạm hệ thống live: lỗ hổng bảo mật khó biện minh trước audit."
+      ],
+      "defenseName": "Exhaustive Handlers + Strict MSW Lifecycle",
+      "defenseCode": "// ✅ Mọi request phải có chủ — không request nào lọt ra Internet\n\n// 1) setupTests.ts — lifecycle nghiêm ngặt\nimport { server } from './mocks/server';\n\nbeforeAll(() => server.listen({ onUnhandledRequest: 'error' })); // 💥 request lạ = FAIL ngay\nafterEach(() => server.resetHandlers());   // ✅ mỗi test một thế giới sạch\nafterAll(() => server.close());\n\n// 2) mocks/handlers.ts — phủ đủ MỌI endpoint component chạm tới\nexport const handlers = [\n  http.get('/api/products', () => HttpResponse.json(FIXTURES.products)),\n  http.post('/api/cart', () => HttpResponse.json({ ok: true })),\n  http.post('/api/analytics/events', () =>\n    HttpResponse.json({ received: true })), // ✅ chặn tại MSW, không chạm mạng thật\n];\n\n// 3) Test cần kịch bản riêng? Override CỤC BỘ bằng server.use — không ảnh hưởng test khác\ntest('xử lý giỏ hàng hết hàng', async () => {\n  server.use(\n    http.post('/api/cart', () =>\n      HttpResponse.json({ error: 'out_of_stock' }, { status: 409 })),\n  );\n  // ... render + assert UI hiển thị trạng thái hết hàng\n});",
+      "defenseTakeaway": "onUnhandledRequest: 'error' kết hợp lifecycle listen/resetHandlers/close nghiêm ngặt: mọi request phải có chủ, không gì lọt ra mạng thật."
+    }
+  ],
+  "missions": [
+    {
+      "id": "rte-mis-01",
+      "slug": "flaky-timer-fuse",
+      "title": "Chiến dịch 01 · Real-Timer Flaky Fuse: quả bom nổ ngẫu nhiên trên CI",
+      "summary": "Test dùng setTimeout/setInterval thật luôn xanh trên máy dev nhưng đỏ ngẫu nhiên trên CI khi CPU bị contention: mổ xẻ cơ chế event-loop và xây dựng kỷ luật fake timers.",
+      "objective": "Tái hiện flake do race giữa timer thật và assertion, rồi vá bằng fake timers kiểm soát được thời gian.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 20,
+      "vectorIds": [
+        "rte-vec-01"
+      ],
+      "rootCause": "Timer thật phụ thuộc scheduler của OS: setTimeout(fn, 1000) chỉ hứa \"ít nhất 1000ms\", không hứa đúng 1000ms. Trên CI chạy parallel worker, CPU contention khiến callback trễ hàng trăm ms — assertion chạy trước callback là fail, chạy sau là pass: kết quả phụ thuộc vận may. Lỗi nền móng: test đang kiểm tra THỜI GIAN THỰC của hệ thống trong môi trường mà thời gian không deterministic, thay vì kiểm tra logic phản ứng với thời gian.",
+      "reconNotes": [
+        "Tìm test có setTimeout/sleep/th.waitForTimeout — đặc biệt các con số \"ma thuật\" 1000/2000ms.",
+        "Đối chiếu lịch sử CI: test đỏ mà rerun xanh (re-run-until-green) là flake kinh điển.",
+        "Kiểm tra mock: có jest.useFakeTimers nào chưa, và nó có phủ đúng module timer không.",
+        "Xác định assertion phụ thuộc thứ tự callback timer hay chỉ phụ thuộc state cuối."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Cài ngòi nổ",
+          "detail": "Component debounce search 800ms; test viết waitForTimeout(800) rồi assert kết quả — trên máy dev SSD nhanh luôn đúng.",
+          "code": "fireInput(\"react\");\nawait new Promise(r => setTimeout(r, 800)); // hy vọng đủ\nexpect(results).toEqual([...])"
+        },
+        {
+          "title": "2 · CI contention kích nổ",
+          "detail": "Worker song song làm setTimeout thật chậm 1.2s; assertion chạy ở 800ms thấy results rỗng → FAIL. Rerun có thể xanh: flake kinh điển.",
+          "code": "Expected: [\"react-docs\"] Received: []\n✕ search debounced (803ms)"
+        },
+        {
+          "title": "3 · Team \"vá\" bằng cách tăng số",
+          "detail": "Dev sửa 800 → 3000ms: test chậm hơn 3s, flake giảm nhưng KHÔNG mất — chỉ cần CI load cao hơn nữa là nổ lại. Nợ kỹ thuật tích luỹ.",
+          "code": "// \"fixed\" by increasing timeout\nawait sleep(3000); // suite time +2.2s × 47 tests"
+        },
+        {
+          "title": "4 · Chi phí dây chuyền",
+          "detail": "Flaky test dạy team thói quen \"rerun là được\": tín hiệu đỏ mất giá trị, bug thật chui qua giữa đống flake giả.",
+          "code": "CI pass-rate 71% · devs auto-rerun ×3 · real regression missed 2 sprint"
+        }
+      ],
+      "hardeningChecklist": [
+        "Cấm sleep/waitForTimeout trong test: dùng jest.useFakeTimers + advanceTimersByTime để điều khiển thời gian.",
+        "Assertion phải chờ điều kiện (waitFor + findBy) thay vì chờ khoảng thời gian cố định.",
+        "Flaky test bị cô lập ngay (skip + ticket) chứ không rerun cho qua — rerun che giấu tín hiệu.",
+        "Theo dõi flake-rate per test trong CI report; test flake >2% là bug của test, ưu tiên như bug sản phẩm.",
+        "Với logic thời gian thật phức tạp, tách pure function tính toán thời gian để test không cần timer."
+      ],
+      "debrief": [
+        {
+          "question": "Fake timers khác gì real timers, và khi nào NÊN dùng real?",
+          "answer": "Fake timers thay thế clock bằng máy ảo: advanceTimersByTime(800) chạy đúng mọi callback hẹn ≤800ms ngay lập tức — deterministic và nhanh. Real timers chỉ cần khi test chính hành vi scheduling của platform (ví dụ test wrapper quanh setTimeout). Quy tắc: test LOGIC với fake, test PLUMBING với real và chấp nhận tolerance."
+        },
+        {
+          "question": "Vì sao \"tăng timeout lên 3s\" là vá độc hại?",
+          "answer": "Nó không loại trừ tính không xác định, chỉ dịch ngưỡng nổ xa hơn — phân bố CI load có đuôi dài nên sooner hay later sẽ vượt 3s. Đồng thời nó đánh thuế mọi lần chạy (chậm tích luỹ) và dạy đội thói quen che giấu flake thay vì xử lý gốc."
+        }
+      ]
+    },
+    {
+      "id": "rte-mis-02",
+      "slug": "selector-fragility-bomb",
+      "title": "Chiến dịch 02 · Selector Fragility Bomb: assertion gây nổ khi refactor CSS",
+      "summary": "Bộ test khoẻ mạnh trở thành chướng ngại khi assertion bám vào class Tailwind và cấu trúc DOM: một lần đổi padding là 40 test đỏ hàng loạt dù tính năng vẫn chạy đúng — huấn luyện kỷ luật query theo vai trò.",
+      "objective": "Nhận diện assertion dính chi tiết triển khai và chuyển sang truy vấn ngữ nghĩa để test chỉ gãy khi hành vi sai.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 20,
+      "vectorIds": [
+        "rte-vec-02"
+      ],
+      "rootCause": "Testing Library triết lý \"test như user dùng\", nhưng assertion kiểu querySelector(\".btn-primary.px-4\") đang test như developer viết CSS. Class name là chi tiết triển khai: nó thay đổi trong mọi lần chỉnh style, trong khi hành vi người dùng quan tâm (có nút \"Thanh toán\" bấm được không) bất biến. Lỗi nền móng: test đang khóa cấu trúc thay vì khóa hợp đồng chức năng — mỗi refactor thẩm mỹ trở thành đợt sửa test loạt, dạy team thói quen sợ refactor, đúng cái mà test sinh ra để cho phép.",
+      "reconNotes": [
+        "Grep test cho className/classSelector/querySelector với class cụ thể (.px-, .text-, .bg-) — mỗi match là một mìn.",
+        "Đo \"refactor blast radius\": đổi 1 class trong component, xem bao nhiêu test gãy — >3 là hệ thống mìn.",
+        "Tìm container.firstChild.children[0] kiểu truy cập DOM theo vị trí — gãy khi thêm wrapper div.",
+        "Ưu tiên rà các test vừa viết kèm PR sửa UI: chúng thường copy selector từ DOM inspector."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Khóa test vào CSS",
+          "detail": "Test nút checkout viết theo DOM inspector: selector ghép 2 class + vị trí con thứ 2 — xanh hôm nay vì khớp implementation.",
+          "code": "container.querySelector(\".btn-primary.px-4\").children[1]\n// khóa: style + structure cùng lúc"
+        },
+        {
+          "title": "2 · Refactor vô hại trở thành thảm họa",
+          "detail": "PR đổi px-4 → px-5 cho đẹp spacing: zero thay đổi hành vi, nhưng 40 test đỏ — reviewer bắt đầu sợ mọi PR UI.",
+          "code": "- <button className=\"btn-primary px-4\">\n+ <button className=\"btn-primary px-5\">\n✕ 40 failed | 0 behavior change"
+        },
+        {
+          "title": "3 · Team học cách né test",
+          "detail": "Sợ gãy test, dev bắt đầu bỏ qua viết test cho UI mới (\"test UI là cồng kềnh\") — coverage rơi đúng nơi rủi ro nhất.",
+          "code": "coverage/src/components/checkout: 92% → 41% trong 2 tháng"
+        },
+        {
+          "title": "4 · Bug thật lọt qua lớp test giả vờ",
+          "detail": "Trong đợt \"bỏ test phiền phức\", một regression thật (nút submit disabled vĩnh viễn) không bị ai bắt vì test vùng đó đã bị xoá.",
+          "code": "prod incident: checkout button disabled forever · 6h downtime"
+        }
+      ],
+      "hardeningChecklist": [
+        "Truy vấn theo vai trò + tên tiếp cận (getByRole(\"button\", { name: /thanh toán/i })) — đúng cách user tìm nút.",
+        "Cấm assert className cụ thể; nếu style là yêu cầu nghiệp vụ thì dùng visual regression test riêng.",
+        "Cấm truy cập DOM theo vị trí (children[n], nth-child) — thêm wrapper là gãy; dùng within() + role/name.",
+        "Refactor test song song refactor code: nếu PR không đổi hành vi mà phải sửa test, test đang khóa implementation.",
+        "Đưa \"test gãy khi không đổi hành vi\" thành mục review bắt buộc — đó là smell của selector fragility."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao getByRole là lựa chọn bền vững nhất trong các truy vấn?",
+          "answer": "Role + accessible name là hợp đồng mà user thật tiêu thụ qua screen reader và bàn phím — nó thuộc về hành vi, không thuộc về markup. Đổi div thành section, đổi class, bọc thêm wrapper: role vẫn đúng nên test vẫn xanh. Chỉ khi hành vi thật sự đổi (nút biến label khác) test mới đỏ — đúng nghĩa một regression."
+        },
+        {
+          "question": "Có trường hợp nào hợp lệ để assert className không?",
+          "answer": "Hiếm, nhưng có: khi style chính là hợp đồng — ví dụ component theme token bắt buộc class \"dark-mode\" cho thư viện bên thứ ba tiêu thụ, hay class điều khiển animation mà test cần chờ. Khi đó hãy assert class NGUYÊN CHỖ (toHaveClass(\"animate-slide\")) kèm comment giải thích hợp đồng, và cô lập nó trong ít test nhất có thể."
+        }
+      ]
+    },
+    {
+      "id": "rte-mis-03",
+      "slug": "unmocked-network-leak",
+      "title": "Chiến dịch 03 · Unmocked Network Leak: test xanh nhưng dữ liệu staging bị ghi thật",
+      "summary": "Một handler MSW bị bỏ sót biến unit test thành khách truy cập không mời của API staging: request thật bay ra ngoài, dữ liệu demo bị mutate, và CI xanh đang che giấu một lỗ hổng vận hành.",
+      "objective": "Phát hiện request rò rỉ ra mạng thật trong test và xây dựng lưới an toàn chặn-cảnh báo mọi unmocked call.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 20,
+      "vectorIds": [
+        "rte-vec-03"
+      ],
+      "rootCause": "MSW chỉ chặn request khớp handler đã khai báo; những request ngoài phạm vi mặc định bay thẳng ra network thật — fetch trong Node test environment vẫn hoạt động như runtime thường. Khi baseURL trỏ staging và test tạo dữ liệu (đăng ký, xoá, cập nhật), test đang MUTATE môi trường thật mà không ai hay. Nguy hiểm nhất là chiều ngược lại: dữ liệu staging đổi dưới tay test khiến test phụ thuộc môi trường ngoài, xanh-đỏ thất thường. Lỗi nền móng: coi \"test không crash\" là \"test an toàn\", trong khi side-effect ra ngoài ranh giới process chưa bao giờ được kiểm soát.",
+      "reconNotes": [
+        "Bật onUnhandledRequest: \"bypass\"/warn trong setup? warn chỉ in log — CI xanh vẫn rò rỉ mỗi ngày.",
+        "Rà các test gọi service layer thật: thiếu msw handler cho endpoint POST/PATCH/DELETE là nguy hiểm nhất.",
+        "Kiểm tra env của test: NEXT_PUBLIC_API_URL trỏ staging/dev chung dữ liệu demo là vùng đỏ.",
+        "Tra log access của staging API: IP của CI runner xuất hiện trong access log chính là bằng chứng leak."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Handler thiếu một endpoint",
+          "detail": "Suite mock GET /orders nhưng quên PATCH /orders/:id; test \"cập nhật đơn hàng\" gọi service thật vì MSW để passthrough.",
+          "code": "// handlers.ts: chỉ có http.get(\"/orders\")\n// test gọi ordersApi.update(id, {...}) → không handler khớp"
+        },
+        {
+          "title": "2 · Request thật bay ra staging",
+          "detail": "Config test trỏ staging để \"tiện đối chiếu\": PATCH mang payload test ghi đè đơn hàng demo #1042 của team QA đang dùng.",
+          "code": "PATCH https://api.staging.example.com/orders/1042\n{\"status\":\"cancelled\"} → 200 OK (THẬT)"
+        },
+        {
+          "title": "3 · Hai chiều nhiễm độc",
+          "detail": "QA thấy đơn hàng biến mất báo bug giả; ngược lại ai đó đổi dữ liệu staging làm test phụ thuộc fails ngẫu nhiên — double contamination.",
+          "code": "#qa-channel: \"đơn 1042 tự huỷ??\" · test flake rate +18%"
+        },
+        {
+          "title": "4 · Rủi ro leo thang",
+          "detail": "Cùng cơ chế, một test đăng ký tài khoản với email thật trong fixture có thể spam user thật — ranh giới test/prod đã bị phá từ trong CI.",
+          "code": "CI runner → POST /register {\"email\":\"real.user@x.com\"} → email thật gửi đi"
+        }
+      ],
+      "hardeningChecklist": [
+        "onUnhandledRequest: \"error\" trong MSW config — mọi request không có handler làm test FAIL ngay, không warn cho qua.",
+        "Test environment trỏ baseURL tới domain không tồn tại (*.test.invalid) để request lọt chắc chắn lỗi thay vì chạm hệ thống thật.",
+        "Fixture email/dùng dữ liệu ảo hoá (example.com, @test.local); cấm dữ liệu thật trong fixture.",
+        "Handler matrix review: mỗi endpoint service dùng phải có handler tương ứng — liệt kê diff trong PR.",
+        "Smoke test định kỳ đối chiếu access-log staging vs CI schedule để phát hiện leak còn sót."
+      ],
+      "debrief": [
+        {
+          "question": "onUnhandledRequest \"warn\" và \"error\" khác nhau thế nào về mặt an toàn?",
+          "answer": "\"Warn\" chỉ in console rồi CHO REQUEST CHẠY TIẾP — CI vẫn xanh, leak vẫn xảy ra mỗi lần chạy, log lại bị nuốt giữa nghìn dòng output. \"Error\" biến mọi request không có handler thành failure của test: leak bị chặn tại chỗ và buộc người viết test khai báo handler. An toàn thật sự phải là fail-closed, không phải log-and-pass."
+        },
+        {
+          "question": "Vì sao không nên để test gọi staging API \"thật\" dù chỉ đọc (GET)?",
+          "answer": "GET đọc cũng tạo phụ thuộc hai chiều: test phụ thuộc dữ liệu staging hiện có (ai đó xoá record là test đỏ), và staging phụ thuộc network của CI (rate-limit, downtime làm test đỏ oan). Test unit/integration phải deterministic trong process — muốn kiểm tra hợp đồng API thật thì đó là job của contract test chạy trong môi trường kiểm soát, không phải của test suite mỗi PR."
+        }
+      ]
+    }
+  ],
+  "dossier": {
+    "readingTimeMinutes": 12,
+    "objectives": [
+      "Chẩn đoán flaky test do đua với thời gian thực và chuyển sang fake clock deterministic với advanceTimersByTime.",
+      "Nhận diện assertion bám chi tiết triển khai như className và cấu trúc DOM, viết lại theo hành vi người dùng với role queries.",
+      "Phát hiện request thoát mock ra staging thật và siết MSW lifecycle với onUnhandledRequest error.",
+      "Xây hardening checklist giữ tín hiệu suite: đỏ nghĩa là bug thật, xanh nghĩa là refactor an toàn."
+    ],
+    "concepts": [
+      {
+        "term": "Flaky là race với scheduler",
+        "definition": "Test assert ngay sau thao tác đang đua với event loop và timer thật; trên CI tải nặng, vài chục millisecond lệch là đỏ ngẫu nhiên. Sleep cộng retry là thuốc giảm đau: suite chậm đi và nuốt bug thật. Fake timers biến thời gian thành biến kiểm soát được — deterministic tuyệt đối trên mọi máy."
+      },
+      {
+        "term": "Coupling vào chi tiết triển khai",
+        "definition": "Assertion bám className Tailwind, nth-child hay textContent format cứng gãy ngay khi refactor markup dù hành vi không đổi; ngược lại test xanh vẫn có thể nói dối nếu chỉ kiểm tra cấu trúc. Chuẩn Testing Library: getByRole, getByLabelText cộng userEvent — test nhìn UI qua mắt người dùng nên refactor design system không làm đỏ test hành vi."
+      },
+      {
+        "term": "Mock boundary và hợp đồng MSW",
+        "definition": "Unit test không được chạm mạng thật; MSW chặn fetch ở tầng service worker và handler registry là hợp đồng các endpoint được phép tồn tại. onUnhandledRequest bypass biến registry thiếu thành đường hầm ra staging: ô nhiễm dữ liệu thật, timeout treo CI, pipeline phụ thuộc VPN. resetHandlers mỗi test giữ isolation."
+      },
+      {
+        "term": "Tín hiệu của CI là tài sản",
+        "definition": "Giá trị duy nhất của suite là tín hiệu: đỏ phải đáng tin và xanh phải đáng tin. Flake rate cao huấn luyện team phớt lờ đỏ; assertion sai hướng huấn luyện team sửa component cho vừa test. Đo flake rate và duration như đo thiết bị, có gate chặn regression."
+      },
+      {
+        "term": "Fake clock kỷ luật",
+        "definition": "vi.useFakeTimers đóng băng setTimeout của component, advanceTimersByTime tua thời gian có kiểm soát; userEvent cần advanceTimers để đồng bộ với clock giả. afterEach phải trả về real timers — quên là leak sang test khác và tạo ra flake mới đúng chỗ mình vừa vá."
+      }
+    ],
+    "attackerPlaybook": [
+      {
+        "title": "Đo flake rate",
+        "detail": "Chạy suite lặp nhiều lần trên CI với repeat, log các test đỏ ngẫu nhiên và phân loại nguyên nhân: timer thật, network thật, phụ thuộc thứ tự. Flake rate vượt 1 phần trăm là alarm hệ thống chứ không phải chuyện test lẻ."
+      },
+      {
+        "title": "Soi assertion giòn",
+        "detail": "Grep các expect chứa bg-, querySelector với nth-child, toBe với format tiền cứng để liệt kê assertion gãy khi refactor vô hại. Thử một refactor markup thật như div sang section để đo thương vong của suite."
+      },
+      {
+        "title": "Rà lỗ hổng mock",
+        "detail": "Chạy nhánh với onUnhandledRequest error: mọi unhandled request là request đang rò ra mạng thật trong các lần chạy thường. Đối chiếu handlers.ts với danh sách endpoint mà component chạm tới, tìm beacon analytics sót."
+      },
+      {
+        "title": "Hardening và gate",
+        "detail": "Fake timers cho mọi test chạm debounce hay interval, role-based queries cho mọi assertion UI, handler matrix phủ đủ endpoint với override cục bộ bằng server.use. Đặt CI gate đo flake rate, duration budget, cấm merge test dùng real sleep."
+      }
+    ],
+    "defensePrinciples": [
+      "Thời gian trong test thuộc quyền test: vi.useFakeTimers cộng advanceTimersByTime; cấm sleep thật và cấm retry che flake — flake phải được sửa tận gốc.",
+      "Assert những gì người dùng thấy và làm: role và label queries cộng userEvent; className và cấu trúc DOM không phải hành vi.",
+      "Không request nào lọt mạng thật: MSW onUnhandledRequest error, lifecycle listen, resetHandlers, close, handler matrix được review cùng PR thêm endpoint.",
+      "Bảo vệ tín hiệu suite như bảo vệ thiết bị đo: đo flake rate định kỳ, CI gate chặn regression, test code được review nghiêm như production code."
+    ]
+  }
+}

@@ -4,16 +4,15 @@ import * as React from 'react';
 import type { ComponentType } from 'react';
 import { FlaskConical } from 'lucide-react';
 import { Card } from '@/components/ui/card';
-import { XssCsrfRange } from './demos/xss-csrf-range';
-import { ReactRenderVisualizerLab } from './demos/react-render-visualizer-lab';
-import { EffectRaceLab } from './demos/effect-race-lab';
-import { FormStateLab } from './demos/form-state-lab';
-import { SchemaValidationRange } from './demos/schema-validation-range';
-import { MemoProfilerLab } from './demos/memo-profiler-lab';
-import { CacheTimelineLab } from './demos/cache-timeline-lab';
-import { React19ActionsLab } from './demos/react19-actions-lab';
-import { RenderingWaterfallLab } from './demos/rendering-waterfall-lab';
-import { TestRunnerSimulator } from './demos/test-runner-simulator';
+import { AsyncRaceLab } from './ranges/async-race-lab';
+import { BundleReconLab } from './ranges/bundle-recon-lab';
+import { CachePoisonLab } from './ranges/cache-poison-lab';
+import { FormAbuseRange } from './ranges/form-abuse-range';
+import { HardeningDrill } from './ranges/hardening-drill';
+import { ResourceDrainLab } from './ranges/resource-drain-lab';
+import { SessionHeistRange } from './ranges/session-heist-range';
+import { StateCorruptionLab } from './ranges/state-corruption-lab';
+import { XssInjectionRange } from './ranges/xss-injection-range';
 
 export interface UiDemoMeta {
   component: ComponentType;
@@ -21,76 +20,76 @@ export interface UiDemoMeta {
   description: string;
 }
 
-/** Map trackSlug → interactive UI demo của track đó */
+/**
+ * Firing range riêng của Red Team — key là slug của RedTeamCollection.
+ *
+ * ⚠️ Các lab cũ (Render Visualizer, Memo Profiler, Cache Timeline…) là lab
+ * học React, KHÔNG còn được gắn vào RT. Mỗi collection có bãi tập thực chiến
+ * riêng (attack/defense sandbox) dưới thư mục components/ranges/.
+ */
 export const UI_DEMO_REGISTRY: Record<string, UiDemoMeta> = {
-  'react-foundations-zero-to-one': {
-    component: ReactRenderVisualizerLab,
-    title: 'UI Demo: Render Visualizer',
+  'frontend-recon': {
+    component: BundleReconLab,
+    title: 'Firing Range: Bundle Recon',
     description:
-      'Bấm nút và quan sát chính xác component nào re-render — props, state, keys trong thời gian thực.',
+      'Đóng vai trinh sát: soi bundle production tìm secret, sourcemap lộ và route nội bộ — rồi bật bản vá để thấy mọi dấu vết biến mất.',
   },
-  'react-hooks-deep-dive': {
-    component: EffectRaceLab,
-    title: 'UI Demo: Effect Race Lab',
+  'script-injection-range': {
+    component: XssInjectionRange,
+    title: 'Firing Range: XSS & Chèn mã',
     description:
-      'Kích hoạt race condition giữa các useEffect fetch và xem cleanup function cứu hệ thống ra sao.',
+      'Bắn stored XSS vào comment box, DOM XSS qua URL fragment và prototype pollution qua query string — bật sanitizer để thấy payload bị vô hiệu.',
   },
-  'standard-react-form-architecture': {
-    component: FormStateLab,
-    title: 'UI Demo: Controlled vs Uncontrolled',
+  'identity-session-heist': {
+    component: SessionHeistRange,
+    title: 'Firing Range: Session Heist',
     description:
-      'So sánh trực tiếp 2 chiến lược form: mỗi keystroke đi đâu, ai sở hữu state, re-render chảy về đâu.',
+      'CSRF rút tiền hộ nạn nhân, trộm JWT theo kiểu lưu trữ token, clickjacking mượn tay user bấm nút — bật từng lớp phòng thủ để chặn lại.',
   },
-  'form-engineering-react-hook-form-zod': {
-    component: SchemaValidationRange,
-    title: 'UI Demo: Schema Validation Range',
+  'async-race-exploits': {
+    component: AsyncRaceLab,
+    title: 'Firing Range: Race Condition',
     description:
-      'Bắn dữ liệu bẩn vào schema Zod: thấy từng rule bắt lỗi, transform và type inference như thật.',
+      'Đua response sai kết quả, closure cũ mất dữ liệu, swarm interval bất tử — điều chỉnh latency và bật stale-guard/cleanup để vô hiệu hoá.',
   },
-  'react-performance-advanced-patterns': {
-    component: MemoProfilerLab,
-    title: 'UI Demo: Memo Profiler',
+  'ui-state-corruption': {
+    component: StateCorruptionLab,
+    title: 'Firing Range: State Corruption',
     description:
-      'Bật/tắt memo · useMemo · useCallback trên danh sách nặng và đếm render như Profiler thật.',
+      'Tráo bài sau lưng user bằng index-key, mutation tê liệt re-render, số 0 ma từ &&, render không thuần khiết — bắn từng đòn và vá ngay.',
   },
-  'tanstack-query-v5-masterclass': {
-    component: CacheTimelineLab,
-    title: 'UI Demo: Query Cache Timeline',
+  'cache-poisoning': {
+    component: CachePoisonLab,
+    title: 'Firing Range: Cache Poison',
     description:
-      'Thử nghiệm staleTime/gcTime: network refetch, cache hit, background refresh trên timeline sống.',
+      'Bão refetch khi đổi tab, query key va chạm phục vụ dữ liệu sai ngữ cảnh, ghost row sống dậy từ mutation thiếu invalidation.',
   },
-  'web-security-and-auth-masterclass': {
-    component: XssCsrfRange,
-    title: 'UI Demo: XSS & CSRF Firing Range',
+  'form-input-abuse': {
+    component: FormAbuseRange,
+    title: 'Firing Range: Form Abuse',
     description:
-      'Bắn payload XSS vào comment box và giả lập CSRF chuyển tiền — bật/tắt phòng thủ xem khác nhau thế nào.',
+      'Field ma mất name, controlled lật uncontrolled, submit kép nhân bản đơn hàng, lách validation client-only và quả mìn parse().',
   },
-  'react-19-compiler-path': {
-    component: React19ActionsLab,
-    title: 'UI Demo: Actions & Optimistic UI',
+  'resource-supply-drain': {
+    component: ResourceDrainLab,
+    title: 'Firing Range: Resource Drain',
     description:
-      'Trải nghiệm useActionState + useOptimistic: todo list cập nhật tức thì, rollback khi server lỗi.',
+      'Waterfall TTFB, bão render đánh DB, đóng băng main thread, reference storm, context blast và CDN hijack — mô phỏng cả 6 đòn drain hạ tầng.',
   },
-  'nextjs-architecture-rendering-strategies': {
-    component: RenderingWaterfallLab,
-    title: 'UI Demo: Rendering Waterfall',
+  'blue-team-capstone': {
+    component: HardeningDrill,
+    title: 'Firing Range: Hardening Drill',
     description:
-      'Đua SSR vs SSG vs ISR vs CSR trên cùng một trang: so sánh TTFB, waterfall và thời gian hiển thị.',
-  },
-  'react-testing-enterprise-mastery': {
-    component: TestRunnerSimulator,
-    title: 'UI Demo: Test Runner Simulator',
-    description:
-      'Chạy bộ test Vitest mô phỏng: Arrange–Act–Assert, mock MSW, xem pass/fail theo từng bước.',
+      'Trò chơi đảo vai blue team: 3 kịch bản test hổng — chọn đúng biện pháp vá trước khi hết giờ để chứng minh hàng phòng thủ đạt chuẩn.',
   },
 };
 
 interface UiDemoStageProps {
-  trackSlug: string;
+  collectionSlug: string;
 }
 
-export function UiDemoStage({ trackSlug }: UiDemoStageProps) {
-  const meta = UI_DEMO_REGISTRY[trackSlug];
+export function UiDemoStage({ collectionSlug }: UiDemoStageProps) {
+  const meta = UI_DEMO_REGISTRY[collectionSlug];
 
   if (!meta) return null;
   const Demo = meta.component;

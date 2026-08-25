@@ -1,0 +1,320 @@
+[
+  {
+    "id": "open-fe-01",
+    "category": "performance-optimization",
+    "level": "senior",
+    "question": "Câu hỏi mở: Production xuất hiện các đợt UI freeze 2–4 giây nhưng backend latency bình thường. Bạn tổ chức điều tra, cô lập nguyên nhân và rollout bản sửa thế nào?",
+    "interviewerIntent": "Đánh giá incident response dựa trên evidence, khả năng giảm blast radius, thiết kế observability và ra quyết định khi root cause chưa rõ.",
+    "contextOrScenario": "Lỗi chỉ xảy ra trên một phần thiết bị Android tầm thấp, không tái hiện ổn định ở máy developer và bắt đầu trong khoảng ba release gần nhau.",
+    "expectedKeywords": [
+      "incident timeline",
+      "RUM",
+      "long task",
+      "cohort",
+      "feature flag",
+      "canary"
+    ],
+    "seniorAnswer": {
+      "summary": "Tôi tách mitigation khỏi root-cause analysis: xác định impact/SLO, rollback hoặc tắt feature có blast radius cao trước; sau đó dùng RUM có release, route, interaction và device cohort để nối freeze với long task/long animation frame, memory hoặc third-party. Tôi tái hiện bằng CPU throttling và dữ liệu đại diện, cô lập bằng flag/binary search, canary bản sửa và chỉ đóng incident khi production percentile hồi phục.",
+      "mentalModel": "Freeze là triệu chứng main thread không phục vụ input/paint, nhưng nguyên nhân có thể là JavaScript, style/layout, GC, decode hoặc third-party. Incident loop là: stabilize → instrument → narrow hypotheses → reproduce → fix → verify → prevent recurrence. Không tối ưu theo intuition trước khi tạo được evidence chain.",
+      "reasoningSteps": [
+        "Mở incident với owner, timeline, affected user %, route/interaction, p75/p95 INP hoặc freeze rate và tiêu chí rollback. Kiểm tra release correlation nhưng không mặc định release gần nhất là thủ phạm.",
+        "Mitigate: remote-disable feature/third-party nghi ngờ hoặc rollback asset/API-compatible release. Giữ snapshot telemetry trước khi thay đổi.",
+        "Instrument có sampling: app version, device memory/CPU proxy, route, interaction breadcrumb, long task/long animation frame, event timing, resource/third-party, error và memory pressure signal hợp lệ.",
+        "So cohort affected/unaffected và dùng binary search qua feature flags hoặc release artifacts. Tái hiện với CPU throttling, dataset lớn, cache cold/warm và chính interaction sequence.",
+        "Profile trace để gắn user interaction → task → script/layout/GC. Sửa owner thực sự, thêm performance test/budget, canary 1–5–25–100% và quan sát cùng metric production."
+      ],
+      "deepDive": "Backend latency bình thường chỉ loại bớt một giả thuyết; response lớn có thể khiến parse/render block, retry loop có thể tạo CPU burst, và third-party callback có thể chạy sau response. Long Tasks API báo task main thread dài nhưng attribution có giới hạn, đặc biệt cross-origin. Event Timing/INP cho biết interaction latency; Long Animation Frames có thể cung cấp script/layout breakdown ở browser hỗ trợ. PerformanceObserver phải feature-detect supportedEntryTypes và sampling vì buffer hữu hạn/entries có thể bị drop.\n\nMột trace local không đại diện production cohort. Cần correlation ID gồm release, feature flags và navigation/interaction. Privacy: không gửi query/input/raw DOM; sanitize URL và payload. Nếu suspected memory leak, freeze có thể là major GC sau nhiều giờ nên reproduction phải chạy dài, không chỉ reload sạch.\n\nMitigation có thể được ship trước root cause: tắt animation/chart, giảm batch, defer vendor. Nhưng phải ghi nhận hypothesis và không đóng incident chỉ vì không còn complaint. Closure criterion là percentile/error rate ổn định qua traffic/device window, không regression business metric, và guardrail đã được thêm.",
+      "tradeoffs": [
+        "Rollback nhanh giảm impact nhưng có thể rollback security/data fix; feature kill switch hẹp hơn nhưng chỉ hữu ích nếu được thiết kế trước.",
+        "RUM chi tiết tăng khả năng chẩn đoán nhưng thêm overhead/privacy cost; dùng sampling, redaction và retention rõ.",
+        "Synthetic test ổn định và so release tốt; RUM phản ánh thiết bị/dữ liệu thật nhưng nhiễu và cần cohort analysis.",
+        "Tắt vendor/feature có thể ảnh hưởng doanh thu; incident commander cần quyết định theo user impact và error budget, không chỉ kỹ thuật."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "type PerfSample = {\n  release: string;\n  route: string;\n  entryType: string;\n  startTime: number;\n  duration: number;\n  interaction?: string;\n};\n\nfunction observePerformance(type: string) {\n  if (!PerformanceObserver.supportedEntryTypes.includes(type)) return;\n\n  const observer = new PerformanceObserver((list, _observer, options) => {\n    for (const entry of list.getEntries()) {\n      if (!shouldSampleSession()) continue;\n      enqueueTelemetry({\n        release: APP_VERSION,\n        route: sanitizeRoute(location.pathname),\n        entryType: entry.entryType,\n        startTime: entry.startTime,\n        duration: entry.duration,\n        interaction: currentInteractionName(),\n      } satisfies PerfSample);\n    }\n\n    if (options?.droppedEntriesCount) {\n      incrementMetric('performance_entries_dropped', options.droppedEntriesCount);\n    }\n  });\n\n  observer.observe({ type, buffered: true });\n}\n\nobservePerformance('longtask');\nobservePerformance('event');\nobservePerformance('long-animation-frame');\n\n// Feature owner phải có remote kill switch trước rollout.\nif (flags.realtimeChartV2) {\n  import('./realtime-chart').then(({ mount }) => mount());\n}",
+      "verification": [
+        "Dashboard theo release × route × device cohort: p75/p95 INP, long-task/freeze sessions, JS errors, memory/OOM và business conversion.",
+        "Canary có automatic halt nếu guardrail xấu hơn control ngoài confidence/noise threshold đã định nghĩa.",
+        "Synthetic test CPU-throttled với production-sized dataset và performance budget cho hot interaction.",
+        "Post-incident action có owner: kill switch coverage, missing telemetry, regression test và runbook; kiểm tra hoàn thành sau thời hạn."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Bắt đầu bằng impact/timeline và dùng Performance profiler/long task thay vì đoán.",
+        "Có rollback/feature flag và thử trên thiết bị yếu.",
+        "Đo production sau fix."
+      ],
+      "strong": [
+        "Tách mitigation với RCA, thiết kế RUM cohort theo release/interaction và privacy-aware sampling.",
+        "Xét script/layout/GC/third-party, binary-search flags và canary guardrails.",
+        "Định nghĩa closure metric bằng percentile, không average hoặc cảm giác."
+      ],
+      "exceptional": [
+        "Điều phối technical/business trade-off theo error budget và security/data compatibility.",
+        "Thiết kế observability có dropped-entry handling, correlation và long-running memory case.",
+        "Biến incident thành platform guardrail/runbook áp dụng được cho nhiều team."
+      ]
+    },
+    "references": [
+      {
+        "title": "W3C Performance Timeline and PerformanceObserver",
+        "url": "https://w3c.github.io/performance-timeline/"
+      },
+      { "title": "W3C Long Tasks API", "url": "https://w3c.github.io/longtasks/" },
+      { "title": "W3C Event Timing API", "url": "https://w3c.github.io/event-timing/" }
+    ],
+    "pitfalls": [
+      "Tối ưu component có nhiều render nhất mà chưa nối nó với freeze.",
+      "Chỉ đo trên laptop mạnh và average toàn bộ user.",
+      "Thu URL/input/raw DOM vào telemetry gây privacy leak.",
+      "Deploy fix 100% và đóng incident khi local trace đẹp."
+    ],
+    "followUpQuestions": [
+      "Nếu thủ phạm là script thanh toán không thể tắt, bạn degrade/circuit-break thế nào?",
+      "Nếu freeze do major GC sau bốn giờ, test và telemetry khác gì?",
+      "Bạn đặt automatic rollback threshold khi RUM có noise ra sao?"
+    ]
+  },
+  {
+    "id": "open-fe-02",
+    "category": "frontend-system-design",
+    "level": "lead",
+    "question": "Câu hỏi mở: Thiết kế dashboard realtime nhận hàng chục nghìn sự kiện mỗi phút nhưng vẫn tương tác mượt trên laptop cấu hình thấp.",
+    "interviewerIntent": "Đánh giá system thinking xuyên transport, consistency, backpressure, worker processing, state/rendering và observability; không chấm một sơ đồ WebSocket chung chung.",
+    "contextOrScenario": "Người dùng cần dữ liệu gần realtime, filter/sort tức thời và lịch sử 30 phút. Khi burst xảy ra, tab lên 100% CPU, memory tăng không giới hạn và reconnect làm trùng/mất event.",
+    "expectedKeywords": [
+      "cursor",
+      "backpressure",
+      "bounded buffer",
+      "aggregation",
+      "Web Worker",
+      "virtualization"
+    ],
+    "seniorAnswer": {
+      "summary": "Tôi bắt đầu bằng freshness/loss SLO. Transport gửi snapshot có cursor rồi delta có sequence; reconnect dùng cursor để replay hoặc resync khi gap. Client tách ingestion khỏi presentation: bounded queue, coalesce/aggregate theo domain, parse trong Worker, publish immutable snapshot theo cadence UI, store selector hẹp và virtualized rendering. Queue depth/lag quyết định backpressure hoặc degradation.",
+      "mentalModel": "Đây là pipeline có tốc độ vào và tốc độ phục vụ. Nếu producer lâu dài nhanh hơn consumer, không có tối ưu render nào cứu được buffer vô hạn. Phải định nghĩa overload semantics: block producer, aggregate, sample/drop low priority, hoặc chuyển computation/server-side. Dữ liệu hiển thị là projection, không nhất thiết là toàn bộ raw stream.",
+      "reasoningSteps": [
+        "Chốt requirements định lượng: events/sec bình thường/burst, freshness p95, có được drop/coalesce không, exact history ở đâu, reconnect window và thiết bị mục tiêu.",
+        "Protocol: initial snapshot tại cursor C, delta sequence C+1..., heartbeat và schema version. Phát hiện gap/duplicate; nếu replay window còn thì request replay, nếu không tải snapshot mới.",
+        "Ingestion queue có max size/bytes. Coalesce update cùng entity, aggregate metrics theo time window hoặc drop priority thấp theo policy; không giữ raw event vô hạn trong React state.",
+        "Worker parse/validate/aggregate và gửi snapshot nhỏ theo 100–250 ms hoặc frame-aware cadence. Main thread chỉ normalize/store và render selector bị ảnh hưởng.",
+        "Virtualize rows, downsample chart theo pixel width, pause/reduce cadence khi document hidden, và instrument end-to-end event lag/queue depth/drop/reconnect/long task/memory."
+      ],
+      "deepDive": "Snapshot + delta tránh race khi subscribe: server phải định nghĩa boundary sao cho client không bỏ event giữa snapshot và stream. Cursor/sequence là protocol correctness, timestamp client không đủ vì clock skew và out-of-order. Duplicate nên xử lý bằng sequence/id nếu delivery at-least-once. Gap vượt replay retention buộc full resync; UI hiển thị stale/reconnecting thay vì giả vờ realtime.\n\nBackpressure trên WebSocket browser không tự giải quyết application queue. Client có thể báo desired rate/subscription granularity cho server, unsubscribe series không nhìn thấy, hoặc đóng/reconnect với reduced mode. Nếu protocol không hỗ trợ, client vẫn phải bound memory và drop/coalesce theo semantic.\n\nReact không nên nhận từng event qua setState. External store giữ normalized projection; `useSyncExternalStore`/selector chỉ notify slice thay đổi. Chart một triệu điểm cần aggregation/downsampling trước render; virtualization chỉ giảm DOM rows, không giảm cost sort/filter nếu vẫn chạy toàn bộ trên main thread mỗi message. Worker result cũng phải versioned để stale snapshot không overwrite state sau filter change.",
+      "tradeoffs": [
+        "Freshness cao hơn làm tăng CPU/network; cadence 100–250 ms thường nhìn realtime nhưng phải dựa trên SLO.",
+        "Coalesce/drop bảo vệ UX nhưng mất raw fidelity; raw authoritative history nên ở server hoặc storage riêng.",
+        "Client aggregation giảm server load và linh hoạt filter; server aggregation giảm bandwidth/device variance.",
+        "Single stream đơn giản ordering; partition streams tăng throughput nhưng cần merge/order semantics và reconnect phức tạp."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "type Delta = { sequence: number; entityId: string; value: number };\ntype Snapshot = { cursor: number; entities: Map<string, number> };\n\nclass BoundedCoalescingQueue {\n  private latestByEntity = new Map<string, Delta>();\n  constructor(private readonly maxEntities: number) {}\n\n  push(delta: Delta) {\n    if (this.latestByEntity.has(delta.entityId)) {\n      this.latestByEntity.set(delta.entityId, delta);\n      return { accepted: true, coalesced: true };\n    }\n    if (this.latestByEntity.size >= this.maxEntities) {\n      return { accepted: false, reason: 'capacity' as const };\n    }\n    this.latestByEntity.set(delta.entityId, delta);\n    return { accepted: true, coalesced: false };\n  }\n\n  drain(): Delta[] {\n    const batch = [...this.latestByEntity.values()];\n    this.latestByEntity.clear();\n    return batch.sort((a, b) => a.sequence - b.sequence);\n  }\n}\n\nlet expectedSequence = initialSnapshot.cursor + 1;\nconst queue = new BoundedCoalescingQueue(10_000);\n\nfunction onDelta(delta: Delta) {\n  if (delta.sequence < expectedSequence) return; // duplicate/replay\n  if (delta.sequence > expectedSequence) {\n    requestReplayOrSnapshot(expectedSequence, delta.sequence);\n    return;\n  }\n  expectedSequence += 1;\n  const result = queue.push(delta);\n  if (!result.accepted) enterReducedSubscriptionMode();\n}\n\nsetInterval(() => {\n  const batch = queue.drain();\n  if (batch.length) aggregationWorker.postMessage({ type: 'APPLY', batch, viewVersion });\n}, 100);",
+      "verification": [
+        "Load test browser với normal/burst/reconnect/gap và CPU throttling; assert memory queue bounded.",
+        "Correctness test snapshot+delta không mất/duplicate projection qua reconnect và stale worker result không commit.",
+        "RUM event-lag p95, queue depth, dropped/coalesced count, Worker time, long tasks, memory và reconnect success.",
+        "Capacity model nêu rõ max sustainable rate/device; degradation được test và hiển thị trạng thái cho user."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Không setState theo từng event; có batching, Worker và virtualization.",
+        "Có reconnect và bounded buffer.",
+        "Đề cập monitoring."
+      ],
+      "strong": [
+        "Định nghĩa freshness/loss SLO, snapshot+cursor+delta/gap protocol và overload semantics.",
+        "Tách ingestion/projection/rendering, coalesce theo domain và version Worker result.",
+        "Có capacity/chaos tests và end-to-end lag telemetry."
+      ],
+      "exceptional": [
+        "Phân tích authoritative history, replay retention, schema evolution và reduced-subscription negotiation.",
+        "Đưa quyết định server/client aggregation theo device/network economics.",
+        "Thiết kế platform primitive reusable với budgets, ownership và graceful degradation cho nhiều dashboard."
+      ]
+    },
+    "references": [
+      {
+        "title": "HTML Standard — WebSocket",
+        "url": "https://websockets.spec.whatwg.org/"
+      },
+      {
+        "title": "HTML Standard — Web workers",
+        "url": "https://html.spec.whatwg.org/multipage/workers.html"
+      }
+    ],
+    "pitfalls": [
+      "setState cho từng WebSocket message.",
+      "Buffer vô hạn để không mất event rồi làm tab OOM.",
+      "Dùng debounce tùy ý mà không định nghĩa freshness/loss SLO.",
+      "Chỉ virtualize DOM nhưng vẫn sort/filter toàn bộ dataset trên main thread mỗi event."
+    ],
+    "followUpQuestions": [
+      "Nếu không được mất event tài chính nào, client projection và authoritative audit log tách thế nào?",
+      "Snapshot tải 10 giây trong khi delta vẫn đến: protocol buffer/boundary ra sao?",
+      "Bạn downsample chart theo pixel width mà vẫn giữ min/max spike thế nào?"
+    ]
+  },
+  {
+    "id": "open-fe-03",
+    "category": "browser-runtime-workers",
+    "level": "senior",
+    "question": "Câu hỏi mở: Thiết kế đồng bộ trạng thái đăng nhập, feature flags và draft giữa nhiều tab mà không tạo loop hoặc làm tab nền tiêu tốn tài nguyên.",
+    "interviewerIntent": "Kiểm tra hiểu biết browser contexts, best-effort messaging, consistency, session security và multi-writer conflict.",
+    "contextOrScenario": "Người dùng logout ở tab A nhưng tab B vẫn gọi API bằng session cũ. Hai tab cùng autosave một draft và liên tục ghi đè; mỗi tab còn mở một WebSocket riêng.",
+    "expectedKeywords": [
+      "BroadcastChannel",
+      "source of truth",
+      "message id",
+      "lease",
+      "optimistic concurrency",
+      "visibility"
+    ],
+    "seniorAnswer": {
+      "summary": "Server/session là nguồn sự thật cho auth; BroadcastChannel chỉ phát tín hiệu best-effort, không truyền token hay làm durable log. Message có protocol version, id, source tab và revision để dedupe/chống loop. Draft dùng server revision/ETag hoặc CRDT theo domain. Background work có thể do leader tab giữ bằng renewable lease, nhưng thiết kế phải chịu leader chết và split brain nhờ idempotency.",
+      "mentalModel": "Mỗi tab là một process độc lập có thể suspend/crash. BroadcastChannel là bus thông báo giữa contexts cùng storage key, không phải database hay consensus. Durable state nằm ở server/IndexedDB; khi tab wake/open lại phải rehydrate và reconcile thay vì tin rằng đã nhận đủ message.",
+      "reasoningSteps": [
+        "Phân loại state: auth authoritative server; feature flags versioned server/config; draft durable IndexedDB/server; ephemeral UI không cần cross-tab.",
+        "Định nghĩa message envelope `{protocol,id,source,type,revision,payload}`. Receiver dedupe id và không rebroadcast message đã nhận.",
+        "Logout: tab A gọi server revoke/end-session rồi broadcast SESSION_INVALIDATED; tab B clear in-memory user state và revalidate server. HttpOnly token không được đưa vào message/localStorage.",
+        "Draft: autosave gửi baseRevision; 409/412 tạo conflict flow. Broadcast chỉ báo draft-updated revision để tab khác reload/reconcile.",
+        "Nếu giảm WebSocket, leader election dùng lease expiry + heartbeat; server vẫn dedupe/subscription id vì hai leader có thể tồn tại tạm thời. Tab hidden giảm cadence và follower nhận snapshot qua channel."
+      ],
+      "deepDive": "BroadcastChannel truyền structured-cloned message cho contexts phù hợp nhưng không lưu message cho tab chưa mở/đang không nhận; delivery không thay persistence. `storage` event có semantics khác và thường dùng fallback đơn giản, nhưng ghi localStorage để tạo bus có synchronous I/O và payload hạn chế. SharedWorker có thể centralize connection ở browser hỗ trợ/use case phù hợp nhưng lifecycle/support/deployment khác.\n\nAuth correctness không dựa vào broadcast: nếu tab B bỏ lỡ message, API server vẫn phải từ chối session revoked. Client xử lý 401/invalid-session thống nhất và revalidate khi visibility/focus trở lại. Không broadcast bearer token vì mọi same-origin script/tab context có channel access theo mô hình origin/storage partition và XSS impact tăng.\n\nLeader lease không phải distributed lock tuyệt đối: tab bị suspend có thể thức dậy sau khi lease đã được tab khác lấy. Mọi external side effect của leader phải idempotent hoặc được server fencing bằng epoch. Với draft, last-write-wins chỉ chấp nhận nếu business chấp nhận mất update; rich text concurrent editing có thể cần CRDT/OT, còn form thường dùng optimistic concurrency + manual field merge.",
+      "tradeoffs": [
+        "Mỗi tab một connection đơn giản và cô lập failure nhưng tốn server/device resource; leader/shared worker tiết kiệm nhưng tăng coordination complexity.",
+        "BroadcastChannel ergonomic nhưng không durable; IndexedDB/server durable nhưng có transaction/reconciliation cost.",
+        "Last-write-wins UX đơn giản nhưng mất update; ETag/manual merge an toàn hơn; CRDT mạnh nhưng tăng model/payload/maintenance.",
+        "Revalidate auth mỗi focus tăng correctness nhưng thêm request; cache ngắn + broadcast hint cân bằng latency/load."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "type CrossTabMessage = {\n  protocol: 1;\n  id: string;\n  source: string;\n  type: 'SESSION_INVALIDATED' | 'DRAFT_UPDATED' | 'LEADER_HEARTBEAT';\n  revision: number;\n  payload?: { draftId?: string; leaseUntil?: number };\n};\n\nconst tabId = crypto.randomUUID();\nconst seen = new Set<string>();\nconst channel = new BroadcastChannel('app-coordination-v1');\n\nfunction publish(message: Omit<CrossTabMessage, 'protocol' | 'id' | 'source'>) {\n  channel.postMessage({ protocol: 1, id: crypto.randomUUID(), source: tabId, ...message } satisfies CrossTabMessage);\n}\n\nchannel.addEventListener('message', async (event: MessageEvent<CrossTabMessage>) => {\n  const message = event.data;\n  if (message.protocol !== 1 || message.source === tabId || seen.has(message.id)) return;\n  seen.add(message.id);\n\n  if (message.type === 'SESSION_INVALIDATED') {\n    authStore.clearLocalSession();\n    await authStore.revalidateWithServer();\n  }\n\n  if (message.type === 'DRAFT_UPDATED' && message.payload?.draftId) {\n    await drafts.reconcile(message.payload.draftId, message.revision);\n  }\n  // Không phát lại message nhận được.\n});\n\nexport async function logoutEverywhere() {\n  await fetch('/api/session', { method: 'DELETE', credentials: 'same-origin' });\n  authStore.clearLocalSession();\n  publish({ type: 'SESSION_INVALIDATED', revision: Date.now() });\n}\n\ndocument.addEventListener('visibilitychange', () => {\n  if (document.visibilityState === 'visible') authStore.revalidateWithServer();\n});",
+      "verification": [
+        "Multi-page E2E mở 3 tabs, drop/reorder message giả lập, suspend leader và assert auth/draft cuối cùng reconcile từ source of truth.",
+        "Security test message giả/malformed không mang token, không bypass server authorization và protocol version fail closed.",
+        "Chaos test split brain hai leaders; external operations dedupe hoặc server fencing ngăn duplicate side effect.",
+        "Theo dõi connections/user, auth-invalid API rate, draft conflicts, leader churn và background CPU/network."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Dùng BroadcastChannel/storage event và không truyền token.",
+        "Có server source of truth cho auth và conflict handling cho draft.",
+        "Giảm background activity."
+      ],
+      "strong": [
+        "Message envelope có id/source/version/revision, dedupe và không rebroadcast loop.",
+        "Biết channel không durable; rehydrate/reconcile khi focus/open.",
+        "Leader lease chịu split brain nhờ idempotency/fencing."
+      ],
+      "exceptional": [
+        "Phân loại state theo consistency/durability và chọn BroadcastChannel, IndexedDB, SharedWorker, server phù hợp.",
+        "Thiết kế protocol migration, bounded dedupe storage và observability.",
+        "Chọn ETag/manual merge/CRDT theo domain thay vì áp một chiến lược cho mọi draft."
+      ]
+    },
+    "references": [
+      {
+        "title": "HTML Standard — Broadcasting to other browsing contexts",
+        "url": "https://html.spec.whatwg.org/multipage/web-messaging.html#broadcasting-to-other-browsing-contexts"
+      }
+    ],
+    "pitfalls": [
+      "Broadcast access token hoặc dữ liệu nhạy cảm.",
+      "Mỗi tab nhận message rồi phát lại vô điều kiện.",
+      "Tin BroadcastChannel bảo đảm persistence/delivery.",
+      "Coi localStorage lease là distributed lock tuyệt đối và không xử lý split brain."
+    ],
+    "followUpQuestions": [
+      "Seen-message Set tăng vô hạn thì bạn bound/dedupe thế nào?",
+      "SharedWorker thay leader election có trade-off lifecycle/browser support gì?",
+      "Hai tab sửa rich text cùng lúc: khi nào ETag đủ, khi nào cần CRDT?"
+    ]
+  },
+  {
+    "id": "open-fe-04",
+    "category": "frontend-system-design",
+    "level": "lead",
+    "question": "Câu hỏi mở: Xây governance cho third-party scripts trên 15 sản phẩm frontend, cân bằng analytics, quảng cáo, bảo mật, privacy và Core Web Vitals.",
+    "interviewerIntent": "Đánh giá năng lực thiết kế frontend platform và operating model: inventory, policy-as-code, isolation, observability, kill switch và vendor lifecycle.",
+    "contextOrScenario": "Mỗi team tự chèn tag manager. Một vendor từng làm hỏng checkout, nhiều script đọc dữ liệu vượt mục đích khai báo và không ai biết owner khi incident xảy ra.",
+    "expectedKeywords": [
+      "vendor registry",
+      "consent",
+      "CSP",
+      "SRI",
+      "performance budget",
+      "kill switch"
+    ],
+    "seniorAnswer": {
+      "summary": "Tôi tạo registry bắt buộc cho mỗi vendor: owner, purpose, data classes, legal basis/consent, allowed products/routes, load trigger, performance/error budget, CSP origins, kill switch và exit plan. Script chỉ được tải qua platform loader/policy-as-code; CI kiểm manifest và CSP, runtime enforce consent/timeout/remote disable, RUM gắn cost với vendor. Security/privacy review và định kỳ recertify/xóa vendor là một phần lifecycle.",
+      "mentalModel": "Third-party script chạy trong page origin thường có quyền gần tương đương first-party JavaScript: đọc DOM, intercept input và dùng network theo policy. `async` chỉ thay thời điểm tải/chạy, không tạo sandbox. Governance phải kết hợp prevention, containment, detection và rapid response; tag manager không phải security boundary.",
+      "reasoningSteps": [
+        "Inventory toàn bộ script/network/tag manager templates; gắn owner và business value. Unknown/unowned vendor bị block theo deadline.",
+        "Phân loại essential, functional, analytics, marketing; map data collected, destinations, consent/legal basis, retention và geographic constraints với privacy/legal.",
+        "Enforcement: centralized manifest + loader, CSP nonce/hash/origin, Trusted Types cho DOM injection sinks, SRI cho immutable versioned cross-origin assets, iframe sandbox khi use case cho phép.",
+        "Performance/resilience: load trigger sau consent/interaction/idle, timeout/circuit breaker, không block critical path, per-vendor RUM attribution và remote kill switch không phụ thuộc vendor.",
+        "Operating model: CI policy checks, security review cho change, quarterly recertification, incident contact/SLA, fallback UX và removal/data-deletion exit plan."
+      ],
+      "deepDive": "CSP `script-src` giới hạn nguồn và inline execution nhưng allowlist origin rộng có thể bị bypass nếu origin phục vụ JSONP/upload hoặc tag manager được phép inject tùy ý. Nonce/hashes và `strict-dynamic` cần thiết kế theo rendering stack. Trusted Types giảm DOM-XSS bằng cách buộc injection sinks nhận typed values từ policy được phép; nó không ngăn vendor hợp lệ exfiltrate dữ liệu qua fetch.\n\nSRI xác minh bytes của resource so với hash và hữu ích với URL/version bất biến; vendor auto-update cùng URL mâu thuẫn SRI và là governance smell. iframe sandbox có thể cô lập origin/capabilities nhưng `allow-scripts allow-same-origin` cùng origin có thể làm suy yếu sandbox; postMessage protocol phải validate origin/schema. Chạy script trong Worker-like sandbox có thể giảm main-thread/DOM access nhưng không tương thích mọi vendor và không tự giải quyết privacy/network.\n\nPerformance cost gồm network, parse/compile, long tasks, layout, memory và downstream requests. `async` không ngăn long task khi script execute. RUM cần vendor attribution và business conversion để quyết định giữ/xóa. Kill switch phải nằm ở first-party config được cache ngắn và loader kiểm trước load; khi vendor đã execute, kill switch chỉ ngăn lần tải tiếp theo hoặc cần reload.",
+      "tradeoffs": [
+        "Strict CSP/Trusted Types giảm attack surface nhưng migration lớn; rollout report-only trước enforcement và có violation triage.",
+        "SRI tăng supply-chain integrity nhưng yêu cầu pin version; auto-update tiện vendor nhưng mất change control.",
+        "Sandbox/worker isolation giảm quyền và main-thread cost nhưng tăng integration limitation, messaging và debugging.",
+        "Consent-gated/lazy load bảo vệ privacy/performance nhưng làm giảm event completeness; product phải chấp nhận metric bias minh bạch."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "type VendorPolicy = {\n  id: string;\n  ownerTeam: string;\n  purpose: 'essential' | 'functional' | 'analytics' | 'marketing';\n  consentCategory?: 'analytics' | 'ads';\n  allowedRoutes: RegExp[];\n  src: string;\n  integrity?: string;\n  maxLoadMs: number;\n  killSwitchKey: string;\n};\n\nfunction appendGovernedScript(policy: VendorPolicy): Promise<void> {\n  return new Promise((resolve, reject) => {\n    const script = document.createElement('script');\n    let settled = false;\n\n    const finish = (result: 'load' | 'error' | 'timeout') => {\n      if (settled) return;\n      settled = true;\n      clearTimeout(timer);\n      script.onload = null;\n      script.onerror = null;\n\n      if (result === 'load') resolve();\n      else {\n        script.remove();\n        reject(new Error(`Vendor ${policy.id}: ${result}`));\n      }\n    };\n\n    const timer = window.setTimeout(() => finish('timeout'), policy.maxLoadMs);\n    script.async = true;\n    script.src = policy.src;\n    script.nonce = getCspNonce();\n    script.crossOrigin = 'anonymous';\n    if (policy.integrity) script.integrity = policy.integrity;\n    script.onload = () => finish('load');\n    script.onerror = () => finish('error');\n    document.head.append(script);\n  });\n}\n\nexport async function loadVendor(policy: VendorPolicy): Promise<void> {\n  if (!policy.allowedRoutes.some((route) => route.test(location.pathname))) return;\n  if (remoteConfig.isDisabled(policy.killSwitchKey)) return;\n  if (policy.consentCategory && !consent.has(policy.consentCategory)) return;\n\n  const startedAt = performance.now();\n  try {\n    await appendGovernedScript(policy);\n    recordVendorMetric(policy.id, 'loaded', performance.now() - startedAt);\n  } catch (error) {\n    // remove() không thể hoàn tác code đã execute; kill switch phải chặn trước load.\n    recordVendorFailure(policy.id, error);\n    renderVendorFallback(policy.id);\n  }\n}\n\n// CI kiểm registry: owner, expiry review, CSP origins, consent và budget bắt buộc.",
+      "verification": [
+        "CSP/Trusted Types chạy report-only, dashboard violation theo owner rồi enforcement theo sản phẩm/cohort.",
+        "Synthetic và RUM đo vendor network/long tasks/INP/error/conversion; budget gate có exception expiry.",
+        "Game day tắt vendor checkout/analytics qua kill switch; assert fallback và thời gian propagation.",
+        "Quarterly recertification: business value, data flow, permissions, incidents, contract/SLA và xóa vendor không owner/không còn giá trị."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Có CSP, consent, async/defer/lazy load, monitoring và kill switch.",
+        "Gắn owner cho vendor.",
+        "Có fallback khi vendor lỗi."
+      ],
+      "strong": [
+        "Phân biệt CSP, Trusted Types, SRI và sandbox giải quyết threat nào/không giải quyết threat nào.",
+        "Thiết kế central registry/loader, policy-as-code, RUM attribution và report-only rollout.",
+        "Bao gồm privacy data inventory, recertification và exit plan."
+      ],
+      "exceptional": [
+        "Đưa governance thành operating model đa team với exception expiry, SLA, game day và business-cost decision.",
+        "Phân tích tag manager trust boundary, CSP bypass surface và vendor auto-update/SRI conflict.",
+        "Thiết kế isolation tiers và migration path theo capability thay vì one-size-fits-all."
+      ]
+    },
+    "references": [
+      {
+        "title": "W3C Content Security Policy Level 3",
+        "url": "https://w3c.github.io/webappsec-csp/"
+      },
+      {
+        "title": "W3C Trusted Types",
+        "url": "https://w3c.github.io/trusted-types/dist/spec/"
+      },
+      {
+        "title": "W3C Subresource Integrity",
+        "url": "https://w3c.github.io/webappsec-subresource-integrity/"
+      }
+    ],
+    "pitfalls": [
+      "Cho rằng async script không thể block interaction.",
+      "Cho toàn bộ vendor vào tag manager rồi gọi đó là governance.",
+      "Dùng CSP domain allowlist quá rộng và không kiểm template/dynamic injection.",
+      "Không có owner, inventory, kill switch, fallback hoặc removal plan."
+    ],
+    "followUpQuestions": [
+      "Tag manager cần dynamic loading: bạn giữ change control và CSP thế nào?",
+      "Vendor fraud detection là critical dependency nhưng p95 4 giây: circuit breaker/fallback policy là gì?",
+      "Làm sao quy đổi 80 ms INP cost và 2% conversion lift thành quyết định tiếp tục vendor?"
+    ]
+  }
+]

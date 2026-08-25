@@ -42,8 +42,8 @@ export function LearningStats() {
               <Flame className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Daily Streak</p>
-              <p className="text-xl font-extrabold text-foreground">
+              <p className="text-muted-foreground text-xs font-medium">Daily Streak</p>
+              <p className="text-foreground text-xl font-extrabold">
                 {displayStreak} Days
               </p>
             </div>
@@ -56,8 +56,8 @@ export function LearningStats() {
               <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Completed</p>
-              <p className="text-xl font-extrabold text-foreground">
+              <p className="text-muted-foreground text-xs font-medium">Completed</p>
+              <p className="text-foreground text-xl font-extrabold">
                 {completedCount}/{totalLessons}
               </p>
             </div>
@@ -70,20 +70,20 @@ export function LearningStats() {
               <Trophy className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Quizzes Passed</p>
-              <p className="text-xl font-extrabold text-foreground">{passedQuizCount}</p>
+              <p className="text-muted-foreground text-xs font-medium">Quizzes Passed</p>
+              <p className="text-foreground text-xl font-extrabold">{passedQuizCount}</p>
             </div>
           </div>
         </Card>
 
         <Card className="glass-card p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
               <BookOpen className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Mastery Level</p>
-              <p className="text-xl font-extrabold text-foreground">{progressPercent}%</p>
+              <p className="text-muted-foreground text-xs font-medium">Mastery Level</p>
+              <p className="text-foreground text-xl font-extrabold">{progressPercent}%</p>
             </div>
           </div>
         </Card>
@@ -93,7 +93,7 @@ export function LearningStats() {
       <Card className="glass-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex-1 space-y-1.5">
           <div className="flex items-center justify-between text-xs font-semibold">
-            <span className="text-foreground">Overall React 19 & Next.js 15 Mastery</span>
+            <span className="text-foreground">Overall React 19 & Next.js 16 Mastery</span>
             <span className="text-primary">{progressPercent}%</span>
           </div>
           <Progress value={progressPercent} />
@@ -108,7 +108,7 @@ export function LearningStats() {
                 resetProgress();
               }
             }}
-            className="self-end text-xs text-muted-foreground hover:text-destructive sm:self-center"
+            className="text-muted-foreground hover:text-destructive self-end text-xs sm:self-center"
           >
             <RotateCcw className="mr-1 h-3.5 w-3.5" />
             Reset

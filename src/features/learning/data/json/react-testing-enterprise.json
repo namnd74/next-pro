@@ -2,10 +2,10 @@
   "id": "track-react-testing-enterprise",
   "slug": "react-testing-enterprise-mastery",
   "title": "Enterprise React Testing & Production Readiness",
-  "description": "Bộ kỹ năng chuẩn Enterprise để tự tin bàn giao sản phẩm: Vitest & React Testing Library, Mock Service Worker (MSW), Testing Custom Hooks & Zustand và Accessibility (a11y).",
+  "description": "Chiến lược kiểm thử từ Vitest/RTL, MSW, hooks/store đến Playwright E2E, accessibility và error resilience.",
   "iconName": "Shield",
   "color": "from-purple-500 to-pink-600",
-  "totalLessons": 4,
+  "totalLessons": 5,
   "lessons": [
     {
       "id": "rte-01",
@@ -61,11 +61,11 @@
       "id": "rte-02",
       "slug": "mocking-network-msw-react-query",
       "title": "Mocking Tầng Mạng với MSW (Mock Service Worker)",
-      "summary": "Chặn bắt request mạng ở tầng Service Worker để kiểm thử các trạng thái Loading, Error, Empty và Success của React Query mà không cần bật backend thật.",
+      "summary": "Chặn request ở network boundary để kiểm thử Loading, Error, Empty và Success mà không cần bật backend thật.",
       "durationMinutes": 20,
       "level": "advanced",
       "tags": ["MSW", "Mock Service Worker", "Integration Testing", "TanStack Query"],
-      "mentalModel": "Thay vì mock hàm `fetch` hay `axios` bằng `vi.fn()` (dễ bị sót hoặc giả lập sai cấu trúc HTTP), MSW can thiệp ở tầng mạng trình duyệt (Network Layer) để trả về response chuẩn xác như một máy chủ API thật.",
+      "mentalModel": "Thay vì mock trực tiếp `fetch` hay `axios`, MSW tái sử dụng HTTP handlers ở network boundary: Service Worker trong browser và request interception với `setupServer` trong Node tests.",
       "keyPoints": [
         "MSW sử dụng các handler khai báo declarative: `http.get('/api/users', () => HttpResponse.json(...))`.",
         "Dễ dàng giả lập các mã lỗi HTTP thực tế: 401 Unauthorized, 403 Forbidden, 429 Rate Limit, 500 Server Error.",
@@ -77,7 +77,7 @@
           "language": "tsx",
           "beforeCode": "// ❌ Mock axios thủ công - khó kiểm soát các trường hợp lỗi mạng phức tạp\nvi.mock('axios');\naxios.get.mockResolvedValue({ data: [{ id: '1', name: 'Nam' }] });",
           "afterCode": "// ✅ Chuẩn MSW: Intercept tầng HTTP thực thụ\nimport { http, HttpResponse } from 'msw';\nimport { setupServer } from 'msw/node';\nimport { render, screen, waitFor } from '@testing-library/react';\nimport { UserList } from './UserList';\nimport { TestQueryClientProvider } from '@/test/test-utils';\n\nconst server = setupServer(\n  http.get('/api/users', () => {\n    return HttpResponse.json([{ id: '1', name: 'Nguyễn Văn Nam' }]);\n  })\n);\n\nbeforeAll(() => server.listen());\nafterEach(() => server.resetHandlers());\nafterAll(() => server.close());\n\ntest('hiển thị danh sách người dùng khi tải thành công', async () => {\n  render(\n    <TestQueryClientProvider>\n      <UserList />\n    </TestQueryClientProvider>\n  );\n\n  expect(screen.getByText(/đang tải.../i)).toBeInTheDocument();\n  expect(await screen.findByText('Nguyễn Văn Nam')).toBeInTheDocument();\n});",
-          "takeaway": "MSW chạy được trong cả Unit test (Node.js) lẫn Live Browser Development, tiết kiệm 80% thời gian viết mock data."
+          "takeaway": "MSW cho phép tái sử dụng HTTP handlers giữa Node tests và browser development, đồng thời giữ code ứng dụng độc lập với thư viện HTTP client."
         }
       ],
       "quizzes": [
@@ -118,7 +118,7 @@
       "mentalModel": "Custom Hooks không thể gọi trực tiếp như hàm JS thông thường vì chúng chứa logic React Hooks. Hàm `renderHook` bọc hook vào một component giả lập vô hình để bạn kiểm tra giá trị `result.current`.",
       "keyPoints": [
         "`renderHook(() => useCustomHook())` cung cấp biến `result.current` để đọc giá trị mới nhất của hook sau mỗi lần cập nhật.",
-        "Mọi hành động trigger thay đổi state trong hook (như gọi hàm callback) BẮT BUỘC phải được bọc bên trong `act(() => { ... })`.",
+        "Khi trực tiếp gọi callback làm đổi state của hook, bọc thao tác bằng `act`. Các tiện ích như `userEvent` và async query của Testing Library thường đã điều phối cập nhật; hãy `await` chúng thay vì bọc máy móc mọi dòng.",
         "Đối với Zustand Store, có thể test trực tiếp các action bằng cách gọi `useStore.getState().myAction()` mà không nhất thiết phải render component."
       ],
       "codeRecipes": [
@@ -127,7 +127,7 @@
           "language": "typescript",
           "beforeCode": "// ❌ Lỗi 'Invalid hook call' khi gọi hook như hàm thông thường\ntest('useCounter', () => {\n  const { count, increment } = useCounter(); // ❌ Báo lỗi vì nằm ngoài React Component!\n});",
           "afterCode": "// ✅ Dùng renderHook & act từ @testing-library/react\nimport { renderHook, act } from '@testing-library/react';\nimport { describe, it, expect } from 'vitest';\nimport { useCounter } from './useCounter';\n\ndescribe('useCounter', () => {\n  it('khởi tạo giá trị mặc định và tăng đếm chính xác', () => {\n    const { result } = renderHook(() => useCounter(10));\n\n    expect(result.current.count).toBe(10);\n\n    act(() => {\n      result.current.increment();\n    });\n\n    expect(result.current.count).toBe(11);\n  });\n});",
-          "takeaway": "renderHook giúp bạn kiểm thử độc lập 100% logic nghiệp vụ của Hook trước khi ghép vào giao diện UI."
+          "takeaway": "renderHook hữu ích cho hook có API riêng; nếu hành vi chỉ có ý nghĩa qua UI, ưu tiên test component sử dụng hook để có độ tin cậy cao hơn."
         }
       ],
       "quizzes": [
@@ -161,23 +161,23 @@
       "id": "rte-04",
       "slug": "accessibility-a11y-and-error-resilience",
       "title": "Accessibility (a11y) & Kiến Trúc Chịu Lỗi (Error Resilience)",
-      "summary": "Tối ưu khả năng tiếp cận WCAG với ARIA roles, điều hướng bàn phím hoàn hảo và thiết lập React Error Boundary đa tầng.",
+      "summary": "Cải thiện khả năng tiếp cận với semantic HTML, điều hướng bàn phím và thiết lập Error Boundary đa tầng.",
       "durationMinutes": 20,
       "level": "advanced",
       "tags": ["a11y", "Accessibility", "Error Boundary", "Production Ready"],
       "mentalModel": "Một ứng dụng cấp Enterprise không bao giờ để toàn bộ trang web bị trắng (White Screen of Death) khi một widget nhỏ gặp sự cố. Error Boundary cô lập lỗi và cung cấp giao diện phục hồi (Graceful Degradation).",
       "keyPoints": [
         "Tuân thủ nguyên tắc WCAG: độ tương phản màu sắc đạt chuẩn, luôn có `alt` cho hình ảnh và `aria-label` cho các icon buttons.",
-        "Đảm bảo toàn bộ tương tác có thể thực hiện 100% bằng bàn phím (Focus Trap trong Modal/Dialog, TabIndex, phím Escape để đóng).",
+        "Đảm bảo các tương tác chính dùng được bằng bàn phím: thứ tự focus hợp lý, focus trap/restore cho dialog và phím Escape để đóng khi phù hợp.",
         "Triển khai Error Boundary đa cấp (Global Error Boundary + Feature Widget Error Boundary) để người dùng có nút 'Thử lại' mà không mất toàn bộ dữ liệu form."
       ],
       "codeRecipes": [
         {
-          "title": "Thiết lập Modal chuẩn Accessibility (Focus Trap & ARIA) & Error Boundary",
+          "title": "Nền tảng Modal accessible với ARIA và phím Escape",
           "language": "tsx",
           "beforeCode": "// ❌ Thẻ div không thể bấm bằng bàn phím, thiếu ARIA attributes\n<div className=\"modal\" onClick={closeModal}>\n  <div className=\"btn-close\" onClick={closeModal}>X</div>\n  <p>Nội dung modal</p>\n</div>",
           "afterCode": "// ✅ Chuẩn Accessible Modal & Kháng lỗi\nimport React, { useEffect, useRef } from 'react';\n\ninterface AccessibleModalProps {\n  isOpen: boolean;\n  onClose: () => void;\n  title: string;\n  children: React.ReactNode;\n}\n\nexport function AccessibleModal({ isOpen, onClose, title, children }: AccessibleModalProps) {\n  const dialogRef = useRef<HTMLDivElement>(null);\n\n  useEffect(() => {\n    const handleKeyDown = (e: KeyboardEvent) => {\n      if (e.key === 'Escape') onClose();\n    };\n    if (isOpen) window.addEventListener('keydown', handleKeyDown);\n    return () => window.removeEventListener('keydown', handleKeyDown);\n  }, [isOpen, onClose]);\n\n  if (!isOpen) return null;\n\n  return (\n    <div\n      role=\"dialog\"\n      aria-modal=\"true\"\n      aria-labelledby=\"modal-title\"\n      className=\"fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm\"\n    >\n      <div ref={dialogRef} className=\"w-full max-w-lg rounded-2xl bg-card p-6 shadow-2xl\">\n        <h2 id=\"modal-title\" className=\"text-lg font-bold\">{title}</h2>\n        <div className=\"py-4\">{children}</div>\n        <button onClick={onClose} aria-label=\"Đóng hộp thoại\" className=\"mt-2 rounded-lg bg-primary px-4 py-2 text-primary-foreground\">\n          Đóng\n        </button>\n      </div>\n    </div>\n  );\n}",
-          "takeaway": "Ứng dụng đạt chuẩn Accessibility và Error Boundary là tiêu chí quyết định của lập trình viên mức độ Senior/Lead."
+          "takeaway": "Ví dụ mới bao phủ semantics và phím Escape, chưa phải dialog production hoàn chỉnh. Nên dùng native `<dialog>` hoặc thư viện đã kiểm thử để xử lý focus trap, restore focus và khóa nền."
         }
       ],
       "quizzes": [
@@ -204,6 +204,77 @@
           ],
           "correctAnswer": "B",
           "explanation": "Từ React 16 trở đi, các lỗi không được bắt (uncaught errors) trong render phase sẽ khiến toàn bộ cây React unmount hoàn toàn để tránh hiển thị dữ liệu sai lệch."
+        }
+      ]
+    },
+    {
+      "id": "rte-05",
+      "slug": "playwright-e2e-critical-user-journeys",
+      "title": "Playwright E2E: Kiểm Thử Critical User Journeys",
+      "summary": "Kiểm thử ứng dụng thật qua browser, tập trung vào các hành trình có giá trị cao thay vì lặp lại mọi unit test.",
+      "durationMinutes": 24,
+      "level": "advanced",
+      "tags": ["Playwright", "E2E", "Test Strategy", "Browser Testing"],
+      "mentalModel": "Unit test kiểm tra logic nhỏ nhanh; integration test kiểm tra nhiều module phối hợp; E2E kiểm tra hệ thống qua browser như người dùng. E2E đắt và chậm hơn nên dành cho critical journeys: đăng nhập, checkout, phân quyền và mutation quan trọng.",
+      "keyPoints": [
+        "Dùng locator theo role/label thay vì CSS implementation detail; Playwright tự chờ actionability nên tránh sleep cố định.",
+        "Mỗi test phải độc lập: tạo dữ liệu riêng qua fixture/API và dọn dẹp hoặc dùng tenant/test database cô lập.",
+        "Chờ kết quả người dùng nhìn thấy hoặc response cụ thể, không chờ timeout tùy ý.",
+        "Giữ ít E2E có giá trị cao, nhiều integration test cho nhánh lỗi; lưu trace/screenshot/video khi CI thất bại."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Khởi tạo Playwright cho Next.js",
+          "language": "bash",
+          "afterCode": "npm init playwright@latest\n\n# playwright.config.ts nên cấu hình webServer:\n# command: 'npm run dev'\n# url: 'http://127.0.0.1:3000'\n# reuseExistingServer: !process.env.CI\n\n# Chạy toàn bộ browser tests\nnpx playwright test\n\n# Mở trace của lần retry thất bại\nnpx playwright show-report",
+          "takeaway": "Để Playwright quản lý webServer và artifact giúp local/CI chạy cùng contract, tránh phụ thuộc server bật thủ công."
+        },
+        {
+          "title": "Lab 2 — E2E hành trình tạo project",
+          "language": "typescript",
+          "afterCode": "import { test, expect } from '@playwright/test';\n\ntest('người dùng tạo project và thấy project trong danh sách', async ({ page, request }) => {\n  const user = await createTestUser(request);\n  await loginAs(page, user);\n\n  await page.goto('/projects');\n  await page.getByRole('link', { name: 'Tạo project' }).click();\n  await page.getByLabel('Tên project').fill('Learning Platform');\n  await page.getByRole('button', { name: 'Lưu project' }).click();\n\n  await expect(page).toHaveURL(/\\/projects\\/[^/]+$/);\n  await expect(page.getByRole('heading', { name: 'Learning Platform' })).toBeVisible();\n});\n\ntest.afterEach(async ({ request }) => {\n  await cleanupTestData(request);\n});",
+          "takeaway": "Test quan sát outcome qua URL và accessible UI; helper API chỉ dùng để arrange/cleanup nhằm giữ test nhanh và độc lập."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rte-05-1",
+          "question": "Selector ưu tiên trong Playwright là gì?",
+          "options": [
+            { "key": "A", "text": "getByRole/getByLabel theo accessible UI" },
+            { "key": "B", "text": "CSS class sinh tự động" },
+            { "key": "C", "text": "XPath tuyệt đối" },
+            { "key": "D", "text": "nth-child cho mọi phần tử" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Accessible locators gần cách người dùng tương tác và ít vỡ khi refactor layout/CSS."
+        },
+        {
+          "id": "q-rte-05-2",
+          "question": "Test thỉnh thoảng fail nên thêm waitForTimeout(5000) ở mọi bước. Vì sao đây là anti-pattern?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Sleep làm test chậm và vẫn flaky; nên chờ locator/response hoặc assertion cụ thể"
+            },
+            { "key": "B", "text": "Playwright không hỗ trợ số" },
+            { "key": "C", "text": "Timeout xóa database" },
+            { "key": "D", "text": "CI không có clock" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Thời gian thực tế thay đổi; web-first assertions và auto-wait đồng bộ theo trạng thái có ý nghĩa."
+        },
+        {
+          "id": "q-rte-05-3",
+          "question": "Luồng nào xứng đáng ưu tiên E2E nhất?",
+          "options": [
+            { "key": "A", "text": "Mọi nhánh của hàm formatDate" },
+            { "key": "B", "text": "Đăng nhập → checkout → xác nhận đơn hàng" },
+            { "key": "C", "text": "Giá trị mặc định của một constant" },
+            { "key": "D", "text": "Từng utility function độc lập" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Critical journey xuyên nhiều lớp đem lại giá trị mà unit/integration test khó bao phủ trọn vẹn."
         }
       ]
     }

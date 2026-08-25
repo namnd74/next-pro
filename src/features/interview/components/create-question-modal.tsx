@@ -65,12 +65,12 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in-50">
+    <div className="animate-in fade-in-50 fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <Card className="glass-card max-h-[90vh] w-full max-w-2xl space-y-6 overflow-y-auto p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border/60 pb-4">
+        <div className="border-border/60 flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-2">
-            <PlusCircle className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-bold text-foreground">
+            <PlusCircle className="text-primary h-5 w-5" />
+            <h3 className="text-foreground text-lg font-bold">
               Soạn Câu Hỏi Phỏng Vấn Mới
             </h3>
           </div>
@@ -82,7 +82,7 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block font-semibold text-muted-foreground">
+              <label className="text-muted-foreground mb-1 block font-semibold">
                 Chủ đề (Category):
               </label>
               <Select
@@ -92,6 +92,10 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
                   { value: 'react-19', label: 'React 19 Core' },
                   { value: 'next-app-router', label: 'Next.js App Router' },
                   { value: 'javascript-typescript', label: 'JavaScript / TypeScript' },
+                  {
+                    value: 'browser-runtime-workers',
+                    label: 'Browser Runtime & Workers',
+                  },
                   { value: 'state-data', label: 'State & Data Query' },
                   { value: 'performance-optimization', label: 'Performance & Security' },
                   { value: 'frontend-system-design', label: 'System Design' },
@@ -100,7 +104,7 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-muted-foreground">
+              <label className="text-muted-foreground mb-1 block font-semibold">
                 Trình độ (Level):
               </label>
               <Select
@@ -117,7 +121,7 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-muted-foreground">
+            <label className="text-muted-foreground mb-1 block font-semibold">
               Câu hỏi phỏng vấn (*):
             </label>
             <input
@@ -126,12 +130,12 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
               placeholder="VD: Hãy giải thích cơ chế Hydration Mismatch trong Next.js App Router?"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
-              className="w-full rounded-xl border border-input bg-background p-2.5 font-medium"
+              className="border-input bg-background w-full rounded-xl border p-2.5 font-medium"
             />
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-muted-foreground">
+            <label className="text-muted-foreground mb-1 block font-semibold">
               Ý đồ tuyển dụng (Interviewer Intent):
             </label>
             <input
@@ -139,12 +143,12 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
               placeholder="VD: Kiểm tra mức độ am hiểu về SSR render cycle..."
               value={interviewerIntent}
               onChange={(e) => setInterviewerIntent(e.target.value)}
-              className="w-full rounded-xl border border-input bg-background p-2.5"
+              className="border-input bg-background w-full rounded-xl border p-2.5"
             />
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-muted-foreground">
+            <label className="text-muted-foreground mb-1 block font-semibold">
               Kịch bản / Scenario (Nếu có):
             </label>
             <input
@@ -152,12 +156,12 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
               placeholder="VD: Trang sản phẩm bị giật lag khi chuyển tab..."
               value={contextOrScenario}
               onChange={(e) => setContextOrScenario(e.target.value)}
-              className="w-full rounded-xl border border-input bg-background p-2.5"
+              className="border-input bg-background w-full rounded-xl border p-2.5"
             />
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-muted-foreground">
+            <label className="text-muted-foreground mb-1 block font-semibold">
               Từ khóa kỳ vọng (phẩy phân cách):
             </label>
             <input
@@ -165,18 +169,18 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
               placeholder="VD: hydration, SSR, window API, useEffect"
               value={keywordsText}
               onChange={(e) => setKeywordsText(e.target.value)}
-              className="w-full rounded-xl border border-input bg-background p-2.5"
+              className="border-input bg-background w-full rounded-xl border p-2.5"
             />
           </div>
 
-          <div className="space-y-2 border-t border-border/40 pt-2">
-            <span className="flex items-center gap-1 font-bold text-primary">
+          <div className="border-border/40 space-y-2 border-t pt-2">
+            <span className="text-primary flex items-center gap-1 font-bold">
               <Sparkles className="h-3.5 w-3.5" />
               Câu trả lời Senior chuẩn:
             </span>
 
             <div>
-              <label className="mb-1 block font-semibold text-muted-foreground">
+              <label className="text-muted-foreground mb-1 block font-semibold">
                 Tóm tắt 30 giây Pitch (*):
               </label>
               <textarea
@@ -185,12 +189,12 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
                 placeholder="Câu trả lời súc tích trong 30 giây..."
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
-                className="w-full rounded-xl border border-input bg-background p-2.5"
+                className="border-input bg-background w-full rounded-xl border p-2.5"
               />
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-muted-foreground">
+              <label className="text-muted-foreground mb-1 block font-semibold">
                 Phân tích sâu (Deep Dive):
               </label>
               <textarea
@@ -198,12 +202,12 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
                 placeholder="Đào sâu nguyên lý hoạt động bên dưới..."
                 value={deepDive}
                 onChange={(e) => setDeepDive(e.target.value)}
-                className="w-full rounded-xl border border-input bg-background p-2.5"
+                className="border-input bg-background w-full rounded-xl border p-2.5"
               />
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-muted-foreground">
+              <label className="text-muted-foreground mb-1 block font-semibold">
                 Mã nguồn ví dụ (Code Example TSX):
               </label>
               <textarea
@@ -211,13 +215,13 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
                 placeholder="// Viết code minh họa..."
                 value={codeExample}
                 onChange={(e) => setCodeExample(e.target.value)}
-                className="w-full rounded-xl border border-input bg-background p-2.5 font-mono"
+                className="border-input bg-background w-full rounded-xl border p-2.5 font-mono"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-muted-foreground">
+            <label className="text-muted-foreground mb-1 block font-semibold">
               Các bẫy / sai lầm thường gặp (mỗi dòng 1 bẫy):
             </label>
             <textarea
@@ -225,11 +229,11 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
               placeholder="- Nhầm lẫn giữa SSR và Hydration&#10;- Gọi window ở top level"
               value={pitfallsText}
               onChange={(e) => setPitfallsText(e.target.value)}
-              className="w-full rounded-xl border border-input bg-background p-2.5"
+              className="border-input bg-background w-full rounded-xl border p-2.5"
             />
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-border/60 pt-3">
+          <div className="border-border/60 flex justify-end gap-2 border-t pt-3">
             <Button type="button" variant="outline" onClick={onClose}>
               Hủy
             </Button>

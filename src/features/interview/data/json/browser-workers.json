@@ -1,0 +1,319 @@
+[
+  {
+    "id": "worker-hard-01",
+    "category": "browser-runtime-workers",
+    "level": "senior",
+    "question": "Bạn sẽ quyết định khi nào chuyển computation sang Web Worker? Phân tích startup, message passing, structured clone, Transferable, progress và cách hủy task cũ thật sự.",
+    "interviewerIntent": "Kiểm tra ứng viên có tối ưu main thread dựa trên measurement và thiết kế protocol/lifecycle hoàn chỉnh thay vì chỉ biết new Worker/postMessage.",
+    "contextOrScenario": "Ứng dụng phân tích file 150 MB. Sau khi chuyển nguyên object graph sang Worker, main thread bớt block nhưng tổng thời gian lâu hơn, peak memory tăng gần gấp đôi và nút Cancel không có tác dụng cho đến khi parse xong.",
+    "expectedKeywords": [
+      "structured clone",
+      "Transferable",
+      "task protocol",
+      "cooperative cancellation",
+      "worker pool",
+      "INP"
+    ],
+    "seniorAnswer": {
+      "summary": "Worker phù hợp khi CPU work trên main thread tạo long task đủ lớn để bù startup và communication cost. postMessage clone dữ liệu theo structured clone trừ các object nằm trong transfer list; transfer ArrayBuffer chuyển ownership và detach buffer phía gửi. Tôi dùng protocol có taskId, progress, result/error/cancel, tái sử dụng Worker, chặn stale result và để worker yield theo chunk để nhận cancel message.",
+      "mentalModel": "Worker là một agent có realm và event loop riêng, không phải một async function chạy miễn phí. Main thread và worker phối hợp bằng message; do đó performance bằng computation saved trừ startup + serialization/transfer orchestration + merge result. Cancellation cũng là message, nên worker đang chạy vòng lặp đồng bộ dài sẽ chưa đọc được cancel.",
+      "reasoningSteps": [
+        "Profile main thread để định lượng long-task duration, input delay và phần thuật toán CPU-bound; network wait không nhanh hơn chỉ vì nằm trong Worker.",
+        "Đo payload. Chuyển dữ liệu về representation phẳng như ArrayBuffer/TypedArray; dùng transfer list khi main thread không cần ownership cũ. Không gửi object graph 150 MB hai chiều.",
+        "Thiết kế discriminated-union protocol với taskId. Client giữ pending map, validate message, reject khi worker error và ignore result của task đã supersede.",
+        "Cancellation là cooperative: main gửi cancel; worker chia computation thành chunk và yield sang event loop để cancel message được dispatch. Nếu task cô lập và cần dừng ngay, terminate Worker rồi tái tạo, chấp nhận mất mọi state trong worker.",
+        "Benchmark end-to-end trên thiết bị mục tiêu: INP/long task, total completion, peak memory, time-to-first-progress và cancellation latency."
+      ],
+      "deepDive": "Dedicated Worker giao tiếp qua implicit MessagePort. Structured clone giữ được nhiều structured types nhưng function, DOM node và một số exotic object không serializable. Clone object graph lớn dùng CPU ở cả hai phía và tăng peak memory. Transferable object được tái tạo ở receiving realm và resource phía gửi bị detached; với ArrayBuffer, byteLength phía gửi trở thành 0. Đây là ownership transfer, không phải shared memory.\n\nMột AbortSignal không nên được giả định là cancellation channel xuyên Worker. Protocol gửi `{type:'cancel', taskId}` rõ ràng và worker lưu cancelled IDs. Nhưng message handler chỉ chạy khi worker event loop có cơ hội lấy task mới. Vì vậy parser phải chunk rồi `await` một task boundary; `await Promise.resolve()` chỉ tạo microtask và vẫn có thể không cho message task chạy.\n\nWorker pool hợp lý khi task lặp lại và startup/module load đáng kể, nhưng pool quá lớn tranh CPU/memory, đặc biệt trên mobile. Queue cần bound và policy supersede/drop. Nếu kết quả cũng lớn, cân nhắc transfer buffer trở lại hoặc stream aggregate nhỏ thay vì dựng object graph lớn.",
+      "tradeoffs": [
+        "Structured clone đơn giản và giữ ownership hai phía nhưng tốn CPU/memory theo payload; transfer nhanh hơn nhưng phía gửi mất buffer.",
+        "Dedicated Worker cô lập lifecycle theo feature; pool giảm startup nhưng cần queue, health check và backpressure.",
+        "Cooperative cancel giữ worker sống nhưng cancellation latency phụ thuộc chunk; terminate dừng mạnh nhưng mất cache/state và tốn recreate.",
+        "Progress update dày tạo message overhead và main-thread rerender; nên throttle/coalesce theo cadence UI."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "// protocol.ts\ntype WorkerRequest =\n  | { type: 'parse'; taskId: string; buffer: ArrayBuffer }\n  | { type: 'cancel'; taskId: string };\n\ntype WorkerResponse =\n  | { type: 'progress'; taskId: string; processed: number; total: number }\n  | { type: 'success'; taskId: string; result: ParsedSummary }\n  | { type: 'cancelled'; taskId: string }\n  | { type: 'error'; taskId: string; message: string };\n\n// parser-client.ts\nexport class ParserClient {\n  private worker = this.createWorker();\n  private activeTaskId?: string;\n\n  private createWorker() {\n    const worker = new Worker(new URL('./parser.worker.ts', import.meta.url), {\n      type: 'module',\n      name: 'file-parser',\n    });\n    worker.addEventListener('error', (event) => reportWorkerCrash(event.message));\n    return worker;\n  }\n\n  parse(buffer: ArrayBuffer, signal: AbortSignal): Promise<ParsedSummary> {\n    const taskId = crypto.randomUUID();\n    this.activeTaskId = taskId;\n\n    return new Promise((resolve, reject) => {\n      const cleanup = () => {\n        signal.removeEventListener('abort', abort);\n        this.worker.removeEventListener('message', receive);\n      };\n      const abort = () => {\n        this.worker.postMessage({ type: 'cancel', taskId } satisfies WorkerRequest);\n        cleanup();\n        reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));\n      };\n      const receive = (event: MessageEvent<WorkerResponse>) => {\n        const message = event.data;\n        if (message.taskId !== taskId) return;\n        if (message.type === 'progress') {\n          reportProgress(message.processed / message.total);\n          return;\n        }\n        cleanup();\n        if (this.activeTaskId !== taskId) return reject(new Error('Stale task'));\n        if (message.type === 'success') resolve(message.result);\n        else if (message.type === 'error') reject(new Error(message.message));\n        else reject(new DOMException('Cancelled', 'AbortError'));\n      };\n\n      signal.addEventListener('abort', abort, { once: true });\n      this.worker.addEventListener('message', receive);\n      this.worker.postMessage({ type: 'parse', taskId, buffer } satisfies WorkerRequest, [buffer]);\n      // buffer đã detached tại đây; caller không được tái sử dụng.\n    });\n  }\n\n  dispose() { this.worker.terminate(); }\n}\n\n// parser.worker.ts\nconst cancelled = new Set<string>();\nself.addEventListener('message', async (event: MessageEvent<WorkerRequest>) => {\n  const request = event.data;\n  if (request.type === 'cancel') { cancelled.add(request.taskId); return; }\n\n  try {\n    const bytes = new Uint8Array(request.buffer);\n    const result = createAccumulator();\n    for (let offset = 0; offset < bytes.length; offset += 64_000) {\n      if (cancelled.delete(request.taskId)) {\n        postMessage({ type: 'cancelled', taskId: request.taskId } satisfies WorkerResponse);\n        return;\n      }\n      parseChunk(bytes.subarray(offset, offset + 64_000), result);\n      if (offset % 640_000 === 0) {\n        postMessage({ type: 'progress', taskId: request.taskId, processed: offset, total: bytes.length } satisfies WorkerResponse);\n        await new Promise((resolve) => setTimeout(resolve, 0));\n      }\n    }\n    postMessage({ type: 'success', taskId: request.taskId, result: finish(result) } satisfies WorkerResponse);\n  } catch (error) {\n    postMessage({ type: 'error', taskId: request.taskId, message: error instanceof Error ? error.message : 'Unknown error' } satisfies WorkerResponse);\n  } finally {\n    cancelled.delete(request.taskId);\n  }\n});",
+      "verification": [
+        "Benchmark clone và transfer riêng với payload production; assert buffer phía gửi bị detach để bắt accidental reuse.",
+        "Test cancel giữa chunk và đo cancellation latency; test stale task không commit sau task mới.",
+        "Simulate worker error/messageerror và bảo đảm pending promise reject, UI có retry/fallback và worker được tái tạo nếu policy yêu cầu.",
+        "Theo dõi main-thread long tasks, total parse time, peak memory, queue depth và worker crash rate theo device class."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Biết Worker không truy cập DOM và postMessage dùng structured clone.",
+        "Nêu Transferable ArrayBuffer tránh copy và làm buffer phía gửi unusable.",
+        "Có taskId và cancellation."
+      ],
+      "strong": [
+        "Nhận ra cancel message không được xử lý trong vòng lặp đồng bộ không yield.",
+        "Thiết kế protocol đầy đủ, stale-result guard, cleanup và worker error path.",
+        "Đo end-to-end thay vì chỉ thời gian computation."
+      ],
+      "exceptional": [
+        "Thiết kế bounded pool/backpressure, transfer kết quả lớn và progressive output.",
+        "Đưa ra threshold/migration dựa trên device cohorts và RUM.",
+        "Xét CSP, module-worker deployment, worker crash recovery và ownership contract xuyên API."
+      ]
+    },
+    "references": [
+      {
+        "title": "HTML Standard — Web workers",
+        "url": "https://html.spec.whatwg.org/multipage/workers.html"
+      },
+      {
+        "title": "HTML Standard — Transferable objects and structured clone",
+        "url": "https://html.spec.whatwg.org/multipage/structured-data.html#transferable-objects"
+      }
+    ],
+    "pitfalls": [
+      "Chuyển task nhỏ sang Worker và bỏ qua startup/communication overhead.",
+      "Clone hàng trăm MB mỗi chiều rồi kết luận Worker chậm.",
+      "Gửi cancel nhưng worker chạy loop đồng bộ không bao giờ yield để nhận message.",
+      "Tạo Worker mới cho từng click và không terminate/reuse."
+    ],
+    "followUpQuestions": [
+      "Bạn áp dụng backpressure khi producer tạo task nhanh hơn worker xử lý thế nào?",
+      "Khi nào SharedWorker phù hợp hơn Dedicated Worker?",
+      "Nếu kết quả là ArrayBuffer 100 MB, bạn trả về main thread và render incremental thế nào?"
+    ]
+  },
+  {
+    "id": "worker-hard-02",
+    "category": "browser-runtime-workers",
+    "level": "lead",
+    "question": "Thiết kế xử lý song song bằng SharedArrayBuffer và Atomics. Bạn ngăn data race, lost wake-up và false sharing thế nào, đồng thời đáp ứng cross-origin isolation?",
+    "interviewerIntent": "Đánh giá kiến thức concurrency thực sự, memory model, deployment security boundary và khả năng nhận ra lúc message passing an toàn hơn.",
+    "contextOrScenario": "Engine xử lý ảnh muốn nhiều Worker cùng đọc/ghi buffer để tránh copy. Prototype nhanh nhưng đôi lúc sai kết quả; SharedArrayBuffer lại không được expose trên production.",
+    "expectedKeywords": [
+      "SharedArrayBuffer",
+      "Atomics",
+      "data race freedom",
+      "compareExchange",
+      "COOP",
+      "COEP"
+    ],
+    "seniorAnswer": {
+      "summary": "SharedArrayBuffer chia sẻ backing memory thật giữa agents; regular reads/writes có thể race, còn Atomics cung cấp sequentially consistent atomic operations trên typed-array phù hợp. Tôi ưu tiên partition output để mỗi worker có vùng ghi riêng và chỉ dùng atomic control words để claim/publish. Trên web phải kiểm tra crossOriginIsolated và triển khai COOP/COEP; nếu hệ sinh thái iframe/CDN không tương thích, dùng Transferable/message passing.",
+      "mentalModel": "Tách data plane và control plane. Data plane được partition để không có hai writer trên cùng byte; control plane là một vùng Int32Array nhỏ dùng Atomics để claim work, publish state và wait/notify. State là nguồn sự thật; notify chỉ đánh thức waiter, không tự mang dữ liệu hay bảo đảm điều kiện vẫn đúng.",
+      "reasoningSteps": [
+        "Đo copy/transfer cost trước; chỉ chọn shared memory khi bottleneck thực sự là ownership/communication chứ không phải thuật toán.",
+        "Thiết kế layout nhị phân có version, alignment và ownership từng range. Tránh atomic và non-atomic access race trên cùng location.",
+        "Dùng Atomics.add/compareExchange để claim index duy nhất; worker ghi range riêng rồi Atomics.store/add để publish completion.",
+        "Wait luôn nằm trong loop kiểm tra predicate: đọc state → nếu chưa thỏa mới wait → khi thức dậy đọc lại. Điều này chịu được notify trước/sau wait và spurious timing ở tầng ứng dụng.",
+        "Kiểm kê deployment: top-level COOP, COEP, CORP/CORS của subresources, iframe/third-party. Feature-detect crossOriginIsolated và có fallback."
+      ],
+      "deepDive": "ECMAScript memory model khuyến nghị chương trình data-race-free. Atomic operations có thứ tự sequentially consistent, nhưng điều đó không tự làm toàn bộ buffer an toàn: non-atomic accesses race vẫn có ordering khó suy luận. Pattern dễ kiểm chứng nhất là immutable shared input hoặc partition output, với atomic counter làm scheduler.\n\nAtomics.wait chỉ dùng với Int32Array/BigInt64Array backed by SharedArrayBuffer và blocking wait không được dùng trên browser main thread; nó phù hợp trong Worker. Atomics.waitAsync có contract async khác và vẫn phải kiểm tra predicate. False sharing xảy ra khi control words nóng của nhiều worker nằm cùng cache line, gây cache coherence traffic dù logic không chia sẻ; padding/alignment hoặc giảm số atomic updates có thể giúp, nhưng phải benchmark.\n\nSharedArrayBuffer trên web gắn với cross-origin isolation để giảm lớp tấn công side-channel. Thường cần Cross-Origin-Opener-Policy: same-origin cùng Cross-Origin-Embedder-Policy: require-corp hoặc credentialless tùy kiến trúc, và mọi tài nguyên nhúng phải đáp ứng. Đây là thay đổi platform có thể làm vỡ popup/iframe/vendor; không phải một flag frontend cục bộ.",
+      "tradeoffs": [
+        "Shared memory giảm copy nhưng tăng độ khó correctness, security headers và debug; transfer ownership thường đơn giản hơn.",
+        "Atomic per item dễ viết nhưng tạo contention; claim một batch giảm atomic traffic nhưng tăng tail imbalance/cancel latency.",
+        "COEP require-corp kiểm soát resource rõ nhưng đòi vendor header/CORS; credentialless thay credential semantics và phải review kỹ.",
+        "Nhiều worker tăng parallelism đến giới hạn CPU/memory bandwidth; sau đó chỉ tăng context switching và thermal throttling."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "// Layout control Int32Array:\n// [0] nextTile, [1] completedTiles, [2] cancelled\nconst NEXT_TILE = 0;\nconst COMPLETED = 1;\nconst CANCELLED = 2;\n\ntype SharedJob = {\n  control: SharedArrayBuffer;\n  input: SharedArrayBuffer;   // immutable sau khi publish\n  output: SharedArrayBuffer;  // mỗi tile có một writer duy nhất\n  totalTiles: number;\n  tileBytes: number;\n};\n\nfunction runWorker(job: SharedJob) {\n  const control = new Int32Array(job.control);\n  const input = new Uint8Array(job.input);\n  const output = new Uint8Array(job.output);\n\n  while (Atomics.load(control, CANCELLED) === 0) {\n    const tile = Atomics.add(control, NEXT_TILE, 1);\n    if (tile >= job.totalTiles) break;\n\n    const start = tile * job.tileBytes;\n    const end = Math.min(start + job.tileBytes, input.length);\n    processTile(input.subarray(start, end), output.subarray(start, end));\n\n    // Publish completion sau khi tile đã ghi xong.\n    Atomics.add(control, COMPLETED, 1);\n    Atomics.notify(control, COMPLETED, 1);\n  }\n}\n\n// Coordinator chạy trong Worker, không block browser main thread.\nfunction waitUntilComplete(controlBuffer: SharedArrayBuffer, total: number) {\n  const control = new Int32Array(controlBuffer);\n  while (true) {\n    const observed = Atomics.load(control, COMPLETED);\n    if (observed >= total || Atomics.load(control, CANCELLED) === 1) return;\n    Atomics.wait(control, COMPLETED, observed, 1_000);\n  }\n}\n\nif (!globalThis.crossOriginIsolated) {\n  // Fallback: partition ArrayBuffer rồi transfer từng partition cho worker.\n  runWithTransferableBuffers();\n}",
+      "verification": [
+        "Stress test cùng seed hàng nghìn lần, so byte-for-byte với single-thread reference implementation.",
+        "Chạy ThreadSanitizer không có cho JS browser theo cách trực tiếp, nên protocol phải giảm race by construction và có invariant assertions/counters.",
+        "Benchmark 1..N workers theo throughput, p95 latency, atomic contention và memory bandwidth trên device cohorts.",
+        "Deploy COOP/COEP ở report/canary environment, inventory cross-origin resources và test popup/iframe/auth flows trước enforcement."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Biết SharedArrayBuffer là shared memory và Atomics cần cho coordination.",
+        "Nêu cross-origin isolation/COOP/COEP.",
+        "Không dùng Atomics.wait trên browser main thread."
+      ],
+      "strong": [
+        "Tách data/control plane, partition writer và tạo chương trình data-race-free by construction.",
+        "Giải thích predicate loop cho wait/notify và atomic claim/publish.",
+        "Có fallback Transferable cùng test reference implementation."
+      ],
+      "exceptional": [
+        "Phân tích false sharing, batch claiming, memory bandwidth và worker-count tuning.",
+        "Đánh giá blast radius COOP/COEP lên popup, iframe, CDN/vendor và rollout strategy.",
+        "Thiết kế binary layout versioning, crash recovery và observability cho worker pool."
+      ]
+    },
+    "references": [
+      {
+        "title": "ECMAScript — Shared Memory Guidelines",
+        "url": "https://tc39.es/ecma262/multipage/memory-model.html#sec-shared-memory-guidelines"
+      },
+      {
+        "title": "ECMAScript — Atomics wait/notify",
+        "url": "https://tc39.es/ecma262/multipage/structured-data.html#sec-atomics-object"
+      },
+      {
+        "title": "HTML Standard — Cross-origin isolated capability",
+        "url": "https://html.spec.whatwg.org/multipage/browsers.html#cross-origin-isolated"
+      }
+    ],
+    "pitfalls": [
+      "Đọc/ghi shared typed array tùy ý rồi giả định CPU tuần tự nhất quán.",
+      "Dùng Atomics cho từng pixel và tạo contention lớn hơn lợi ích song song.",
+      "Coi notify như message chứa state và không kiểm tra lại predicate.",
+      "Bật COOP/COEP mà không kiểm kê iframe, popup auth, CDN và third-party resources."
+    ],
+    "followUpQuestions": [
+      "Nếu một Worker chết sau khi claim tile nhưng trước publish, coordinator phục hồi thế nào?",
+      "Bạn chọn tile size dựa trên cache locality và load balancing ra sao?",
+      "GitHub Pages không tùy biến response header linh hoạt thì kiến trúc deployment thay đổi thế nào?"
+    ]
+  },
+  {
+    "id": "sw-hard-01",
+    "category": "browser-runtime-workers",
+    "level": "senior",
+    "question": "Giải thích vòng đời install → waiting → activate của Service Worker và thiết kế rollout sao cho không trộn HTML cũ với asset/API contract mới.",
+    "interviewerIntent": "Kiểm tra hiểu biết update lifecycle, version skew, cache ownership và rủi ro thực của skipWaiting/clients.claim.",
+    "contextOrScenario": "Sau deploy, tab đang mở chạy app shell v41 nhưng Service Worker v42 bắt đầu intercept request. Cache v41 bị xóa, chunk cũ trả 404 và người dùng thấy màn hình trắng.",
+    "expectedKeywords": [
+      "install",
+      "waiting",
+      "activate",
+      "skipWaiting",
+      "clients.claim",
+      "compatibility window"
+    ],
+    "seniorAnswer": {
+      "summary": "Worker mới install rồi thường ở waiting cho đến khi worker active cũ không còn client. skipWaiting cho phép activate dù client cũ còn mở; clients.claim có thể điều khiển client chưa qua navigation. Hai API này tăng tốc update nhưng tạo version skew. Tôi dùng content-hashed assets, giữ compatibility window của cache/API, thông báo update-ready và chỉ kích hoạt/reload ở safe point.",
+      "mentalModel": "Một document và Service Worker controller có lifecycle độc lập. Deploy file mới không đồng nghĩa mọi tab chuyển phiên bản cùng lúc. Hãy xem rollout như distributed version negotiation giữa page, active worker, waiting worker, cache và backend contract.",
+      "reasoningSteps": [
+        "Asset build phải immutable/content-hashed; HTML/manifest có freshness policy khác asset và không trỏ tới chunk đã bị xóa ngay.",
+        "Install precache shell tối thiểu vào cache version mới. Nếu resource bắt buộc thiếu, install reject để worker cũ tiếp tục phục vụ.",
+        "Không auto skipWaiting. Page phát hiện waiting worker, hiển thị update-ready; lưu draft/kiểm tra safe point rồi gửi message kích hoạt.",
+        "Activate dọn cache ngoài compatibility window, không xóa cache mà client cũ còn cần. API giữ backward compatibility ít nhất trong rollout window.",
+        "Page lắng controllerchange và reload đúng một lần; có kill switch/recovery path nếu worker mới gây boot loop."
+      ],
+      "deepDive": "Service Worker registration có installing, waiting và active worker. Mặc định worker mới không thay active worker đang kiểm soát client; khi client cũ đóng, activation được thử. `skipWaiting()` đặt flag cho phép tiến tới active sớm. `clients.claim()` làm active worker nhận control của matching uncontrolled clients. Cả hai đều hợp lệ nhưng không bảo đảm page code và worker code cùng build.\n\nCache Storage không tự version hay tự xóa. Cache name và manifest thuộc application protocol. Nếu activate xóa tất cả cache cũ trong khi v41 client vẫn request chunk v41, lỗi là do chiến lược cache. Nên giữ current + previous hoặc reference-count/TTL phù hợp, asset URL content-hashed và CDN giữ asset trong compatibility window.\n\nRollback Service Worker khó hơn rollback HTML vì worker lỗi đã nằm trong browser và có thể intercept request rollback. Recovery cần worker release có version cao hơn hoặc stable rescue script/route không bị cache sai. Telemetry phải gắn pageVersion, workerVersion và controller state để nhận ra version skew.",
+      "tradeoffs": [
+        "Immediate activation vá security nhanh nhưng tăng rủi ro page/worker mismatch; prompt update an toàn hơn nhưng kéo dài thời gian worker cũ tồn tại.",
+        "Giữ cache N-1 tăng storage nhưng bảo vệ tab dài; xóa sớm tiết kiệm storage nhưng tăng chunk 404.",
+        "clients.claim giảm thời gian uncontrolled nhưng có thể thay fetch behavior giữa session; navigation-only control dễ suy luận hơn.",
+        "Cache-first shell tăng offline availability nhưng dễ stale HTML; network-first/navigation preload cần fallback và timeout."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "// sw.ts\nconst VERSION = 'v42';\nconst SHELL_CACHE = `shell-${VERSION}`;\nconst COMPATIBLE_CACHES = new Set(['shell-v41', SHELL_CACHE]);\n\nself.addEventListener('install', (event: ExtendableEvent) => {\n  event.waitUntil(\n    caches.open(SHELL_CACHE).then((cache) => cache.addAll(PRECACHE_URLS))\n  );\n  // Không gọi skipWaiting tự động.\n});\n\nself.addEventListener('message', (event: ExtendableMessageEvent) => {\n  if (event.data?.type === 'ACTIVATE_UPDATE') {\n    event.waitUntil(self.skipWaiting());\n  }\n});\n\nself.addEventListener('activate', (event: ExtendableEvent) => {\n  event.waitUntil((async () => {\n    for (const cacheName of await caches.keys()) {\n      if (cacheName.startsWith('shell-') && !COMPATIBLE_CACHES.has(cacheName)) {\n        await caches.delete(cacheName);\n      }\n    }\n    // Chỉ claim nếu page/worker protocol hỗ trợ mixed-version clients.\n    await self.clients.claim();\n  })());\n});\n\n// update-coordinator.ts trong page\nlet reloading = false;\nnavigator.serviceWorker.addEventListener('controllerchange', () => {\n  if (reloading) return;\n  reloading = true;\n  window.location.reload();\n});\n\nexport async function activateWaitingWorker(registration: ServiceWorkerRegistration) {\n  await persistUnsavedDrafts();\n  registration.waiting?.postMessage({ type: 'ACTIVATE_UPDATE' });\n}",
+      "verification": [
+        "E2E giữ tab v41 mở, deploy v42, thao tác trước/sau activate và assert không chunk 404 hoặc mất draft.",
+        "Test update khi install precache fail; worker v41 phải tiếp tục active.",
+        "Telemetry pageVersion × workerVersion × cache hit/miss × chunk-load-error để phát hiện skew.",
+        "Canary worker rollout và có rescue release/kill switch; test rollback khi v42 fetch handler ném lỗi."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Mô tả được install, waiting, activate và worker cũ còn control tab.",
+        "Biết skipWaiting/clients.claim không phải lúc nào cũng nên gọi.",
+        "Dùng versioned cache và content-hashed assets."
+      ],
+      "strong": [
+        "Thiết kế update-ready handshake, safe reload và compatibility window cho cache/API.",
+        "Nêu rollback khác website thông thường và cần telemetry page/worker version.",
+        "Test mixed-version client cùng install failure."
+      ],
+      "exceptional": [
+        "Thiết kế rescue path, canary/kill switch và cache cleanup dựa trên protocol thay vì delete all.",
+        "Cân bằng security emergency activation với unsaved state/version skew.",
+        "Đưa governance CDN asset retention và backend compatibility vào rollout contract."
+      ]
+    },
+    "references": [
+      {
+        "title": "Service Workers specification — lifecycle, skipWaiting and clients.claim",
+        "url": "https://w3c.github.io/ServiceWorker/"
+      }
+    ],
+    "pitfalls": [
+      "Luôn gọi skipWaiting và clients.claim mà không xét document cũ.",
+      "Xóa toàn bộ cache cũ trong activate.",
+      "Cache HTML cache-first vô hạn trong khi asset manifest thay đổi.",
+      "Giả định rollback hosting tự loại worker lỗi khỏi browser."
+    ],
+    "followUpQuestions": [
+      "Security hotfix buộc activate ngay: bạn giảm rủi ro mất draft và mismatch thế nào?",
+      "Chunk load error recovery cần tránh reload loop ra sao?",
+      "Nếu storage quota thấp, bạn giữ compatibility cache theo policy nào?"
+    ]
+  },
+  {
+    "id": "sw-hard-02",
+    "category": "browser-runtime-workers",
+    "level": "lead",
+    "question": "Thiết kế offline-first cho mutation: queue ở đâu, đảm bảo idempotency và ordering thế nào, xử lý conflict ra sao khi Service Worker có thể bị dừng bất kỳ lúc nào?",
+    "interviewerIntent": "Đánh giá thiết kế distributed state giữa UI, Service Worker và server; ứng viên phải nhận ra exactly-once delivery không thể suy ra từ client retry.",
+    "contextOrScenario": "Nhân viên hiện trường sửa cùng hồ sơ trên nhiều thiết bị khi mất mạng. Khi online lại, mutation gửi lặp, sai thứ tự và ghi đè dữ liệu mới hơn từ thiết bị khác.",
+    "expectedKeywords": [
+      "IndexedDB outbox",
+      "at-least-once",
+      "idempotency key",
+      "lease",
+      "base version",
+      "conflict resolution"
+    ],
+    "seniorAnswer": {
+      "summary": "Service Worker là executor tạm thời, không phải nơi lưu queue trong memory. UI ghi local projection và outbox command bền vững trong IndexedDB; mỗi command có operationId, entityId, baseVersion và ordering key. Delivery là at-least-once, server dedupe bằng idempotency key và kiểm tra optimistic concurrency. Conflict trở thành state hiển thị cho người dùng hoặc merge theo domain, không dùng last-write-wins mặc định.",
+      "mentalModel": "Dùng transactional outbox ở client: local state và intent gửi server được ghi cùng một local transaction. Executor có thể crash ở mọi điểm, nên mọi bước phải replay-safe. 'Response bị mất' không cho biết server đã commit hay chưa; operationId là cầu nối để retry nhận cùng kết quả.",
+      "reasoningSteps": [
+        "Định nghĩa command domain và conflict semantics trước: operation nào commutative, operation nào cần strict order, field nào merge được.",
+        "Trong một IndexedDB transaction, cập nhật optimistic local projection và thêm outbox record pending với operationId/baseVersion.",
+        "Drain queue theo entity/order key. Claim record bằng lease có expiresAt; crash làm lease hết hạn và worker sau retry lại.",
+        "Server lưu idempotency result theo operationId và dùng version/ETag. Duplicate trả cùng kết quả; version mismatch trả conflict payload có server state/version.",
+        "UI reconcile ack hoặc đánh dấu conflicted. Background Sync chỉ trigger opportunistic; app foreground/online event cũng drain và metrics theo oldest-pending age."
+      ],
+      "deepDive": "Không thể đạt exactly-once end-to-end chỉ bằng network: client có thể gửi request, server commit, rồi connection mất trước response. Retry tạo duplicate trừ khi server dedupe. Vì vậy contract thực tế là at-least-once delivery + idempotent processing, hoặc operation semantics tự idempotent.\n\nOrdering toàn cục làm giảm throughput và dễ head-of-line blocking. Thường chỉ cần order theo entity hoặc causal dependency. Command B phụ thuộc A phải ghi dependency/sequence; command độc lập có thể song song. Lease tránh hai executor gửi cùng record thường xuyên nhưng không thay idempotency vì split brain/crash vẫn có thể duplicate.\n\nCache API lưu Request/Response, không phù hợp outbox cần index, transaction và state machine; IndexedDB phù hợp hơn. Service Worker có thể bị user agent terminate khi không xử lý event; `event.waitUntil()` kéo dài lifetime cho promise event hiện tại nhưng không biến worker thành daemon. Authentication phải dựa vào server-valid session/cookie; không lưu refresh token đọc được bởi JS chỉ để background sync. Khi auth hết hạn, queue chuyển blocked-auth và UI yêu cầu re-auth.",
+      "tradeoffs": [
+        "Optimistic UI tăng khả năng offline nhưng cần pending/conflict UX; pessimistic UI đơn giản hơn nhưng không đáp ứng field work mất mạng.",
+        "Order theo entity giữ causal correctness và throughput; global order dễ hiểu nhưng tạo bottleneck.",
+        "Automatic merge tốt cho counter/set/CRDT-like domain; manual conflict an toàn hơn cho nội dung không merge đáng tin.",
+        "Giữ outbox lâu tăng recoverability nhưng cần quota, encryption/data minimization và retention policy."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "type OutboxCommand = {\n  operationId: string;\n  entityId: string;\n  sequence: number;\n  baseVersion: number;\n  payload: UpdatePayload;\n  status: 'pending' | 'sending' | 'conflicted' | 'blocked-auth';\n  leaseUntil?: number;\n  attempts: number;\n  retryAt: number;\n};\n\nexport async function editOffline(entityId: string, patch: UpdatePayload) {\n  await db.transaction('rw', db.entities, db.outbox, async () => {\n    const current = await db.entities.get(entityId);\n    if (!current) throw new Error('Entity not available offline');\n\n    const operationId = crypto.randomUUID();\n    const sequence = current.localSequence + 1;\n    await db.entities.put(applyOptimisticPatch(current, patch, sequence));\n    await db.outbox.add({\n      operationId, entityId, sequence, baseVersion: current.serverVersion,\n      payload: patch, status: 'pending', attempts: 0, retryAt: Date.now(),\n    });\n  });\n}\n\nasync function sendCommand(command: OutboxCommand) {\n  const response = await fetch(`/api/entities/${command.entityId}`, {\n    method: 'PATCH',\n    credentials: 'same-origin',\n    headers: {\n      'content-type': 'application/json',\n      'idempotency-key': command.operationId,\n      'if-match': String(command.baseVersion),\n    },\n    body: JSON.stringify(command.payload),\n  });\n\n  if (response.status === 401) return markBlockedByAuth(command.operationId);\n  if (response.status === 409 || response.status === 412) {\n    return markConflict(command.operationId, await response.json());\n  }\n  if (!response.ok) throw new RetryableSyncError(response.status);\n  await reconcileAck(command.operationId, await response.json());\n}\n\nself.addEventListener('sync', (event: SyncEvent) => {\n  if (event.tag === 'drain-outbox') event.waitUntil(drainDueCommands());\n});",
+      "verification": [
+        "State-machine tests crash trước send, sau server commit trước ack, sau ack trước local delete; mọi case replay về state đúng.",
+        "Contract test duplicate operationId trả cùng result và không apply mutation hai lần.",
+        "Test concurrent edits hai thiết bị, version mismatch, auth expiry, quota exceeded và clock/lease expiry.",
+        "Theo dõi oldest pending age, retry distribution, conflicts/entity, duplicate dedupe hits và blocked-auth count."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Lưu queue bền vững trong IndexedDB, không memory Service Worker.",
+        "Có idempotency key và conflict/version check phía server.",
+        "Biết Background Sync không được bảo đảm chạy đúng giờ."
+      ],
+      "strong": [
+        "Mô tả at-least-once + server dedupe, transactional local outbox và crash points.",
+        "Thiết kế ordering theo entity, lease và explicit conflict state.",
+        "Xử lý auth expiry, retry budget và foreground drain."
+      ],
+      "exceptional": [
+        "Phân loại commutative/mergeable operations và chọn CRDT/manual resolution theo domain.",
+        "Thiết kế quota/retention/privacy, observability và operational recovery cho queue lâu ngày.",
+        "Nêu rõ protocol idempotency result retention, dependency ordering và schema migration của outbox."
+      ]
+    },
+    "references": [
+      {
+        "title": "Service Workers specification — lifetime and events",
+        "url": "https://w3c.github.io/ServiceWorker/"
+      },
+      { "title": "Indexed Database API", "url": "https://w3c.github.io/IndexedDB/" }
+    ],
+    "pitfalls": [
+      "Lưu mutation queue trong memory Service Worker.",
+      "Giả định Background Sync chắc chắn chạy và exactly once.",
+      "Dùng last-write-wins cho mọi domain và âm thầm mất dữ liệu.",
+      "Lưu access/refresh token đọc được bởi JavaScript để sync nền."
+    ],
+    "followUpQuestions": [
+      "Idempotency result phía server phải giữ bao lâu và cleanup thế nào?",
+      "Schema outbox đổi giữa hai app versions thì migration/replay ra sao?",
+      "Rich-text collaboration nhiều writer nên dùng OT, CRDT hay manual merge theo tiêu chí nào?"
+    ]
+  }
+]

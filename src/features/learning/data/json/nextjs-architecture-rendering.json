@@ -2,31 +2,99 @@
   "id": "track-next-architecture-rendering",
   "slug": "nextjs-architecture-rendering-strategies",
   "title": "Next.js Architecture & Rendering",
-  "description": "Thấu suốt ranh giới Client vs Server Code và chọn đúng Chiến lược Rendering (CSR/SSR/SSG/ISR/PPR) cho từng dự án thực tế.",
+  "description": "Lộ trình App Router từ routing, navigation, Server/Client boundary đến streaming, error handling, Cache Components và chiến lược rendering Next.js 16.",
   "iconName": "Layers",
   "color": "from-indigo-500 to-purple-600",
-  "totalLessons": 2,
+  "totalLessons": 5,
   "lessons": [
+    {
+      "id": "na-00",
+      "slug": "app-router-layouts-dynamic-routes-navigation",
+      "title": "App Router: Layouts, Dynamic Routes & Navigation",
+      "summary": "Đọc cây thư mục App Router, xây layout dùng chung và chọn Link hay router API cho từng kiểu navigation.",
+      "durationMinutes": 22,
+      "level": "beginner",
+      "tags": ["Next.js 16", "App Router", "Layouts", "Navigation"],
+      "mentalModel": "Filesystem tạo route tree: folder là segment, `layout.tsx` giữ UI dùng chung, `page.tsx` tạo endpoint UI và `[slug]` nhận segment động. Navigation nội bộ dùng Link để Next prefetch và chuyển trang phía client; router API dành cho điều hướng bằng code.",
+      "keyPoints": [
+        "`layout.tsx` bao bọc các segment con và giữ state/UI dùng chung qua navigation; route groups `(group)` tổ chức code mà không thêm segment vào URL.",
+        "Trong Next.js 16, `params` và `searchParams` ở Server Component là Promise và cần `await` hoặc đọc bằng `use` trong trường hợp phù hợp.",
+        "Ưu tiên `<Link>` cho liên kết nội bộ; dùng `useRouter` trong Client Component khi navigation là kết quả của logic/event, không dùng để thay mọi link.",
+        "Search params phù hợp cho filter/sort/page có thể bookmark; validate giá trị ở boundary thay vì tin chuỗi URL."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Layout và dynamic product route",
+          "language": "tsx",
+          "afterCode": "// app/shop/layout.tsx\nimport type { ReactNode } from 'react';\nimport Link from 'next/link';\n\nexport default function ShopLayout({ children }: { children: ReactNode }) {\n  return (\n    <div className=\"grid grid-cols-[14rem_1fr] gap-6\">\n      <nav aria-label=\"Shop\"><Link href=\"/shop\">Sản phẩm</Link></nav>\n      <main>{children}</main>\n    </div>\n  );\n}\n\n// app/shop/[slug]/page.tsx\nexport default async function ProductPage({\n  params,\n}: {\n  params: Promise<{ slug: string }>;\n}) {\n  const { slug } = await params;\n  const product = await getProduct(slug);\n  return <ProductDetails product={product} />;\n}",
+          "takeaway": "Layout thuộc route tree và được tái sử dụng; dynamic params được đọc bất đồng bộ trong Next.js 16."
+        },
+        {
+          "title": "Lab 2 — Filter được lưu trong search params",
+          "language": "tsx",
+          "afterCode": "// app/shop/page.tsx — Server Component\nexport default async function ShopPage({\n  searchParams,\n}: {\n  searchParams: Promise<{ category?: string; page?: string }>;\n}) {\n  const params = await searchParams;\n  const category = params.category ?? 'all';\n  const page = Math.max(1, Number(params.page) || 1);\n  const products = await getProducts({ category, page });\n\n  return <ProductGrid products={products} />;\n}\n\n// Link giữ navigation declarative và có thể prefetch\n<Link href={{ pathname: '/shop', query: { category: 'books', page: 1 } }}>\n  Sách\n</Link>",
+          "takeaway": "URL là source of truth cho filter/page, giúp reload, back/forward và chia sẻ link hoạt động đúng."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-na-00-1",
+          "question": "File nào tạo UI dùng chung cho một route segment và các segment con?",
+          "options": [
+            { "key": "A", "text": "layout.tsx" },
+            { "key": "B", "text": "route.ts" },
+            { "key": "C", "text": "middleware.css" },
+            { "key": "D", "text": "manifest.json" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Layout nhận children, bao bọc subtree route và được giữ qua navigation trong phạm vi tương ứng."
+        },
+        {
+          "id": "q-na-00-2",
+          "question": "Trong Next.js 16 Server Component, cách đọc params đúng là gì?",
+          "options": [
+            { "key": "A", "text": "Đọc params.id đồng bộ trong mọi trường hợp" },
+            { "key": "B", "text": "Khai báo params là Promise và await params" },
+            { "key": "C", "text": "Luôn dùng window.location" },
+            { "key": "D", "text": "Đưa params vào localStorage" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Dynamic route APIs là async trong phiên bản hiện tại; await giúp đọc giá trị đúng tại server boundary."
+        },
+        {
+          "id": "q-na-00-3",
+          "question": "Điều hướng từ card sản phẩm sang trang chi tiết khi người dùng click nên ưu tiên gì?",
+          "options": [
+            { "key": "A", "text": "window.location.reload" },
+            { "key": "B", "text": "Một button gọi fetch rồi sửa history thủ công" },
+            { "key": "C", "text": "Next Link với href nội bộ" },
+            { "key": "D", "text": "Server Action" }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Link giữ semantics của liên kết và cho Next.js thực hiện prefetch/client transition khi phù hợp."
+        }
+      ]
+    },
     {
       "id": "na-01",
       "slug": "client-vs-server-code-execution-model",
       "title": "Phân tách triệt để Client Code vs Server Code",
-      "summary": "Hiểu sâu cơ chế chạy của Server Component (Node.js/Edge) vs Client Component (\"use client\"), và ranh giới Serialization Boundary.",
+      "summary": "Hiểu cơ chế chạy của Server Component và Client Component, cùng ranh giới module và serialization giữa chúng.",
       "durationMinutes": 16,
       "level": "advanced",
-      "tags": ["Next.js 15", "RSC", "Client Boundary", "Architecture"],
-      "mentalModel": "Server Code chạy 100% trên Server (0 KB client bundle). Client Code bắt đầu bằng SSR HTML trên server và tiếp tục Hydrate chạy JS trên browser.",
+      "tags": ["Next.js 16", "RSC", "Client Boundary", "Architecture"],
+      "mentalModel": "Server Component render trong môi trường server và module code của nó không được gửi xuống browser. Client Component có thể được prerender thành HTML ban đầu, nhưng module nằm sau ranh giới `use client` sẽ vào client bundle để hydrate.",
       "keyPoints": [
-        "Server Component: Chạy trên Node.js/Edge server. Có thể đọc trực tiếp DB, đọc process.env.SECRET_KEY. Trả về định dạng RSC Payload stream. 0 KB JS gửi về client.",
+        "Server Component: chạy trong môi trường server, có thể truy cập DB và secret, rồi tạo RSC payload. Module code của chính Server Component không được đưa vào client bundle, nhưng Client Component con vẫn có JavaScript riêng.",
         "Client Component (\"use client\"): Đánh dấu ranh giới module sẽ được đóng gói vào client bundle. VẪN ĐƯỢC render ra HTML ban đầu ở Server (SSR initial request), sau đó được Hydrate trên trình duyệt.",
-        "Serialization Boundary: Dữ liệu truyền qua ranh giới từ Server Component vào Client Component phải Serializable (JSON-compatible: String, Number, Array, Plain Object, Date). KHÔNG ĐƯỢC truyền Function/Class instances (trừ Server Actions)."
+        "Serialization Boundary: props đi từ Server Component sang Client Component phải thuộc các kiểu React hỗ trợ serialize. Function thường và class instance không hợp lệ; Server Function được đánh dấu đúng là ngoại lệ."
       ],
       "codeRecipes": [
         {
           "title": "Mô hình Phân tách An toàn Server & Client Code",
           "language": "tsx",
-          "afterCode": "// 1. db-service.ts (Server Only - An toàn tuyệt đối)\nimport 'server-only'; // Ném lỗi build nếu lỡ import vào client!\nimport { db } from '@/lib/db';\n\nexport async function getPrivateUserData(userId: string) {\n  return await db.user.findUnique({ where: { id: userId } });\n}\n\n// 2. UserProfilePage.tsx (Server Component - 0 KB bundle)\nimport { getPrivateUserData } from './db-service';\nimport { ClientAvatarMenu } from './ClientAvatarMenu';\n\nexport default async function UserProfilePage({ params }: { params: { id: string } }) {\n  const user = await getPrivateUserData(params.id);\n  \n  // Dữ liệu truyền xuống ClientAvatarMenu phải serializable!\n  return (\n    <div>\n      <h1>Welcome {user.name}</h1>\n      <ClientAvatarMenu user={{ name: user.name, avatarUrl: user.avatarUrl }} />\n    </div>\n  );\n}",
-          "takeaway": "Giữ 100% logic DB & Secrets an toàn trên Server, chỉ truyền dữ liệu tinh gọn xuống Client."
+          "afterCode": "// 1. db-service.ts (server-only)\nimport 'server-only'; // Báo lỗi build nếu module bị kéo vào client graph\nimport { db } from '@/lib/db';\n\nexport async function getPrivateUserData(userId: string) {\n  return db.user.findUnique({ where: { id: userId } });\n}\n\n// 2. app/users/[id]/page.tsx (Server Component)\nimport { getPrivateUserData } from './db-service';\nimport { ClientAvatarMenu } from './ClientAvatarMenu';\n\nexport default async function UserProfilePage({\n  params,\n}: {\n  params: Promise<{ id: string }>;\n}) {\n  const { id } = await params; // Dynamic APIs là async trong Next.js 16\n  const user = await getPrivateUserData(id);\n  if (!user) return null;\n\n  return (\n    <div>\n      <h1>Welcome {user.name}</h1>\n      <ClientAvatarMenu user={{ name: user.name, avatarUrl: user.avatarUrl }} />\n    </div>\n  );\n}",
+          "takeaway": "Giữ truy cập DB và secret trong server-only module, đồng thời chỉ truyền dữ liệu cần thiết và serializable qua client boundary."
         }
       ],
       "quizzes": [
@@ -57,6 +125,148 @@
       ]
     },
     {
+      "id": "na-03",
+      "slug": "loading-suspense-error-not-found-streaming",
+      "title": "Loading, Suspense, Error & Not Found Boundaries",
+      "summary": "Thiết kế route phản hồi sớm, stream phần chậm và cô lập lỗi bằng các special files của App Router.",
+      "durationMinutes": 22,
+      "level": "intermediate",
+      "tags": ["Suspense", "loading.tsx", "error.tsx", "not-found.tsx"],
+      "mentalModel": "Mỗi route segment có thể có boundary cho pending, error và not-found. `loading.tsx` tạo Suspense boundary quanh page; Suspense thủ công chia nhỏ phần chậm; `error.tsx` bắt lỗi runtime của subtree; `notFound()` chuyển control tới not-found UI.",
+      "keyPoints": [
+        "Thêm `loading.tsx` cho dynamic route để navigation có phản hồi ngay và shared layout tiếp tục tương tác được.",
+        "Đặt Suspense gần phần dữ liệu chậm để stream shell và nội dung nhanh trước, thay vì chặn toàn page.",
+        "`error.tsx` phải là Client Component và nhận `{ error, reset }`; log lỗi nhưng không lộ thông tin nhạy cảm cho người dùng.",
+        "Gọi `notFound()` khi resource không tồn tại; đây khác với lỗi hệ thống và nên có UI/metadata phù hợp."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Special files cho product route",
+          "language": "tsx",
+          "afterCode": "// app/products/[slug]/loading.tsx\nexport default function Loading() {\n  return <ProductSkeleton />;\n}\n\n// app/products/[slug]/not-found.tsx\nimport Link from 'next/link';\nexport default function NotFound() {\n  return <div><h1>Không tìm thấy sản phẩm</h1><Link href=\"/products\">Quay lại</Link></div>;\n}\n\n// app/products/[slug]/error.tsx\n'use client';\nexport default function ErrorView({ reset }: { error: Error; reset: () => void }) {\n  return <div role=\"alert\"><p>Không tải được trang.</p><button onClick={reset}>Thử lại</button></div>;\n}\n\n// app/products/[slug]/page.tsx\nimport { notFound } from 'next/navigation';\nexport default async function Page({ params }: { params: Promise<{ slug: string }> }) {\n  const { slug } = await params;\n  const product = await getProduct(slug);\n  if (!product) notFound();\n  return <ProductDetails product={product} />;\n}",
+          "takeaway": "Pending, missing resource và runtime failure là ba trạng thái khác nhau; route nên biểu diễn từng trạng thái bằng boundary tương ứng."
+        },
+        {
+          "title": "Lab 2 — Stream review chậm sau product shell",
+          "language": "tsx",
+          "afterCode": "import { Suspense } from 'react';\n\nexport default async function ProductPage({ params }: Props) {\n  const { slug } = await params;\n  const product = await getProduct(slug);\n  if (!product) notFound();\n\n  return (\n    <>\n      <ProductDetails product={product} />\n      <Suspense fallback={<ReviewsSkeleton />}>\n        <Reviews productId={product.id} />\n      </Suspense>\n    </>\n  );\n}\n\nasync function Reviews({ productId }: { productId: string }) {\n  const reviews = await getReviews(productId);\n  return <ReviewList reviews={reviews} />;\n}",
+          "takeaway": "Không await reviews ở page trước khi trả JSX; để async child nằm sau Suspense giúp product shell stream trước."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-na-03-1",
+          "question": "Special file nào cung cấp fallback pending cho route segment?",
+          "options": [
+            { "key": "A", "text": "loading.tsx" },
+            { "key": "B", "text": "route.css" },
+            { "key": "C", "text": "template.json" },
+            { "key": "D", "text": "instrumentation.md" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Next.js tự tạo Suspense boundary quanh page bằng loading.tsx."
+        },
+        {
+          "id": "q-na-03-2",
+          "question": "Product slug hợp lệ nhưng database không có record. Nên xử lý thế nào?",
+          "options": [
+            { "key": "A", "text": "Throw lỗi 500" },
+            { "key": "B", "text": "Gọi notFound() và cung cấp not-found.tsx" },
+            { "key": "C", "text": "Trả chuỗi rỗng" },
+            { "key": "D", "text": "Reload vô hạn" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Resource không tồn tại là trạng thái not found, không phải lỗi hệ thống cần Error Boundary."
+        },
+        {
+          "id": "q-na-03-3",
+          "question": "Reviews chậm nhưng thông tin sản phẩm nhanh. Boundary tốt nhất đặt ở đâu?",
+          "options": [
+            { "key": "A", "text": "Bọc toàn root layout" },
+            { "key": "B", "text": "Chỉ bọc Reviews bằng Suspense" },
+            { "key": "C", "text": "Không dùng boundary" },
+            { "key": "D", "text": "Đưa reviews vào useEffect" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Boundary nhỏ cho phép shell và ProductDetails hiển thị trước trong khi Reviews tiếp tục tải."
+        }
+      ]
+    },
+    {
+      "id": "na-04",
+      "slug": "nextjs-16-cache-components-revalidation",
+      "title": "Next.js 16 Cache Components & Revalidation",
+      "summary": "Cache dữ liệu có chủ đích bằng use cache/cacheLife/cacheTag và chọn updateTag hay revalidateTag sau mutation.",
+      "durationMinutes": 24,
+      "level": "advanced",
+      "tags": ["Next.js 16", "use cache", "cacheLife", "cacheTag"],
+      "mentalModel": "Với Cache Components, code request-time là động mặc định. Chỉ đưa dữ liệu có thể chia sẻ vào cached scope bằng `use cache`; mô tả freshness bằng cacheLife, gắn domain tag bằng cacheTag và invalidation sau mutation theo consistency mà UX cần.",
+      "keyPoints": [
+        "Bật `cacheComponents: true`; `use cache` có thể đặt ở function/component/file async và cache key bao gồm arguments cùng closed-over values được hỗ trợ.",
+        "Không đọc cookies/headers trực tiếp trong shared cached scope; đọc bên ngoài rồi truyền primitive cần thiết vào hoặc cân nhắc private cache theo yêu cầu.",
+        "`cacheLife` đặt profile thời gian; `cacheTag` gắn domain identity để invalidation chính xác hơn path rộng.",
+        "Dùng `updateTag` trong Server Action khi người vừa mutate phải thấy dữ liệu mới ngay; dùng `revalidateTag(tag, 'max')` cho stale-while-revalidate khi chấp nhận eventual consistency."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Cached product query có lifetime và tag",
+          "language": "typescript",
+          "afterCode": "// next.config.ts\nimport type { NextConfig } from 'next';\nexport default { cacheComponents: true } satisfies NextConfig;\n\n// app/lib/products.ts\nimport { cacheLife, cacheTag } from 'next/cache';\n\nexport async function getProduct(id: string) {\n  'use cache';\n  cacheLife('hours');\n  cacheTag('products', `product:${id}`);\n  return db.product.findUnique({ where: { id } });\n}\n\n// app/products/[id]/page.tsx\nexport default async function Page({ params }: { params: Promise<{ id: string }> }) {\n  const { id } = await params;\n  return <ProductDetails product={await getProduct(id)} />;\n}",
+          "takeaway": "Cache policy nằm cạnh data function, còn tag biểu diễn domain resource để nhiều route dùng chung một invalidation contract."
+        },
+        {
+          "title": "Lab 2 — Mutation với read-your-own-writes",
+          "language": "typescript",
+          "afterCode": "'use server';\nimport { updateTag } from 'next/cache';\nimport { z } from 'zod';\n\nconst RenameProduct = z.object({ id: z.string().min(1), name: z.string().trim().min(1) });\n\nexport async function renameProduct(formData: FormData) {\n  const actor = await requireUser();\n  const input = RenameProduct.parse({ id: formData.get('id'), name: formData.get('name') });\n  await assertCanEditProduct(actor, input.id);\n  await db.product.update({ where: { id: input.id }, data: { name: input.name } });\n\n  updateTag(`product:${input.id}`);\n  updateTag('products');\n}",
+          "takeaway": "Mutation vẫn phải auth, authorize và validate. updateTag hết hạn cache liên quan để UI sau action đọc dữ liệu mới."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-na-04-1",
+          "question": "API nào mô tả thời gian sống của cached scope trong Cache Components?",
+          "options": [
+            { "key": "A", "text": "cacheLife" },
+            { "key": "B", "text": "useEffect" },
+            { "key": "C", "text": "router.refresh only" },
+            { "key": "D", "text": "gcTime" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "cacheLife chọn profile hoặc policy thời gian cho function/component có use cache."
+        },
+        {
+          "id": "q-na-04-2",
+          "question": "Vì sao không nên đọc cookies trực tiếp trong shared `use cache` function?",
+          "options": [
+            { "key": "A", "text": "Cookie luôn là số" },
+            {
+              "key": "B",
+              "text": "Runtime request data không thuộc shared cached scope; có thể gây cache sai theo người dùng"
+            },
+            { "key": "C", "text": "use cache chỉ chạy client" },
+            { "key": "D", "text": "Database không hỗ trợ cookie" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Đọc runtime data bên ngoài và truyền giá trị thích hợp vào giúp cache key và phạm vi chia sẻ rõ ràng."
+        },
+        {
+          "id": "q-na-04-3",
+          "question": "Sau khi người dùng đổi tên sản phẩm và phải thấy tên mới ngay, lựa chọn phù hợp nhất là gì?",
+          "options": [
+            { "key": "A", "text": "Không invalidate" },
+            {
+              "key": "B",
+              "text": "updateTag cho product và collection liên quan trong Server Action"
+            },
+            { "key": "C", "text": "Chỉ tăng cacheLife" },
+            { "key": "D", "text": "Xóa cookie" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "updateTag hỗ trợ read-your-own-writes; revalidateTag dạng stale-while-revalidate phù hợp dữ liệu chấp nhận cũ tạm thời hơn."
+        }
+      ]
+    },
+    {
       "id": "na-02",
       "slug": "rendering-strategies-csr-ssr-ssg-isr-ppr",
       "title": "Bản đồ Chiến lược Rendering: CSR vs SSR vs SSG vs ISR vs PPR",
@@ -70,13 +280,13 @@
         "SSR (Server-Side Rendering): Render HTML mới ở MỌI request người dùng gửi lên. Dùng cho: Trang tin tức/sản phẩm thời gian thực cần SEO tối đa.",
         "SSG (Static Site Generation): Biến trang thành HTML tĩnh ngay tại Build Time. Tốc độ cực đại CDN. Dùng cho: Trang Landing Page, Blogs, Documentation.",
         "ISR (Incremental Static Regeneration): Cập nhật trang tĩnh ngầm (stale-while-revalidate) theo chu kỳ revalidate giây mà không cần build lại toàn bộ website. Dùng cho: E-commerce có 100,000 sản phẩm.",
-        "PPR (Partial Prerendering - Next.js 15): Gửi trước Static Shell (SSG) ngay lập tức và stream Dynamic Content (SSR) vào đúng khe Suspense."
+        "PPR trong mô hình Cache Components của Next.js 16: prerender static shell và stream phần request-time nằm sau Suspense. Bật bằng `cacheComponents: true` cho toàn ứng dụng."
       ],
       "codeRecipes": [
         {
           "title": "Bảng Tiêu chí Chọn Chiến lược Rendering",
           "language": "typescript",
-          "afterCode": "// 1. SSG (Static - Build Time)\nexport const revalidate = false; // Hoặc fetch(url, { cache: 'force-cache' })\n\n// 2. ISR (Incremental - Revalidate ngầm mỗi 60s)\nexport const revalidate = 60; // Hoặc fetch(url, { next: { revalidate: 60 } })\n\n// 3. SSR (Dynamic - Render mỗi Request)\nexport const dynamic = 'force-dynamic'; // Hoặc fetch(url, { cache: 'no-store' })\n\n// 4. PPR (Partial Prerendering - Mixed Static Shell + Dynamic Stream)\n// next.config.mjs: ppr: 'incremental'\nexport default function Page() {\n  return (\n    <div>\n      <StaticHeader /> {/* SSG Static Shell */}\n      <Suspense fallback={<Skeleton />}>\n        <DynamicFeed /> {/* SSR Streamed Content */}\n      </Suspense>\n    </div>\n  );\n}",
+          "afterCode": "// next.config.ts — bật Cache Components/PPR trong Next.js 16\nimport type { NextConfig } from 'next';\nconst nextConfig: NextConfig = { cacheComponents: true };\nexport default nextConfig;\n\n// app/page.tsx — static shell + request-time content được stream\nimport { Suspense } from 'react';\n\nexport default function Page() {\n  return (\n    <div>\n      <StaticHeader />\n      <Suspense fallback={<Skeleton />}>\n        <DynamicFeed />\n      </Suspense>\n    </div>\n  );\n}\n\n// Với dữ liệu muốn cache trong Cache Components, đặt `use cache`\n// và cấu hình cacheLife/cacheTag trong hàm dữ liệu phù hợp.",
           "takeaway": "Lựa chọn linh hoạt chiến lược phù hợp theo từng route cụ thể."
         }
       ],

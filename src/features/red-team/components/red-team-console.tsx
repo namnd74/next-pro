@@ -2,7 +2,10 @@
 
 import * as React from 'react';
 import {
+  BookOpen,
   Crosshair,
+  GraduationCap,
+  ListChecks,
   Skull,
   ShieldCheck,
   Terminal,
@@ -12,7 +15,8 @@ import {
   RotateCcw,
   Target,
 } from 'lucide-react';
-import { AttackVector, RedTeamScenario, SEVERITY_META } from '../types';
+import { AttackVector, SEVERITY_META } from '../types';
+import type { RedTeamCollection, StudyDossier } from '../types';
 import { useRedTeamStore } from '../stores/use-red-team-store';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -237,11 +241,106 @@ export function AttackVectorCard({ vector }: AttackVectorCardProps) {
   );
 }
 
-interface RedTeamConsoleProps {
-  scenario: RedTeamScenario;
+/**
+ * Học liệu riêng của collection — lý thuyết nền đọc trước khi bắn.
+ * Render tĩnh, không phụ thuộc feature nào khác.
+ */
+function CollectionDossier({ dossier }: { dossier?: StudyDossier }) {
+  if (!dossier) return null;
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-foreground">
+          <BookOpen className="h-5 w-5 text-primary" />
+          Học liệu · Lý thuyết nền
+        </h2>
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          ~{dossier.readingTimeMinutes} min read
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Objectives + Defense principles */}
+        <Card className="glass-card space-y-4 p-5">
+          <div className="space-y-2">
+            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary">
+              <GraduationCap className="h-3.5 w-3.5" />
+              Sau bài học này bạn sẽ
+            </span>
+            <ul className="space-y-1.5">
+              {dossier.objectives.map((objective, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-xs leading-relaxed text-foreground">
+                  <ListChecks className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                  {objective}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-2 border-t border-border/40 pt-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+              Nguyên tắc phòng thủ
+            </span>
+            <ul className="space-y-1.5">
+              {dossier.defensePrinciples.map((principle, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                  {principle}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+
+        {/* Concepts */}
+        <Card className="glass-card space-y-2 p-5">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+            Khái niệm cốt lõi
+          </span>
+          <dl className="space-y-2.5">
+            {dossier.concepts.map((concept, idx) => (
+              <div key={idx} className="rounded-xl border border-border/50 bg-secondary/20 p-3">
+                <dt className="font-mono text-[11px] font-bold text-foreground">
+                  {concept.term}
+                </dt>
+                <dd className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {concept.definition}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+      </div>
+
+      {/* Attacker playbook — full width */}
+      <Card className="glass-card space-y-3 p-5">
+        <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-destructive">
+          <Skull className="h-3.5 w-3.5" />
+          Attacker Playbook — quy trình chuẩn của domain này
+        </span>
+        <ol className="space-y-2.5">
+          {dossier.attackerPlaybook.map((step, idx) => (
+            <li key={idx} className="flex items-start gap-3 rounded-xl border border-destructive/15 bg-destructive/5 p-3">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-destructive/15 font-mono text-[10px] font-bold text-destructive">
+                {String(idx + 1).padStart(2, '0')}
+              </span>
+              <div className="min-w-0 space-y-1">
+                <p className="text-xs font-bold text-foreground">{step.title}</p>
+                <p className="text-xs leading-relaxed text-muted-foreground">{step.detail}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </Card>
+    </section>
+  );
 }
 
-export function RedTeamConsole({ scenario }: RedTeamConsoleProps) {
+interface RedTeamConsoleProps {
+  collection: RedTeamCollection;
+}
+
+export function RedTeamConsole({ collection }: RedTeamConsoleProps) {
   const { launchedVectorIds, patchedVectorIds, resetRedTeamProgress } = useRedTeamStore();
   const [mounted, setMounted] = React.useState(false);
 
@@ -249,12 +348,12 @@ export function RedTeamConsole({ scenario }: RedTeamConsoleProps) {
     setMounted(true);
   }, []);
 
-  const totalVectors = scenario.vectors.length;
+  const totalVectors = collection.vectors.length;
   const breachedCount = mounted
-    ? scenario.vectors.filter((v) => launchedVectorIds.includes(v.id)).length
+    ? collection.vectors.filter((v) => launchedVectorIds.includes(v.id)).length
     : 0;
   const patchedCount = mounted
-    ? scenario.vectors.filter((v) => patchedVectorIds.includes(v.id)).length
+    ? collection.vectors.filter((v) => patchedVectorIds.includes(v.id)).length
     : 0;
 
   return (
@@ -268,13 +367,13 @@ export function RedTeamConsole({ scenario }: RedTeamConsoleProps) {
             <div className="flex flex-wrap items-center gap-2">
               <Crosshair className="h-5 w-5 text-destructive" />
               <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">
-                {scenario.title}
+                {collection.title}
               </h2>
               <Badge variant="destructive" className="text-[10px] uppercase tracking-wider">
-                {scenario.difficulty}
+                {collection.difficulty}
               </Badge>
             </div>
-            <p className="text-sm font-medium text-muted-foreground">{scenario.tagline}</p>
+            <p className="text-sm font-medium text-muted-foreground">{collection.tagline}</p>
           </div>
 
           <Button
@@ -293,7 +392,7 @@ export function RedTeamConsole({ scenario }: RedTeamConsoleProps) {
             Mission Briefing
           </span>
           <p className="text-xs leading-relaxed text-foreground sm:text-sm">
-            {scenario.missionBriefing}
+            {collection.missionBriefing}
           </p>
         </div>
 
@@ -325,9 +424,12 @@ export function RedTeamConsole({ scenario }: RedTeamConsoleProps) {
         </div>
       </Card>
 
+      {/* Học liệu — lý thuyết nền độc lập của collection */}
+      <CollectionDossier dossier={collection.dossier} />
+
       {/* Attack Vectors */}
       <div className="space-y-6">
-        {scenario.vectors.map((vector) => (
+        {collection.vectors.map((vector) => (
           <AttackVectorCard key={vector.id} vector={vector} />
         ))}
       </div>

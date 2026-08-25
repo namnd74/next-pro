@@ -2,16 +2,84 @@
   "id": "track-tanstack-query-masterclass",
   "slug": "tanstack-query-v5-masterclass",
   "title": "TanStack Query v5 Masterclass",
-  "description": "Tại sao phải dùng TanStack Query? Hậu quả khi KHÔNG có React Query (Waterfall, Race conditions, Stale state, Duplicate requests) và giải pháp Caching/Optimistic Updates.",
+  "description": "Làm chủ server state với TanStack Query v5: caching, query keys, parallel/dependent queries, mutations, pagination, infinite scroll, prefetching và bộ hooks thường dùng.",
   "iconName": "Zap",
   "color": "from-red-500 to-orange-600",
-  "totalLessons": 2,
+  "totalLessons": 7,
   "lessons": [
+    {
+      "id": "tq-00",
+      "slug": "query-client-provider-defaults-devtools-cancellation",
+      "title": "Setup Chuẩn: QueryClient, Defaults, Devtools & Cancellation",
+      "summary": "Thiết lập QueryClient ổn định, chọn freshness/retry mặc định, bật Devtools và truyền AbortSignal vào request.",
+      "durationMinutes": 20,
+      "level": "beginner",
+      "tags": ["QueryClientProvider", "Devtools", "AbortSignal", "Defaults"],
+      "mentalModel": "QueryClient là bộ nhớ và policy engine của server state; Provider đưa cùng client vào React tree. Tạo client một lần cho mỗi browser session, đặt default bảo thủ rồi override theo domain. Query function nhận AbortSignal để công việc cũ có thể bị hủy.",
+      "keyPoints": [
+        "Không tạo `new QueryClient()` trong mỗi render; giữ một browser client ổn định để cache không bị reset.",
+        "Đặt `staleTime`, `retry` và refetch policy theo UX/API thay vì sao chép cấu hình vào mọi query.",
+        "React Query Devtools giúp xem queryKey, observers, freshness và cache state; chỉ hiển thị panel trong môi trường development.",
+        "Nhận `signal` từ queryFn context và truyền vào fetch/axios hỗ trợ signal để request không còn cần thiết có thể bị abort."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Client Provider có defaults và Devtools",
+          "language": "tsx",
+          "afterCode": "'use client';\nimport { useState, type ReactNode } from 'react';\nimport { QueryClient, QueryClientProvider } from '@tanstack/react-query';\nimport { ReactQueryDevtools } from '@tanstack/react-query-devtools';\n\nexport function QueryProvider({ children }: { children: ReactNode }) {\n  const [queryClient] = useState(() =>\n    new QueryClient({\n      defaultOptions: {\n        queries: {\n          staleTime: 60_000,\n          retry: 2,\n          refetchOnWindowFocus: true,\n        },\n        mutations: { retry: 0 },\n      },\n    }),\n  );\n\n  return (\n    <QueryClientProvider client={queryClient}>\n      {children}\n      {process.env.NODE_ENV === 'development' && <ReactQueryDevtools />}\n    </QueryClientProvider>\n  );\n}",
+          "takeaway": "Một browser QueryClient ổn định giữ cache qua re-render; defaults là baseline và query cụ thể vẫn có thể override."
+        },
+        {
+          "title": "Lab 2 — Query có error handling và cancellation",
+          "language": "tsx",
+          "afterCode": "import { useQuery } from '@tanstack/react-query';\n\nasync function getSearchResults(query: string, signal: AbortSignal) {\n  const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal });\n  if (!response.ok) {\n    throw new Error(`Search failed: ${response.status}`);\n  }\n  return response.json() as Promise<SearchResult[]>;\n}\n\nfunction SearchResults({ query }: { query: string }) {\n  const result = useQuery({\n    queryKey: ['search', query],\n    queryFn: ({ signal }) => getSearchResults(query, signal),\n    enabled: query.trim().length >= 2,\n  });\n\n  if (result.isPending) return <SearchSkeleton />;\n  if (result.isError) return <p role=\"alert\">{result.error.message}</p>;\n  return <ResultList results={result.data} />;\n}",
+          "takeaway": "QueryKey chứa input, enabled chặn query chưa hợp lệ và AbortSignal nối cancellation của cache với network request thật."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-tq-00-1",
+          "question": "QueryClientProvider có vai trò chính gì?",
+          "options": [
+            { "key": "A", "text": "Cung cấp QueryClient/cache cho hooks trong subtree" },
+            { "key": "B", "text": "Tạo database" },
+            { "key": "C", "text": "Thay thế router" },
+            { "key": "D", "text": "Compile TypeScript" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Các query/mutation hooks tìm QueryClient gần nhất qua Provider để đọc policy và cache."
+        },
+        {
+          "id": "q-tq-00-2",
+          "question": "Điều gì xảy ra nếu tạo QueryClient mới trong mỗi render của Provider?",
+          "options": [
+            { "key": "A", "text": "Cache có thể bị reset/thay client ngoài ý muốn" },
+            { "key": "B", "text": "QueryKey tự ngắn lại" },
+            { "key": "C", "text": "Fetch chuyển sang Web Worker" },
+            { "key": "D", "text": "Không có khác biệt" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Client giữ cache và observers; identity phải ổn định qua render của browser tree."
+        },
+        {
+          "id": "q-tq-00-3",
+          "question": "Để TanStack Query thực sự hủy HTTP fetch cũ, queryFn cần làm gì?",
+          "options": [
+            { "key": "A", "text": "Tăng staleTime" },
+            { "key": "B", "text": "Truyền signal từ queryFn context vào fetch" },
+            { "key": "C", "text": "Dùng useMemo" },
+            { "key": "D", "text": "Đặt queryKey rỗng" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "AbortSignal chỉ hủy network work khi HTTP client nhận và tôn trọng signal đó."
+        }
+      ]
+    },
     {
       "id": "tq-01",
       "slug": "why-tanstack-query-consequences-of-manual-fetch",
       "title": "Tại sao cần TanStack Query? Hậu quả khi KHÔNG sử dụng",
-      "summary": "Phân tích 5 thảm họa khi quản lý Async State bằng useState + useEffect thủ công.",
+      "summary": "Phân tích các chi phí khi tự quản lý server state bằng useState + useEffect và lúc TanStack Query đem lại giá trị.",
       "durationMinutes": 18,
       "level": "intermediate",
       "tags": ["TanStack Query v5", "React Query", "Server State", "Caching"],
@@ -28,8 +96,8 @@
           "title": "So sánh: useEffect thủ công vs TanStack Query v5",
           "language": "tsx",
           "beforeCode": "// ❌ Thảm họa useState + useEffect thủ công:\n// Khủng hoảng loading, error, race condition, 0 cache, 0 dedup!\nfunction UserProfile({ userId }) {\n  const [data, setData] = useState(null);\n  const [loading, setLoading] = useState(true);\n\n  useEffect(() => {\n    let isMounted = true;\n    fetchUser(userId).then(res => {\n      if (isMounted) { setData(res); setLoading(false); }\n    });\n    return () => { isMounted = false; }; // Phải tự ngắt race condition!\n  }, [userId]);\n\n  if (loading) return <Spinner />;\n  return <div>{data.name}</div>;\n}",
-          "afterCode": "// ✅ Đỉnh cao TanStack Query v5: 1 dòng code giải quyết 100% vấn đề!\nimport { useQuery } from '@tanstack/react-query';\n\nfunction UserProfile({ userId }) {\n  const { data, isLoading } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId),\n    staleTime: 1000 * 60 * 5, // Cache 5 phút, 0 duplicate request!\n  });\n\n  if (isLoading) return <Spinner />;\n  return <div>{data.name}</div>;\n}",
-          "takeaway": "Code ngắn hơn 70%, tự động cache, tự động dedup, tự động background refetch."
+          "afterCode": "// ✅ TanStack Query v5 quản lý vòng đời server state\nimport { useQuery } from '@tanstack/react-query';\n\nfunction UserProfile({ userId }) {\n  const { data, isPending, isError } = useQuery({\n    queryKey: ['user', userId],\n    queryFn: () => fetchUser(userId),\n    staleTime: 1000 * 60 * 5,\n  });\n\n  if (isPending) return <Spinner />;\n  if (isError) return <p>Không tải được người dùng.</p>;\n  return <div>{data.name}</div>;\n}",
+          "takeaway": "Query chia sẻ cache theo queryKey, deduplicate các request đồng thời tương ứng và hỗ trợ refetch theo chính sách; vẫn cần thiết kế queryKey, lỗi và freshness phù hợp."
         }
       ],
       "quizzes": [
@@ -63,7 +131,7 @@
       "id": "tq-02",
       "slug": "tanstack-query-advanced-mutations-invalidations",
       "title": "Làm chủ Caching, Invalidation & Optimistic Mutations",
-      "summary": "Kỹ thuật invalidateQueries chính xác và xử lý update 0ms với onMutate.",
+      "summary": "Invalidate cache có chủ đích và tạo phản hồi optimistic với snapshot/rollback trong onMutate.",
       "durationMinutes": 16,
       "level": "advanced",
       "tags": ["TanStack Query v5", "Mutations", "Optimistic UI", "Cache"],
@@ -71,14 +139,20 @@
       "keyPoints": [
         "staleTime: Thời gian data được coi là còn mới (không refetch ngầm).",
         "gcTime (Garbage Collection Time): Thời gian giữ cache trong RAM trước khi giải phóng.",
-        "queryClient.invalidateQueries({ queryKey }): Đánh dấu cache là cũ và kích hoạt refetch tức thì."
+        "`invalidateQueries({ queryKey })` đánh dấu các query khớp là stale; mặc định các query đang active sẽ refetch ở background. Có thể điều chỉnh phạm vi bằng filter và `refetchType`."
       ],
       "codeRecipes": [
         {
           "title": "Mẫu Mutation & Cache Invalidation chuẩn v5",
           "language": "typescript",
-          "afterCode": "import { useMutation, useQueryClient } from '@tanstack/react-query';\n\nexport function useAddTodo() {\n  const queryClient = useQueryClient();\n\n  return useMutation({\n    mutationFn: addTodoApi,\n    onSuccess: () => {\n      // ✅ Tức thì làm tươi danh sách todos trên toàn bộ ứng dụng!\n      queryClient.invalidateQueries({ queryKey: ['todos'] });\n    },\n  });\n}",
-          "takeaway": "Đồng bộ dữ liệu thời gian thực mượt mà trên toàn bộ các trang."
+          "afterCode": "import { useMutation, useQueryClient } from '@tanstack/react-query';\n\nexport function useAddTodo() {\n  const queryClient = useQueryClient();\n\n  return useMutation({\n    mutationFn: addTodoApi,\n    onSuccess: async () => {\n      // Đánh dấu stale; active matching queries refetch ở background mặc định\n      await queryClient.invalidateQueries({ queryKey: ['todos'] });\n    },\n  });\n}",
+          "takeaway": "Invalidation không tự biết mọi cache liên quan; hãy chọn queryKey đủ chính xác và quyết định có chờ refetch hay không theo UX mong muốn."
+        },
+        {
+          "title": "Optimistic mutation có snapshot và rollback",
+          "language": "typescript",
+          "afterCode": "import { useMutation, useQueryClient } from '@tanstack/react-query';\n\ntype Todo = { id: string; title: string };\n\nexport function useRenameTodo() {\n  const queryClient = useQueryClient();\n\n  return useMutation({\n    mutationFn: renameTodoApi,\n    onMutate: async (next: Todo) => {\n      await queryClient.cancelQueries({ queryKey: ['todos'] });\n      const previous = queryClient.getQueryData<Todo[]>(['todos']);\n      queryClient.setQueryData<Todo[]>(['todos'], old =>\n        old?.map(todo => todo.id === next.id ? next : todo)\n      );\n      return { previous };\n    },\n    onError: (_error, _next, context) => {\n      queryClient.setQueryData(['todos'], context?.previous);\n    },\n    onSettled: () => {\n      return queryClient.invalidateQueries({ queryKey: ['todos'] });\n    },\n  });\n}",
+          "takeaway": "Hủy refetch trước khi ghi optimistic để tránh dữ liệu cũ ghi đè, giữ snapshot để rollback và cuối cùng đối chiếu lại với server."
         }
       ],
       "quizzes": [
@@ -105,6 +179,297 @@
           ],
           "correctAnswer": "A",
           "explanation": "staleTime quyết định KHI NÀO cần refetch ngầm, gcTime (Garbage Collection) quyết định KHI NÀO cần xóa cache khỏi bộ nhớ RAM khi component unmount."
+        }
+      ]
+    },
+    {
+      "id": "tq-03",
+      "slug": "query-keys-parallel-dependent-prefetching",
+      "title": "Query Keys, Parallel/Dependent Queries & Prefetching",
+      "summary": "Thiết kế query key ổn định, tránh request waterfall và tái sử dụng queryOptions giữa component với QueryClient.",
+      "durationMinutes": 22,
+      "level": "intermediate",
+      "tags": ["Query Keys", "useQueries", "Dependent Queries", "Prefetching"],
+      "mentalModel": "Query key là địa chỉ của dữ liệu trong cache. Mọi biến mà queryFn sử dụng để tạo ra dữ liệu khác phải xuất hiện trong key. Các dữ liệu độc lập nên khởi chạy song song; dữ liệu thật sự phụ thuộc mới chờ nhau.",
+      "keyPoints": [
+        "Query key phải là Array ở top-level, có thể chứa object serializable và được hash ổn định. Đặt key từ tổng quát đến chi tiết: `['projects', 'detail', projectId]`.",
+        "Dùng `queryOptions()` để đặt queryKey/queryFn/staleTime ở một nơi và giữ type inference khi tái sử dụng với `useQuery`, prefetch hoặc `setQueryData`.",
+        "Các `useQuery` đứng cạnh nhau chạy song song. Với số lượng query động, dùng `useQueries`; với query phụ thuộc, dùng `enabled` và cân nhắc đổi API để tránh waterfall.",
+        "Prefetch khi có tín hiệu người dùng sắp cần dữ liệu, ví dụ hover/focus link hoặc ở router/server preload phase; prefetch chỉ hữu ích nếu key và options khớp với consumer."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Query key factory với queryOptions",
+          "language": "typescript",
+          "afterCode": "import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';\n\ntype Project = { id: string; name: string };\n\nexport const projectQueries = {\n  all: () => ['projects'] as const,\n  detail: (id: string) =>\n    queryOptions({\n      queryKey: ['projects', 'detail', id] as const,\n      queryFn: async (): Promise<Project> => {\n        const response = await fetch(`/api/projects/${id}`);\n        if (!response.ok) throw new Error('Không tải được project');\n        return response.json();\n      },\n      staleTime: 60_000,\n    }),\n};\n\nexport function ProjectName({ id }: { id: string }) {\n  const project = useQuery(projectQueries.detail(id));\n  if (project.isPending) return <span>Đang tải...</span>;\n  if (project.isError) return <span>Tải thất bại</span>;\n  return <strong>{project.data.name}</strong>;\n}\n\nexport function ProjectLink({ id }: { id: string }) {\n  const queryClient = useQueryClient();\n  return (\n    <a\n      href={`/projects/${id}`}\n      onMouseEnter={() => queryClient.prefetchQuery(projectQueries.detail(id))}\n    >\n      Xem project\n    </a>\n  );\n}",
+          "takeaway": "Factory giữ query key và queryFn nhất quán. Prefetch dùng đúng options sẽ làm ấm chính cache entry mà màn hình đích đọc."
+        },
+        {
+          "title": "Phân biệt query động song song và query phụ thuộc",
+          "language": "tsx",
+          "afterCode": "import { useQueries, useQuery } from '@tanstack/react-query';\n\n// Số lượng động: tất cả project được fetch song song\nfunction ProjectCards({ ids }: { ids: string[] }) {\n  const projects = useQueries({\n    queries: ids.map(id => projectQueries.detail(id)),\n  });\n\n  return projects.map((project, index) => (\n    <div key={ids[index]}>\n      {project.isPending ? 'Đang tải...' : project.data?.name}\n    </div>\n  ));\n}\n\n// Query thứ hai thật sự cần user.id từ query thứ nhất\nfunction UserProjects({ email }: { email: string }) {\n  const user = useQuery({\n    queryKey: ['users', 'by-email', email],\n    queryFn: () => getUserByEmail(email),\n  });\n\n  const projects = useQuery({\n    queryKey: ['projects', 'by-user', user.data?.id],\n    queryFn: () => getProjectsByUser(user.data!.id),\n    enabled: Boolean(user.data?.id),\n  });\n\n  return <ProjectList projects={projects.data ?? []} />;\n}",
+          "takeaway": "`enabled` mô tả dependency hợp lệ nhưng tạo waterfall có chủ đích. Nếu latency quan trọng, cân nhắc endpoint nhận email trực tiếp hoặc trả user kèm projects."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-tq-03-1",
+          "question": "Query function gọi `/api/projects?page=3&status=open`. Thành phần nào phải có trong queryKey?",
+          "options": [
+            { "key": "A", "text": "Chỉ chuỗi `projects`" },
+            { "key": "B", "text": "Page và status vì chúng làm thay đổi dữ liệu trả về" },
+            { "key": "C", "text": "Chỉ tên component" },
+            { "key": "D", "text": "Không cần queryKey khi có queryFn" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Một key phù hợp có thể là `['projects', { page: 3, status: 'open' }]`. Nếu thiếu biến phụ thuộc, các kết quả khác nhau có thể dùng nhầm cùng cache entry."
+        },
+        {
+          "id": "q-tq-03-2",
+          "question": "Bạn có một mảng ID thay đổi theo filter và muốn fetch chi tiết của tất cả ID song song. Hook nào phù hợp nhất?",
+          "options": [
+            { "key": "A", "text": "Gọi useQuery bên trong ids.map" },
+            { "key": "B", "text": "useQueries với mảng queries được tạo từ ids" },
+            { "key": "C", "text": "useMutation" },
+            { "key": "D", "text": "useIsFetching" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Không được gọi hook trong vòng lặp có số lượng thay đổi. `useQueries` được thiết kế cho số lượng query động."
+        },
+        {
+          "id": "q-tq-03-3",
+          "question": "Cách tốt nhất để giảm waterfall `getUser(email) → getProjects(user.id)` khi backend có thể thay đổi là gì?",
+          "options": [
+            { "key": "A", "text": "Tăng gcTime" },
+            { "key": "B", "text": "Gọi cả hai query cùng lúc dù chưa có user.id" },
+            {
+              "key": "C",
+              "text": "Thiết kế endpoint lấy projects bằng email hoặc trả user và projects trong một request phù hợp"
+            },
+            { "key": "D", "text": "Đặt retry thành Infinity" }
+          ],
+          "correctAnswer": "C",
+          "explanation": "`enabled` xử lý đúng dependency nhưng không xóa độ trễ nối tiếp. Thay đổi data contract thường là cách thực chất để flatten waterfall."
+        }
+      ]
+    },
+    {
+      "id": "tq-04",
+      "slug": "pagination-infinite-query-load-more",
+      "title": "Pagination & Infinite Query: Page, Cursor và Load More",
+      "summary": "Giữ UI ổn định khi đổi trang và triển khai load-more/infinite scroll bằng useInfiniteQuery.",
+      "durationMinutes": 22,
+      "level": "intermediate",
+      "tags": ["Pagination", "useInfiniteQuery", "placeholderData", "Cursor"],
+      "mentalModel": "Pagination thường tạo một cache entry cho mỗi page. Infinite query gom nhiều page vào cùng một cache entry có cấu trúc `{ pages, pageParams }`; `getNextPageParam` quyết định cursor kế tiếp.",
+      "keyPoints": [
+        "Đưa `page` hoặc cursor vào queryKey. Với phân trang bằng `useQuery`, dùng `placeholderData: keepPreviousData` để giữ trang cũ trong lúc trang mới tải.",
+        "`useInfiniteQuery` v5 cần `initialPageParam`, `queryFn({ pageParam })` và `getNextPageParam`; render dữ liệu bằng cách duyệt `data.pages`.",
+        "Chặn gọi trùng bằng `hasNextPage && !isFetchingNextPage` trước khi gọi `fetchNextPage`.",
+        "Infinite scroll cần nút Load more hoặc phương án bàn phím tương đương; IntersectionObserver là enhancement, không nên là con đường tương tác duy nhất."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Pagination không nhấp nháy với keepPreviousData",
+          "language": "tsx",
+          "afterCode": "import { keepPreviousData, useQuery } from '@tanstack/react-query';\nimport { useState } from 'react';\n\nfunction ProjectsTable() {\n  const [page, setPage] = useState(1);\n  const projects = useQuery({\n    queryKey: ['projects', { page }],\n    queryFn: () => fetchProjectsPage(page),\n    placeholderData: keepPreviousData,\n  });\n\n  return (\n    <>\n      <ProjectRows rows={projects.data?.items ?? []} />\n      {projects.isFetching && <span>Đang cập nhật...</span>}\n      <button disabled={page === 1} onClick={() => setPage(p => p - 1)}>Trước</button>\n      <button\n        disabled={projects.isPlaceholderData || !projects.data?.hasMore}\n        onClick={() => setPage(p => p + 1)}\n      >\n        Sau\n      </button>\n    </>\n  );\n}",
+          "takeaway": "Mỗi page vẫn có cache riêng; placeholderData chỉ giữ dữ liệu trước đó để UI không rơi lại vào pending state khi key đổi."
+        },
+        {
+          "title": "Load more bằng cursor với useInfiniteQuery",
+          "language": "tsx",
+          "afterCode": "import { useInfiniteQuery } from '@tanstack/react-query';\n\ntype FeedPage = {\n  items: Array<{ id: string; title: string }>;\n  nextCursor: string | null;\n};\n\nfunction Feed() {\n  const feed = useInfiniteQuery({\n    queryKey: ['feed'],\n    initialPageParam: null as string | null,\n    queryFn: ({ pageParam }) => fetchFeed({ cursor: pageParam }),\n    getNextPageParam: (lastPage: FeedPage) => lastPage.nextCursor ?? undefined,\n  });\n\n  const items = feed.data?.pages.flatMap(page => page.items) ?? [];\n\n  return (\n    <>\n      <ul>{items.map(item => <li key={item.id}>{item.title}</li>)}</ul>\n      <button\n        disabled={!feed.hasNextPage || feed.isFetchingNextPage}\n        onClick={() => feed.fetchNextPage()}\n      >\n        {feed.isFetchingNextPage ? 'Đang tải...' : feed.hasNextPage ? 'Tải thêm' : 'Đã hết'}\n      </button>\n    </>\n  );\n}",
+          "takeaway": "API phải trả cursor kế tiếp rõ ràng. Trả `undefined` từ getNextPageParam báo rằng không còn page tiếp theo."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-tq-04-1",
+          "question": "Trong TanStack Query v5, cấu hình nào giữ dữ liệu page cũ trong lúc page mới đang fetch?",
+          "options": [
+            { "key": "A", "text": "cacheTime: Infinity" },
+            { "key": "B", "text": "placeholderData: keepPreviousData" },
+            { "key": "C", "text": "retry: false" },
+            { "key": "D", "text": "enabled: false" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "V5 thay option `keepPreviousData: true` cũ bằng `placeholderData`, có thể dùng helper `keepPreviousData`."
+        },
+        {
+          "id": "q-tq-04-2",
+          "question": "`getNextPageParam` trả về `undefined` có ý nghĩa gì?",
+          "options": [
+            { "key": "A", "text": "Xóa toàn bộ cache" },
+            { "key": "B", "text": "Retry page hiện tại" },
+            {
+              "key": "C",
+              "text": "Không còn page tiếp theo, hasNextPage trở thành false"
+            },
+            { "key": "D", "text": "Chuyển sang page đầu" }
+          ],
+          "correctAnswer": "C",
+          "explanation": "TanStack Query dùng kết quả của getNextPageParam để xác định tham số và sự tồn tại của page kế tiếp."
+        },
+        {
+          "id": "q-tq-04-3",
+          "question": "Vì sao infinite scroll vẫn nên có nút “Tải thêm” có thể focus bằng bàn phím?",
+          "options": [
+            { "key": "A", "text": "Để tăng gcTime" },
+            {
+              "key": "B",
+              "text": "Để có fallback accessible và cho người dùng kiểm soát việc tải thêm"
+            },
+            { "key": "C", "text": "Vì IntersectionObserver không chạy trong React" },
+            { "key": "D", "text": "Để queryKey ngắn hơn" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Auto-load bằng viewport có thể là enhancement, nhưng nút thật hỗ trợ bàn phím, screen reader và kiểm soát dữ liệu tốt hơn."
+        }
+      ]
+    },
+    {
+      "id": "tq-05",
+      "slug": "tanstack-query-hooks-toolbox",
+      "title": "TanStack Query Hook Toolbox: Chọn Hook Đúng Việc",
+      "summary": "Bản đồ các hook thường dùng để đọc dữ liệu, ghi dữ liệu, truy cập cache và hiển thị trạng thái mạng toàn cục.",
+      "durationMinutes": 20,
+      "level": "intermediate",
+      "tags": ["useQuery", "useSuspenseQuery", "useQueries", "useMutationState"],
+      "mentalModel": "Chia hooks thành ba nhóm: đọc server state (`useQuery`, `useSuspenseQuery`, `useQueries`, `useInfiniteQuery`), ghi (`useMutation`) và quan sát/điều phối cache (`useQueryClient`, `useIsFetching`, `useIsMutating`, `useMutationState`).",
+      "keyPoints": [
+        "`useQuery` là mặc định cho một resource; `useSuspenseQuery` giao pending cho Suspense và lỗi cho Error Boundary, đổi lại `data` luôn được định nghĩa khi component render tiếp.",
+        "`useQueries` dành cho số lượng query động; `useInfiniteQuery` dành cho nhiều page của cùng một danh sách. Không gọi hooks trong map hoặc điều kiện.",
+        "`useMutation` thực hiện create/update/delete; `useQueryClient` đọc, ghi, prefetch, cancel hoặc invalidate cache ngoài declarative query observer.",
+        "`useIsFetching` và `useIsMutating` trả số tác vụ đang chạy; `useMutationState` đọc chi tiết mutation cache theo filter/mutationKey để làm optimistic UI ở component khác."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Cheatsheet chọn hook qua các tình huống phổ biến",
+          "language": "tsx",
+          "afterCode": "import {\n  useInfiniteQuery,\n  useMutation,\n  useQueries,\n  useQuery,\n  useQueryClient,\n  useSuspenseQuery,\n} from '@tanstack/react-query';\n\nfunction DataDashboard({ id, roomIds }: { id: string; roomIds: string[] }) {\n  // 1 resource, component tự xử lý pending/error\n  const user = useQuery({\n    queryKey: ['user', id],\n    queryFn: () => getUser(id),\n  });\n\n  // Đặt component dưới <Suspense> + Error Boundary; data luôn tồn tại\n  const { data: settings } = useSuspenseQuery({\n    queryKey: ['settings'],\n    queryFn: getSettings,\n  });\n\n  // Số lượng resource động, chạy song song\n  const messages = useQueries({\n    queries: roomIds.map(roomId => ({\n      queryKey: ['messages', roomId],\n      queryFn: () => getMessages(roomId),\n    })),\n  });\n\n  // Nhiều page của cùng feed\n  const feed = useInfiniteQuery({\n    queryKey: ['feed'],\n    initialPageParam: null as string | null,\n    queryFn: ({ pageParam }) => getFeed(pageParam),\n    getNextPageParam: last => last.nextCursor ?? undefined,\n  });\n\n  // Ghi dữ liệu + điều phối cache\n  const queryClient = useQueryClient();\n  const saveUser = useMutation({\n    mutationKey: ['users', 'save'],\n    mutationFn: updateUser,\n    onSuccess: savedUser => {\n      queryClient.setQueryData(['user', savedUser.id], savedUser);\n    },\n  });\n\n  return <DashboardView {...{ user, settings, messages, feed, saveUser }} />;\n}",
+          "takeaway": "Bắt đầu từ shape của dữ liệu và UX, không chọn hook theo độ 'nâng cao'. Một resource → useQuery; danh sách page → useInfiniteQuery; ghi → useMutation."
+        },
+        {
+          "title": "Thanh trạng thái mạng toàn cục và pending mutation liên component",
+          "language": "tsx",
+          "afterCode": "import { useIsFetching, useIsMutating, useMutationState } from '@tanstack/react-query';\n\nexport function GlobalNetworkStatus() {\n  const fetchingCount = useIsFetching();\n  const mutatingCount = useIsMutating();\n\n  if (fetchingCount + mutatingCount === 0) return null;\n  return (\n    <div role=\"status\" aria-live=\"polite\">\n      Đang đồng bộ {fetchingCount + mutatingCount} tác vụ…\n    </div>\n  );\n}\n\nexport function PendingUserNames() {\n  const pendingNames = useMutationState<string>({\n    filters: { mutationKey: ['users', 'save'], status: 'pending' },\n    select: mutation => {\n      const variables = mutation.state.variables as { name: string };\n      return variables.name;\n    },\n  });\n\n  return pendingNames.map((name, index) => (\n    <span key={`${name}-${index}`} aria-busy=\"true\">{name} đang lưu…</span>\n  ));\n}",
+          "takeaway": "Dùng filters để tránh indicator hoặc mutation observer lắng nghe toàn bộ cache. Các hook trạng thái trả snapshot reactive, phù hợp cho UI toàn cục."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-tq-05-1",
+          "question": "Hook nào phù hợp nhất để hiển thị một progress bar khi có bất kỳ query nào đang fetch?",
+          "options": [
+            { "key": "A", "text": "useIsFetching" },
+            { "key": "B", "text": "useInfiniteQuery" },
+            { "key": "C", "text": "useMutation" },
+            { "key": "D", "text": "useSuspenseQuery" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "`useIsFetching` trả số query đang fetch và có thể nhận filters để chỉ theo dõi một nhóm query."
+        },
+        {
+          "id": "q-tq-05-2",
+          "question": "Component A chạy mutation; Component B cần hiển thị variables của mutation pending có mutationKey cụ thể. Hook nào phù hợp?",
+          "options": [
+            { "key": "A", "text": "useQueryClient chỉ để lấy boolean" },
+            { "key": "B", "text": "useMutationState với filters và select" },
+            { "key": "C", "text": "useIsFetching" },
+            { "key": "D", "text": "useInfiniteQuery" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "`useMutationState` quan sát MutationCache và cho phép lọc/chọn dữ liệu chi tiết; `useIsMutating` chỉ phù hợp khi cần số lượng."
+        },
+        {
+          "id": "q-tq-05-3",
+          "question": "Khi nào nên ưu tiên useSuspenseQuery thay vì useQuery?",
+          "options": [
+            { "key": "A", "text": "Khi muốn dùng enabled: false" },
+            {
+              "key": "B",
+              "text": "Khi cây đã có Suspense/Error Boundary phù hợp và muốn giao pending/error cho boundary"
+            },
+            { "key": "C", "text": "Cho mọi mutation POST" },
+            { "key": "D", "text": "Khi không có QueryClientProvider" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Suspense query đơn giản hóa success path nhưng yêu cầu boundary được đặt đúng. Nó không thay thế mutation và vẫn cần QueryClientProvider."
+        }
+      ]
+    },
+    {
+      "id": "tq-06",
+      "slug": "nextjs-app-router-prefetch-hydration",
+      "title": "TanStack Query + Next.js: Prefetch, Dehydrate & Hydrate",
+      "summary": "Prefetch server state trong App Router, chuyển cache an toàn qua HydrationBoundary và tránh request waterfall.",
+      "durationMinutes": 24,
+      "level": "advanced",
+      "tags": ["Next.js App Router", "HydrationBoundary", "dehydrate", "SSR"],
+      "mentalModel": "Server Component là preload phase: tạo QueryClient theo request, prefetch data rồi dehydrate cache thành state serializable. HydrationBoundary đưa state đó vào browser QueryClient để client hook dùng cùng queryKey mà không bắt đầu từ cache rỗng.",
+      "keyPoints": [
+        "Tạo QueryClient riêng cho request/server boundary để tránh rò dữ liệu giữa người dùng; browser giữ một QueryClient ổn định.",
+        "Server prefetch và client consumer phải dùng cùng queryKey/queryFn contract; `queryOptions` giúp tái sử dụng type-safe options.",
+        "Đặt staleTime lớn hơn 0 cho hydrated query nếu không muốn client refetch ngay sau hydration.",
+        "Prefetch các query độc lập song song để flatten waterfall. Không dùng Server Action làm queryFn cho client refetch; dùng Route Handler/API/RPC, còn Server Action phù hợp hơn cho mutation."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Prefetch trong Server Component và hydrate Client Component",
+          "language": "tsx",
+          "afterCode": "// app/posts/page.tsx — Server Component\nimport { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';\nimport { postsOptions } from '@/queries/posts';\nimport { Posts } from './posts';\n\nexport default async function PostsPage() {\n  const queryClient = new QueryClient();\n  await queryClient.prefetchQuery(postsOptions());\n\n  return (\n    <HydrationBoundary state={dehydrate(queryClient)}>\n      <Posts />\n    </HydrationBoundary>\n  );\n}\n\n// app/posts/posts.tsx — Client Component\n'use client';\nimport { useQuery } from '@tanstack/react-query';\nimport { postsOptions } from '@/queries/posts';\n\nexport function Posts() {\n  const posts = useQuery(postsOptions());\n  return <PostList posts={posts.data ?? []} />;\n}\n\n// queries/posts.ts\nexport const postsOptions = () => queryOptions({\n  queryKey: ['posts'] as const,\n  queryFn: fetchPosts, // API/RPC chạy được khi client refetch\n  staleTime: 60_000,\n});",
+          "takeaway": "Hydration cung cấp cùng cache snapshot cho server render và browser; query options chung ngăn key/queryFn lệch nhau."
+        },
+        {
+          "title": "Lab 2 — Prefetch song song để tránh server waterfall",
+          "language": "tsx",
+          "beforeCode": "// ❌ Hai prefetch độc lập nhưng chạy nối tiếp\nawait queryClient.prefetchQuery(userOptions());\nawait queryClient.prefetchQuery(projectsOptions());",
+          "afterCode": "export default async function DashboardPage() {\n  const queryClient = new QueryClient();\n\n  await Promise.all([\n    queryClient.prefetchQuery(userOptions()),\n    queryClient.prefetchQuery(projectsOptions()),\n  ]);\n\n  return (\n    <HydrationBoundary state={dehydrate(queryClient)}>\n      <Dashboard />\n    </HydrationBoundary>\n  );\n}",
+          "takeaway": "Chỉ await nối tiếp khi query sau thật sự cần kết quả query trước; query độc lập nên khởi chạy cùng lúc."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-tq-06-1",
+          "question": "HydrationBoundary nhận state thường được tạo bởi hàm nào?",
+          "options": [
+            { "key": "A", "text": "dehydrate(queryClient)" },
+            { "key": "B", "text": "JSON.stringify(window)" },
+            { "key": "C", "text": "useMutationState" },
+            { "key": "D", "text": "router.refresh" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "dehydrate trích cache state phù hợp để chuyển từ preload/server phase sang client hydration."
+        },
+        {
+          "id": "q-tq-06-2",
+          "question": "Server prefetch dùng key ['posts'], client useQuery dùng ['post-list']. Kết quả là gì?",
+          "options": [
+            { "key": "A", "text": "Client tự nối hai cache entry" },
+            {
+              "key": "B",
+              "text": "Client không tìm thấy prefetched entry và có thể fetch lại"
+            },
+            { "key": "C", "text": "Build tự sửa key" },
+            { "key": "D", "text": "Mutation cache bị xóa" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Cache được định danh bằng queryKey; producer và consumer phải dùng cùng contract."
+        },
+        {
+          "id": "q-tq-06-3",
+          "question": "Vì sao không nên dùng Server Action làm queryFn cho TanStack Query client?",
+          "options": [
+            { "key": "A", "text": "Server Action không nhận string" },
+            {
+              "key": "B",
+              "text": "Client query cần cơ chế fetch/refetch phù hợp; Server Actions có semantics tuần tự và phù hợp mutation hơn"
+            },
+            { "key": "C", "text": "Query chỉ chạy CSS" },
+            { "key": "D", "text": "HydrationBoundary cấm function" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Dùng Route Handler/API/RPC cho queryFn client; Server Actions vẫn phù hợp cho mutation có auth/validation."
         }
       ]
     }

@@ -17,17 +17,25 @@
       "tags": ["React Concurrency", "useTransition", "useDeferredValue", "Performance"],
       "mentalModel": "Không phải mọi cập nhật state đều có độ ưu tiên như nhau. Nhập phím vào ô input là khẩn cấp (Urgent - cần phản hồi tức thì), còn render lại danh sách 5000 kết quả tìm kiếm là chuyển cảnh không khẩn cấp (Non-urgent Transition - có thể tạm dừng/ngắt quãng để ưu tiên gõ phím).",
       "keyPoints": [
-        "`useTransition` bọc các tác vụ cập nhật state nặng vào hàm `startTransition()`, cung cấp cờ `isPending` để hiển thị spinner mượt mà.",
-        "`useDeferredValue` nhận vào một giá trị prop/state và tự động tạo ra một bản sao giá trị có độ ưu tiên thấp hơn (trì hoãn render phần nặng).",
-        "Concurrent Rendering giúp React không còn chặn đứng (block) Main Thread khi render các cây component lớn."
+        "`useTransition` đánh dấu một hoặc nhiều cập nhật state là không khẩn cấp; React có thể tạm ngắt render đó để ưu tiên tương tác khẩn cấp và cung cấp `isPending`.",
+        "`useDeferredValue` tạo một phiên bản có thể tụt lại phía sau của giá trị hiện tại, phù hợp khi bạn không kiểm soát nơi gọi setState hoặc muốn trì hoãn một cây render nặng.",
+        "Callback của `startTransition` chạy ngay trên main thread: API này không chuyển phép tính sang background thread và không thay thế Web Worker.",
+        "Hai API đều không phải debounce. `useDeferredValue` không giảm số request mạng; hãy debounce hoặc cache riêng nếu mục tiêu là giảm request."
       ],
       "codeRecipes": [
         {
           "title": "Tối ưu danh sách tìm kiếm nặng với useTransition",
           "language": "tsx",
           "beforeCode": "// ❌ Ô gõ phím bị đơ, giật lag vì phải render 2000 items cùng lúc với cập nhật input\nfunction SearchDemo() {\n  const [query, setQuery] = useState('');\n  const [filteredList, setFilteredList] = useState(allData);\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    setQuery(e.target.value); // Khẩn cấp\n    setFilteredList(allData.filter(item => item.includes(e.target.value))); // Nặng -> Block UI!\n  };\n}",
-          "afterCode": "// ✅ Tách bạch Urgent State vs Non-Urgent Transition với useTransition\nimport { useState, useTransition } from 'react';\n\nfunction SearchDemo() {\n  const [query, setQuery] = useState('');\n  const [filteredList, setFilteredList] = useState(allData);\n  const [isPending, startTransition] = useTransition();\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    setQuery(e.target.value); // 1. Cập nhật input tức thì (60 FPS)\n\n    startTransition(() => {\n      // 2. Chuyển tác vụ tính toán lọc danh sách vào hàng đợi nền\n      setFilteredList(allData.filter(item => item.includes(e.target.value)));\n    });\n  };\n\n  return (\n    <div>\n      <input value={query} onChange={handleChange} placeholder=\"Tìm kiếm...\" />\n      {isPending && <span className=\"text-xs text-muted-foreground\">Đang lọc kết quả...</span>}\n      <HeavyList items={filteredList} opacity={isPending ? 0.6 : 1} />\n    </div>\n  );\n}",
-          "takeaway": "useTransition giữ cho người dùng gõ phím mượt mà ở 60 FPS dù phía dưới đang render hàng ngàn item phức tạp."
+          "afterCode": "// ✅ Input là urgent; cập nhật query dùng để render danh sách là Transition\nimport { useState, useTransition } from 'react';\n\nfunction SearchDemo() {\n  const [input, setInput] = useState('');\n  const [listQuery, setListQuery] = useState('');\n  const [isPending, startTransition] = useTransition();\n\n  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    const next = e.target.value;\n    setInput(next); // Controlled input phải cập nhật đồng bộ\n    startTransition(() => {\n      setListQuery(next); // Đánh dấu render HeavyList là không khẩn cấp\n    });\n  };\n\n  return (\n    <div>\n      <input value={input} onChange={handleChange} placeholder=\"Tìm kiếm...\" />\n      {isPending && <span>Đang cập nhật kết quả...</span>}\n      <HeavyList query={listQuery} aria-busy={isPending} />\n    </div>\n  );\n}",
+          "takeaway": "useTransition giúp React ưu tiên input và có thể ngắt render danh sách cũ. Nó không làm phép tính chạy trên luồng nền; tác vụ CPU rất nặng vẫn cần tối ưu thuật toán, virtualization hoặc Web Worker."
+        },
+        {
+          "title": "Trì hoãn cây kết quả nặng với useDeferredValue",
+          "language": "tsx",
+          "beforeCode": "// ❌ Mỗi phím gõ buộc SlowResults render ngay với query mới\nfunction SearchPage() {\n  const [query, setQuery] = useState('');\n  return <>\n    <input value={query} onChange={e => setQuery(e.target.value)} />\n    <SlowResults query={query} />\n  </>;\n}",
+          "afterCode": "// ✅ Giá trị input vẫn tức thời, cây kết quả có thể render trễ hơn\nimport { memo, useDeferredValue, useState } from 'react';\n\nconst SlowResults = memo(function SlowResults({ query }: { query: string }) {\n  const items = allData.filter(item => item.includes(query));\n  return <ul>{items.map(item => <li key={item}>{item}</li>)}</ul>;\n});\n\nfunction SearchPage() {\n  const [query, setQuery] = useState('');\n  const deferredQuery = useDeferredValue(query);\n  const isStale = query !== deferredQuery;\n\n  return (\n    <>\n      <input value={query} onChange={e => setQuery(e.target.value)} />\n      <div style={{ opacity: isStale ? 0.6 : 1 }}>\n        <SlowResults query={deferredQuery} />\n      </div>\n    </>\n  );\n}",
+          "takeaway": "So sánh giá trị hiện tại với giá trị deferred để báo UI đang cũ. `memo` giúp cây chậm bỏ qua lần render urgent khi deferred value chưa đổi."
         }
       ],
       "quizzes": [
@@ -54,6 +62,42 @@
           ],
           "correctAnswer": "A",
           "explanation": "`useTransition` bọc hàm setState bên trong callback `startTransition(() => setState())`. Trong khi đó, `useDeferredValue(value)` nhận vào một giá trị (thường từ props hoặc store bên ngoài) và tạo ra bản sao render trễ."
+        },
+        {
+          "id": "q-rpp-01-2",
+          "question": "Đặt một vòng lặp CPU rất nặng bên trong callback `startTransition` có làm nó chạy trên background thread không?",
+          "options": [
+            { "key": "A", "text": "Có, React tự chuyển callback sang Web Worker" },
+            {
+              "key": "B",
+              "text": "Không. Callback chạy ngay trên main thread; Transition chỉ thay đổi độ ưu tiên của các state update"
+            },
+            { "key": "C", "text": "Có, nhưng chỉ trong Next.js" },
+            { "key": "D", "text": "Chỉ khi dùng kèm useMemo" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Transition làm render có thể bị ngắt, nhưng JavaScript đồng bộ nặng vẫn chặn main thread. Hãy tối ưu công việc hoặc chuyển nó sang Web Worker."
+        },
+        {
+          "id": "q-rpp-01-3",
+          "question": "Bạn muốn giảm số request search khi người dùng gõ liên tục. Giải pháp đúng là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Chỉ dùng useDeferredValue vì hook này tự hủy request"
+            },
+            {
+              "key": "B",
+              "text": "Chỉ dùng useTransition vì Transition gộp mọi request"
+            },
+            {
+              "key": "C",
+              "text": "Debounce request và có thể kết hợp cache; dùng deferred value riêng để ưu tiên render nếu cần"
+            },
+            { "key": "D", "text": "Đưa fetch vào useMemo" }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Deferred rendering và kiểm soát tần suất network là hai vấn đề khác nhau. useDeferredValue không ngăn request được tạo."
         }
       ]
     },
@@ -132,7 +176,7 @@
           "language": "typescript",
           "beforeCode": "// ❌ Anti-pattern: Destructure trực tiếp từ hook store gây re-render khi bất kỳ state nào đổi\nfunction Header() {\n  const { user, cartItems, notifications, changeTheme } = useAppStore();\n  // Dù chỉ dùng 'user', component này vẫn bị re-render khi cartItems hoặc notifications đổi!\n  return <div>{user.name}</div>;\n}",
           "afterCode": "// ✅ Chuẩn Zustand v5: Sử dụng Atomic Selectors riêng biệt\nimport { create } from 'zustand';\nimport { persist, createJSONStorage } from 'zustand/middleware';\n\ninterface UserState {\n  user: { name: string; email: string } | null;\n  setUser: (u: { name: string; email: string } | null) => void;\n}\n\nexport const useUserStore = create<UserState>()(\n  persist(\n    (set) => ({\n      user: null,\n      setUser: (user) => set({ user }),\n    }),\n    {\n      name: 'user-storage',\n      storage: createJSONStorage(() => localStorage),\n    }\n  )\n);\n\n// Trong component:\nfunction Header() {\n  const user = useUserStore((state) => state.user); // ✅ Chỉ re-render khi 'user' thay đổi\n  return <div>{user?.name ?? 'Khách'}</div>;\n}",
-          "takeaway": "Atomic Selectors của Zustand đem lại hiệu năng vượt trội và loại bỏ hoàn toàn vấn đề Provider Hell."
+          "takeaway": "Atomic selectors giới hạn các re-render do store gây ra. Zustand cũng có thể giảm nhu cầu lồng nhiều Provider, nhưng không thay thế mọi loại Context."
         }
       ],
       "quizzes": [
@@ -170,10 +214,10 @@
       "durationMinutes": 22,
       "level": "advanced",
       "tags": ["Profiler", "Virtualization", "TanStack Virtual", "Performance"],
-      "mentalModel": "Trình duyệt chỉ có thể hiển thị tối đa khoảng 15-20 phần tử trên màn hình cùng một lúc. Kỹ thuật Virtualization chỉ render đúng những DOM node nằm trong khung nhìn (Viewport) và tái sử dụng chúng khi cuộn.",
+      "mentalModel": "Tại một thời điểm, người dùng chỉ nhìn thấy một phần nhỏ của danh sách dài. Virtualization chỉ mount vùng đang nhìn thấy cộng một lượng overscan, rồi thay đổi các row được mount khi cuộn.",
       "keyPoints": [
         "Dùng React DevTools Profiler (tab Flamegraph & Ranked chart) để xác định chính xác component nào render lâu và lý do re-render (Why did this render).",
-        "Khi hiển thị danh sách từ 500 phần tử trở lên có giao diện phức tạp, Virtualization là giải pháp bắt buộc để tránh crash bộ nhớ RAM của trình duyệt.",
+        "Cân nhắc virtualization khi profiling cho thấy số DOM node hoặc chi phí render/scroll của danh sách dài là nút thắt; không có ngưỡng item cố định đúng cho mọi giao diện.",
         "Sử dụng `@tanstack/react-virtual` để quản lý vị trí cuộn mượt mà với dynamic height."
       ],
       "codeRecipes": [
@@ -181,8 +225,8 @@
           "title": "Ảo hóa danh sách 10,000 items với @tanstack/react-virtual",
           "language": "tsx",
           "beforeCode": "// ❌ Render trực tiếp 10,000 DOM Nodes làm trình duyệt đơ và tốn 500MB RAM\nfunction BigList({ items }: { items: string[] }) {\n  return (\n    <div className=\"overflow-auto h-[400px]\">\n      {items.map((item, idx) => (\n        <div key={idx} className=\"h-10 border-b\">{item}</div>\n      ))}\n    </div>\n  );\n}",
-          "afterCode": "// ✅ Áo hóa: Chỉ render ~15 DOM nodes nhìn thấy được trong viewport\nimport { useRef } from 'react';\nimport { useVirtualizer } from '@tanstack/react-virtual';\n\nfunction VirtualizedList({ items }: { items: string[] }) {\n  const parentRef = useRef<HTMLDivElement>(null);\n\n  const rowVirtualizer = useVirtualizer({\n    count: items.length,\n    getScrollElement: () => parentRef.current,\n    estimateSize: () => 40, // Chiều cao ước tính mỗi dòng (px)\n    overscan: 5,\n  });\n\n  return (\n    <div ref={parentRef} className=\"h-[400px] overflow-auto border rounded-xl\">\n      <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>\n        {rowVirtualizer.getVirtualItems().map((virtualRow) => (\n          <div\n            key={virtualRow.index}\n            className=\"absolute left-0 top-0 w-full h-10 px-4 flex items-center border-b\"\n            style={{ transform: `translateY(${virtualRow.start}px)` }}\n          >\n            {items[virtualRow.index]}\n          </div>\n        ))}\n      </div>\n    </div>\n  );\n}",
-          "takeaway": "Dung lượng DOM luôn giữ ở mức tối thiểu (< 30 nodes), cuộn danh sách 100k items vẫn đạt chuẩn 60 FPS mượt mà."
+          "afterCode": "// ✅ Ảo hóa: Chỉ render ~15 DOM nodes nhìn thấy được trong viewport\nimport { useRef } from 'react';\nimport { useVirtualizer } from '@tanstack/react-virtual';\n\nfunction VirtualizedList({ items }: { items: string[] }) {\n  const parentRef = useRef<HTMLDivElement>(null);\n\n  const rowVirtualizer = useVirtualizer({\n    count: items.length,\n    getScrollElement: () => parentRef.current,\n    estimateSize: () => 40, // Chiều cao ước tính mỗi dòng (px)\n    overscan: 5,\n  });\n\n  return (\n    <div ref={parentRef} className=\"h-[400px] overflow-auto border rounded-xl\">\n      <div style={{ height: `${rowVirtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>\n        {rowVirtualizer.getVirtualItems().map((virtualRow) => (\n          <div\n            key={virtualRow.index}\n            className=\"absolute left-0 top-0 w-full h-10 px-4 flex items-center border-b\"\n            style={{ transform: `translateY(${virtualRow.start}px)` }}\n          >\n            {items[virtualRow.index]}\n          </div>\n        ))}\n      </div>\n    </div>\n  );\n}",
+          "takeaway": "Virtualization giữ số DOM node gần với lượng phần tử đang nhìn thấy cộng overscan. Hiệu năng thực tế vẫn phụ thuộc độ phức tạp mỗi row và thiết bị."
         }
       ],
       "quizzes": [
@@ -208,7 +252,7 @@
             }
           ],
           "correctAnswer": "B",
-          "explanation": "Virtualization tính toán vị trí cuộn và chỉ mount các DOM elements trong khung nhìn người dùng, giúp tiết kiệm bộ nhớ và giữ tốc độ cuộn ở 60 FPS."
+          "explanation": "Virtualization tính toán vị trí cuộn và chỉ mount các DOM element trong viewport cộng overscan, nhờ đó giảm bộ nhớ và công việc layout/render."
         }
       ]
     }

@@ -10,7 +10,7 @@ const FALLBACK_OVERVIEW_DATA: OverviewData = {
       change: '+14.2%',
       isPositive: true,
       iconName: 'users',
-      description: 'Monthly active learners mastering React 19 & Next.js 15',
+      description: 'Monthly active learners mastering React 19 & Next.js 16',
     },
     {
       id: 'metric-2',
