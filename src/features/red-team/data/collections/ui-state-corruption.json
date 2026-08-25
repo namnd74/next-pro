@@ -150,9 +150,7 @@
       "objective": "Khiến trạng thái nội bộ của các row (input đang gõ, checkbox tick) gán nhầm sang item khác ngay sau một lần prepend, mà không có bất kỳ lỗi console nào.",
       "difficulty": "beginner",
       "estimatedMinutes": 20,
-      "vectorIds": [
-        "rcf-vec-01"
-      ],
+      "vectorIds": ["rcf-vec-01"],
       "rootCause": "React đối chiếu cây UI giữa hai lần render bằng key trong cùng một list. Key không phải 'tên hiển thị' mà là DANH TÍNH của element qua thời gian. Khi key=index, danh tính trở thành vị trí trong mảng — một thứ thay đổi theo mọi phép insert/remove. Vấn đề nền tảng: dev nhầm giữa hai khái niệm 'thứ tự hiển thị' (thuộc dữ liệu) và 'định danh' (cũng phải thuộc dữ liệu). Mọi state nội bộ của component row (uncontrolled input, useState cục bộ) bám theo DANH TÍNH, không bám theo nội dung props.",
       "reconNotes": [
         "Tìm mọi .map( render component có state riêng: input, checkbox, animation entry.",
@@ -208,9 +206,7 @@
       "objective": "Tạo ra tình trạng data thật đã đổi nhưng UI hoàn toàn không hay biết, và hiểu vì sao React 'chính đáng' bỏ qua re-render đó.",
       "difficulty": "intermediate",
       "estimatedMinutes": 22,
-      "vectorIds": [
-        "rcf-vec-02"
-      ],
+      "vectorIds": ["rcf-vec-02"],
       "rootCause": "React không theo dõi 'ý định' của bạn mà phát hiện thay đổi bằng so sánh tham chiếu: Object.is(oldState, newState). Đây là lựa chọn kiến trúc để render nhanh — so sánh con trỏ O(1) thay vì deep-compare toàn cây. Hệ quả hai mặt: mutation tại chỗ RẺ về hiệu năng nhưng VÔ HÌNH với React; immutable update TỐN một lần copy nhưng đổi tham chiếu thành tín hiệu đáng tin. Mọi tầng phía trên (memo, dependency array của useMemo/useEffect, Redux time-travel) đều xây trên cùng giả định tham chiếu bất biến.",
       "reconNotes": [
         "Grep các pattern nguy hiểm: state.push(, state[i] =, obj.field = trong handler.",
@@ -266,9 +262,7 @@
       "objective": "Làm chữ số 0 xuất hiện trên production ở mọi tài khoản mới, hiểu chính xác ngữ cảnh biểu thức JS quyết định điều đó, và vá bằng pattern an toàn vĩnh viễn.",
       "difficulty": "beginner",
       "estimatedMinutes": 18,
-      "vectorIds": [
-        "rcf-vec-03"
-      ],
+      "vectorIds": ["rcf-vec-03"],
       "rootCause": "JSX expression container {} render BẤT KỲ giá trị nào hợp lệ làm ReactNode: chuỗi, số, element, mảng. Toán tử && trả về giá trị của toán hạng — không ép về boolean. Vì vậy count=0 (falsy NHƯNG là number) được trả nguyên vẹn và React trung thành in ký tự '0'. Gốc rễ là va chạm giữa truthiness logic của JS (dành cho điều khiển luồng) và render semantics của React (mọi giá trị đều có thể hiển thị). NaN, chuỗi rỗng '' cũng thuộc nhóm này — 0 chỉ là nạn nhân nổi tiếng nhất.",
       "reconNotes": [
         "Grep toàn repo mẫu '{count &&', '{items.length &&', '{total &&' trong file .tsx.",
@@ -324,9 +318,7 @@
       "objective": "Chứng minh một hàm không thuần trong render phá hủy giả định caching của compiler (giá trị đổi mỗi lần nhưng deps 'không đổi'), dẫn tới UI bất nhất và re-render dại, sau đó tái cấu trúc về nguồn sự thật duy nhất.",
       "difficulty": "advanced",
       "estimatedMinutes": 22,
-      "vectorIds": [
-        "r19-vec-01"
-      ],
+      "vectorIds": ["r19-vec-01"],
       "rootCause": "React Compiler tự động memoize bằng giả định RENDER LÀ HÀM THUẦN: cùng input → cùng output, không side-effect, không đọc dữ liệu biến đổi ngoài hệ thống (Date.now, Math.random, module-level mutable). Khi component vi phạm, compiler vẫn cache theo deps nó nhìn thấy — nhưng output thật khác nhau mỗi lần chạy, sinh ra hai loại lỗi: giá trị hiển thị KHÔNG KHỚP với state hiện tại (cache hit trả kết quả cũ), hoặc ngược lại cache miss liên tục khiến tối ưu vô dụng. Gốc rễ: purity không phải quy tắc thẩm mỹ mà là TIỀN ĐỀ VẬT LÝ để 'nhớ kết quả theo input' có nghĩa.",
       "reconNotes": [
         "Grep trong body render: Math.random, Date.now, performance.now, new Date().",
@@ -382,9 +374,7 @@
       "objective": "Tạo stale UI chỉ bằng mutate-during-render, giải thích vì sao compiler không thể phát hiện (mutation vô hình với so sánh tham chiếu), và chuyển toàn bộ mutation sang đúng vị trí (event/effect).",
       "difficulty": "advanced",
       "estimatedMinutes": 20,
-      "vectorIds": [
-        "r19-vec-02"
-      ],
+      "vectorIds": ["r19-vec-02"],
       "rootCause": "Compiler quyết định re-render bằng cách theo dõi ĐỌC/GHI qua các kênh reactive (props, state). Mutation tại chỗ (obj.field = x, arr.push) thay đổi NỘI DUNG mà không đổi THAM CHIẾU — với mọi cơ chế so sánh dựa trên identity, đây là thay đổi vô hình. Khi dev mutate trong render (vi phạm cổ điển của class era sống sót sang function era), compiler tin rằng 'không có gì thay đổi' và bỏ qua invalidation: dữ liệu thật mới, màn hình cũ. Đây là lý do React Docs liệt mutate-during-render vào nhóm lỗi compiler KHÔNG thể tự vá — nó phá chính ngôn ngữ mô tả thay đổi.",
       "reconNotes": [
         "Grep trong component body: ref.current = , obj.prop = , .push(, .sort( trực tiếp (không qua copy).",

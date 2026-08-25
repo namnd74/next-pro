@@ -61,7 +61,8 @@ const FINDINGS: Finding[] = [
     icon: <FileSearch className="h-3.5 w-3.5" />,
     label: 'Webhook URL staging để lại trong code',
     exposed: 'fetch("https://staging.internal.api/hooks/deploy")',
-    patched: '// ✅ URL môi trường inject qua server-side env, client chỉ thấy tên action',
+    patched:
+      '// ✅ URL môi trường inject qua server-side env, client chỉ thấy tên action',
     hint: 'Có một fetch tới host staging.internal.api',
   },
 ];
@@ -93,7 +94,7 @@ export function BundleReconLab() {
               ATTACK MODE
             </Badge>
           )}
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
             tìm thấy {foundIds.length}/{FINDINGS.length} thông tin lộ
           </span>
         </div>
@@ -122,7 +123,9 @@ export function BundleReconLab() {
       {/* Fake deployed bundle */}
       <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] leading-relaxed shadow-inner">
         <div className="mb-1.5 flex items-center justify-between">
-          <span className="text-slate-500">$ inspect https://shop.example.com/_next/static/chunks/app.chunk.js</span>
+          <span className="text-slate-500">
+            $ inspect https://shop.example.com/_next/static/chunks/app.chunk.js
+          </span>
         </div>
 
         {/* Chunk header */}
@@ -184,9 +187,9 @@ export function BundleReconLab() {
                 {found ? <Skull className="h-3.5 w-3.5" /> : finding.icon}
               </span>
               <div className="min-w-0 space-y-0.5">
-                <p className="text-xs font-bold text-foreground">{finding.label}</p>
+                <p className="text-foreground text-xs font-bold">{finding.label}</p>
                 {found && (
-                  <p className="text-[11px] leading-relaxed text-destructive">
+                  <p className="text-destructive text-[11px] leading-relaxed">
                     ĐÃ XÁC NHẬN LỘ: attacker đọc được ngay khi mở DevTools.
                   </p>
                 )}
@@ -196,7 +199,7 @@ export function BundleReconLab() {
                   </p>
                 )}
                 {!found && !patchedAway && (
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
                     Chưa phát hiện — soi kỹ từng dòng trong bundle ở ATTACK MODE.
                   </p>
                 )}
@@ -214,17 +217,20 @@ export function BundleReconLab() {
           }`}
         >
           {allFound && !defenseMode ? (
-            <p className="text-xs leading-relaxed text-foreground">
+            <p className="text-foreground text-xs leading-relaxed">
               💀 <span className="font-bold">Blast Radius:</span> attacker biết đầy đủ
-              endpoint nội bộ, key thanh toán và cả source gốc (qua sourcemap) — giai
-              đoạn trinh sát hoàn tất mà hệ thống không ghi nhận bất kỳ alarm nào.
+              endpoint nội bộ, key thanh toán và cả source gốc (qua sourcemap) — giai đoạn
+              trinh sát hoàn tất mà hệ thống không ghi nhận bất kỳ alarm nào.
             </p>
           ) : (
-            <p className="text-xs leading-relaxed text-foreground">
-              🛡️ <span className="font-bold text-emerald-600 dark:text-emerald-400">Defense Patch:</span>{' '}
-              key/webhook chỉ sống phía server, sourcemap bị strip khi deploy,
-              route nhạy cảm luôn guard phía server. Attacker mở DevTools chỉ thấy
-              code đã minify, không còn điểm neo.
+            <p className="text-foreground text-xs leading-relaxed">
+              🛡️{' '}
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                Defense Patch:
+              </span>{' '}
+              key/webhook chỉ sống phía server, sourcemap bị strip khi deploy, route nhạy
+              cảm luôn guard phía server. Attacker mở DevTools chỉ thấy code đã minify,
+              không còn điểm neo.
             </p>
           )}
         </Card>

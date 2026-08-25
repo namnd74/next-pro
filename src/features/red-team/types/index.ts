@@ -31,12 +31,7 @@ export interface AttackVector {
 
 /** Id của một phase trong lộ trình Red Team (thứ tự học chuẩn) */
 export type RtPhaseId =
-  | 'phase-01'
-  | 'phase-02'
-  | 'phase-03'
-  | 'phase-04'
-  | 'phase-05'
-  | 'phase-06';
+  'phase-01' | 'phase-02' | 'phase-03' | 'phase-04' | 'phase-05' | 'phase-06';
 
 /**
  * Một phase trong lộ trình Red Team — đơn vị tổ chức của roadmap.
@@ -156,7 +151,12 @@ export interface RedTeamCollectionFile extends RedTeamCollection {
 
 export const SEVERITY_META: Record<
   SeverityLevel,
-  { label: string; badgeVariant: 'destructive' | 'warning' | 'info'; ring: string; text: string }
+  {
+    label: string;
+    badgeVariant: 'destructive' | 'warning' | 'info';
+    ring: string;
+    text: string;
+  }
 > = {
   critical: {
     label: 'CRITICAL',

@@ -64,11 +64,12 @@ test('gọi search API sau debounce', async () => {
 });
 
 // $ local 5/5 PASS — CI 2/10 PASS · team bật retry: 2 cho hết đỏ`,
-    question: 'CI đỏ ngẫu nhiên ~80%. Bản vá hardening nào biến test này deterministic tuyệt đối?',
+    question:
+      'CI đỏ ngẫu nhiên ~80%. Bản vá hardening nào biến test này deterministic tuyệt đối?',
     choices: [
       {
         id: 'r1a',
-        label: "Bật retry: 3 trong config CI — đỏ thì chạy lại đến khi xanh",
+        label: 'Bật retry: 3 trong config CI — đỏ thì chạy lại đến khi xanh',
         correct: false,
         verdict: 'Retry không sửa race condition — nó che nó sau lớp chạy lại.',
         consequence:
@@ -127,7 +128,8 @@ test('nút mua hiển thị đúng', () => {
         id: 'r2a',
         label: 'Cập nhật selector sang class mới (.bg-primary.px-4) sau mỗi lần refactor',
         correct: false,
-        verdict: 'Vẫn khoá vào chi tiết triển khai — bạn vừa biến suite thành việc làm tay vĩnh viễn.',
+        verdict:
+          'Vẫn khoá vào chi tiết triển khai — bạn vừa biến suite thành việc làm tay vĩnh viễn.',
         consequence:
           'Mỗi refactor UI kéo theo đợt sửa test cơ học; refactor đóng băng vì sợ, và đuôi vẫy con chó: test điều khiển design.',
       },
@@ -187,13 +189,15 @@ test('track view event khi mount', () => {
         id: 'r3a',
         label: "Giữ nguyên 'bypass', chỉ nhớ tắt VPN khi chạy test cho nhanh",
         correct: false,
-        verdict: "'Bypass' chính là tính năng rò rỉ — tắt VPN chỉ đổi đường dây của cuộc rò rỉ.",
+        verdict:
+          "'Bypass' chính là tính năng rò rỉ — tắt VPN chỉ đổi đường dây của cuộc rò rỉ.",
         consequence:
           'Unit test vẫn chạm hệ thống live bất kỳ khi nào env có cred: ô nhiễm dữ liệu dùng chung và rủi ro bảo mật khó biện minh trước audit.',
       },
       {
         id: 'r3b',
-        label: 'onUnhandledRequest: "error" + thêm http.post("/api/analytics/events") handler + afterEach(server.resetHandlers())',
+        label:
+          'onUnhandledRequest: "error" + thêm http.post("/api/analytics/events") handler + afterEach(server.resetHandlers())',
         correct: true,
         verdict:
           'Đúng. Request lạ giờ FAIL NGAY tại chỗ thay vì bay ra ngoài; handler matrix phủ đủ endpoint component chạm tới; resetHandlers cho mỗi test một thế giới sạch. Không gì lọt ra mạng thật nữa.',
@@ -203,7 +207,8 @@ test('track view event khi mount', () => {
         id: 'r3c',
         label: "Trỏ BASE_URL sang localhost trong env test để request 'không đi đâu'",
         correct: false,
-        verdict: 'Che giấu vấn đề chứ không vá: một dòng env lệch là request lại bay ra staging thật.',
+        verdict:
+          'Che giấu vấn đề chứ không vá: một dòng env lệch là request lại bay ra staging thật.',
         consequence:
           'Suite âm thầm phụ thuộc cấu hình máy — staging sập hoặc env sai là TOÀN BỘ PR đỏ không rõ nguyên nhân.',
       },
@@ -243,7 +248,7 @@ export function HardeningDrill() {
   const weakRounds = ROUNDS.filter((_, i) => results[i] === 'wrong');
 
   const pickedChoice =
-    round && pickedId ? round.choices.find((c) => c.id === pickedId) ?? null : null;
+    round && pickedId ? (round.choices.find((c) => c.id === pickedId) ?? null) : null;
 
   const pick = (choiceId: string) => {
     if (!round || pickedId) return;
@@ -275,7 +280,7 @@ export function HardeningDrill() {
             <ShieldCheck className="h-3 w-3" />
             BLUE TEAM · CAPSTONE DRILL
           </Badge>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
             {finished ? 'hoàn tất' : `hiệp ${current + 1}/${TOTAL_ROUNDS}`}
           </span>
         </div>
@@ -285,13 +290,13 @@ export function HardeningDrill() {
               r === 'correct' ? (
                 <CheckCircle2 key={i} className="h-3.5 w-3.5 text-emerald-500" />
               ) : r === 'wrong' ? (
-                <XCircle key={i} className="h-3.5 w-3.5 text-destructive" />
+                <XCircle key={i} className="text-destructive h-3.5 w-3.5" />
               ) : (
                 <span key={i} className="h-3 w-3 rounded-full border border-slate-700" />
               )
             )}
           </span>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
             điểm {score}/{TOTAL_ROUNDS}
           </span>
           <Button
@@ -320,8 +325,10 @@ export function HardeningDrill() {
                 {round.icon}
               </span>
               <div>
-                <p className="text-xs font-bold text-foreground">{round.title}</p>
-                <p className="font-mono text-[10px] text-muted-foreground">{round.vectorName}</p>
+                <p className="text-foreground text-xs font-bold">{round.title}</p>
+                <p className="text-muted-foreground font-mono text-[10px]">
+                  {round.vectorName}
+                </p>
               </div>
             </div>
             <Badge variant="warning" className="text-[10px]">
@@ -331,7 +338,7 @@ export function HardeningDrill() {
 
           {/* Threat hint */}
           {showThreatHints && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2 font-mono text-[10px] leading-relaxed text-destructive">
+            <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border p-2 font-mono text-[10px] leading-relaxed">
               ☠ Vì sao vết nứt này nguy hiểm: {round.threat}
             </div>
           )}
@@ -342,7 +349,7 @@ export function HardeningDrill() {
           </pre>
 
           {/* Question */}
-          <p className="text-xs font-bold text-foreground">{round.question}</p>
+          <p className="text-foreground text-xs font-bold">{round.question}</p>
 
           {/* Choices */}
           <div className="space-y-1.5">
@@ -390,7 +397,7 @@ export function HardeningDrill() {
                 </div>
               ) : (
                 <div className="space-y-1 text-[11px] leading-relaxed">
-                  <p className="font-bold text-destructive">❌ VÌ SAO SAI</p>
+                  <p className="text-destructive font-bold">❌ VÌ SAO SAI</p>
                   <p className="text-foreground">{pickedChoice.verdict}</p>
                   <p className="text-destructive">
                     💥 Hậu quả production: {pickedChoice.consequence}
@@ -427,10 +434,10 @@ export function HardeningDrill() {
               <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
                 🏆 Hàng phòng thủ đạt chuẩn — {score}/{TOTAL_ROUNDS}
               </p>
-              <ul className="list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-muted-foreground">
+              <ul className="text-muted-foreground list-disc space-y-1 pl-4 text-[11px] leading-relaxed">
                 {ROUNDS.map((r) => (
                   <li key={r.id}>
-                    <span className="font-semibold text-foreground">{r.vectorName}:</span>{' '}
+                    <span className="text-foreground font-semibold">{r.vectorName}:</span>{' '}
                     {r.defenseTakeaway}
                   </li>
                 ))}
@@ -438,14 +445,14 @@ export function HardeningDrill() {
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="text-xs font-bold text-destructive">
+              <p className="text-destructive text-xs font-bold">
                 💀 Kết quả {score}/{TOTAL_ROUNDS} — hàng phòng thủ còn điểm yếu:
               </p>
-              <ul className="space-y-1.5 text-[11px] leading-relaxed text-muted-foreground">
+              <ul className="text-muted-foreground space-y-1.5 text-[11px] leading-relaxed">
                 {weakRounds.map((r) => (
                   <li key={r.id}>
-                    ❌ <span className="font-semibold text-foreground">{r.title}</span> — bản vá
-                    đúng:{' '}
+                    ❌ <span className="text-foreground font-semibold">{r.title}</span> —
+                    bản vá đúng:{' '}
                     <span className="text-emerald-600 dark:text-emerald-400">
                       {r.choices.find((c) => c.correct)?.label ?? ''}
                     </span>

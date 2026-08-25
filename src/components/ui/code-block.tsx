@@ -74,7 +74,7 @@ function highlightLine(line: string): React.ReactNode {
 
   // 1. Comments
   if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
-    return <span className="font-sans italic text-emerald-400/90">{line}</span>;
+    return <span className="font-sans text-emerald-400/90 italic">{line}</span>;
   }
 
   // 2. Directives
@@ -188,7 +188,7 @@ export function CodeBlock({
       {/* Header bar if language specified */}
       {language && (
         <div className="flex items-center justify-between border-b border-slate-800/80 bg-slate-900/60 px-4 py-1.5 font-mono text-[10px] font-medium text-slate-400">
-          <span className="uppercase tracking-wider text-slate-300">{language}</span>
+          <span className="tracking-wider text-slate-300 uppercase">{language}</span>
           {showCopyButton && (
             <button
               type="button"
@@ -217,7 +217,7 @@ export function CodeBlock({
         <code className="block w-full">
           {lines.map((line, idx) => (
             <div key={idx} className="flex items-start gap-3">
-              <span className="w-7 shrink-0 select-none text-right text-[11px] text-slate-600">
+              <span className="w-7 shrink-0 text-right text-[11px] text-slate-600 select-none">
                 {idx + 1}
               </span>
               <span className="flex-1 whitespace-pre">{highlightLine(line)}</span>

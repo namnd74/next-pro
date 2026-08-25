@@ -121,7 +121,13 @@ interface SectionShellProps {
   children: React.ReactNode;
 }
 
-function SectionShell({ icon, title, subtitle, vulnerable, children }: SectionShellProps) {
+function SectionShell({
+  icon,
+  title,
+  subtitle,
+  vulnerable,
+  children,
+}: SectionShellProps) {
   return (
     <Card
       className={`glass-card p-3 sm:p-4 ${
@@ -140,8 +146,8 @@ function SectionShell({ icon, title, subtitle, vulnerable, children }: SectionSh
             {icon}
           </span>
           <div>
-            <p className="text-xs font-bold text-foreground">{title}</p>
-            <p className="font-mono text-[10px] text-muted-foreground">{subtitle}</p>
+            <p className="text-foreground text-xs font-bold">{title}</p>
+            <p className="text-muted-foreground font-mono text-[10px]">{subtitle}</p>
           </div>
         </div>
         {vulnerable ? (
@@ -321,9 +327,7 @@ export function ResourceDrainLab() {
   const fireContextBlast = () => {
     markFired('context-blast');
     setDark((d) => !d);
-    const ids = splitCtx
-      ? [THEME_DOT]
-      : Array.from({ length: SUBSCRIBERS }, (_, i) => i);
+    const ids = splitCtx ? [THEME_DOT] : Array.from({ length: SUBSCRIBERS }, (_, i) => i);
     setCtxFlash(ids);
     setLastBlast(ids.length);
     later(() => setCtxFlash(null), 700);
@@ -403,8 +407,9 @@ export function ResourceDrainLab() {
               ATTACK MODE
             </Badge>
           )}
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            đã vá {patchedCount}/{VECTOR_TOTAL} vector · đã bắn {fired.length}/{VECTOR_TOTAL} đợt
+          <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
+            đã vá {patchedCount}/{VECTOR_TOTAL} vector · đã bắn {fired.length}/
+            {VECTOR_TOTAL} đợt
           </span>
         </div>
         <div className="flex gap-2">
@@ -426,7 +431,12 @@ export function ResourceDrainLab() {
             <ShieldCheck className="mr-1 h-3 w-3" />
             Bản vá
           </Button>
-          <Button size="sm" variant="outline" onClick={resetLab} className="h-7 text-[11px]">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={resetLab}
+            className="h-7 text-[11px]"
+          >
             <RotateCcw className="mr-1 h-3 w-3" />
             Reset
           </Button>
@@ -489,7 +499,9 @@ export function ResourceDrainLab() {
                 </span>
               )
             ) : (
-              <span className="text-slate-500">$ nhấn &quot;Chạy trace&quot; để đo TTFB…</span>
+              <span className="text-slate-500">
+                $ nhấn &quot;Chạy trace&quot; để đo TTFB…
+              </span>
             )}
           </p>
           <Button
@@ -523,7 +535,7 @@ export function ResourceDrainLab() {
         vulnerable={!isr}
       >
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+          <span className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
             flood /san-pham?page=*
           </span>
           <DefenseToggle
@@ -535,7 +547,11 @@ export function ResourceDrainLab() {
 
         <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-950 p-3">
           <div className="grid grid-cols-2 gap-2 font-mono text-[10px] sm:grid-cols-3">
-            <StatBox label="requests" value={reqs.toLocaleString('vi-VN')} tone="neutral" />
+            <StatBox
+              label="requests"
+              value={reqs.toLocaleString('vi-VN')}
+              tone="neutral"
+            />
             <StatBox
               label="DB hits"
               value={dbHits.toLocaleString('vi-VN')}
@@ -543,17 +559,26 @@ export function ResourceDrainLab() {
             />
             <StatBox
               label="pool"
-              value={dbHits > 50 ? `${Math.min(20, Math.ceil(dbHits / 50))}/20 busy` : '0/20 busy'}
+              value={
+                dbHits > 50
+                  ? `${Math.min(20, Math.ceil(dbHits / 50))}/20 busy`
+                  : '0/20 busy'
+              }
               tone={dbHits > 50 ? 'bad' : 'good'}
             />
           </div>
 
           <div className="max-h-24 space-y-0.5 overflow-hidden font-mono text-[10px] leading-relaxed text-slate-400">
             {stormLines.length === 0 ? (
-              <p className="animate-pulse text-slate-600">$ log request trống — chưa bắn…</p>
+              <p className="animate-pulse text-slate-600">
+                $ log request trống — chưa bắn…
+              </p>
             ) : (
               stormLines.map((line, i) => (
-                <p key={`${line}-${i}`} className={line.includes('💀') ? 'text-rose-400' : 'text-emerald-400'}>
+                <p
+                  key={`${line}-${i}`}
+                  className={line.includes('💀') ? 'text-rose-400' : 'text-emerald-400'}
+                >
                   {line}
                 </p>
               ))
@@ -591,9 +616,11 @@ export function ResourceDrainLab() {
         vulnerable={!memoCompute}
       >
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <label className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+          <label className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
             dataset:{' '}
-            <span className="text-amber-400">{ROW_OPTIONS[rowStep].toLocaleString('vi-VN')} rows</span>
+            <span className="text-amber-400">
+              {ROW_OPTIONS[rowStep].toLocaleString('vi-VN')} rows
+            </span>
           </label>
           <DefenseToggle
             active={memoCompute}
@@ -618,7 +645,9 @@ export function ResourceDrainLab() {
             {memoCompute ? (
               <>
                 <span className="text-emerald-400">const rows = useMemo(…)</span>{' '}
-                <span className="text-slate-600">{'// chỉ tính lại khi query/sortKey đổi'}</span>
+                <span className="text-slate-600">
+                  {'// chỉ tính lại khi query/sortKey đổi'}
+                </span>
               </>
             ) : (
               <>
@@ -632,7 +661,9 @@ export function ResourceDrainLab() {
             <div className="space-y-1">
               <div className="flex items-center justify-between font-mono text-[10px] text-slate-400">
                 <span>dropped frames / 1.5s</span>
-                <span className={framesDropped > 0 ? 'text-amber-400' : 'text-emerald-400'}>
+                <span
+                  className={framesDropped > 0 ? 'text-amber-400' : 'text-emerald-400'}
+                >
                   {framesDropped}
                 </span>
               </div>
@@ -669,7 +700,8 @@ export function ResourceDrainLab() {
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 bg-slate-950/90 backdrop-blur-[2px]">
               <Skull className="h-5 w-5 animate-pulse text-rose-500" />
               <p className="font-mono text-[11px] font-bold text-rose-400">
-                ⛔ MAIN THREAD BLOCKED — filter {ROW_OPTIONS[rowStep].toLocaleString('vi-VN')} rows…
+                ⛔ MAIN THREAD BLOCKED — filter{' '}
+                {ROW_OPTIONS[rowStep].toLocaleString('vi-VN')} rows…
               </p>
               <p className="font-mono text-[10px] text-slate-500">
                 input · click · animation đang xếp hàng chờ compute
@@ -697,7 +729,7 @@ export function ResourceDrainLab() {
         vulnerable={!memoChildren}
       >
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+          <span className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
             parent re-render 1s/nhịp
           </span>
           <div className="flex gap-2">
@@ -715,7 +747,11 @@ export function ResourceDrainLab() {
             </Button>
             <DefenseToggle
               active={memoChildren}
-              label={memoChildren ? 'React.memo + stable refs ON' : 'React.memo + stable refs OFF'}
+              label={
+                memoChildren
+                  ? 'React.memo + stable refs ON'
+                  : 'React.memo + stable refs OFF'
+              }
               onToggle={() => setMemoChildren((v) => !v)}
             />
           </div>
@@ -747,7 +783,11 @@ export function ResourceDrainLab() {
           <div className="space-y-1.5 font-mono text-[10px] leading-relaxed">
             <p className="text-slate-400">
               child commits:{' '}
-              <span className={childCommits > REF_ROWS.length ? 'text-rose-400' : 'text-emerald-400'}>
+              <span
+                className={
+                  childCommits > REF_ROWS.length ? 'text-rose-400' : 'text-emerald-400'
+                }
+              >
                 {childCommits.toLocaleString('vi-VN')}
               </span>
             </p>
@@ -788,11 +828,19 @@ export function ResourceDrainLab() {
         vulnerable={!splitCtx}
       >
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
-            theme: <span className={dark ? 'text-sky-400' : 'text-amber-400'}>{dark ? 'dark' : 'light'}</span>
+          <span className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
+            theme:{' '}
+            <span className={dark ? 'text-sky-400' : 'text-amber-400'}>
+              {dark ? 'dark' : 'light'}
+            </span>
           </span>
           <div className="flex gap-2">
-            <Button size="sm" variant="destructive" onClick={fireContextBlast} className="h-6 px-2 text-[10px]">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={fireContextBlast}
+              className="h-6 px-2 text-[10px]"
+            >
               <Zap className="mr-1 h-3 w-3" />
               Đổi theme toàn cục
             </Button>
@@ -832,13 +880,16 @@ export function ResourceDrainLab() {
               <span className="h-1.5 w-3 rounded-sm bg-sky-500/60" /> consumer dùng theme
             </span>
             <span className="flex items-center gap-1">
-              <span className={`h-1.5 w-3 rounded-sm ${splitCtx ? 'bg-emerald-400' : 'bg-rose-500'}`} />{' '}
+              <span
+                className={`h-1.5 w-3 rounded-sm ${splitCtx ? 'bg-emerald-400' : 'bg-rose-500'}`}
+              />{' '}
               re-render do setTheme()
             </span>
             <span className="ml-auto">
               {lastBlast !== null && (
                 <span className={splitCtx ? 'text-emerald-400' : 'text-rose-400'}>
-                  {splitCtx ? '🛡️' : '💀'} setTheme() → {lastBlast}/{SUBSCRIBERS} consumer re-render
+                  {splitCtx ? '🛡️' : '💀'} setTheme() → {lastBlast}/{SUBSCRIBERS} consumer
+                  re-render
                 </span>
               )}
             </span>
@@ -864,7 +915,7 @@ export function ResourceDrainLab() {
         vulnerable={!(pinVersion || sriOn)}
       >
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
+          <span className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
             index.html · third-party script
           </span>
           <div className="flex gap-2">
@@ -892,7 +943,9 @@ export function ResourceDrainLab() {
         <pre className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-[10px] leading-relaxed text-slate-300">
           {pinVersion || sriOn ? (
             <>
-              <span className="text-slate-500">{'<!-- ✅ khoá version + kiểm chứng integrity -->'}</span>
+              <span className="text-slate-500">
+                {'<!-- ✅ khoá version + kiểm chứng integrity -->'}
+              </span>
               {'\n'}
               <span className="text-emerald-400">
                 {`<script src="https://cdn.example.com/lib${pinVersion ? '@2.4.1' : '@latest'}"`}
@@ -900,7 +953,9 @@ export function ResourceDrainLab() {
               {'\n'}
               {sriOn && (
                 <span className="text-emerald-400">
-                  {'  integrity="sha384-W9smwUo7QqZj4vXk2LmTe8rRb1nYc0dFgHjK5lPqA2s"\n  crossorigin="anonymous"'}
+                  {
+                    '  integrity="sha384-W9smwUo7QqZj4vXk2LmTe8rRb1nYc0dFgHjK5lPqA2s"\n  crossorigin="anonymous"'
+                  }
                 </span>
               )}
               <span className="text-emerald-400">{'></script>'}</span>
@@ -940,7 +995,7 @@ export function ResourceDrainLab() {
               setKeystrokes((k) => k + 1);
             }}
             placeholder="nhập mật khẩu giả lập…"
-            className={`w-full rounded-lg border bg-slate-900 px-3 py-2 font-mono text-xs text-slate-200 outline-none transition-colors placeholder:text-slate-600 ${
+            className={`w-full rounded-lg border bg-slate-900 px-3 py-2 font-mono text-xs text-slate-200 transition-colors outline-none placeholder:text-slate-600 ${
               hijackLive
                 ? 'border-destructive/60 focus:border-destructive'
                 : 'border-slate-700 focus:border-slate-500'
@@ -952,7 +1007,7 @@ export function ResourceDrainLab() {
               $ nhấn &quot;Nạp lib từ CDN&quot; rồi gõ vài phím để xem ai nghe lén…
             </p>
           ) : hijackLive ? (
-            <div className="space-y-1 rounded-lg border border-destructive/40 bg-destructive/10 p-2 font-mono text-[10px] leading-relaxed text-destructive">
+            <div className="border-destructive/40 bg-destructive/10 text-destructive space-y-1 rounded-lg border p-2 font-mono text-[10px] leading-relaxed">
               <p className="font-bold">☠ lib@latest bị đầu độc — keylogger đã inject!</p>
               <p>
                 captured: &quot;{pwdValue}&quot; · {keystrokes} phím
@@ -963,7 +1018,9 @@ export function ResourceDrainLab() {
             </div>
           ) : (
             <div className="space-y-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 font-mono text-[10px] leading-relaxed text-emerald-600 dark:text-emerald-400">
-              <p className="font-bold">🛡️ Script bị neutralize — keylogger không kịp chạy.</p>
+              <p className="font-bold">
+                🛡️ Script bị neutralize — keylogger không kịp chạy.
+              </p>
               <p>
                 {sriOn
                   ? 'integrity hash mismatch → browser refuse to execute file lạ.'
@@ -971,7 +1028,8 @@ export function ResourceDrainLab() {
               </p>
               {sriOn && !pinVersion && (
                 <p className="text-amber-500">
-                  ⚠ @latest vẫn là viên đạn trên nòng: hash chỉ chặn lần này, lần deploy sau nội dung lại đổi.
+                  ⚠ @latest vẫn là viên đạn trên nòng: hash chỉ chặn lần này, lần deploy
+                  sau nội dung lại đổi.
                 </p>
               )}
             </div>
@@ -999,27 +1057,32 @@ export function ResourceDrainLab() {
           }`}
         >
           {allPatched ? (
-            <p className="text-xs leading-relaxed text-foreground">
-              🛡️ <span className="font-bold text-emerald-600 dark:text-emerald-400">Defense Patch:</span>{' '}
-              Promise.all/preload hạ TTFB về max(fetch), ISR hấp thụ cả bão request, useMemo đưa
-              compute ra khỏi đường nóng, kỷ luật tham chiếu cho React.memo sống lại, context tách
-              domain thu hẹp blast radius còn đúng 1 consumer, và pin+SRI khiến script giả bị trình
-              duyệt từ chối thực thi. Hạ tầng thở lại — attacker chỉ thấy trang tải nhanh.
+            <p className="text-foreground text-xs leading-relaxed">
+              🛡️{' '}
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                Defense Patch:
+              </span>{' '}
+              Promise.all/preload hạ TTFB về max(fetch), ISR hấp thụ cả bão request,
+              useMemo đưa compute ra khỏi đường nóng, kỷ luật tham chiếu cho React.memo
+              sống lại, context tách domain thu hẹp blast radius còn đúng 1 consumer, và
+              pin+SRI khiến script giả bị trình duyệt từ chối thực thi. Hạ tầng thở lại —
+              attacker chỉ thấy trang tải nhanh.
             </p>
           ) : (
-            <p className="text-xs leading-relaxed text-foreground">
-              💀 <span className="font-bold">Blast Radius:</span> cả 6 vector nổ cùng lúc ở cấu hình
-              không vá — TTFB gấp 4 lần do waterfall, DB gánh trọn 1.000 request động, main thread
-              đóng băng 1.5s mỗi lần filter, 12 row re-render vô nghĩa mỗi giây vì tham chiếu mới,
-              300/300 consumer rung theo một cú đổi theme, và lib@latest đầu độc đã ghi trộm mật
-              khẩu. Production: mất doanh thu giờ vàng, INP cháy đỏ, credential rò ra Internet.
+            <p className="text-foreground text-xs leading-relaxed">
+              💀 <span className="font-bold">Blast Radius:</span> cả 6 vector nổ cùng lúc
+              ở cấu hình không vá — TTFB gấp 4 lần do waterfall, DB gánh trọn 1.000
+              request động, main thread đóng băng 1.5s mỗi lần filter, 12 row re-render vô
+              nghĩa mỗi giây vì tham chiếu mới, 300/300 consumer rung theo một cú đổi
+              theme, và lib@latest đầu độc đã ghi trộm mật khẩu. Production: mất doanh thu
+              giờ vàng, INP cháy đỏ, credential rò ra Internet.
             </p>
           )}
         </Card>
       )}
 
       {!allPatched && !allFired && (
-        <p className="text-center font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <p className="text-muted-foreground text-center font-mono text-[10px] tracking-wider uppercase">
           $ bắn đủ cả {VECTOR_TOTAL} đợt tấn công hoặc bật đủ bản vá để mở kết luận cuối…
         </p>
       )}
@@ -1031,8 +1094,12 @@ export function ResourceDrainLab() {
 
 function AttackTraceLabel({ running, done }: { running: boolean; done: boolean }) {
   return (
-    <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
-      {running ? 'tracing…' : done ? 'trace xong — xem TTFB bên dưới' : '4 resources · tuần tự vs song song'}
+    <span className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
+      {running
+        ? 'tracing…'
+        : done
+          ? 'trace xong — xem TTFB bên dưới'
+          : '4 resources · tuần tự vs song song'}
     </span>
   );
 }
@@ -1047,10 +1114,14 @@ function StatBox({
   tone: 'neutral' | 'good' | 'bad';
 }) {
   const toneCls =
-    tone === 'bad' ? 'text-rose-400' : tone === 'good' ? 'text-emerald-400' : 'text-slate-300';
+    tone === 'bad'
+      ? 'text-rose-400'
+      : tone === 'good'
+        ? 'text-emerald-400'
+        : 'text-slate-300';
   return (
     <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2">
-      <p className="uppercase tracking-wider text-slate-600">{label}</p>
+      <p className="tracking-wider text-slate-600 uppercase">{label}</p>
       <p className={`mt-0.5 text-sm font-bold ${toneCls}`}>{value}</p>
     </div>
   );

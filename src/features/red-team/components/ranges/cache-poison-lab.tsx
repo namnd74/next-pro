@@ -29,10 +29,34 @@ import { Card } from '@/components/ui/card';
  */
 
 const TABS = [
-  { id: 'overview', label: 'Tổng quan', icon: <LayoutDashboard className="h-3 w-3" />, endpoint: '/api/stats', queryKey: "['stats']" },
-  { id: 'orders', label: 'Đơn hàng', icon: <Package className="h-3 w-3" />, endpoint: '/api/orders', queryKey: "['orders']" },
-  { id: 'notifications', label: 'Thông báo', icon: <Bell className="h-3 w-3" />, endpoint: '/api/notifications', queryKey: "['notifications']" },
-  { id: 'settings', label: 'Cài đặt', icon: <Settings className="h-3 w-3" />, endpoint: '/api/settings', queryKey: "['settings']" },
+  {
+    id: 'overview',
+    label: 'Tổng quan',
+    icon: <LayoutDashboard className="h-3 w-3" />,
+    endpoint: '/api/stats',
+    queryKey: "['stats']",
+  },
+  {
+    id: 'orders',
+    label: 'Đơn hàng',
+    icon: <Package className="h-3 w-3" />,
+    endpoint: '/api/orders',
+    queryKey: "['orders']",
+  },
+  {
+    id: 'notifications',
+    label: 'Thông báo',
+    icon: <Bell className="h-3 w-3" />,
+    endpoint: '/api/notifications',
+    queryKey: "['notifications']",
+  },
+  {
+    id: 'settings',
+    label: 'Cài đặt',
+    icon: <Settings className="h-3 w-3" />,
+    endpoint: '/api/settings',
+    queryKey: "['settings']",
+  },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -103,7 +127,9 @@ export function CachePoisonLab() {
   const [activeTab, setActiveTab] = React.useState<TabId>('overview');
   const [netRequests, setNetRequests] = React.useState(0);
   const [fetchesByTab, setFetchesByTab] = React.useState<Record<string, number>>({});
-  const [visitedOnce, setVisitedOnce] = React.useState<Partial<Record<TabId, boolean>>>({});
+  const [visitedOnce, setVisitedOnce] = React.useState<Partial<Record<TabId, boolean>>>(
+    {}
+  );
   const [netLog, setNetLog] = React.useState<string[]>([]);
 
   const switchTab = (tabId: TabId) => {
@@ -113,7 +139,10 @@ export function CachePoisonLab() {
 
     if (cachedBefore && fixStaleTime) {
       setNetLog((prev) =>
-        [...prev, `> CACHE HIT ${tab.queryKey} — staleTime 60s còn tươi → 0 request`].slice(-7)
+        [
+          ...prev,
+          `> CACHE HIT ${tab.queryKey} — staleTime 60s còn tươi → 0 request`,
+        ].slice(-7)
       );
     } else {
       setNetRequests((n) => n + 1);
@@ -141,8 +170,12 @@ export function CachePoisonLab() {
   // ── Vector 02 · Query Key Collision ───────────────────────────────────
   const [fixScopedKey, setFixScopedKey] = React.useState(false);
   // Mô phỏng QueryClient cache: key-string → payload
-  const [profileCache, setProfileCache] = React.useState<Record<string, ProfilePayload>>({});
-  const [shown, setShown] = React.useState<Record<'admin' | 'viewer', ProfilePayload | null>>({
+  const [profileCache, setProfileCache] = React.useState<Record<string, ProfilePayload>>(
+    {}
+  );
+  const [shown, setShown] = React.useState<
+    Record<'admin' | 'viewer', ProfilePayload | null>
+  >({
     admin: null,
     viewer: null,
   });
@@ -156,13 +189,18 @@ export function CachePoisonLab() {
     if (hit) {
       setShown((prev) => ({ ...prev, [who]: hit }));
       setColLog((prev) =>
-        [...prev, `> CACHE HIT ${keyStr} → widget ${who} nhận data của “${hit.name}”`].slice(-6)
+        [
+          ...prev,
+          `> CACHE HIT ${keyStr} → widget ${who} nhận data của “${hit.name}”`,
+        ].slice(-6)
       );
       return;
     }
     setProfileCache((prev) => ({ ...prev, [keyStr]: me }));
     setShown((prev) => ({ ...prev, [who]: me }));
-    setColLog((prev) => [...prev, `$ GET /api/profile (${who}) → SET ${keyStr}`].slice(-6));
+    setColLog((prev) =>
+      [...prev, `$ GET /api/profile (${who}) → SET ${keyStr}`].slice(-6)
+    );
   };
 
   const resetCollisionDemo = () => {
@@ -217,7 +255,9 @@ export function CachePoisonLab() {
     // ❌ cache không hề biết có mutation — merge với bản cũ → hồn ma sống dậy
     const resurrected = SERVER_POSTS.filter((r) => deletedIds.includes(r.id));
     if (resurrected.length === 0) {
-      setGhostLog((prev) => [...prev, '> refetch — chưa xoá gì nên list nguyên vẹn'].slice(-6));
+      setGhostLog((prev) =>
+        [...prev, '> refetch — chưa xoá gì nên list nguyên vẹn'].slice(-6)
+      );
       return;
     }
     setViewRows((prev) => {
@@ -225,7 +265,10 @@ export function CachePoisonLab() {
       return [...prev, ...resurrected.filter((r) => !ids.has(r.id))];
     });
     setGhostLog((prev) =>
-      [...prev, `> CACHE HIT ['posts'] — bản cũ chưa invalidate → ${resurrected.length} ghost row HỒI SINH 👻`].slice(-6)
+      [
+        ...prev,
+        `> CACHE HIT ['posts'] — bản cũ chưa invalidate → ${resurrected.length} ghost row HỒI SINH 👻`,
+      ].slice(-6)
     );
   };
 
@@ -268,8 +311,10 @@ export function CachePoisonLab() {
               ATTACK MODE
             </Badge>
           )}
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            đầu độc {[stormExploited, collisionExploited, ghostExploited].filter(Boolean).length}/3 vector
+          <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
+            đầu độc{' '}
+            {[stormExploited, collisionExploited, ghostExploited].filter(Boolean).length}
+            /3 vector
           </span>
         </div>
         <div className="flex gap-2">
@@ -298,12 +343,12 @@ export function CachePoisonLab() {
       <Card className="glass-card space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+            <span className="bg-secondary text-muted-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
               <Activity className="h-3.5 w-3.5" />
             </span>
             <div>
-              <p className="text-xs font-bold text-foreground">01 · Refetch Storm</p>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-foreground text-xs font-bold">01 · Refetch Storm</p>
+              <p className="text-muted-foreground text-[10px]">
                 Lưu ý mỗi tab rồi quay lại — đếm request bay ra khi staleTime=0.
               </p>
             </div>
@@ -336,14 +381,22 @@ export function CachePoisonLab() {
                 )}
               </button>
             ))}
-            <Button size="sm" variant="ghost" onClick={resetStormDemo} className="ml-auto h-6 text-[11px]">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={resetStormDemo}
+              className="ml-auto h-6 text-[11px]"
+            >
               <RotateCcw className="mr-1 h-3 w-3" />
               Reset
             </Button>
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <Badge variant={netRequests >= 4 ? 'destructive' : 'secondary'} className="font-mono">
+            <Badge
+              variant={netRequests >= 4 ? 'destructive' : 'secondary'}
+              className="font-mono"
+            >
               Network requests: {netRequests}
             </Badge>
             {stormExploited && !fixStaleTime && (
@@ -352,7 +405,9 @@ export function CachePoisonLab() {
               </span>
             )}
             {fixStaleTime && netRequests > 0 && (
-              <span className="text-emerald-400">✅ quay lại tab đã xem = CACHE HIT, 0 request</span>
+              <span className="text-emerald-400">
+                ✅ quay lại tab đã xem = CACHE HIT, 0 request
+              </span>
             )}
           </div>
 
@@ -383,12 +438,14 @@ export function CachePoisonLab() {
       <Card className="glass-card space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+            <span className="bg-secondary text-muted-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
               <Users className="h-3.5 w-3.5" />
             </span>
             <div>
-              <p className="text-xs font-bold text-foreground">02 · Query Key Collision</p>
-              <p className="text-[10px] text-muted-foreground">
+              <p className="text-foreground text-xs font-bold">
+                02 · Query Key Collision
+              </p>
+              <p className="text-muted-foreground text-[10px]">
                 Mở widget Admin → Viewer → quay lại Admin để xem cache giao nhầm data.
               </p>
             </div>
@@ -400,7 +457,12 @@ export function CachePoisonLab() {
               labelOn={"Vá: ['user', id]"}
               labelOff={"Bật vá: ['user', id]"}
             />
-            <Button size="sm" variant="ghost" onClick={resetCollisionDemo} className="h-6 text-[10px]">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={resetCollisionDemo}
+              className="h-6 text-[10px]"
+            >
               <RotateCcw className="mr-1 h-3 w-3" />
               Reset
             </Button>
@@ -438,12 +500,15 @@ export function CachePoisonLab() {
                   <p className="text-slate-600">$ useQuery chưa mount…</p>
                 ) : (
                   <>
-                    <p className="text-sm font-bold text-foreground">{shownData.name}</p>
+                    <p className="text-foreground text-sm font-bold">{shownData.name}</p>
                     <p className="text-slate-400">{shownData.role}</p>
-                    <p className={mismatched ? 'text-red-400' : 'text-emerald-400'}>{shownData.stat}</p>
+                    <p className={mismatched ? 'text-red-400' : 'text-emerald-400'}>
+                      {shownData.stat}
+                    </p>
                     {mismatched ? (
                       <p className="mt-1 text-red-400">
-                        ⚠️ SAI NGỮ CẢNH — đang hiện data của “{shownData.name}” cho user “{me.name}”!
+                        ⚠️ SAI NGỮ CẢNH — đang hiện data của “{shownData.name}” cho user “
+                        {me.name}”!
                       </p>
                     ) : (
                       <p className="mt-1 text-emerald-400">✅ đúng chủ nhân của data.</p>
@@ -466,7 +531,9 @@ export function CachePoisonLab() {
             Object.entries(profileCache).map(([k, v]) => (
               <div key={k} className="text-slate-300">
                 {k} <span className="text-slate-500">→</span>{' '}
-                <span className={v.role === 'Quản trị' ? 'text-red-400' : 'text-emerald-400'}>
+                <span
+                  className={v.role === 'Quản trị' ? 'text-red-400' : 'text-emerald-400'}
+                >
                   {v.name} ({v.role})
                 </span>
               </div>
@@ -477,7 +544,10 @@ export function CachePoisonLab() {
               <span className="text-slate-600">$ chờ mount…</span>
             ) : (
               colLog.map((line, i) => (
-                <div key={`${i}-${line}`} className={line.startsWith('$') ? 'text-amber-300' : 'text-sky-300'}>
+                <div
+                  key={`${i}-${line}`}
+                  className={line.startsWith('$') ? 'text-amber-300' : 'text-sky-300'}
+                >
                   {line}
                 </div>
               ))
@@ -485,7 +555,7 @@ export function CachePoisonLab() {
           </div>
         </div>
         {collisionExploited && (
-          <p className="text-[11px] leading-relaxed text-destructive">
+          <p className="text-destructive text-[11px] leading-relaxed">
             {`🎯 Key tĩnh ['user'] là MỘT ngăn kéo duy nhất — ai mount sau chiếm kho, ai quay lại sau ăn data của người khác. Không một request trái phép nào xuất hiện trong audit log.`}
           </p>
         )}
@@ -495,13 +565,16 @@ export function CachePoisonLab() {
       <Card className="glass-card space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+            <span className="bg-secondary text-muted-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
               <Ghost className="h-3.5 w-3.5" />
             </span>
             <div>
-              <p className="text-xs font-bold text-foreground">03 · Ghost Row Resurrection</p>
-              <p className="text-[10px] text-muted-foreground">
-                Xoá một dòng rồi bấm Refetch — xem nó hồi sinh thế nào khi mutation quên invalidate.
+              <p className="text-foreground text-xs font-bold">
+                03 · Ghost Row Resurrection
+              </p>
+              <p className="text-muted-foreground text-[10px]">
+                Xoá một dòng rồi bấm Refetch — xem nó hồi sinh thế nào khi mutation quên
+                invalidate.
               </p>
             </div>
           </div>
@@ -515,13 +588,23 @@ export function CachePoisonLab() {
 
         <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-[11px]">
           <div className="flex items-center justify-between">
-            <span className="text-slate-500">{'useQuery([\'posts\']) · /api/posts'}</span>
+            <span className="text-slate-500">{"useQuery(['posts']) · /api/posts"}</span>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={refetchList} className="h-6 text-[10px]">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={refetchList}
+                className="h-6 text-[10px]"
+              >
                 <RefreshCw className="mr-1 h-3 w-3" />
                 Refetch
               </Button>
-              <Button size="sm" variant="ghost" onClick={resetGhostDemo} className="h-6 text-[10px]">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={resetGhostDemo}
+                className="h-6 text-[10px]"
+              >
                 <RotateCcw className="mr-1 h-3 w-3" />
                 Reset
               </Button>
@@ -529,7 +612,9 @@ export function CachePoisonLab() {
           </div>
           <div className="mt-2 space-y-1">
             {viewRows.length === 0 && (
-              <p className="text-slate-600">(list trống — server cũng xác nhận hết đã xoá)</p>
+              <p className="text-slate-600">
+                (list trống — server cũng xác nhận hết đã xoá)
+              </p>
             )}
             {viewRows.map((row) => {
               const isGhost = deletedIds.includes(row.id);
@@ -549,7 +634,7 @@ export function CachePoisonLab() {
                     type="button"
                     onClick={() => deleteRow(row)}
                     title="Xoá dòng này"
-                    className="rounded p-1 text-slate-500 transition-colors hover:bg-destructive/15 hover:text-destructive"
+                    className="hover:bg-destructive/15 hover:text-destructive rounded p-1 text-slate-500 transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -637,21 +722,29 @@ export function CachePoisonLab() {
                     : 'bg-secondary text-muted-foreground'
               }`}
             >
-              {finding.found && !finding.patched ? <Skull className="h-3.5 w-3.5" /> : finding.icon}
+              {finding.found && !finding.patched ? (
+                <Skull className="h-3.5 w-3.5" />
+              ) : (
+                finding.icon
+              )}
             </span>
             <div className="min-w-0 space-y-0.5">
-              <p className="text-xs font-bold text-foreground">{finding.label}</p>
+              <p className="text-foreground text-xs font-bold">{finding.label}</p>
               {finding.found && !finding.patched && (
-                <p className="text-[11px] leading-relaxed text-destructive">{finding.foundText}</p>
+                <p className="text-destructive text-[11px] leading-relaxed">
+                  {finding.foundText}
+                </p>
               )}
               {finding.patched && (
                 <p className="text-[11px] leading-relaxed text-emerald-600 dark:text-emerald-400">
-                  Đã vá: staleTime theo SLA dữ liệu / key chứa đủ ngữ cảnh / invalidateQueries đúng
-                  chỗ trong onSuccess — cache hết cách nói dối.
+                  Đã vá: staleTime theo SLA dữ liệu / key chứa đủ ngữ cảnh /
+                  invalidateQueries đúng chỗ trong onSuccess — cache hết cách nói dối.
                 </p>
               )}
               {!finding.found && !finding.patched && (
-                <p className="text-[11px] leading-relaxed text-muted-foreground">{finding.idleText}</p>
+                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                  {finding.idleText}
+                </p>
               )}
             </div>
           </Card>
@@ -666,18 +759,22 @@ export function CachePoisonLab() {
           }`}
         >
           {allFound && !defenseMode ? (
-            <p className="text-xs leading-relaxed text-foreground">
-              💀 <span className="font-bold">Blast Radius:</span> tầng cache vừa tự DoS mình bằng bão
-              refetch, vừa rò dữ liệu admin sang tài khoản thường mà audit log vẫn sạch bong, vừa
-              hồi sinh dữ liệu đã xoá vi phạm right-to-erasure. Ba sự cố production, không một dòng
-              code độc nào cần thiết.
+            <p className="text-foreground text-xs leading-relaxed">
+              💀 <span className="font-bold">Blast Radius:</span> tầng cache vừa tự DoS
+              mình bằng bão refetch, vừa rò dữ liệu admin sang tài khoản thường mà audit
+              log vẫn sạch bong, vừa hồi sinh dữ liệu đã xoá vi phạm right-to-erasure. Ba
+              sự cố production, không một dòng code độc nào cần thiết.
             </p>
           ) : (
-            <p className="text-xs leading-relaxed text-foreground">
-              🛡️ <span className="font-bold text-emerald-600 dark:text-emerald-400">Defense Patch:</span>{' '}
-              staleTime đặt theo độ nhạy cảm dữ liệu, mọi biến số ảnh hưởng kết quả nằm trong query
-              key (key factory), và mutation nào thay đổi server thì invalidate đúng key đó ngay
-              trong onSuccess. Cache trở thành nguồn phản ánh trung thực của server.
+            <p className="text-foreground text-xs leading-relaxed">
+              🛡️{' '}
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                Defense Patch:
+              </span>{' '}
+              staleTime đặt theo độ nhạy cảm dữ liệu, mọi biến số ảnh hưởng kết quả nằm
+              trong query key (key factory), và mutation nào thay đổi server thì
+              invalidate đúng key đó ngay trong onSuccess. Cache trở thành nguồn phản ánh
+              trung thực của server.
             </p>
           )}
         </Card>

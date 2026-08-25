@@ -1,0 +1,773 @@
+[
+  {
+    "slug": "agent-skills-deep-dive",
+    "title": "Agent Skills Deep Dive",
+    "summary": "Tạo capability tái sử dụng bằng AGENTS.md, SKILL.md, scripts, references, assets và eval.",
+    "level": "Nâng cao",
+    "durationMinutes": 70,
+    "icon": "skills",
+    "color": "from-amber-500 to-orange-600",
+    "tags": ["AGENTS.md", "SKILL.md", "Scripts", "Workshop"],
+    "mentalModel": "AGENTS.md đặt luật chơi thường trực; SKILL.md đóng gói workflow chỉ nạp khi phù hợp; scripts biến bước cần tính xác định thành code; harness khám phá và thực thi chúng.",
+    "takeaways": [
+      "Instruction, skill, script, tool và sub-agent giải quyết các lớp vấn đề khác nhau.",
+      "Description của skill là routing contract, không phải câu quảng cáo.",
+      "Script không tự chạy chỉ vì nằm trong thư mục skill.",
+      "Skill cần eval cho trigger đúng, trigger sai và failure recovery."
+    ],
+    "sections": [
+      {
+        "title": "1. Instruction không đồng nghĩa capability",
+        "paragraphs": [
+          "Một prompt như “review accessibility thật kỹ” chỉ nêu ý định. Capability tái sử dụng phải mô tả phạm vi, trigger, workflow, nguồn tham chiếu, tool, định dạng đầu ra và bước xác minh.",
+          "Quy tắc luôn đúng với repository thuộc về AGENTS.md. Workflow chuyên môn chỉ cần theo tình huống thuộc về skill. Phép tính hoặc transformation cần tính xác định nên nằm trong script. Truy cập dịch vụ bên ngoài thuộc về tool hoặc MCP."
+        ]
+      },
+      {
+        "title": "2. AGENTS.md, AGENTS.override.md và CLAUDE.md",
+        "paragraphs": [
+          "Codex đọc AGENTS.md trước khi làm việc và ghép chỉ dẫn từ global scope xuống repository rồi đến thư mục hiện tại. Chỉ dẫn gần code đang làm việc hơn có độ ưu tiên cao hơn; AGENTS.override.md thay thế file thường ở cùng scope.",
+          "CLAUDE.md phục vụ nhóm nhu cầu tương tự nhưng là convention của Claude Code. Codex không mặc định coi mọi CLAUDE.md là instruction file; có thể cấu hình fallback filename nếu dự án thực sự cần hỗ trợ convention khác."
+        ],
+        "points": [
+          "AGENTS.md: agent phải tuân thủ quy tắc nào trong phạm vi này?",
+          "SKILL.md: khi workflow này được kích hoạt, agent phải làm như thế nào?",
+          "README: con người cần biết gì để hiểu và sử dụng dự án?"
+        ]
+      },
+      {
+        "title": "3. Anatomy của một Agent Skill",
+        "paragraphs": [
+          "Một skill là thư mục có SKILL.md bắt buộc. scripts, references, assets và agents/openai.yaml đều tùy chọn; chỉ thêm chúng khi giúp workflow rõ hơn hoặc đáng tin cậy hơn.",
+          "SKILL.md chứa metadata định tuyến và instruction. references tách tài liệu dài khỏi workflow chính. assets chứa template hoặc tài nguyên đầu ra. scripts chứa executable code. agents/openai.yaml có thể mô tả UI metadata, invocation policy và dependency."
+        ]
+      },
+      {
+        "title": "4. Discovery và progressive disclosure",
+        "paragraphs": [
+          "Harness không nhét toàn bộ mọi skill vào context. Codex bắt đầu từ name, description và path; chỉ khi người dùng gọi trực tiếp hoặc task khớp description thì toàn bộ SKILL.md mới được đọc.",
+          "Description quá rộng gây kích hoạt nhầm; description chỉ mang tính quảng cáo khiến skill bị bỏ lỡ. Một description tốt nêu action, artifact, trigger và cả trường hợp không nên dùng."
+        ]
+      },
+      {
+        "title": "5. script.py dùng để làm gì?",
+        "paragraphs": [
+          "script.py chỉ là ví dụ tên file; skill có thể dùng Python, TypeScript, shell hoặc binary phù hợp. Script dành cho validation, conversion, extraction, rendering và phép tính cần kết quả lặp lại.",
+          "SKILL.md phải nói rõ command, working directory, input, output, exit code và failure handling. Script cần validate input, tránh in secret, không lách sandbox và không ghi đè dữ liệu ngoài phạm vi."
+        ]
+      },
+      {
+        "title": "6. Quy trình tạo skill từ con số 0",
+        "paragraphs": [
+          "Bắt đầu từ một workflow thực sự lặp lại. Thu thập ba đến năm prompt đại diện, output mong muốn và lỗi thường gặp. Đây chính là eval set ban đầu.",
+          "Viết contract trước: goal, trigger, non-trigger, input, output, quyền, side effect và definition of done. Sau đó tạo skill instruction-only nhỏ nhất; chỉ thêm reference hoặc script tại nơi model thiếu ổn định."
+        ],
+        "points": [
+          "Chọn workflow có đầu ra kiểm chứng được.",
+          "Định nghĩa trigger và near-miss prompt.",
+          "Viết SKILL.md instruction-only trước.",
+          "Thêm reference cho kiến thức dài và script cho bước deterministic.",
+          "Chạy eval rồi điều chỉnh boundary dựa trên failure thật."
+        ]
+      },
+      {
+        "title": "7. Test skill như test một sản phẩm",
+        "paragraphs": [
+          "Routing eval kiểm tra skill có được chọn đúng không. Execution eval kiểm tra sau khi chọn, agent có tuân thủ workflow và tạo đúng artifact không. Hai nhóm lỗi này cần được chẩn đoán riêng.",
+          "Ngoài happy path, phải kiểm tra prompt gần giống nhưng ngoài phạm vi, input thiếu, script lỗi, tool không có quyền, reference vắng mặt và yêu cầu có side effect."
+        ]
+      },
+      {
+        "title": "8. Workshop frontend-production-review",
+        "paragraphs": [
+          "Học viên tạo skill review thay đổi React/Next.js về accessibility, responsive layout, state UX và performance. AGENTS.md giữ quy tắc repository; SKILL.md điều phối review; references chứa checklist; script đọc bundle report; assets chứa report template.",
+          "Definition of Done: gọi trực tiếp được, tự kích hoạt đúng prompt review, không kích hoạt cho yêu cầu xây UI mới, báo lỗi rõ khi thiếu input và tạo finding có severity cùng evidence."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "Cấu trúc skill",
+        "language": "text",
+        "code": ".agents/skills/frontend-production-review/\n├── SKILL.md\n├── references/\n│   └── accessibility-checklist.md\n├── scripts/\n│   └── inspect_bundle.py\n├── assets/\n│   └── review-template.md\n└── agents/\n    └── openai.yaml",
+        "takeaway": "SKILL.md là bắt buộc; các thành phần khác chỉ xuất hiện khi phục vụ workflow."
+      },
+      {
+        "title": "SKILL.md có routing boundary",
+        "language": "markdown",
+        "code": "---\nname: frontend-production-review\ndescription: Review existing React or Next.js UI changes for accessibility, responsive behavior, state UX, and performance. Use for audit requests; do not use to build a new interface.\n---\n\n# Frontend Production Review\n\n## Workflow\n1. Inspect changed UI files and repository instructions.\n2. Read references/accessibility-checklist.md.\n3. Run scripts/inspect_bundle.py only when a report exists.\n4. Classify findings and cite evidence.\n\n## Boundaries\n- Do not modify files unless the user asks for a fix.\n- Report missing evidence instead of inventing it.",
+        "takeaway": "Description điều khiển routing; body điều khiển execution; boundary ngăn skill tự mở rộng quyền."
+      },
+      {
+        "title": "Script deterministic có contract rõ",
+        "language": "python",
+        "code": "#!/usr/bin/env python3\nimport json\nimport sys\nfrom pathlib import Path\n\nif len(sys.argv) != 2:\n    raise SystemExit('usage: inspect_bundle.py <report.json>')\n\nreport = Path(sys.argv[1]).resolve()\nif not report.is_file():\n    raise SystemExit(f'report not found: {report}')\n\ndata = json.loads(report.read_text(encoding='utf-8'))\nroutes = sorted(data['routes'], key=lambda item: item['bytes'], reverse=True)\nprint(json.dumps({'largestRoutes': routes[:5]}))",
+        "takeaway": "Script validate input, báo lỗi bằng exit code và trả output có cấu trúc để agent tổng hợp."
+      }
+    ],
+    "resources": [
+      {
+        "title": "Build skills — Official OpenAI Docs",
+        "url": "https://learn.chatgpt.com/docs/build-skills",
+        "description": "Cấu trúc, progressive disclosure, discovery và phân phối skills."
+      },
+      {
+        "title": "Custom instructions with AGENTS.md",
+        "url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+        "description": "Discovery chain, precedence, overrides và verification."
+      },
+      {
+        "title": "Agent Skills specification",
+        "url": "https://agentskills.io/specification",
+        "description": "Portable format cho SKILL.md, metadata và bundled resources."
+      },
+      {
+        "title": "OpenAI Skills repository",
+        "url": "https://github.com/openai/skills",
+        "description": "Các skill thực tế được duy trì bởi OpenAI để nghiên cứu instruction và resource layout."
+      },
+      {
+        "title": "Google Skills repository",
+        "url": "https://github.com/google/skills",
+        "description": "Skill catalog mã nguồn mở cho Google Cloud với governance và eval workflow."
+      },
+      {
+        "title": "Anthropic Skills repository",
+        "url": "https://github.com/anthropics/skills",
+        "description": "Ví dụ skill, document creation workflow và progressive disclosure từ Anthropic."
+      },
+      {
+        "title": "Superpowers",
+        "url": "https://github.com/obra/superpowers",
+        "description": "Skill framework áp process discipline, TDD, planning và delegated development."
+      }
+    ],
+    "lab": "agent-skills-studio"
+  },
+  {
+    "slug": "skill-boundaries-and-runtime-contracts",
+    "title": "Skill không phải Prompt, Tool hay Agent",
+    "summary": "Phân biệt instruction, skill, tool, MCP, hook, plugin, harness và sub-agent bằng runtime contract thay vì tên gọi marketing.",
+    "level": "Nâng cao",
+    "durationMinutes": 34,
+    "icon": "skills",
+    "color": "from-amber-500 to-orange-600",
+    "tags": ["Boundary", "Runtime", "Architecture"],
+    "mentalModel": "Skill là procedural knowledge được nạp vào context; tool là capability được runtime thực thi; harness là control plane quyết định discovery, quyền, execution và lifecycle.",
+    "takeaways": [
+      "AGENTS.md là policy luôn hiện diện trong scope; skill chỉ được disclose khi task phù hợp.",
+      "Một script nằm trong skill vẫn chỉ là code trên đĩa cho đến khi harness cho phép agent chạy nó.",
+      "MCP chuẩn hóa giao tiếp với capability bên ngoài; nó không thay thế instruction về cách dùng capability đó.",
+      "Plugin là đơn vị đóng gói và phân phối; một plugin có thể chứa nhiều skill, hook và MCP server."
+    ],
+    "sections": [
+      {
+        "title": "Bắt đầu từ câu hỏi: runtime làm gì với artifact này?",
+        "paragraphs": [
+          "Tên file không quyết định semantics. Cùng một Markdown có thể là system instruction được inject mọi turn, skill được nạp theo nhu cầu, hoặc tài liệu tham khảo chỉ được đọc khi một workflow trỏ tới. Hãy phân loại bằng thời điểm nạp, chủ thể kích hoạt, quyền thực thi và vòng đời.",
+          "Skill không làm model có thêm quyền. Nó chỉ thay đổi context và quy trình ra quyết định. Quyền đọc file, gọi mạng, chạy shell hoặc tạo sub-agent vẫn thuộc harness và policy của môi trường."
+        ],
+        "points": [
+          "Instruction/rule: constraint mặc định trong một scope.",
+          "Skill: workflow hoặc knowledge package được progressive-disclose.",
+          "Tool: interface có schema để tạo observation hoặc side effect.",
+          "Hook: callback deterministic tại lifecycle event.",
+          "Plugin: bundle phân phối nhiều extension point."
+        ]
+      },
+      {
+        "title": "AGENTS.md, CLAUDE.md và file instruction theo harness",
+        "paragraphs": [
+          "AGENTS.md phù hợp với quy tắc repository phải được áp dụng thường xuyên: command chuẩn, boundary thư mục, definition of done và điều cấm. CLAUDE.md phục vụ vai trò tương tự trong Claude Code. Không nên giả định mọi harness tự đọc mọi tên file; portability cần một installer, symlink, fallback configuration hoặc file adapter rõ ràng.",
+          "Một anti-pattern phổ biến là đưa mọi runbook vào AGENTS.md. Điều đó tiêu tốn context ở cả những task không liên quan và làm instruction quan trọng bị chìm. Runbook theo tình huống nên chuyển thành skill; invariant có thể kiểm tra tự động nên chuyển thành lint, test hoặc hook."
+        ]
+      },
+      {
+        "title": "Skill + Tool mới tạo thành capability vận hành được",
+        "paragraphs": [
+          "Skill có thể dạy agent khi nào gọi database tool, cách giới hạn query và cách xác minh kết quả. Tool mới là thành phần nhận arguments, thực thi query và trả observation. Nếu chỉ có tool, agent thiếu domain workflow; nếu chỉ có skill, agent không có capability thực thi.",
+          "MCP cung cấp protocol để client khám phá và gọi tools/resources/prompts. Một skill có thể tham chiếu MCP tool nhưng authorization, consent và isolation vẫn phải nằm ngoài lời văn của skill."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "Decision table tối thiểu",
+        "language": "text",
+        "code": "Need                         Artifact\nAlways-on repository rule    AGENTS.md / CLAUDE.md\nSituational expert workflow  Skill\nDeterministic enforcement    Test / lint / hook\nExternal side effect         Tool / MCP server\nInstallable extension bundle Plugin\nIndependent delegated work   Sub-agent + task contract",
+        "takeaway": "Chọn artifact theo lifecycle và quyền, không theo việc tên nào đang thịnh hành."
+      }
+    ],
+    "resources": [
+      {
+        "title": "Agent Skills specification",
+        "url": "https://agentskills.io/specification",
+        "description": "Đặc tả cấu trúc SKILL.md, resources và progressive disclosure."
+      },
+      {
+        "title": "Model Context Protocol",
+        "url": "https://modelcontextprotocol.io",
+        "description": "Protocol kết nối agent host với tools, resources và prompts."
+      },
+      {
+        "title": "Custom instructions with AGENTS.md",
+        "url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+        "description": "Discovery chain và precedence của instruction trong Codex."
+      },
+      {
+        "title": "Anthropic — Building effective agents",
+        "url": "https://www.anthropic.com/engineering/building-effective-agents",
+        "description": "Phân biệt workflow, agent và tool orchestration bằng complexity ladder."
+      },
+      {
+        "title": "OpenAI — MCP and Connectors",
+        "url": "https://developers.openai.com/api/docs/guides/tools-connectors-mcp",
+        "description": "Capability integration và trust boundary của remote MCP servers."
+      }
+    ]
+  },
+  {
+    "slug": "skill-anatomy-and-progressive-disclosure",
+    "title": "Anatomy & Progressive Disclosure",
+    "summary": "Thiết kế SKILL.md, scripts, references và assets theo ba tầng context thay vì biến skill thành một prompt khổng lồ.",
+    "level": "Nâng cao",
+    "durationMinutes": 38,
+    "icon": "skills",
+    "color": "from-orange-500 to-rose-500",
+    "tags": ["SKILL.md", "Context", "Progressive Disclosure"],
+    "mentalModel": "Catalog giúp model quyết định có nên đọc; SKILL.md điều phối workflow; resource chỉ được tải tại đúng nhánh cần nó.",
+    "takeaways": [
+      "Name và description là retrieval interface của skill.",
+      "SKILL.md nên giữ đường đi chính, không chứa toàn bộ encyclopedia.",
+      "Reference phải có điều kiện đọc cụ thể, không tạo chuỗi link sâu.",
+      "Asset là input/output template; script là executable, hai loại không thể hoán đổi."
+    ],
+    "sections": [
+      {
+        "title": "Ba tầng disclosure và ba loại failure",
+        "paragraphs": [
+          "Tầng catalog chỉ chứa metadata để routing. Nếu description kém, skill không được gọi hoặc bị gọi nhầm. Tầng instruction nạp toàn bộ SKILL.md sau activation; nếu workflow mơ hồ, execution lệch. Tầng resource chỉ nạp file hoặc chạy script theo nhánh; nếu pointer không nói khi nào đọc, context bị phình hoặc evidence bị bỏ sót.",
+          "Vì ba tầng có failure mode khác nhau, eval cũng phải tách routing eval, workflow eval và resource/tool eval."
+        ]
+      },
+      {
+        "title": "Cấu trúc portable tối thiểu",
+        "paragraphs": [
+          "Đặc tả Agent Skills yêu cầu thư mục có SKILL.md và frontmatter name/description. scripts, references và assets là convention tùy chọn. Một số harness bổ sung metadata riêng như agents/openai.yaml hoặc plugin manifest; đó là extension của runtime, không phải phần portable bắt buộc.",
+          "Giữ reference cách SKILL.md một cấp giúp agent resolve path ổn định. Nếu reference A lại trỏ B rồi B trỏ C, activation trở thành cuộc săn tài liệu và khó đánh giá context thực tế."
+        ]
+      },
+      {
+        "title": "Budget context bằng decision point",
+        "paragraphs": [
+          "Không tách file chỉ vì SKILL.md dài. Hãy tách khi nội dung chỉ cần ở một decision branch: ví dụ đọc accessibility checklist khi diff chứa UI, hoặc đọc API error catalog khi request trả non-2xx.",
+          "Một pointer tốt gồm điều kiện, path và mục tiêu đọc. “Xem references/” là pointer yếu; “Nếu bundle report tồn tại, đọc references/budget-policy.md trước khi phân loại regression” là pointer có thể thực thi và test."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "Skill package có disclosure boundary",
+        "language": "text",
+        "code": ".agents/skills/frontend-production-review/\n├── SKILL.md\n├── references/\n│   ├── accessibility.md\n│   └── performance-budgets.md\n├── scripts/\n│   └── inspect_bundle.py\n├── assets/\n│   └── finding-template.md\n└── agents/\n    └── openai.yaml  # runtime-specific, optional",
+        "takeaway": "Portable core nằm ở SKILL.md; metadata runtime-specific phải được gọi đúng tên và không giả làm standard."
+      }
+    ],
+    "caseStudies": [
+      {
+        "title": "Google tổ chức một skill như một sản phẩm có owner và eval",
+        "pattern": "Skill package anatomy",
+        "summary": "Cây thư mục này cho thấy một skill production không chỉ có instruction. Google giữ SKILL.md ở trung tâm, tách reference, script và asset; đồng thời bổ sung OWNERS, EVAL.yaml và dữ liệu nội bộ cho governance. Đây là implementation của Google, không phải toàn bộ field đều là yêu cầu của Agent Skills specification.",
+        "image": {
+          "src": "/images/ai/case-studies/google-skill-folder-structure.png",
+          "alt": "Cây thư mục Agent Skill của Google gồm SKILL.md, OWNERS, EVAL.yaml, reference, scripts, assets và thư mục internal",
+          "width": 1600,
+          "height": 460
+        },
+        "source": {
+          "title": "Google Cloud — Behind the scenes: how we build, test and scale Agent Skills",
+          "url": "https://cloud.google.com/blog/topics/developers-practitioners/behind-the-scenes-how-we-build-test-and-scale-google-agent-skills"
+        },
+        "whyItWorks": [
+          "Instruction, knowledge, executable và output material có lifecycle riêng nên có thể review độc lập.",
+          "OWNERS biến freshness thành trách nhiệm cụ thể thay vì hy vọng cộng đồng tự cập nhật.",
+          "Eval suite đặt cạnh skill giúp thay đổi instruction đi cùng regression evidence."
+        ],
+        "implementation": [
+          "Bắt đầu bằng SKILL.md với trigger, workflow và done-condition tối thiểu.",
+          "Chỉ tách reference hoặc script khi một decision branch thật sự cần chúng.",
+          "Thêm owner, version và eval manifest theo convention của chính team/harness.",
+          "Chạy schema, link và routing checks trong CI trước khi phân phối."
+        ],
+        "caveat": "Không copy nguyên cây thư mục này rồi gọi là portable standard. OWNERS, EVAL.yaml và _internal là governance convention của Google; portable contract vẫn phải được kiểm tra với Agent Skills specification và host mục tiêu."
+      }
+    ],
+    "resources": [
+      {
+        "title": "Agent Skills overview",
+        "url": "https://agentskills.io/home",
+        "description": "Discovery, activation và execution theo progressive disclosure."
+      },
+      {
+        "title": "Google Antigravity Skills",
+        "url": "https://antigravity.google/docs/skills",
+        "description": "Workspace/global skill locations và frontmatter trong Antigravity."
+      },
+      {
+        "title": "OpenAI Build Skills",
+        "url": "https://learn.chatgpt.com/docs/build-skills",
+        "description": "Cấu trúc và workflow xây skill trong hệ sinh thái OpenAI."
+      },
+      {
+        "title": "Google Skills repository",
+        "url": "https://github.com/google/skills",
+        "description": "Các skill production cho Google Cloud để nghiên cứu package layout và instruction style."
+      },
+      {
+        "title": "OpenAI Skills repository",
+        "url": "https://github.com/openai/skills",
+        "description": "Skill chính thức của OpenAI, hữu ích để so sánh portable core và OpenAI metadata."
+      },
+      {
+        "title": "Google — Build, test and scale Agent Skills",
+        "url": "https://cloud.google.com/blog/topics/developers-practitioners/behind-the-scenes-how-we-build-test-and-scale-google-agent-skills",
+        "description": "Governance, CI, ownership và continuous eval cho một skill catalog lớn."
+      }
+    ]
+  },
+  {
+    "slug": "authoring-discoverable-composable-skills",
+    "title": "Authoring: Trigger, Contract & Composition",
+    "summary": "Viết description có boundary, workflow có completion criteria và skill nhỏ có thể compose theo pattern từ Matt Pocock và Superpowers.",
+    "level": "Nâng cao",
+    "durationMinutes": 46,
+    "icon": "skills",
+    "color": "from-fuchsia-500 to-violet-600",
+    "tags": ["Authoring", "Routing", "Composition"],
+    "mentalModel": "Description là routing contract; body là execution contract; completion criteria là verification contract.",
+    "takeaways": [
+      "Description cần cả positive trigger và boundary đủ phân biệt near-miss.",
+      "Skill nhỏ, composable thường dễ route và dễ eval hơn framework ôm toàn quy trình.",
+      "User-invoked skill phù hợp orchestration có chủ ý; model-invoked skill phù hợp discipline tái sử dụng.",
+      "Instruction tốt tạo cùng process dưới nhiều input, không ép mọi lần sinh cùng câu chữ."
+    ],
+    "sections": [
+      {
+        "title": "Học từ Matt Pocock: giữ quyền điều khiển và compose primitives",
+        "paragraphs": [
+          "Repository mattpocock/skills tách user-invoked skill dùng để orchestration khỏi model-invoked skill chứa discipline tái sử dụng. Một router có thể chọn flow, nhưng primitive không nên phụ thuộc vào một mega-framework sở hữu toàn session.",
+          "Điểm tinh tế không phải “skill càng ngắn càng tốt”, mà là mỗi skill có một reason to change và một invocation boundary rõ. Grilling, diagnosis, TDD và code review có thể compose, nhưng mỗi phần vẫn test được độc lập."
+        ]
+      },
+      {
+        "title": "Description tối ưu retrieval, không tóm tắt giáo trình",
+        "paragraphs": [
+          "Đặc tả yêu cầu description nói skill làm gì và khi nào dùng. Trong thực tế, symptom và near-miss quan trọng hơn slogan. “Helps with frontend” không tạo tín hiệu; “Review existing React UI changes for accessibility and responsive regressions; do not use to build a new screen” tạo decision boundary.",
+          "Không dựa hoàn toàn vào keyword. Model routing dùng semantic match, nên description cần artifact, action, trạng thái hiện tại và trường hợp loại trừ."
+        ]
+      },
+      {
+        "title": "Body phải có observable completion criteria",
+        "paragraphs": [
+          "“Review carefully” là intention, không phải workflow. Một step mạnh nói phải kiểm tra artifact nào, tạo evidence gì và điều kiện nào cho phép đi tiếp. Completion criteria kéo theo legwork: agent phải chạy test thật thay vì chỉ tuyên bố đã kiểm tra.",
+          "Mỗi step nên phân biệt rigid rule và flexible heuristic. Nếu mọi câu đều viết như tuyệt đối, agent không biết phần nào được trade-off; nếu mọi câu đều mềm, workflow biến thành gợi ý có thể bỏ qua."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "SKILL.md có routing boundary và definition of done",
+        "language": "markdown",
+        "code": "---\nname: frontend-production-review\ndescription: Review existing React or Next.js UI changes for accessibility, responsive behavior, state UX, and performance. Use for audit requests; do not use to build a new interface.\n---\n\n# Frontend Production Review\n\n## Workflow\n1. Read repository instructions and inspect the changed UI files.\n2. Classify findings by severity and cite file-level evidence.\n3. Run the relevant static checks without modifying code.\n\n## Done when\n- Every finding has impact, evidence, and a concrete remediation.\n- Passed checks and unavailable checks are reported separately.\n- No file is changed unless the user requested a fix.",
+        "takeaway": "Trigger, workflow và done-condition giải quyết ba failure mode khác nhau."
+      }
+    ],
+    "resources": [
+      {
+        "title": "Matt Pocock — Skills for Real Engineers",
+        "url": "https://github.com/mattpocock/skills",
+        "description": "Skill nhỏ, composable và phân loại user/model-invoked."
+      },
+      {
+        "title": "Writing for agents",
+        "url": "https://github.com/mattpocock/skills/blob/main/docs/productivity/writing-for-agents.md",
+        "description": "Completion criteria, leading words và pruning agent-facing text."
+      },
+      {
+        "title": "Best practices for skill creators",
+        "url": "https://agentskills.io/skill-creation/best-practices",
+        "description": "Scope, examples và progressive disclosure cho skill author."
+      },
+      {
+        "title": "Superpowers — writing skills",
+        "url": "https://github.com/obra/superpowers/blob/main/skills/writing-skills/SKILL.md",
+        "description": "Skill discovery optimization, flowchart boundary và TDD cho process documentation."
+      }
+    ]
+  },
+  {
+    "slug": "openai-yaml-and-host-adapters",
+    "title": "Vì sao agents/ chỉ có openai.yaml?",
+    "summary": "Tách portable skill khỏi host adapter, hiểu chính xác OpenAI đọc file nào, host khác xử lý ra sao và phần nào tuyệt đối không nên đặt trong YAML này.",
+    "level": "Nâng cao",
+    "durationMinutes": 36,
+    "icon": "interface",
+    "color": "from-emerald-500 to-cyan-600",
+    "tags": ["openai.yaml", "Portability", "Host Adapter"],
+    "mentalModel": "SKILL.md là protocol chung; agents/openai.yaml là adapter tùy chọn cho trải nghiệm OpenAI, giống một lớp integration chứ không phải implementation của skill.",
+    "takeaways": [
+      "Chỉ có openai.yaml vì bundle hiện chỉ chọn hỗ trợ extension của OpenAI.",
+      "Không được suy ra mọi vendor đều dùng quy ước agents/<vendor>.yaml.",
+      "Host không hiểu extension vẫn có thể chạy portable core từ SKILL.md.",
+      "Workflow quan trọng không được giấu trong metadata dành riêng cho một host."
+    ],
+    "sections": [
+      {
+        "title": "Câu trả lời ngắn: đây là một adapter, không phải danh sách agent",
+        "paragraphs": [
+          "Tên thư mục agents dễ gây hiểu nhầm rằng mỗi file là một sub-agent. Trong cấu trúc skill của OpenAI, agents/openai.yaml là optional host metadata: OpenAI dùng nó để cấu hình appearance, invocation policy và tool dependencies. Nó không tạo ra một agent tên OpenAI và cũng không chứa reasoning loop.",
+          "Package chỉ có openai.yaml vì tác giả mới khai báo integration mà OpenAI đã document. Không có yêu cầu phải tạo đủ claude.yaml, antigravity.yaml hay autogen.yaml. Quan trọng hơn, không nên tự chế các filename đó chỉ để cây thư mục trông đối xứng; mỗi host có format và vị trí config riêng."
+        ]
+      },
+      {
+        "title": "Portable core và host-specific extension sống song song",
+        "paragraphs": [
+          "Portable core gồm SKILL.md với name, description và instruction, kèm scripts, references hoặc assets nếu cần. Đây là phần chứa workflow mà một host hỗ trợ Agent Skills có thể khám phá và thực hiện.",
+          "Host adapter chỉ cải thiện trải nghiệm trên một runtime cụ thể. Với OpenAI, interface định nghĩa display_name, short_description, icon, brand color và default prompt; policy điều khiển implicit invocation; dependencies khai báo tool mà host nên chuẩn bị. Nếu xóa openai.yaml, skill có thể mất icon hoặc integration tiện lợi nhưng logic trong SKILL.md không nên biến mất."
+        ],
+        "points": [
+          "SKILL.md trả lời: phải làm gì, theo thứ tự nào, khi nào hoàn thành?",
+          "openai.yaml trả lời: OpenAI nên hiển thị, kích hoạt và chuẩn bị dependency thế nào?",
+          "Harness policy trả lời: tool call này có thực sự được phép chạy hay không?"
+        ]
+      },
+      {
+        "title": "Host khác gặp openai.yaml thì điều gì xảy ra?",
+        "paragraphs": [
+          "Một host không triển khai extension của OpenAI không có lý do để diễn giải file này. Nó có thể bỏ qua file và chỉ dùng SKILL.md. Khả năng portable vì vậy phụ thuộc vào việc workflow cốt lõi không tham chiếu ngược vào behavior chỉ OpenAI mới hiểu.",
+          "Nếu muốn tối ưu cho host thứ hai, trước hết phải đọc tài liệu chính thức của host đó: nó có dùng cùng Agent Skills spec không, có manifest riêng không, file nằm ở đâu và field nào được hỗ trợ. Portability là common denominator có chủ ý, không phải đổi chữ openai thành tên vendor."
+        ]
+      },
+      {
+        "title": "Ba field group của OpenAI ảnh hưởng ở đâu?",
+        "paragraphs": [
+          "interface là presentation layer. Nó giúp người dùng nhận ra skill và khởi động bằng prompt phù hợp, nhưng một icon đẹp không cải thiện execution correctness. policy.allow_implicit_invocation là routing control: false ngăn Codex tự chọn skill theo prompt, trong khi explicit invocation vẫn hoạt động.",
+          "dependencies.tools là dependency declaration, không phải quyền truy cập. Nó mô tả tool integration cần cho trải nghiệm trơn tru; quyền thực tế vẫn do runtime, workspace, authentication và approval quyết định. Khai báo MCP URL không tự đăng nhập và không tự vượt sandbox."
+        ]
+      },
+      {
+        "title": "Quy tắc thiết kế để không bị vendor lock-in ngoài ý muốn",
+        "paragraphs": [
+          "Hãy thử nghiệm bằng cách tạm bỏ agents/openai.yaml. Nếu skill không còn biết workflow, input, output hoặc done-condition, boundary đã sai. Nếu chỉ mất display name, icon, implicit routing preference hoặc dependency hint, boundary đang hợp lý."
+        ],
+        "points": [
+          "Không lặp toàn bộ instruction từ SKILL.md vào default_prompt.",
+          "Không lưu secret, token hoặc credential trong YAML.",
+          "Không xem dependency declaration là authorization.",
+          "Không tạo filename cho vendor khác khi chưa có spec chính thức."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "OpenAI adapter tối thiểu và đúng boundary",
+        "language": "yaml",
+        "code": "interface:\n  display_name: \"Frontend Production Review\"\n  short_description: \"Audit an existing frontend change\"\n  icon_small: \"./assets/review.svg\"\n  default_prompt: \"Review this existing UI diff and cite evidence.\"\n\npolicy:\n  allow_implicit_invocation: false\n\ndependencies:\n  tools:\n    - type: \"mcp\"\n      value: \"browser\"\n      description: \"Inspect rendered UI\"",
+        "takeaway": "File mô tả integration của OpenAI; step-by-step review và definition of done vẫn thuộc SKILL.md."
+      },
+      {
+        "title": "Compatibility matrix để review boundary",
+        "language": "text",
+        "code": "Concern                    SKILL.md   agents/openai.yaml\nWorkflow steps             yes        no\nDone condition             yes        no\nReference/script pointers  yes        no\nDisplay name and icon      no         yes\nImplicit invocation policy no         yes\nOpenAI tool dependencies   no         yes\nActual tool authorization  no         no  (belongs to harness/runtime)",
+        "takeaway": "Hai file giải quyết hai tầng khác nhau; authorization không thuộc tầng nào trong số đó."
+      }
+    ],
+    "resources": [
+      {
+        "title": "OpenAI — Build skills",
+        "url": "https://learn.chatgpt.com/docs/build-skills",
+        "description": "Nguồn chính thức cho cấu trúc skill, optional openai.yaml, invocation policy và dependencies."
+      },
+      {
+        "title": "Agent Skills specification",
+        "url": "https://agentskills.io/specification",
+        "description": "Portable core và progressive disclosure độc lập với host adapter."
+      },
+      {
+        "title": "OpenAI Skills repository",
+        "url": "https://github.com/openai/skills",
+        "description": "Ví dụ thực tế về agents/openai.yaml, assets và skill distribution."
+      },
+      {
+        "title": "OpenAI — Plugins in Codex",
+        "url": "https://learn.chatgpt.com/docs/plugins",
+        "description": "Phân phối skills cùng app, MCP dependency và presentation metadata."
+      }
+    ]
+  },
+  {
+    "slug": "scripts-references-assets-and-hooks",
+    "title": "Scripts, References, Assets & Hooks",
+    "summary": "Quyết định phần nào nên là prose, executable, reference, template hay lifecycle hook và thiết kế failure contract an toàn.",
+    "level": "Nâng cao",
+    "durationMinutes": 42,
+    "icon": "harness",
+    "color": "from-cyan-500 to-blue-600",
+    "tags": ["Scripts", "Determinism", "Hooks"],
+    "mentalModel": "Judgment ở trong prose; transformation deterministic ở trong code; enforcement chắc chắn ở trong test/hook; knowledge dài ở reference.",
+    "takeaways": [
+      "Script phải có input/output/exit-code contract và không được che giấu side effect.",
+      "Skill phải hướng dẫn khi chạy script, không chỉ đặt script cạnh SKILL.md.",
+      "Hook phù hợp invariant tại lifecycle event; skill phù hợp reasoning theo task.",
+      "Assets là vật liệu đầu ra, không nên bị nạp như instruction."
+    ],
+    "sections": [
+      {
+        "title": "Quy tắc script-vs-prose",
+        "paragraphs": [
+          "Nếu cùng input luôn phải tạo cùng output và một chương trình có thể làm đáng tin cậy hơn, ưu tiên script: parse report, validate schema, render artifact, normalize data. Nếu quyết định phụ thuộc intent, risk hoặc evidence không hoàn chỉnh, giữ nó trong prose để model suy luận.",
+          "Đừng chuyển mọi thứ thành script. Code tăng dependency, permission surface và maintenance. Script chỉ đáng có khi giảm variance, token cost hoặc lỗi thao tác đủ lớn."
+        ]
+      },
+      {
+        "title": "Executable contract cần được viết như API",
+        "paragraphs": [
+          "SKILL.md phải nói working directory, command, input, output, exit codes, files được phép ghi và cách xử lý failure. Script phải validate input trước side effect, ghi diagnostic ra stderr, structured result ra stdout và không in secret.",
+          "Không dùng script để lách approval hoặc sandbox. Skill text không thể cấp quyền; harness vẫn phải authorize command và target."
+        ]
+      },
+      {
+        "title": "Script thực sự được gọi như thế nào?",
+        "paragraphs": [
+          "Luồng đầy đủ có ít nhất sáu ranh giới: model đọc instruction; model quyết định cần executable; model phát tool call; harness kiểm tra command và permission; operating system tạo process; stdout, stderr và exit code quay lại thành observation. scripts/ chỉ là convention tổ chức file, không phải auto-run directory.",
+          "Điểm này giải thích vì sao cùng một skill có thể chạy trên hai harness nhưng hành vi khác nhau. Model có thể đưa ra cùng command, song harness A cho network còn harness B chặn; harness A yêu cầu approval còn harness B chỉ cho đọc. Skill ảnh hưởng proposal, harness quyết định capability thực tế."
+        ],
+        "points": [
+          "Trước execution: mới có intent và arguments do model đề xuất.",
+          "Trong execution: sandbox, environment, cwd và dependency quyết định kết quả.",
+          "Sau execution: model chỉ biết những gì observation trả về, không tự biết process đã làm gì ngoài contract."
+        ]
+      },
+      {
+        "title": "Reference ảnh hưởng reasoning nhưng không tự hành động",
+        "paragraphs": [
+          "Reference được đọc vào context giống evidence. Nó có thể thay đổi kết luận, branch hoặc tool call tiếp theo, nhưng không tự ghi file hay gọi API. Tác động gián tiếp vẫn lớn: tài liệu sai có thể khiến model đề xuất hành động sai, nên reference cần owner, version và điều kiện đọc.",
+          "Pointer nên nói rõ trigger, path và mục tiêu. Ví dụ: “Nếu diff thay đổi authentication, đọc references/auth-threat-model.md để tạo checklist” tốt hơn “đọc references khi cần”. Cách viết này vừa giảm context vừa tạo được eval case quan sát rõ file nào đáng lẽ phải được mở."
+        ]
+      },
+      {
+        "title": "Thiết kế stdout, stderr và exit code như protocol",
+        "paragraphs": [
+          "stdout nên ổn định và machine-readable khi model phải parse kết quả; stderr dành cho diagnostic; exit 0 nghĩa là command hoàn thành theo contract, không nhất thiết business result là “pass”. Non-zero phải phân biệt invalid input, dependency thiếu và execution failure nếu workflow cần recovery khác nhau.",
+          "Một script tốt còn định nghĩa idempotency và write set. Chạy lại có ghi đè an toàn không? File nào được tạo? Partial failure để lại artifact nào? Không trả lời được các câu này thì agent khó retry và harness khó review side effect."
+        ]
+      },
+      {
+        "title": "Hook khác skill ở tính bắt buộc",
+        "paragraphs": [
+          "Skill dựa vào activation và model compliance. Hook chạy tại event do runtime định nghĩa, phù hợp với formatting sau edit, secret scan trước commit hoặc telemetry sau tool call. Nếu một constraint không được phép bỏ sót, đừng chỉ viết nó thành lời nhắc.",
+          "Hook cũng cần budget và failure policy. Một hook fail-closed tăng an toàn nhưng có thể khóa workflow; fail-open giữ availability nhưng phải tạo alert và evidence."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "SKILL.md gọi script bằng một contract có thể kiểm thử",
+        "language": "markdown",
+        "code": "## Bundle inspection\n\nRun only when the user provides an existing Next.js build report.\n\n1. From the repository root, run:\n   `python3 scripts/inspect_bundle.py <report.json>`\n2. Treat stdout as JSON with `largestRoutes`.\n3. Treat exit 2 as invalid input; do not retry unchanged.\n4. Treat exit 3 as a missing dependency; report the dependency.\n5. The script is read-only. Stop if it requests a writable target.\n6. Compare the result with references/performance-budgets.md.\n\nDone when every reported regression cites route bytes and its budget.",
+        "takeaway": "Instruction nối judgment với executable bằng trigger, command, result schema, recovery và done-condition."
+      },
+      {
+        "title": "Script trả structured evidence",
+        "language": "python",
+        "code": "#!/usr/bin/env python3\nimport json\nimport sys\nfrom pathlib import Path\n\nif len(sys.argv) != 2:\n    raise SystemExit('usage: inspect_bundle.py <report.json>')\n\nreport = Path(sys.argv[1]).resolve()\nif not report.is_file():\n    raise SystemExit(f'report not found: {report}')\n\ndata = json.loads(report.read_text(encoding='utf-8'))\nroutes = sorted(data['routes'], key=lambda item: item['bytes'], reverse=True)\nprint(json.dumps({'largestRoutes': routes[:5]}))",
+        "takeaway": "Script thu thập fact lặp lại; skill vẫn phải diễn giải impact dựa trên budget và context sản phẩm."
+      }
+    ],
+    "resources": [
+      {
+        "title": "Google Antigravity Hooks",
+        "url": "https://antigravity.google/docs/hooks",
+        "description": "Lifecycle interceptor hooks và use case enforcement."
+      },
+      {
+        "title": "Agent Skills specification — scripts",
+        "url": "https://agentskills.io/specification",
+        "description": "Yêu cầu và khuyến nghị cho optional executable resources."
+      },
+      {
+        "title": "Superpowers writing-skills",
+        "url": "https://github.com/obra/superpowers/blob/main/skills/writing-skills/SKILL.md",
+        "description": "Cách tổ chức skill, heavy reference và reusable tools."
+      },
+      {
+        "title": "OpenAI — Shell tool",
+        "url": "https://developers.openai.com/api/docs/guides/tools-shell",
+        "description": "Hosted shell execution, command lifecycle và container environment."
+      },
+      {
+        "title": "OpenAI — Local shell",
+        "url": "https://developers.openai.com/api/docs/guides/tools-local-shell",
+        "description": "Đưa tool call về runtime local và giữ application chịu trách nhiệm thực thi."
+      },
+      {
+        "title": "Python packaging guide — CLI tools",
+        "url": "https://packaging.python.org/en/latest/guides/creating-command-line-tools/",
+        "description": "Entrypoint và packaging contract khi script phát triển thành reusable CLI."
+      }
+    ]
+  },
+  {
+    "slug": "testing-evaluating-and-shipping-skills",
+    "title": "Testing, Evals & Skill Supply Chain",
+    "summary": "Kiểm thử routing và behavior bằng baseline/pressure scenarios, rồi phân phối skill như executable dependency có version và trust boundary.",
+    "level": "Nâng cao",
+    "durationMinutes": 52,
+    "icon": "multi-agent",
+    "color": "from-rose-500 to-red-600",
+    "tags": ["Evals", "TDD", "Supply Chain"],
+    "mentalModel": "Một skill chưa được test chỉ là giả thuyết về hành vi; một skill bên thứ ba chưa được review là dependency có quyền tác động tới agent.",
+    "takeaways": [
+      "Routing eval và execution eval phải tách riêng.",
+      "RED baseline chứng minh failure thực sự tồn tại trước khi thêm instruction.",
+      "Pressure scenario tìm rationalization mà happy-path prompt không lộ ra.",
+      "Pin version, review diff và giới hạn quyền khi cài skill bên thứ ba."
+    ],
+    "sections": [
+      {
+        "title": "Superpowers: TDD cho process documentation",
+        "paragraphs": [
+          "Superpowers áp RED–GREEN–REFACTOR cho skill: chạy scenario không có skill và ghi lại failure; viết instruction tối thiểu xử lý failure đó; chạy lại với skill; sau đó thêm pressure để tìm loophole mới. Giá trị lớn nhất của RED là ngăn tác giả viết theo intuition thay vì failure quan sát được.",
+          "Pressure scenario kết hợp deadline, sunk cost, authority hoặc exhaustion để buộc agent lựa chọn. Nó phù hợp với skill kỷ luật như TDD hay verification; reference skill thuần kiến thức không nhất thiết cần kiểu test compliance này."
+        ]
+      },
+      {
+        "title": "Eval matrix: trigger đúng, trigger sai, chạy đúng",
+        "paragraphs": [
+          "Positive routing prompt kiểm tra task rõ ràng phải kích hoạt. Near-miss prompt kiểm tra task gần giống nhưng ngoài scope không được kích hoạt. Execution eval kiểm tra artifact, step order, tool call, refusal và done-condition sau khi skill đã được load.",
+          "Đo outcome thay vì exact prose: file hợp lệ, test thực sự chạy, side effect nằm trong scope, finding có evidence. Exact-string assertion thường khiến eval giòn mà không đo chất lượng."
+        ]
+      },
+      {
+        "title": "Skill là một phần của software supply chain",
+        "paragraphs": [
+          "SKILL.md là operational text: nó có thể hướng agent đọc file, chạy script và gọi tool. Cài repository lạ tương đương thêm dependency có khả năng định hướng hành động. Cần review instruction, executable, hook, network target, license và update channel.",
+          "Matt Pocock phân biệt plugin managed/read-only với bản copy qua skills installer mà team sở hữu và chỉnh sửa. Hai mô hình có trade-off khác nhau: subscription dễ cập nhật; vendoring dễ audit và pin nhưng team phải tự merge bản vá."
+        ]
+      },
+      {
+        "title": "Definition of Done cho một skill production",
+        "paragraphs": [
+          "Một skill sẵn sàng khi schema validate, routing suite qua, execution suite qua, failure mode có recovery, permission được ghi rõ, reference không chết và versioning policy tồn tại. Số sao GitHub hay output demo đẹp không thay thế các bằng chứng này."
+        ],
+        "points": [
+          "Ít nhất: positive, near-miss và explicit invocation cases.",
+          "Có baseline chứng minh skill thay đổi hành vi mong muốn.",
+          "Có test cho missing input, tool denial và script failure.",
+          "Có owner, version và cách rollback/update."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "Eval cases tập trung vào boundary",
+        "language": "typescript",
+        "code": "const cases = [\n  { prompt: 'Audit this existing checkout UI', shouldActivate: true },\n  { prompt: 'Build a new checkout page', shouldActivate: false },\n  { prompt: 'Use frontend-production-review on this diff', shouldActivate: true },\n];\n\nfor (const testCase of cases) {\n  const result = await runAgent(testCase.prompt);\n  expect(result.activatedSkills.includes('frontend-production-review'))\n    .toBe(testCase.shouldActivate);\n}",
+        "takeaway": "Near-miss case bảo vệ precision; explicit case bảo vệ invocation contract; positive case bảo vệ recall."
+      }
+    ],
+    "resources": [
+      {
+        "title": "Superpowers — testing skills with subagents",
+        "url": "https://github.com/obra/superpowers/blob/main/skills/writing-skills/testing-skills-with-subagents.md",
+        "description": "RED–GREEN–REFACTOR và pressure testing cho skill behavior."
+      },
+      {
+        "title": "Matt Pocock Skills installation models",
+        "url": "https://github.com/mattpocock/skills",
+        "description": "Managed plugin so với editable vendored skills."
+      },
+      {
+        "title": "Anthropic — Demystifying evals for AI agents",
+        "url": "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents",
+        "description": "Outcome-oriented evaluation cho agent nhiều turn."
+      },
+      {
+        "title": "Google — Continuous evals for Agent Skills",
+        "url": "https://cloud.google.com/blog/topics/developers-practitioners/behind-the-scenes-how-we-build-test-and-scale-google-agent-skills",
+        "description": "Case study thực tế về baseline, CI gates, accuracy và efficiency."
+      },
+      {
+        "title": "OpenAI — Evaluate agent workflows",
+        "url": "https://developers.openai.com/api/docs/guides/agent-evals",
+        "description": "Trace grading và evaluation workflow cho agent production."
+      },
+      {
+        "title": "Promptfoo",
+        "url": "https://github.com/promptfoo/promptfoo",
+        "description": "Open-source eval harness để chạy dataset, assertions và regression suite."
+      },
+      {
+        "title": "Inspect AI",
+        "url": "https://github.com/UKGovernmentBEIS/inspect_ai",
+        "description": "Framework open source cho model evaluation, task, scorer và sandbox."
+      }
+    ],
+    "caseStudies": [
+      {
+        "title": "Từ SKILL.md đến public release: quality gate thay vì upload thủ công",
+        "pattern": "Skill delivery pipeline",
+        "summary": "Google mô tả một pipeline nơi skill đi qua kiểm tra cấu trúc và link, sau đó so sánh agent-only với agent-plus-skill trên accuracy lẫn efficiency trước khi public export. Điểm đáng học không phải công cụ cụ thể mà là skill được release giống software dependency.",
+        "image": {
+          "src": "/images/ai/case-studies/google-skills-pipeline.jpg",
+          "alt": "Pipeline Agent Skills từ tác giả qua CI, đánh giá agent có và không có skill rồi public export",
+          "width": 1376,
+          "height": 768
+        },
+        "source": {
+          "title": "Google Cloud — Behind the scenes: how we build, test and scale Agent Skills",
+          "url": "https://cloud.google.com/blog/topics/developers-practitioners/behind-the-scenes-how-we-build-test-and-scale-google-agent-skills"
+        },
+        "whyItWorks": [
+          "Baseline without-skill chứng minh skill tạo uplift thay vì chỉ tạo output trông thuyết phục.",
+          "Static checks bắt lỗi rẻ như frontmatter, naming và dead link trước khi tốn model calls.",
+          "Public export tách internal data, owner metadata và eval fixtures khỏi artifact phân phối."
+        ],
+        "implementation": [
+          "Validate schema, path, frontmatter và mọi URL trong pull request.",
+          "Chạy positive, near-miss và failure prompts nhiều lần ở baseline và candidate.",
+          "Chấm outcome bằng rubric; ghi tokens, latency, tool calls và completion rate.",
+          "Chỉ publish version mới khi quality tăng mà permission surface không mở rộng ngoài dự kiến."
+        ],
+        "caveat": "Một lần eval pass không chứng minh skill bền vững. Model, API, reference và harness đều thay đổi nên cần scheduled regression run và owner xử lý failure."
+      },
+      {
+        "title": "Đừng chỉ đo câu trả lời hay hơn—hãy đo cả token và thời gian",
+        "pattern": "2×2 evaluation matrix",
+        "summary": "Ma trận tách accuracy khỏi efficiency. Một skill có thể tăng task completion nhưng nạp quá nhiều context hoặc gọi tool dư thừa; ngược lại, giảm token mà làm mất evidence cũng không phải cải tiến. Candidate tốt phải được so trên cùng workload và cùng success rubric.",
+        "image": {
+          "src": "/images/ai/case-studies/google-skill-eval-matrix.jpg",
+          "alt": "Ma trận đánh giá 2x2 so sánh agent có và không có skill theo accuracy cùng efficiency",
+          "width": 1376,
+          "height": 768
+        },
+        "source": {
+          "title": "Google Cloud — Behind the scenes: how we build, test and scale Agent Skills",
+          "url": "https://cloud.google.com/blog/topics/developers-practitioners/behind-the-scenes-how-we-build-test-and-scale-google-agent-skills"
+        },
+        "whyItWorks": [
+          "Outcome metric ngăn tối ưu exact wording thay vì task success.",
+          "Efficiency metric phát hiện context bloat và workflow lặp dù output cuối vẫn đúng.",
+          "Cùng một rubric cho baseline/candidate giúp attribution rõ hơn."
+        ],
+        "implementation": [
+          "Định nghĩa task success và evidence bắt buộc trước khi chạy model.",
+          "Ghi total tokens, wall-clock time, số turn, tool call, retry và side effect.",
+          "Chạy nhiều trial để variance của model không quyết định kết luận.",
+          "Review riêng các regression: route sai, tool denial, timeout và partial artifact."
+        ],
+        "caveat": "Không cộng accuracy và efficiency thành một điểm số tùy ý quá sớm. Giữ hai trục riêng để team nhìn thấy trade-off và đặt threshold phù hợp với workload."
+      }
+    ]
+  }
+]

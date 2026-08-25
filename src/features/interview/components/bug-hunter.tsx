@@ -59,7 +59,7 @@ export function BugHunter({ challenges }: BugHunterProps) {
       {/* Main Challenge Card */}
       <Card className="glass-card space-y-6 p-6 sm:p-8">
         {/* Header */}
-        <div className="flex flex-col gap-3 border-b border-border/50 pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="border-border/50 flex flex-col gap-3 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex-1 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="destructive" className="gap-1 text-[10px] uppercase">
@@ -74,11 +74,11 @@ export function BugHunter({ challenges }: BugHunterProps) {
               </Badge>
             </div>
 
-            <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+            <h2 className="text-foreground text-xl font-bold tracking-tight sm:text-2xl">
               {activeChallenge.title}
             </h2>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              <span className="font-semibold text-foreground">Scenario: </span>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              <span className="text-foreground font-semibold">Scenario: </span>
               {activeChallenge.scenario}
             </p>
           </div>
@@ -109,7 +109,7 @@ export function BugHunter({ challenges }: BugHunterProps) {
         {/* Buggy Code Snippet */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs font-bold text-destructive">
+            <span className="text-destructive flex items-center gap-1.5 text-xs font-bold">
               <AlertTriangle className="h-3.5 w-3.5" />
               Buggy Code Snippet (Hãy tìm lỗi bên dưới):
             </span>
@@ -150,7 +150,7 @@ export function BugHunter({ challenges }: BugHunterProps) {
           </div>
 
           {showHints && (
-            <div className="space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 animate-in fade-in-50">
+            <div className="animate-in fade-in-50 space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
               <span className="text-xs font-bold text-amber-700 dark:text-amber-300">
                 Gợi ý phỏng vấn:
               </span>
@@ -168,19 +168,19 @@ export function BugHunter({ challenges }: BugHunterProps) {
 
         {/* Solution & Refactored Code */}
         {showSolution && (
-          <div className="space-y-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 duration-300 animate-in fade-in-50">
+          <div className="animate-in fade-in-50 space-y-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 duration-300">
             <div className="space-y-1.5">
               <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 Nguyên nhân lỗi kiến trúc & Hậu quả:
               </span>
-              <p className="text-xs font-medium leading-relaxed text-foreground">
+              <p className="text-foreground text-xs leading-relaxed font-medium">
                 {activeChallenge.bugExplanation}
               </p>
             </div>
 
             <div className="space-y-2 pt-2">
-              <span className="text-xs font-bold text-foreground">
+              <span className="text-foreground text-xs font-bold">
                 Mã nguồn đã được refactor chuẩn:
               </span>
               <CodeBlock code={activeChallenge.fixedCode} language="tsx" />

@@ -229,20 +229,20 @@ export function ApiDemoTester() {
   return (
     <Card className="glass-card space-y-6 p-6 sm:p-8">
       {/* Header */}
-      <div className="flex flex-col gap-2 border-b border-border/50 pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-border/50 flex flex-col gap-2 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-0.5 text-xs font-semibold text-primary">
+          <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-0.5 text-xs font-semibold">
             <Send className="h-3.5 w-3.5" />
             <span>Concurrent React 19 API Testing Suite</span>
           </div>
-          <h3 className="text-xl font-bold tracking-tight text-foreground">
+          <h3 className="text-foreground text-xl font-bold tracking-tight">
             Demo Trực Tiếp Các Endpoint API & HTTP Headers
           </h3>
         </div>
 
         <Badge
           variant="outline"
-          className="w-fit font-mono text-xs text-muted-foreground"
+          className="text-muted-foreground w-fit font-mono text-xs"
         >
           Concurrent Transition Mode
         </Badge>
@@ -266,11 +266,11 @@ export function ApiDemoTester() {
                   : 'border-border/60 bg-secondary/30 hover:border-border hover:bg-secondary/50'
               }`}
             >
-              <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+              <div className="text-foreground flex items-center gap-2 text-xs font-bold">
                 {demo.icon}
                 <span>{demo.title}</span>
               </div>
-              <span className="w-full truncate font-mono text-[11px] text-muted-foreground">
+              <span className="text-muted-foreground w-full truncate font-mono text-[11px]">
                 {demo.endpoint}
               </span>
             </button>
@@ -279,7 +279,7 @@ export function ApiDemoTester() {
       </div>
 
       {/* Active Endpoint Info & Execute Bar */}
-      <div className="space-y-3 rounded-xl border border-border/60 bg-muted/30 p-4">
+      <div className="border-border/60 bg-muted/30 space-y-3 rounded-xl border p-4">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -289,7 +289,7 @@ export function ApiDemoTester() {
               >
                 {activeDemo.method}
               </Badge>
-              <span className="font-mono text-xs font-bold text-foreground">
+              <span className="text-foreground font-mono text-xs font-bold">
                 {activeDemo.endpoint}
               </span>
               {isPending && (
@@ -301,13 +301,13 @@ export function ApiDemoTester() {
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">{activeDemo.description}</p>
+            <p className="text-muted-foreground text-xs">{activeDemo.description}</p>
           </div>
 
           <Button
             onClick={handleExecuteRequest}
             disabled={isPending}
-            className="shrink-0 gap-2 text-xs font-semibold shadow-md shadow-primary/20"
+            className="shadow-primary/20 shrink-0 gap-2 text-xs font-semibold shadow-md"
           >
             {isPending ? (
               <>
@@ -330,7 +330,7 @@ export function ApiDemoTester() {
 
       {/* Step-by-Step Timeline for Silent Refresh Flow */}
       {activeKey === 'silent-refresh' && refreshSteps.length > 0 && (
-        <div className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 animate-in fade-in-50">
+        <div className="animate-in fade-in-50 space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
           <div className="flex items-center gap-2 text-xs font-bold text-amber-500">
             <Zap className="h-4 w-4" />
             <span>Quy trình Silent Refresh Token (Background Execution Flow):</span>
@@ -375,12 +375,12 @@ export function ApiDemoTester() {
       {/* Live Response Panel (CONCURRENT ATOMIC RENDER - 0 UI Flicker, Old UI stays 100% intact until ready!) */}
       {status !== null && (
         <div
-          className={`space-y-4 rounded-2xl border border-primary/30 bg-primary/5 p-6 transition-opacity duration-200 ${isPending ? 'opacity-70' : 'opacity-100'}`}
+          className={`border-primary/30 bg-primary/5 space-y-4 rounded-2xl border p-6 transition-opacity duration-200 ${isPending ? 'opacity-70' : 'opacity-100'}`}
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-3">
+          <div className="border-border/40 flex flex-wrap items-center justify-between gap-2 border-b pb-3">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <span className="text-xs font-bold text-foreground">
+              <span className="text-foreground text-xs font-bold">
                 HTTP Response Status
               </span>
               <Badge
@@ -399,8 +399,8 @@ export function ApiDemoTester() {
             </div>
 
             {responseTimeMs !== null && (
-              <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-                <Clock className="h-3.5 w-3.5 text-primary" />
+              <span className="text-muted-foreground flex items-center gap-1 font-mono text-xs">
+                <Clock className="text-primary h-3.5 w-3.5" />
                 Total Latency:{' '}
                 <strong className="text-foreground">{responseTimeMs} ms</strong>
               </span>
@@ -410,7 +410,7 @@ export function ApiDemoTester() {
           {/* Response Headers */}
           {responseHeadersJson && (
             <div className="space-y-1.5">
-              <span className="text-xs font-bold text-muted-foreground">
+              <span className="text-muted-foreground text-xs font-bold">
                 HTTP Response Headers:
               </span>
               <CodeBlock
@@ -424,7 +424,7 @@ export function ApiDemoTester() {
           {/* Response Body JSON */}
           {responseBodyJson && (
             <div className="space-y-1.5">
-              <span className="text-xs font-bold text-muted-foreground">
+              <span className="text-muted-foreground text-xs font-bold">
                 Response Body JSON:
               </span>
               <CodeBlock code={responseBodyJson} language="json" />

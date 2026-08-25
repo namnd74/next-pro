@@ -73,11 +73,7 @@ const STATUS_DOT: Record<LessonStatus, string> = {
 
 function StatusDot({ status }: { status: LessonStatus }) {
   const cls =
-    status === 'breached'
-      ? ''
-      : status === 'patched'
-        ? ''
-        : 'text-muted-foreground/40';
+    status === 'breached' ? '' : status === 'patched' ? '' : 'text-muted-foreground/40';
   return (
     <span className={`w-4 shrink-0 text-center text-[9px] ${cls}`}>
       {STATUS_DOT[status]}
@@ -95,8 +91,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const activeCollectionSlug = segments[2];
   const activeMissionSlug = segments[3];
 
-  const { resetRedTeamProgress, launchedVectorIds, patchedVectorIds } =
-    useRedTeamStore();
+  const { resetRedTeamProgress, launchedVectorIds, patchedVectorIds } = useRedTeamStore();
   const [mounted, setMounted] = React.useState(false);
   const [manualExpanded, setManualExpanded] = React.useState<string[]>([]);
 
@@ -110,7 +105,9 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
     (collectionSlug: string, mission: { vectorIds: string[] }): LessonStatus => {
       if (!mounted) return 'idle';
       if (mission.vectorIds.length === 0) return 'idle';
-      const patched = mission.vectorIds.filter((id) => patchedVectorIds.includes(id)).length;
+      const patched = mission.vectorIds.filter((id) =>
+        patchedVectorIds.includes(id)
+      ).length;
       const breached = mission.vectorIds.some((id) => launchedVectorIds.includes(id));
       return patched === mission.vectorIds.length
         ? 'patched'
@@ -127,16 +124,16 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
       <Link
         href="/rt"
         onClick={onNavigate}
-        className="flex shrink-0 items-center gap-2 rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2.5 transition-colors hover:bg-destructive/10"
+        className="border-destructive/20 bg-destructive/5 hover:bg-destructive/10 flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 transition-colors"
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-orange-500 text-white shadow-md">
           <Crosshair className="h-4 w-4" />
         </span>
         <span className="space-y-0.5">
-          <span className="block text-sm font-extrabold tracking-tight text-foreground">
+          <span className="text-foreground block text-sm font-extrabold tracking-tight">
             Red Team Ops
           </span>
-          <span className="block font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+          <span className="text-muted-foreground block font-mono text-[9px] tracking-widest uppercase">
             attack · defend · master
           </span>
         </span>
@@ -144,7 +141,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
 
       {/* Roadmap phases */}
       <nav className="space-y-2">
-        <p className="px-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+        <p className="text-muted-foreground px-1 font-mono text-[10px] tracking-widest uppercase">
           Lộ trình ({RED_TEAM_COLLECTIONS.length} collections)
         </p>
 
@@ -155,14 +152,14 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
             <div key={phase.id} className="space-y-1.5">
               {/* Phase header */}
               <div
-                className={`sticky top-0 z-10 flex items-center gap-1.5 rounded-lg bg-background/95 px-1 py-1 backdrop-blur ${
+                className={`bg-background/95 sticky top-0 z-10 flex items-center gap-1.5 rounded-lg px-1 py-1 backdrop-blur ${
                   phaseIdx > 0 ? 'mt-1' : ''
                 }`}
               >
-                <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-destructive">
+                <span className="text-destructive font-mono text-[9px] font-bold tracking-widest uppercase">
                   P{String(phase.order).padStart(2, '0')}
                 </span>
-                <span className="truncate text-[11px] font-bold text-foreground">
+                <span className="text-foreground truncate text-[11px] font-bold">
                   {phase.title}
                 </span>
               </div>
@@ -170,11 +167,9 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
               {collections.map((collection) => {
                 const collectionSlug = collection.slug;
                 const isActive = activeCollectionSlug === collectionSlug;
-                const expanded =
-                  isActive || manualExpanded.includes(collectionSlug);
+                const expanded = isActive || manualExpanded.includes(collectionSlug);
                 const shortTitle = collection.title.replace(/^Red Team:\s*/, '');
-                const missions =
-                  getMissionsByCollectionSlug(collectionSlug);
+                const missions = getMissionsByCollectionSlug(collectionSlug);
 
                 return (
                   <div
@@ -216,15 +211,15 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
                           )
                         }
                         aria-label="Toggle missions"
-                        className="shrink-0 px-2 text-muted-foreground transition-colors hover:text-foreground"
+                        className="text-muted-foreground hover:text-foreground shrink-0 px-2 transition-colors"
                       >
                         <Chevron expanded={expanded} />
                       </button>
                     </div>
 
                     {expanded && missions.length > 0 && (
-                      <ul className="space-y-0.5 border-t border-border/40 px-2 py-1.5">
-                        <li className="px-1 pb-0.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                      <ul className="border-border/40 space-y-0.5 border-t px-2 py-1.5">
+                        <li className="text-muted-foreground px-1 pb-0.5 font-mono text-[9px] tracking-widest uppercase">
                           Missions ({missions.length})
                         </li>
                         {missions.map((mission) => {
@@ -238,14 +233,16 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
                                 onClick={onNavigate}
                                 className={`flex items-start gap-1.5 rounded-lg px-1.5 py-1 text-[11px] leading-snug transition-colors ${
                                   missionActive
-                                    ? 'bg-primary/10 font-semibold text-primary'
+                                    ? 'bg-primary/10 text-primary font-semibold'
                                     : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
                                 }`}
                               >
                                 <StatusDot status={st} />
                                 <span className="min-w-0 flex-1">
-                                  <span className="line-clamp-2 block">{mission.title}</span>
-                                  <span className="font-mono text-[9px] text-muted-foreground/70">
+                                  <span className="line-clamp-2 block">
+                                    {mission.title}
+                                  </span>
+                                  <span className="text-muted-foreground/70 font-mono text-[9px]">
                                     {minutesLabel} · {mission.vectorIds.length} vector
                                   </span>
                                 </span>
@@ -264,11 +261,11 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
       </nav>
 
       {/* Footer stats + reset */}
-      <div className="mt-auto space-y-2 rounded-xl border border-border/60 bg-secondary/30 p-3">
-        <div className="flex items-center justify-between font-mono text-[10px] text-muted-foreground">
+      <div className="border-border/60 bg-secondary/30 mt-auto space-y-2 rounded-xl border p-3">
+        <div className="text-muted-foreground flex items-center justify-between font-mono text-[10px]">
           <span>
             breached:{' '}
-            <span className="font-bold text-destructive">
+            <span className="text-destructive font-bold">
               {totalBreached}/{totalVectors}
             </span>
           </span>
@@ -285,7 +282,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
             resetRedTeamProgress();
             onNavigate?.();
           }}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-background/60 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+          className="border-border bg-background/60 text-muted-foreground hover:border-destructive/40 hover:text-destructive flex w-full items-center justify-center gap-1.5 rounded-lg border px-2 py-1.5 text-[11px] font-semibold transition-colors"
         >
           <RotateCcw className="h-3 w-3" />
           Reset toàn bộ Ops

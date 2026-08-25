@@ -106,8 +106,8 @@ export function Select({
         onClick={() => setIsOpen((prev) => !prev)}
         onKeyDown={handleKeyDown}
         className={cn(
-          'flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 py-2 text-xs font-medium text-slate-100 shadow-sm transition-all hover:border-primary/60 hover:bg-slate-800/90 focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50',
-          isOpen && 'border-primary bg-slate-900 ring-2 ring-primary/50'
+          'hover:border-primary/60 focus:ring-primary/50 flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 py-2 text-xs font-medium text-slate-100 shadow-sm transition-all hover:bg-slate-800/90 focus:ring-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+          isOpen && 'border-primary ring-primary/50 bg-slate-900 ring-2'
         )}
       >
         <span className={cn('truncate text-left', !selectedOption && 'text-slate-400')}>
@@ -116,7 +116,7 @@ export function Select({
         <ChevronDown
           className={cn(
             'h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200',
-            isOpen && 'rotate-180 text-primary'
+            isOpen && 'text-primary rotate-180'
           )}
         />
       </button>
@@ -135,7 +135,7 @@ export function Select({
               maxWidth: '90vw',
               zIndex: 99999,
             }}
-            className="max-h-64 overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-1.5 opacity-100 shadow-2xl ring-1 ring-white/10 animate-in fade-in-50 zoom-in-95"
+            className="animate-in fade-in-50 zoom-in-95 max-h-64 overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-1.5 opacity-100 shadow-2xl ring-1 ring-white/10"
           >
             {options.map((option) => {
               const isSelected = option.value === value;
@@ -149,15 +149,15 @@ export function Select({
                     setIsOpen(false);
                   }}
                   className={cn(
-                    'relative flex w-full select-none items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-800 hover:text-white disabled:pointer-events-none disabled:opacity-50',
+                    'relative flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-xs font-medium text-slate-200 transition-colors select-none hover:bg-slate-800 hover:text-white disabled:pointer-events-none disabled:opacity-50',
                     isSelected &&
-                      'bg-primary/20 font-bold text-primary hover:bg-primary/30'
+                      'bg-primary/20 text-primary hover:bg-primary/30 font-bold'
                   )}
                 >
-                  <span className="flex-1 whitespace-normal break-words text-left leading-relaxed">
+                  <span className="flex-1 text-left leading-relaxed break-words whitespace-normal">
                     {option.label}
                   </span>
-                  {isSelected && <Check className="ml-2 h-4 w-4 shrink-0 text-primary" />}
+                  {isSelected && <Check className="text-primary ml-2 h-4 w-4 shrink-0" />}
                 </button>
               );
             })}

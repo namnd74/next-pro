@@ -14,7 +14,7 @@ export default function NotFound() {
     <div className="flex min-h-[60vh] items-center justify-center p-4">
       <Card glass className="w-full max-w-md text-center">
         <CardHeader>
-          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <div className="bg-primary/10 text-primary mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl">
             <Compass className="animate-spin-slow h-8 w-8" />
           </div>
           <CardTitle className="text-2xl font-bold">404 - Page Not Found</CardTitle>

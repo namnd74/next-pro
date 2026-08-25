@@ -24,10 +24,7 @@ interface MissionTabsViewProps {
   mission: RedTeamMission;
 }
 
-export function MissionTabsView({
-  collection,
-  mission,
-}: MissionTabsViewProps) {
+export function MissionTabsView({ collection, mission }: MissionTabsViewProps) {
   const linkedVectors = collection.vectors.filter((v) =>
     mission.vectorIds.includes(v.id)
   );
@@ -51,24 +48,24 @@ export function MissionTabsView({
       {/* ══════════════ TAB 1 · BRIEFING ══════════════ */}
       <TabsContent value="briefing" className="mt-4 space-y-6">
         {/* Objective */}
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
-          <span className="mb-1 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-destructive">
+        <div className="border-destructive/30 bg-destructive/5 rounded-2xl border p-4">
+          <span className="text-destructive mb-1 flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase">
             <Target className="h-3.5 w-3.5" />
             Mission Objective
           </span>
-          <p className="text-sm font-medium leading-relaxed text-foreground">
+          <p className="text-foreground text-sm leading-relaxed font-medium">
             {mission.objective}
           </p>
         </div>
 
         {/* Root cause — phần "theory" sâu */}
         <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
-            <GitBranch className="h-4 w-4 text-primary" />
+          <h2 className="text-foreground flex items-center gap-2 text-base font-bold tracking-tight">
+            <GitBranch className="text-primary h-4 w-4" />
             Vì sao lỗ hổng tồn tại? (Root Cause)
           </h2>
           <Card className="glass-card p-5">
-            <p className="text-sm leading-relaxed text-muted-foreground">
+            <p className="text-muted-foreground text-sm leading-relaxed">
               {mission.rootCause}
             </p>
           </Card>
@@ -76,17 +73,17 @@ export function MissionTabsView({
 
         {/* Recon */}
         <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
-            <Search className="h-4 w-4 text-primary" />
+          <h2 className="text-foreground flex items-center gap-2 text-base font-bold tracking-tight">
+            <Search className="text-primary h-4 w-4" />
             Recon Notes — attacker nhìn thấy gì trước tiên?
           </h2>
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {mission.reconNotes.map((note, idx) => (
               <Card key={idx} className="glass-card flex items-start gap-3 p-4">
-                <span className="mt-0.5 font-mono text-[10px] font-bold text-destructive">
+                <span className="text-destructive mt-0.5 font-mono text-[10px] font-bold">
                   R{idx + 1}
                 </span>
-                <span className="text-xs leading-relaxed text-foreground">{note}</span>
+                <span className="text-foreground text-xs leading-relaxed">{note}</span>
               </Card>
             ))}
           </div>
@@ -97,16 +94,16 @@ export function MissionTabsView({
       <TabsContent value="attack" className="mt-4 space-y-8">
         {/* Kill chain */}
         <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
-            <Crosshair className="h-4 w-4 text-destructive" />
+          <h2 className="text-foreground flex items-center gap-2 text-base font-bold tracking-tight">
+            <Crosshair className="text-destructive h-4 w-4" />
             Kill Chain — từng bước khai thác
           </h2>
-          <div className="space-y-4 border-l-2 border-destructive/30 pl-5">
+          <div className="border-destructive/30 space-y-4 border-l-2 pl-5">
             {mission.killChain.map((step, idx) => (
               <div key={idx} className="relative space-y-2">
-                <span className="absolute -left-[27px] top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-destructive bg-background" />
-                <h3 className="text-sm font-bold text-foreground">{step.title}</h3>
-                <p className="text-xs leading-relaxed text-muted-foreground">
+                <span className="border-destructive bg-background absolute top-1 -left-[27px] flex h-3.5 w-3.5 items-center justify-center rounded-full border-2" />
+                <h3 className="text-foreground text-sm font-bold">{step.title}</h3>
+                <p className="text-muted-foreground text-xs leading-relaxed">
                   {step.detail}
                 </p>
                 {step.code && <CodeBlock code={step.code} language="tsx" />}
@@ -117,14 +114,14 @@ export function MissionTabsView({
 
         {/* Live vector simulator */}
         <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
-            <Info className="h-4 w-4 text-primary" />
+          <h2 className="text-foreground flex items-center gap-2 text-base font-bold tracking-tight">
+            <Info className="text-primary h-4 w-4" />
             Bắn thử vector thật
           </h2>
           {linkedVectors.length === 0 ? (
             <Card className="glass-card flex items-center gap-3 p-4">
               <Info className="h-4 w-4 shrink-0 text-sky-500" />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs">
                 Mission này dùng lại vector của topic — mở topic hub để bắn thử.
               </p>
             </Card>
@@ -140,8 +137,8 @@ export function MissionTabsView({
         {/* UI Demo */}
         {Demo && demoMeta && (
           <section className="space-y-3">
-            <h2 className="flex items-center gap-1.5 text-base font-bold tracking-tight text-foreground">
-              <FlaskConical className="h-4 w-4 text-primary" />
+            <h2 className="text-foreground flex items-center gap-1.5 text-base font-bold tracking-tight">
+              <FlaskConical className="text-primary h-4 w-4" />
               {demoMeta.title}
             </h2>
             <Card className="glass-card p-4 sm:p-6">
@@ -155,7 +152,7 @@ export function MissionTabsView({
       <TabsContent value="defense" className="mt-4 space-y-8">
         {/* Hardening checklist */}
         <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
+          <h2 className="text-foreground flex items-center gap-2 text-base font-bold tracking-tight">
             <ShieldCheck className="h-4 w-4 text-emerald-500" />
             Hardening Checklist
           </h2>
@@ -168,7 +165,7 @@ export function MissionTabsView({
                 <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-emerald-500/15 font-mono text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                   ✓
                 </span>
-                <span className="text-xs leading-relaxed text-foreground">{item}</span>
+                <span className="text-foreground text-xs leading-relaxed">{item}</span>
               </Card>
             ))}
           </div>
@@ -176,20 +173,20 @@ export function MissionTabsView({
 
         {/* Debrief */}
         <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
-            <HelpCircle className="h-4 w-4 text-primary" />
+          <h2 className="text-foreground flex items-center gap-2 text-base font-bold tracking-tight">
+            <HelpCircle className="text-primary h-4 w-4" />
             Debrief — trả lời trước khi rời chiến dịch
           </h2>
           <div className="space-y-3">
             {mission.debrief.map((qa, idx) => (
               <Card key={idx} className="glass-card space-y-2 p-5">
-                <p className="flex items-start gap-2 text-sm font-semibold text-foreground">
+                <p className="text-foreground flex items-start gap-2 text-sm font-semibold">
                   <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">
                     Q{idx + 1}
                   </Badge>
                   {qa.question}
                 </p>
-                <p className="pl-9 text-xs leading-relaxed text-muted-foreground">
+                <p className="text-muted-foreground pl-9 text-xs leading-relaxed">
                   <span className="font-bold text-emerald-600 dark:text-emerald-400">
                     A:{' '}
                   </span>

@@ -88,16 +88,16 @@ export function BlitzQuiz({ lessonId, quizzes, onQuizComplete }: BlitzQuizProps)
   const isPassed = currentScore >= Math.ceil(quizzes.length * 0.7);
 
   return (
-    <Card className="glass-card overflow-hidden border-primary/20 p-6 shadow-md">
+    <Card className="glass-card border-primary/20 overflow-hidden p-6 shadow-md">
       {/* Header */}
-      <div className="flex flex-col gap-3 border-b border-border/50 pb-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-border/50 flex flex-col gap-3 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-foreground">60s Rapid Blitz Quiz</h3>
-            <p className="text-xs text-muted-foreground">
+            <h3 className="text-foreground text-base font-bold">60s Rapid Blitz Quiz</h3>
+            <p className="text-muted-foreground text-xs">
               Test your understanding with 3 rapid questions (Pass mark: 70%+)
             </p>
           </div>
@@ -152,16 +152,16 @@ export function BlitzQuiz({ lessonId, quizzes, onQuizComplete }: BlitzQuizProps)
             >
               {/* Question Title */}
               <div className="flex items-start gap-2.5">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-bold text-foreground">
+                <span className="bg-secondary text-foreground flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold">
                   {qIndex + 1}
                 </span>
                 <div className="flex-1 space-y-2">
-                  <p className="text-sm font-semibold leading-snug text-foreground">
+                  <p className="text-foreground text-sm leading-snug font-semibold">
                     {q.question}
                   </p>
 
                   {q.codeSnippet && (
-                    <pre className="overflow-x-auto rounded-xl border border-border/80 bg-slate-950 p-3 text-xs text-slate-100 dark:bg-black/60">
+                    <pre className="border-border/80 overflow-x-auto rounded-xl border bg-slate-950 p-3 text-xs text-slate-100 dark:bg-black/60">
                       <code>{q.codeSnippet}</code>
                     </pre>
                   )}
@@ -211,10 +211,10 @@ export function BlitzQuiz({ lessonId, quizzes, onQuizComplete }: BlitzQuizProps)
 
               {/* Explanation on submit */}
               {isSubmitted && (
-                <div className="mt-3 flex items-start gap-2 rounded-xl border border-border/40 bg-background/80 p-3 text-xs leading-relaxed text-muted-foreground">
-                  <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <div className="border-border/40 bg-background/80 text-muted-foreground mt-3 flex items-start gap-2 rounded-xl border p-3 text-xs leading-relaxed">
+                  <HelpCircle className="text-primary mt-0.5 h-4 w-4 shrink-0" />
                   <div>
-                    <span className="font-semibold text-foreground">Explanation: </span>
+                    <span className="text-foreground font-semibold">Explanation: </span>
                     {q.explanation}
                   </div>
                 </div>
@@ -226,15 +226,15 @@ export function BlitzQuiz({ lessonId, quizzes, onQuizComplete }: BlitzQuizProps)
 
       {/* Submit Footer */}
       {!isSubmitted && (
-        <div className="mt-6 flex flex-col items-center justify-between gap-3 border-t border-border/50 pt-4 sm:flex-row">
-          <span className="text-xs text-muted-foreground">
+        <div className="border-border/50 mt-6 flex flex-col items-center justify-between gap-3 border-t pt-4 sm:flex-row">
+          <span className="text-muted-foreground text-xs">
             Answered {answeredCount} of {quizzes.length} questions
           </span>
 
           <Button
             onClick={handleGradeQuiz}
             disabled={!isAllAnswered}
-            className="w-full gap-2 shadow-md shadow-primary/20 sm:w-auto"
+            className="shadow-primary/20 w-full gap-2 shadow-md sm:w-auto"
           >
             <CheckCircle2 className="h-4 w-4" />
             <span>Submit & Grade Quiz</span>

@@ -2,13 +2,7 @@ import * as React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Clock,
-  Crosshair,
-  Target,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Clock, Crosshair, Target } from 'lucide-react';
 import {
   RED_TEAM_COLLECTIONS,
   getCollectionBySlug,
@@ -39,8 +33,7 @@ export async function generateMetadata({
   const { collectionSlug, missionSlug } = await params;
   const collection = getCollectionBySlug(collectionSlug);
   const mission = getMissionBySlugSafe(collectionSlug, missionSlug);
-  if (!collection || !mission)
-    return { title: 'Mission Not Found | NextPro Red Team' };
+  if (!collection || !mission) return { title: 'Mission Not Found | NextPro Red Team' };
 
   return {
     title: `${mission.title} | NextPro Red Team`,
@@ -49,14 +42,10 @@ export async function generateMetadata({
 }
 
 function getMissionBySlugSafe(collectionSlug: string, missionSlug: string) {
-  return getMissionsByCollectionSlug(collectionSlug).find(
-    (m) => m.slug === missionSlug
-  );
+  return getMissionsByCollectionSlug(collectionSlug).find((m) => m.slug === missionSlug);
 }
 
-export default async function RedTeamMissionPage({
-  params,
-}: RedTeamMissionPageProps) {
+export default async function RedTeamMissionPage({ params }: RedTeamMissionPageProps) {
   const { collectionSlug, missionSlug } = await params;
   const collection = getCollectionBySlug(collectionSlug);
   const mission = getMissionBySlugSafe(collectionSlug, missionSlug);
@@ -79,7 +68,7 @@ export default async function RedTeamMissionPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href={`/rt/${collection.slug}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+          className="text-muted-foreground hover:text-primary inline-flex items-center gap-1.5 text-xs font-semibold transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>{collection.title}</span>
@@ -89,25 +78,25 @@ export default async function RedTeamMissionPage({
       {/* Mission Header */}
       <section className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Crosshair className="h-4 w-4 text-destructive" />
-          <Badge variant="destructive" className="text-[10px] uppercase tracking-wider">
+          <Crosshair className="text-destructive h-4 w-4" />
+          <Badge variant="destructive" className="text-[10px] tracking-wider uppercase">
             Red Team Mission
           </Badge>
           <Badge variant="outline" className="text-[10px] uppercase">
             {mission.difficulty}
           </Badge>
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span className="text-muted-foreground flex items-center gap-1 text-xs">
             <Clock className="h-3 w-3" />~{mission.estimatedMinutes} phút
           </span>
-          <span className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+          <span className="text-muted-foreground flex items-center gap-1 font-mono text-[10px]">
             <Target className="h-3 w-3" />
             {mission.vectorIds.length} vector
           </span>
         </div>
-        <h1 className="text-xl font-extrabold tracking-tight text-foreground sm:text-2xl">
+        <h1 className="text-foreground text-xl font-extrabold tracking-tight sm:text-2xl">
           {mission.title}
         </h1>
-        <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">
+        <p className="text-muted-foreground max-w-3xl text-sm leading-relaxed">
           {mission.summary}
         </p>
       </section>
@@ -117,9 +106,9 @@ export default async function RedTeamMissionPage({
 
       {/* Next mission footer */}
       {nextMission && (
-        <div className="flex justify-end border-t border-border/40 pt-5">
+        <div className="border-border/40 flex justify-end border-t pt-5">
           <Link href={`/rt/${collection.slug}/${nextMission.slug}`}>
-            <span className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-xs font-semibold text-white shadow-md shadow-red-500/25 transition-colors hover:bg-destructive/90">
+            <span className="bg-destructive hover:bg-destructive/90 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md shadow-red-500/25 transition-colors">
               <span>
                 Mission kế:{' '}
                 {nextMission.title.length > 44

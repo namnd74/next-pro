@@ -99,16 +99,16 @@ export function TrackCard({ track }: TrackCardProps) {
 
         {/* Title & Description */}
         <div className="space-y-1.5">
-          <h3 className="text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary">
+          <h3 className="text-foreground group-hover:text-primary text-lg font-bold tracking-tight transition-colors">
             {track.title}
           </h3>
-          <p className="line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="text-muted-foreground line-clamp-2 text-xs leading-relaxed">
             {track.description}
           </p>
         </div>
 
         {/* Meta stats */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-4 text-xs">
           <span className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" />
             {totalMinutes} mins
@@ -121,9 +121,9 @@ export function TrackCard({ track }: TrackCardProps) {
 
         {/* Progress Bar */}
         <div className="space-y-1.5 pt-1">
-          <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
+          <div className="text-muted-foreground flex justify-between text-[11px] font-medium">
             <span>Progress</span>
-            <span className="font-semibold text-foreground">{progressPercent}%</span>
+            <span className="text-foreground font-semibold">{progressPercent}%</span>
           </div>
           <Progress value={progressPercent} />
         </div>

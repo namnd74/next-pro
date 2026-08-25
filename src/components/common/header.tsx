@@ -11,6 +11,7 @@ import {
   Home,
   Github,
   Crosshair,
+  BrainCircuit,
 } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ const navLinks = [
   { href: '/', label: 'Overview', icon: Home },
   { href: '/learn', label: 'Lộ Trình Học', icon: BookOpen },
   { href: '/interview', label: 'Phỏng Vấn', icon: Briefcase },
+  { href: '/ai', label: 'AI', icon: BrainCircuit },
   { href: '/rt', label: 'Red Team', icon: Crosshair, comingSoon: RED_TEAM_COMING_SOON },
 ];
 
@@ -71,7 +73,7 @@ export function Header() {
                   className="text-muted-foreground flex cursor-not-allowed items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold opacity-60"
                 >
                   <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span className="xs:inline hidden sm:inline">{link.label}</span>
+                  <span className="hidden md:inline">{link.label}</span>
                   <span className="hidden rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-amber-600 uppercase lg:inline dark:text-amber-400">
                     Soon
                   </span>
@@ -91,7 +93,7 @@ export function Header() {
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                <span className="xs:inline hidden sm:inline">{link.label}</span>
+                <span className="hidden md:inline">{link.label}</span>
               </Link>
             );
           })}
@@ -114,7 +116,7 @@ export function Header() {
           <Button
             variant="outline"
             size="sm"
-            className="hidden gap-1.5 text-xs sm:inline-flex"
+            className="hidden gap-1.5 text-xs lg:inline-flex"
             onClick={() => {
               window.open('https://github.com', '_blank');
             }}

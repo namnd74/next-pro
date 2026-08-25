@@ -51,8 +51,16 @@ interface PendingBonus {
 
 const TABS: Array<{ id: TabId; label: string; icon: React.ReactNode }> = [
   { id: 'race', label: 'Last-Response Race', icon: <Swords className="h-3.5 w-3.5" /> },
-  { id: 'closure', label: 'Stale Closure', icon: <HistoryIcon className="h-3.5 w-3.5" /> },
-  { id: 'interval', label: 'Immortal Interval', icon: <InfinityIcon className="h-3.5 w-3.5" /> },
+  {
+    id: 'closure',
+    label: 'Stale Closure',
+    icon: <HistoryIcon className="h-3.5 w-3.5" />,
+  },
+  {
+    id: 'interval',
+    label: 'Immortal Interval',
+    icon: <InfinityIcon className="h-3.5 w-3.5" />,
+  },
 ];
 
 export function AsyncRaceLab() {
@@ -71,7 +79,10 @@ export function AsyncRaceLab() {
   // ── Race: last-response-wins ──────────────────────────────────────────────
   const [latencyA, setLatencyA] = React.useState(300);
   const [latencyB, setLatencyB] = React.useState(1800);
-  const [inFlight, setInFlight] = React.useState<{ A: boolean; B: boolean }>({ A: false, B: false });
+  const [inFlight, setInFlight] = React.useState<{ A: boolean; B: boolean }>({
+    A: false,
+    B: false,
+  });
   const [result, setResult] = React.useState<SearchResult | null>(null);
   const [raceLogs, setRaceLogs] = React.useState<LogLine[]>([]);
   const resultRef = React.useRef<SearchResult | null>(null);
@@ -85,7 +96,9 @@ export function AsyncRaceLab() {
     latestReqRef.current = id;
     setInFlight((prev) => ({ ...prev, [letter]: true }));
     const issuedAt = Date.now();
-    append(setRaceLogs, [[`t+0ms → GET /api/search?q=${letter} · latency ${latency}ms (req#${id})`, 'info']]);
+    append(setRaceLogs, [
+      [`t+0ms → GET /api/search?q=${letter} · latency ${latency}ms (req#${id})`, 'info'],
+    ]);
     const timer = window.setTimeout(() => {
       setInFlight((prev) => ({ ...prev, [letter]: false }));
       const arrivedAt = Date.now() - issuedAt;
@@ -94,11 +107,17 @@ export function AsyncRaceLab() {
           resultRef.current = { letter, order: id, stale: false };
           setResult(resultRef.current);
           append(setRaceLogs, [
-            [`+${arrivedAt}ms ← ${letter} (req#${id}) — ÁP DỤNG (response mới nhất ✅)`, 'ok'],
+            [
+              `+${arrivedAt}ms ← ${letter} (req#${id}) — ÁP DỤNG (response mới nhất ✅)`,
+              'ok',
+            ],
           ]);
         } else {
           append(setRaceLogs, [
-            [`+${arrivedAt}ms ← ${letter} (req#${id}) về TRỄ nhưng bị stale-guard BỎ QUA ✅`, 'warn'],
+            [
+              `+${arrivedAt}ms ← ${letter} (req#${id}) về TRỄ nhưng bị stale-guard BỎ QUA ✅`,
+              'warn',
+            ],
           ]);
         }
         return;
@@ -109,14 +128,22 @@ export function AsyncRaceLab() {
         setResult(resultRef.current);
         setHits((prev) => ({ ...prev, race: true }));
         append(setRaceLogs, [
-          [`+${arrivedAt}ms ← ${letter} (req#${id}, CŨ) về SAU CÙNG → ĐÈ lên kết quả mới 💀`, 'bad'],
-          [`last-write-wins: user tìm "${current.letter === 'A' ? 'B' : 'A'}"... màn hình lại hiện ${letter}`, 'bad'],
+          [
+            `+${arrivedAt}ms ← ${letter} (req#${id}, CŨ) về SAU CÙNG → ĐÈ lên kết quả mới 💀`,
+            'bad',
+          ],
+          [
+            `last-write-wins: user tìm "${current.letter === 'A' ? 'B' : 'A'}"... màn hình lại hiện ${letter}`,
+            'bad',
+          ],
         ]);
         return;
       }
       resultRef.current = { letter, order: id, stale: false };
       setResult(resultRef.current);
-      append(setRaceLogs, [[`+${arrivedAt}ms ← ${letter} (req#${id}) — hiển thị kết quả`, 'ok']]);
+      append(setRaceLogs, [
+        [`+${arrivedAt}ms ← ${letter} (req#${id}) — hiển thị kết quả`, 'ok'],
+      ]);
     }, latency);
     raceTimersRef.current.push(timer);
   };
@@ -143,14 +170,20 @@ export function AsyncRaceLab() {
     expectedRef.current += 10;
     setPendingBonuses((prev) => [...prev, { id, snapshot }]);
     append(setClosureLogs, [
-      [`⏰ hẹn +10 sau 2s — closure đóng băng count=${snapshot}${!defenseMode ? ' (snapshot!)' : ''}`, 'info'],
+      [
+        `⏰ hẹn +10 sau 2s — closure đóng băng count=${snapshot}${!defenseMode ? ' (snapshot!)' : ''}`,
+        'info',
+      ],
     ]);
     const timer = window.setTimeout(() => {
       setPendingBonuses((prev) => prev.filter((b) => b.id !== id));
       if (defenseMode) {
         setCount((c) => c + 10); // ✅ updater nhận giá trị MỚI NHẤT
         append(setClosureLogs, [
-          [`t+2s ⏰ timeout nổ → setCount(c => c + 10) — đọc giá trị LIVE tại thời điểm thực thi ✅`, 'ok'],
+          [
+            `t+2s ⏰ timeout nổ → setCount(c => c + 10) — đọc giá trị LIVE tại thời điểm thực thi ✅`,
+            'ok',
+          ],
         ]);
         return;
       }
@@ -158,12 +191,20 @@ export function AsyncRaceLab() {
       setCount(applied);
       const exp = expectedRef.current;
       append(setClosureLogs, [
-        [`t+2s ⏰ timeout nổ — closure vẫn nhớ count=${snapshot} → setCount(${applied})`, 'bad'],
+        [
+          `t+2s ⏰ timeout nổ — closure vẫn nhớ count=${snapshot} → setCount(${applied})`,
+          'bad',
+        ],
         ...(applied !== exp
           ? ([
-              [`expected=${exp} → MẤT ${exp - applied} lượt tăng, dữ liệu TƯƠNG LAI bị quá khứ ghi đè 💀`, 'bad'],
+              [
+                `expected=${exp} → MẤT ${exp - applied} lượt tăng, dữ liệu TƯƠNG LAI bị quá khứ ghi đè 💀`,
+                'bad',
+              ],
             ] as Array<[string, Tone]>)
-          : ([[`lần này trùng khớp — hãy spam "+1" TRONG lúc chờ 2s rồi hẹn lại`, 'warn']] as Array<[string, Tone]>)),
+          : ([
+              [`lần này trùng khớp — hãy spam "+1" TRONG lúc chờ 2s rồi hẹn lại`, 'warn'],
+            ] as Array<[string, Tone]>)),
       ]);
       if (applied !== exp) setHits((prev) => ({ ...prev, closure: true }));
     }, 2000);
@@ -189,7 +230,9 @@ export function AsyncRaceLab() {
     intervalsRef.current.push(id);
     setActiveIntervals((a) => a + 1);
     setNavigatedAway(false);
-    append(setIntervalLogs, [[`mount #${activeIntervals + 1} → setInterval(#${id}, 500ms) khởi động`, 'info']]);
+    append(setIntervalLogs, [
+      [`mount #${activeIntervals + 1} → setInterval(#${id}, 500ms) khởi động`, 'info'],
+    ]);
   };
 
   const navigateAway = () => {
@@ -206,7 +249,10 @@ export function AsyncRaceLab() {
     if (activeIntervals > 0) setHits((prev) => ({ ...prev, leak: true }));
     append(setIntervalLogs, [
       [`unmount → KHÔNG có cleanup…`, 'bad'],
-      [`${activeIntervals} interval VẪN CHẠY ngầm trên component đã chết — zombie timers 🧟`, 'bad'],
+      [
+        `${activeIntervals} interval VẪN CHẠY ngầm trên component đã chết — zombie timers 🧟`,
+        'bad',
+      ],
       [`backend nhận ${activeIntervals * 120} request/phút từ MỘT tab duy nhất`, 'warn'],
     ]);
   };
@@ -214,7 +260,9 @@ export function AsyncRaceLab() {
   const closeTab = () => {
     clearAllIntervals();
     setNavigatedAway(false);
-    append(setIntervalLogs, [['🛑 giả lập đóng tab — browser thu hồi toàn bộ timer của page', 'info']]);
+    append(setIntervalLogs, [
+      ['🛑 giả lập đóng tab — browser thu hồi toàn bộ timer của page', 'info'],
+    ]);
   };
 
   // Dọn mọi timer khi lab unmount (đúng tinh thần của chính bài học)
@@ -281,7 +329,9 @@ export function AsyncRaceLab() {
     accent: string
   ) => (
     <div className="flex items-center gap-2">
-      <span className="w-20 shrink-0 font-mono text-[10px] uppercase tracking-wider text-slate-400">{label}</span>
+      <span className="w-20 shrink-0 font-mono text-[10px] tracking-wider text-slate-400 uppercase">
+        {label}
+      </span>
       <input
         type="range"
         min={100}
@@ -292,7 +342,9 @@ export function AsyncRaceLab() {
         className={`h-1.5 w-full cursor-pointer ${accent}`}
         aria-label={`Latency ${label}`}
       />
-      <span className="w-14 shrink-0 text-right font-mono text-[10px] text-slate-300">{value}ms</span>
+      <span className="w-14 shrink-0 text-right font-mono text-[10px] text-slate-300">
+        {value}ms
+      </span>
     </div>
   );
 
@@ -312,7 +364,7 @@ export function AsyncRaceLab() {
               ATTACK MODE
             </Badge>
           )}
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
             đã ghi nhận {hitCount}/3 sai phạm bất đồng bộ
           </span>
         </div>
@@ -335,7 +387,12 @@ export function AsyncRaceLab() {
             <ShieldCheck className="mr-1 h-3 w-3" />
             Abort + updater + cleanup
           </Button>
-          <Button size="sm" variant="ghost" onClick={resetRange} className="h-7 px-2 text-[11px]">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={resetRange}
+            className="h-7 px-2 text-[11px]"
+          >
             <RotateCcw className="mr-1 h-3 w-3" />
             Reset
           </Button>
@@ -343,7 +400,7 @@ export function AsyncRaceLab() {
       </div>
 
       {/* Tab-like switcher */}
-      <div className="flex w-fit gap-1 rounded-xl border border-border/80 bg-card p-1">
+      <div className="border-border/80 bg-card flex w-fit gap-1 rounded-xl border p-1">
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -366,8 +423,13 @@ export function AsyncRaceLab() {
         <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-inner">
           <div className="flex items-center justify-between font-mono text-[11px] text-slate-500">
             <span>$ search-as-you-type · response nào về SAU ghi đè tất cả</span>
-            <Badge variant={defenseMode ? 'success' : 'destructive'} className="text-[9px]">
-              {defenseMode ? 'guard: AbortController + stale-guard' : 'guard: NONE — last-write-wins'}
+            <Badge
+              variant={defenseMode ? 'success' : 'destructive'}
+              className="text-[9px]"
+            >
+              {defenseMode
+                ? 'guard: AbortController + stale-guard'
+                : 'guard: NONE — last-write-wins'}
             </Badge>
           </div>
 
@@ -412,24 +474,32 @@ export function AsyncRaceLab() {
           <div
             className={`rounded-lg border p-3 ${
               result?.stale
-                ? 'border-destructive/60 bg-red-500/10 ring-2 ring-destructive/40'
+                ? 'border-destructive/60 ring-destructive/40 bg-red-500/10 ring-2'
                 : 'border-slate-800 bg-black/40'
             }`}
           >
             {result ? (
               <div className="space-y-1">
-                <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">kết quả đang hiển thị:</p>
-                <p className={`font-mono text-sm font-bold ${result.stale ? 'text-red-300' : 'text-emerald-300'}`}>
-                  📄 Kết quả cho &quot;{result.letter === 'A' ? 'react hooks' : 'react router'}&quot;
+                <p className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
+                  kết quả đang hiển thị:
+                </p>
+                <p
+                  className={`font-mono text-sm font-bold ${result.stale ? 'text-red-300' : 'text-emerald-300'}`}
+                >
+                  📄 Kết quả cho &quot;
+                  {result.letter === 'A' ? 'react hooks' : 'react router'}&quot;
                 </p>
                 {result.stale && (
                   <p className="animate-pulse font-mono text-[11px] font-bold text-red-400">
-                    ⚠️ SAI KẾT QUẢ — user vừa tìm query khác nhưng response cũ về sau đã ghi đè!
+                    ⚠️ SAI KẾT QUẢ — user vừa tìm query khác nhưng response cũ về sau đã
+                    ghi đè!
                   </p>
                 )}
               </div>
             ) : (
-              <p className="animate-pulse font-mono text-[11px] text-slate-600">$ chưa có kết quả nào…</p>
+              <p className="animate-pulse font-mono text-[11px] text-slate-600">
+                $ chưa có kết quả nào…
+              </p>
             )}
           </div>
 
@@ -442,34 +512,58 @@ export function AsyncRaceLab() {
         <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-inner">
           <div className="flex items-center justify-between font-mono text-[11px] text-slate-500">
             <span>$ setTimeout(() =&gt; setCount(count + 10), 2000)</span>
-            <Badge variant={defenseMode ? 'success' : 'destructive'} className="text-[9px]">
-              {defenseMode ? 'fix: setCount(c => c + 10)' : 'bug: closure giữ snapshot cũ'}
+            <Badge
+              variant={defenseMode ? 'success' : 'destructive'}
+              className="text-[9px]"
+            >
+              {defenseMode
+                ? 'fix: setCount(c => c + 10)'
+                : 'bug: closure giữ snapshot cũ'}
             </Badge>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div
               className={`rounded-lg border p-3 text-center ${
-                count !== expected ? 'border-destructive/50 bg-red-500/10' : 'border-slate-800 bg-black/40'
+                count !== expected
+                  ? 'border-destructive/50 bg-red-500/10'
+                  : 'border-slate-800 bg-black/40'
               }`}
             >
-              <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">actual (hiển thị)</p>
-              <p className={`font-mono text-3xl font-bold tabular-nums ${count !== expected ? 'text-red-400' : 'text-slate-100'}`}>
+              <p className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
+                actual (hiển thị)
+              </p>
+              <p
+                className={`font-mono text-3xl font-bold tabular-nums ${count !== expected ? 'text-red-400' : 'text-slate-100'}`}
+              >
                 {count}
               </p>
               {count !== expected && (
-                <p className="mt-1 font-mono text-[10px] text-red-400">thiếu {expected - count} so với kỳ vọng</p>
+                <p className="mt-1 font-mono text-[10px] text-red-400">
+                  thiếu {expected - count} so với kỳ vọng
+                </p>
               )}
             </div>
             <div className="rounded-lg border border-slate-800 bg-black/40 p-3 text-center">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">expected (kỳ vọng)</p>
-              <p className="font-mono text-3xl font-bold tabular-nums text-emerald-400">{expected}</p>
-              <p className="mt-1 font-mono text-[10px] text-slate-600">mỗi ý định +1 / mỗi bonus +10</p>
+              <p className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
+                expected (kỳ vọng)
+              </p>
+              <p className="font-mono text-3xl font-bold text-emerald-400 tabular-nums">
+                {expected}
+              </p>
+              <p className="mt-1 font-mono text-[10px] text-slate-600">
+                mỗi ý định +1 / mỗi bonus +10
+              </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={clickPlusOne} className="h-8 text-[11px]">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={clickPlusOne}
+              className="h-8 text-[11px]"
+            >
               +1 (spam được)
             </Button>
             <Button
@@ -501,26 +595,41 @@ export function AsyncRaceLab() {
         <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-inner">
           <div className="flex items-center justify-between font-mono text-[11px] text-slate-500">
             <span>$ LiveTicker · polling 500ms</span>
-            <Badge variant={defenseMode ? 'success' : 'destructive'} className="text-[9px]">
+            <Badge
+              variant={defenseMode ? 'success' : 'destructive'}
+              className="text-[9px]"
+            >
               {defenseMode ? 'cleanup: return clearInterval' : 'cleanup: KHÔNG TỒN TẠI'}
             </Badge>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-lg border border-slate-800 bg-black/40 p-2.5 text-center">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">intervals sống</p>
-              <p className={`font-mono text-2xl font-bold tabular-nums ${activeIntervals > 1 ? 'text-amber-400' : 'text-slate-100'}`}>
+              <p className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
+                intervals sống
+              </p>
+              <p
+                className={`font-mono text-2xl font-bold tabular-nums ${activeIntervals > 1 ? 'text-amber-400' : 'text-slate-100'}`}
+              >
                 {Math.min(activeIntervals, 20)}
                 {activeIntervals > 20 ? '+' : ''}
               </p>
             </div>
             <div className="rounded-lg border border-slate-800 bg-black/40 p-2.5 text-center">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">total ticks</p>
-              <p className="font-mono text-2xl font-bold tabular-nums text-sky-400">{totalTicks}</p>
+              <p className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
+                total ticks
+              </p>
+              <p className="font-mono text-2xl font-bold text-sky-400 tabular-nums">
+                {totalTicks}
+              </p>
             </div>
             <div className="rounded-lg border border-slate-800 bg-black/40 p-2.5 text-center">
-              <p className="font-mono text-[10px] uppercase tracking-wider text-slate-500">tải backend</p>
-              <p className={`font-mono text-2xl font-bold tabular-nums ${activeIntervals > 1 ? 'text-red-400' : 'text-slate-100'}`}>
+              <p className="font-mono text-[10px] tracking-wider text-slate-500 uppercase">
+                tải backend
+              </p>
+              <p
+                className={`font-mono text-2xl font-bold tabular-nums ${activeIntervals > 1 ? 'text-red-400' : 'text-slate-100'}`}
+              >
                 {activeIntervals * 120}
               </p>
               <p className="font-mono text-[9px] text-slate-600">request/phút</p>
@@ -531,22 +640,38 @@ export function AsyncRaceLab() {
             <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5">
               <Ghost className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
               <p className="font-mono text-[11px] leading-relaxed text-amber-300">
-                Component ĐÃ unmount nhưng {activeIntervals} timer mồ côi vẫn tick — heap snapshot:{' '}
-                {activeIntervals} detached Timer · RAM +{activeIntervals * 18}MB và không giảm sau GC.
+                Component ĐÃ unmount nhưng {activeIntervals} timer mồ côi vẫn tick — heap
+                snapshot: {activeIntervals} detached Timer · RAM +{activeIntervals * 18}MB
+                và không giảm sau GC.
               </p>
             </div>
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" onClick={mountTicker} disabled={activeIntervals >= 25} className="h-8 text-[11px]">
+            <Button
+              size="sm"
+              onClick={mountTicker}
+              disabled={activeIntervals >= 25}
+              className="h-8 text-[11px]"
+            >
               <Play className="mr-1 h-3 w-3" />
               Mount LiveTicker (+1 interval)
             </Button>
-            <Button size="sm" variant="outline" onClick={navigateAway} className="h-8 text-[11px]">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={navigateAway}
+              className="h-8 text-[11px]"
+            >
               <Route className="mr-1 h-3 w-3" />
               Điều hướng sang trang khác (unmount)
             </Button>
-            <Button size="sm" variant="ghost" onClick={closeTab} className="h-8 text-[11px]">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={closeTab}
+              className="h-8 text-[11px]"
+            >
               <Trash2 className="mr-1 h-3 w-3" />
               Giả lập đóng tab
             </Button>
@@ -570,24 +695,30 @@ export function AsyncRaceLab() {
               icon: <Swords className="h-3.5 w-3.5" />,
               label: 'Last Response Wins Race',
               hit: hits.race,
-              hitNote: 'Response cũ về sau cùng ghi đè dữ liệu mới — không exception, không cảnh báo, chỉ dữ liệu sai im lặng.',
-              patchNote: 'AbortController hủy request cũ khi có request mới + stale-guard chỉ nhận kết quả của req mới nhất.',
+              hitNote:
+                'Response cũ về sau cùng ghi đè dữ liệu mới — không exception, không cảnh báo, chỉ dữ liệu sai im lặng.',
+              patchNote:
+                'AbortController hủy request cũ khi có request mới + stale-guard chỉ nhận kết quả của req mới nhất.',
             },
             {
               key: 'closure' as const,
               icon: <HistoryIcon className="h-3.5 w-3.5" />,
               label: 'Stale Closure trong setTimeout',
               hit: hits.closure,
-              hitNote: 'Closure đóng băng snapshot cũ: timeout nổ setCount(snapshot + 10) — mọi lượt tăng trong lúc chờ bị nuốt.',
-              patchNote: 'Functional updater setCount(c => c + 10) nhận giá trị mới nhất tại thời điểm thực thi — không còn snapshot chết.',
+              hitNote:
+                'Closure đóng băng snapshot cũ: timeout nổ setCount(snapshot + 10) — mọi lượt tăng trong lúc chờ bị nuốt.',
+              patchNote:
+                'Functional updater setCount(c => c + 10) nhận giá trị mới nhất tại thời điểm thực thi — không còn snapshot chết.',
             },
             {
               key: 'leak' as const,
               icon: <InfinityIcon className="h-3.5 w-3.5" />,
               label: 'Immortal Interval Swarm',
               hit: hits.leak,
-              hitNote: 'Interval không cleanup sống sót qua unmount — mỗi lần quay lại trang cộng dồn thêm timer, RAM leo thang.',
-              patchNote: 'Cleanup return protocol: setup setInterval ↔ return () => clearInterval — StrictMode trở thành unit test miễn phí.',
+              hitNote:
+                'Interval không cleanup sống sót qua unmount — mỗi lần quay lại trang cộng dồn thêm timer, RAM leo thang.',
+              patchNote:
+                'Cleanup return protocol: setup setInterval ↔ return () => clearInterval — StrictMode trở thành unit test miễn phí.',
             },
           ] as Array<{
             key: TabId;
@@ -603,7 +734,11 @@ export function AsyncRaceLab() {
             <Card
               key={vector.key}
               className={`glass-card flex items-start gap-3 p-3 ${
-                showHit ? 'border-destructive/30' : defenseMode ? 'border-emerald-500/20' : ''
+                showHit
+                  ? 'border-destructive/30'
+                  : defenseMode
+                    ? 'border-emerald-500/20'
+                    : ''
               }`}
             >
               <span
@@ -615,16 +750,28 @@ export function AsyncRaceLab() {
                       : 'bg-secondary text-muted-foreground'
                 }`}
               >
-                {showHit ? <Skull className="h-3.5 w-3.5" /> : defenseMode ? <ShieldCheck className="h-3.5 w-3.5" /> : vector.icon}
+                {showHit ? (
+                  <Skull className="h-3.5 w-3.5" />
+                ) : defenseMode ? (
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                ) : (
+                  vector.icon
+                )}
               </span>
               <div className="min-w-0 space-y-0.5">
-                <p className="text-xs font-bold text-foreground">{vector.label}</p>
-                {showHit && <p className="text-[11px] leading-relaxed text-destructive">{vector.hitNote}</p>}
+                <p className="text-foreground text-xs font-bold">{vector.label}</p>
+                {showHit && (
+                  <p className="text-destructive text-[11px] leading-relaxed">
+                    {vector.hitNote}
+                  </p>
+                )}
                 {defenseMode && (
-                  <p className="text-[11px] leading-relaxed text-emerald-600 dark:text-emerald-400">{vector.patchNote}</p>
+                  <p className="text-[11px] leading-relaxed text-emerald-600 dark:text-emerald-400">
+                    {vector.patchNote}
+                  </p>
                 )}
                 {!showHit && !defenseMode && (
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
                     Chưa ghi nhận — tái hiện vector này ở ATTACK MODE để xem Blast Radius.
                   </p>
                 )}
@@ -636,21 +783,25 @@ export function AsyncRaceLab() {
 
       {/* Verdict */}
       {(hitCount > 0 || defenseMode) && (
-        <Card className={`glass-card p-4 ${defenseMode ? 'border-emerald-500/30' : 'border-destructive/30'}`}>
+        <Card
+          className={`glass-card p-4 ${defenseMode ? 'border-emerald-500/30' : 'border-destructive/30'}`}
+        >
           {hitCount > 0 && !defenseMode ? (
-            <p className="text-xs leading-relaxed text-foreground">
-              💀 <span className="font-bold">Blast Radius:</span> response cũ ghi đè kết quả mới mà
-              không một exception nào, closure gửi dữ liệu đã chết thẳng lên server, và swarm
-              interval bất tử nhân tải backend theo mỗi lần điều hướng — cả ba đều không crash,
-              chỉ âm thầm sai và đốt tiền hạ tầng.
+            <p className="text-foreground text-xs leading-relaxed">
+              💀 <span className="font-bold">Blast Radius:</span> response cũ ghi đè kết
+              quả mới mà không một exception nào, closure gửi dữ liệu đã chết thẳng lên
+              server, và swarm interval bất tử nhân tải backend theo mỗi lần điều hướng —
+              cả ba đều không crash, chỉ âm thầm sai và đốt tiền hạ tầng.
             </p>
           ) : (
-            <p className="text-xs leading-relaxed text-foreground">
+            <p className="text-foreground text-xs leading-relaxed">
               🛡️{' '}
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">Defense Patch:</span>{' '}
-              AbortController + stale-guard đảm bảo chỉ response mới nhất được áp dụng, functional
-              updater đọc giá trị live thay vì snapshot, cleanup return hạ đúng số timer đã tạo —
-              mọi vector chuyển trạng thái PATCHED.
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                Defense Patch:
+              </span>{' '}
+              AbortController + stale-guard đảm bảo chỉ response mới nhất được áp dụng,
+              functional updater đọc giá trị live thay vì snapshot, cleanup return hạ đúng
+              số timer đã tạo — mọi vector chuyển trạng thái PATCHED.
             </p>
           )}
         </Card>
