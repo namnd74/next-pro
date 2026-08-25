@@ -1,8 +1,4 @@
-import type {
-  RedTeamCollection,
-  RedTeamCollectionFile,
-  RedTeamMission,
-} from '../types';
+import type { RedTeamCollection, RedTeamCollectionFile, RedTeamMission } from '../types';
 import asyncRaceExploits from './collections/async-race-exploits.json';
 import blueTeamCapstone from './collections/blue-team-capstone.json';
 import cachePoisoning from './collections/cache-poisoning.json';
@@ -37,9 +33,7 @@ export const RED_TEAM_COLLECTIONS: RedTeamCollection[] = COLLECTION_FILES.map(
 export function getCollectionBySlug(
   collectionSlug: string
 ): RedTeamCollection | undefined {
-  return RED_TEAM_COLLECTIONS.find(
-    (collection) => collection.slug === collectionSlug
-  );
+  return RED_TEAM_COLLECTIONS.find((collection) => collection.slug === collectionSlug);
 }
 
 /** Collection của một phase, sắp theo thứ tự trong phase */
@@ -49,21 +43,15 @@ export function getCollectionsByPhase(phaseId: string): RedTeamCollection[] {
   );
 }
 
-export function getMissionsByCollectionSlug(
-  collectionSlug: string
-): RedTeamMission[] {
-  return (
-    COLLECTION_FILES.find((c) => c.slug === collectionSlug)?.missions ?? []
-  );
+export function getMissionsByCollectionSlug(collectionSlug: string): RedTeamMission[] {
+  return COLLECTION_FILES.find((c) => c.slug === collectionSlug)?.missions ?? [];
 }
 
 export function getMissionBySlug(
   collectionSlug: string,
   missionSlug: string
 ): RedTeamMission | undefined {
-  return getMissionsByCollectionSlug(collectionSlug).find(
-    (m) => m.slug === missionSlug
-  );
+  return getMissionsByCollectionSlug(collectionSlug).find((m) => m.slug === missionSlug);
 }
 
 /** Tổng số mission toàn app (cho stats ở /rt overview) */

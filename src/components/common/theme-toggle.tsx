@@ -34,15 +34,15 @@ export function ThemeToggle() {
       <Sun
         className={`h-4 w-4 transition-all duration-300 ${
           isDark
-            ? 'absolute rotate-90 scale-0 opacity-0'
-            : 'rotate-0 scale-100 text-amber-500 opacity-100'
+            ? 'absolute scale-0 rotate-90 opacity-0'
+            : 'scale-100 rotate-0 text-amber-500 opacity-100'
         }`}
       />
       <Moon
         className={`h-4 w-4 transition-all duration-300 ${
           isDark
-            ? 'rotate-0 scale-100 text-indigo-400 opacity-100'
-            : 'absolute -rotate-90 scale-0 opacity-0'
+            ? 'scale-100 rotate-0 text-indigo-400 opacity-100'
+            : 'absolute scale-0 -rotate-90 opacity-0'
         }`}
       />
       <span className="sr-only">Toggle theme</span>

@@ -150,9 +150,7 @@
       "objective": "Tạo form submit thành công nhưng một field hoàn toàn vắng mặt trong payload gửi lên server, không lỗi, không warning nào báo hiệu.",
       "difficulty": "intermediate",
       "estimatedMinutes": 18,
-      "vectorIds": [
-        "sr-vec-01"
-      ],
+      "vectorIds": ["sr-vec-01"],
       "rootCause": "FormData và cơ chế submit gốc của HTML không đọc từ React state hay DOM 'tổng thể' — nó thu thập theo cặp [name] → value của các control SUCCESSFUL bên trong <form>. name là hợp đồng định danh duy nhất của field trong thế giới serialization. React chỉ quản lý view; khi dev quen controlled component (đọc value qua state) dễ quên hẳn name vì 'dữ liệu đã nằm trong state rồi'. Ranh giới sụp khi team mix hai thế giới: nút submit type=submit + handler đọc FormData/e.target.elements — lúc đó field thiếu name trở thành bóng ma: có thật trên màn hình, không tồn tại trong dữ liệu.",
       "reconNotes": [
         "Liệt kê form dùng FormData(target) hoặc new FormData(form) thay vì đọc từng state.",
@@ -208,9 +206,7 @@
       "objective": "Kích hoạt cảnh báo 'A component is changing an uncontrolled input to be controlled' và mất dữ liệu nhập, rồi chuẩn hóa contract của form field vĩnh viễn.",
       "difficulty": "intermediate",
       "estimatedMinutes": 18,
-      "vectorIds": [
-        "sr-vec-02"
-      ],
+      "vectorIds": ["sr-vec-02"],
       "rootCause": "React phân loại input dựa trên prop ĐƯỢC TRUYỀN tại mỗi render: có value → controlled (React sở hữu), không có value (chỉ defaultValue hoặc không gì) → uncontrolled (DOM sở hữu). Việc chuyển mode giữa chừng buộc DOM và React tranh giành nguồn sự thật. Gốc rễ: dev coi value là 'optional prop' trong khi nó là TUYÊN BỐ KIẾN TRÚC về ai giữ state. Khi value đến từ data có thể undefined (API chưa trả, field ẩn theo điều kiện), mode flip xảy ra âm thầm — và lần render đầu tiên với undefined đã khóa input vào uncontrolled world.",
       "reconNotes": [
         "Grep input có value= nằm trong điều kiện: {isEdit && <input value=...>} hoặc value={user?.name}.",
@@ -266,9 +262,7 @@
       "objective": "Nhân bản một thao tác ghi dữ liệu chỉ bằng double-click trong khoảng network latency, sau đó dựng hàng rào phòng thủ từ UI tới database.",
       "difficulty": "advanced",
       "estimatedMinutes": 22,
-      "vectorIds": [
-        "sr-vec-03"
-      ],
+      "vectorIds": ["sr-vec-03"],
       "rootCause": "Submit không đồng bộ mở ra cửa sổ thời gian giữa CLICK và PHẢN HỒI — trong cửa sổ đó app vẫn ở trạng thái 'chưa làm gì', nên mọi click thêm đều được coi là ý muốn mới. Frontend thường chỉ disable button 'khi đang xử lý' nhưng quên: (1) handler async có thể throw trước khi re-enable, (2) Enter key/double-tap mobile bypass onClick guard, (3) tab khác/retry của trình duyệt gửi lại request. Phòng thủ triệt để phải nhiều tầng: UI lock, single-flight ở client, và IDempotency-Key ở server để hai request GIỐNG HỆT chỉ tính một.",
       "reconNotes": [
         "Throttle network xuống Slow 3G rồi double-click nhanh mọi nút submit quan trọng.",
@@ -324,9 +318,7 @@
       "objective": "Gửi dữ liệu vi phạm mọi rule (email rác, age âm, role tự gán) thẳng vào API bỏ qua React Hook Form, chứng minh client validation không phải bảo mật, rồi vá bằng server-side re-validation dùng chính schema đó.",
       "difficulty": "critical",
       "estimatedMinutes": 22,
-      "vectorIds": [
-        "fe-vec-01"
-      ],
+      "vectorIds": ["fe-vec-01"],
       "rootCause": "Client validation phục vụ TRẢI NGHIỆM (phản hồi nhanh), không phải BẢO MẬT. Mọi thứ trong browser thuộc quyền kiểm soát user: họ xem được source, sửa được state qua devtools, hoặc đơn giản bỏ qua app và gọi curl/postman trực tiếp. Lỗ hổng kiến trúc nằm ở ranh giới trust: server nhận JSON và TIN nó giống như khi form UI gửi — thiếu bước xác thực lại tại biên giới. Nguyên tắc nền: never trust the client; schema là hợp đồng, mà hợp đồng phải được kiểm tra ở nơi có kẻ xấu.",
       "reconNotes": [
         "Mở Network tab xem endpoint + payload shape thật của form submit.",
@@ -382,9 +374,7 @@
       "objective": "Kích hoạt unhandled exception từ Zod parse làm sập flow submit, hiểu error boundary che giấu đến đâu, và chuyển đổi codebase sang safeParse pipeline có thông báo lỗi thân thiện.",
       "difficulty": "intermediate",
       "estimatedMinutes": 18,
-      "vectorIds": [
-        "fe-vec-02"
-      ],
+      "vectorIds": ["fe-vec-02"],
       "rootCause": "Zod thiết kế .parse() theo phong cách throw-on-invalid: tiện cho internal pipeline nơi dữ liệu xấu là BUG lập trình (fail fast), nguy hiểm cho USER INPUT nơi dữ liệu xấu là CHUYỆN THƯỜNG. Nhầm lẫn hai ngữ cảnh này là gốc rễ: input user phải đi qua safeParse — hàm trả về { success, data | error } không ném. Khi parse() ném trong async handler mà không ai catch, promise reject → Next.js hiển thị error boundary/toàn trang trắng, và người dùng mất toàn bộ nội dung vừa gõ.",
       "reconNotes": [
         "Grep '.parse(' trong component/handler xử lý input user — ứng viên mìn số một.",

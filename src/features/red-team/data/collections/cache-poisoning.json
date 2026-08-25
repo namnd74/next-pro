@@ -98,9 +98,7 @@
       "objective": "Flooding backend bằng refetch tự động khi focus window, chứng minh chi phí ẩn của cấu hình mặc định, rồi thiết lập chiến lược staleness hợp lý cho từng loại dữ liệu.",
       "difficulty": "high",
       "estimatedMinutes": 20,
-      "vectorIds": [
-        "tq-vec-01"
-      ],
+      "vectorIds": ["tq-vec-01"],
       "rootCause": "TanStack Query coi data là CACHE có hạn sử dụng: staleTime định nghĩa 'data tươi bao lâu', hết hạn thì mọi trigger (mount mới, window focus, reconnect) đều hợp pháp để refetch. Mặc định staleTime=0 + refetchOnWindowFocus=true nghĩa là data HẾT HẠN NGAY khi về — mọi sự kiện focus trở lên lý do fetch lại toàn bộ mounted queries. Gốc rễ: team copy default từ docs không hỏi câu hỏi sản phẩm 'data này được phép cũ bao nhiêu?'. Dashboard 8 widget × 200 user × mỗi lần alt-tab = DoS tự nguyện.",
       "reconNotes": [
         "Kiểm tra QueryClient config: staleTime/gcTime/refetchOnWindowFocus đang là gì?",
@@ -156,9 +154,7 @@
       "objective": "Poison cache bằng key collision để user B nhìn thấy data của user A, sau đó thiết kế key structure chặn tận gốc mọi dạng collision.",
       "difficulty": "critical",
       "estimatedMinutes": 22,
-      "vectorIds": [
-        "tq-vec-02"
-      ],
+      "vectorIds": ["tq-vec-02"],
       "rootCause": "Query key là CHỈ MỤC DUY NHẤT của cache entry — TanStack hash key để lưu/truy xuất. Nguyên tắc nền: hai lần fetch cần data KHÁC NHAU thì bắt buộc key KHÁC NHAU, và key phải chứa mọi biến số tạo nên kết quả (filter, pagination, userId, locale...). Thiếu một biến = hai nguồn dữ liệu khác nhau ghi đè nhau trong cùng ngăn kéo. Khi biến số thiếu là USER ID, collision leo thang thành sự cố bảo mật: dữ liệu cá nhân của người này phục vụ người kia, hoàn toàn hợp lệ theo cơ chế cache.",
       "reconNotes": [
         "Grep queryKey: tìm key literal mảng không chứa biến ([\"posts\"], [\"profile\"]...).",
@@ -214,9 +210,7 @@
       "objective": "Tạo tình trạng ghost data sau delete/create/update, giải thích vì sao local state vá víu thất bại, rồi tái cấu trúc bằng onSuccess invalidation chain và optimistic update có rollback.",
       "difficulty": "intermediate",
       "estimatedMinutes": 20,
-      "vectorIds": [
-        "tq-vec-03"
-      ],
+      "vectorIds": ["tq-vec-03"],
       "rootCause": "useMutation cập nhật SERVER nhưng không biết cache nào liên quan — TanStack không đoán hộ. Khoảng trống này được dev lấp bằng state local thủ công (filter mảng visible), sinh ra hai nguồn sự thật song song. Bất kỳ refetch nào (focus, remount, interval) sẽ kéo dữ liệu server về đè lên bản vá local — ghost rows hồi sinh. Gốc rễ kiến trúc: server là SỰ THẬT duy nhất; mọi state client phản ánh sự thật phải đi qua CƠ CHẾ ĐỒNG BỘ duy nhất (cache + invalidation), không phải đường tắt riêng từng component.",
       "reconNotes": [
         "Tìm mutation không có onSuccess/onSettled gọi invalidateQueries/setQueryData.",

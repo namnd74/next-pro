@@ -98,9 +98,7 @@
       "objective": "Giành quyền truy cập trình duyệt của mọi user xem trang, exfiltrate cookie và duy trì quyền điều khiển mà không cần password.",
       "difficulty": "advanced",
       "estimatedMinutes": 25,
-      "vectorIds": [
-        "ws-vec-01"
-      ],
+      "vectorIds": ["ws-vec-01"],
       "rootCause": "XSS tồn tại khi dữ liệu người dùng được đưa vào HTML parser context mà không qua bước context-aware encoding. dangerouslySetInnerHTML tắt hoàn toàn cơ chế auto-escape của React — chuỗi bạn truyền được parser browser xử lý như markup thật. Sâu hơn: lỗi không nằm ở 'quên escape' mà ở việc NHẬP DIỆN dữ liệu không rõ nguồn vào ngữ cảnh nguy hiểm; escaping chỉ là một trong nhiều biên phòng (output encoding, CSP, Trusted Types, HttpOnly cookie giới hạn thiệt hại).",
       "reconNotes": [
         "Rà các điểm render rich-text: comment, bio, tên file, UGC markdown — tìm chỗ dùng dangerouslySetInnerHTML hoặc innerHTML.",
@@ -161,9 +159,7 @@
       "objective": "Thực thi script tùy ý trong trình duyệt nạn nhân chỉ bằng một link, chứng minh toàn bộ stack phòng thủ server-side (WAF, log, rate limit) mù trước vector này, rồi đóng vĩnh viễn sink bằng defense-in-depth phía client.",
       "difficulty": "advanced",
       "estimatedMinutes": 22,
-      "vectorIds": [
-        "rt2-vec-01"
-      ],
+      "vectorIds": ["rt2-vec-01"],
       "rootCause": "DOM XSS tách khỏi họ stored/reflected ở mô hình dữ liệu: 'source' là API trình duyệt mà attacker kiểm soát (location.hash/search, postMessage, referrer) và 'sink' cũng nằm ngay client (innerHTML, eval, document.write) — dữ liệu độc không bao giờ rời tab. Toàn bộ hạ tầng phòng thủ tư duy server-centric trở nên vô nghĩa: WAF không thấy payload, access log không ghi fragment vì phần sau dấu # thậm chí không được gửi lên mạng. Gốc rễ thứ hai là mô hình tin cậy sai: dev nhìn location.hash và thấy 'dữ liệu của trang tôi', trong khi đó là input do attacker chế tạo hoàn toàn, chỉ được vận chuyển bởi URL. Thứ ba: innerHTML tắt toàn bộ lớp escaping của framework, ném chuỗi thẳng vào HTML parser — context mà mọi ký tự đều mang ngữ nghĩa cấu trúc. Và vì không có dấu vết server, phát hiện phụ thuộc hoàn toàn vào client telemetry mà đa số app không hề có.",
       "reconNotes": [
         "Rà sink trước: grep innerHTML, outerHTML, insertAdjacentHTML, document.write, eval, dangerouslySetInnerHTML trong codebase và dependencies.",
@@ -219,9 +215,7 @@
       "objective": "Nhiễm Object.prototype qua tham số query lồng nhau, bypass check phân quyền cho mọi user trong process, chứng minh tính hệ thống của pollution, rồi đóng lỗ hổng bằng null-prototype parsing + key-meta guard + regression test.",
       "difficulty": "advanced",
       "estimatedMinutes": 25,
-      "vectorIds": [
-        "rt2-vec-02"
-      ],
+      "vectorIds": ["rt2-vec-02"],
       "rootCause": "JavaScript tra cứu thuộc tính theo chuỗi prototype: key không tồn tại trên object thì runtime leo lên __proto__ tới tận Object.prototype. Parser/merge cho phép gán key điều khiển được (__proto__, constructor.prototype) thì attacker không gán vào MỘT object — hắn gán vào nguồn mặc định của MỌI object tương lai trong process. Đây là lý do pollution mang tính hệ thống: một request duy nhất đổi hằng số logic của runtime, mọi phép đọc obj.isAdmin, obj.timeout sau đó gặp giá trị nhiễm. Mức độ thiên tai phụ thuộc gadget: thư viện nào dùng key polluted làm config (spawn env, template option) nâng pollution thành RCE. Gốc rễ kép: ngôn ngữ cho phép mutate prototype, và code xử lý input không lọc key meta — hai điều kiện gặp nhau đúng ở một dòng parser tự viết.",
       "reconNotes": [
         "Inventar parser/merge: tự viết? lodash.merge < 4.17.12? qs/deepmerge phiên bản nào? Đó là danh sách nghi phạm.",

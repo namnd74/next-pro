@@ -30,20 +30,20 @@ export function StatCard({ metric }: StatCardProps) {
   return (
     <Card glass className="group relative overflow-hidden">
       {/* Subtle top accent line */}
-      <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      <div className="via-primary/50 absolute top-0 right-0 left-0 h-1 bg-gradient-to-r from-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
             {metric.label}
           </span>
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+          <div className="bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground flex h-10 w-10 items-center justify-center rounded-xl transition-colors">
             <IconComponent className="h-5 w-5" />
           </div>
         </div>
 
         <div className="mt-4 flex items-baseline justify-between">
-          <div className="font-sans text-3xl font-bold tracking-tight text-foreground">
+          <div className="text-foreground font-sans text-3xl font-bold tracking-tight">
             {metric.value}
           </div>
           <Badge
@@ -59,7 +59,7 @@ export function StatCard({ metric }: StatCardProps) {
           </Badge>
         </div>
 
-        <p className="mt-2 line-clamp-1 text-xs text-muted-foreground">
+        <p className="text-muted-foreground mt-2 line-clamp-1 text-xs">
           {metric.description}
         </p>
       </CardContent>

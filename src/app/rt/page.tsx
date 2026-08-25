@@ -44,28 +44,24 @@ const STEPS = [
 ];
 
 export default function RedTeamHomePage() {
-  const totalVectors = RED_TEAM_COLLECTIONS.reduce(
-    (acc, s) => acc + s.vectors.length,
-    0
-  );
+  const totalVectors = RED_TEAM_COLLECTIONS.reduce((acc, s) => acc + s.vectors.length, 0);
 
   return (
     <div className="space-y-10">
       {/* Header Banner */}
       <section className="space-y-4">
-        <div className="inline-flex items-center gap-2 rounded-full border border-destructive/20 bg-destructive/10 px-3 py-1 text-xs font-medium text-destructive">
+        <div className="border-destructive/20 bg-destructive/10 text-destructive inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
           <Crosshair className="h-4 w-4" />
           <span>Attack · Defend · Master</span>
         </div>
 
-        <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+        <h1 className="text-foreground text-3xl font-extrabold tracking-tight sm:text-4xl">
           Red Team <span className="text-destructive">Academy</span>
         </h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
-          Lộ trình học thực chiến dành riêng cho Red Team: từ tư duy trinh sát
-          đến capstone phòng thủ. Mỗi collection có học liệu riêng, mission
-          chiến dịch riêng và lab bắn đạn thật — không mượn nội dung từ bất kỳ
-          lộ trình nào khác.
+        <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed sm:text-base">
+          Lộ trình học thực chiến dành riêng cho Red Team: từ tư duy trinh sát đến
+          capstone phòng thủ. Mỗi collection có học liệu riêng, mission chiến dịch riêng
+          và lab bắn đạn thật — không mượn nội dung từ bất kỳ lộ trình nào khác.
         </p>
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -90,8 +86,8 @@ export default function RedTeamHomePage() {
 
       {/* Roadmap */}
       <section className="space-y-5">
-        <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight text-foreground">
-          <Crosshair className="h-5 w-5 text-destructive" />
+        <h2 className="text-foreground flex items-center gap-2 text-lg font-bold tracking-tight">
+          <Crosshair className="text-destructive h-5 w-5" />
           Lộ trình thực chiến
         </h2>
 
@@ -115,18 +111,18 @@ export default function RedTeamHomePage() {
                       >
                         PHASE {String(phase.order).padStart(2, '0')}
                       </span>
-                      <h3 className="text-base font-extrabold tracking-tight text-foreground">
+                      <h3 className="text-foreground text-base font-extrabold tracking-tight">
                         {phase.title}
                       </h3>
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      <span className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
                         {phase.subtitle}
                       </span>
                     </div>
-                    <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
+                    <p className="text-muted-foreground max-w-3xl text-xs leading-relaxed">
                       {phase.tagline}
                     </p>
                   </div>
-                  <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span className="text-muted-foreground shrink-0 font-mono text-[10px] tracking-wider uppercase">
                     {collections.length} collection · {phaseVectors} vector
                   </span>
                 </div>
@@ -141,18 +137,18 @@ export default function RedTeamHomePage() {
                     >
                       <Card className="glass-card glass-card-hover flex h-full flex-col gap-1.5 p-3.5">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-xs font-bold text-foreground transition-colors group-hover:text-primary">
+                          <p className="text-foreground group-hover:text-primary truncate text-xs font-bold transition-colors">
                             {collection.title}
                           </p>
-                          <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-destructive" />
+                          <ArrowRight className="text-muted-foreground group-hover:text-destructive h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" />
                         </div>
-                        <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">
+                        <p className="text-muted-foreground line-clamp-2 text-[11px] leading-relaxed">
                           {collection.tagline}
                         </p>
-                        <p className="mt-auto pt-1 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/70">
+                        <p className="text-muted-foreground/70 mt-auto pt-1 font-mono text-[9px] tracking-wider uppercase">
                           {collection.vectors.length} vector ·{' '}
-                          {getMissionsByCollectionSlug(collection.slug).length}{' '}
-                          mission · {collection.difficulty}
+                          {getMissionsByCollectionSlug(collection.slug).length} mission ·{' '}
+                          {collection.difficulty}
                         </p>
                       </Card>
                     </Link>
@@ -166,19 +162,19 @@ export default function RedTeamHomePage() {
 
       {/* How it works */}
       <section className="space-y-4">
-        <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight text-foreground">
-          <MousePointerClick className="h-5 w-5 text-primary" />
+        <h2 className="text-foreground flex items-center gap-2 text-lg font-bold tracking-tight">
+          <MousePointerClick className="text-primary h-5 w-5" />
           Cách vận hành
         </h2>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {STEPS.map((step) => (
             <Card key={step.title} className="glass-card space-y-2 p-5">
-              <span className="font-mono text-lg font-extrabold text-destructive">
+              <span className="text-destructive font-mono text-lg font-extrabold">
                 {step.icon}
               </span>
-              <h3 className="text-sm font-bold text-foreground">{step.title}</h3>
-              <p className="text-xs leading-relaxed text-muted-foreground">{step.desc}</p>
+              <h3 className="text-foreground text-sm font-bold">{step.title}</h3>
+              <p className="text-muted-foreground text-xs leading-relaxed">{step.desc}</p>
             </Card>
           ))}
         </div>

@@ -97,10 +97,12 @@ export function UiDemoStage({ collectionSlug }: UiDemoStageProps) {
   return (
     <section className="space-y-4">
       <div className="flex items-start gap-2">
-        <FlaskConical className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+        <FlaskConical className="text-primary mt-0.5 h-5 w-5 shrink-0" />
         <div className="space-y-0.5">
-          <h2 className="text-lg font-bold tracking-tight text-foreground">{meta.title}</h2>
-          <p className="text-xs text-muted-foreground">{meta.description}</p>
+          <h2 className="text-foreground text-lg font-bold tracking-tight">
+            {meta.title}
+          </h2>
+          <p className="text-muted-foreground text-xs">{meta.description}</p>
         </div>
       </div>
       <Card className="glass-card p-4 sm:p-6">

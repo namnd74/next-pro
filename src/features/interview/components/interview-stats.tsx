@@ -48,10 +48,10 @@ export function InterviewStats() {
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="text-muted-foreground text-xs font-medium">
                 Interview Readiness
               </p>
-              <p className="text-xl font-extrabold text-foreground">{readinessScore}%</p>
+              <p className="text-foreground text-xl font-extrabold">{readinessScore}%</p>
             </div>
           </div>
         </Card>
@@ -62,8 +62,8 @@ export function InterviewStats() {
               <Trophy className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Mock Avg Score</p>
-              <p className="text-xl font-extrabold text-foreground">
+              <p className="text-muted-foreground text-xs font-medium">Mock Avg Score</p>
+              <p className="text-foreground text-xl font-extrabold">
                 {averageMockScore}/100
               </p>
             </div>
@@ -76,8 +76,8 @@ export function InterviewStats() {
               <Bug className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Bugs Solved</p>
-              <p className="text-xl font-extrabold text-foreground">
+              <p className="text-muted-foreground text-xs font-medium">Bugs Solved</p>
+              <p className="text-foreground text-xl font-extrabold">
                 {solvedBugCount}/{totalBugHunts}
               </p>
             </div>
@@ -90,8 +90,8 @@ export function InterviewStats() {
               <Bookmark className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Bookmarked</p>
-              <p className="text-xl font-extrabold text-foreground">
+              <p className="text-muted-foreground text-xs font-medium">Bookmarked</p>
+              <p className="text-foreground text-xl font-extrabold">
                 {bookmarkedCount}/{totalQuestions}
               </p>
             </div>
@@ -102,8 +102,8 @@ export function InterviewStats() {
       {/* Progress Bar */}
       <Card className="glass-card space-y-1.5 p-4">
         <div className="flex items-center justify-between text-xs font-semibold">
-          <span className="flex items-center gap-1.5 text-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
+          <span className="text-foreground flex items-center gap-1.5">
+            <Sparkles className="text-primary h-3.5 w-3.5" />
             Senior Next.js Candidate Readiness Index
           </span>
           <span className="text-primary">{readinessScore}%</span>

@@ -70,12 +70,12 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+      <span className="bg-secondary text-muted-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
         {icon}
       </span>
       <div>
-        <p className="text-xs font-bold text-foreground">{title}</p>
-        <p className="text-[10px] text-muted-foreground">{hint}</p>
+        <p className="text-foreground text-xs font-bold">{title}</p>
+        <p className="text-muted-foreground text-[10px]">{hint}</p>
       </div>
     </div>
   );
@@ -96,9 +96,12 @@ export function FormAbuseRange() {
   };
 
   const missingKeys = dumpEntries
-    ? EXPECTED_FIELDS.map((f) => f.key).filter((k) => !dumpEntries.some(([ek]) => ek === k))
+    ? EXPECTED_FIELDS.map((f) => f.key).filter(
+        (k) => !dumpEntries.some(([ek]) => ek === k)
+      )
     : [];
-  const ghostFieldExploited = dumpEntries !== null && missingKeys.includes('referralCode');
+  const ghostFieldExploited =
+    dumpEntries !== null && missingKeys.includes('referralCode');
 
   const toggleFixName = () => {
     setFixName((v) => !v);
@@ -195,7 +198,9 @@ export function FormAbuseRange() {
     { id: 'rv-1', author: 'Khánh', rating: 5, comment: 'Sản phẩm đúng mô tả' },
     { id: 'rv-2', author: 'Lan', rating: 4, comment: 'Giao nhanh, đóng gói kĩ' },
   ]);
-  const [serverReject, setServerReject] = React.useState<Record<string, string[]> | null>(null);
+  const [serverReject, setServerReject] = React.useState<Record<string, string[]> | null>(
+    null
+  );
   const [curlLog, setCurlLog] = React.useState<string[]>([]);
 
   const ATTACK_COMMENT = '<img src=x onerror=steal()>' + 'rác '.repeat(130);
@@ -213,7 +218,7 @@ export function FormAbuseRange() {
         },
       ]);
       setCurlLog([
-        "$ curl -X POST /api/reviews -d '{rating:-999, comment:\"<img onerror>…\"}'",
+        '$ curl -X POST /api/reviews -d \'{rating:-999, comment:"<img onerror>…"}\'',
         '> db.review.create(body) — 0% validation',
         'CRITICAL: payload độc COMMIT vào DB · stored XSS nhập cư',
       ]);
@@ -307,8 +312,18 @@ export function FormAbuseRange() {
               ATTACK MODE
             </Badge>
           )}
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            khai thác {[ghostFieldExploited, lostText, doubleSubmitExploited, validationBypassExploited, parseLandmineExploited].filter(Boolean).length}/5 vector
+          <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
+            khai thác{' '}
+            {
+              [
+                ghostFieldExploited,
+                lostText,
+                doubleSubmitExploited,
+                validationBypassExploited,
+                parseLandmineExploited,
+              ].filter(Boolean).length
+            }
+            /5 vector
           </span>
         </div>
         <div className="flex gap-2">
@@ -397,7 +412,12 @@ export function FormAbuseRange() {
                 }`}
               />
             </label>
-            <Button type="submit" size="sm" variant="destructive" className="h-7 w-full text-[11px]">
+            <Button
+              type="submit"
+              size="sm"
+              variant="destructive"
+              className="h-7 w-full text-[11px]"
+            >
               <Send className="mr-1 h-3 w-3" />
               Đặt hàng — COD
             </Button>
@@ -414,21 +434,28 @@ export function FormAbuseRange() {
                   [{`[${dumpEntries.map(([k, v]) => `['${k}','${v}']`).join(', ')}]`}]
                 </div>
                 <div className="mt-2 text-slate-500">$ POST /api/orders</div>
-                <div className="text-amber-300">{JSON.stringify(Object.fromEntries(dumpEntries))}</div>
+                <div className="text-amber-300">
+                  {JSON.stringify(Object.fromEntries(dumpEntries))}
+                </div>
                 <div className="mt-2 space-y-1">
                   {EXPECTED_FIELDS.map((f) => {
                     const present = dumpEntries.some(([k]) => k === f.key);
                     return (
-                      <div key={f.key} className={present ? 'text-emerald-400' : 'text-red-400'}>
-                        {present ? `✓ ${f.key}` : `☠️ ${f.key} — KHÔNG TỒN TẠI trong payload`}
+                      <div
+                        key={f.key}
+                        className={present ? 'text-emerald-400' : 'text-red-400'}
+                      >
+                        {present
+                          ? `✓ ${f.key}`
+                          : `☠️ ${f.key} — KHÔNG TỒN TẠI trong payload`}
                       </div>
                     );
                   })}
                 </div>
                 {missingKeys.length > 0 ? (
                   <div className="mt-2 text-red-400">
-                    Server âm thầm fallback shipping/giá mặc định — user chọn express nhưng nhận
-                    giao thường.
+                    Server âm thầm fallback shipping/giá mặc định — user chọn express
+                    nhưng nhận giao thường.
                   </div>
                 ) : (
                   <div className="mt-2 text-emerald-400">
@@ -479,22 +506,34 @@ export function FormAbuseRange() {
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="VD: SALE50"
                   className={`w-full rounded border bg-slate-900 px-2 py-1 text-slate-200 placeholder:text-slate-600 focus:outline-none ${
-                    lostText ? 'border-red-600' : 'border-emerald-700 focus:border-emerald-500/60'
+                    lostText
+                      ? 'border-red-600'
+                      : 'border-emerald-700 focus:border-emerald-500/60'
                   }`}
                 />
               )}
               <span className="block text-[10px] text-slate-500">
                 {!fixControlled && !verified
-                  ? '// value=undefined → UNCONTROLLED — DOM tự quản, state vẫn \'\''
+                  ? "// value=undefined → UNCONTROLLED — DOM tự quản, state vẫn ''"
                   : '// value={code} → CONTROLLED — React sở hữu giá trị'}
               </span>
             </label>
             <div className="flex gap-2 pb-4">
-              <Button size="sm" variant="outline" onClick={runVerify} className="h-7 text-[11px]">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={runVerify}
+                className="h-7 text-[11px]"
+              >
                 <ShieldCheck className="mr-1 h-3 w-3" />
                 Verify xong → bật editable
               </Button>
-              <Button size="sm" variant="ghost" onClick={resetCouponDemo} className="h-7 text-[11px]">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={resetCouponDemo}
+                className="h-7 text-[11px]"
+              >
                 <RotateCcw className="mr-1 h-3 w-3" />
                 Reset
               </Button>
@@ -507,14 +546,15 @@ export function FormAbuseRange() {
                 WARNING: A component is changing an uncontrolled input to be controlled…
               </p>
               <p className="mt-1 text-red-300">
-                💀 “SALE50” sống trong DOM, state vẫn rỗng ({'value = ""'}) → flip ghi đè bằng chuỗi
-                rỗng đó. Coupon bốc hơi ngay trước mắt khách hàng.
+                💀 “SALE50” sống trong DOM, state vẫn rỗng ({'value = ""'}) → flip ghi đè
+                bằng chuỗi rỗng đó. Coupon bốc hơi ngay trước mắt khách hàng.
               </p>
             </div>
           )}
           {fixControlled && verified && !lostText && (
             <p className="mt-2 text-emerald-400">
-              ✅ Input controlled xuyên suốt — verify chỉ đổi cờ disabled, chữ user gõ giữ nguyên.
+              ✅ Input controlled xuyên suốt — verify chỉ đổi cờ disabled, chữ user gõ giữ
+              nguyên.
             </p>
           )}
         </div>
@@ -550,11 +590,17 @@ export function FormAbuseRange() {
                   <>Đang xử lý…</>
                 ) : (
                   <>
-                    <ShoppingBag className="mr-1 h-3 w-3" />Đặt hàng
+                    <ShoppingBag className="mr-1 h-3 w-3" />
+                    Đặt hàng
                   </>
                 )}
               </Button>
-              <Button size="sm" variant="ghost" onClick={resetOrderDemo} className="h-7 text-[11px]">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={resetOrderDemo}
+                className="h-7 text-[11px]"
+              >
                 <RotateCcw className="mr-1 h-3 w-3" />
                 Reset
               </Button>
@@ -565,7 +611,9 @@ export function FormAbuseRange() {
               </span>
               <span>
                 đơn tạo:{' '}
-                <span className={duplicateCount > 0 ? 'text-red-400' : 'text-emerald-400'}>
+                <span
+                  className={duplicateCount > 0 ? 'text-red-400' : 'text-emerald-400'}
+                >
                   {orders.length}
                 </span>
               </span>
@@ -660,7 +708,12 @@ export function FormAbuseRange() {
                 ))
               )}
             </div>
-            <Button size="sm" variant="destructive" onClick={fireCurl} className="h-7 text-[11px]">
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={fireCurl}
+              className="h-7 text-[11px]"
+            >
               <Send className="mr-1 h-3 w-3" />
               curl -X POST /api/reviews
             </Button>
@@ -726,15 +779,15 @@ export function FormAbuseRange() {
             /* Error boundary crash card */
             <div className="rounded-lg border border-red-500/50 bg-[#1a0505] p-3">
               <p className="text-xs font-bold text-red-400">Unhandled Runtime Error</p>
-              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap text-[11px] leading-relaxed text-red-300">
-{`ZodError: [
+              <pre className="mt-1 overflow-x-auto text-[11px] leading-relaxed whitespace-pre-wrap text-red-300">
+                {`ZodError: [
   { path: ['port'],
     message: 'Number must be less than or equal to 65535' }
 ]`}
               </pre>
               <p className="mt-1 text-red-400/80">
-                .parse() ném giữa render/handler → root unmount → TRẮNG TOÁT TOÀN TRANG. Form soạn
-                dở mất sạch.
+                .parse() ném giữa render/handler → root unmount → TRẮNG TOÁT TOÀN TRANG.
+                Form soạn dở mất sạch.
               </p>
               <Button
                 size="sm"
@@ -760,7 +813,9 @@ export function FormAbuseRange() {
                       setSaveResult(null);
                     }}
                     className={`w-28 rounded border bg-slate-900 px-2 py-1 text-slate-200 focus:outline-none ${
-                      portInvalid ? 'border-red-700 focus:border-red-500/60' : 'border-slate-700 focus:border-sky-500/60'
+                      portInvalid
+                        ? 'border-red-700 focus:border-red-500/60'
+                        : 'border-slate-700 focus:border-sky-500/60'
                     }`}
                   />
                 </label>
@@ -775,18 +830,25 @@ export function FormAbuseRange() {
                 >
                   📋 Dán dữ liệu hỏng từ Excel
                 </Button>
-                <Button size="sm" variant="destructive" onClick={saveSettings} className="h-7 text-[11px]">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={saveSettings}
+                  className="h-7 text-[11px]"
+                >
                   <Send className="mr-1 h-3 w-3" />
                   Lưu settings
                 </Button>
               </div>
               {saveResult === 'ok' && (
-                <p className="mt-2 text-emerald-400">✅ SettingsSchema.safeParse → success — đã lưu.</p>
+                <p className="mt-2 text-emerald-400">
+                  ✅ SettingsSchema.safeParse → success — đã lưu.
+                </p>
               )}
               {saveResult === 'field-error' && (
                 <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-amber-300">
-                  safeParse → success:false · port: “Number must be less than or equal to 65535” —
-                  lỗi hiển thị CÓ KIỂM SOÁT, UI vẫn sống.
+                  safeParse → success:false · port: “Number must be less than or equal to
+                  65535” — lỗi hiển thị CÓ KIỂM SOÁT, UI vẫn sống.
                 </div>
               )}
               {!saveResult && (
@@ -873,21 +935,29 @@ export function FormAbuseRange() {
                     : 'bg-secondary text-muted-foreground'
               }`}
             >
-              {finding.found && !finding.patched ? <Skull className="h-3.5 w-3.5" /> : finding.icon}
+              {finding.found && !finding.patched ? (
+                <Skull className="h-3.5 w-3.5" />
+              ) : (
+                finding.icon
+              )}
             </span>
             <div className="min-w-0 space-y-0.5">
-              <p className="text-xs font-bold text-foreground">{finding.label}</p>
+              <p className="text-foreground text-xs font-bold">{finding.label}</p>
               {finding.found && !finding.patched && (
-                <p className="text-[11px] leading-relaxed text-destructive">{finding.foundText}</p>
+                <p className="text-destructive text-[11px] leading-relaxed">
+                  {finding.foundText}
+                </p>
               )}
               {finding.patched && (
                 <p className="text-[11px] leading-relaxed text-emerald-600 dark:text-emerald-400">
-                  Đã vá: name contract / single-mode input / pending lock + idempotency / shared
-                  schema re-validate / safeParse — vector hết đường khai thác.
+                  Đã vá: name contract / single-mode input / pending lock + idempotency /
+                  shared schema re-validate / safeParse — vector hết đường khai thác.
                 </p>
               )}
               {!finding.found && !finding.patched && (
-                <p className="text-[11px] leading-relaxed text-muted-foreground">{finding.idleText}</p>
+                <p className="text-muted-foreground text-[11px] leading-relaxed">
+                  {finding.idleText}
+                </p>
               )}
             </div>
           </Card>
@@ -902,18 +972,22 @@ export function FormAbuseRange() {
           }`}
         >
           {allFound && !defenseMode ? (
-            <p className="text-xs leading-relaxed text-foreground">
-              💀 <span className="font-bold">Blast Radius:</span> một form duy nhất gây năm lớp thiệt
-              hại — đơn giao sai cam kết, coupon bốc hơi, thẻ khách trừ tiền N lần, stored XSS nhập
-              cư vào DB và toàn trang trắng khi parse nổ. Không vector nào cần exploit tinh vi: chỉ
-              cần form chạy “bình thường”.
+            <p className="text-foreground text-xs leading-relaxed">
+              💀 <span className="font-bold">Blast Radius:</span> một form duy nhất gây
+              năm lớp thiệt hại — đơn giao sai cam kết, coupon bốc hơi, thẻ khách trừ tiền
+              N lần, stored XSS nhập cư vào DB và toàn trang trắng khi parse nổ. Không
+              vector nào cần exploit tinh vi: chỉ cần form chạy “bình thường”.
             </p>
           ) : (
-            <p className="text-xs leading-relaxed text-foreground">
-              🛡️ <span className="font-bold text-emerald-600 dark:text-emerald-400">Defense Patch:</span>{' '}
-              mọi control có name khớp schema, input giữ một chế độ suốt vòng đời, submit tiền bạc
-              có pending lock + Idempotency-Key, cùng một Zod schema chạy ở cả hai đầu với safeParse
-              tại biên giới — client validation chỉ còn là UX, security nằm ở server.
+            <p className="text-foreground text-xs leading-relaxed">
+              🛡️{' '}
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                Defense Patch:
+              </span>{' '}
+              mọi control có name khớp schema, input giữ một chế độ suốt vòng đời, submit
+              tiền bạc có pending lock + Idempotency-Key, cùng một Zod schema chạy ở cả
+              hai đầu với safeParse tại biên giới — client validation chỉ còn là UX,
+              security nằm ở server.
             </p>
           )}
         </Card>

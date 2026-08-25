@@ -69,7 +69,7 @@ export function StateTester() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="space-y-3 rounded-xl border border-border/50 bg-secondary/60 p-4">
+          <div className="border-border/50 bg-secondary/60 space-y-3 rounded-xl border p-4">
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Auth Session:</span>
               <Badge variant={isAuthenticated ? 'success' : 'secondary'}>
@@ -78,10 +78,10 @@ export function StateTester() {
             </div>
 
             {isAuthenticated && user && (
-              <div className="space-y-1 border-t border-border/40 pt-2 text-xs">
+              <div className="border-border/40 space-y-1 border-t pt-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">User:</span>
-                  <span className="font-semibold text-foreground">{user.name}</span>
+                  <span className="text-foreground font-semibold">{user.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Email:</span>
@@ -90,9 +90,9 @@ export function StateTester() {
               </div>
             )}
 
-            <div className="flex items-center justify-between border-t border-border/40 pt-2 text-xs">
+            <div className="border-border/40 flex items-center justify-between border-t pt-2 text-xs">
               <span className="text-muted-foreground">UI Store (Sidebar):</span>
-              <span className="font-mono font-medium text-primary">
+              <span className="text-primary font-mono font-medium">
                 {sidebarOpen ? 'Open' : 'Collapsed'}
               </span>
             </div>
@@ -111,7 +111,7 @@ export function StateTester() {
               type="submit"
               size="sm"
               variant="secondary"
-              className="whitespace-nowrap text-xs"
+              className="text-xs whitespace-nowrap"
               disabled={!isAuthenticated}
             >
               Update
@@ -184,10 +184,10 @@ export function StateTester() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          <div className="space-y-2.5 rounded-xl border border-border/50 bg-secondary/60 p-4 text-xs">
+          <div className="border-border/50 bg-secondary/60 space-y-2.5 rounded-xl border p-4 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Query Key:</span>
-              <span className="font-mono font-semibold text-foreground">
+              <span className="text-foreground font-mono font-semibold">
                 {`['overview', 'metrics']`}
               </span>
             </div>
@@ -217,9 +217,9 @@ export function StateTester() {
             </Button>
           </div>
 
-          <div className="flex items-center justify-between px-1 text-[11px] text-muted-foreground">
+          <div className="text-muted-foreground flex items-center justify-between px-1 text-[11px]">
             <span>Devtools embedded at bottom right</span>
-            <span className="flex items-center gap-1 text-primary">
+            <span className="text-primary flex items-center gap-1">
               <Sparkles className="h-3 w-3" />
               React 19 Ready
             </span>

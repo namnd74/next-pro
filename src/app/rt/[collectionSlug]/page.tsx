@@ -2,11 +2,7 @@ import * as React from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Crosshair,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Crosshair } from 'lucide-react';
 import {
   RED_TEAM_COLLECTIONS,
   getCollectionBySlug,
@@ -60,7 +56,7 @@ export default async function RedTeamCollectionPage({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/rt"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-primary"
+          className="text-muted-foreground hover:text-primary inline-flex items-center gap-1.5 text-xs font-semibold transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>Quay lại Red Team Ops</span>
@@ -71,12 +67,12 @@ export default async function RedTeamCollectionPage({
       {phase && (
         <div className="flex flex-wrap items-center gap-2">
           <span
-            className={`inline-flex items-center rounded-lg bg-gradient-to-r ${phase.color} px-2 py-0.5 font-mono text-[10px] font-extrabold uppercase tracking-widest text-white shadow`}
+            className={`inline-flex items-center rounded-lg bg-gradient-to-r ${phase.color} px-2 py-0.5 font-mono text-[10px] font-extrabold tracking-widest text-white uppercase shadow`}
           >
             Phase {String(phase.order).padStart(2, '0')}
           </span>
-          <span className="text-xs font-bold text-foreground">{phase.title}</span>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span className="text-foreground text-xs font-bold">{phase.title}</span>
+          <span className="text-muted-foreground font-mono text-[10px] tracking-widest uppercase">
             {phase.subtitle}
           </span>
         </div>
@@ -85,8 +81,8 @@ export default async function RedTeamCollectionPage({
       {/* Missions quick strip */}
       {missions.length > 0 && (
         <section className="space-y-3">
-          <h2 className="flex items-center gap-2 text-sm font-bold tracking-tight text-foreground">
-            <Crosshair className="h-4 w-4 text-destructive" />
+          <h2 className="text-foreground flex items-center gap-2 text-sm font-bold tracking-tight">
+            <Crosshair className="text-destructive h-4 w-4" />
             Chiến dịch của chủ đề này ({missions.length})
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -98,15 +94,15 @@ export default async function RedTeamCollectionPage({
               >
                 <Card className="glass-card glass-card-hover flex items-center justify-between gap-3 p-4">
                   <div className="min-w-0 space-y-1">
-                    <p className="truncate text-xs font-bold text-foreground transition-colors group-hover:text-primary">
+                    <p className="text-foreground group-hover:text-primary truncate text-xs font-bold transition-colors">
                       {mission.title}
                     </p>
-                    <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                      ~{mission.estimatedMinutes} min · {mission.vectorIds.length}{' '}
-                      vector · {mission.difficulty}
+                    <p className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
+                      ~{mission.estimatedMinutes} min · {mission.vectorIds.length} vector
+                      · {mission.difficulty}
                     </p>
                   </div>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-destructive" />
+                  <ArrowRight className="text-muted-foreground group-hover:text-destructive h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" />
                 </Card>
               </Link>
             ))}

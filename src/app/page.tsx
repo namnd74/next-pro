@@ -12,6 +12,7 @@ import {
   Briefcase,
   Crosshair,
   ArrowRight,
+  BrainCircuit,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +66,17 @@ export default function HomePage() {
             </Button>
           </Link>
 
+          <Link href="/ai">
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2 border-violet-500/30 font-semibold text-violet-600 hover:bg-violet-500/10 dark:text-violet-400"
+            >
+              <BrainCircuit className="h-4 w-4" aria-hidden="true" />
+              <span>AI Engineering Hub</span>
+            </Button>
+          </Link>
+
           {RED_TEAM_COMING_SOON ? (
             <Button
               variant="outline"
@@ -94,8 +106,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3 Featured Quick Access Cards */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Featured Quick Access Cards */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/learn" className="group">
           <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-600" />
@@ -134,6 +146,27 @@ export default function HomePage() {
                 </p>
               </div>
               <ArrowRight className="text-muted-foreground group-hover:text-primary mt-2 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1" />
+            </div>
+          </Card>
+        </Link>
+
+        <Link href="/ai" className="group">
+          <Card className="glass-card glass-card-hover relative h-full overflow-hidden p-6">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500" />
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500">
+                  <BrainCircuit className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <h3 className="text-foreground text-lg font-bold transition-colors group-hover:text-violet-500">
+                  AI Engineering Hub
+                </h3>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  Interface, agent runtime, harness, skills, sub-agent, safety và evals
+                  trong hệ thống AI hiện đại.
+                </p>
+              </div>
+              <ArrowRight className="text-muted-foreground mt-2 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1 group-hover:text-violet-500" />
             </div>
           </Card>
         </Link>

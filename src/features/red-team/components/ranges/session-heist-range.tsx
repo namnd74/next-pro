@@ -38,9 +38,21 @@ type TabId = 'csrf' | 'token' | 'jack';
 type TokenStore = 'local' | 'memory' | 'httponly';
 
 const TABS: Array<{ id: TabId; label: string; icon: React.ReactNode }> = [
-  { id: 'csrf', label: 'CSRF Transfer Fraud', icon: <Landmark className="h-3.5 w-3.5" /> },
-  { id: 'token', label: 'JWT Heist · Storage', icon: <KeyRound className="h-3.5 w-3.5" /> },
-  { id: 'jack', label: 'Clickjacking', icon: <MousePointerClick className="h-3.5 w-3.5" /> },
+  {
+    id: 'csrf',
+    label: 'CSRF Transfer Fraud',
+    icon: <Landmark className="h-3.5 w-3.5" />,
+  },
+  {
+    id: 'token',
+    label: 'JWT Heist · Storage',
+    icon: <KeyRound className="h-3.5 w-3.5" />,
+  },
+  {
+    id: 'jack',
+    label: 'Clickjacking',
+    icon: <MousePointerClick className="h-3.5 w-3.5" />,
+  },
 ];
 
 const LOOT_TEXT = [
@@ -101,7 +113,10 @@ export function SessionHeistRange() {
     if (parseAmount() <= 0) return;
     debit();
     append(setCsrfLogs, [
-      [`$ POST /api/users/transfer {to:'${recipient || '…'}', amount:${fmtVnd(parseAmount())}}`, 'info'],
+      [
+        `$ POST /api/users/transfer {to:'${recipient || '…'}', amount:${fmtVnd(parseAmount())}}`,
+        'info',
+      ],
       ['200 OK — người dùng TỰ thao tác trên mybank.com ✅', 'ok'],
     ]);
   };
@@ -118,7 +133,10 @@ export function SessionHeistRange() {
       append(setCsrfLogs, [
         ['$ victim mở https://quiz-vui.example …', 'info'],
         ['hidden form auto-submit → POST cross-site tới /api/users/transfer', 'info'],
-        ['Cookie SameSite=Strict: browser KHÔNG đính kèm session cho cross-site POST', 'ok'],
+        [
+          'Cookie SameSite=Strict: browser KHÔNG đính kèm session cho cross-site POST',
+          'ok',
+        ],
         ['server: 403 Blocked — request vô danh, tiền an toàn ✅', 'ok'],
       ]);
       return;
@@ -129,7 +147,10 @@ export function SessionHeistRange() {
       ['$ victim mở https://quiz-vui.example …', 'info'],
       ['body onload → document.forms[0].submit()', 'bad'],
       ['browser gắn cookie session (SameSite=None) vào request cross-site', 'bad'],
-      [`POST /api/users/transfer {to:'${recipient || 'attacker'}', amount:${fmtVnd(parseAmount())}}`, 'bad'],
+      [
+        `POST /api/users/transfer {to:'${recipient || 'attacker'}', amount:${fmtVnd(parseAmount())}}`,
+        'bad',
+      ],
       ['200 OK — tiền đã rời tài khoản, nạn nhân KHÔNG hay biết 💀', 'bad'],
     ]);
   };
@@ -144,7 +165,7 @@ export function SessionHeistRange() {
       setLootRevealed(true);
       setTokenHit(true);
       append(setTokenLogs, [
-        ["$ scanning window.localStorage …", 'info'],
+        ['$ scanning window.localStorage …', 'info'],
         ["found keys: ['accessToken','refreshToken','user-profile']", 'bad'],
         ["getItem('accessToken') ✔ · getItem('refreshToken') ✔", 'bad'],
         ['exfiltrating to https://evil.sh/loot → 200 OK 💀', 'bad'],
@@ -155,17 +176,20 @@ export function SessionHeistRange() {
     if (tokenStore === 'memory') {
       setLootRevealed(false);
       append(setTokenLogs, [
-        ["$ scanning window.localStorage …", 'info'],
+        ['$ scanning window.localStorage …', 'info'],
         ['localStorage trống trơn — không có gì để quét', 'ok'],
         ['script đọc được accessToken trong RAM (biến React context)', 'warn'],
-        ['NHƯNG mất ngay khi F5 · refresh token KHÔNG nằm đây → không giữ phiên dài hạn', 'warn'],
+        [
+          'NHƯNG mất ngay khi F5 · refresh token KHÔNG nằm đây → không giữ phiên dài hạn',
+          'warn',
+        ],
       ]);
       return;
     }
     setLootRevealed(false);
     append(setTokenLogs, [
-      ["$ scanning window.localStorage …", 'info'],
-      ["script gọi document.cookie → chuỗi RỖNG", 'ok'],
+      ['$ scanning window.localStorage …', 'info'],
+      ['script gọi document.cookie → chuỗi RỖNG', 'ok'],
       ['HttpOnly: JS KHÔNG THỂ đọc cookie phiên — theft thất bại ✅', 'ok'],
       ['frontend chỉ gọi /api/auth/* — token chưa bao giờ chạm tay JS client', 'ok'],
     ]);
@@ -175,7 +199,10 @@ export function SessionHeistRange() {
     debit();
     append(setJackLogs, [
       ['$ user bấm nút "Chuyển tiền" trên mybank.com/wallet', 'info'],
-      [`POST /api/users/transfer ${fmtVnd(parseAmount())} → 200 OK (thao tác chính chủ ✅)`, 'ok'],
+      [
+        `POST /api/users/transfer ${fmtVnd(parseAmount())} → 200 OK (thao tác chính chủ ✅)`,
+        'ok',
+      ],
     ]);
   };
 
@@ -248,7 +275,7 @@ export function SessionHeistRange() {
               ATTACK MODE
             </Badge>
           )}
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
             đã ghi nhận {hitCount}/3 vụ đánh cắp · số dư {fmtVnd(balance)}
           </span>
         </div>
@@ -279,7 +306,12 @@ export function SessionHeistRange() {
             <ShieldCheck className="mr-1 h-3 w-3" />
             Phòng thủ tối đa
           </Button>
-          <Button size="sm" variant="ghost" onClick={resetRange} className="h-7 px-2 text-[11px]">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={resetRange}
+            className="h-7 px-2 text-[11px]"
+          >
             <RotateCcw className="mr-1 h-3 w-3" />
             Reset
           </Button>
@@ -287,7 +319,7 @@ export function SessionHeistRange() {
       </div>
 
       {/* Tab-like switcher */}
-      <div className="flex w-fit gap-1 rounded-xl border border-border/80 bg-card p-1">
+      <div className="border-border/80 bg-card flex w-fit gap-1 rounded-xl border p-1">
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -320,7 +352,9 @@ export function SessionHeistRange() {
                 cookie SameSite: {sameSiteStrict ? 'Strict' : 'None'}
               </Badge>
             </div>
-            <p className="font-mono text-lg font-bold text-emerald-400">{fmtVnd(balance)}</p>
+            <p className="font-mono text-lg font-bold text-emerald-400">
+              {fmtVnd(balance)}
+            </p>
             <Input
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
@@ -353,7 +387,7 @@ export function SessionHeistRange() {
                     ? 'SameSite=Strict đã vô hiệu hóa form — không cần gỡ'
                     : 'Bật/tắt form ẩn auto-submit'
                 }
-                className={`rounded-md border px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider transition-colors ${
+                className={`rounded-md border px-2 py-0.5 font-mono text-[9px] tracking-wider uppercase transition-colors ${
                   formArmed && !sameSiteStrict
                     ? 'animate-pulse border-red-500/40 bg-red-500/15 text-red-300'
                     : 'border-slate-700 text-slate-500 hover:bg-slate-800'
@@ -363,7 +397,9 @@ export function SessionHeistRange() {
               </button>
             </div>
             <div className="rounded-lg border border-slate-800 bg-black/40 p-2.5 font-mono text-[10px] leading-relaxed text-slate-400">
-              {'<form action="https://mybank.com/api/users/transfer" method="POST" style="display:none">'}
+              {
+                '<form action="https://mybank.com/api/users/transfer" method="POST" style="display:none">'
+              }
               <br />
               {`  <input name="to" value="${recipient || 'attacker-account'}" />`}
               <br />
@@ -394,13 +430,23 @@ export function SessionHeistRange() {
           <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-slate-500">
             <span>$ DevTools → Application → Storage</span>
             <div className="flex gap-1.5">
-              {(
-                [
-                  { id: 'local' as const, label: 'localStorage', icon: <HardDrive className="h-3 w-3" /> },
-                  { id: 'memory' as const, label: 'Memory (RAM)', icon: <Cpu className="h-3 w-3" /> },
-                  { id: 'httponly' as const, label: 'HttpOnly Cookie', icon: <Lock className="h-3 w-3" /> },
-                ]
-              ).map((opt) => (
+              {[
+                {
+                  id: 'local' as const,
+                  label: 'localStorage',
+                  icon: <HardDrive className="h-3 w-3" />,
+                },
+                {
+                  id: 'memory' as const,
+                  label: 'Memory (RAM)',
+                  icon: <Cpu className="h-3 w-3" />,
+                },
+                {
+                  id: 'httponly' as const,
+                  label: 'HttpOnly Cookie',
+                  icon: <Lock className="h-3 w-3" />,
+                },
+              ].map((opt) => (
                 <Button
                   key={opt.id}
                   size="sm"
@@ -419,21 +465,33 @@ export function SessionHeistRange() {
             {tokenStore === 'local' ? (
               <>
                 <p className="text-slate-400">window.localStorage</p>
-                <p className="text-amber-300">accessToken: &quot;eyJhbGciOiJIUzI1NiJ9.payload.sig&quot;</p>
+                <p className="text-amber-300">
+                  accessToken: &quot;eyJhbGciOiJIUzI1NiJ9.payload.sig&quot;
+                </p>
                 <p className="text-amber-300">refreshToken: &quot;rt_live_9f2a…&quot;</p>
-                <p className="mt-1 text-red-400">{'// không có thuộc tính bảo vệ nào — mọi JS cùng origin đọc được'}</p>
+                <p className="mt-1 text-red-400">
+                  {'// không có thuộc tính bảo vệ nào — mọi JS cùng origin đọc được'}
+                </p>
               </>
             ) : tokenStore === 'memory' ? (
               <>
                 <p className="text-slate-400">AppMemory (React context)</p>
-                <p className="text-slate-300">accessToken: &quot;eyJ…&quot; // biến RAM, mất khi F5</p>
-                <p className="mt-1 text-emerald-500">{'// refresh token KHÔNG nằm ở client'}</p>
+                <p className="text-slate-300">
+                  accessToken: &quot;eyJ…&quot; // biến RAM, mất khi F5
+                </p>
+                <p className="mt-1 text-emerald-500">
+                  {'// refresh token KHÔNG nằm ở client'}
+                </p>
               </>
             ) : (
               <>
                 <p className="text-slate-400">document.cookie → &quot;&quot;</p>
-                <p className="text-emerald-400">Set-Cookie: access_token=…; HttpOnly; Secure; SameSite=Lax</p>
-                <p className="mt-1 text-emerald-500">{'// HttpOnly ẨN cookie khỏi mọi đoạn JavaScript'}</p>
+                <p className="text-emerald-400">
+                  Set-Cookie: access_token=…; HttpOnly; Secure; SameSite=Lax
+                </p>
+                <p className="mt-1 text-emerald-500">
+                  {'// HttpOnly ẨN cookie khỏi mọi đoạn JavaScript'}
+                </p>
               </>
             )}
           </div>
@@ -449,12 +507,15 @@ export function SessionHeistRange() {
 
           {lootRevealed && (
             <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-2.5">
-              <p className="mb-1 font-mono text-[10px] font-bold uppercase tracking-wider text-red-300">
+              <p className="mb-1 font-mono text-[10px] font-bold tracking-wider text-red-300 uppercase">
                 📦 Gói hàng bị chặn tại evil.sh
               </p>
-              <pre className="whitespace-pre-wrap break-all font-mono text-[10px] leading-relaxed text-red-300">{LOOT_TEXT}</pre>
+              <pre className="font-mono text-[10px] leading-relaxed break-all whitespace-pre-wrap text-red-300">
+                {LOOT_TEXT}
+              </pre>
               <p className="mt-1 text-[10px] text-red-400/80">
-                Attacker đăng nhập AS VICTIM từ bất cứ đâu — đổi mật khẩu cũng chưa đủ nếu thiếu revoke.
+                Attacker đăng nhập AS VICTIM từ bất cứ đâu — đổi mật khẩu cũng chưa đủ nếu
+                thiếu revoke.
               </p>
             </div>
           )}
@@ -467,7 +528,9 @@ export function SessionHeistRange() {
       {activeTab === 'jack' && (
         <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-inner">
           <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-slate-500">
-            <span>$ kịch bản: trang attacker chồng iframe trong suốt lên nút chuyển tiền</span>
+            <span>
+              $ kịch bản: trang attacker chồng iframe trong suốt lên nút chuyển tiền
+            </span>
             <div className="flex gap-1.5">
               <Button
                 size="sm"
@@ -490,9 +553,15 @@ export function SessionHeistRange() {
 
           {/* Trang nạn nhân + overlay */}
           <div className="relative overflow-hidden rounded-lg border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-4">
-            <p className="font-mono text-[11px] font-bold text-slate-300">MyBank · Ví của bạn</p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Số dư: <span className="font-mono font-bold text-emerald-400">{fmtVnd(balance)}</span> — xác nhận lệnh chuyển bên dưới.
+            <p className="font-mono text-[11px] font-bold text-slate-300">
+              MyBank · Ví của bạn
+            </p>
+            <p className="text-muted-foreground mt-1 text-[11px]">
+              Số dư:{' '}
+              <span className="font-mono font-bold text-emerald-400">
+                {fmtVnd(balance)}
+              </span>{' '}
+              — xác nhận lệnh chuyển bên dưới.
             </p>
             <div className="mt-6 flex justify-end">
               <Button size="sm" onClick={realWalletClick} className="h-9 text-[11px]">
@@ -502,10 +571,10 @@ export function SessionHeistRange() {
 
             {overlayOn && !xfoDeny && (
               <div className="pointer-events-none absolute inset-0 z-20 border-2 border-dashed border-sky-500/40 bg-sky-500/[0.04]">
-                <span className="pointer-events-none absolute left-2 top-1.5 font-mono text-[9px] uppercase tracking-wider text-sky-400/70">
+                <span className="pointer-events-none absolute top-1.5 left-2 font-mono text-[9px] tracking-wider text-sky-400/70 uppercase">
                   iframe transparent · opacity: .001 · z-index: 9999
                 </span>
-                <span className="absolute bottom-3 right-3 z-30 block cursor-pointer animate-pulse">
+                <span className="absolute right-3 bottom-3 z-30 block animate-pulse cursor-pointer">
                   <Button
                     size="sm"
                     variant="glass"
@@ -551,8 +620,10 @@ export function SessionHeistRange() {
               label: 'CSRF Transfer Fraud',
               patched: sameSiteStrict,
               hit: csrfHit,
-              hitNote: 'Request forged mang cookie hợp lệ của nạn nhân — giao dịch thành công dưới danh nghĩa người thật.',
-              patchNote: 'SameSite=Strict chặn cookie trên POST cross-site; server kiểm tra Origin + CSRF token để tự vệ độc lập.',
+              hitNote:
+                'Request forged mang cookie hợp lệ của nạn nhân — giao dịch thành công dưới danh nghĩa người thật.',
+              patchNote:
+                'SameSite=Strict chặn cookie trên POST cross-site; server kiểm tra Origin + CSRF token để tự vệ độc lập.',
             },
             {
               key: 'token' as const,
@@ -560,8 +631,10 @@ export function SessionHeistRange() {
               label: 'JWT Heist từ localStorage',
               patched: tokenStore === 'httponly',
               hit: tokenHit,
-              hitNote: 'Cặp access+refresh token bị exfiltrate — backdoor 30 ngày sống sót qua cả logout.',
-              patchNote: 'Token nằm trong HttpOnly cookie ngoài tầm với của JavaScript; access ngắn hạn trong RAM, refresh kèm rotation.',
+              hitNote:
+                'Cặp access+refresh token bị exfiltrate — backdoor 30 ngày sống sót qua cả logout.',
+              patchNote:
+                'Token nằm trong HttpOnly cookie ngoài tầm với của JavaScript; access ngắn hạn trong RAM, refresh kèm rotation.',
             },
             {
               key: 'jack' as const,
@@ -569,8 +642,10 @@ export function SessionHeistRange() {
               label: 'Clickjacking qua iframe trong suốt',
               patched: xfoDeny,
               hit: jackHit,
-              hitNote: 'Một cú click "nhận quà" trở thành lệnh chuyển tiền — không XSS, không password, không cảnh báo.',
-              patchNote: 'X-Frame-Options: DENY (hoặc CSP frame-ancestors) khiến browser từ chối nhúng trang vào iframe bẫy.',
+              hitNote:
+                'Một cú click "nhận quà" trở thành lệnh chuyển tiền — không XSS, không password, không cảnh báo.',
+              patchNote:
+                'X-Frame-Options: DENY (hoặc CSP frame-ancestors) khiến browser từ chối nhúng trang vào iframe bẫy.',
             },
           ] as Array<{
             key: TabId;
@@ -587,7 +662,11 @@ export function SessionHeistRange() {
             <Card
               key={vector.key}
               className={`glass-card flex items-start gap-3 p-3 ${
-                showHit ? 'border-destructive/30' : vector.patched ? 'border-emerald-500/20' : ''
+                showHit
+                  ? 'border-destructive/30'
+                  : vector.patched
+                    ? 'border-emerald-500/20'
+                    : ''
               }`}
             >
               <span
@@ -599,17 +678,30 @@ export function SessionHeistRange() {
                       : 'bg-secondary text-muted-foreground'
                 }`}
               >
-                {showHit ? <Skull className="h-3.5 w-3.5" /> : vector.patched ? <ShieldCheck className="h-3.5 w-3.5" /> : vector.icon}
+                {showHit ? (
+                  <Skull className="h-3.5 w-3.5" />
+                ) : vector.patched ? (
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                ) : (
+                  vector.icon
+                )}
               </span>
               <div className="min-w-0 space-y-0.5">
-                <p className="text-xs font-bold text-foreground">{vector.label}</p>
-                {showHit && <p className="text-[11px] leading-relaxed text-destructive">{vector.hitNote}</p>}
+                <p className="text-foreground text-xs font-bold">{vector.label}</p>
+                {showHit && (
+                  <p className="text-destructive text-[11px] leading-relaxed">
+                    {vector.hitNote}
+                  </p>
+                )}
                 {vector.patched && (
-                  <p className="text-[11px] leading-relaxed text-emerald-600 dark:text-emerald-400">{vector.patchNote}</p>
+                  <p className="text-[11px] leading-relaxed text-emerald-600 dark:text-emerald-400">
+                    {vector.patchNote}
+                  </p>
                 )}
                 {!showHit && !vector.patched && (
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    Chưa khai hoả — kích hoạt vector này ở ATTACK MODE để xem Blast Radius.
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    Chưa khai hoả — kích hoạt vector này ở ATTACK MODE để xem Blast
+                    Radius.
                   </p>
                 )}
               </div>
@@ -620,21 +712,25 @@ export function SessionHeistRange() {
 
       {/* Verdict */}
       {(hitCount > 0 || allDefenses) && (
-        <Card className={`glass-card p-4 ${allDefenses ? 'border-emerald-500/30' : 'border-destructive/30'}`}>
+        <Card
+          className={`glass-card p-4 ${allDefenses ? 'border-emerald-500/30' : 'border-destructive/30'}`}
+        >
           {hitCount > 0 && !allDefenses ? (
-            <p className="text-xs leading-relaxed text-foreground">
-              💀 <span className="font-bold">Blast Radius:</span> tiền rời tài khoản bằng chính
-              cookie của nạn nhân, cặp JWT nằm gọn trong localStorage chờ một XSS nhỏ khai quật,
-              và một cú click vô hại đủ ký lệnh chuyển khoản — toàn bộ chuỗi không cần password và
-              không kích hoạt bất kỳ alarm nào.
+            <p className="text-foreground text-xs leading-relaxed">
+              💀 <span className="font-bold">Blast Radius:</span> tiền rời tài khoản bằng
+              chính cookie của nạn nhân, cặp JWT nằm gọn trong localStorage chờ một XSS
+              nhỏ khai quật, và một cú click vô hại đủ ký lệnh chuyển khoản — toàn bộ
+              chuỗi không cần password và không kích hoạt bất kỳ alarm nào.
             </p>
           ) : (
-            <p className="text-xs leading-relaxed text-foreground">
+            <p className="text-foreground text-xs leading-relaxed">
               🛡️{' '}
-              <span className="font-bold text-emerald-600 dark:text-emerald-400">Defense Patch:</span>{' '}
-              SameSite=Strict cắt cookie khỏi mọi POST cross-site, token sống trong HttpOnly cookie
-              ngoài tầm với của script, X-Frame-Options: DENY khiến iframe bẫy trắng tay — chuỗi
-              đánh cắp danh tính đứt từng mắt xích.
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                Defense Patch:
+              </span>{' '}
+              SameSite=Strict cắt cookie khỏi mọi POST cross-site, token sống trong
+              HttpOnly cookie ngoài tầm với của script, X-Frame-Options: DENY khiến iframe
+              bẫy trắng tay — chuỗi đánh cắp danh tính đứt từng mắt xích.
             </p>
           )}
         </Card>

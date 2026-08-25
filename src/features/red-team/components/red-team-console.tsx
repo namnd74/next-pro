@@ -65,13 +65,16 @@ export function AttackVectorCard({ vector }: AttackVectorCardProps) {
     setIsLaunching(true);
 
     vector.impactLog.forEach((line, idx) => {
-      const timer = setTimeout(() => {
-        setLogLines((prev) => [...prev, line]);
-        if (idx === vector.impactLog.length - 1) {
-          setIsLaunching(false);
-          launchVector(vector.id);
-        }
-      }, LOG_LINE_DELAY_MS * (idx + 1));
+      const timer = setTimeout(
+        () => {
+          setLogLines((prev) => [...prev, line]);
+          if (idx === vector.impactLog.length - 1) {
+            setIsLaunching(false);
+            launchVector(vector.id);
+          }
+        },
+        LOG_LINE_DELAY_MS * (idx + 1)
+      );
       timersRef.current.push(timer);
     });
   };
@@ -94,8 +97,10 @@ export function AttackVectorCard({ vector }: AttackVectorCardProps) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <Skull className={`h-4 w-4 ${isPatched ? 'text-emerald-500' : 'text-destructive'}`} />
-            <h3 className="text-sm font-bold tracking-tight text-foreground sm:text-base">
+            <Skull
+              className={`h-4 w-4 ${isPatched ? 'text-emerald-500' : 'text-destructive'}`}
+            />
+            <h3 className="text-foreground text-sm font-bold tracking-tight sm:text-base">
               {vector.name}
             </h3>
             <Badge variant={severity.badgeVariant} className="text-[10px] tracking-wider">
@@ -116,7 +121,7 @@ export function AttackVectorCard({ vector }: AttackVectorCardProps) {
               </Badge>
             )}
           </div>
-          <p className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+          <p className="text-muted-foreground flex items-center gap-1.5 font-mono text-[11px]">
             <Target className="h-3 w-3" />
             target: {vector.target}
           </p>
@@ -124,12 +129,12 @@ export function AttackVectorCard({ vector }: AttackVectorCardProps) {
       </div>
 
       {/* Attack Narrative */}
-      <p className="text-xs leading-relaxed text-muted-foreground">{vector.story}</p>
+      <p className="text-muted-foreground text-xs leading-relaxed">{vector.story}</p>
 
       {/* Impact Simulator Terminal */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span className="text-muted-foreground flex items-center gap-1.5 font-mono text-[10px] tracking-widest uppercase">
             <Terminal className="h-3 w-3" />
             Impact Simulator
           </span>
@@ -141,7 +146,11 @@ export function AttackVectorCard({ vector }: AttackVectorCardProps) {
             className="gap-1.5 text-[11px] font-bold"
           >
             <Play className="h-3 w-3" />
-            {isLaunching ? 'Attacking...' : isBreached ? 'Re-launch Attack' : 'Launch Attack'}
+            {isLaunching
+              ? 'Attacking...'
+              : isBreached
+                ? 'Re-launch Attack'
+                : 'Launch Attack'}
           </Button>
         </div>
 
@@ -151,21 +160,24 @@ export function AttackVectorCard({ vector }: AttackVectorCardProps) {
         >
           {logLines.length === 0 ? (
             <span className="text-slate-500">
-              $ awaiting launch order... nhấn &quot;Launch Attack&quot; để mô phỏng hậu quả.
+              $ awaiting launch order... nhấn &quot;Launch Attack&quot; để mô phỏng hậu
+              quả.
             </span>
           ) : (
             logLines.map((line, idx) => (
               <div
                 key={`${idx}-${line}`}
                 className={
-                  line.startsWith('>') || line.includes('FATAL') || line.includes('CRITICAL')
+                  line.startsWith('>') ||
+                  line.includes('FATAL') ||
+                  line.includes('CRITICAL')
                     ? 'text-red-400'
                     : line.includes('✓') || line.includes('PATCHED')
                       ? 'text-emerald-400'
                       : 'text-slate-300'
                 }
               >
-                <span className="mr-2 select-none text-slate-600">$</span>
+                <span className="mr-2 text-slate-600 select-none">$</span>
                 {line}
               </div>
             ))
@@ -175,14 +187,14 @@ export function AttackVectorCard({ vector }: AttackVectorCardProps) {
       </div>
 
       {/* Blast Radius */}
-      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-3">
-        <span className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-destructive">
+      <div className="border-destructive/20 bg-destructive/5 rounded-xl border p-3">
+        <span className="text-destructive mb-1.5 flex items-center gap-1.5 text-[10px] font-bold tracking-wider uppercase">
           <AlertTriangle className="h-3 w-3" />
           Blast Radius (hậu quả production)
         </span>
         <ul className="space-y-1">
           {vector.blastRadius.map((impact, idx) => (
-            <li key={idx} className="text-xs leading-relaxed text-foreground">
+            <li key={idx} className="text-foreground text-xs leading-relaxed">
               • {impact}
             </li>
           ))}
@@ -210,9 +222,11 @@ export function AttackVectorCard({ vector }: AttackVectorCardProps) {
       </Tabs>
 
       {/* Defense Takeaway + Patch Action */}
-      <div className="flex flex-col items-start justify-between gap-3 border-t border-border/40 pt-3 sm:flex-row sm:items-center">
-        <p className="text-xs italic leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-emerald-600 dark:text-emerald-400">Takeaway: </span>
+      <div className="border-border/40 flex flex-col items-start justify-between gap-3 border-t pt-3 sm:flex-row sm:items-center">
+        <p className="text-muted-foreground text-xs leading-relaxed italic">
+          <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+            Takeaway:{' '}
+          </span>
           {vector.defenseTakeaway}
         </p>
         <Button
@@ -250,11 +264,11 @@ function CollectionDossier({ dossier }: { dossier?: StudyDossier }) {
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-lg font-extrabold tracking-tight text-foreground">
-          <BookOpen className="h-5 w-5 text-primary" />
+        <h2 className="text-foreground flex items-center gap-2 text-lg font-extrabold tracking-tight">
+          <BookOpen className="text-primary h-5 w-5" />
           Học liệu · Lý thuyết nền
         </h2>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span className="text-muted-foreground font-mono text-[10px] tracking-wider uppercase">
           ~{dossier.readingTimeMinutes} min read
         </span>
       </div>
@@ -263,13 +277,16 @@ function CollectionDossier({ dossier }: { dossier?: StudyDossier }) {
         {/* Objectives + Defense principles */}
         <Card className="glass-card space-y-4 p-5">
           <div className="space-y-2">
-            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-primary">
+            <span className="text-primary flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase">
               <GraduationCap className="h-3.5 w-3.5" />
               Sau bài học này bạn sẽ
             </span>
             <ul className="space-y-1.5">
               {dossier.objectives.map((objective, idx) => (
-                <li key={idx} className="flex items-start gap-2 text-xs leading-relaxed text-foreground">
+                <li
+                  key={idx}
+                  className="text-foreground flex items-start gap-2 text-xs leading-relaxed"
+                >
                   <ListChecks className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
                   {objective}
                 </li>
@@ -277,13 +294,16 @@ function CollectionDossier({ dossier }: { dossier?: StudyDossier }) {
             </ul>
           </div>
 
-          <div className="space-y-2 border-t border-border/40 pt-3">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+          <div className="border-border/40 space-y-2 border-t pt-3">
+            <span className="text-[10px] font-bold tracking-widest text-emerald-600 uppercase dark:text-emerald-400">
               Nguyên tắc phòng thủ
             </span>
             <ul className="space-y-1.5">
               {dossier.defensePrinciples.map((principle, idx) => (
-                <li key={idx} className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+                <li
+                  key={idx}
+                  className="text-muted-foreground flex items-start gap-2 text-xs leading-relaxed"
+                >
                   <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
                   {principle}
                 </li>
@@ -294,16 +314,19 @@ function CollectionDossier({ dossier }: { dossier?: StudyDossier }) {
 
         {/* Concepts */}
         <Card className="glass-card space-y-2 p-5">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-primary">
+          <span className="text-primary text-[10px] font-bold tracking-widest uppercase">
             Khái niệm cốt lõi
           </span>
           <dl className="space-y-2.5">
             {dossier.concepts.map((concept, idx) => (
-              <div key={idx} className="rounded-xl border border-border/50 bg-secondary/20 p-3">
-                <dt className="font-mono text-[11px] font-bold text-foreground">
+              <div
+                key={idx}
+                className="border-border/50 bg-secondary/20 rounded-xl border p-3"
+              >
+                <dt className="text-foreground font-mono text-[11px] font-bold">
                   {concept.term}
                 </dt>
-                <dd className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                <dd className="text-muted-foreground mt-1 text-xs leading-relaxed">
                   {concept.definition}
                 </dd>
               </div>
@@ -314,19 +337,24 @@ function CollectionDossier({ dossier }: { dossier?: StudyDossier }) {
 
       {/* Attacker playbook — full width */}
       <Card className="glass-card space-y-3 p-5">
-        <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-destructive">
+        <span className="text-destructive flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase">
           <Skull className="h-3.5 w-3.5" />
           Attacker Playbook — quy trình chuẩn của domain này
         </span>
         <ol className="space-y-2.5">
           {dossier.attackerPlaybook.map((step, idx) => (
-            <li key={idx} className="flex items-start gap-3 rounded-xl border border-destructive/15 bg-destructive/5 p-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-destructive/15 font-mono text-[10px] font-bold text-destructive">
+            <li
+              key={idx}
+              className="border-destructive/15 bg-destructive/5 flex items-start gap-3 rounded-xl border p-3"
+            >
+              <span className="bg-destructive/15 text-destructive flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-bold">
                 {String(idx + 1).padStart(2, '0')}
               </span>
               <div className="min-w-0 space-y-1">
-                <p className="text-xs font-bold text-foreground">{step.title}</p>
-                <p className="text-xs leading-relaxed text-muted-foreground">{step.detail}</p>
+                <p className="text-foreground text-xs font-bold">{step.title}</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  {step.detail}
+                </p>
               </div>
             </li>
           ))}
@@ -365,33 +393,38 @@ export function RedTeamConsole({ collection }: RedTeamConsoleProps) {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
-              <Crosshair className="h-5 w-5 text-destructive" />
-              <h2 className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl">
+              <Crosshair className="text-destructive h-5 w-5" />
+              <h2 className="text-foreground text-lg font-extrabold tracking-tight sm:text-xl">
                 {collection.title}
               </h2>
-              <Badge variant="destructive" className="text-[10px] uppercase tracking-wider">
+              <Badge
+                variant="destructive"
+                className="text-[10px] tracking-wider uppercase"
+              >
                 {collection.difficulty}
               </Badge>
             </div>
-            <p className="text-sm font-medium text-muted-foreground">{collection.tagline}</p>
+            <p className="text-muted-foreground text-sm font-medium">
+              {collection.tagline}
+            </p>
           </div>
 
           <Button
             variant="ghost"
             size="sm"
             onClick={resetRedTeamProgress}
-            className="gap-1.5 text-xs text-muted-foreground"
+            className="text-muted-foreground gap-1.5 text-xs"
           >
             <RotateCcw className="h-3 w-3" />
             Reset Ops
           </Button>
         </div>
 
-        <div className="rounded-xl border border-border/60 bg-secondary/30 p-4">
-          <span className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-primary">
+        <div className="border-border/60 bg-secondary/30 rounded-xl border p-4">
+          <span className="text-primary mb-1 block text-[10px] font-bold tracking-widest uppercase">
             Mission Briefing
           </span>
-          <p className="text-xs leading-relaxed text-foreground sm:text-sm">
+          <p className="text-foreground text-xs leading-relaxed sm:text-sm">
             {collection.missionBriefing}
           </p>
         </div>
@@ -399,9 +432,9 @@ export function RedTeamConsole({ collection }: RedTeamConsoleProps) {
         {/* Ops Scoreboard */}
         <div className="space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span className="font-medium text-muted-foreground">
+            <span className="text-muted-foreground font-medium">
               Breached:{' '}
-              <span className="font-bold text-destructive">
+              <span className="text-destructive font-bold">
                 {breachedCount}/{totalVectors}
               </span>{' '}
               · Patched:{' '}
@@ -409,7 +442,7 @@ export function RedTeamConsole({ collection }: RedTeamConsoleProps) {
                 {patchedCount}/{totalVectors}
               </span>
             </span>
-            <span className="font-medium text-muted-foreground">
+            <span className="text-muted-foreground font-medium">
               {breachedCount === 0
                 ? 'Hệ thống đang an toàn… tưởng vậy đó 🤔'
                 : patchedCount === totalVectors

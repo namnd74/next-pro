@@ -1,0 +1,256 @@
+[
+  {
+    "slug": "agent-runtime-and-harness",
+    "title": "Agent Runtime & Harness",
+    "summary": "Agent loop, tool execution, context assembly, permission, budget và termination condition.",
+    "level": "Trung cấp",
+    "durationMinutes": 28,
+    "icon": "harness",
+    "color": "from-emerald-500 to-teal-600",
+    "tags": ["Agent", "Harness", "Tools"],
+    "mentalModel": "Agent là model chạy trong vòng lặp quan sát–quyết định–hành động. Harness là runtime kiểm soát context, tool, quyền, state, budget và điều kiện kết thúc.",
+    "takeaways": [
+      "Model đề xuất hành động; harness validate, authorize và thực thi.",
+      "Tool description không phải security boundary.",
+      "Mọi agent loop cần step budget và điều kiện dừng.",
+      "Working context, conversation state và persistent memory là ba lớp khác nhau."
+    ],
+    "sections": [
+      {
+        "title": "Một model mạnh vẫn có thể tạo agent yếu",
+        "paragraphs": [
+          "Nếu harness cung cấp context sai, tool mơ hồ, quyền quá rộng hoặc không có recovery, model thông minh hơn chỉ giúp hệ thống mắc lỗi một cách thuyết phục hơn.",
+          "Harness phải sở hữu sandbox, approval, timeout, retry, compaction, tracing và termination. Authorization không được giao cho model tự quyết định."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "Agent loop có guardrail",
+        "language": "typescript",
+        "code": "for (let step = 0; step < MAX_STEPS; step++) {\n  const decision = await model.respond(context);\n  if (decision.type === 'final') return decision.output;\n\n  const call = validateToolCall(decision.toolCall);\n  await authorize(call, userPolicy);\n  const observation = await runInSandbox(call);\n  context = compact([...context, decision, observation]);\n}\n\nthrow new Error('Agent step budget exceeded');",
+        "takeaway": "Model chọn bước tiếp theo nhưng code đáng tin cậy vẫn kiểm soát quyền, thực thi và giới hạn."
+      }
+    ],
+    "resources": [
+      {
+        "title": "Function calling",
+        "url": "https://developers.openai.com/api/docs/guides/function-calling",
+        "description": "Contract và vòng đời của tool call."
+      },
+      {
+        "title": "MCP and Connectors",
+        "url": "https://developers.openai.com/api/docs/guides/tools-connectors-mcp",
+        "description": "Kết nối agent với tool và dữ liệu bên ngoài."
+      },
+      {
+        "title": "OpenAI — Model guidance for tool orchestration",
+        "url": "https://developers.openai.com/api/docs/guides/latest-model",
+        "description": "Leaner prompts, approval boundaries và chọn direct hay programmatic tool calling."
+      },
+      {
+        "title": "Anthropic — Building effective agents",
+        "url": "https://www.anthropic.com/engineering/building-effective-agents",
+        "description": "Agent loop và các workflow primitive trước khi dùng framework phức tạp."
+      },
+      {
+        "title": "Model Context Protocol specification",
+        "url": "https://modelcontextprotocol.io/specification/latest",
+        "description": "Protocol boundary giữa host, client, server, tools và resources."
+      }
+    ]
+  },
+  {
+    "slug": "multi-agent-safety-and-evals",
+    "title": "Multi-agent, Safety & Evals",
+    "summary": "Phân rã công việc, điều phối sub-agent và đánh giá hành động bằng evidence.",
+    "level": "Nâng cao",
+    "durationMinutes": 24,
+    "icon": "multi-agent",
+    "color": "from-rose-500 to-red-600",
+    "tags": ["Sub-agent", "Security", "Evals"],
+    "mentalModel": "Multi-agent chỉ có lợi khi công việc chia được thành các nhánh đủ độc lập; chất lượng vẫn phụ thuộc contract giao việc, isolation, synthesis và verification.",
+    "takeaways": [
+      "Mỗi sub-agent cần scope, output contract, budget và ownership rõ.",
+      "Shared filesystem tạo rủi ro ghi đè và merge conflict.",
+      "Parent agent phải kiểm chứng, không chỉ nối kết quả con.",
+      "Eval cần đo tool correctness, side effect, recovery, latency và cost."
+    ],
+    "sections": [
+      {
+        "title": "Song song chỉ hiệu quả khi workstream độc lập",
+        "paragraphs": [
+          "Accessibility audit, bundle analysis và test review có thể chạy song song vì mỗi nhánh có artifact riêng. Ba agent cùng sửa một component thường chỉ tạo coordination overhead và conflict.",
+          "Security boundary phải được áp dụng cho từng sub-agent. Việc parent có quyền không có nghĩa mọi child đều nên nhận cùng tool và cùng phạm vi dữ liệu."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "Fan-out có bounded workers và deterministic synthesis",
+        "language": "typescript",
+        "code": "const contracts = [\n  { role: 'accessibility', files: uiFiles, output: FindingSchema.array() },\n  { role: 'performance', files: bundleFiles, output: BudgetResultSchema },\n  { role: 'tests', files: testFiles, output: CoverageRiskSchema },\n];\n\nconst results = await Promise.all(\n  contracts.map((contract) =>\n    runWorker({\n      contract,\n      tools: toolsFor(contract.role),\n      maxSteps: 8,\n      writeAccess: false,\n    })\n  )\n);\n\nconst verified = results.map(validateAgainstContract);\nreturn synthesizeBySeverity(verified);",
+        "takeaway": "Parallelism chỉ nằm ở workstream độc lập; schema validation và synthesis order vẫn deterministic."
+      }
+    ],
+    "resources": [
+      {
+        "title": "Multi-agent — OpenAI API",
+        "url": "https://developers.openai.com/api/docs/guides/responses-multi-agent",
+        "description": "Phối hợp nhiều sub-agent và tổng hợp kết quả."
+      },
+      {
+        "title": "Evaluate agent workflows",
+        "url": "https://developers.openai.com/api/docs/guides/agent-evals",
+        "description": "Thiết kế evaluation cho workflow agent."
+      },
+      {
+        "title": "LangGraph — Multi-agent patterns",
+        "url": "https://langchain-ai.github.io/langgraph/tutorials/multi_agent/multi-agent-collaboration/",
+        "description": "Supervisor, handoff và custom graph; kèm cảnh báo không phải task phức tạp nào cũng cần multi-agent."
+      },
+      {
+        "title": "Microsoft AutoGen AgentChat teams",
+        "url": "https://microsoft.github.io/autogen/stable/user-guide/agentchat-user-guide/tutorial/teams.html",
+        "description": "Round-robin, selector team, termination condition và stateful team patterns."
+      },
+      {
+        "title": "Google ADK — Multi-agent systems",
+        "url": "https://google.github.io/adk-docs/agents/multi-agents/",
+        "description": "Hierarchy, delegation và workflow agents trong Agent Development Kit."
+      },
+      {
+        "title": "Anthropic — Building effective agents",
+        "url": "https://www.anthropic.com/engineering/building-effective-agents",
+        "description": "Orchestrator-workers, parallelization và evaluator-optimizer patterns."
+      }
+    ]
+  },
+  {
+    "slug": "workflow-agent-and-framework-selection",
+    "title": "Workflow, Agent hay Multi-agent Framework?",
+    "summary": "Chọn mức tự chủ và abstraction bằng failure model, state, control flow và observability—không bằng độ nổi tiếng của framework.",
+    "level": "Nâng cao",
+    "durationMinutes": 40,
+    "icon": "multi-agent",
+    "color": "from-emerald-500 to-cyan-600",
+    "tags": ["Workflow", "Frameworks", "Trade-offs"],
+    "mentalModel": "Bắt đầu bằng deterministic workflow; chỉ trao quyền chọn bước cho model khi variance của task tạo giá trị lớn hơn chi phí kiểm soát.",
+    "takeaways": [
+      "Workflow có code path định trước; agent tự quyết định process và tool usage.",
+      "Multi-agent thêm coordination state, failure propagation và synthesis cost.",
+      "Framework được chọn sau khi đã biết state machine và reliability requirement.",
+      "Repository cũ có thể còn giá trị giáo dục nhưng không đồng nghĩa phù hợp production mới."
+    ],
+    "sections": [
+      {
+        "title": "Complexity ladder trước framework matrix",
+        "paragraphs": [
+          "Anthropic đề xuất đi từ augmented LLM đến prompt chaining, routing, parallelization, orchestrator-workers rồi mới tới autonomous agent. Mỗi nấc đổi latency, cost và failure surface. Nếu task phân rã ổn định, workflow code thường dễ test và vận hành hơn agent tự lập kế hoạch.",
+          "Multi-agent phù hợp khi subtasks thật sự độc lập hoặc cần context/role chuyên biệt. Nếu các worker liên tục chia sẻ mutable state hoặc sửa cùng artifact, coordination overhead có thể lớn hơn lợi ích song song."
+        ]
+      },
+      {
+        "title": "Đọc framework qua primitive nó sở hữu",
+        "paragraphs": [
+          "LangGraph tập trung graph state, durable execution và human-in-the-loop cho workflow dài. Semantic Kernel cung cấp agent abstraction, plugins và các orchestration pattern. AutoGen có đóng góp lớn về event-driven multi-agent, nhưng repository hiện khuyến nghị dự án mới xem Microsoft Agent Framework. CrewAI đưa role/task/crew lên abstraction cao hơn.",
+          "Không framework nào loại bỏ nhu cầu định nghĩa tool schema, permission, state ownership, termination và eval. Framework chỉ quyết định phần boilerplate nào được đóng gói và phần behavior nào trở nên implicit."
+        ]
+      },
+      {
+        "title": "Swarm là case study về lifecycle của nguồn tham khảo",
+        "paragraphs": [
+          "OpenAI Swarm minh họa hai primitive dễ hiểu: agent và handoff. Repository tự ghi rõ đây là educational/experimental và đã được thay thế cho production bởi OpenAI Agents SDK. Một source catalog tốt phải lưu cả status này, không chỉ URL.",
+          "Bài học tổng quát: luôn kiểm tra maintenance mode, migration note, experimental label và ngày cập nhật trước khi biến sample thành nền tảng kiến trúc."
+        ]
+      },
+      {
+        "title": "Framework selection checklist",
+        "paragraphs": [
+          "Vẽ state machine không phụ thuộc vendor trước: run, step, observation, checkpoint, approval, cancel và terminal states. Sau đó đánh giá framework theo durability, replay, tracing, interrupt/resume, TypeScript support, deployment model và khả năng thoát framework."
+        ],
+        "points": [
+          "Control flow cố định hay model-driven?",
+          "State ephemeral, thread-scoped hay durable?",
+          "Có cần parallel, handoff hay evaluator-optimizer?",
+          "Ai sở hữu retry, idempotency và compensation?",
+          "Trace có đủ để tái hiện một failure production không?"
+        ]
+      },
+      {
+        "title": "Hướng triển khai đang hội tụ: agentic ở decision point, deterministic ở execution path",
+        "paragraphs": [
+          "Các hệ sinh thái lớn đang hội tụ ở cùng một nguyên tắc: giữ model ở nơi cần semantic judgment, còn validation, permission, retry, state transition và artifact verification nằm trong code hoặc runtime. OpenAI gọi rõ ranh giới giữa direct tool calls và programmatic tool calling; Anthropic khuyến nghị tăng complexity theo nhu cầu; LangGraph và AutoGen đưa state, termination và coordination thành primitive quan sát được.",
+          "Một stack hiệu quả thường có bốn lớp: skills hoặc dynamic context để chỉ nạp expertise cần thiết; tools/MCP để chuẩn hóa capability; durable workflow để checkpoint và resume; eval/trace để chứng minh accuracy, efficiency và side effect. Multi-agent chỉ là topology tùy chọn ở trên bốn lớp này, không phải đích đến mặc định."
+        ],
+        "points": [
+          "Dynamic context thay cho mega-prompt luôn nạp mọi thứ.",
+          "Bounded code path cho filtering, joining, validation và aggregation.",
+          "Model judgment tại routing, exception handling và final synthesis.",
+          "Human approval trước external write hoặc hành động khó đảo ngược.",
+          "Eval dataset và trace review đi cùng mỗi thay đổi prompt, skill hoặc tool."
+        ]
+      }
+    ],
+    "examples": [
+      {
+        "title": "Decision sequence không phụ thuộc vendor",
+        "language": "text",
+        "code": "Known steps + strict SLA        -> deterministic workflow\nDistinct input categories        -> router + specialized workflows\nIndependent bounded subtasks     -> parallel workers + deterministic synthesis\nUnknown task decomposition       -> orchestrator-workers with budgets\nLong-running mutable process     -> durable graph/runtime\nHigh-risk external side effects  -> approval + idempotency + audit trail",
+        "takeaway": "Chọn topology trước, chọn library sau; nếu đổi framework mà mental model sụp đổ, abstraction ban đầu chưa đủ rõ."
+      }
+    ],
+    "resources": [
+      {
+        "title": "Anthropic — Building effective agents",
+        "url": "https://www.anthropic.com/engineering/building-effective-agents",
+        "description": "Complexity ladder và các workflow pattern composable."
+      },
+      {
+        "title": "LangGraph",
+        "url": "https://github.com/langchain-ai/langgraph",
+        "description": "Low-level orchestration cho long-running stateful agents."
+      },
+      {
+        "title": "Microsoft Semantic Kernel Agent Framework",
+        "url": "https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/",
+        "description": "Agent abstraction, plugins và orchestration patterns."
+      },
+      {
+        "title": "Microsoft AutoGen",
+        "url": "https://github.com/microsoft/autogen",
+        "description": "Kiến trúc multi-agent và trạng thái maintenance hiện tại."
+      },
+      {
+        "title": "OpenAI Swarm",
+        "url": "https://github.com/openai/swarm",
+        "description": "Case study educational về agent handoff; không dùng cho production mới."
+      },
+      {
+        "title": "CrewAI documentation",
+        "url": "https://docs.crewai.com",
+        "description": "Role/task/crew abstraction trong ecosystem multi-agent."
+      },
+      {
+        "title": "OpenAI — Programmatic Tool Calling",
+        "url": "https://developers.openai.com/api/docs/guides/programmatic-tool-calling",
+        "description": "Chạy bounded tool-heavy stage bằng code và trả structured result nhỏ hơn."
+      },
+      {
+        "title": "LangGraphJS architecture specification",
+        "url": "https://github.com/langchain-ai/langgraphjs/blob/main/libs/langgraph-core/spec/langgraph-architecture-spec.md",
+        "description": "Channels, checkpointer và Pregel execution engine phía dưới graph API."
+      },
+      {
+        "title": "AutoGen architecture and AgentChat",
+        "url": "https://microsoft.github.io/autogen/stable/user-guide/agentchat-user-guide/index.html",
+        "description": "AgentChat abstraction trên event-driven AutoGen Core."
+      },
+      {
+        "title": "Google Agent Development Kit",
+        "url": "https://github.com/google/adk-python",
+        "description": "Open-source runtime và patterns để xây, đánh giá, triển khai agent."
+      }
+    ]
+  }
+]

@@ -97,7 +97,7 @@ export function RichTextEditor({
   const renderPreviewHtml = (text: string) => {
     if (!text.trim()) {
       return (
-        <p className="italic text-muted-foreground">Chưa có nội dung để xem trước...</p>
+        <p className="text-muted-foreground italic">Chưa có nội dung để xem trước...</p>
       );
     }
 
@@ -133,25 +133,25 @@ export function RichTextEditor({
 
       if (line.startsWith('### ')) {
         elements.push(
-          <h4 key={idx} className="mt-3 font-bold text-foreground">
+          <h4 key={idx} className="text-foreground mt-3 font-bold">
             {line.replace('### ', '')}
           </h4>
         );
       } else if (line.startsWith('## ')) {
         elements.push(
-          <h3 key={idx} className="mt-4 text-base font-bold text-foreground">
+          <h3 key={idx} className="text-foreground mt-4 text-base font-bold">
             {line.replace('## ', '')}
           </h3>
         );
       } else if (line.startsWith('**') && line.endsWith('**')) {
         elements.push(
-          <p key={idx} className="font-bold text-foreground">
+          <p key={idx} className="text-foreground font-bold">
             {line.slice(2, -2)}
           </p>
         );
       } else if (line.startsWith('- ')) {
         elements.push(
-          <li key={idx} className="ml-4 list-disc text-xs text-foreground/90">
+          <li key={idx} className="text-foreground/90 ml-4 list-disc text-xs">
             {line.replace('- ', '')}
           </li>
         );
@@ -159,7 +159,7 @@ export function RichTextEditor({
         elements.push(<div key={idx} className="h-2" />);
       } else {
         elements.push(
-          <p key={idx} className="text-xs leading-relaxed text-foreground">
+          <p key={idx} className="text-foreground text-xs leading-relaxed">
             {line}
           </p>
         );
@@ -170,9 +170,9 @@ export function RichTextEditor({
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-border/80 bg-background/80 shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20">
+    <div className="border-border/80 bg-background/80 focus-within:border-primary/50 focus-within:ring-primary/20 overflow-hidden rounded-2xl border shadow-sm transition-all focus-within:ring-2">
       {/* Editor Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-border/60 bg-muted/40 px-3 py-2">
+      <div className="border-border/60 bg-muted/40 flex flex-wrap items-center justify-between gap-1.5 border-b px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
           <Button
             type="button"
@@ -180,7 +180,7 @@ export function RichTextEditor({
             size="sm"
             disabled={disabled || isPreview}
             onClick={() => insertFormatting('**', '**')}
-            className="h-7 w-7 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground h-7 w-7 rounded-lg p-0"
             title="Bold (Ctrl+B)"
           >
             <Bold className="h-3.5 w-3.5" />
@@ -192,7 +192,7 @@ export function RichTextEditor({
             size="sm"
             disabled={disabled || isPreview}
             onClick={() => insertFormatting('*', '*')}
-            className="h-7 w-7 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground h-7 w-7 rounded-lg p-0"
             title="Italic (Ctrl+I)"
           >
             <Italic className="h-3.5 w-3.5" />
@@ -204,7 +204,7 @@ export function RichTextEditor({
             size="sm"
             disabled={disabled || isPreview}
             onClick={() => insertFormatting('`', '`')}
-            className="h-7 w-7 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground h-7 w-7 rounded-lg p-0"
             title="Inline Code (Ctrl+E)"
           >
             <Code className="h-3.5 w-3.5" />
@@ -216,7 +216,7 @@ export function RichTextEditor({
             size="sm"
             disabled={disabled || isPreview}
             onClick={() => insertFormatting('```tsx\n', '\n```')}
-            className="h-7 w-7 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground h-7 w-7 rounded-lg p-0"
             title="Code Block"
           >
             <FileCode className="h-3.5 w-3.5" />
@@ -228,7 +228,7 @@ export function RichTextEditor({
             size="sm"
             disabled={disabled || isPreview}
             onClick={() => insertFormatting('- ')}
-            className="h-7 w-7 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground h-7 w-7 rounded-lg p-0"
             title="Bullet List"
           >
             <List className="h-3.5 w-3.5" />
@@ -240,13 +240,13 @@ export function RichTextEditor({
             size="sm"
             disabled={disabled || isPreview}
             onClick={() => insertFormatting('### ')}
-            className="h-7 w-7 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground h-7 w-7 rounded-lg p-0"
             title="Heading"
           >
             <Heading2 className="h-3.5 w-3.5" />
           </Button>
 
-          <div className="mx-1 h-4 w-[1px] bg-border/60" />
+          <div className="bg-border/60 mx-1 h-4 w-[1px]" />
 
           {/* Preset templates */}
           <Button
@@ -271,7 +271,7 @@ export function RichTextEditor({
               variant="ghost"
               size="sm"
               onClick={() => onChange('')}
-              className="h-7 w-7 rounded-lg p-0 text-muted-foreground hover:text-destructive"
+              className="text-muted-foreground hover:text-destructive h-7 w-7 rounded-lg p-0"
               title="Xóa tất cả"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -305,7 +305,7 @@ export function RichTextEditor({
         {isPreview ? (
           <div
             style={{ minHeight }}
-            className="rounded-xl border border-border/40 bg-secondary/20 p-4 font-sans text-xs sm:text-sm"
+            className="border-border/40 bg-secondary/20 rounded-xl border p-4 font-sans text-xs sm:text-sm"
           >
             {renderPreviewHtml(value)}
           </div>
@@ -318,13 +318,13 @@ export function RichTextEditor({
             disabled={disabled}
             placeholder={placeholder}
             style={{ minHeight }}
-            className="w-full resize-y bg-transparent font-sans text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none sm:text-sm"
+            className="text-foreground placeholder:text-muted-foreground w-full resize-y bg-transparent font-sans text-xs leading-relaxed focus:outline-none sm:text-sm"
           />
         )}
       </div>
 
       {/* Footer Stats Bar */}
-      <div className="flex items-center justify-between border-t border-border/40 bg-muted/20 px-3 py-1.5 text-[10px] font-medium text-muted-foreground">
+      <div className="border-border/40 bg-muted/20 text-muted-foreground flex items-center justify-between border-t px-3 py-1.5 text-[10px] font-medium">
         <div className="flex items-center gap-2">
           <span>Phím tắt: Ctrl+B (In đậm), Ctrl+I (In nghiêng), Tab (Lùi dòng)</span>
         </div>
