@@ -1,0 +1,1105 @@
+{
+  "id": "os00-m03-evidence-and-disclosure",
+  "slug": "evidence-and-disclosure",
+  "trackId": "os00-ethics-authorization",
+  "title": "Bằng chứng, Xử lý Dữ liệu & Coordinated Disclosure",
+  "summary": "Thu thập và bảo quản bằng chứng kỹ thuật có thể kiểm toán, xử lý an toàn dữ liệu nhạy cảm (PII/Secret) và thực thi quy trình công bố lỗ hổng có trách nhiệm (Coordinated Vulnerability Disclosure).",
+  "difficulty": "foundation",
+  "estimatedMinutes": 120,
+  "careerPaths": [
+    "penetration-test",
+    "red-team",
+    "bug-bounty",
+    "vulnerability-research",
+    "vulnerability-assessment"
+  ],
+  "domains": ["human", "network", "web"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os00-l07-evidence-collection-and-chain-of-custody",
+      "slug": "evidence-collection-and-chain-of-custody",
+      "title": "Thu thập Bằng chứng Kỹ thuật & Chuỗi Hành trình (Chain of Custody)",
+      "summary": "Chuẩn hóa bằng chứng (HTTP raw request/response, packet PCAP, screenshot state, command output có timestamp), bảo đảm tính toàn vẹn thông qua mã băm mật mã (SHA-256) và duy trì chuỗi bảo quản bằng chứng (Chain of Custody) phục vụ đối soát pháp lý.",
+      "difficulty": "foundation",
+      "durationMinutes": 40,
+      "prerequisites": [],
+      "outcomes": [
+        "Thu thập đầy đủ các thành phần bằng chứng tái hiện được (reproducible artifacts): raw HTTP request/response headers, CLI logs, console output, và snapshot trạng thái.",
+        "Tính toán và xác thực mã băm mật mã (SHA-256) cho tất cả các file bằng chứng nhằm chống giả mạo hoặc thay đổi ngoài ý muốn.",
+        "Thiết lập quy trình Chain of Custody ghi nhận người thu thập, thời gian, phương thức lưu trữ và phân quyền truy cập bằng chứng.",
+        "Phân biệt bằng chứng tái hiện tối thiểu (Minimum Viable PoC) với hành vi thu thập dư thừa làm tăng rủi ro cho tổ chức."
+      ],
+      "careerPaths": [
+        "penetration-test",
+        "red-team",
+        "bug-bounty",
+        "vulnerability-research"
+      ],
+      "domains": ["human", "network", "web"],
+      "attackTactics": [],
+      "keywords": [
+        "evidence",
+        "chain-of-custody",
+        "sha256-hashing",
+        "reproducible-poc",
+        "raw-artifacts",
+        "audit-trail"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Bằng chứng kỹ thuật không phải là lời khẳng định suông mà là tập hợp các artifact có thể tái hiện độc lập: raw request/response, command transcript có timestamp UTC, và mã băm SHA-256 bất biến. Chuỗi hành trình bằng chứng (Chain of Custody) đảm bảo mọi artifact được bảo vệ nghiêm ngặt từ lúc trích xuất đến khi bàn giao báo cáo và tiêu hủy.",
+      "visual": {
+        "title": "Vòng đời Thu thập và Bảo quản Bằng chứng Kỹ thuật",
+        "caption": "Quy trình 5 bước biến phát hiện kỹ thuật thành bằng chứng pháp lý có thể kiểm toán.",
+        "steps": [
+          {
+            "label": "Trích xuất Artifact Thô",
+            "detail": "Ghi nhận raw HTTP request/response, command transcript, network packet capture (PCAP).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Tối thiểu hóa Dữ liệu (PoC)",
+            "detail": "Cắt tỉa phần dữ liệu thừa, chỉ giữ lại đủ bước tối thiểu chứng minh lỗ hổng hoạt động.",
+            "tone": "caution"
+          },
+          {
+            "label": "Tạo Mã Băm SHA-256",
+            "detail": "Tính toán checksum mật mã cho từng artifact và ghi vào sổ cái bất biến (Audit Ledger).",
+            "tone": "allow"
+          },
+          {
+            "label": "Ghi nhận Chain of Custody",
+            "detail": "Lưu thông tin Operator ID, UTC Timestamp, Storage Location và Encryption Key ID.",
+            "tone": "allow"
+          },
+          {
+            "label": "Bàn giao & Lưu trữ Mã hóa",
+            "detail": "Truyền tải qua kênh mã hóa GPG/TLS và chuyển vào kho lưu trữ được phân quyền nghiêm ngặt.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bản chất của Bằng chứng Kỹ thuật Tái hiện được (Reproducible Artifacts)",
+          "paragraphs": [
+            "Một ảnh chụp màn hình bị cắt xén hoặc một dòng khẳng định 'tôi đã chiếm được quyền admin' không có giá trị kiểm toán. Để một phát hiện (finding) có giá trị kỹ thuật và pháp lý, bằng chứng phải mang tính chất tái hiện được (reproducible).",
+            "Các thành phần bằng chứng tiêu chuẩn bao gồm: 1. Full Raw HTTP Request và Response (bao gồm đầy đủ HTTP headers, status code, body); 2. Command Transcript với timestamp UTC, user context và output đầy đủ; 3. Network Packet Capture (file .pcap) đối với các lỗ hổng tầng mạng hoặc giao thức nhị phân; 4. Source code diff hoặc configuration snippet chỉ ra vị trí sai sót."
+          ],
+          "points": [
+            "Raw Artifacts: Giữ nguyên vẹn định dạng gốc của giao thức, không chỉ trích xuất phần kết quả đẹp mắt.",
+            "Timestamped Logs: Mọi thao tác phải gắn liền với thời gian chuẩn UTC đã được đồng bộ NTP.",
+            "Step-by-Step Repro: Cung cấp các bước thực thi tuần tự từ trạng thái ban đầu đến khi kích hoạt lỗ hổng."
+          ]
+        },
+        {
+          "title": "Toàn vẹn Dữ liệu bằng Mã băm Mật mã (Cryptographic Integrity Hashing)",
+          "paragraphs": [
+            "Trong môi trường doanh nghiệp hoặc khi giải quyết tranh chấp pháp lý, bằng chứng có thể bị nghi ngờ là bị can thiệp, chỉnh sửa sau thời điểm kiểm thử. Để đảm bảo tính bất biến (tamper-evident), ngay sau khi thu thập một file bằng chứng, operator phải tính toán mã băm mật mã SHA-256.",
+            "Mã băm này được ghi nhận ngay lập tức vào nhật ký tác chiến (Operational Log) được ký số. Bất kỳ sự thay đổi dù chỉ 1 byte trong file bằng chứng sau đó cũng sẽ làm sai lệch mã băm, giúp phát hiện lập tức sự biến dạng của dữ liệu."
+          ],
+          "points": [
+            "SHA-256 Checksum: Tính toán mã băm cho từng file video, ảnh màn hình, file log và script PoC.",
+            "Integrity Manifest: Đính kèm bảng kê khai mã băm vào phụ lục của báo cáo kỹ thuật.",
+            "Chống chối bỏ (Non-repudiation): Đảm bảo bằng chứng giữ nguyên vẹn giá trị đối soát trước hội đồng đánh giá."
+          ]
+        },
+        {
+          "title": "Quy trình Chuỗi Hành trình Bằng chứng (Chain of Custody)",
+          "paragraphs": [
+            "Chain of Custody (Chuỗi bảo quản/Hành trình bằng chứng) là tài liệu theo dõi toàn bộ lịch sử của bằng chứng: Ai đã thu thập? Vào thời điểm nào? Bằng công cụ gì? Được lưu trữ ở đâu? Ai đã truy cập hoặc sao chép? Và khi nào được tiêu hủy?",
+            "Nếu bằng chứng bị lưu trữ trên máy tính cá nhân không mã hóa hoặc gửi qua email không an toàn, chuỗi hành trình bị phá vỡ (Broken Chain of Custody). Khi đó, dữ liệu có thể bị rò rỉ hoặc bị vô hiệu hóa giá trị trong các cuộc điều tra tuân thủ."
+          ],
+          "points": [
+            "Custody Log: Ghi rõ danh tính người tạo, người nhận bàn giao, thời gian và mục đích truy cập.",
+            "Access Control: Chỉ những nhân sự có tên trong hợp đồng đánh giá mới được cấp quyền giải mã bằng chứng.",
+            "Storage Isolation: Lưu trữ bằng chứng trên phân vùng ổ đĩa được mã hóa (LUKS/BitLocker) hoặc kho lưu trữ chuyên dụng."
+          ]
+        },
+        {
+          "title": "Nguyên tắc Bằng chứng Tối thiểu (Minimum Viable PoC)",
+          "paragraphs": [
+            "Nhiều người lầm tưởng thu thập càng nhiều dữ liệu thì bằng chứng càng mạnh mẽ. Đây là quan niệm nguy hiểm. Khi phát hiện lỗ hổng cho phép tải file tùy ý (Arbitrary File Read), một PoC chỉ cần đọc file '/etc/hostname' hoặc 1 dòng đầu tiên của '/etc/passwd' là đủ để chứng minh tác động.",
+            "Việc tải toàn bộ file chứa hash mật khẩu ('/etc/shadow') hoặc cơ sở dữ liệu khách hàng làm gia tăng rủi ro lưu trữ và vi phạm nghĩa vụ bảo vệ dữ liệu nhạy cảm."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Technical Evidence & Chain of Custody Desk",
+        "objective": "Thực hành đánh giá tính hợp lệ của bằng chứng kỹ thuật, kiểm soát toàn vẹn SHA-256 và thiết lập chuỗi bảo quản.",
+        "scenario": "Bạn là Lead QA/Auditor đang rà soát hồ sơ bằng chứng lỗ hổng do các pentester gửi về trước khi xuất báo cáo chính thức cho khách hàng.",
+        "constraints": [
+          "Bằng chứng phải tái hiện được một cách độc lập từ thông số kỹ thuật.",
+          "Mọi file artifact phải có mã băm SHA-256 đối soát.",
+          "Từ chối các bằng chứng thu thập dữ liệu dư thừa vi phạm nguyên tắc PoC tối thiểu."
+        ],
+        "cases": [
+          {
+            "id": "evidence-case-01",
+            "title": "Bằng chứng lỗ hổng IDOR chỉ có ảnh chụp kết quả cuối cùng",
+            "context": "Pentester nộp một báo cáo lỗ hổng IDOR nghiêm trọng với bằng chứng duy nhất là ảnh chụp màn hình trình duyệt hiển thị thông tin tài khoản VIP, nhưng không có HTTP request, không có ID tham số và không có HTTP response headers.",
+            "prompt": "Hội đồng thẩm định chất lượng bằng chứng cần đưa ra kết luận gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chấp thuận ngay vì ảnh chụp màn hình hiển thị rất rõ tên tài khoản VIP.",
+                "correct": false,
+                "rationale": "Ảnh chụp màn hình có thể dễ dàng bị chỉnh sửa qua DevTools và không thể hiện được cơ chế request/response kỹ thuật để dev tái hiện."
+              },
+              {
+                "id": "B",
+                "label": "Yêu cầu cung cấp bổ sung Raw HTTP Request/Response (với method, path, headers, payload) và mã băm SHA-256 của file log để bảo đảm tính tái hiện và kiểm toán.",
+                "correct": true,
+                "rationale": "Bằng chứng kỹ thuật chuẩn mực bắt buộc phải có raw protocol traffic để chứng minh lỗi nằm ở tầng API và giúp đội phát triển tái hiện bản vá."
+              },
+              {
+                "id": "C",
+                "label": "Tự động hạ mức độ nghiêm trọng của lỗ hổng từ Critical xuống Low mà không cần kiểm tra lại.",
+                "correct": false,
+                "rationale": "Mức độ nghiêm trọng của lỗ hổng phụ thuộc vào tác động thực tế, không giải quyết được vấn đề thiếu bằng chứng bằng cách hạ severity bừa bãi."
+              },
+              {
+                "id": "D",
+                "label": "Xóa bỏ finding này khỏi hệ thống mà không cần phản hồi cho pentester.",
+                "correct": false,
+                "rationale": "Bỏ qua lỗ hổng có thể để lại điểm yếu nguy hiểm trên production; quy trình chuẩn là yêu cầu bổ sung bằng chứng (Request for Evidence)."
+              }
+            ]
+          },
+          {
+            "id": "evidence-case-02",
+            "title": "Thu thập bằng chứng lỗ hổng LFI trên máy chủ chứa dữ liệu y tế",
+            "context": "Khi phát hiện lỗ hổng Local File Inclusion (LFI), tester đã viết script tải về toàn bộ 5.000 file bệnh án (.pdf) lưu trên máy chủ mục tiêu về laptop cá nhân để 'chứng minh đã đọc được hết'.",
+            "prompt": "Đánh giá mức độ phù hợp của hành vi thu thập bằng chứng này:",
+            "options": [
+              {
+                "id": "A",
+                "label": "Rất tốt vì tải càng nhiều dữ liệu thì bằng chứng tác động càng thuyết phục.",
+                "correct": false,
+                "rationale": "Vi phạm nghiêm trọng nguyên tắc bảo vệ dữ liệu nhạy cảm (HIPAA/PII) và tạo ra rủi ro rò rỉ dữ liệu khổng lồ trên máy cá nhân."
+              },
+              {
+                "id": "B",
+                "label": "Vi phạm nguyên tắc PoC tối thiểu: Tester chỉ cần đọc 1 file cấu hình không nhạy cảm (như /etc/hosts hoặc file tĩnh) làm PoC; việc tải 5.000 bệnh án là dư thừa và vi phạm an toàn dữ liệu.",
+                "correct": true,
+                "rationale": "Bằng chứng kỹ thuật chỉ cần chứng minh cơ chế đọc file thành công. Việc tải hàng loạt dữ liệu người dùng thật là hành vi bị nghiêm cấm."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần đổi tên các file bệnh án thành file .txt là hợp lệ.",
+                "correct": false,
+                "rationale": "Đổi đuôi file không làm thay đổi bản chất nội dung nhạy cảm bên trong."
+              },
+              {
+                "id": "D",
+                "label": "Tải thêm cơ sở dữ liệu backup để so sánh chéo.",
+                "correct": false,
+                "rationale": "Tiếp tục leo thang hành vi vi phạm đạo đức và an toàn thông tin."
+              }
+            ]
+          },
+          {
+            "id": "evidence-case-03",
+            "title": "Bảo quản và chuyển giao file Packet Capture (.pcap) nhạy cảm",
+            "context": "Trong quá trình đánh giá mạng nội bộ, bạn bắt được gói tin chứa mật khẩu quản trị dạng Cleartext trong file 'network_dump.pcap'. File này cần được gửi cho khách hàng trong báo cáo.",
+            "prompt": "Quy trình Chain of Custody và chuyển giao nào an toàn nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tải file .pcap lên dịch vụ chia sẻ file công cộng không mật khẩu để khách hàng tải cho tiện.",
+                "correct": false,
+                "rationale": "Làm lộ mật khẩu quản trị của khách hàng ra môi trường Internet công cộng (Public Data Leak)."
+              },
+              {
+                "id": "B",
+                "label": "Tính mã SHA-256 của file .pcap, lưu vào sổ nhật ký; mã hóa file bằng khóa PGP/GPG của khách hàng trước khi truyền qua kênh bảo mật đã thống nhất trong ROE.",
+                "correct": true,
+                "rationale": "Đảm bảo cả tính toàn vẹn (Integrity via SHA-256) và tính bảo mật (Confidentiality via PGP Encryption) trong toàn bộ chuỗi hành trình bằng chứng."
+              },
+              {
+                "id": "C",
+                "label": "Gửi qua email thông thường đính kèm mật khẩu giải nén ngay trong tiêu đề email.",
+                "correct": false,
+                "rationale": "Gửi mật khẩu cùng kênh với file mã hóa vô hiệu hóa hoàn toàn lớp bảo vệ mã hóa."
+              },
+              {
+                "id": "D",
+                "label": "Lưu file vĩnh viễn trên desktop của mọi thành viên trong nhóm mà không cần xóa.",
+                "correct": false,
+                "rationale": "Vi phạm quy trình lưu trữ và tiêu hủy an toàn sau dự án."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Thẩm định chính xác tính hợp lệ và đầy đủ của bằng chứng kỹ thuật.",
+          "Áp dụng triệt để nguyên tắc Minimum Viable PoC để ngăn chặn thu thập dữ liệu dư thừa.",
+          "Thực thi quy trình mã hóa và đối soát mã băm SHA-256 trong Chain of Custody."
+        ],
+        "evidenceTemplate": [
+          "Tên phát hiện và Loại bằng chứng (Raw HTTP, CLI Transcript, PCAP)",
+          "Mã băm mật mã SHA-256 Checksum",
+          "Mức độ tuân thủ PoC tối thiểu (Minimum Viable vs Excessive)",
+          "Nhật ký lưu trữ và bảo vệ Chain of Custody (Key ID, Access Log)"
+        ],
+        "reset": "Đặt lại lựa chọn để làm lại các tình huống thẩm định bằng chứng từ đầu.",
+        "cleanup": "Toàn bộ bài tập là mô phỏng logic thẩm định, không lưu trữ dữ liệu thực tế ngoài trình duyệt."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc cấu hình tính năng lưu raw log và timestamp tự động trên các công cụ proxy (Burp Suite, Caido, ZAP).",
+          "Ban hành hướng dẫn rõ ràng về giới hạn PoC tối thiểu (không dump DB, không tải PII hàng loạt).",
+          "Trang bị khóa mã hóa GPG/PGP cho tất cả các operator tham gia dự án."
+        ],
+        "observe": [
+          "Kiểm tra tính toàn vẹn định kỳ của kho lưu trữ bằng chứng thông qua script đối soát mã SHA-256.",
+          "Ghi nhận nhật ký truy cập (Access Logs) vào kho lưu trữ bằng chứng của dự án."
+        ],
+        "respond": [
+          "Lập tức thu hồi và tiêu hủy các file bằng chứng vô tình chứa dữ liệu PII dư thừa ngoài ý muốn.",
+          "Báo cáo sự cố rò rỉ nếu một file bằng chứng bị phát hiện truyền qua kênh không mã hóa."
+        ],
+        "residualRisk": [
+          "Rủi ro mất mát dữ liệu nếu khóa mã hóa GPG của khách hàng bị hết hạn hoặc không thể khôi phục.",
+          "Bằng chứng dạng raw network traffic có thể vô tình bắt phải dữ liệu nhạy cảm của người dùng khác trong mạng chia sẻ."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Một bức ảnh chụp màn hình trình duyệt là đủ làm bằng chứng cho mọi lỗ hổng web.",
+          "correction": "Ảnh chụp màn hình rất dễ bị giả mạo hoặc hiểu sai ngữ cảnh. Bằng chứng kỹ thuật chuẩn mực bắt buộc phải có raw HTTP request/response và các headers liên quan."
+        },
+        {
+          "claim": "Càng tải được nhiều dữ liệu nhạy cảm về máy thì báo cáo càng có giá trị cao.",
+          "correction": "Thu thập dữ liệu nhạy cảm quá mức là hành vi thiếu chuyên nghiệp, vi phạm luật bảo vệ dữ liệu và gia tăng rủi ro trách nhiệm pháp lý cho cả hai bên."
+        },
+        {
+          "claim": "Không cần tính mã băm SHA-256 nếu lưu file trên dịch vụ đám mây có trả phí.",
+          "correction": "Mã băm SHA-256 là chứng chỉ toàn vẹn mật mã độc lập với nền tảng lưu trữ, giúp chứng minh file không bị thay đổi nội dung kể từ thời điểm thu thập."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os00-l07-q1",
+          "difficulty": "easy",
+          "question": "Thành phần nào sau đây là quan trọng nhất để đội ngũ phát triển (Dev) có thể tái hiện chính xác một lỗ hổng API?",
+          "options": [
+            { "id": "A", "label": "Một ảnh chụp màn hình trang chủ đẹp mắt" },
+            {
+              "id": "B",
+              "label": "Full Raw HTTP Request và Response (Method, URL, Headers, Body, Status Code)"
+            },
+            { "id": "C", "label": "Một bài thơ mô tả cảm xúc khi tìm ra lỗi" },
+            {
+              "id": "D",
+              "label": "Danh sách các trang web khác cũng bị dính lỗi tương tự"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Raw HTTP request và response chứa đầy đủ các thông số kỹ thuật chính xác giúp đội ngũ kỹ thuật hiểu rõ cơ chế gửi nhận và tái hiện bản vá một cách độc lập."
+        },
+        {
+          "id": "os00-l07-q2",
+          "difficulty": "medium",
+          "question": "Khi tìm thấy lỗ hổng cho phép đọc file tùy ý (Arbitrary File Read) trên máy chủ Linux, hành động nào tuân thủ đúng nguyên tắc 'Minimum Viable PoC'?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tải toàn bộ thư mục /home của tất cả người dùng về máy cá nhân"
+            },
+            {
+              "id": "B",
+              "label": "Đọc file không chứa bí mật nhạy cảm như /etc/hostname hoặc dòng đầu của /etc/passwd để chứng minh quyền đọc"
+            },
+            {
+              "id": "C",
+              "label": "Cố tình ghi đè file /etc/shadow để xem có quyền root không"
+            },
+            {
+              "id": "D",
+              "label": "Tải toàn bộ mã nguồn website và database credentials về chia sẻ cho đồng nghiệp"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Nguyên tắc Minimum Viable PoC đòi hỏi chứng minh được cơ chế tác động với mức độ rủi ro và thu thập dữ liệu tối thiểu nhất có thể."
+        },
+        {
+          "id": "os00-l07-q3",
+          "difficulty": "hard",
+          "question": "Tại sao việc tính toán mã băm SHA-256 ngay tại thời điểm thu thập bằng chứng lại là yêu cầu bắt buộc trong quy trình Chain of Custody?",
+          "options": [
+            { "id": "A", "label": "Để làm cho dung lượng file bằng chứng nhỏ đi" },
+            {
+              "id": "B",
+              "label": "Để tạo ra bằng chứng toàn vẹn mật mã (Tamper-evident), chứng minh file không bị chỉnh sửa sau thời điểm ghi nhận"
+            },
+            { "id": "C", "label": "Để tự động gửi file lên trang web của CISA" },
+            { "id": "D", "label": "Để che giấu nội dung file không cho khách hàng đọc" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Mã băm SHA-256 là dấu vân tay số độc nhất của dữ liệu. Bất kỳ thay đổi nào đối với file cũng sẽ làm đổi mã băm, giúp khẳng định tính toàn vẹn không thể chối cãi của bằng chứng."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được yêu cầu thiết kế quy trình thu thập và bảo quản bằng chứng cho một cuộc đánh giá hệ thống Smart Contract trên nền tảng Blockchain, nơi các giao dịch đã thực thi là bất biến nhưng các tương tác off-chain (API node, private keys, transaction payloads) cần được kiểm chứng nghiêm ngặt.",
+        "tasks": [
+          "Xác định các loại artifact bắt buộc cần lưu trữ (Transaction Hash, Raw RPC request/response, State Diff, Decompiled Bytecode).",
+          "Thiết lập cơ chế tính toán SHA-256 và ký số (Digital Signature) bằng GPG cho từng bundle bằng chứng.",
+          "Soạn thảo biểu mẫu Chain of Custody bàn giao giữa Smart Contract Auditor và Security Committee của DAO."
+        ],
+        "requiredEvidence": [
+          "Bản quy chuẩn Evidence Collection Protocol cho Smart Contract Auditing.",
+          "Mẫu sổ cái Chain of Custody Ledger có trường đối soát chữ ký số."
+        ]
+      },
+      "sources": [
+        {
+          "title": "NIST SP 800-115 — Technical Guide to Information Security Testing and Assessment (Section 6: Post-Testing and Evidence Handling)",
+          "url": "https://csrc.nist.gov/pubs/sp/800/115/final",
+          "publisher": "NIST",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Chuẩn mực thu thập và bảo vệ bằng chứng kiểm thử",
+            "Đảm bảo tính toàn vẹn và tái hiện của dữ liệu phát hiện",
+            "Nguyên tắc lưu trữ và bàn giao an toàn cho khách hàng"
+          ]
+        },
+        {
+          "title": "ISO/IEC 27037:2012 — Guidelines for identification, collection, acquisition and preservation of digital evidence",
+          "url": "https://www.iso.org/standard/43864.html",
+          "publisher": "ISO / IEC",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Quy trình bảo quản chuỗi hành trình bằng chứng (Chain of Custody)",
+            "Ứng dụng mã băm mật mã trong bảo vệ chứng cứ kỹ thuật số"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os00-l08-sensitive-data-handling-and-redaction",
+      "slug": "sensitive-data-handling-and-redaction",
+      "title": "Xử lý Dữ liệu Nhạy cảm, Che mờ (Redaction) & Lưu trữ An toàn",
+      "summary": "Xử lý thông tin nhạy cảm thu được trong quá trình kiểm thử (PII, PCI-DSS thẻ tín dụng, API keys, password hashes, secrets); thực hiện kỹ thuật redaction/masking và quy trình xóa hủy dữ liệu an toàn (Secure Data Purging) sau đánh giá.",
+      "difficulty": "foundation",
+      "durationMinutes": 40,
+      "prerequisites": ["os00-l07-evidence-collection-and-chain-of-custody"],
+      "outcomes": [
+        "Nhận diện các loại dữ liệu nhạy cảm theo tiêu chuẩn tuân thủ (PII, PCI-DSS, HIPAA, Secret tokens) xuất hiện trong quá trình đánh giá.",
+        "Thực hiện kỹ thuật che mờ dữ liệu (Redaction/Masking) trên screenshot, log, và báo cáo kỹ thuật trước khi bàn giao.",
+        "Áp dụng phương thức mã hóa lưu trữ (At-rest Encryption với AES-256/GPG) và truyền tải an toàn cho tài liệu phát hiện lỗ hổng.",
+        "Thực thi quy trình xóa hủy an toàn (Secure Data Purge & Verification) đối với dữ liệu tạm trên thiết bị của operator sau khi dự án kết thúc."
+      ],
+      "careerPaths": [
+        "penetration-test",
+        "red-team",
+        "bug-bounty",
+        "vulnerability-research",
+        "vulnerability-assessment"
+      ],
+      "domains": ["human", "network", "web"],
+      "attackTactics": [],
+      "keywords": [
+        "sensitive-data",
+        "redaction",
+        "data-masking",
+        "pii-protection",
+        "secure-purge",
+        "at-rest-encryption"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Dữ liệu nhạy cảm thu được trong quá trình đánh giá là một 'tài sản độc hại' (Toxic Asset). Càng giữ nhiều dữ liệu của khách hàng thì rủi ro pháp lý và trách nhiệm bảo mật của operator càng cao. Nguyên tắc cốt lõi là: Che mờ (Redact) mọi thông tin nhạy cảm trước khi đưa vào tài liệu báo cáo, Mã hóa (Encrypt) tuyệt đối trong quá trình xử lý, và Tiêu hủy hoàn toàn (Secure Purge) ngay khi kết thúc nghĩa vụ hợp đồng.",
+      "visual": {
+        "title": "Quy trình Xử lý và Tiêu hủy Dữ liệu Nhạy cảm",
+        "caption": "Từ phát hiện dữ liệu nhạy cảm thô đến báo cáo che mờ an toàn và tiêu hủy vĩnh viễn.",
+        "steps": [
+          {
+            "label": "Nhận diện Dữ liệu Nhạy cảm",
+            "detail": "Phát hiện PII (CCCD/Email), PCI-DSS (Thẻ tín dụng), Secrets (API key/Password).",
+            "tone": "caution"
+          },
+          {
+            "label": "Thực hiện Redaction & Masking",
+            "detail": "Che mờ các ký tự nhạy cảm (VD: 4111-XXXX-XXXX-1234, AKIA****), chỉ giữ đủ định dạng.",
+            "tone": "allow"
+          },
+          {
+            "label": "Lưu trữ Mã hóa Tạm thời",
+            "detail": "Lưu trữ trên phân vùng được mã hóa AES-256/LUKS với kiểm soát truy cập nghiêm ngặt.",
+            "tone": "allow"
+          },
+          {
+            "label": "Bàn giao Báo cáo Đã Che mờ",
+            "detail": "Báo cáo gửi khách hàng chỉ chứa bằng chứng đã redaction đầy đủ, không để lọt secret thô.",
+            "tone": "allow"
+          },
+          {
+            "label": "Secure Purge & Xóa Hủy",
+            "detail": "Thực hiện xóa an toàn (shred/overwrite), thu hồi khóa giải mã và ký biên bản tiêu hủy.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Phân loại Dữ liệu Nhạy cảm và Khung Tuân thủ Pháp lý",
+          "paragraphs": [
+            "Trong quá trình kiểm thử, operator thường tiếp cận các loại dữ liệu nhạy cảm thuộc các khung quy định pháp lý khác nhau: Thông tin định danh cá nhân (PII - CCCD, tên tuổi, số điện thoại, địa chỉ); Dữ liệu tài chính ngân hàng (PCI-DSS - Số thẻ tín dụng, CVV, thông tin tài khoản); Dữ liệu y tế (HIPAA/PHI - Bệnh án, hồ sơ điều trị); và Bí mật kỹ thuật (Credentials - Mật khẩu, private keys, API tokens, session tokens).",
+            "Việc lưu trữ hoặc để lộ các dữ liệu này không chỉ vi phạm bảo mật mà còn khiến tổ chức và chính đơn vị kiểm thử đối mặt với các án phạt pháp lý nặng nề."
+          ],
+          "points": [
+            "PII/GDPR: Dữ liệu cá nhân đòi hỏi quyền riêng tư tuyệt đối, cấm sao chép tràn lan.",
+            "PCI-DSS: Nghiêm cấm lưu trữ mã CVV/CVC và cấm hiển thị đầy đủ số thẻ tín dụng (PAN).",
+            "Credentials & Secrets: Private keys và database passwords phải được bảo vệ bằng mã hóa mạnh nhất."
+          ]
+        },
+        {
+          "title": "Kỹ thuật Che mờ (Redaction) và Masking Chuẩn mực",
+          "paragraphs": [
+            "Che mờ (Redaction) là hành vi loại bỏ hoặc ẩn đi các phần dữ liệu nhạy cảm trên văn bản, hình ảnh hoặc log kỹ thuật trước khi đưa vào báo cáo. Một sai lầm phổ biến là dùng công cụ làm mờ (Blur) hoặc vẽ hình chữ nhật bán trong suốt trên ảnh; các thuật toán hiện đại có thể đảo ngược hiệu ứng làm mờ để khôi phục lại chữ gốc.",
+            "Kỹ thuật chuẩn mực đòi hỏi: 1. Trên văn bản: Sử dụng ký tự thay thế (ví dụ: 'user_email: j***@example.com', 'card: 4532-XXXX-XXXX-9812'); 2. Trên hình ảnh: Sử dụng mảng màu đen đặc (Solid Black Fill) đè hoàn toàn lên vùng nhạy cảm và 'làm phẳng' (flatten) bức ảnh để không thể bóc tách layer; 3. Loại bỏ secrets khỏi chuỗi URL hoặc URL query parameters."
+          ],
+          "points": [
+            "Solid Black Redaction: Cấm dùng hiệu ứng blur/pixelate; luôn dùng hình khối đặc đè lên văn bản.",
+            "Format Preserving Masking: Giữ lại vài ký tự đầu và cuối để chứng minh định dạng dữ liệu mà không lộ toàn bộ.",
+            "Flatten Artifacts: Xuất ảnh ra định dạng phẳng (PNG/JPEG đơn lớp) để ngăn chặn việc bóc tách layer gốc."
+          ]
+        },
+        {
+          "title": "Lưu trữ Mã hóa và Truyền tải An toàn (At-Rest & In-Transit Encryption)",
+          "paragraphs": [
+            "Tất cả các tài liệu làm việc, ghi chú, bằng chứng và báo cáo nháp trong suốt quá trình đánh giá phải được lưu trữ trên ổ đĩa có mã hóa toàn bộ phân vùng (Full Disk Encryption - BitLocker, FileVault, hoặc LUKS AES-XTS-256). Tuyệt đối không lưu trên USB không mã hóa hoặc các thư mục chia sẻ công cộng.",
+            "Khi truyền tải báo cáo lỗ hổng cho khách hàng, chỉ sử dụng các kênh mã hóa đầu cuối (End-to-End Encryption) như PGP/GPG Email hoặc cổng tiếp nhận báo cáo bảo mật qua TLS 1.3 có xác thực đa yếu tố (MFA). Không bao giờ gửi báo cáo chứa lỗ hổng chưa vá qua email thường dạng văn bản rõ."
+          ],
+          "points": [
+            "At-Rest Encryption: Bắt buộc mã hóa toàn bộ ổ đĩa trên máy tính của tất cả operator.",
+            "In-Transit Encryption: Sử dụng khóa công khai PGP/GPG của khách hàng để mã hóa tài liệu trước khi gửi.",
+            "MFA Protection: Cổng chia sẻ file bảo mật phải yêu cầu xác thực 2 lớp."
+          ]
+        },
+        {
+          "title": "Quy trình Xóa hủy Dữ liệu An toàn (Secure Data Purging) Sau Đánh giá",
+          "paragraphs": [
+            "Khi chiến dịch kết thúc và báo cáo cuối cùng đã được nghiệm thu, operator phải tiến hành quy trình xóa hủy an toàn (Data Purge). Việc bấm nút 'Delete' thông thường trong hệ điều hành chỉ xóa con trỏ file, dữ liệu thực tế vẫn còn nguyên trên đĩa và có thể khôi phục bằng công cụ phục hồi dữ liệu.",
+            "Quy trình xóa an toàn chuẩn bao gồm: Sử dụng công cụ ghi đè dữ liệu (Data Shredding/Overwriting theo chuẩn NIST SP 800-88 như lệnh 'shred -u' hoặc 'srm'); Hủy các container/máy ảo kiểm thử dùng một lần; Thu hồi và tiêu hủy các access token/SSH key tạm; và Lập Biên bản xác nhận tiêu hủy dữ liệu (Certificate of Data Destruction) gửi cho khách hàng."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Sensitive Data Redaction & Secure Purge Desk",
+        "objective": "Thực hành phát hiện dữ liệu nhạy cảm, áp dụng kỹ thuật che mờ chuẩn mực và thực thi quy trình tiêu hủy an toàn.",
+        "scenario": "Bạn đang biên tập bản báo cáo kỹ thuật pentest chứa nhiều ảnh chụp màn hình cơ sở dữ liệu và token quản trị trước khi gửi cho khách hàng doanh nghiệp tài chính.",
+        "constraints": [
+          "Che mờ triệt để mọi dữ liệu PII và PCI-DSS theo chuẩn Solid Fill Masking.",
+          "Áp dụng mã hóa GPG khi truyền tải file báo cáo.",
+          "Thực hiện quy trình xóa an toàn theo tiêu chuẩn NIST SP 800-88 sau khi nghiệm thu."
+        ],
+        "cases": [
+          {
+            "id": "redaction-case-01",
+            "title": "Báo cáo chứa ảnh chụp màn hình bảng thẻ tín dụng khách hàng",
+            "context": "Pentester đưa vào báo cáo một ảnh chụp màn hình bảng thanh toán hiển thị rõ ràng: Họ tên chủ thẻ, Số thẻ 16 số đầy đủ (PAN), Ngày hết hạn và Mã CVV 3 số để chứng minh lỗ hổng SQLi.",
+            "prompt": "Biện pháp xử lý hình ảnh này chuẩn mực nhất trước khi gửi báo cáo là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Giữ nguyên hình ảnh vì khách hàng cần nhìn thấy toàn bộ số thẻ mới tin là lỗ hổng thật.",
+                "correct": false,
+                "rationale": "Vi phạm nghiêm trọng chuẩn mực PCI-DSS và luật bảo vệ dữ liệu; tuyệt đối không được hiển thị số CVV và số thẻ đầy đủ."
+              },
+              {
+                "id": "B",
+                "label": "Sử dụng mảng màu đen đặc (Solid Black Fill) che phủ hoàn toàn mã CVV, ngày hết hạn và 8 chữ số ở giữa số thẻ (chỉ để lại 4 số đầu và 4 số cuối), sau đó làm phẳng ảnh (flatten image).",
+                "correct": true,
+                "rationale": "Tuân thủ chuẩn PCI-DSS masking: vừa chứng minh được cấu trúc định dạng thẻ tín dụng vừa loại bỏ hoàn toàn khả năng lạm dụng dữ liệu nhạy cảm."
+              },
+              {
+                "id": "C",
+                "label": "Dùng bộ lọc làm mờ (Gaussian Blur) nhẹ lên dãy số thẻ trên file ảnh Photoshop nhiều layer.",
+                "correct": false,
+                "rationale": "Bộ lọc Blur có thể bị đảo ngược bằng phần mềm khôi phục ảnh, và lưu file nhiều layer cho phép người nhận ẩn layer che mờ để xem ảnh gốc."
+              },
+              {
+                "id": "D",
+                "label": "Tô màu chữ trùng với màu nền của ảnh để người đọc không nhìn thấy bằng mắt thường.",
+                "correct": false,
+                "rationale": "Dữ liệu văn bản vẫn tồn tại nguyên vẹn trong file và có thể bị trích xuất bằng cách bôi đen copy."
+              }
+            ]
+          },
+          {
+            "id": "redaction-case-02",
+            "title": "Chuyển giao báo cáo chứa AWS Secret Access Key mức Root",
+            "context": "Trong báo cáo có bằng chứng về một file cấu hình bị lộ chứa cặp key 'AWS_ACCESS_KEY_ID' và 'AWS_SECRET_ACCESS_KEY' quyền quản trị tối cao của hạ tầng khách hàng.",
+            "prompt": "Cách thức xử lý và chuyển giao an toàn nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Gửi file PDF đính kèm qua email thông thường tới toàn bộ nhân viên công ty khách hàng.",
+                "correct": false,
+                "rationale": "Làm lộ AWS Root key ra kênh truyền không an toàn và phát tán cho các đối tượng không có thẩm quyền."
+              },
+              {
+                "id": "B",
+                "label": "Che mờ phần lớn chuỗi secret key trong báo cáo (chỉ để lại 4 ký tự nhận diện), mã hóa file báo cáo bằng khóa PGP công khai của CISO/Lead kỹ thuật, và thông báo khẩn cấp cho khách hàng rotate key ngay lập tức.",
+                "correct": true,
+                "rationale": "Bảo vệ bí mật tức thì: khuyến nghị thu hồi key ngay lập tức và bảo vệ file báo cáo bằng mã hóa bất đối xứng PGP."
+              },
+              {
+                "id": "C",
+                "label": "Dùng cặp AWS key đó để tự động tạo thêm tài khoản admin dự phòng cho mình trước khi báo.",
+                "correct": false,
+                "rationale": "Hành vi lạm quyền trái phép vi phạm đạo đức và pháp luật."
+              },
+              {
+                "id": "D",
+                "label": "Đăng tải cặp key lên GitHub Gist ở chế độ bí mật để gửi link cho khách hàng.",
+                "correct": false,
+                "rationale": "Đưa secret lên nền tảng bên thứ ba là hành vi cực kỳ thiếu an toàn và dễ bị quét bởi các bot tìm kiếm secret."
+              }
+            ]
+          },
+          {
+            "id": "redaction-case-03",
+            "title": "Tiêu hủy dữ liệu sau khi hoàn tất dự án đánh giá an ninh",
+            "context": "Dự án pentest đã hoàn thành 30 ngày, khách hàng đã nghiệm thu và ký biên bản thanh lý hợp đồng. Trên máy tính của các tester vẫn còn lưu thư mục chứa raw logs, memory dumps và file cấu hình của khách hàng.",
+            "prompt": "Quy trình tiêu hủy dữ liệu chuẩn mực theo hợp đồng là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kéo thư mục vào Recycle Bin / Trash của hệ điều hành và để đó.",
+                "correct": false,
+                "rationale": "Xóa thông thường không xóa dữ liệu vật lý trên ổ đĩa, file vẫn có thể dễ dàng khôi phục lại."
+              },
+              {
+                "id": "B",
+                "label": "Sử dụng công cụ ghi đè an toàn (Secure Data Shredding theo NIST SP 800-88), xóa sạch các máy ảo/container tạm, hủy các session token và phát hành Biên bản tiêu hủy dữ liệu (Certificate of Data Destruction).",
+                "correct": true,
+                "rationale": "Tiêu hủy dữ liệu triệt để, ngăn chặn nguy cơ rò rỉ dữ liệu sau dự án và hoàn thành nghĩa vụ pháp lý đối với khách hàng."
+              },
+              {
+                "id": "C",
+                "label": "Lưu trữ toàn bộ dữ liệu vào USB cá nhân để làm tài liệu tham khảo cho các dự án sau.",
+                "correct": false,
+                "rationale": "Chiếm giữ dữ liệu khách hàng trái phép sau khi kết thúc hợp đồng là hành vi vi phạm thỏa thuận bảo mật (NDA)."
+              },
+              {
+                "id": "D",
+                "label": "Đập vỡ toàn bộ máy tính của tester thành từng mảnh.",
+                "correct": false,
+                "rationale": "Biện pháp thái quá và không kinh tế; tiêu chuẩn NIST SP 800-88 có các phương pháp ghi đè phần mềm an toàn mà không cần phá hủy phần cứng."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Áp dụng kỹ thuật Redaction và Masking chuẩn xác (Solid Black, Format Preserving).",
+          "Thực hiện chuyển giao tài liệu chứa Secrets qua kênh mã hóa đầu cuối PGP.",
+          "Tuân thủ quy trình tiêu hủy dữ liệu an toàn theo tiêu chuẩn NIST SP 800-88."
+        ],
+        "evidenceTemplate": [
+          "Danh mục Dữ liệu Nhạy cảm được phát hiện trong bài đánh giá",
+          "Kỹ thuật Redaction đã áp dụng (Solid Fill, Token Masking)",
+          "Phương thức truyền tải an toàn (PGP Key ID, Secure Portal Link)",
+          "Biên bản tiêu hủy dữ liệu (Certificate of Data Destruction & Overwrite Method)"
+        ],
+        "reset": "Đặt lại lựa chọn để xem lại các tình huống xử lý dữ liệu nhạy cảm.",
+        "cleanup": "Mô phỏng an toàn, không có dữ liệu nhạy cảm thực tế nào bị thu thập."
+      },
+      "governance": {
+        "prevent": [
+          "Yêu cầu 100% thiết bị làm việc của nhân sự phải bật mã hóa toàn bộ ổ đĩa (BitLocker/FileVault).",
+          "Sử dụng công cụ quét tự động (Automated Secret Scanner) kiểm tra file báo cáo trước khi gửi khách hàng.",
+          "Ký cam kết bảo mật thông tin (NDA) và thỏa thuận xử lý dữ liệu (DPA) trước khi bắt đầu dự án."
+        ],
+        "observe": [
+          "Kiểm toán định kỳ việc thực hiện Redaction trên các báo cáo mẫu.",
+          "Theo dõi thời hạn lưu trữ dữ liệu tạm của các dự án đang hoạt động để lên lịch tiêu hủy đúng hạn."
+        ],
+        "respond": [
+          "Kích hoạt quy trình ứng cứu sự cố rò rỉ dữ liệu nếu phát hiện dữ liệu nhạy cảm chưa che mờ bị gửi nhầm.",
+          "Hỗ trợ khách hàng thu hồi và cấp mới (Rotate) ngay lập tức các API keys/Credentials bị lộ."
+        ],
+        "residualRisk": [
+          "Dữ liệu tạm trong bộ nhớ swap hoặc crash dump của hệ điều hành có thể chưa bị xóa nếu không tắt swap hoặc không mã hóa swap partition.",
+          "Việc sử dụng các font chữ hoặc metadata trong file PDF có thể vô tình để lộ tác giả hoặc thông tin hệ thống nội bộ."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Dùng công cụ làm mờ (Blur hoặc Pixelate) trên ảnh là đủ để che số thẻ tín dụng.",
+          "correction": "Thuật toán làm mờ vẫn giữ lại các thông tin gradient màu sắc và hoàn toàn có thể bị các công cụ AI/khôi phục ảnh giải mã ngược lại thành số gốc. Luôn dùng mảng màu đen đặc (Solid Fill)."
+        },
+        {
+          "claim": "Báo cáo gửi cho khách hàng thì không cần che mờ vì khách hàng đã sở hữu dữ liệu đó.",
+          "correction": "Báo cáo kỹ thuật có thể được chuyển tiếp qua nhiều phòng ban (Dev, QA, Ban giám đốc, Kiểm toán bên ngoài). Giữ nguyên dữ liệu nhạy cảm làm tăng nguy cơ rò rỉ nội bộ không cần thiết."
+        },
+        {
+          "claim": "Bấm phím Shift + Delete trên Windows là dữ liệu đã biến mất vĩnh viễn không thể khôi phục.",
+          "correction": "Shift + Delete chỉ giải phóng chỉ mục trên file system; các sector chứa dữ liệu thực tế vẫn còn nguyên vẹn trên đĩa cứng cho đến khi bị ghi đè. Cần dùng công cụ shredding chuyên dụng."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os00-l08-q1",
+          "difficulty": "easy",
+          "question": "Kỹ thuật nào sau đây là phương pháp che mờ (Redaction) an toàn nhất đối với dữ liệu nhạy cảm trên file ảnh chụp màn hình?",
+          "options": [
+            { "id": "A", "label": "Làm mờ ảnh bằng hiệu ứng Gaussian Blur" },
+            {
+              "id": "B",
+              "label": "Vẽ mảng màu đen đặc (Solid Black Fill) đè hoàn toàn lên vùng dữ liệu và làm phẳng (flatten) ảnh"
+            },
+            {
+              "id": "C",
+              "label": "Thu nhỏ kích thước ảnh cho chữ bé lại không đọc được"
+            },
+            {
+              "id": "D",
+              "label": "Chèn một hình mặt cười bán trong suốt lên trên dãy số"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Mảng màu đen đặc (Solid Fill) loại bỏ hoàn toàn các điểm ảnh gốc bên dưới và làm phẳng ảnh ngăn chặn việc khôi phục hoặc bóc tách layer."
+        },
+        {
+          "id": "os00-l08-q2",
+          "difficulty": "medium",
+          "question": "Khi gửi báo cáo chứa các lỗ hổng bảo mật nghiêm trọng và bằng chứng kỹ thuật cho khách hàng qua internet, phương thức nào bảo đảm an toàn nhất?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Gửi qua email công cộng dạng văn bản rõ không mã hóa"
+            },
+            {
+              "id": "B",
+              "label": "Mã hóa file báo cáo bằng khóa công khai PGP/GPG của người nhận hoặc qua cổng truyền file an toàn có xác thực đa yếu tố (MFA)"
+            },
+            {
+              "id": "C",
+              "label": "Nén file zip đặt mật khẩu là '123456' rồi gửi mật khẩu qua cùng email"
+            },
+            { "id": "D", "label": "Gửi qua tin nhắn SMS điện thoại" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Mã hóa bất đối xứng PGP hoặc cổng truyền tải an toàn có MFA đảm bảo chỉ người nhận có khóa bí mật hoặc tài khoản xác thực mới có thể đọc được nội dung báo cáo."
+        },
+        {
+          "id": "os00-l08-q3",
+          "difficulty": "hard",
+          "question": "Sau khi kết thúc hợp đồng đánh giá an ninh, tại sao việc thực hiện quy trình 'Secure Purge' (ghi đè dữ liệu theo chuẩn NIST SP 800-88) lại quan trọng hơn việc chỉ xóa file thông thường?",
+          "options": [
+            { "id": "A", "label": "Để làm tăng tốc độ xử lý của CPU máy tính" },
+            {
+              "id": "B",
+              "label": "Để đảm bảo dữ liệu nhạy cảm của khách hàng bị ghi đè vật lý trên đĩa từ/SSD, không thể khôi phục lại bằng các công cụ phục hồi dữ liệu pháp y (Forensics)"
+            },
+            { "id": "C", "label": "Để tự động cập nhật hệ điều hành" },
+            { "id": "D", "label": "Để cài đặt lại phần mềm diệt virus" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Xóa thông thường chỉ xóa con trỏ quản lý file. Quy trình Secure Purge ghi đè các mẫu bit ngẫu nhiên lên sector vật lý để đảm bảo dữ liệu không thể khôi phục bằng bất kỳ công cụ chuyên dụng nào."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một công ty công nghệ y tế (HealthTech) thuê bạn đánh giá an ninh ứng dụng quản lý hồ sơ bệnh án điện tử (EHR) lưu trữ trên AWS S3 và xử lý bằng mô hình AI. Quá trình kiểm thử vô tình tải về một tập tin cache chứa 10.000 hồ sơ bệnh nhân bao gồm hình ảnh X-quang và thông tin chẩn đoán ung thư.",
+        "tasks": [
+          "Thiết lập quy trình khoanh vùng và cách ly khẩn cấp tập tin cache chứa dữ liệu nhạy cảm trên máy tính của tester.",
+          "Thực hiện quy trình báo cáo sự cố lộ dữ liệu nội bộ (Internal Breach Notification) gửi cho Data Protection Officer (DPO) của khách hàng.",
+          "Thực thi quy trình xóa hủy an toàn có chứng nhận độc lập và xác minh không còn bản sao lưu trên các thiết bị phụ trợ."
+        ],
+        "requiredEvidence": [
+          "Bản quy trình Sensitive Data Containment & Redaction Protocol cho dữ liệu y tế PHI/HIPAA.",
+          "Biên bản xác nhận tiêu hủy dữ liệu an toàn (Data Sanitization Verification Report)."
+        ]
+      },
+      "sources": [
+        {
+          "title": "NIST SP 800-88 Rev. 1 — Guidelines for Media Sanitization",
+          "url": "https://csrc.nist.gov/pubs/sp/800/88/r1/final",
+          "publisher": "NIST",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Tiêu chuẩn xóa hủy dữ liệu an toàn (Clear, Purge, Destroy)",
+            "Phương pháp ghi đè sector và bảo vệ phương tiện lưu trữ kỹ thuật số",
+            "Mẫu chứng nhận tiêu hủy dữ liệu (Certificate of Destruction)"
+          ]
+        },
+        {
+          "title": "PCI Security Standards Council — Information Supplement: Protecting Telephone-based Payment Card Data & Masking Standards",
+          "url": "https://www.pcisecuritystandards.org/",
+          "publisher": "PCI SSC",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Quy chuẩn che mờ số thẻ tín dụng (Primary Account Number Masking)",
+            "Nghiêm cấm lưu trữ mã xác thực thẻ nhạy cảm (CVV/CVC)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os00-l09-coordinated-vulnerability-disclosure",
+      "slug": "coordinated-vulnerability-disclosure",
+      "title": "Quy trình Công bố Lỗ hổng Phối hợp (CVD) & Quản trị Rủi ro",
+      "summary": "Vận hành quy trình Coordinated Vulnerability Disclosure (ISO/IEC 29147, CERT/CC, FIRST Policy): quản lý mốc thời gian 90 ngày (Remediation Timeline), phối hợp với bên thứ ba (CNA/CERT), và xử lý bất đồng quan điểm về mức độ nghiêm trọng (CVSS vs Business Risk).",
+      "difficulty": "foundation",
+      "durationMinutes": 40,
+      "prerequisites": ["os00-l08-sensitive-data-handling-and-redaction"],
+      "outcomes": [
+        "Giải thích các giai đoạn trong quy trình Coordinated Vulnerability Disclosure (CVD) theo tiêu chuẩn ISO/IEC 29147 và CERT/CC.",
+        "Xác định thời hạn khắc phục hợp lý (thường là 90 ngày) và xử lý các trường hợp đặc biệt (Active Exploitation 7 ngày hoặc Extenuating Circumstances).",
+        "Soạn thảo một bản báo cáo lỗ hổng có trách nhiệm (Vulnerability Advisory) đầy đủ thành phần: Affected versions, Root cause, Impact, Remediation guidance, và Timeline.",
+        "Phân biệt Full Disclosure, Zero-Day drop và Coordinated Disclosure trên các khía cạnh an toàn cộng đồng và đạo đức nghề nghiệp."
+      ],
+      "careerPaths": [
+        "vulnerability-research",
+        "bug-bounty",
+        "penetration-test",
+        "red-team"
+      ],
+      "domains": ["human", "web", "network"],
+      "attackTactics": [],
+      "keywords": [
+        "coordinated-disclosure",
+        "vulnerability-disclosure",
+        "iso-29147",
+        "cve-assignment",
+        "disclosure-timeline",
+        "security-advisory"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Coordinated Vulnerability Disclosure (CVD) là thỏa ước hợp tác bảo vệ người dùng cuối. Thay vì đơn phương công bố lỗ hổng (Full Disclosure / Zero-day Drop) khiến hàng triệu hệ thống bị đe dọa khi chưa có bản vá, researcher phối hợp cùng vendor trong một khung thời gian định trước (thường là 90 ngày) để phát triển, thử nghiệm bản vá và cùng công bố advisory đồng thời.",
+      "visual": {
+        "title": "Vòng đời Coordinated Vulnerability Disclosure (CVD)",
+        "caption": "Quy trình phối hợp 5 giai đoạn từ phát hiện lỗ hổng đến phát hành bản vá và Security Advisory.",
+        "steps": [
+          {
+            "label": "Gửi Báo cáo Ban đầu",
+            "detail": "Researcher gửi báo cáo mã hóa chứa PoC tối thiểu qua kênh bảo mật chính thức của vendor.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Xác nhận & Bắt đầu Đếm 90 Ngày",
+            "detail": "Vendor xác nhận tiếp nhận trong vòng 7 ngày; kích hoạt mốc thời hạn khắc phục chuẩn 90 ngày.",
+            "tone": "caution"
+          },
+          {
+            "label": "Phát triển & Thử nghiệm Bản vá",
+            "detail": "Vendor phát triển bản vá; researcher hỗ trợ xác minh bản vá đã xử lý triệt để root cause.",
+            "tone": "allow"
+          },
+          {
+            "label": "Đăng ký Định danh CVE",
+            "detail": "Liên hệ cơ quan cấp phát CVE (CNA / CERT/CC) để nhận mã CVE định danh duy nhất.",
+            "tone": "allow"
+          },
+          {
+            "label": "Đồng Công bố (Coordinated Release)",
+            "detail": "Phát hành bản vá công khai cùng lúc với Security Advisory hướng dẫn người dùng cập nhật.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bản chất và Giá trị của Coordinated Vulnerability Disclosure (CVD)",
+          "paragraphs": [
+            "Coordinated Vulnerability Disclosure (CVD - Công bố lỗ hổng có phối hợp) là tiêu chuẩn vàng trong ngành an ninh mạng toàn cầu (được chuẩn hóa trong ISO/IEC 29147 và ISO/IEC 30111). CVD dựa trên nguyên tắc: mục tiêu cao nhất của bảo mật là bảo vệ an toàn cho người dùng cuối và toàn bộ hệ sinh thái số.",
+            "Nếu một researcher tìm ra lỗ hổng và ngay lập tức đăng tải PoC lên mạng xã hội (Zero-Day Drop / Unilateral Full Disclosure), kẻ xấu có thể lập tức vũ khí hóa lỗ hổng để tấn công hàng triệu nạn nhân trước khi nhà sản xuất kịp viết code sửa chữa. Ngược lại, CVD cho phép vendor có một khoảng thời gian hợp lý để sửa lỗi nhưng vẫn đảm bảo tính minh bạch trước công chúng."
+          ],
+          "points": [
+            "Bảo vệ người dùng cuối: Không để người dùng rơi vào tình trạng bị tấn công mà không có bản vá phòng thủ.",
+            "Hợp tác kỹ thuật: Researcher hỗ trợ vendor xác minh và kiểm tra chéo bản vá để tránh vá thiếu sót.",
+            "Minh bạch cộng đồng: Lỗ hổng luôn được công bố công khai sau khi bản vá hoàn tất để người dùng chủ động nâng cấp."
+          ]
+        },
+        {
+          "title": "Khung Thời gian Chuẩn mực (Disclosure Timelines) và Trường hợp Ngoại lệ",
+          "paragraphs": [
+            "Chính sách CVD phổ biến nhất trong ngành (được áp dụng bởi Google Project Zero, CERT/CC, ZDI) quy định thời hạn khắc phục tiêu chuẩn là 90 ngày kể từ ngày gửi báo cáo ban đầu. Nếu vendor phát hành bản vá trước 90 ngày, advisory sẽ được công bố cùng lúc hoặc sau đó một khoảng thời gian ngắn để người dùng kịp cập nhật.",
+            "Các trường hợp ngoại lệ về thời gian bao gồm: 1. Lỗ hổng đang bị khai thác thực tế trên diện rộng (In-the-wild Active Exploitation): Thời hạn rút ngắn xuống còn 7 ngày để cộng đồng kịp áp dụng các biện pháp ngăn chặn tạm thời (Workaround); 2. Trường hợp bất khả kháng hoặc tính chất hệ thống phức tạp (Hardware/Protocol): Researcher và vendor có thể thỏa thuận gia hạn thêm (Grace Period) tối đa 14 hoặc 30 ngày."
+          ],
+          "points": [
+            "Standard 90-Day Policy: Khung thời gian tiêu chuẩn cho phần mềm và ứng dụng thông thường.",
+            "Active Exploitation 7-Day Window: Thời hạn khẩn cấp khi mã độc hoặc hacker đang khai thác thực tế.",
+            "Mutual Grace Period Extension: Gia hạn có văn bản thỏa thuận khi vendor chứng minh được tiến độ xử lý nghiêm túc."
+          ]
+        },
+        {
+          "title": "Cấu trúc Chuẩn của một Bản Security Advisory và Định danh CVE",
+          "paragraphs": [
+            "Khi bản vá sẵn sàng, một bản Thông cáo An ninh (Security Advisory) chính thức sẽ được công bố. Bản advisory phải được viết khách quan, rõ ràng, giúp quản trị viên hệ thống đánh giá được mức độ rủi ro và cách khắc phục.",
+            "Một Security Advisory chuẩn mực bao gồm: 1. Định danh CVE (ví dụ CVE-2026-XXXXX) do CVE Numbering Authority (CNA) cấp; 2. Danh sách các phiên bản bị ảnh hưởng (Affected Versions) và phiên bản an toàn (Fixed In); 3. Phân loại điểm yếu theo CWE (Common Weakness Enumeration); 4. Đánh giá mức độ nghiêm trọng theo điểm CVSS v3.1/v4.0; 5. Tóm tắt nguyên nhân gốc rễ (Root Cause); 6. Hướng dẫn nâng cấp và biện pháp giảm thiểu tạm thời (Mitigations/Workarounds); 7. Ghi nhận đóng góp của researcher (Credit)."
+          ],
+          "points": [
+            "CVE ID: Mã định danh toàn cầu duy nhất để theo dõi lỗ hổng.",
+            "CVSS vs Business Impact: CVSS phản ánh thuộc tính kỹ thuật; tổ chức tự đánh giá rủi ro kinh doanh.",
+            "Researcher Credit: Ghi nhận đóng góp đạo đức của người tìm ra điểm yếu."
+          ]
+        },
+        {
+          "title": "Xử lý Bất đồng Quan điểm và Vendor Không Phản hồi (Ghosting)",
+          "paragraphs": [
+            "Trong thực tế, researcher có thể gặp tình huống vendor phớt lờ báo cáo, từ chối công nhận lỗ hổng hoặc đe dọa pháp lý. Trong trường hợp vendor không phản hồi sau nhiều lần liên lạc (tối thiểu 3 kênh trong 14 ngày), quy trình chuẩn là liên hệ với bên điều phối trung gian độc lập (Coordinator) như CERT/CC, CISA hoặc CNA quản lý lĩnh vực đó.",
+            "Tổ chức điều phối trung gian sẽ đứng ra kết nối, xác minh và cấp mã CVE. Nếu hết thời hạn 90 ngày mà vendor vẫn không hợp tác và không có lý do chính đáng, researcher có quyền công bố bản advisory kỹ thuật tối thiểu (không chứa vũ khí khai thác hủy diệt) để cảnh báo người dùng tự bảo vệ hệ thống của mình."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Coordinated Vulnerability Disclosure Desk",
+        "objective": "Thực hành điều hướng các giai đoạn của quy trình CVD, xử lý bất đồng thời gian và soạn thảo Security Advisory chuẩn mực.",
+        "scenario": "Bạn là Security Researcher vừa phát hiện một lỗ hổng nghiêm trọng cho phép RCE không cần xác thực trong một thư viện mạng mã nguồn mở được hàng ngàn doanh nghiệp sử dụng. Hãy đưa ra quyết định chuẩn xác cho từng giai đoạn disclosure.",
+        "constraints": [
+          "Tuân thủ tuyệt đối quy trình Coordinated Disclosure theo chuẩn ISO/IEC 29147.",
+          "Ưu tiên an toàn của cộng đồng người dùng cuối lên trên lợi ích cá nhân.",
+          "Chỉ công bố thông tin công khai khi bản vá đã sẵn sàng hoặc hết thời hạn 90 ngày sau khi đã qua trung gian điều phối."
+        ],
+        "cases": [
+          {
+            "id": "disclosure-case-01",
+            "title": "Vendor yêu cầu giữ bí mật vô thời hạn vì chưa có ngân sách sửa",
+            "context": "Sau khi nhận báo cáo RCE, Vendor phản hồi: 'Chúng tôi ghi nhận lỗ hổng nhưng hiện tại đội ngũ dev đang bận dự án khác, yêu cầu researcher cam kết không công bố cho đến năm sau (12 tháng nữa)'.",
+            "prompt": "Quyết định xử lý đúng đắn theo thông lệ CVD quốc tế là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đồng ý giữ bí mật 12 tháng vì vendor là chủ sở hữu mã nguồn.",
+                "correct": false,
+                "rationale": "Trì hoãn vô thời hạn đặt người dùng vào vòng nguy hiểm kéo dài và vi phạm chính sách thời hạn tiêu chuẩn."
+              },
+              {
+                "id": "B",
+                "label": "Từ chối yêu cầu giữ bí mật vô thời hạn; giải thích rõ chính sách thời hạn chuẩn 90 ngày, đề xuất hỗ trợ kỹ thuật và thông báo sẽ phối hợp cùng CERT/CC nếu vendor cần thêm điều phối viên.",
+                "correct": true,
+                "rationale": "Khẳng định ranh giới trách nhiệm: 90 ngày là khoảng thời gian hợp lý để ưu tiên vá lỗi nghiêm trọng; nếu vendor gặp khó khăn thì cơ quan điều phối trung gian (CERT/CC) sẽ hỗ trợ."
+              },
+              {
+                "id": "C",
+                "label": "Tức giận và đăng tải ngay toàn bộ mã khai thác vũ khí hóa lên mạng xã hội trong 24 giờ.",
+                "correct": false,
+                "rationale": "Hành vi Zero-Day Drop gây nguy hiểm cho người dùng cuối và phá vỡ đạo đức nghề nghiệp."
+              },
+              {
+                "id": "D",
+                "label": "Bán lỗ hổng cho các diễn đàn chợ đen để lấy tiền.",
+                "correct": false,
+                "rationale": "Hành vi phạm tội hình sự tiếp tay cho tội phạm mạng."
+              }
+            ]
+          },
+          {
+            "id": "disclosure-case-02",
+            "title": "Phát hiện mã độc thực tế đang khai thác lỗ hổng trong lúc chờ bản vá",
+            "context": "Vào ngày thứ 20 của chuỗi 90 ngày, các công ty an ninh mạng phát hiện một nhóm tin tặc đang tích cực khai thác lỗ hổng này trong thực tế (In-the-wild Active Exploitation) để tấn công các tổ chức tài chính.",
+            "prompt": "Quy trình điều chỉnh thời hạn disclosure nào cần được kích hoạt?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tiếp tục im lặng chờ đủ 90 ngày mới được lên tiếng.",
+                "correct": false,
+                "rationale": "Người dùng đang bị tấn công thực tế và không có thông tin để phòng thủ; im lặng lúc này là tắc trách."
+              },
+              {
+                "id": "B",
+                "label": "Kích hoạt chính sách khẩn cấp (Active Exploitation Timeline - 7 ngày): Phối hợp khẩn cấp cùng Vendor và CERT/CC để phát hành bản vá nóng (Hotfix) hoặc hướng dẫn giảm thiểu tạm thời (Workaround) trong vòng 7 ngày.",
+                "correct": true,
+                "rationale": "Khi có khai thác thực tế, ưu tiên số một là cung cấp biện pháp phòng thủ ngay lập tức cho cộng đồng nạn nhân."
+              },
+              {
+                "id": "C",
+                "label": "Viết bài blog ca ngợi nhóm tin tặc đã nhanh tay hơn vendor.",
+                "correct": false,
+                "rationale": "Hành vi phi đạo đức và cổ xúy tội phạm mạng."
+              },
+              {
+                "id": "D",
+                "label": "Xóa toàn bộ liên lạc với vendor để tránh bị liên lụy.",
+                "correct": false,
+                "rationale": "Trốn tránh trách nhiệm trong lúc cộng đồng cần sự phối hợp kỹ thuật khẩn cấp."
+              }
+            ]
+          },
+          {
+            "id": "disclosure-case-03",
+            "title": "Vendor phát hành bản vá và yêu cầu đăng Security Advisory",
+            "context": "Vào ngày thứ 45, Vendor đã phát triển xong bản vá, hoàn tất kiểm thử và phát hành phiên bản v2.4.1. Vendor đã gửi thông báo cho researcher và chuẩn bị công bố thông cáo an ninh.",
+            "prompt": "Các nội dung cốt lõi bắt buộc phải có trong bản Security Advisory đồng phát hành là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cần ghi 'Đã sửa một số lỗi vặt' mà không cần nêu chi tiết.",
+                "correct": false,
+                "rationale": "Che giấu thông tin khiến quản trị viên không đánh giá được mức độ ưu tiên để cập nhật hệ thống."
+              },
+              {
+                "id": "B",
+                "label": "Định danh CVE, danh sách phiên bản bị ảnh hưởng và phiên bản đã vá, phân loại CWE, điểm CVSS, mô tả nguyên nhân gốc rễ, hướng dẫn nâng cấp và ghi nhận researcher đóng góp.",
+                "correct": true,
+                "rationale": "Cung cấp đầy đủ thông tin kỹ thuật khách quan và hướng dẫn rõ ràng giúp cộng đồng quản trị hệ thống phòng thủ hiệu quả."
+              },
+              {
+                "id": "C",
+                "label": "Đăng tải toàn bộ mã nguồn exploit 1-click tự động tấn công hàng loạt máy chủ chưa kịp cập nhật.",
+                "correct": false,
+                "rationale": "Vũ khí hóa quá mức ngay tại thời điểm vừa ra bản vá khiến các hệ thống chưa kịp update trở thành mồi ngon cho hacker."
+              },
+              {
+                "id": "D",
+                "label": "Yêu cầu xóa tên vendor ra khỏi thông cáo.",
+                "correct": false,
+                "rationale": "Bản thông cáo an ninh phải gắn liền với sản phẩm và phiên bản cụ thể của nhà sản xuất."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Điều hướng chính xác các giai đoạn của quy trình Coordinated Vulnerability Disclosure.",
+          "Áp dụng linh hoạt chính sách thời hạn chuẩn (90 ngày) và khẩn cấp (7 ngày khi có active exploitation).",
+          "Soạn thảo bản Security Advisory đầy đủ chuẩn mực quốc tế (CVE, CVSS, Remediation)."
+        ],
+        "evidenceTemplate": [
+          "Mã định danh lỗ hổng (CVE ID) và Phân loại CWE",
+          "Biên bản mốc thời gian Disclosure Timeline (Initial Report, Vendor Acknowledgment, Patch Date, Advisory Date)",
+          "Bản Security Advisory hoàn chỉnh (Affected Versions, Root Cause, Mitigation)",
+          "Tài liệu điều phối trung gian (CERT/CC Coordination Ticket)"
+        ],
+        "reset": "Đặt lại lựa chọn để làm lại các ca quyết định CVD từ đầu.",
+        "cleanup": "Toàn bộ bài tập là mô phỏng an toàn, không phát sinh dữ liệu ngoài trình duyệt."
+      },
+      "governance": {
+        "prevent": [
+          "Xây dựng chính sách Vulnerability Disclosure Policy (VDP) công khai trên website kèm kênh nhận PGP rõ ràng.",
+          "Đào tạo đội ngũ phát triển về quy trình tiếp nhận và xử lý sự cố an ninh sản phẩm (PSIRT).",
+          "Đăng ký làm CVE Numbering Authority (CNA) hoặc thiết lập đầu mối làm việc trực tiếp với CNA."
+        ],
+        "observe": [
+          "Theo dõi sát sao SLA phản hồi báo cáo lỗ hổng (SLA tiếp nhận dưới 7 ngày, xử lý dưới 90 ngày).",
+          "Giám sát không gian mạng (Threat Intelligence) để phát hiện sớm các dấu hiệu lỗ hổng bị khai thác ngoài ý muốn."
+        ],
+        "respond": [
+          "Kích hoạt quy trình vá khẩn cấp 7 ngày nếu phát hiện lỗ hổng đang bị khai thác thực tế.",
+          "Phối hợp với các cơ quan điều phối an ninh quốc gia (VNCERT, CERT/CC, CISA) khi xử lý các lỗ hổng hạ tầng trọng yếu."
+        ],
+        "residualRisk": [
+          "Người dùng cuối có thể chậm trễ trong việc cập nhật bản vá (Patch Lag), khiến hệ thống vẫn dễ bị tổn thương dù bản vá đã phát hành.",
+          "Sự khác biệt trong việc tính điểm CVSS giữa researcher và vendor dẫn đến tranh chấp mức độ ưu tiên khắc phục."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Công bố Zero-Day lên mạng xã hội là cách tốt nhất để ép vendor phải sửa lỗi nhanh chóng.",
+          "correction": "Zero-Day Drop đặt hàng triệu người dùng vô tội vào tình thế nguy hiểm trước các cuộc tấn công của tin tặc. CVD là quy trình văn minh và an toàn nhất để bảo vệ cộng đồng."
+        },
+        {
+          "claim": "Thời hạn 90 ngày là bắt buộc cứng nhắc trong mọi tình huống không thể thay đổi.",
+          "correction": "Thời hạn 90 ngày có thể rút ngắn xuống 7 ngày nếu có bằng chứng khai thác thực tế ngoài đời (In-the-wild), hoặc có thể gia hạn thêm 14-30 ngày nếu vendor chứng minh được tính chất kỹ thuật phức tạp và đang nỗ lực xử lý."
+        },
+        {
+          "claim": "Security Advisory phải đính kèm mã khai thác vũ khí hóa (Weaponized Exploit) thì mới đầy đủ.",
+          "correction": "Security Advisory tập trung vào việc mô tả nguyên nhân gốc rễ, ảnh hưởng và hướng dẫn vá lỗi. Đính kèm công cụ tấn công tự động ngay thời điểm ra bản vá là hành vi nguy hiểm và thiếu đạo đức."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os00-l09-q1",
+          "difficulty": "easy",
+          "question": "Mục tiêu tối thượng của quy trình Coordinated Vulnerability Disclosure (CVD) là gì?",
+          "options": [
+            { "id": "A", "label": "Giúp researcher trở nên nổi tiếng trên mạng xã hội" },
+            {
+              "id": "B",
+              "label": "Bảo vệ an toàn cho người dùng cuối bằng cách phối hợp phát triển bản vá trước khi công bố thông tin công khai"
+            },
+            {
+              "id": "C",
+              "label": "Ép buộc vendor phải trả tiền thưởng bug bounty thật cao"
+            },
+            {
+              "id": "D",
+              "label": "Giữ bí mật lỗ hổng vĩnh viễn không bao giờ cho ai biết"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "CVD sinh ra để bảo vệ người dùng cuối. Bằng cách cho vendor thời gian viết và thử nghiệm bản vá, người dùng sẽ có giải pháp bảo vệ ngay khi lỗ hổng được công bố công khai."
+        },
+        {
+          "id": "os00-l09-q2",
+          "difficulty": "medium",
+          "question": "Theo thông lệ chuẩn mực quốc tế (Google Project Zero, CERT/CC), thời hạn khắc phục tiêu chuẩn (Standard Disclosure Timeline) cho một lỗ hổng phần mềm thông thường là bao lâu?",
+          "options": [
+            { "id": "A", "label": "24 giờ" },
+            { "id": "B", "label": "90 ngày kể từ ngày vendor nhận được báo cáo ban đầu" },
+            { "id": "C", "label": "3 năm" },
+            { "id": "D", "label": "Tùy thuộc vào việc khi nào vendor thích sửa thì sửa" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "90 ngày là mốc thời gian chuẩn mực cân bằng giữa việc tạo đủ thời gian cho nhà sản xuất phát triển bản vá chất lượng và việc không để người dùng chờ đợi quá lâu."
+        },
+        {
+          "id": "os00-l09-q3",
+          "difficulty": "hard",
+          "question": "Trong trường hợp researcher phát hiện lỗ hổng nhưng vendor hoàn toàn không phản hồi email sau 14 ngày qua nhiều kênh liên lạc, hành động tiếp theo đúng chuẩn mực nhất là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Đăng tải toàn bộ mã nguồn khai thác lên Twitter/X ngay lập tức"
+            },
+            {
+              "id": "B",
+              "label": "Liên hệ với tổ chức điều phối trung gian độc lập (như CERT/CC, CISA hoặc CNA phụ trách) để họ đứng ra làm cầu nối và cấp định danh CVE"
+            },
+            {
+              "id": "C",
+              "label": "Tự ý xóa bỏ máy chủ của vendor để trừng phạt thái độ phớt lờ"
+            },
+            { "id": "D", "label": "Bỏ cuộc và không bao giờ nghiên cứu bảo mật nữa" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Khi vendor không phản hồi (Ghosting), cơ quan điều phối trung gian (Coordinator như CERT/CC, CISA) sẽ sử dụng thẩm quyền và kênh liên lạc chính thức để kết nối vendor, bảo đảm quy trình disclosure vẫn diễn ra an toàn và có trách nhiệm."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn là chuyên gia nghiên cứu bảo mật phát hiện một lỗ hổng tràn bộ đệm nghiêm trọng trong vi điều khiển phần cứng (Hardware Chipset Firmware) được nhúng trong hơn 50 triệu bộ định tuyến Wi-Fi gia đình của 20 nhà sản xuất router khác nhau trên thế giới.",
+        "tasks": [
+          "Xác định mô hình điều phối đa bên (Multi-party CVD) thông qua CERT/CC hoặc FIRST VRDX-SIG.",
+          "Xây dựng kế hoạch kéo dài thời hạn (Extended Timeline) phù hợp với chu kỳ sản xuất và cập nhật firmware của ngành phần cứng (thay vì 90 ngày thông thường).",
+          "Thiết kế bản Thông cáo An ninh chung (Joint Security Advisory) đồng bộ giữa nhà sản xuất chip gốc và các bên tích hợp thiết bị cuối."
+        ],
+        "requiredEvidence": [
+          "Sơ đồ quy trình Multi-party Coordinated Disclosure cho chuỗi cung ứng phần cứng.",
+          "Mẫu thỏa thuận bảo mật thông tin trước công bố (Pre-disclosure Embargo Agreement)."
+        ]
+      },
+      "sources": [
+        {
+          "title": "ISO/IEC 29147:2018 — Information technology — Security techniques — Vulnerability disclosure",
+          "url": "https://www.iso.org/standard/72311.html",
+          "publisher": "ISO / IEC",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Quy trình tiếp nhận và xử lý báo cáo lỗ hổng an ninh",
+            "Kênh truyền thông an toàn và định dạng thông cáo an ninh",
+            "Tiêu chuẩn công bố thông tin có trách nhiệm"
+          ]
+        },
+        {
+          "title": "CERT/CC — Guide to Coordinated Vulnerability Disclosure (Special Report)",
+          "url": "https://vuls.cert.org/",
+          "publisher": "Carnegie Mellon University / SEI",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Nguyên tắc và vai trò của bên điều phối trung gian trong CVD",
+            "Chính sách thời hạn 90 ngày và xử lý tình huống khẩn cấp (Active Exploitation)",
+            "Thực tiễn quản lý rủi ro và quan hệ giữa researcher và vendor"
+          ]
+        }
+      ]
+    }
+  ]
+}

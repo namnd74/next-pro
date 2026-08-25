@@ -1,5 +1,6 @@
 import rolesAndBoundariesData from '../data/academy/roles-and-boundaries.json';
 import rulesOfEngagementData from '../data/academy/rules-of-engagement.json';
+import evidenceAndDisclosureData from '../data/academy/evidence-and-disclosure.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -71,10 +72,14 @@ function parseAcademyModule(value: unknown): AcademyModule {
 
 export const ROLES_AND_BOUNDARIES_MODULE = parseAcademyModule(rolesAndBoundariesData);
 export const RULES_OF_ENGAGEMENT_MODULE = parseAcademyModule(rulesOfEngagementData);
+export const EVIDENCE_AND_DISCLOSURE_MODULE = parseAcademyModule(
+  evidenceAndDisclosureData
+);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
   RULES_OF_ENGAGEMENT_MODULE,
+  EVIDENCE_AND_DISCLOSURE_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {
