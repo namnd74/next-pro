@@ -11,30 +11,27 @@ import {
   Info,
   Crosshair,
 } from 'lucide-react';
-import { RedTeamMission, RedTeamScenario } from '../types';
+import { RedTeamCollection, RedTeamMission } from '../types';
 import { AttackVectorCard } from './red-team-console';
 import { UI_DEMO_REGISTRY } from './ui-demo-stage';
-import type { LearningTrack } from '@/features/learning/types';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CodeBlock } from '@/components/ui/code-block';
 
 interface MissionTabsViewProps {
-  track: LearningTrack;
+  collection: RedTeamCollection;
   mission: RedTeamMission;
-  scenario: RedTeamScenario;
 }
 
 export function MissionTabsView({
-  track,
+  collection,
   mission,
-  scenario,
 }: MissionTabsViewProps) {
-  const linkedVectors = scenario.vectors.filter((v) =>
+  const linkedVectors = collection.vectors.filter((v) =>
     mission.vectorIds.includes(v.id)
   );
-  const demoMeta = UI_DEMO_REGISTRY[track.slug];
+  const demoMeta = UI_DEMO_REGISTRY[collection.slug];
   const Demo = demoMeta?.component;
 
   return (

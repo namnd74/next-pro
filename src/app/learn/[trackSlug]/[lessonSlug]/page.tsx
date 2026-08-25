@@ -1,7 +1,8 @@
 import * as React from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { MOCK_LEARNING_TRACKS, LessonViewer } from '@/features/learning';
+import { LessonViewer } from '@/features/learning/components/lesson-viewer';
+import { MOCK_LEARNING_TRACKS } from '@/features/learning/data/mock-courses';
 
 interface LessonPageProps {
   params: Promise<{

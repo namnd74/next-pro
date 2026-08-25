@@ -9,16 +9,20 @@ import webSecurityAuthTrack from './json/web-security-auth.json';
 import react19Track from './json/react19-compiler.json';
 import nextArchitectureTrack from './json/nextjs-architecture-rendering.json';
 import reactTestingEnterpriseTrack from './json/react-testing-enterprise.json';
+import nextDeploymentOperationsTrack from './json/nextjs-deployment-operations.json';
+import productionCapstoneTrack from './json/production-react-capstone.json';
 
 export const DEFAULT_JSON_LEARNING_TRACKS: LearningTrack[] = [
   reactCoreFoundationsTrack as LearningTrack,
   reactHooksMasteryTrack as LearningTrack,
   standardFormsTrack as LearningTrack,
-  formEngineeringTrack as LearningTrack,
-  reactPerformanceTrack as LearningTrack,
-  tanstackQueryTrack as LearningTrack,
-  webSecurityAuthTrack as LearningTrack,
   react19Track as LearningTrack,
+  formEngineeringTrack as LearningTrack,
   nextArchitectureTrack as LearningTrack,
+  tanstackQueryTrack as LearningTrack,
+  reactPerformanceTrack as LearningTrack,
   reactTestingEnterpriseTrack as LearningTrack,
+  webSecurityAuthTrack as LearningTrack,
+  nextDeploymentOperationsTrack as LearningTrack,
+  productionCapstoneTrack as LearningTrack,
 ];

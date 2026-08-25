@@ -62,9 +62,34 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
         expectedKeywords: ['keyword1', 'keyword2', 'keyword3'],
         seniorAnswer: {
           summary: 'Tóm tắt câu trả lời 30s...',
+          mentalModel: 'Mô hình tư duy cốt lõi để suy luận...',
+          reasoningSteps: [
+            'Bước 1: Xác định constraint và dữ kiện...',
+            'Bước 2: Phân tích cơ chế nền tảng...',
+            'Bước 3: Chọn giải pháp và failure path...',
+            'Bước 4: Kiểm chứng bằng test/metric...',
+          ],
           deepDive: 'Giải thích kiến trúc chi tiết...',
+          tradeoffs: ['Đánh đổi 1...', 'Đánh đổi 2...', 'Đánh đổi 3...'],
+          verification: [
+            'Cách kiểm chứng bằng test...',
+            'Metric production cần theo dõi...',
+            'Failure scenario cần mô phỏng...',
+          ],
           codeExample: '// Code minh họa\nconst example = true;',
+          codeLanguage: 'typescript',
         },
+        evaluationRubric: {
+          baseline: ['Tín hiệu đạt yêu cầu tối thiểu...'],
+          strong: ['Tín hiệu của Senior mạnh...'],
+          exceptional: ['Tín hiệu Lead / Staff...'],
+        },
+        references: [
+          {
+            title: 'Nguồn đặc tả hoặc tài liệu chính thức',
+            url: 'https://example.com/official-spec',
+          },
+        ],
         pitfalls: ['Bẫy 1...', 'Bẫy 2...'],
         followUpQuestions: ['Câu hỏi đào sâu 1?'],
       },
@@ -117,12 +142,12 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in-50">
+    <div className="animate-in fade-in-50 fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <Card className="glass-card w-full max-w-lg space-y-6 p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border/60 pb-4">
+        <div className="border-border/60 flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-2">
-            <FileJson className="h-5 w-5 text-primary" />
-            <h3 className="text-lg font-bold text-foreground">
+            <FileJson className="text-primary h-5 w-5" />
+            <h3 className="text-foreground text-lg font-bold">
               Quản Lý Import / Export JSON
             </h3>
           </div>
@@ -132,7 +157,7 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
         </div>
 
         {/* Current status stats */}
-        <div className="space-y-2 rounded-xl border border-border/40 bg-secondary/30 p-4">
+        <div className="border-border/40 bg-secondary/30 space-y-2 rounded-xl border p-4">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Ngân hàng mặc định:</span>
             <Badge variant="secondary">{MOCK_INTERVIEW_QUESTIONS.length} câu hỏi</Badge>
@@ -141,9 +166,9 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
             <span className="text-muted-foreground">Câu hỏi đã import/tạo thêm:</span>
             <Badge variant="default">{customQuestions.length} câu hỏi</Badge>
           </div>
-          <div className="flex items-center justify-between border-t border-border/40 pt-1 text-xs">
-            <span className="font-bold text-foreground">Tổng cộng đang có:</span>
-            <Badge variant="outline" className="font-bold text-primary">
+          <div className="border-border/40 flex items-center justify-between border-t pt-1 text-xs">
+            <span className="text-foreground font-bold">Tổng cộng đang có:</span>
+            <Badge variant="outline" className="text-primary font-bold">
               {allActiveQuestions.length} câu hỏi
             </Badge>
           </div>
@@ -183,7 +208,7 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
             variant="ghost"
             size="sm"
             onClick={handleDownloadTemplate}
-            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground hover:text-foreground gap-1.5 text-xs"
           >
             <Download className="h-3.5 w-3.5" />
             <span>Tải mẫu file JSON cấu trúc chuẩn</span>
@@ -202,7 +227,7 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
                   });
                 }
               }}
-              className="gap-1 text-xs text-destructive hover:text-destructive"
+              className="text-destructive hover:text-destructive gap-1 text-xs"
             >
               <RefreshCw className="h-3 w-3" />
               <span>Reset Custom</span>
@@ -222,7 +247,7 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
             {importStatus.type === 'success' ? (
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
             ) : (
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
             )}
             <span>{importStatus.message}</span>
           </div>

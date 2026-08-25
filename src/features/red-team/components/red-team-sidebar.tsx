@@ -4,26 +4,44 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Crosshair,
-  RotateCcw,
-  GraduationCap,
-  Zap,
-  Flame,
-  Shield,
-  Lock,
-  Database,
+  Boxes,
   Code2,
+  Crosshair,
+  Database,
+  Flame,
+  KeyRound,
   Layers,
-  Atom,
-  BookOpen,
+  Lock,
+  Radar,
+  RotateCcw,
+  Shield,
+  ShieldCheck,
+  Syringe,
+  Timer,
+  Zap,
+  GraduationCap,
 } from 'lucide-react';
-import { RED_TEAM_SCENARIOS } from '../data/json-loader';
-import { getMissionsByTrackSlug } from '../data/mission-loader';
+import { RED_TEAM_COLLECTIONS } from '../data/collection-loader';
+import { getCollectionsByPhase } from '../data/collection-loader';
+import { getMissionsByCollectionSlug } from '../data/collection-loader';
+import { RT_PHASES_ORDERED } from '../data/roadmap';
 import { useRedTeamStore } from '../stores/use-red-team-store';
 
 function getTopicIcon(iconName: string) {
   const cls = 'h-4 w-4';
   switch (iconName) {
+    case 'Radar':
+      return <Radar className={cls} />;
+    case 'Syringe':
+      return <Syringe className={cls} />;
+    case 'KeyRound':
+      return <KeyRound className={cls} />;
+    case 'Timer':
+      return <Timer className={cls} />;
+    case 'Boxes':
+      return <Boxes className={cls} />;
+    case 'ShieldCheck':
+      return <ShieldCheck className={cls} />;
     case 'GraduationCap':
       return <GraduationCap className={cls} />;
     case 'Zap':
@@ -36,30 +54,14 @@ function getTopicIcon(iconName: string) {
       return <Lock className={cls} />;
     case 'Database':
       return <Database className={cls} />;
-    case 'Atom':
-      return <Atom className={cls} />;
     case 'Layers':
       return <Layers className={cls} />;
     case 'Code':
       return <Code2 className={cls} />;
     default:
-      return <BookOpen className={cls} />;
+      return <Crosshair className={cls} />;
   }
 }
-
-/* Map trackSlug -> icon giống TrackCard để đồng bộ hình ảnh với /learn */
-const TOPIC_ICON: Record<string, string> = {
-  'react-foundations-zero-to-one': 'GraduationCap',
-  'react-hooks-deep-dive': 'Zap',
-  'standard-react-form-architecture': 'Code',
-  'form-engineering-react-hook-form-zod': 'Layers',
-  'react-performance-advanced-patterns': 'Flame',
-  'tanstack-query-v5-masterclass': 'Zap',
-  'web-security-and-auth-masterclass': 'Zap',
-  'react-19-compiler-path': 'Atom',
-  'nextjs-architecture-rendering-strategies': 'Layers',
-  'react-testing-enterprise-mastery': 'Shield',
-};
 
 type LessonStatus = 'idle' | 'breached' | 'patched';
 
@@ -90,7 +92,7 @@ interface SidebarContentProps {
 export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const pathname = usePathname();
   const segments = pathname.split('/');
-  const activeTrackSlug = segments[2];
+  const activeCollectionSlug = segments[2];
   const activeMissionSlug = segments[3];
 
   const { resetRedTeamProgress, launchedVectorIds, patchedVectorIds } =
@@ -100,12 +102,12 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
 
   React.useEffect(() => setMounted(true), []);
 
-  const totalVectors = RED_TEAM_SCENARIOS.reduce((acc, s) => acc + s.vectors.length, 0);
+  const totalVectors = RED_TEAM_COLLECTIONS.reduce((acc, s) => acc + s.vectors.length, 0);
   const totalPatched = mounted ? patchedVectorIds.length : 0;
   const totalBreached = mounted ? launchedVectorIds.length : 0;
 
   const missionStatus = React.useCallback(
-    (trackSlug: string, mission: { vectorIds: string[] }): LessonStatus => {
+    (collectionSlug: string, mission: { vectorIds: string[] }): LessonStatus => {
       if (!mounted) return 'idle';
       if (mission.vectorIds.length === 0) return 'idle';
       const patched = mission.vectorIds.filter((id) => patchedVectorIds.includes(id)).length;
@@ -140,98 +142,122 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
         </span>
       </Link>
 
-      {/* Topics */}
-      <nav className="space-y-1.5">
+      {/* Roadmap phases */}
+      <nav className="space-y-2">
         <p className="px-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          Topics ({RED_TEAM_SCENARIOS.length})
+          Lộ trình ({RED_TEAM_COLLECTIONS.length} collections)
         </p>
 
-        {RED_TEAM_SCENARIOS.map((scenario) => {
-          const trackSlug = scenario.trackSlug;
-          const isActive = activeTrackSlug === trackSlug;
-          const expanded = isActive || manualExpanded.includes(trackSlug);
-          const shortTitle = scenario.title.replace(/^Red Team:\s*/, '');
-          const missions = getMissionsByTrackSlug(trackSlug);
-
+        {RT_PHASES_ORDERED.map((phase, phaseIdx) => {
+          const collections = getCollectionsByPhase(phase.id);
+          if (collections.length === 0) return null;
           return (
-            <div
-              key={scenario.id}
-              className={`overflow-hidden rounded-xl border transition-colors ${
-                isActive
-                  ? 'border-destructive/40 bg-destructive/5'
-                  : 'border-border/60 bg-secondary/20 hover:border-border'
-              }`}
-            >
-              <div className="flex items-stretch">
-                <Link
-                  href={`/rt/${trackSlug}`}
-                  onClick={onNavigate}
-                  className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2"
-                >
-                  <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-red-500/15 to-orange-500/15 ${
-                      isActive ? 'text-destructive' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {getTopicIcon(TOPIC_ICON[trackSlug] ?? 'BookOpen')}
-                  </span>
-                  <span
-                    className={`truncate text-xs font-semibold ${
-                      isActive ? 'text-foreground' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {shortTitle}
-                  </span>
-                </Link>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setManualExpanded((prev) =>
-                      prev.includes(trackSlug)
-                        ? prev.filter((s) => s !== trackSlug)
-                        : [...prev, trackSlug]
-                    )
-                  }
-                  aria-label="Toggle missions"
-                  className="shrink-0 px-2 text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  <Chevron expanded={expanded} />
-                </button>
+            <div key={phase.id} className="space-y-1.5">
+              {/* Phase header */}
+              <div
+                className={`sticky top-0 z-10 flex items-center gap-1.5 rounded-lg bg-background/95 px-1 py-1 backdrop-blur ${
+                  phaseIdx > 0 ? 'mt-1' : ''
+                }`}
+              >
+                <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-destructive">
+                  P{String(phase.order).padStart(2, '0')}
+                </span>
+                <span className="truncate text-[11px] font-bold text-foreground">
+                  {phase.title}
+                </span>
               </div>
 
-              {expanded && missions.length > 0 && (
-                <ul className="space-y-0.5 border-t border-border/40 px-2 py-1.5">
-                  <li className="px-1 pb-0.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
-                    Missions ({missions.length})
-                  </li>
-                  {missions.map((mission) => {
-                    const st = missionStatus(trackSlug, mission);
-                    const missionActive = activeMissionSlug === mission.slug;
-                    const minutesLabel = `${mission.estimatedMinutes}′`;
-                    return (
-                      <li key={mission.id}>
-                        <Link
-                          href={`/rt/${trackSlug}/${mission.slug}`}
-                          onClick={onNavigate}
-                          className={`flex items-start gap-1.5 rounded-lg px-1.5 py-1 text-[11px] leading-snug transition-colors ${
-                            missionActive
-                              ? 'bg-primary/10 font-semibold text-primary'
-                              : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+              {collections.map((collection) => {
+                const collectionSlug = collection.slug;
+                const isActive = activeCollectionSlug === collectionSlug;
+                const expanded =
+                  isActive || manualExpanded.includes(collectionSlug);
+                const shortTitle = collection.title.replace(/^Red Team:\s*/, '');
+                const missions =
+                  getMissionsByCollectionSlug(collectionSlug);
+
+                return (
+                  <div
+                    key={collection.id}
+                    className={`overflow-hidden rounded-xl border transition-colors ${
+                      isActive
+                        ? 'border-destructive/40 bg-destructive/5'
+                        : 'border-border/60 bg-secondary/20 hover:border-border'
+                    }`}
+                  >
+                    <div className="flex items-stretch">
+                      <Link
+                        href={`/rt/${collectionSlug}`}
+                        onClick={onNavigate}
+                        className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-2"
+                      >
+                        <span
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-red-500/15 to-orange-500/15 ${
+                            isActive ? 'text-destructive' : 'text-muted-foreground'
                           }`}
                         >
-                          <StatusDot status={st} />
-                          <span className="min-w-0 flex-1">
-                            <span className="line-clamp-2 block">{mission.title}</span>
-                            <span className="font-mono text-[9px] text-muted-foreground/70">
-                              {minutesLabel} · {mission.vectorIds.length} vector
-                            </span>
-                          </span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+                          {getTopicIcon(collection.iconName)}
+                        </span>
+                        <span
+                          className={`truncate text-xs font-semibold ${
+                            isActive ? 'text-foreground' : 'text-muted-foreground'
+                          }`}
+                        >
+                          {shortTitle}
+                        </span>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setManualExpanded((prev) =>
+                            prev.includes(collectionSlug)
+                              ? prev.filter((s) => s !== collectionSlug)
+                              : [...prev, collectionSlug]
+                          )
+                        }
+                        aria-label="Toggle missions"
+                        className="shrink-0 px-2 text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <Chevron expanded={expanded} />
+                      </button>
+                    </div>
+
+                    {expanded && missions.length > 0 && (
+                      <ul className="space-y-0.5 border-t border-border/40 px-2 py-1.5">
+                        <li className="px-1 pb-0.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground">
+                          Missions ({missions.length})
+                        </li>
+                        {missions.map((mission) => {
+                          const st = missionStatus(collectionSlug, mission);
+                          const missionActive = activeMissionSlug === mission.slug;
+                          const minutesLabel = `${mission.estimatedMinutes}′`;
+                          return (
+                            <li key={mission.id}>
+                              <Link
+                                href={`/rt/${collectionSlug}/${mission.slug}`}
+                                onClick={onNavigate}
+                                className={`flex items-start gap-1.5 rounded-lg px-1.5 py-1 text-[11px] leading-snug transition-colors ${
+                                  missionActive
+                                    ? 'bg-primary/10 font-semibold text-primary'
+                                    : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+                                }`}
+                              >
+                                <StatusDot status={st} />
+                                <span className="min-w-0 flex-1">
+                                  <span className="line-clamp-2 block">{mission.title}</span>
+                                  <span className="font-mono text-[9px] text-muted-foreground/70">
+                                    {minutesLabel} · {mission.vectorIds.length} vector
+                                  </span>
+                                </span>
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })}

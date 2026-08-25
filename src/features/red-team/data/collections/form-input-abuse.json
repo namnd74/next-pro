@@ -1,0 +1,491 @@
+{
+  "id": "rt-form-input-abuse",
+  "slug": "form-input-abuse",
+  "phaseId": "phase-04",
+  "orderInPhase": 3,
+  "title": "Lạm dụng Form & Input",
+  "tagline": "Field không name biến mất khỏi FormData, controlled lật uncontrolled, submit kép nhân bản đơn hàng, validation chỉ tồn tại ở UI và parse() chưa ai bắt lỗi.",
+  "missionBriefing": "Nhiệm vụ: lạm dụng tầng form theo 5 kiểu — đánh cắp field bằng cách bỏ name, lật chế độ controlled khi prop đổi, bấm kép tạo đơn trùng, vượt validation client-only, và giẫm quả mìn parse() không guard. Đọc Blast Radius về tiền bạc và dữ liệu, rồi vá bằng name contract/safeParse/idempotency cho đến khi toàn bộ vector PATCHED.",
+  "difficulty": "intermediate",
+  "iconName": "Code",
+  "color": "from-amber-500 to-orange-600",
+  "vectors": [
+    {
+      "id": "sr-vec-01",
+      "name": "Ghost Field Vanishing",
+      "severity": "high",
+      "category": "Form Serialization",
+      "target": "FormData builder (name attribute)",
+      "story": "Một input quên thuộc tính name — với FormData, nó KHÔNG TỒN TẠI. User chọn 'Giao nhanh 2 giờ', server lại nhận payload không hề có trường đó và âm thầm fallback về giao thường. Không lỗi, không warning — chỉ có 1.200 đơn mỗi tháng giao sai cam kết cho tới ngày khách doanh nghiệp đòi bồi thường.",
+      "payloadCode": "// ❌ Hai field KHÔNG có name — FormData sẽ bỏ qua chúng\nexport default function OrderForm() {\n  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {\n    e.preventDefault();\n    // Chỉ serialize field CÓ name: 'fullName' & 'shipping' BIẾN MẤT\n    const data = Object.fromEntries(new FormData(e.currentTarget));\n    await fetch('/api/orders', { method: 'POST', body: JSON.stringify(data) });\n  }\n  return (\n    <form onSubmit={handleSubmit}>\n      <input type=\"text\" placeholder=\"Họ tên người nhận\" />   {/* ❌ thiếu name */}\n      <input type=\"tel\" name=\"phone\" placeholder=\"Số điện thoại\" />\n      <select defaultValue=\"express\">                          {/* ❌ thiếu name */}\n        <option value=\"standard\">Giao thường (3-5 ngày)</option>\n        <option value=\"express\">Giao nhanh (2 giờ)</option>\n      </select>\n      <button type=\"submit\">Đặt hàng — COD</button>\n    </form>\n  );\n}",
+      "impactLog": [
+        "$ submit → new FormData(form).entries()",
+        "> [['phone','0912xxx']] — 'fullName', 'shipping' KHÔNG xuất hiện",
+        "> POST /api/orders {phone:'0912xxx'} → 201 Created, im lặng",
+        "WARNING: server fallback shipping='standard' dù user chọn express",
+        "HIGH: 1.203 đơn/tháng giao trễ — ticket CS tăng 34%",
+        "BLOCKED: hợp đồng SLA 2h với khách doanh nghiệp bị vi phạm"
+      ],
+      "blastRadius": [
+        "Dữ liệu user nhập bị vứt bỏ im lặng — không log, không error, không ai hay biết.",
+        "Server fallback ngầm sang giá trị mặc định → sai cam kết vận chuyển và giá.",
+        "CS nhận ticket 'mưa' trong khi dev không tìm được lỗi vì 'mọi thứ vẫn chạy'.",
+        "Lỗi này qua hết code review: input hiển thị hoàn hảo trên màn hình."
+      ],
+      "defenseName": "Name Attribute Contract",
+      "defenseCode": "// ✅ Mọi control tham gia submit PHẢI có name khớp schema API\n\n// 1) Gắn name đúng key backend mong đợi\n<form onSubmit={handleSubmit}>\n  <input type=\"text\" name=\"fullName\" placeholder=\"Họ tên người nhận\" />\n  <input type=\"tel\" name=\"phone\" placeholder=\"Số điện thoại\" />\n  <select name=\"shippingMethod\" defaultValue=\"express\">\n    <option value=\"standard\">Giao thường (3-5 ngày)</option>\n    <option value=\"express\">Giao nhanh (2 giờ)</option>\n  </select>\n  <button type=\"submit\">Đặt hàng — COD</button>\n</form>\n\n// 2) Smoke-test khi review: dump payload ra console\nconst data = Object.fromEntries(new FormData(e.currentTarget));\nconsole.table(data); // đủ key? đúng tên? đúng kiểu?\n\n// 3) Server vẫn validate: thiếu/trường lạ → 400 + log cảnh báo\n// (Client-side check không bao giờ là ranh giới tin cậy cuối cùng)",
+      "defenseTakeaway": "FormData chỉ thu những field có name — audit mọi input/select/textarea trước khi submit và dump payload ra để tự kiểm chứng."
+    },
+    {
+      "id": "sr-vec-02",
+      "name": "Controlled Mode Flip",
+      "severity": "medium",
+      "category": "Controlled Contract",
+      "target": "Input value binding lifecycle",
+      "story": "Input coupon khởi đầu uncontrolled (value=undefined), rồi khi fetch quyền user xong, parent bật editable=true — input đột ngột Lật sang controlled. React gào lên warning, DOM giữ text user đang gõ trong khi state vẫn rỗng; một nhịp render sau, mã giảm giá 'SALE50' bốc hơi ngay trước mắt khách hàng.",
+      "payloadCode": "// ❌ value đổi giữa controlled ↔ uncontrolled theo prop\nfunction CouponField({ editable }: { editable: boolean }) {\n  const [code, setCode] = useState('');\n\n  return (\n    <input\n      // editable=false → value={undefined} → input thành UNCONTROLLED\n      value={editable ? code : undefined}\n      onChange={(e) => setCode(e.target.value)}\n      disabled={!editable}\n      placeholder=\"Mã giảm giá\"\n    />\n  );\n}\n\n// Parent fetch quyền user xong mới set editable → input FLIP chế độ\n<CouponField editable={isVerified} />\n// React warning + DOM giữ text user gõ trong lúc state code vẫn ''",
+      "impactLog": [
+        "$ mount editable=false → value=undefined → UNCONTROLLED mode",
+        "> user gõ 'SALE50' → DOM value='SALE50', state code='' ",
+        "> verify xong → editable=true → FLIP sang CONTROLLED",
+        "WARNING: 'A component is changing an uncontrolled input to be controlled'",
+        "HIGH: controlled value '' ghi đè DOM → 'SALE50' biến mất trước mắt user",
+        "CRITICAL: đơn qua bước verify đều mất coupon → doanh thu giảm 4,2%"
+      ],
+      "blastRadius": [
+        "Console warning ngập Sentry, che khuất các lỗi thật sự quan trọng hơn.",
+        "Text user đang gõ bốc hơi ngay trên màn hình — trải nghiệm 'app ăn chữ' phá niềm tin.",
+        "State và DOM lệch nhau vĩnh viễn: submit gửi giá trị khác với những gì user thấy.",
+        "Bug chỉ nổ theo đúng trình tự thao tác — gần như không tái hiện được trong test tự động."
+      ],
+      "defenseName": "Single-Mode Input Contract",
+      "defenseCode": "// ✅ Một input chỉ được sống MỘT chế độ suốt vòng đời\n\n// 1) Controlled xuyên suốt: value KHÔNG BAO GIỜ undefined\nfunction CouponField({ editable }: { editable: boolean }) {\n  const [code, setCode] = useState('');\n  return (\n    <input\n      value={code}                     // ✅ luôn string\n      onChange={(e) => setCode(e.target.value)}\n      disabled={!editable}             // khóa tương tác, KHÔNG khóa value\n      placeholder=\"Mã giảm giá\"\n    />\n  );\n}\n\n// 2) Muốn uncontrolled? defaultValue + ref — và KHÔNG truyền value sau đó\n<input defaultValue={initial} ref={couponRef} />\n\n// 3) Data chưa sẵn sàng? Render skeleton thay vì flip prop\nif (!verified) return <FieldSkeleton />;",
+      "defenseTakeaway": "Chọn controlled hoặc uncontrolled NGAY khi viết component — prop value không bao giờ được phép undefined giữa đường đời của input."
+    },
+    {
+      "id": "sr-vec-03",
+      "name": "Double Submit Fraud",
+      "severity": "critical",
+      "category": "Idempotency",
+      "target": "Order/Payment submission pipeline",
+      "story": "Nút 'Thanh toán' không khóa trong lúc chờ API. Mạng chậm 900ms, khách sốt ruột bấm thêm phát nữa — hai POST song song với cùng payload, hai đơn hàng, hai lần trừ thẻ 12.500.000₫. Chargeback, phạt cổng thanh toán và niềm tin sụp đổ — tất cả chỉ sau một cú double-click 180 mili-giây.",
+      "payloadCode": "// ❌ Submit không có khóa pending — nút luôn nhấn được\nfunction CheckoutForm() {\n  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {\n    e.preventDefault(); // KHÔNG có cờ pending, KHÔNG có guard\n    const res = await fetch('/api/orders', {\n      method: 'POST',\n      body: JSON.stringify(buildPayload()),\n    });\n    const { id } = await res.json();\n    router.push(`/orders/${id}`);\n  }\n\n  return (\n    <form onSubmit={handleSubmit}>\n      <AddressFields />\n      {/* Click #1 t=0ms, click #2 t=180ms → 2 POST song song */}\n      <button type=\"submit\" className=\"w-full bg-emerald-600 py-3 font-bold\">\n        💳 Thanh toán 12.500.000₫\n      </button>\n    </form>\n  );\n}",
+      "impactLog": [
+        "$ click #1 t=0ms → POST /api/orders (req A)",
+        "> mạng lag 900ms — nút VẪN enabled",
+        "$ click #2 t=180ms → POST /api/orders (req B, cùng payload)",
+        "> req A → 201 Created — trừ thẻ 12.500.000₫",
+        "> req B → 201 Created — TRỪ THÊM 12.500.000₫",
+        "CRITICAL: 2 đơn trùng SKU · chargeback + phí gateway · khách gọi tổng đài"
+      ],
+      "blastRadius": [
+        "Khách bị trừ tiền đôi: chargeback cộng phí phạt từ cổng thanh toán, risk score tăng vọt.",
+        "Kho xuất 2 đơn trùng SKU → hoàn kho, ship 2 chiều, chi phí logistics nhân đôi.",
+        "Fraud system flag shop vì tỷ lệ duplicate bất thường — tài khoản gateway bị review.",
+        "Mẫu lỗi lặp lại ở mọi form dính tiền: đăng ký gói, nạp ví, đặt cọc giữ chỗ."
+      ],
+      "defenseName": "Pending Lock + Idempotency Key",
+      "defenseCode": "// ✅ Khóa nút khi pending + Idempotency-Key chống trùng ở server\n\n// 1) Client: cờ isSubmitting chặn mọi submit kế tiếp\nconst [isSubmitting, setIsSubmitting] = useState(false);\n\nasync function handleSubmit(e: React.FormEvent<HTMLFormElement>) {\n  e.preventDefault();\n  if (isSubmitting) return;            // 🔒 cửa vào đã khóa\n  setIsSubmitting(true);\n  try {\n    await fetch('/api/orders', {\n      method: 'POST',\n      headers: { 'Idempotency-Key': crypto.randomUUID() },\n      body: JSON.stringify(buildPayload()),\n    });\n  } finally {\n    setIsSubmitting(false);            // mở khóa cả khi network lỗi\n  }\n}\n\n<button type=\"submit\" disabled={isSubmitting}>\n  {isSubmitting ? 'Đang xử lý…' : '💳 Thanh toán'}\n</button>\n\n// 2) Server: lưu key → trùng key trả kết quả cached, KHÔNG tạo đơn mới\n// 3) RHF cung cấp sẵn formState.isSubmitting — đừng tự chế lại bánh xe",
+      "defenseTakeaway": "Submit dính tiền bạc phải có khóa pending ở client VÀ Idempotency-Key ở server — riêng disabled nút là chưa đủ khi network tự retry."
+    },
+    {
+      "id": "fe-vec-01",
+      "name": "Client-Only Validation Bypass",
+      "severity": "critical",
+      "category": "Validation Bypass",
+      "target": "API trust boundary (server-side re-validation)",
+      "story": "Attacker chẳng buồn mở UI. Một curl POST thẳng vào /api/reviews với rating=-999 và comment chứa <img onerror> — mọi zodResolver ở client đều bị bỏ qua như thể chúng không tồn tại. Route handler tin tưởng tuyệt đối req.json() và ghi thẳng vào database: payload độc chính thức nhập cư vào production.",
+      "payloadCode": "// 🕵️ Attacker bỏ qua UI — gọi thẳng endpoint\n// $ curl -X POST https://shop.com/api/reviews -d '{\"rating\":-999,\"comment\":\"<img src=x onerror=steal()>\",\"productId\":\"../admin\"}'\n\n// ❌ Route handler TIN TUYỆT ĐỐI vào validation phía client\n// app/api/reviews/route.ts (Next.js App Router)\nimport { NextResponse } from 'next/server';\nimport { db } from '@/lib/db';\n\nexport async function POST(req: Request) {\n  // UI có zodResolver? Vô nghĩa — attacker không đi qua UI\n  const body = await req.json(); // ❌ 0% validation\n  const review = await db.review.create({\n    data: body, // ❌ payload lạ ghi thẳng vào DB\n  });\n  return NextResponse.json(review, { status: 201 });\n}\n\n// Hệ quả: stored XSS · rating âm phá aggregate · mass-assignment",
+      "impactLog": [
+        "$ POST /api/reviews — KHÔNG qua browser, KHÔNG qua resolver",
+        "> body: {rating:-999, comment:'<img onerror>', productId:'../admin'}",
+        "> db.review.create(body) → COMMIT thành công",
+        "CRITICAL: Stored XSS phát tán tới mọi visitor trang sản phẩm",
+        "HIGH: rating=-999 làm điểm trung bình shop tính ra NaN",
+        "WARNING: mass-assignment ghi đè field isApproved=true"
+      ],
+      "blastRadius": [
+        "Stored XSS chạy trên domain thật với quyền của mọi user truy cập trang.",
+        "Dữ liệu rác/độc nhiễm DB — backup, replica, data warehouse lần lượt dính.",
+        "Mass-assignment cho attacker bật/tắt field nhạy cảm (role, isApproved).",
+        "Client validation chỉ là UX: mọi API public chính là bề mặt tấn công thật."
+      ],
+      "defenseName": "Shared Zod Schema — Server Re-validate",
+      "defenseCode": "// ✅ Server validate lại bằng CÙNG schema được share cho cả 2 đầu\n\n// lib/schemas/review.ts — nguồn sự thật duy nhất\nexport const ReviewSchema = z.object({\n  rating: z.number().int().min(1).max(5),\n  comment: z.string().trim().min(1).max(500),\n  productId: z.string().cuid(),\n});\nexport type ReviewInput = z.infer<typeof ReviewSchema>;\n\n// app/api/reviews/route.ts — ranh giới tin cậy THẬT\nimport { ReviewSchema } from '@/lib/schemas/review';\n\nexport async function POST(req: Request) {\n  const parsed = ReviewSchema.safeParse(await req.json());\n  if (!parsed.success) {\n    return NextResponse.json(\n      { errors: parsed.error.flatten().fieldErrors },\n      { status: 400 },\n    );\n  }\n  const review = await db.review.create({ data: parsed.data }); // đã kiểm\n  return NextResponse.json(review, { status: 201 });\n}",
+      "defenseTakeaway": "Một schema Zod phải chạy ở cả hai đầu: zodResolver cho UX, safeParse tại route handler cho an ninh — client validation chưa bao giờ là ranh giới tin cậy."
+    },
+    {
+      "id": "fe-vec-02",
+      "name": "parse() Landmine",
+      "severity": "high",
+      "category": "Unhandled Exception",
+      "target": "Event handler & render-phase error surface",
+      "story": ".parse() ném ZodError nhưng không một try/catch nào đứng ra nhận tội. Trong event handler, submit chết im lặng — nút loading quay vĩnh viễn. Tệ hơn: cùng pattern được tái sử dụng lúc render để parse localStorage, và lần này exception bắn thẳng vào React — route trắng toát toàn màn hình trong 14 phút trước khi có người nhận alert.",
+      "payloadCode": "// ❌ .parse() NÉM exception — không ai đứng ra bắt\n'use client';\n\nconst SettingsSchema = z.object({\n  siteName: z.string().min(3),\n  port: z.coerce.number().int().max(65535),\n});\n\nexport default function SettingsForm() {\n  // Path 1: trong event handler → uncaught → submit CHẾT IM LẶNG\n  async function onSave(raw: FormData) {\n    const data = SettingsSchema.parse(Object.fromEntries(raw)); // 💣 ZodError\n    await saveSettings(data); // không bao giờ chạy tới\n  }\n\n  // Path 2: cùng pattern chạy TRONG render — parse localStorage lúc init\n  const initial = SettingsSchema.parse(JSON.parse(localStorage.getItem('settings') ?? '{}'));\n  // 💣 throw NGAY TRONG render → không Error Boundary bao quanh = trắng toàn trang\n}",
+      "impactLog": [
+        "$ click 'Lưu' → parse({port:'99999'}) → ZodError THROWN",
+        "> unhandled in handler → saveSettings KHÔNG chạy, spinner treo vĩnh viễn",
+        "> reload trang → parse(localStorage) chạy TRONG render phase",
+        "FATAL: ZodError tại render → root unmount → WHITE SCREEN toàn app",
+        "CRITICAL: 14 phút trắng trang trước khi alert kêu được người",
+        "WARNING: user mất form settings soạn dở — hỗ trợ nhận 37 ticket"
+      ],
+      "blastRadius": [
+        "Toàn route trắng trang: user không thao tác được gì cho tới khi dev hotfix.",
+        "Lỗi im lặng trong handler: nút loading mãi mãi — không log, không toast, không dấu vết.",
+        "Sentry nhóm nhầm stack thành 'lỗi mạng' — chẩn đoán sai hướng suốt nhiều ngày.",
+        "Chỉ cần đổi message schema là cả trang chết: độ phủ test cho dữ liệu hỏng gần bằng 0."
+      ],
+      "defenseName": "safeParse + Error Surface",
+      "defenseCode": "// ✅ safeParse KHÔNG ném — trả union { success, data | error }\n\nasync function onSave(raw: FormData) {\n  const parsed = SettingsSchema.safeParse(Object.fromEntries(raw));\n  if (!parsed.success) {\n    // 1) Lỗi hiển thị CÓ KIỂM SOÁT theo từng field\n    setFieldErrors(parsed.error.flatten().fieldErrors);\n    toast.error('Dữ liệu chưa hợp lệ — kiểm tra các trường nổi đỏ');\n    return; // dừng sớm, UI vẫn sống\n  }\n  await saveSettings(parsed.data); // ✅ data đã qua kiểm chứng\n}\n\n// 2) Parse lúc render? Bọc fallback thay vì để nổ tự do\nconst initial = useMemo(() => {\n  const result = SettingsSchema.safeParse(readStoredSettings());\n  return result.success ? result.data : DEFAULT_SETTINGS; // ✅ graceful\n}, []);\n\n// 3) Lớp cuối: Error Boundary quanh route segment — crash cục bộ, không trắng trang",
+      "defenseTakeaway": "Ở biên dữ liệu luôn dùng safeParse và hiển thị lỗi có kiểm soát — .parse chỉ hợp lệ khi bạn thực sự muốn throw bên trong try/catch."
+    }
+  ],
+  "missions": [
+    {
+      "id": "sr-mis-01",
+      "slug": "ghost-field-vanishing",
+      "title": "Chiến dịch 01 · Bóng ma không tên: field biến mất khỏi FormData",
+      "summary": "Input hiển thị trên UI, user điền đầy đủ — nhưng server nhận payload thiếu trường đó. Truy nguyên quy tắc name attribute của HTML form và hợp đồng serialization ngầm.",
+      "objective": "Tạo form submit thành công nhưng một field hoàn toàn vắng mặt trong payload gửi lên server, không lỗi, không warning nào báo hiệu.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 18,
+      "vectorIds": [
+        "sr-vec-01"
+      ],
+      "rootCause": "FormData và cơ chế submit gốc của HTML không đọc từ React state hay DOM 'tổng thể' — nó thu thập theo cặp [name] → value của các control SUCCESSFUL bên trong <form>. name là hợp đồng định danh duy nhất của field trong thế giới serialization. React chỉ quản lý view; khi dev quen controlled component (đọc value qua state) dễ quên hẳn name vì 'dữ liệu đã nằm trong state rồi'. Ranh giới sụp khi team mix hai thế giới: nút submit type=submit + handler đọc FormData/e.target.elements — lúc đó field thiếu name trở thành bóng ma: có thật trên màn hình, không tồn tại trong dữ liệu.",
+      "reconNotes": [
+        "Liệt kê form dùng FormData(target) hoặc new FormData(form) thay vì đọc từng state.",
+        "So từng input giữa UI và payload: field nào có trong JSX nhưng thiếu trong request?",
+        "Kiểm tra custom component wrapper: có forwardRef và truyền {...props} (kể cả name) xuống input thật không?",
+        "Chú ý input disabled/readonly — successful control cũng loại bỏ disabled khỏi FormData."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Dựng form lai",
+          "detail": "Form đăng ký: email dùng controlled (có name), còn 'referralCode' dev thêm sau — quên name vì giá trị đọc qua onChange state.",
+          "code": "<input value={email} name=\"email\" onChange={...} />\n<input value={referral} onChange={...} /> {/* 💀 thiếu name */}"
+        },
+        {
+          "title": "2 · Submit qua cơ chế native",
+          "detail": "onSubmit gọi new FormData(e.currentTarget) — serializer quét form, gặp referral input KHÔNG có name → bỏ qua im lặng theo spec HTML.",
+          "code": "const fd = new FormData(e.currentTarget);\nfd.get('email');    // 'an@x.com'\nfd.get('referral'); // null 💀"
+        },
+        {
+          "title": "3 · Server nhận payload cụt",
+          "detail": "POST /register gửi {email} mà không referral. Backend Zod schema optional nên 200 OK — mã giảm giá của user bay vào hư không.",
+          "code": "// server log\n{ \"email\": \"an@x.com\" }   // referralCode: absent"
+        },
+        {
+          "title": "4 · Vá đúng hợp đồng",
+          "detail": "Thêm name cho mọi control; với custom Field component, đảm bảo props lan xuống input gốc. Chọn MỘT thế giới serialization: hoặc full-controlled đọc state, hoặc native FormData — không trộn.",
+          "code": "<TextField name=\"referral\" value={referral} onChange={...} />\n// TextField phải forward {name,...rest} vào <input/> bên trong"
+        }
+      ],
+      "hardeningChecklist": [
+        "Quy tắc: mọi input bên trong <form> đều phải có name — kể cả khi đang controlled.",
+        "Custom form control bắt buộc forwardRef + spread rest props để name/disabled/aria không bị nuốt.",
+        "Log payload ở tầng API client (dev-only) để lệch giữa UI và request lộ ngay khi test.",
+        "Server schema: những field business-critical nên required thay vì optional lặng lẽ.",
+        "E2E test ít nhất 1 flow submit per form: assert payload đầy đủ field như UI hiển thị."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao controlled input vẫn cần name dù dữ liệu nằm trong state?",
+          "answer": "Vì name phục vụ thế giới SERIALIZATION (FormData, autofill, password manager), không phục vụ React. Hai hệ thống nhìn cùng một DOM nhưng bằng hai hợp đồng khác nhau."
+        },
+        {
+          "question": "Disabled input bị bỏ khỏi FormData — tận dụng thế nào cho đúng?",
+          "answer": "Đó là tính năng: dùng disabled để 'gỡ' field khỏi payload khi business rule yêu cầu (ví dụ khóa mã giảm giá sau khi tính tiền). Nhưng phải chủ động; đừng để disabled xuất hiện do bug state."
+        }
+      ]
+    },
+    {
+      "id": "sr-mis-02",
+      "slug": "controlled-mode-flip",
+      "title": "Chiến dịch 02 · Lật chế độ: controlled ↔ uncontrolled đổi pha giữa chừng",
+      "summary": "Một điều kiện render khiến input đổi from controlled sang uncontrolled: warning đỏ trong console, chữ user gõ bốc hơi, và bài học về hợp đồng nhất quán của value/defaultValue.",
+      "objective": "Kích hoạt cảnh báo 'A component is changing an uncontrolled input to be controlled' và mất dữ liệu nhập, rồi chuẩn hóa contract của form field vĩnh viễn.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 18,
+      "vectorIds": [
+        "sr-vec-02"
+      ],
+      "rootCause": "React phân loại input dựa trên prop ĐƯỢC TRUYỀN tại mỗi render: có value → controlled (React sở hữu), không có value (chỉ defaultValue hoặc không gì) → uncontrolled (DOM sở hữu). Việc chuyển mode giữa chừng buộc DOM và React tranh giành nguồn sự thật. Gốc rễ: dev coi value là 'optional prop' trong khi nó là TUYÊN BỐ KIẾN TRÚC về ai giữ state. Khi value đến từ data có thể undefined (API chưa trả, field ẩn theo điều kiện), mode flip xảy ra âm thầm — và lần render đầu tiên với undefined đã khóa input vào uncontrolled world.",
+      "reconNotes": [
+        "Grep input có value= nằm trong điều kiện: {isEdit && <input value=...>} hoặc value={user?.name}.",
+        "Mở console filter Warning: 'changing an uncontrolled input' / 'controlled input to be uncontrolled'.",
+        "Thử flow tạo-mới vs chỉnh-sửa trên cùng form component — nơi hay lộ mode flip.",
+        "Kiểm tra reset form: setValues(undefined) thay vì '' cũng là một cú flip ngược."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Truyền value có thể undefined",
+          "detail": "Form edit profile tái sử dụng cho trang create; user object chưa load nên name prop là undefined.",
+          "code": "<ProfileForm name={user?.name} />\n// lần đầu mount: user === null → name === undefined"
+        },
+        {
+          "title": "2 · Mount ở chế độ uncontrolled",
+          "detail": "value={undefined} ≡ không truyền value → React xem đây uncontrolled input, DOM tự quản. User gõ 'Nguyễn Văn A' — chữ nằm trong DOM node.",
+          "code": "<input value={undefined} onChange={...} defaultValue={undefined} />\n// = uncontrolled; DOM giữ 'Nguyễn Văn A'"
+        },
+        {
+          "title": "3 · Data về, mode lật ngược",
+          "detail": "user load xong → name='An (server)' → input giờ controlled. Console nổ warning; chữ user vừa gõ bị ghi đè bởi giá trị server.",
+          "code": "// Warning: A component is changing an uncontrolled input to be controlled.\n// DOM text bị replace: 'Nguyễn Văn A' → 'An (server)' 💀"
+        },
+        {
+          "title": "4 · Chuẩn hóa hợp đồng",
+          "detail": "Vá bằng giá trị fallback + tách trạng thái loading, bảo đảm input CHỈ thuộc một thế giới suốt vòng đời.",
+          "code": "{!user ? <Spinner/> : (\n  <ProfileForm name={user.name ?? ''} /> // ✅ luôn string, luôn controlled\n)}"
+        }
+      ],
+      "hardeningChecklist": [
+        "Không bao giờ truyền value có khả năng undefined vào input: fallback '' hoặc dùng defaultValue một cách CỐ Ý.",
+        "Chọn chiến lược cho từng field ngay từ thiết kế: controlled (validation động) hay uncontrolled (performance, file input).",
+        "Form chưa sẵn sàng (data loading) thì không render input — render skeleton/spinner thay thế.",
+        "Giám sát console warning trong CI (cypress devtools / testing-library) — coi React warning là failure.",
+        "Reset form dùng setValues(INITIAL_VALUES) với mọi key là string rỗng, không bao giờ undefined/null."
+      ],
+      "debrief": [
+        {
+          "question": "defaultValue khác value chỗ nào về mặt hợp đồng?",
+          "answer": "defaultValue là 'giá trị khởi tạo một lần' cho thế giới uncontrolled — DOM sở hữu sau đó. value là tuyên bố 'mỗi render giá trị là NÀY, DOM không được tự ý đổi'. Trộn hai cái trong vòng đời một input là vi phạm hợp đồng."
+        },
+        {
+          "question": "Warning này có nghiêm trọng không nếu UI 'vẫn chạy'?",
+          "answer": "Có. Nó báo ownership flip — nguồn sự thật đổi tay giữa chừng, kéo theo mất input user, hành vi autofill/password manager khó đoán, và logic validation đọc sai nguồn. Đây là mùi kiến trúc chứ không chỉ warning thẩm mỹ."
+        }
+      ]
+    },
+    {
+      "id": "sr-mis-03",
+      "slug": "double-submit-fraud",
+      "title": "Chiến dịch 03 · Double Submit: đơn hàng nhân bản từ một cú click sốt ruột",
+      "summary": "User bấm nút Thanh toán hai lần vì mạng chậm — hai đơn hàng, hai lần trừ tiền. Xây kịch bản race condition từ UX đến DB idempotency, và lớp vá nhiều tầng chuẩn production.",
+      "objective": "Nhân bản một thao tác ghi dữ liệu chỉ bằng double-click trong khoảng network latency, sau đó dựng hàng rào phòng thủ từ UI tới database.",
+      "difficulty": "advanced",
+      "estimatedMinutes": 22,
+      "vectorIds": [
+        "sr-vec-03"
+      ],
+      "rootCause": "Submit không đồng bộ mở ra cửa sổ thời gian giữa CLICK và PHẢN HỒI — trong cửa sổ đó app vẫn ở trạng thái 'chưa làm gì', nên mọi click thêm đều được coi là ý muốn mới. Frontend thường chỉ disable button 'khi đang xử lý' nhưng quên: (1) handler async có thể throw trước khi re-enable, (2) Enter key/double-tap mobile bypass onClick guard, (3) tab khác/retry của trình duyệt gửi lại request. Phòng thủ triệt để phải nhiều tầng: UI lock, single-flight ở client, và IDempotency-Key ở server để hai request GIỐNG HỆT chỉ tính một.",
+      "reconNotes": [
+        "Throttle network xuống Slow 3G rồi double-click nhanh mọi nút submit quan trọng.",
+        "Xem handler có flag isSubmitting/disable không; flag có chắc chắn reset trong finally không?",
+        "Server side: endpoint checkout có kiểm tra trùng (idempotency token, unique constraint) không?",
+        "Test bàn phím: focus nút rồi nhấn Enter ×2 — onClick guard có bao phủ path này?"
+      ],
+      "killChain": [
+        {
+          "title": "1 · Dựng nút không khóa",
+          "detail": "Handler async gọi API nhưng button không biết tiến trình nào đang chạy — mọi click đều phát request mới.",
+          "code": "const handleCheckout = async () => {\n  await api.post('/orders', cart); // 💀 không lock\n  router.push('/thank-you');\n};"
+        },
+        {
+          "title": "2 · Khai thác cửa sổ latency",
+          "detail": "Slow 3G: request đầu mất 2.4s. User sốt ruột click lần nữa ở giây thứ 0.8 — request hai khởi phát khi request một còn trên đường truyền.",
+          "code": "t=0.0s click#1 → POST /orders (in-flight)\nt=0.8s click#2 → POST /orders (in-flight)\n// hai request song song, cùng cart content"
+        },
+        {
+          "title": "3 · Thu hoạch hai đơn hàng",
+          "detail": "Cả hai request 201 Created. User có hai đơn giống hệt, thẻ bị trừ hai lần — support nhận ticket 'tôi chỉ bấm một lần'.",
+          "code": "POST #1 → 201 order_8841\nPOST #2 → 201 order_8842\n// charge ×2, inventory −2"
+        },
+        {
+          "title": "4 · Vá nhiều tầng",
+          "detail": "UI disable + client single-flight + server idempotency-key: ba lớp độc lập, lớp dưới vẫn đứng vững khi lớp trên bị vượt.",
+          "code": "// UI: pending lock\nconst [pending, setPending] = useState(false);\nasync function submit() {\n  if (pending) return;\n  setPending(true);\n  try { await api.post('/orders', cart, {\n    headers: { 'Idempotency-Key': crypto.randomUUID() } }); }\n  finally { setPending(false); }\n}\n// SERVER: lưu key→response, trùng key trả kết quả cũ"
+        }
+      ],
+      "hardeningChecklist": [
+        "Disable nút + hiển thị spinner khi pending; khóa ở mức FORM (không chỉ nút) gồm cả phím Enter.",
+        "Reset lock trong finally — kể cả nhánh lỗi, tránh khóa vĩnh viễn khiến user kẹt.",
+        "Mọi POST tạo tài nguyên: client sinh Idempotency-Key một lần per intent; server cache response theo key.",
+        "DB thêm unique constraint nghiệp vụ (user_id+cart_hash trong 60s) làm lưới cuối.",
+        "Giám sát: alert khi cùng user tạo >1 đơn giống nhau trong cửa sổ ngắn — tín hiệu leak của tầng UI."
+      ],
+      "debrief": [
+        {
+          "question": "Disable button đã đủ chưa, cần Idempotency-Key làm gì?",
+          "answer": "Disable chỉ chặn path UI của một tab. Còn: retry của fetch library, tab thứ hai, script bên ngoài, network replay. Key idempotency là hợp đồng giữa CLIENT INTENT và SERVER — cùng một ý định thì chỉ tính một lần, bất kể request phát mấy lần."
+        },
+        {
+          "question": "Đặt unique index DB có thay được cho idempotency không?",
+          "answer": "Index chống duplicate nhưng phản hồi 500/409 khiến UX xấu và client không nhận lại kết quả mong muốn. Idempotency trả về KẾT QUẢ của request đầu tiên — an toàn và thân thiện. Index là lưới an toàn cuối, không phải lớp chính."
+        }
+      ]
+    },
+    {
+      "id": "fe-mis-01",
+      "slug": "client-validation-bypass",
+      "title": "Chiến dịch 04 · Vượt trạm: bypass toàn bộ validation phía client",
+      "summary": "Zod schema đẹp trên UI chỉ là trang trí nếu server tin payload từ client. Mô phỏng attacker curl thẳng API với dữ liệu độc, và dựng kiến trúc 'một schema, hai nơi xác thực'.",
+      "objective": "Gửi dữ liệu vi phạm mọi rule (email rác, age âm, role tự gán) thẳng vào API bỏ qua React Hook Form, chứng minh client validation không phải bảo mật, rồi vá bằng server-side re-validation dùng chính schema đó.",
+      "difficulty": "critical",
+      "estimatedMinutes": 22,
+      "vectorIds": [
+        "fe-vec-01"
+      ],
+      "rootCause": "Client validation phục vụ TRẢI NGHIỆM (phản hồi nhanh), không phải BẢO MẬT. Mọi thứ trong browser thuộc quyền kiểm soát user: họ xem được source, sửa được state qua devtools, hoặc đơn giản bỏ qua app và gọi curl/postman trực tiếp. Lỗ hổng kiến trúc nằm ở ranh giới trust: server nhận JSON và TIN nó giống như khi form UI gửi — thiếu bước xác thực lại tại biên giới. Nguyên tắc nền: never trust the client; schema là hợp đồng, mà hợp đồng phải được kiểm tra ở nơi có kẻ xấu.",
+      "reconNotes": [
+        "Mở Network tab xem endpoint + payload shape thật của form submit.",
+        "Đọc bundle tìm Zod schema leak (nếu có) để biết đúng rule cần vượt.",
+        "Thử POST trực tiếp bằng curl với body rác: thiếu field, sai kiểu, thừa field nhạy cảm như role.",
+        "Quan sát response: 400 có message chi tiết hay 200 OK nuốt sạch = server không validate."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Chụp request chuẩn",
+          "detail": "Submit form hợp lệ một lần để biết endpoint, header, cấu trúc payload.",
+          "code": "POST /api/register\n{ \"email\": \"an@x.com\", \"password\": \"Str0ng!pass\", \"age\": 25 }"
+        },
+        {
+          "title": "2 · Bỏ form, bắn thẳng",
+          "detail": "Attacker bỏ qua toàn bộ RHF+Zod phía client — chúng chỉ chạy khi đi qua UI.",
+          "code": "$ curl -X POST https://app.com/api/register \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"email\":\"not-an-email\",\"age\":-999,\"role\":\"admin\"}'"
+        },
+        {
+          "title": "3 · Thu hoạch dữ liệu độc",
+          "detail": "Server lưu nguyên trạng thái: email rác vào DB, age âm phá thống kê, role admin leo thang đặc quyền — tất cả vì 'form đã validate' theo tưởng tưởng của dev.",
+          "code": "201 Created\n{ \"id\": 8841, \"email\": \"not-an-email\", \"role\": \"admin\" } 💀"
+        },
+        {
+          "title": "4 · Vá bằng shared schema",
+          "detail": "Cùng một Zod schema dùng ở CẢ hai nơi: client cho UX, server cho an toàn. Schema sống ở thư mục shared import được từ cả route handler.",
+          "code": "// shared/schemas/register.ts\nexport const registerSchema = z.object({\n  email: z.string().email(),\n  password: z.string().min(8),\n  age: z.number().int().positive(),\n});\n// app/api/register/route.ts\nconst parsed = registerSchema.safeParse(await req.json());\nif (!parsed.success) return Response.json({ errors: parsed.error.flatten() }, { status: 400 });"
+        }
+      ],
+      "hardeningChecklist": [
+        "TUYỆT ĐỐI re-validate mọi input ở server dù client đã validate — coi client là kẻ thù không đáng tin.",
+        "Schema Zod đặt ở thư mục shared, import chung cho form UI và route handler — single source of truth.",
+        "Dùng .strict() hoặc strip unknown keys để chặn field thừa (mass assignment) như role/isAdmin.",
+        "Authorization check riêng: field nào user ĐƯỢC phép gửi phải kiểm theo session, không tin từ payload.",
+        "E2E security test: curl payload rác phải nhận 400 — đưa vào CI như regression test bảo mật."
+      ],
+      "debrief": [
+        {
+          "question": "Nếu đã dùng React Hook Form + Zod thì còn thiếu gì?",
+          "answer": "RHF resolver chỉ chạy khi submit QUA form. Nó là tầng UX. Server-side parsing với cùng schema mới là tầng security — hai vai trò khác nhau của cùng một artifact."
+        },
+        {
+          "question": "Trả 400 chi tiết lỗi cho client có nguy hiểm gì?",
+          "answer": "Message quá chi tiết giúp attacker dò cấu trúc. Thực hành tốt: trả lỗi field-level cho lỗi format thông thường, nhưng log chi tiết server-side; với lỗi nhạy cảm chỉ trả thông báo chung."
+        }
+      ]
+    },
+    {
+      "id": "fe-mis-02",
+      "slug": "parse-landmine-crash",
+      "title": "Chiến dịch 05 · Mìn parse(): quả bom nổ chậm trong event handler",
+      "summary": ".parse() ném exception khi dữ liệu không hợp lệ — đặt trong handler không try/catch, một input xấu enough biến thành màn hình trắng. So sánh parse vs safeParse và pattern xử lý lỗi chuẩn.",
+      "objective": "Kích hoạt unhandled exception từ Zod parse làm sập flow submit, hiểu error boundary che giấu đến đâu, và chuyển đổi codebase sang safeParse pipeline có thông báo lỗi thân thiện.",
+      "difficulty": "intermediate",
+      "estimatedMinutes": 18,
+      "vectorIds": [
+        "fe-vec-02"
+      ],
+      "rootCause": "Zod thiết kế .parse() theo phong cách throw-on-invalid: tiện cho internal pipeline nơi dữ liệu xấu là BUG lập trình (fail fast), nguy hiểm cho USER INPUT nơi dữ liệu xấu là CHUYỆN THƯỜNG. Nhầm lẫn hai ngữ cảnh này là gốc rễ: input user phải đi qua safeParse — hàm trả về { success, data | error } không ném. Khi parse() ném trong async handler mà không ai catch, promise reject → Next.js hiển thị error boundary/toàn trang trắng, và người dùng mất toàn bộ nội dung vừa gõ.",
+      "reconNotes": [
+        "Grep '.parse(' trong component/handler xử lý input user — ứng viên mìn số một.",
+        "Kiểm tra handler async có try/catch bao quanh không; error boundary có tồn tại ở cấp nào?",
+        "Nhập liệu thử các giá trị biên: chuỗi rỗng, chữ vào ô number, null từ autofill.",
+        "Xem telemetry/Sentry: unhandled rejection với stack chứa ZodError."
+      ],
+      "killChain": [
+        {
+          "title": "1 · Đặt mìn",
+          "detail": "Dev chọn .parse() vì gọn: giá trị trả ra dùng luôn, không xử lý error case.",
+          "code": "function onSubmit(values: unknown) {\n  const data = registerSchema.parse(values); // 💀 throws\n  api.register(data);\n}"
+        },
+        {
+          "title": "2 · Kích hoạt bằng input bình thường",
+          "detail": "User dán tuổi từ Excel dạng text '25 ' (có khoảng trắng) hoặc để trống — parse ném ZodError ngay giữa handler.",
+          "code": "{ age: \"25 \" } → ZodError: Expected number, received string"
+        },
+        {
+          "title": "3 · Sập có hệ thống",
+          "detail": "Exception thoát khỏi event handler → React coi là lỗi render/commit → error boundary bắt (nếu có) hoặc trắng trang. Toàn bộ form state mất.",
+          "code": "Unhandled Runtime Error\nZodError: [\n  { path: ['age'], message: 'Expected number...' }\n]\n// form data: GONE 💀"
+        },
+        {
+          "title": "4 · Giải mìn bằng safeParse",
+          "detail": "Chuyển sang safeParse: dữ liệu xấu trở thành NHÁNH CODE bình thường, hiển thị lỗi từng field cạnh input, giữ nguyên công sức gõ của user.",
+          "code": "function onSubmit(raw: unknown) {\n  const result = registerSchema.safeParse(raw);\n  if (!result.success) {\n    setFieldErrors(result.error.flatten().fieldErrors);\n    return;\n  }\n  api.register(result.data); // ✅ typed & validated\n}"
+        }
+      ],
+      "hardeningChecklist": [
+        "Quy ước: .parse() chỉ dành cho dữ liệu TIN CẬY (config, response API đã qua middleware); input user luôn safeParse.",
+        "Mọi async handler submit có try/catch hoặc Promise.catch — không để rejection thoát ra ngoài.",
+        "Hiển thị lỗi theo field (flatten().fieldErrors) thay vì alert chung chung.",
+        "Có error boundary cấp form để dù crash cũng giữ được draft (lưu draft localStorage trước submit).",
+        "Test đường xấu: submit với từng field sai kiểu — assert UI hiện lỗi, không trắng trang."
+      ],
+      "debrief": [
+        {
+          "question": "Vì sao Zod không tự 'an toàn' luôn, bỏ parse()?",
+          "answer": "Throw-on-invalid có giá trị riêng: trong pipeline nội bộ, dữ liệu xấu là bug cần nổ NGAY để phát hiện. Hai API cho hai ngữ cảnh — chọn sai ngữ cảnh mới là vấn đề."
+        },
+        {
+          "question": "safeParse trả success:false rồi nên làm gì thêm ngoài hiển thị lỗi?",
+          "answer": "Log telemetry (field nào hay sai để cải thiện UX), giữ state form, disable double-submit, và nếu lỗi do server trả về thì map về cùng cơ chế hiển thị fieldErrors."
+        }
+      ]
+    }
+  ],
+  "dossier": {
+    "readingTimeMinutes": 13,
+    "objectives": [
+      "Loại bỏ field khỏi payload chỉ bằng cách xóa name attribute, giải thích FormData thu thập theo name như thế nào.",
+      "Lật controlled sang uncontrolled để vượt ràng buộc giá trị và bơm trạng thái lệch vào form.",
+      "Thực hiện double submit tạo đơn hàng và trừ tiền nhân bản, chỉ ra cửa sổ race và chặn bằng idempotency.",
+      "Bypass validation phía client và kích nổ parse() landmine; vá bằng re-validate server với zod safeParse."
+    ],
+    "concepts": [
+      {
+        "term": "FormData thu theo name",
+        "definition": "new FormData(form) và submit mặc định lấy cặp name/value của các field đang enable; field thiếu name, bị disabled hoặc nằm ngoài form biến mất khỏi payload. Backend tin payload là đủ nên sinh ghost field: giá trị user nhìn thấy không bao giờ đến server, đơn hàng thiếu địa chỉ hay số lượng mà không một cảnh báo."
+      },
+      {
+        "term": "Controlled và uncontrolled flip",
+        "definition": "Input controlled có value cộng onChange; nếu value undefined, React flip sang uncontrolled và input tự quản lý DOM value — mọi ràng buộc format và validation gắn với state bị bỏ qua. Flip ngược chiều còn reset dữ liệu user giữa chừng gõ. Nguồn sự thật mờ nhạt là cửa vào cho state corruption."
+      },
+      {
+        "term": "Cửa sổ race của double submit",
+        "definition": "Khoảng giữa lúc bấm và response về là cửa sổ race: bấm thêm lần nữa phát sinh request song song với cùng dữ liệu — hai đơn hàng, hai lần trừ tiền, hai email xác nhận. Nguyên nhân kép: nút không khóa isPending và server không idempotent. Idempotency-Key cộng unique constraint ở DB là hàng rào tận gốc."
+      },
+      {
+        "term": "Client validation không phải bảo mật",
+        "definition": "Validation trên client chỉ là trải nghiệm người dùng; attacker gọi thẳng API bằng curl với payload tùy ý, mọi rule required, max, min chỉ tồn tại ở browser đều bị bỏ qua. Server phải re-validate schema trước khi chạm business logic. Tin client là mở cửa ghi rác dữ liệu và vượt logic giá."
+      },
+      {
+        "term": "Parse() landmine",
+        "definition": "parseInt, JSON.parse, Number() ném exception hoặc trả NaN trên input lạ; gọi trong render hoặc handler không có try-catch thì một ký tự kỳ là trắng trang. Error boundary có thể che màn hình nhưng state đã hỏng trước đó. Parse an toàn: safeParse của schema, kiểm tra Number.isFinite, cô lập việc parse ở biên giới dữ liệu ngoại lai."
+      }
+    ],
+    "attackerPlaybook": [
+      {
+        "title": "Soi bản đồ form",
+        "detail": "Đọc DOM form: field nào thiếu name hoặc disabled, input nào thiếu onChange, nút submit có khóa khi pending hay không. Bản đồ này chỉ đích danh từng vector khả dụng trước khi khai hỏa."
+      },
+      {
+        "title": "Bắn ghost field và flip",
+        "detail": "Xóa name của field then chốt trong DevTools rồi submit, soi payload thiếu field trên Network tab. Lật controlled input để nhập giá trị ngoài ràng buộc: số âm, ký tự đặc biệt, độ dài cực đại."
+      },
+      {
+        "title": "Double submit và bypass validation",
+        "detail": "Spam nút Lưu hoặc Thanh toán nhiều lần với throttled network để giữ mở cửa sổ race. Song song gọi thẳng API bỏ qua form với amount -1 và age abc để chứng minh trust boundary hở hoàn toàn."
+      },
+      {
+        "title": "Kích landmine parse",
+        "detail": "Nhập e, chuỗi rỗng, 0x10, JSON cắt cụt vào ô số và ô JSON config để ném exception từ handler và render, chụp stack trace. Tổng hợp biên bản: mỗi vector một PoC kèm bản vá name attr, controlled contract, idempotency, zod safeParse."
+      }
+    ],
+    "defensePrinciples": [
+      "Mọi field nghiệp vụ có name ổn định và thuộc về form; payload được tạo bởi một serializer duy nhất qua react-hook-form cộng zodResolver, không ghép tay.",
+      "Input nghiệp vụ luôn controlled với value cộng onChange và một nguồn sự thật duy nhất; cấm lẫn value undefined với defaultValue.",
+      "Endpoint mutation phải idempotent: Idempotency-Key, unique constraint ở DB, khóa isPending và disable nút — chặn nhân bản ở cả UI lẫn dữ liệu.",
+      "Server re-validate mọi thứ bằng schema; parse dữ liệu ngoài luôn trong try-catch với fallback có chủ đích và không bao giờ parse trong render."
+    ]
+  }
+}

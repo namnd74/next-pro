@@ -75,15 +75,15 @@ export default function InterviewPage() {
       {/* Header Banner */}
       <section className="flex flex-col gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
         <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
             <Briefcase className="h-4 w-4" />
             <span>Senior Frontend Interview Simulator</span>
           </div>
 
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
-            Luyện Phỏng Vấn React 19 & Next.js 15
+          <h1 className="text-foreground text-3xl font-extrabold tracking-tight sm:text-4xl">
+            Luyện Phỏng Vấn React 19 & Next.js 16
           </h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed sm:text-base">
             Mô phỏng phỏng vấn kỹ thuật thực tế với bộ câu hỏi Senior, bẫy tuyển dụng
             (Pitfalls), chấm điểm tự động và các thử thách bắt lỗi bug kiến trúc.
           </p>
@@ -97,7 +97,7 @@ export default function InterviewPage() {
             onClick={() => setIsJsonModalOpen(true)}
             className="gap-1.5 text-xs font-semibold"
           >
-            <FileJson className="h-4 w-4 text-primary" />
+            <FileJson className="text-primary h-4 w-4" />
             <span>Import / Export JSON</span>
           </Button>
 
@@ -146,20 +146,20 @@ export default function InterviewPage() {
             <Card className="glass-card relative z-20 space-y-3 p-4">
               {/* Search bar */}
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
                 <input
                   type="text"
                   placeholder="Tìm kiếm câu hỏi, từ khóa kỹ thuật (VD: RSC, Hydration, useOptimistic...)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-input bg-background py-2 pl-9 pr-4 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-primary w-full rounded-xl border py-2 pr-4 pl-9 text-xs focus:ring-2 focus:outline-none"
                 />
               </div>
 
               {/* Filters row */}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/40 pt-1">
+              <div className="border-border/40 flex flex-wrap items-center justify-between gap-3 border-t pt-1">
                 <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold">
                     <Filter className="h-3.5 w-3.5" />
                     <span>Chủ đề:</span>
                   </div>
@@ -174,6 +174,10 @@ export default function InterviewPage() {
                       {
                         value: 'javascript-typescript',
                         label: 'JavaScript & TypeScript',
+                      },
+                      {
+                        value: 'browser-runtime-workers',
+                        label: 'Browser Runtime & Workers',
                       },
                       { value: 'state-data', label: 'State & Data Query' },
                       {
@@ -217,7 +221,7 @@ export default function InterviewPage() {
             {/* Questions list */}
             <div className="space-y-4">
               {filteredQuestions.length === 0 ? (
-                <Card className="glass-card p-8 text-center text-sm text-muted-foreground">
+                <Card className="glass-card text-muted-foreground p-8 text-center text-sm">
                   Không tìm thấy câu hỏi nào phù hợp với từ khóa hoặc bộ lọc hiện tại.
                 </Card>
               ) : (

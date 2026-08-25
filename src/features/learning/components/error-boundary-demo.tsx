@@ -12,7 +12,7 @@ import { CodeBlock } from '@/components/ui/code-block';
  *
  * 1. React Core Team chỉ cung cấp 2 primitive lifecycle methods: `getDerivedStateFromError` và `componentDidCatch`.
  *    React KHÔNG ship sẵn 1 component `<ErrorBoundary>` mặc định vì mỗi ứng dụng/framework lại có thiết kế Fallback UI khác nhau hoàn toàn.
- * 2. Trong Next.js 15 App Router: Next.js ĐÃ VIẾT SẴN Class Engine này ngầm cho bạn! Khi bạn tạo file `error.tsx`,
+ * 2. Trong Next.js 16 App Router: Next.js ĐÃ VIẾT SẴN Class Engine này ngầm cho bạn! Khi bạn tạo file `error.tsx`,
  *    Next.js tự động bọc Class Engine này xung quanh Functional Component `error.tsx` của bạn.
  * 3. Trong React thuần (Vite/CRA): Bạn tự định nghĩa Class Engine này 1 lần (hoặc dùng package `react-error-boundary`).
  */
@@ -78,7 +78,7 @@ export function ErrorBoundary({
     <InternalErrorBoundary
       onReset={onReset}
       fallback={({ error, resetErrorBoundary }) => (
-        <div className="space-y-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-left animate-in fade-in-50">
+        <div className="animate-in fade-in-50 space-y-4 rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-left">
           <div className="flex items-center justify-between border-b border-red-500/20 pb-3">
             <div className="flex items-center gap-2">
               <ShieldAlert className="h-5 w-5 text-red-500" />
@@ -92,7 +92,7 @@ export function ErrorBoundary({
             </Badge>
           </div>
 
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="text-muted-foreground text-xs leading-relaxed">
             Nhờ có <strong>Functional Error Boundary Wrapper</strong> (mô hình như package{' '}
             <code>react-error-boundary</code> &amp; Next.js <code>error.tsx</code>), lỗi
             JavaScript chỉ khoanh vùng component con bị hỏng mà không làm sập toàn bộ
@@ -139,10 +139,10 @@ function BuggyWidget() {
       <div className="flex items-center gap-3">
         <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
         <div className="space-y-0.5">
-          <h5 className="text-xs font-bold text-foreground">
+          <h5 className="text-foreground text-xs font-bold">
             Functional Component Con Đang Chạy Mượt Mà
           </h5>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-muted-foreground text-[11px]">
             Bấm nút bên cạnh để giả lập lỗi Runtime Render Crash trong Functional
             Component.
           </p>
@@ -166,28 +166,28 @@ function BuggyWidget() {
 export function ErrorBoundaryDemo() {
   return (
     <Card className="glass-card space-y-6 p-6 sm:p-8">
-      <div className="flex flex-col gap-2 border-b border-border/50 pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-border/50 flex flex-col gap-2 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-0.5 text-xs font-semibold text-red-500">
             <ShieldAlert className="h-3.5 w-3.5" />
             <span>Functional React Error Boundary Simulator</span>
           </div>
-          <h3 className="text-xl font-bold tracking-tight text-foreground">
+          <h3 className="text-foreground text-xl font-bold tracking-tight">
             Thực Nghiệm Khoanh Vùng Lỗi Với Functional Component Error Boundary
           </h3>
         </div>
 
         <Badge
           variant="outline"
-          className="w-fit font-mono text-xs text-muted-foreground"
+          className="text-muted-foreground w-fit font-mono text-xs"
         >
           Functional Component API
         </Badge>
       </div>
 
-      <p className="text-xs leading-relaxed text-muted-foreground">
+      <p className="text-muted-foreground text-xs leading-relaxed">
         Lập trình viên sử dụng <strong>Functional Component API</strong> để bọc các nhánh
-        giao diện. Trong Next.js 15, file <code>error.tsx</code> chính là một Functional
+        giao diện. Trong Next.js 16, file <code>error.tsx</code> chính là một Functional
         Component nhận vào <code>{'{ error, reset }'}</code>!
       </p>
 

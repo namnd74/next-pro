@@ -19,7 +19,7 @@ interface MetricChartsProps {
 export function MetricCharts({ activities = [] }: MetricChartsProps) {
   const stackItems = [
     {
-      name: 'Next.js 15 (App Router)',
+      name: 'Next.js 16 (App Router)',
       desc: 'RSC, Server Actions, Dynamic Routes',
       tag: 'Framework',
     },
@@ -62,7 +62,7 @@ export function MetricCharts({ activities = [] }: MetricChartsProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-primary/10 p-2 text-primary">
+              <div className="bg-primary/10 text-primary rounded-lg p-2">
                 <Box className="h-4 w-4" />
               </div>
               <CardTitle className="text-base">Integrated Architecture Matrix</CardTitle>
@@ -82,20 +82,20 @@ export function MetricCharts({ activities = [] }: MetricChartsProps) {
             {stackItems.map((item, idx) => (
               <div
                 key={idx}
-                className="flex flex-col justify-between rounded-xl border border-border/50 bg-secondary/40 p-3.5 transition-colors hover:bg-secondary/70"
+                className="border-border/50 bg-secondary/40 hover:bg-secondary/70 flex flex-col justify-between rounded-xl border p-3.5 transition-colors"
               >
                 <div>
                   <div className="mb-1 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                    <span className="text-foreground flex items-center gap-1.5 text-xs font-semibold">
+                      <span className="bg-primary h-1.5 w-1.5 rounded-full" />
                       {item.name}
                     </span>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
                     {item.desc}
                   </p>
                 </div>
-                <div className="mt-2 flex justify-end border-t border-border/30 pt-2">
+                <div className="border-border/30 mt-2 flex justify-end border-t pt-2">
                   <Badge variant="secondary" className="px-2 py-0 text-[10px]">
                     {item.tag}
                   </Badge>
@@ -129,8 +129,8 @@ export function MetricCharts({ activities = [] }: MetricChartsProps) {
                   <CheckCircle2 className="h-4 w-4" />
                 </div>
                 <div className="flex-1 space-y-0.5">
-                  <p className="font-medium leading-snug text-foreground">{act.action}</p>
-                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                  <p className="text-foreground leading-snug font-medium">{act.action}</p>
+                  <div className="text-muted-foreground flex items-center gap-2 text-[10px]">
                     <span>{act.actor}</span>
                     <span>•</span>
                     <span className="flex items-center gap-0.5">
@@ -142,7 +142,7 @@ export function MetricCharts({ activities = [] }: MetricChartsProps) {
               </div>
             ))
           ) : (
-            <div className="py-6 text-center text-xs text-muted-foreground">
+            <div className="text-muted-foreground py-6 text-center text-xs">
               No recent events
             </div>
           )}

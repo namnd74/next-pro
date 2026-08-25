@@ -3,85 +3,244 @@
     "id": "int-01",
     "category": "next-app-router",
     "level": "senior",
-    "question": "Hãy giải thích sự khác biệt giữa SSR truyền thống của Pages Router (getServerSideProps) và React Server Components (RSC) trong App Router?",
-    "interviewerIntent": "Kiểm tra xem ứng viên có hiểu sâu về cơ chế Hydration, Client Bundle Size và kiến trúc Streaming của RSC hay chỉ biết code bề mặt.",
-    "contextOrScenario": "Hệ thống E-commerce có TTFB khá nhưng TTI (Time to Interactive) bị chậm và tải hơn 1.2MB JS về browser trên thiết bị di động.",
+    "question": "Trong Next.js 16 App Router, React Server Components khác gì với SSR truyền thống của Pages Router? RSC, prerendering/SSR, streaming và hydration phối hợp với nhau ra sao?",
+    "interviewerIntent": "Kiểm tra ứng viên có phân biệt nơi component execute, định dạng payload, HTML generation và hydration hay chỉ lặp lại khẩu hiệu 'RSC bằng zero JavaScript'.",
+    "contextOrScenario": "E-commerce có HTML xuất hiện sớm nhưng tải hơn 1,2 MB JavaScript và INP kém trên mobile. Team muốn chuyển mọi component sang Server Component vì tin rằng RSC tự động giải quyết toàn bộ main-thread cost.",
     "expectedKeywords": [
-      "zero bundle size",
-      "hydration",
-      "rsc payload",
+      "RSC payload",
+      "server component",
+      "client boundary",
+      "HTML preview",
       "streaming",
-      "server only",
-      "serialization"
+      "hydration"
     ],
     "seniorAnswer": {
-      "summary": "SSR truyền thống render HTML trên server nhưng vẫn phải tải TOÀN BỘ JavaScript code của component về client để chạy quá trình Hydration. Ngược lại, RSC chạy 100% trên server, trả về format RSC Payload stream và đóng góp 0 KB JavaScript vào client bundle.",
-      "deepDive": "Với RSC, các dependencies nặng như date-fns, markdown-parser, hay DB client (Prisma/Drizzle) không bao giờ bị đóng gói gửi về browser. Hydration chỉ diễn ra ở các Client Component lá ('use client'), giúp giải phóng hoàn toàn Main Thread và cải thiện vượt bậc chỉ số INP/TTI.",
-      "codeExample": "// RSC (Server Component): Zero bundle cost\nimport { heavyMarkdownParser } from '@/lib/parser'; // 300KB lib\nimport { db } from '@/lib/db';\n\nexport default async function PostPage({ params }: { params: { id: string } }) {\n  const post = await db.post.findUnique({ where: { id: params.id } });\n  const html = heavyMarkdownParser(post.content);\n  return <div dangerouslySetInnerHTML={{ __html: html }} />;\n}"
+      "summary": "SSR và RSC giải quyết hai trục khác nhau. SSR/prerendering tạo HTML ban đầu; RSC quyết định component nào chỉ execute trên server và gửi React Server Component Payload thay vì module JavaScript của component đó xuống browser. Client Components vẫn được dùng cho interactivity, được prerender thành HTML ở initial load và sau đó hydrate bằng bundle client. Vì vậy RSC có thể giảm JavaScript nhưng không bảo đảm zero JS hay INP tốt nếu client boundary vẫn lớn.",
+      "mentalModel": "Hỏi hai câu riêng: 'Ai tạo HTML và khi nào?' là static/dynamic rendering, streaming; 'Code component nào phải có mặt ở browser?' là Server/Client Component boundary. RSC Payload mô tả cây server và vị trí client references; browser dùng payload để reconcile, còn hydrate chỉ gắn interactivity cho Client Components.",
+      "reasoningSteps": [
+        "Đo bundle/client execution theo route và interaction; không mặc định 1,2 MB đến từ component có thể chuyển server—nó có thể là chart/editor/vendor cần browser.",
+        "Giữ data access, secret, markdown transform và dependency server-only trong Server Components hoặc server-only modules. Chỉ đẩy state/event/browser API xuống Client Component leaf.",
+        "Đặt Suspense boundary quanh phần chậm để stream fallback và tránh một fetch giữ toàn route; song song hóa data không phụ thuộc.",
+        "Giữ props qua server→client boundary nhỏ và serializable; không gửi object graph lớn rồi parse/render lại ở client.",
+        "Xác minh bằng bundle analyzer, RSC/client chunks, hydration/INP và route navigation—không chỉ TTFB hoặc Lighthouse một lần."
+      ],
+      "deepDive": "Trong App Router, page/layout mặc định là Server Components. Khi render ban đầu, Next.js dùng RSC Payload cùng Client Component references để tạo HTML preview trên server, sau đó client dùng HTML cho immediate preview, RSC payload để reconcile tree và JavaScript để hydrate Client Components. Ở navigation tiếp theo, RSC payload có thể được prefetch/cache bởi router và áp dụng mà không full-page reload.\n\nMột Server Component không đóng góp chính module/component code vào client bundle nếu dependency chỉ reachable từ server graph. Nhưng dữ liệu serialized, Client Components con và dependency import qua client boundary vẫn có cost. Đặt `'use client'` cao trong tree kéo toàn bộ module graph phía dưới boundary vào client graph, nên boundary placement quan trọng hơn số lượng directive.\n\nNext.js 16 dùng async request APIs; dynamic route `params` là Promise và phải await trong Server Component. Code dùng DB/client secret phải được bảo vệ bằng module boundary như `server-only`, authorization vẫn kiểm tra gần data operation. Rendering markdown thành HTML phải sanitize nếu input không hoàn toàn trusted; RSC không tự ngăn XSS.",
+      "tradeoffs": [
+        "Server Component giảm client JS và cho server data access trực tiếp, nhưng tăng server work/RSC payload và yêu cầu serializable boundary.",
+        "Client Component cho interactivity tức thời nhưng bundle/hydration/main-thread cost tăng; đặt boundary quá cao làm lợi ích RSC mất đi.",
+        "Streaming cải thiện thời điểm nội dung xuất hiện nhưng nhiều Suspense fallback nhỏ có thể gây layout churn và UX phân mảnh.",
+        "Server render dependency nặng tránh browser cost nhưng vẫn tốn server CPU; cần cache/stream/profile thay vì chuyển nơi chạy rồi bỏ qua capacity."
+      ],
+      "codeLanguage": "tsx",
+      "codeExample": "// app/posts/[id]/page.tsx — Server Component mặc định\nimport 'server-only';\nimport { Suspense } from 'react';\nimport { notFound } from 'next/navigation';\nimport { db } from '@/lib/db';\nimport { renderAndSanitizeMarkdown } from '@/lib/markdown.server';\nimport { LikeButton } from './like-button';\n\ntype PageProps = { params: Promise<{ id: string }> };\n\nasync function PostBody({ id }: { id: string }) {\n  const post = await db.post.findUnique({\n    where: { id },\n    select: { id: true, title: true, body: true, likes: true },\n  });\n  if (!post) notFound();\n\n  const safeHtml = renderAndSanitizeMarkdown(post.body);\n  return (\n    <article>\n      <h1>{post.title}</h1>\n      <div dangerouslySetInnerHTML={{ __html: safeHtml }} />\n      {/* Chỉ primitive data cần thiết đi qua client boundary. */}\n      <LikeButton postId={post.id} initialLikes={post.likes} />\n    </article>\n  );\n}\n\nexport default async function PostPage({ params }: PageProps) {\n  const { id } = await params;\n  return (\n    <Suspense fallback={<PostSkeleton />}>\n      <PostBody id={id} />\n    </Suspense>\n  );\n}\n\n// like-button.tsx\n'use client';\nexport function LikeButton({ postId, initialLikes }: {\n  postId: string; initialLikes: number;\n}) {\n  // state/event/browser interactivity nằm ở leaf boundary\n  return <button onClick={() => like(postId)}>{initialLikes} likes</button>;\n}",
+      "verification": [
+        "So route client chunks trước/sau và xác nhận server-only dependency không xuất hiện trong browser bundle.",
+        "Profile hydration/interaction trên mobile CPU throttling; RSC migration thành công phải cải thiện main-thread/INP chứ không chỉ giảm một file chunk.",
+        "Test initial load, client navigation, Suspense error và serialized props; không chỉ render server snapshot.",
+        "Security test markdown/XSS và authorization server-side vì RSC boundary không thay security boundary."
+      ]
     },
+    "evaluationRubric": {
+      "baseline": [
+        "Phân biệt Server Component với Client Component và biết Client Component vẫn có thể được prerender HTML.",
+        "Nêu RSC giảm client JavaScript nhưng không thay mọi Client Component.",
+        "Biết props qua boundary phải serializable."
+      ],
+      "strong": [
+        "Phân biệt RSC với SSR/prerendering và giải thích HTML + RSC payload + hydration.",
+        "Nói được transitive client module graph, Suspense streaming và async params Next.js 16.",
+        "Đưa ra đo bundle/INP và server capacity trade-off."
+      ],
+      "exceptional": [
+        "Thiết kế boundary theo dependency graph/data ownership thay vì chuyển component máy móc.",
+        "Xét navigation RSC payload/router behavior, security và partial failure.",
+        "Có migration/canary metric để chứng minh lợi ích trên device cohort."
+      ]
+    },
+    "references": [
+      {
+        "title": "Next.js 16 — Server and Client Components",
+        "url": "https://nextjs.org/docs/app/getting-started/server-and-client-components"
+      },
+      {
+        "title": "Next.js 16 — Fetching Data and Streaming",
+        "url": "https://nextjs.org/docs/app/getting-started/fetching-data"
+      }
+    ],
     "pitfalls": [
-      "Nhầm lẫn rằng RSC thay thế hoàn toàn Client Components.",
-      "Hiểu sai 'use client' là component chỉ chạy ở browser (thực chất vẫn được pre-render HTML trên server ở lần tải đầu).",
-      "Không giải thích được định dạng RSC Payload hay quá trình Hydration diễn ra như thế nào."
+      "Nói Server Component luôn đóng góp đúng 0 KB cho mọi trường hợp, bỏ qua serialized data và client descendants.",
+      "Đồng nhất RSC với SSR hoặc cho rằng RSC loại bỏ hydration toàn trang.",
+      "Đặt 'use client' ở layout cao rồi kéo cả feature graph vào bundle.",
+      "Dùng params đồng bộ hoặc quên sanitize HTML trong ví dụ Next.js 16."
     ],
     "followUpQuestions": [
-      "Làm thế nào để truyền dữ liệu từ Server Component vào Client Component mà không bị vi phạm serialization constraints?",
-      "Server Action khác gì so với Route Handler POST thông thường?"
+      "Bạn phát hiện một package vô tình bị kéo qua client boundary bằng cách nào?",
+      "RSC payload chứa dữ liệu nhạy cảm có khác HTML/API response về security không?",
+      "Khi Server Component chậm, cache hay Suspense giải quyết những phần khác nhau nào?"
     ]
   },
   {
     "id": "int-05",
     "category": "next-app-router",
     "level": "middle",
-    "question": "Chỉ thị 'use client' và 'use server' trong Next.js 15 có ý nghĩa chính xác là gì? Khi nào bắt buộc phải dùng?",
-    "interviewerIntent": "Đánh giá sự hiểu biết về boundaries giữa client và server trong kiến trúc hybrid của Next.js.",
-    "contextOrScenario": "Junior dev thêm 'use server' ở đầu mọi Server Component vì nghĩ rằng để chạy trên server thì cần khai báo như vậy.",
+    "question": "Trong Next.js 16, 'use client' và 'use server' tạo boundary gì? Khi nào cần dùng, và vì sao Server Function vẫn phải tự xác thực/ủy quyền input?",
+    "interviewerIntent": "Đánh giá hiểu biết về client module boundary, Server Functions và security; loại bỏ quan niệm sai rằng directive tự biến code thành trusted endpoint.",
+    "contextOrScenario": "Junior thêm 'use server' vào mọi Server Component và tin rằng Server Action chỉ được gọi từ button đã render nên không cần kiểm tra role hay validate FormData.",
     "expectedKeywords": [
-      "client boundary",
-      "server actions",
-      "rpc endpoint",
-      "default server component",
-      "directive"
+      "client entry point",
+      "server component default",
+      "server function",
+      "serializable props",
+      "authorization",
+      "validation"
     ],
     "seniorAnswer": {
-      "summary": "'use client' định nghĩa boundary chuyển giao cho Client Component khi cần React state, hook, hoặc DOM events. Mặc định mọi component trong App Router ĐÃ LÀ Server Component, nên 'use server' KHÔNG DÙNG để đánh dấu Server Component mà dùng để khai báo Server Action (hàm RPC chạy trên server).",
-      "deepDive": "Đặt 'use server' ở đầu file hoặc hàm sẽ biến hàm đó thành một HTTP POST endpoint an toàn có thể gọi trực tiếp từ Client Component. Việc đặt 'use server' ở đầu component file là sai và gây nhầm lẫn vì component mặc định đã chạy trên server rồi.",
-      "codeExample": "// 1. Server Action: actions/auth.ts\n'use server'; // ✅ Khai báo Server Action\nexport async function loginAction(formData: FormData) {\n  const email = formData.get('email');\n  return { success: true };\n}\n\n// 2. Client Component: LoginForm.tsx\n'use client'; // ✅ Cần event onChange, onSubmit\nimport { loginAction } from '@/actions/auth';\nexport function LoginForm() {\n  return <form action={loginAction}>...</form>;\n}"
+      "summary": "'use client' đánh dấu entry point của client module graph; chỉ file được render trực tiếp từ Server Component cần directive, không phải mọi file con. App Router component mặc định là Server Component. 'use server' đánh dấu async functions/file exports là Server Functions có thể được framework gọi từ client/form; nó không dùng để đánh dấu Server Component và không cung cấp authorization tự động. Mỗi mutation phải validate input, authenticate và authorize bên trong function.",
+      "mentalModel": "Directive là compiler/runtime boundary, không phải security annotation. `'use client'` nói module nào cần browser runtime; `'use server'` nói function reference nào có thể được gọi qua framework transport để execute trên server. Browser vẫn là untrusted caller.",
+      "reasoningSteps": [
+        "Giữ page/layout/data composition là Server Components mặc định. Chỉ tạo client leaf khi cần state, effect, event handler hoặc browser API.",
+        "Đặt 'use client' ở entry point nhỏ nhất; imports và children module graph của file này cần được đánh giá về client bundle/browser compatibility.",
+        "Đặt 'use server' ở đầu dedicated actions file hoặc bên trong async function theo supported pattern; export functions, không dùng nó để 'bật server mode' cho component.",
+        "Trong action: parse/validate FormData, lấy session từ server, authorize resource/action, thực hiện mutation và invalidation; không tin hidden input, disabled button hoặc client role.",
+        "Giữ secret/data layer trong `server-only` modules và trả DTO serializable tối thiểu; handle expected errors thành result có type."
+      ],
+      "deepDive": "`'use client'` định nghĩa client-server boundary. File exports là client entry points; props từ Server Component phải serializable bởi React. Function prop tùy ý không thể đi qua boundary, trừ Server Function reference theo framework contract. Client Component vẫn có thể được prerender ở server trong initial render, nên tên directive không có nghĩa 'chỉ chạy browser'.\n\n`'use server'` ở file level áp dụng cho async function exports; inline directive nằm trong async function Server Component scope theo pattern được hỗ trợ. Next.js tạo transport để client/form invoke function, nhưng request có thể bị giả mạo/replay như endpoint khác. Authentication, authorization, CSRF/origin protections theo deployment và input validation vẫn là trách nhiệm ứng dụng. Closure/captured values không nên chứa assumption về user identity lâu dài; đọc session trong invocation.\n\nServer Function phù hợp mutation gắn UI và progressive enhancement. Route Handler phù hợp public/webhook/non-React clients hoặc khi cần HTTP contract rõ. Đây là lựa chọn interface, không phải mức an toàn cao/thấp mặc định.",
+      "tradeoffs": [
+        "Client boundary nhỏ giảm JS nhưng có thể tăng prop drilling/server round trips; boundary lớn tiện state composition nhưng tăng hydration/bundle.",
+        "Server Function giảm boilerplate UI mutation và tích hợp form/revalidation; Route Handler rõ HTTP contract và reuse ngoài React.",
+        "Trả error result có type giúp expected validation UX; throw phù hợp unexpected failure/error boundary nhưng không thay logging.",
+        "Revalidate rộng dễ viết nhưng tăng work; tag/update chính xác cần domain cache design."
+      ],
+      "codeLanguage": "tsx",
+      "codeExample": "// app/actions/update-profile.ts\n'use server';\n\nimport 'server-only';\nimport { updateTag } from 'next/cache';\nimport { z } from 'zod';\nimport { auth } from '@/lib/auth.server';\nimport { db } from '@/lib/db.server';\n\nconst Input = z.object({\n  userId: z.string().uuid(),\n  displayName: z.string().trim().min(2).max(80),\n});\n\nexport async function updateProfile(formData: FormData) {\n  const session = await auth();\n  if (!session) return { ok: false, code: 'UNAUTHENTICATED' } as const;\n\n  const parsed = Input.safeParse({\n    userId: formData.get('userId'),\n    displayName: formData.get('displayName'),\n  });\n  if (!parsed.success) {\n    return { ok: false, code: 'INVALID_INPUT', issues: parsed.error.flatten() } as const;\n  }\n\n  // Không tin hidden userId: kiểm tra quyền trên server trong invocation.\n  if (session.user.id !== parsed.data.userId && session.user.role !== 'admin') {\n    return { ok: false, code: 'FORBIDDEN' } as const;\n  }\n\n  await db.user.update({\n    where: { id: parsed.data.userId },\n    data: { displayName: parsed.data.displayName },\n  });\n  updateTag(`user-${parsed.data.userId}`);\n  return { ok: true } as const;\n}\n\n// app/profile/profile-form.tsx\n'use client';\nimport { useActionState } from 'react';\nimport { updateProfile } from '@/app/actions/update-profile';\n\nexport function ProfileForm({ userId }: { userId: string }) {\n  const [state, action, pending] = useActionState(\n    async (_previous: unknown, formData: FormData) => updateProfile(formData),\n    null\n  );\n  return (\n    <form action={action}>\n      <input type=\"hidden\" name=\"userId\" value={userId} />\n      <input name=\"displayName\" />\n      <button disabled={pending}>Save</button>\n      {state?.ok === false && <p>{state.code}</p>}\n    </form>\n  );\n}",
+      "verification": [
+        "Test direct action invocation với forged userId, missing session, wrong role và invalid FormData; UI hiding không được tính là authorization test.",
+        "Bundle scan xác nhận server-only DB/secret module không xuất hiện trong client chunks.",
+        "Test progressive form submission, pending/error state và cache read-your-writes sau mutation.",
+        "Log/audit mutation theo server identity và resource, không tin metadata caller gửi."
+      ]
     },
+    "evaluationRubric": {
+      "baseline": [
+        "Biết Server Components là mặc định và 'use server' không đánh dấu component.",
+        "Biết 'use client' cần state/event/browser APIs.",
+        "Nêu phải validate input trong Server Action."
+      ],
+      "strong": [
+        "Giải thích entry-point/transitive module graph và serialization boundary.",
+        "Coi Server Function như untrusted callable interface, có authn/authz/resource check.",
+        "Phân biệt Server Function với Route Handler theo consumer/HTTP contract."
+      ],
+      "exceptional": [
+        "Xét replay/idempotency/audit và data DTO minimization.",
+        "Thiết kế server-only module boundary cùng security tests/bundle verification.",
+        "Kết nối mutation với updateTag/revalidation đúng consistency semantics."
+      ]
+    },
+    "references": [
+      {
+        "title": "Next.js 16 — use client directive",
+        "url": "https://nextjs.org/docs/app/api-reference/directives/use-client"
+      },
+      {
+        "title": "Next.js 16 — use server directive and security considerations",
+        "url": "https://nextjs.org/docs/app/api-reference/directives/use-server"
+      }
+    ],
     "pitfalls": [
-      "Nghĩ rằng 'use server' là từ khóa để tạo Server Component.",
-      "Không biết rằng 'use client' vẫn được server render ra HTML ở initial request."
+      "Dùng 'use server' để đánh dấu Server Component.",
+      "Gọi Server Function là endpoint an toàn và bỏ auth/authorization.",
+      "Đặt 'use client' ở layout cao rồi kéo server-incompatible dependency vào client graph.",
+      "Tin hidden input hoặc disabled button là security control."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đảm bảo code nhạy cảm (như API Secret Keys) không bao giờ bị import nhầm vào Client Component?"
+      "Server Function bị gọi lại do retry thì mutation cần idempotency thế nào?",
+      "Bạn ngăn import nhầm secret vào Client Component ở CI ra sao?",
+      "Khi nào Route Handler tốt hơn Server Function cho cùng mutation?"
     ]
   },
   {
     "id": "int-06",
     "category": "next-app-router",
     "level": "senior",
-    "question": "Hãy phân tích cơ chế Caching trong Next.js 15: revalidatePath vs revalidateTag vs fetch cache options?",
-    "interviewerIntent": "Kiểm tra khả năng kiểm soát cache đa tầng (Request memoization, Data Cache, Full Route Cache, Router Cache).",
-    "contextOrScenario": "Dự án vừa update bài viết qua CMS nhưng người dùng vào trang feed vẫn thấy nội dung cũ do cache chưa được xóa đúng cách.",
+    "question": "Phân tích mô hình caching hiện tại của Next.js 16: Cache Components, 'use cache', cacheLife/cacheTag, updateTag, revalidateTag và revalidatePath khác nhau thế nào?",
+    "interviewerIntent": "Kiểm tra ứng viên có hiểu caching là opt-in policy với consistency semantics trong Next.js 16, thay vì ghi nhớ vài hàm invalidation của phiên bản cũ.",
+    "contextOrScenario": "CMS cập nhật bài viết nhưng feed vẫn hiển thị dữ liệu cũ; trang profile lại cần read-your-own-writes ngay sau khi người dùng Save. Team đang gọi revalidatePath('/') cho mọi mutation.",
     "expectedKeywords": [
-      "revalidatetag",
-      "revalidatepath",
-      "data cache",
-      "on-demand revalidation",
-      "stale-while-revalidate",
-      "next.js 15 uncached default"
+      "Cache Components",
+      "use cache",
+      "cacheLife",
+      "cacheTag",
+      "updateTag",
+      "stale-while-revalidate"
     ],
     "seniorAnswer": {
-      "summary": "Next.js 15 chuyển đổi fetch requests mặc định sang 'no-store' (không tự cache nữa). Để cache và làm tươi dữ liệu chủ động, ta dùng fetch({ next: { tags: ['posts'] } }) và gọi revalidateTag('posts') trong Server Action.",
-      "deepDive": "revalidatePath('/') xóa cache theo URL path, nhưng tốn kém vì xóa luôn cả các layout không liên quan. revalidateTag('tag-name') là cơ chế hạt nhân tối ưu nhất: xóa cache của tất cả các fetch queries gắn tag đó trên toàn bộ ứng dụng mà không cần biết chúng nằm ở route nào.",
-      "codeExample": "// Fetch với Tag:\nconst res = await fetch('https://api.example.com/posts', {\n  next: { tags: ['posts-list'], revalidate: 3600 }\n});\n\n// Invalidate trong Server Action:\n'use server';\nimport { revalidateTag } from 'next/cache';\n\nexport async function createPost() {\n  await db.post.create({...});\n  revalidateTag('posts-list'); // ✅ Tức thì làm tươi dữ liệu feed\n}"
+      "summary": "Trong Next.js 16 với Cache Components bật, caching là opt-in bằng 'use cache'. cacheLife đặt freshness/expiry, cacheTag gắn domain tag. updateTag chỉ dùng trong Server Actions để expire và refresh ngay cho read-your-own-writes. revalidateTag(tag, 'max') dùng stale-while-revalidate trong Server Action hoặc Route Handler khi chấp nhận stale ngắn. revalidatePath invalidates theo route và rộng hơn tag; ưu tiên tag khi biết domain data.",
+      "mentalModel": "Tách ba quyết định: cái gì được cache (`use cache`), cache sống bao lâu (`cacheLife`), và mutation cần consistency nào (`updateTag` immediate hay `revalidateTag` stale-while-revalidate). `revalidatePath` là route-level invalidation khi không có data tag chính xác. Cache policy thuộc domain freshness, không phải mẹo performance chung.",
+      "reasoningSteps": [
+        "Xác nhận app có bật `cacheComponents: true`; nếu không, đó là previous caching model và semantics/config khác. Không trộn hai tài liệu.",
+        "Đặt 'use cache' ở function/component/page có output dùng lại được. Runtime data như cookies/headers đọc ngoài cached scope rồi truyền primitive/serializable input nếu policy cho phép.",
+        "Dùng cacheLife profile/custom values theo SLO freshness và cacheTag theo entity/list dependency, ví dụ posts và post-42.",
+        "Sau mutation cá nhân cần thấy ngay, gọi updateTag trong Server Action. Với CMS/webhook/catalog chấp nhận stale trong lúc background refresh, gọi revalidateTag(tag, 'max').",
+        "Dùng revalidatePath khi cần invalidation toàn route tree hoặc không biết tag; đo hit rate/revalidation load và tránh root path cho mọi mutation."
+      ],
+      "deepDive": "Cache Components là mô hình Next.js 16 opt-in, được bật bằng `cacheComponents: true`. `'use cache'` có thể áp dụng file/component/function; compiler tạo cache key từ arguments và closed-over serializable inputs. `cacheLife` mô tả stale/revalidate/expire profile. `cacheTag` gắn tag vào cached work để invalidation không phụ thuộc route.\n\n`revalidateTag(tag, 'max')` đánh dấu entry stale theo stale-while-revalidate: request có thể nhận stale data và trigger refresh nền. Dạng một tham số cũ đã bị deprecate; code mới phải thể hiện profile/semantics. `updateTag` chỉ dùng trong Server Actions, expire cache và cho read-your-own-writes trong cùng interaction. `revalidatePath` invalidates cached data cho path; nó không thay thế domain tags khi cùng data xuất hiện nhiều route. `refresh()` chỉ refresh client router từ Server Action, không tự invalidate tagged data.\n\nKhi Cache Components bật, dynamic/runtime data cần Suspense boundary và uncached work được stream như dynamic hole; config cũ như experimental PPR bị loại bỏ, route segment configs thuộc previous model được thay bằng `use cache`/`cacheLife` trong migration. Với static export như GitHub Pages, runtime server cache invalidation không tồn tại sau deploy; nội dung cần được prerender lúc build hoặc cập nhật bằng client/API/deploy mới. Câu trả lời mạnh phải nêu deployment model này.",
+      "tradeoffs": [
+        "updateTag cho consistency mạnh hơn trong user mutation nhưng có thể block/refresh ngay; revalidateTag SWR giảm latency/load nhưng cho phép stale.",
+        "Tag theo entity/list invalidation chính xác nhưng cần dependency taxonomy; path invalidation đơn giản nhưng dễ over-invalidate.",
+        "Cache lâu tăng hit rate và static shell nhưng tăng staleness/invalidations; cache ngắn giảm stale nhưng có thể bị loại khỏi prerender và tăng origin load.",
+        "Cache Components tăng khả năng trộn static/dynamic nhưng cần Suspense/error UX; static export không có runtime Next server để thực hiện on-demand revalidation."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "// next.config.ts — runtime-hosted app dùng Cache Components\nimport type { NextConfig } from 'next';\nconst nextConfig: NextConfig = { cacheComponents: true };\nexport default nextConfig;\n\n// app/lib/posts.ts\nimport { cacheLife, cacheTag } from 'next/cache';\n\nexport async function getPost(id: string) {\n  'use cache';\n  cacheLife('hours');\n  cacheTag('posts', `post-${id}`);\n  return db.post.findUnique({ where: { id } });\n}\n\n// app/actions/posts.ts\n'use server';\nimport { revalidateTag, updateTag } from 'next/cache';\n\nexport async function updateOwnDraft(id: string, input: DraftInput) {\n  const user = await requireUser();\n  await assertCanEdit(user, id);\n  await db.post.update({ where: { id }, data: input });\n\n  // Người vừa Save phải đọc thấy dữ liệu mới ngay.\n  updateTag(`post-${id}`);\n  updateTag('posts');\n}\n\n// Route Handler nhận webhook CMS\nexport async function POST(request: Request) {\n  await verifyCmsSignature(request);\n  revalidateTag('posts', 'max'); // stale-while-revalidate\n  return Response.json({ revalidated: true });\n}\n\n// Lưu ý: dự án static export lên GitHub Pages không chạy đoạn\n// invalidation server-side này sau deploy; cần build/deploy mới hoặc client data source.",
+      "verification": [
+        "Test read-your-own-writes sau updateTag và test concurrent reader nhận SWR behavior sau revalidateTag.",
+        "Theo dõi cache hit/miss, revalidation latency/error và origin/database load theo tag/profile.",
+        "Test cùng entity xuất hiện ở feed/detail/search để bảo đảm tag taxonomy invalidates đủ nhưng không rộng quá.",
+        "Kiểm tra deployment target: runtime server hỗ trợ cache handlers/revalidation hay static export chỉ build-time."
+      ]
     },
+    "evaluationRubric": {
+      "baseline": [
+        "Biết 'use cache' là opt-in trong Cache Components và phân biệt tag/path invalidation.",
+        "Nêu updateTag cho immediate update và revalidateTag cho background refresh.",
+        "Không gọi revalidatePath('/') cho mọi mutation."
+      ],
+      "strong": [
+        "Giải thích cacheLife/cacheTag cùng consistency semantics của updateTag(tag)/revalidateTag(tag, 'max').",
+        "Biết Cache Components phải bật và không trộn previous model.",
+        "Thiết kế tag taxonomy, Suspense và observability."
+      ],
+      "exceptional": [
+        "Nêu static export không có runtime Next cache invalidation và điều chỉnh kiến trúc theo deployment.",
+        "Phân tích multi-instance/shared cache/tag coordination và origin load khi revalidate.",
+        "Chọn freshness profile từ product SLO thay vì một TTL chung."
+      ]
+    },
+    "references": [
+      {
+        "title": "Next.js 16 — use cache directive",
+        "url": "https://nextjs.org/docs/app/api-reference/directives/use-cache"
+      },
+      {
+        "title": "Next.js 16 — Revalidating with Cache Components",
+        "url": "https://nextjs.org/docs/app/getting-started/revalidating"
+      },
+      {
+        "title": "Next.js 16 upgrade guide — caching APIs",
+        "url": "https://nextjs.org/docs/app/guides/upgrading/version-16#caching-apis"
+      }
+    ],
     "pitfalls": [
-      "Nghĩ rằng Next.js 15 vẫn tự động cache fetch như Next.js 14 (Next 15 mặc định fetch không cache).",
-      "Lạm dụng revalidatePath('/') gây xóa cache hàng loạt không cần thiết."
+      "Chỉ đổi fetch sang force-cache nhưng không định nghĩa freshness/invalidation semantics.",
+      "Dùng dạng revalidateTag một tham số cũ và gọi nó immediate read-your-own-writes.",
+      "Trộn Cache Components với previous-model route segment configs/PPR cũ.",
+      "Mô tả runtime revalidation cho static export GitHub Pages như thể có Next server đang chạy."
     ],
     "followUpQuestions": [
-      "Partial Prerendering (PPR) trong Next.js hoạt động ra sao và kết hợp Static Shell với Dynamic Stream như thế nào?"
+      "Feed và detail dùng tag nào để update một post không over-invalidate toàn catalog?",
+      "Static export cần nội dung CMS cập nhật trong vài phút thì bạn đổi deployment/data architecture ra sao?",
+      "Multi-region instances phối hợp cache tag invalidation và deploy version thế nào?"
     ]
   }
 ]

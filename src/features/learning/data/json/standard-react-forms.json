@@ -1,12 +1,112 @@
 {
   "id": "track-standard-react-forms",
   "slug": "standard-react-form-architecture",
-  "title": "React Form Architecture",
-  "description": "Lộ trình tiêu chuẩn (Không Compiler): Tối ưu memoization thủ công (useMemo/useCallback), Chuyên sâu Controlled vs Uncontrolled Forms, Custom Component và React Error Boundary.",
+  "title": "React Component Architecture & Forms",
+  "description": "Thiết kế component có type an toàn, controlled/uncontrolled boundaries, memoization có đo đạc và Error Boundary trước khi bước sang kiến trúc form chuyên sâu.",
   "iconName": "Code",
   "color": "from-amber-500 to-orange-600",
   "totalLessons": 4,
   "lessons": [
+    {
+      "id": "sr-03",
+      "slug": "custom-component-architecture-typescript",
+      "title": "Quy chuẩn Viết Custom Component & Typescript (Enterprise)",
+      "summary": "Hướng dẫn đặt tên Component/Files và quy tắc khi nào chọn `type` vs `interface` cho Props.",
+      "durationMinutes": 15,
+      "level": "intermediate",
+      "tags": ["TypeScript", "Component Design", "Best Practices"],
+      "mentalModel": "Thiết kế Component chuẩn: Tên thể hiện đúng trách nhiệm, Props rõ ràng mã hóa Type/Interface và hỗ trợ mở rộng.",
+      "keyPoints": [
+        "Đặt tên Component: Dùng tên ngắn gọn trực diện như `Button` (trong `src/components/ui/button.tsx`), KHÔNG dùng tiền tố `Custom` thừa thãi.",
+        "Dùng `interface` khi: Định nghĩa Object shapes cần mở rộng (extends) hoặc Declaration Merging (Component Props cho UI Library).",
+        "Dùng `type` khi: Định nghĩa Union types (\"sm\" | \"md\" | \"lg\"), Discriminated Unions (Status = Success | Error), Tuples, Primitives hoặc Mapped types."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Quy chuẩn Props: Type vs Interface",
+          "language": "typescript",
+          "afterCode": "// 1. Dùng Type cho Union Options (Discriminated Union)\nexport type ButtonVariant = 'primary' | 'secondary' | 'outline';\nexport type ButtonSize = 'sm' | 'md' | 'lg';\n\n// 2. Dùng Interface cho Props chính (Extensible)\nexport interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {\n  variant?: ButtonVariant;\n  size?: ButtonSize;\n  isLoading?: boolean;\n}\n\n// 3. Component chuẩn Enterprise (Tên súc tích, không thêm tiền tố 'Custom' thừa)\nexport function Button({\n  variant = 'primary',\n  size = 'md',\n  isLoading = false,\n  children,\n  onClick,\n  ...restProps\n}: ButtonProps) {\n  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {\n    if (isLoading) return;\n    onClick?.(e);\n  };\n\n  return (\n    <button onClick={handleClick} disabled={isLoading} {...restProps}>\n      {isLoading ? <span>Loading...</span> : children}\n    </button>\n  );\n}",
+          "takeaway": "Kết hợp hoàn hảo giữa `type` cho Union giá trị và `interface` cho Props kế thừa HTML."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-sr-03-1",
+          "question": "Trong trường hợp nào sau đây bạn BẮT BUỘC phải dùng `type` thay vì `interface` trong TypeScript?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Khi định nghĩa Props kế thừa từ React.HTMLAttributes"
+            },
+            {
+              "key": "B",
+              "text": "Khi định nghĩa Union Types (ví dụ: type Status = \"idle\" | \"loading\" | \"success\")"
+            },
+            {
+              "key": "C",
+              "text": "Khi tạo một React Server Component"
+            },
+            {
+              "key": "D",
+              "text": "Khi khai báo một async function"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Union trực tiếp như `A | B` được khai báo bằng `type`. `interface` phù hợp cho các object/callable shape có thể mở rộng hoặc declaration merge; hai công cụ có nhiều vùng giao nhau."
+        }
+      ]
+    },
+    {
+      "id": "sr-02",
+      "slug": "controlled-vs-uncontrolled-forms-deep-dive",
+      "title": "Chuyên sâu Form: Controlled vs Uncontrolled Components",
+      "summary": "Phân tích ưu/nhược điểm, khi nào dùng useRef vs useState và các bế tắc (Issues) của Form truyền thống.",
+      "durationMinutes": 18,
+      "level": "intermediate",
+      "tags": ["Forms", "Controlled", "Uncontrolled", "useRef"],
+      "mentalModel": "Controlled Form = React giữ quyền kiểm soát State ở từng keystroke. Uncontrolled Form = Trình duyệt (DOM) giữ quyền kiểm soát value, React chỉ đọc qua useRef.",
+      "keyPoints": [
+        "Controlled Component (useState + onChange): Phù hợp cho realtime input validation, dynamic field masking, dependent inputs. Nhược điểm: Re-render component ở MỌI phím gõ.",
+        "Uncontrolled Component (useRef + FormData): giá trị nằm trong DOM nên mỗi phím gõ không tự lên lịch React render. Phù hợp khi chỉ cần đọc dữ liệu lúc submit; live validation và đồng bộ UI sẽ khó hơn.",
+        "Bế tắc của Form truyền thống: (1) Form lớn 100 inputs bị giật lag re-render; (2) Xử lý pending status thủ công tốn code; (3) Server validation error mapping phức tạp; (4) Không có JS thì form hỏng.",
+        "Giải pháp React 19: Dùng Form Actions + useActionState kết hợp ưu điểm của cả 2 mô hình!"
+      ],
+      "codeRecipes": [
+        {
+          "title": "So sánh Controlled vs Uncontrolled Form",
+          "language": "tsx",
+          "beforeCode": "// 🔴 Controlled Form: Re-render ở MỌI phím gõ (100 inputs = giật lag)\nfunction ControlledForm() {\n  const [email, setEmail] = useState('');\n  return <input value={email} onChange={e => setEmail(e.target.value)} />;\n}",
+          "afterCode": "// 🟢 Uncontrolled Form: Zero re-render khi gõ phím!\nfunction UncontrolledForm() {\n  const formRef = useRef<HTMLFormElement>(null);\n  \n  const handleSubmit = (e: React.FormEvent) => {\n    e.preventDefault();\n    const formData = new FormData(formRef.current!);\n    console.log(formData.get('email')); // Đọc trực tiếp từ DOM!\n  };\n\n  return (\n    <form ref={formRef} onSubmit={handleSubmit}>\n      <input name=\"email\" defaultValue=\"\" />\n      <button type=\"submit\">Submit</button>\n    </form>\n  );\n}",
+          "takeaway": "Uncontrolled Form cho hiệu năng vượt trội với form nhiều trường dữ liệu."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-sr-02-1",
+          "question": "Nhược điểm lớn nhất của Controlled Form (useState ở từng onChange) khi xử lý Form cỡ lớn (trên 50 inputs) là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Không gửi được dữ liệu lên Server"
+            },
+            {
+              "key": "B",
+              "text": "Gây ra re-render toàn bộ component ở mỗi phím gõ (keystroke), làm đơ bàn phím và giảm chỉ số INP"
+            },
+            {
+              "key": "C",
+              "text": "Không hỗ trợ thẻ <input type=\"text\">"
+            },
+            {
+              "key": "D",
+              "text": "Không dùng được với Tailwind CSS"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Mỗi lần người dùng gõ 1 ký tự, setState lại trigger re-render toàn bộ cây component, gây lãng phí CPU khổng lồ trên thiết bị yếu."
+        }
+      ]
+    },
     {
       "id": "sr-01",
       "slug": "manual-memoization-usememo-usecallback",
@@ -58,127 +158,27 @@
       ]
     },
     {
-      "id": "sr-02",
-      "slug": "controlled-vs-uncontrolled-forms-deep-dive",
-      "title": "Chuyên sâu Form: Controlled vs Uncontrolled Components",
-      "summary": "Phân tích ưu/nhược điểm, khi nào dùng useRef vs useState và các bế tắc (Issues) của Form truyền thống.",
-      "durationMinutes": 18,
-      "level": "intermediate",
-      "tags": ["Forms", "Controlled", "Uncontrolled", "useRef"],
-      "mentalModel": "Controlled Form = React giữ quyền kiểm soát State ở từng keystroke. Uncontrolled Form = Trình duyệt (DOM) giữ quyền kiểm soát value, React chỉ đọc qua useRef.",
-      "keyPoints": [
-        "Controlled Component (useState + onChange): Phù hợp cho realtime input validation, dynamic field masking, dependent inputs. Nhược điểm: Re-render component ở MỌI phím gõ.",
-        "Uncontrolled Component (useRef + FormData): Phù hợp cho Form lớn (50-100 inputs), tối ưu hiệu năng 0 re-render khi gõ phím. Nhược điểm: Khó làm live validation realtime.",
-        "Bế tắc của Form truyền thống: (1) Form lớn 100 inputs bị giật lag re-render; (2) Xử lý pending status thủ công tốn code; (3) Server validation error mapping phức tạp; (4) Không có JS thì form hỏng.",
-        "Giải pháp React 19: Dùng Form Actions + useActionState kết hợp ưu điểm của cả 2 mô hình!"
-      ],
-      "codeRecipes": [
-        {
-          "title": "So sánh Controlled vs Uncontrolled Form",
-          "language": "tsx",
-          "beforeCode": "// 🔴 Controlled Form: Re-render ở MỌI phím gõ (100 inputs = giật lag)\nfunction ControlledForm() {\n  const [email, setEmail] = useState('');\n  return <input value={email} onChange={e => setEmail(e.target.value)} />;\n}",
-          "afterCode": "// 🟢 Uncontrolled Form: Zero re-render khi gõ phím!\nfunction UncontrolledForm() {\n  const formRef = useRef<HTMLFormElement>(null);\n  \n  const handleSubmit = (e: React.FormEvent) => {\n    e.preventDefault();\n    const formData = new FormData(formRef.current!);\n    console.log(formData.get('email')); // Đọc trực tiếp từ DOM!\n  };\n\n  return (\n    <form ref={formRef} onSubmit={handleSubmit}>\n      <input name=\"email\" defaultValue=\"\" />\n      <button type=\"submit\">Submit</button>\n    </form>\n  );\n}",
-          "takeaway": "Uncontrolled Form cho hiệu năng vượt trội với form nhiều trường dữ liệu."
-        }
-      ],
-      "quizzes": [
-        {
-          "id": "q-sr-02-1",
-          "question": "Nhược điểm lớn nhất của Controlled Form (useState ở từng onChange) khi xử lý Form cỡ lớn (trên 50 inputs) là gì?",
-          "options": [
-            {
-              "key": "A",
-              "text": "Không gửi được dữ liệu lên Server"
-            },
-            {
-              "key": "B",
-              "text": "Gây ra re-render toàn bộ component ở mỗi phím gõ (keystroke), làm đơ bàn phím và giảm chỉ số INP"
-            },
-            {
-              "key": "C",
-              "text": "Không hỗ trợ thẻ <input type=\"text\">"
-            },
-            {
-              "key": "D",
-              "text": "Không dùng được với Tailwind CSS"
-            }
-          ],
-          "correctAnswer": "B",
-          "explanation": "Mỗi lần người dùng gõ 1 ký tự, setState lại trigger re-render toàn bộ cây component, gây lãng phí CPU khổng lồ trên thiết bị yếu."
-        }
-      ]
-    },
-    {
-      "id": "sr-03",
-      "slug": "custom-component-architecture-typescript",
-      "title": "Quy chuẩn Viết Custom Component & Typescript (Enterprise)",
-      "summary": "Hướng dẫn đặt tên Component/Files và quy tắc khi nào chọn `type` vs `interface` cho Props.",
-      "durationMinutes": 15,
-      "level": "intermediate",
-      "tags": ["TypeScript", "Component Design", "Best Practices"],
-      "mentalModel": "Thiết kế Component chuẩn: Tên thể hiện đúng trách nhiệm, Props rõ ràng mã hóa Type/Interface và hỗ trợ mở rộng.",
-      "keyPoints": [
-        "Đặt tên Component: Dùng tên ngắn gọn trực diện như `Button` (trong `src/components/ui/button.tsx`), KHÔNG dùng tiền tố `Custom` thừa thãi.",
-        "Dùng `interface` khi: Định nghĩa Object shapes cần mở rộng (extends) hoặc Declaration Merging (Component Props cho UI Library).",
-        "Dùng `type` khi: Định nghĩa Union types (\"sm\" | \"md\" | \"lg\"), Discriminated Unions (Status = Success | Error), Tuples, Primitives hoặc Mapped types."
-      ],
-      "codeRecipes": [
-        {
-          "title": "Quy chuẩn Props: Type vs Interface",
-          "language": "typescript",
-          "afterCode": "// 1. Dùng Type cho Union Options (Discriminated Union)\nexport type ButtonVariant = 'primary' | 'secondary' | 'outline';\nexport type ButtonSize = 'sm' | 'md' | 'lg';\n\n// 2. Dùng Interface cho Props chính (Extensible)\nexport interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {\n  variant?: ButtonVariant;\n  size?: ButtonSize;\n  isLoading?: boolean;\n}\n\n// 3. Component chuẩn Enterprise (Tên súc tích, không thêm tiền tố 'Custom' thừa)\nexport function Button({\n  variant = 'primary',\n  size = 'md',\n  isLoading = false,\n  children,\n  onClick,\n  ...restProps\n}: ButtonProps) {\n  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {\n    if (isLoading) return;\n    onClick?.(e);\n  };\n\n  return (\n    <button onClick={handleClick} disabled={isLoading} {...restProps}>\n      {isLoading ? <span>Loading...</span> : children}\n    </button>\n  );\n}",
-          "takeaway": "Kết hợp hoàn hảo giữa `type` cho Union giá trị và `interface` cho Props kế thừa HTML."
-        }
-      ],
-      "quizzes": [
-        {
-          "id": "q-sr-03-1",
-          "question": "Trong trường hợp nào sau đây bạn BẮT BUỘC phải dùng `type` thay vì `interface` trong TypeScript?",
-          "options": [
-            {
-              "key": "A",
-              "text": "Khi định nghĩa Props kế thừa từ React.HTMLAttributes"
-            },
-            {
-              "key": "B",
-              "text": "Khi định nghĩa Union Types (ví dụ: type Status = \"idle\" | \"loading\" | \"success\")"
-            },
-            {
-              "key": "C",
-              "text": "Khi tạo một React Server Component"
-            },
-            {
-              "key": "D",
-              "text": "Khi khai báo một async function"
-            }
-          ],
-          "correctAnswer": "B",
-          "explanation": "`interface` chỉ có thể biểu diễn hình dạng Object, không thể biểu diễn trực tiếp Union types (`A | B`). Do đó bắt buộc dùng `type`."
-        }
-      ]
-    },
-    {
       "id": "sr-04",
       "slug": "react-error-boundary-nextjs-error-tsx",
-      "title": "Khoanh vùng lỗi với React Error Boundary & Next.js 15 error.tsx",
+      "title": "Khoanh vùng lỗi với React Error Boundary & Next.js 16 error.tsx",
       "summary": "Ngăn ngừa White Screen of Death (WSOD), bắt Unhandled Render Errors và khôi phục giao diện mượt mà với reset().",
       "durationMinutes": 18,
       "level": "advanced",
-      "tags": ["React Error Boundary", "Next.js 15", "error.tsx", "Resilience"],
+      "tags": ["React Error Boundary", "Next.js 16", "error.tsx", "Resilience"],
       "mentalModel": "Error Boundary đóng vai trò như cầu chì bảo vệ điện: khi 1 bóng đèn (component con) bị chập cháy, cầu chì ngắt điện khoanh vùng tại chỗ mà KHÔNG làm sập điện toàn bộ tòa nhà.",
       "keyPoints": [
         "Tại sao cần Error Boundary: Nếu không có Error Boundary, 1 lỗi JavaScript nhỏ khi render ở component con sẽ khiến React gỡ toàn bộ cây DOM, biến toàn bộ trang web thành màn hình trắng (White Screen of Death).",
         "React Class Component Error Boundary: Bắt buộc dùng Class Component với static getDerivedStateFromError(error) và componentDidCatch(error, info) (hoặc thư viện react-error-boundary).",
-        "Next.js 15 App Router error.tsx: Tự động bọc route segment trong 1 Client Error Boundary ngầm. Nhận vào props { error, reset } để thử render lại mà không cần reload trang.",
+        "Next.js 16 App Router `error.tsx`: tạo error boundary cho route segment. Component nhận `{ error, reset }`; `reset()` thử render lại segment và không bảo đảm lỗi nguồn đã được xử lý.",
         "Phạm vi BẮT ĐƯỢC lỗi: Lỗi xảy ra trong khi Render, Lỗi trong Lifecycle methods, Lỗi trong Constructors của cây component con.",
         "Phạm vi KHÔNG BẮT ĐƯỢC lỗi: Lỗi trong Event Handlers (onClick - dùng try/catch), Lỗi trong mã Asynchronous (setTimeout, requestAnimationFrame), Lỗi phía Server (Server Actions)."
       ],
       "codeRecipes": [
         {
-          "title": "Next.js 15 App Router error.tsx & Custom Class Error Boundary",
+          "title": "Next.js 16 App Router error.tsx & Custom Class Error Boundary",
           "language": "tsx",
-          "afterCode": "// 1. app/dashboard/error.tsx (Next.js 15 Client Error Boundary)\n'use client';\nimport { useEffect } from 'react';\n\nexport default function Error({\n  error,\n  reset,\n}: {\n  error: Error & { digest?: string };\n  reset: () => void;\n}) {\n  useEffect(() => {\n    // Gửi log lỗi lên Sentry / LogRocket\n    console.error('Unhandled Route Error:', error);\n  }, [error]);\n\n  return (\n    <div className=\"p-6 rounded-xl border border-red-500/30 bg-red-500/10 space-y-4\">\n      <h2 className=\"text-sm font-bold text-red-400\">⚠️ Đã xảy ra lỗi ở phân hệ này!</h2>\n      <p className=\"text-xs text-muted-foreground\">{error.message}</p>\n      <button onClick={() => reset()} className=\"px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg\">\n        Thử khôi phục (Reset)\n      </button>\n    </div>\n  );\n}",
-          "takeaway": "Khoanh vùng sự cố tại route segment, giữ cho Navigation Bar và Layout chung hoạt động 100%."
+          "afterCode": "// 1. app/dashboard/error.tsx (Next.js 16 Client Error Boundary)\n'use client';\nimport { useEffect } from 'react';\n\nexport default function Error({\n  error,\n  reset,\n}: {\n  error: Error & { digest?: string };\n  reset: () => void;\n}) {\n  useEffect(() => {\n    // Gửi log lỗi lên Sentry / LogRocket\n    console.error('Unhandled Route Error:', error);\n  }, [error]);\n\n  return (\n    <div className=\"p-6 rounded-xl border border-red-500/30 bg-red-500/10 space-y-4\">\n      <h2 className=\"text-sm font-bold text-red-400\">⚠️ Đã xảy ra lỗi ở phân hệ này!</h2>\n      <p className=\"text-xs text-muted-foreground\">{error.message}</p>\n      <button onClick={() => reset()} className=\"px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg\">\n        Thử khôi phục (Reset)\n      </button>\n    </div>\n  );\n}",
+          "takeaway": "Error boundary ở route segment giúp giới hạn phạm vi crash; layout cha thường vẫn hoạt động, còn lỗi trong chính boundary hoặc event handler cần cơ chế xử lý khác."
         }
       ],
       "quizzes": [

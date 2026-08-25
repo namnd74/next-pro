@@ -11,24 +11,24 @@
       "id": "r19-compiler-01",
       "slug": "react-compiler-setup-guide",
       "title": "Cấu hình & Hoạt động của React Compiler",
-      "summary": "Hiểu cách React Compiler tự động hóa 99% việc memoize ngầm, loại bỏ cần thiết của useCallback/useMemo.",
+      "summary": "Hiểu cách React Compiler tự động memoize theo phân tích tĩnh, cùng những trường hợp vẫn cần đo đạc và dùng escape hatch thủ công.",
       "durationMinutes": 12,
       "level": "intermediate",
       "tags": ["React 19", "React Compiler", "Performance"],
-      "mentalModel": "React Compiler phân tích cây phụ thuộc ở bước build (AST) và tự động bọc memoization vào mọi biến/hàm mà bạn không cần phải viết code thủ công.",
+      "mentalModel": "React Compiler phân tích code ở bước build và tự động memoize những giá trị, biểu thức hoặc component mà heuristics của Compiler xác định là có lợi. Đây là tối ưu có chọn lọc, không phải bọc mọi biến/hàm.",
       "keyPoints": [
-        "Không cần dùng useCallback hay useMemo thủ công khi React Compiler đã được bật.",
-        "Cần cài đặt babel-plugin-react-compiler và cấu hình experimental.reactCompiler: true trong next.config.mjs.",
-        "Nên cài eslint-plugin-react-compiler để bắt các lỗi vi phạm Rules of React (như mutate state trực tiếp).",
-        "Compiler chỉ hoạt động chuẩn xác nếu code tuân thủ tính thuần khiết (Purity) của React Component."
+        "Compiler giảm nhu cầu viết `useMemo`, `useCallback` và `React.memo`; các API này vẫn là escape hatch khi bạn cần kiểm soát danh tính tham chiếu hoặc đã đo được một điểm nóng cụ thể.",
+        "Với Next.js 16, cài `babel-plugin-react-compiler` và bật `reactCompiler: true` ở cấp cao nhất trong `next.config.ts`.",
+        "Dùng `eslint-plugin-react-hooks` để phát hiện vi phạm Rules of React; diagnostics của Compiler có thể bỏ qua component không an toàn thay vì làm hỏng toàn bộ build.",
+        "Compiler hoạt động tốt khi component và hook tuân thủ tính thuần khiết; vẫn cần dùng React DevTools Profiler để xác nhận cải thiện thực tế."
       ],
       "codeRecipes": [
         {
-          "title": "Cấu hình React Compiler trong Next.js 15",
+          "title": "Cấu hình React Compiler trong Next.js 16",
           "language": "typescript",
           "beforeCode": "// ❌ Khi CHƯA bật React Compiler: Phải dùng useMemo/useCallback thủ công\nimport { useMemo, useCallback } from 'react';\n\nexport function List({ items, filter }) {\n  const filtered = useMemo(() => items.filter(filter), [items, filter]);\n  const handleClick = useCallback((id) => console.log(id), []);\n  return <div>...</div>;\n}",
-          "afterCode": "// ✅ Khi ĐÃ BẬT React Compiler trong next.config.mjs:\n// next.config.mjs:\n// export default { experimental: { reactCompiler: true } };\n\n// Code React thuần tự nhiên, Compiler tự động memoize ngầm khi build!\nexport function List({ items, filter }) {\n  const filtered = items.filter(filter);\n  const handleClick = (id) => console.log(id);\n  return <div>...</div>;\n}",
-          "takeaway": "Code ngắn hơn 40%, không lo sót dependency array hay tạo bug stale closure."
+          "afterCode": "// ✅ next.config.ts (Next.js 16)\nimport type { NextConfig } from 'next';\n\nconst nextConfig: NextConfig = {\n  reactCompiler: true,\n};\nexport default nextConfig;\n\n// Component viết theo Rules of React; Compiler quyết định chỗ cần memoize\nexport function List({ items, filter }) {\n  const filtered = items.filter(filter);\n  const handleClick = (id) => console.log(id);\n  return <div>...</div>;\n}",
+          "takeaway": "Compiler có thể giảm boilerplate memoization nhưng không bảo đảm loại bỏ mọi stale closure hay mọi nhu cầu tối ưu thủ công."
         }
       ],
       "quizzes": [
@@ -111,7 +111,7 @@
       "id": "r19-02",
       "slug": "use-optimistic-updates",
       "title": "Optimistic UI với useOptimistic",
-      "summary": "Tối ưu trải nghiệm 0ms latency, hiển thị phản hồi tức thì và tự động rollback khi lỗi.",
+      "summary": "Hiển thị phản hồi lạc quan ngay trong lúc Action đang chạy và quay về state nguồn khi cập nhật không thành công.",
       "durationMinutes": 10,
       "level": "intermediate",
       "tags": ["React 19", "Optimistic UI", "UX"],
@@ -126,7 +126,7 @@
           "title": "Like Button Optimistic Update",
           "language": "tsx",
           "afterCode": "'use client';\nimport { useOptimistic, startTransition } from 'react';\n\nexport function LikeBtn({ likes }: { likes: number }) {\n  const [optLikes, setOptLikes] = useOptimistic(likes, (current, inc: number) => current + inc);\n\n  const handleLike = () => {\n    startTransition(async () => {\n      setOptLikes(1);\n      await updateLikesServerAction();\n    });\n  };\n\n  return <button onClick={handleLike}>❤️ {optLikes}</button>;\n}",
-          "takeaway": "UI nhảy số ngay 0ms, tự động đồng bộ lại khi server hoàn tất."
+          "takeaway": "UI phản hồi ngay mà không phải chờ round trip; vẫn cần hiển thị lỗi và bảo đảm state nguồn được làm mới sau khi server hoàn tất."
         }
       ],
       "quizzes": [
@@ -175,7 +175,7 @@
           "title": "Đọc Context trong lệnh IF",
           "language": "tsx",
           "afterCode": "'use client';\nimport { use } from 'react';\nimport { ThemeContext } from './theme-context';\n\nexport function Card({ hasCustomTheme }: { hasCustomTheme: boolean }) {\n  if (!hasCustomTheme) return <div>Default Card</div>;\n\n  // ✅ Hợp lệ trong React 19!\n  const theme = use(ThemeContext);\n  return <div className={theme.dark}>Custom Card</div>;\n}",
-          "takeaway": "Linh hoạt tuyệt đối, phá vỡ giới hạn Rules of Hooks cũ."
+          "takeaway": "`use` có quy tắc riêng và có thể xuất hiện trong điều kiện hoặc vòng lặp, nhưng vẫn phải được gọi bên trong Component hoặc Hook."
         }
       ],
       "quizzes": [

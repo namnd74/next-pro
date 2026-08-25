@@ -2,10 +2,10 @@
   "id": "track-react-core-foundations",
   "slug": "react-foundations-zero-to-one",
   "title": "React Core Foundations",
-  "description": "Lộ trình khởi đầu vững chắc: Nắm vững tư duy Component, JSX & Virtual DOM, Immutability của State, quy tắc Render Lifecycle và cơ chế Reconciliation.",
+  "description": "Lộ trình khởi đầu vững chắc: JSX, component, props, events, state modeling, lifting state, rendering và cách chọn đúng nơi đặt state.",
   "iconName": "GraduationCap",
   "color": "from-emerald-500 to-teal-600",
-  "totalLessons": 4,
+  "totalLessons": 6,
   "lessons": [
     {
       "id": "rcf-01",
@@ -61,7 +61,7 @@
       "id": "rcf-02",
       "slug": "props-composition-and-children-pattern",
       "title": "Props, Tính Bất Biến & Pattern Component Composition",
-      "summary": "Sử dụng Props đúng cách, tuân thủ Read-Only props và áp dụng Component Composition để loại bỏ hoàn toàn Props Drilling.",
+      "summary": "Sử dụng props đúng cách, tuân thủ dữ liệu read-only và áp dụng composition để giảm prop drilling.",
       "durationMinutes": 15,
       "level": "beginner",
       "tags": ["Props", "Component Composition", "Children Pattern"],
@@ -77,7 +77,7 @@
           "language": "tsx",
           "beforeCode": "// ❌ Props Drilling: Truyền user qua Dashboard -> Sidebar -> UserAvatar (3 tầng)\nfunction Dashboard({ user }: { user: User }) {\n  return <Sidebar user={user} />;\n}\nfunction Sidebar({ user }: { user: User }) {\n  return <UserAvatar user={user} />;\n}",
           "afterCode": "// ✅ Composition với children: Dashboard và Sidebar không cần quan tâm đến user\nfunction Dashboard({ children }: { children: React.ReactNode }) {\n  return <Sidebar>{children}</Sidebar>;\n}\nfunction Sidebar({ children }: { children: React.ReactNode }) {\n  return <aside className=\"p-4\">{children}</aside>;\n}\n\n// Sử dụng ở Root:\n<Dashboard>\n  <UserAvatar user={currentUser} />\n</Dashboard>",
-          "takeaway": "Composition giúp các component ở giữa hoàn toàn decoupling, không cần giữ các props mà chúng không trực tiếp sử dụng."
+          "takeaway": "Composition có thể giúp component trung gian không phải chuyển tiếp các props mà nó không dùng. Với dữ liệu chia sẻ sâu và thay đổi thường xuyên, Context hoặc external store có thể phù hợp hơn."
         }
       ],
       "quizzes": [
@@ -158,6 +158,76 @@
       ]
     },
     {
+      "id": "rcf-05",
+      "slug": "react-events-state-modeling-lifting-state",
+      "title": "React Events, State Modeling & Lifting State",
+      "summary": "Xử lý event đúng cách, thiết kế state tối thiểu và nâng state lên owner chung khi nhiều component cần đồng bộ.",
+      "durationMinutes": 20,
+      "level": "beginner",
+      "tags": ["Events", "State Modeling", "Lifting State", "Single Source of Truth"],
+      "mentalModel": "Event mô tả điều vừa xảy ra; state mô tả UI cần ghi nhớ. Mỗi mẩu state nên có một owner rõ ràng. Khi hai component phải luôn đồng bộ, đặt state ở ancestor chung gần nhất và truyền value/callback xuống.",
+      "keyPoints": [
+        "Truyền function cho event handler (`onClick={handleClick}`), không gọi function ngay trong render (`onClick={handleClick()}`).",
+        "Chỉ lưu state tối thiểu; dữ liệu có thể tính từ props/state hiện tại nên được tính trong render thay vì lưu bản sao.",
+        "Lifting state tạo một source of truth cho các component cần phối hợp; callback prop truyền ý định thay đổi ngược lên owner.",
+        "Dùng functional updater khi state mới phụ thuộc state trước: `setCount(count => count + 1)`."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Event handler và functional updater",
+          "language": "tsx",
+          "beforeCode": "// ❌ Gọi handler ngay khi render và dùng snapshot cũ hai lần\n<button onClick={setCount(count + 1)}>Tăng</button>\n\nfunction addTwo() {\n  setCount(count + 1);\n  setCount(count + 1);\n}",
+          "afterCode": "import { useState } from 'react';\n\nfunction Counter() {\n  const [count, setCount] = useState(0);\n\n  function addTwo() {\n    setCount(current => current + 1);\n    setCount(current => current + 1);\n  }\n\n  return <button onClick={addTwo}>Giá trị: {count}</button>;\n}",
+          "takeaway": "Handler là function được React gọi sau tương tác. Functional updater nối tiếp đúng nhiều cập nhật dựa trên state trước."
+        },
+        {
+          "title": "Lab 2 — Accordion với một source of truth",
+          "language": "tsx",
+          "beforeCode": "// ❌ Mỗi Panel giữ isOpen riêng nên có thể cùng mở\nfunction Panel() {\n  const [isOpen, setIsOpen] = useState(false);\n}",
+          "afterCode": "import { useState } from 'react';\n\nfunction Accordion() {\n  const [activeId, setActiveId] = useState<string | null>(null);\n\n  return sections.map(section => (\n    <Panel\n      key={section.id}\n      title={section.title}\n      isOpen={activeId === section.id}\n      onOpen={() => setActiveId(section.id)}\n    />\n  ));\n}\n\nfunction Panel({ title, isOpen, onOpen }: {\n  title: string;\n  isOpen: boolean;\n  onOpen: () => void;\n}) {\n  return isOpen ? <section>{title}</section> : <button onClick={onOpen}>Mở {title}</button>;\n}",
+          "takeaway": "Owner chung kiểm soát invariant “chỉ một panel mở”; component con trở thành controlled component qua value và callback."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rcf-05-1",
+          "question": "Cách truyền click handler nào đúng?",
+          "options": [
+            { "key": "A", "text": "onClick={save()}" },
+            { "key": "B", "text": "onClick={save}" },
+            { "key": "C", "text": "onClick=\"save\"" },
+            { "key": "D", "text": "onClick={await save}" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "React cần nhận function để gọi sau khi event xảy ra; `save()` gọi function ngay trong render."
+        },
+        {
+          "id": "q-rcf-05-2",
+          "question": "Hai component TemperatureInput phải luôn hiển thị cùng nhiệt độ. State nên đặt ở đâu?",
+          "options": [
+            { "key": "A", "text": "Mỗi input giữ một bản sao riêng" },
+            { "key": "B", "text": "Ancestor chung gần nhất của hai input" },
+            { "key": "C", "text": "Trong biến global không reactive" },
+            { "key": "D", "text": "Trong useEffect của cả hai input" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Một owner chung tạo single source of truth và truyền dữ liệu/callback xuống hai input."
+        },
+        {
+          "id": "q-rcf-05-3",
+          "question": "Bạn có `firstName` và `lastName` trong state. `fullName` nên được quản lý thế nào?",
+          "options": [
+            { "key": "A", "text": "Thêm state và effect để đồng bộ" },
+            { "key": "B", "text": "Tính `firstName + ' ' + lastName` trong render" },
+            { "key": "C", "text": "Lưu localStorage ở mỗi render" },
+            { "key": "D", "text": "Đưa vào ref" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Derived data không cần state riêng; bản sao tạo thêm source of truth và nguy cơ lệch dữ liệu."
+        }
+      ]
+    },
+    {
       "id": "rcf-04",
       "slug": "rendering-lists-keys-and-conditionals",
       "title": "Rendering Danh Sách, Keys & Điều Kiện Hiển Thị Chuẩn",
@@ -204,6 +274,75 @@
           ],
           "correctAnswer": "B",
           "explanation": "Vì index thay đổi khi xóa phần tử đầu, React tái sử dụng DOM node theo index cũ và có thể giữ lại uncontrolled state (như giá trị input hoặc focus) của phần tử trước."
+        }
+      ]
+    },
+    {
+      "id": "rcf-06",
+      "slug": "state-placement-local-url-server-global-form",
+      "title": "State Placement: Local, URL, Server, Global hay Form?",
+      "summary": "Dùng cây quyết định để đặt state đúng nơi thay vì đưa mọi thứ vào useState, Context hoặc Zustand.",
+      "durationMinutes": 20,
+      "level": "intermediate",
+      "tags": ["State Architecture", "URL State", "Server State", "Global State"],
+      "mentalModel": "Phân loại state theo owner và vòng đời: UI cục bộ thuộc component; trạng thái cần chia sẻ/bookmark thuộc URL; dữ liệu remote thuộc server-state cache; dữ liệu client dùng xuyên cây mới cân nhắc Context/store; dữ liệu nhập tạm thuộc form.",
+      "keyPoints": [
+        "Giữ state gần nơi sử dụng nhất và chỉ nâng lên khi có consumer thứ hai hoặc cần duy trì qua navigation.",
+        "Filter, sort, page và tab cần share/bookmark thường thuộc URL search params.",
+        "Dữ liệu API có freshness, retry và invalidation là server state; tránh copy sang Zustand/Redux nếu không có lý do rõ ràng.",
+        "Context/store phù hợp cho client state dùng rộng như theme, session view model hoặc draft liên màn hình; form library quản lý field/touched/errors."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Phân loại state của trang sản phẩm",
+          "language": "typescript",
+          "afterCode": "type ProductPageStateMap = {\n  isFilterPanelOpen: 'local-component-state';\n  search: 'url-search-param';\n  sort: 'url-search-param';\n  page: 'url-search-param';\n  products: 'server-state-query-cache';\n  cartDraft: 'client-global-state';\n  checkoutFields: 'form-state';\n};\n\n// Quy tắc kiểm tra:\n// 1. Server có phải source of truth? -> server state\n// 2. Reload/share URL có cần giữ giá trị? -> URL state\n// 3. Chỉ một subtree dùng? -> local state\n// 4. Đây là input/touched/error tạm thời? -> form state\n// 5. Nhiều nhánh client cần và không thuộc server/URL? -> Context/store",
+          "takeaway": "Phân loại trước khi chọn thư viện giúp tránh duplicate state và các luồng đồng bộ bằng effect."
+        },
+        {
+          "title": "Lab 2 — Đưa filter có thể chia sẻ lên URL",
+          "language": "tsx",
+          "beforeCode": "// ❌ Reload hoặc gửi link sẽ mất filter\nconst [status, setStatus] = useState('all');",
+          "afterCode": "'use client';\nimport { usePathname, useRouter, useSearchParams } from 'next/navigation';\n\nfunction StatusFilter() {\n  const router = useRouter();\n  const pathname = usePathname();\n  const searchParams = useSearchParams();\n  const status = searchParams.get('status') ?? 'all';\n\n  function changeStatus(next: string) {\n    const params = new URLSearchParams(searchParams);\n    params.set('status', next);\n    router.replace(`${pathname}?${params.toString()}`);\n  }\n\n  return <Filter value={status} onValueChange={changeStatus} />;\n}",
+          "takeaway": "URL trở thành source of truth cho navigation state; back/forward, reload và link chia sẻ hoạt động tự nhiên."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-rcf-06-1",
+          "question": "Trạng thái mở/đóng tooltip chỉ dùng trong một component nên đặt ở đâu?",
+          "options": [
+            { "key": "A", "text": "Local component state" },
+            { "key": "B", "text": "TanStack Query" },
+            { "key": "C", "text": "URL" },
+            { "key": "D", "text": "Database" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "State cục bộ, ngắn hạn và chỉ một owner dùng nên ở gần component đó."
+        },
+        {
+          "id": "q-rcf-06-2",
+          "question": "Danh sách orders từ API cần cache và refetch khi focus nên thuộc loại nào?",
+          "options": [
+            { "key": "A", "text": "Form state" },
+            { "key": "B", "text": "Server state" },
+            { "key": "C", "text": "DOM ref" },
+            { "key": "D", "text": "CSS state" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Server là source of truth và dữ liệu có vòng đời freshness/cache nên dùng server-state solution."
+        },
+        {
+          "id": "q-rcf-06-3",
+          "question": "Một bảng có filter cần gửi link cho đồng nghiệp xem đúng cùng kết quả. State phù hợp nhất là gì?",
+          "options": [
+            { "key": "A", "text": "useRef" },
+            { "key": "B", "text": "State riêng trong mỗi row" },
+            { "key": "C", "text": "URL search params" },
+            { "key": "D", "text": "Mutation cache" }
+          ],
+          "correctAnswer": "C",
+          "explanation": "URL state có thể bookmark, chia sẻ và tương tác đúng với browser history."
         }
       ]
     }

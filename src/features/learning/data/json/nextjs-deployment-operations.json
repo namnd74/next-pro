@@ -1,0 +1,508 @@
+{
+  "id": "track-nextjs-deployment-operations",
+  "slug": "nextjs-deployment-and-operations",
+  "title": "Next.js Deployment & Operations",
+  "description": "Triển khai Next.js 16 theo ba mô hình: static hosting, managed platform và self-hosted bằng PM2/Docker; đi sâu standalone, health, graceful shutdown và scaling.",
+  "iconName": "Database",
+  "color": "from-sky-500 to-blue-700",
+  "totalLessons": 7,
+  "lessons": [
+    {
+      "id": "deploy-01",
+      "slug": "deployment-decision-export-managed-self-hosted",
+      "title": "Deployment Decision Map: Export, Managed hay Self-hosted?",
+      "summary": "Chọn output và nền tảng từ requirement thay vì chọn theo dịch vụ đang phổ biến hoặc miễn phí.",
+      "durationMinutes": 22,
+      "level": "intermediate",
+      "tags": ["Deployment", "Static Export", "Managed Platform", "Self-hosting"],
+      "mentalModel": "Deployment là ghép feature requirement với runtime capability. Static export chỉ cần file server/CDN; managed platform vận hành runtime thay bạn; self-hosted trao toàn quyền và toàn bộ trách nhiệm về process, proxy, cache, security cùng rollback.",
+      "keyPoints": [
+        "`output: 'export'` tạo `out/` và không có Node runtime: phù hợp Pages/CDN nhưng không có SSR, Server Actions hay runtime Route Handler.",
+        "`next start` chạy production Node server đầy đủ; `output: 'standalone'` tạo server tối giản đã trace dependency, phù hợp container hoặc artifact VPS.",
+        "Vercel/Netlify/Cloudflare Workers là managed platforms, không phải VPS; PM2 và Docker trên VPS là self-hosting.",
+        "Phân biệt biến build-time được nhúng vào client bundle với runtime secret chỉ đọc phía server; không đổi secret bằng cách rebuild tùy tiện nếu không cần."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Decision table từ product requirements",
+          "language": "typescript",
+          "afterCode": "type DeploymentTarget = 'static-export' | 'managed-next' | 'node-self-hosted';\n\ntype Requirements = {\n  serverActions: boolean;\n  runtimeAuth: boolean;\n  isr: boolean;\n  operationsTeam: boolean;\n};\n\nfunction chooseTarget(input: Requirements): DeploymentTarget {\n  const needsServer = input.serverActions || input.runtimeAuth || input.isr;\n  if (!needsServer) return 'static-export';\n  return input.operationsTeam ? 'node-self-hosted' : 'managed-next';\n}\n\n// Portfolio/docs -> static-export\n// Fullstack cá nhân, không muốn vận hành -> managed-next\n// Cần kiểm soát hạ tầng/network/runtime -> node-self-hosted",
+          "takeaway": "Output là hệ quả của capability cần dùng; không thể sửa thiếu Node runtime bằng PM2 sau khi đã build static export."
+        },
+        {
+          "title": "Lab 2 — Hai build profile export và standalone",
+          "language": "typescript",
+          "afterCode": "// next.config.ts\nimport type { NextConfig } from 'next';\n\nconst mode = process.env.NEXT_OUTPUT ?? 'export';\nconst output: NextConfig['output'] =\n  mode === 'standalone' ? 'standalone' : mode === 'export' ? 'export' : undefined;\n\nconst nextConfig: NextConfig = {\n  ...(output ? { output } : {}),\n  poweredByHeader: false,\n  images: {\n    // Static export không có image optimizer runtime.\n    unoptimized: mode === 'export',\n  },\n};\n\nexport default nextConfig;\n\n// Static:     npm run build (default export)\n// Node:       NEXT_OUTPUT=node npm run build\n// Standalone: NEXT_OUTPUT=standalone npm run build",
+          "takeaway": "Profile giúp học hai artifact trong cùng repo, nhưng route dùng server-only feature vẫn không thể xuất static chỉ bằng đổi biến môi trường."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-deploy-01-1",
+          "question": "Artifact chính của `output: 'export'` nằm ở đâu?",
+          "options": [
+            { "key": "A", "text": "out/" },
+            { "key": "B", "text": ".next/standalone/server.js" },
+            { "key": "C", "text": "node_modules/.cache" },
+            { "key": "D", "text": "/var/log" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Static export tạo HTML/CSS/JS/assets trong `out/` để file server hoặc CDN phục vụ."
+        },
+        {
+          "id": "q-deploy-01-2",
+          "question": "Ứng dụng cần Server Actions và runtime authentication. Có thể deploy nguyên artifact static lên GitHub Pages không?",
+          "options": [
+            { "key": "A", "text": "Có, Pages tự tạo Node server" },
+            {
+              "key": "B",
+              "text": "Không, cần managed Next runtime hoặc Node self-hosted"
+            },
+            { "key": "C", "text": "Có nếu cài PM2 trên máy local" },
+            { "key": "D", "text": "Có nếu đổi port" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Server Actions/auth runtime cần server thực thi request; GitHub Pages chỉ phục vụ static files."
+        },
+        {
+          "id": "q-deploy-01-3",
+          "question": "Team nhỏ muốn fullstack Next.js nhưng chưa muốn quản trị Linux, proxy và process. Lựa chọn khởi đầu hợp lý nhất?",
+          "options": [
+            { "key": "A", "text": "Managed Next platform" },
+            { "key": "B", "text": "GitHub Pages bất kể feature" },
+            { "key": "C", "text": "PM2 cluster trên laptop" },
+            { "key": "D", "text": "Copy source vào CDN" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Managed platform giữ Node/edge capability nhưng giảm trách nhiệm vận hành ban đầu."
+        }
+      ]
+    },
+    {
+      "id": "deploy-02",
+      "slug": "static-export-github-pages-actions",
+      "title": "Static Export & GitHub Pages bằng GitHub Actions",
+      "summary": "Build, kiểm tra và phát hành thư mục out/ lên GitHub Pages với basePath đúng cho repository site.",
+      "durationMinutes": 24,
+      "level": "intermediate",
+      "tags": ["GitHub Pages", "GitHub Actions", "Static Export", "CI/CD"],
+      "mentalModel": "GitHub Actions là build environment; GitHub Pages chỉ nhận artifact tĩnh. Pipeline phải tái tạo build từ lockfile, chạy quality gates, upload đúng `out/` và deploy bằng quyền tối thiểu.",
+      "keyPoints": [
+        "Repository site thường chạy dưới `/<repository>` nên asset/link cần basePath đúng; user site `<name>.github.io` thường dùng root path.",
+        "Workflow cần `contents: read`, `pages: write`, `id-token: write`, concurrency và environment `github-pages`.",
+        "Chạy validation/typecheck/lint trước build để artifact lỗi không được phát hành; upload duy nhất `out/`, không upload source hay toàn `.next`.",
+        "GitHub Pages phù hợp portfolio/docs/public static site, không dành cho SaaS/e-commerce hoặc giao dịch nhạy cảm và không có runtime health check."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Workflow build và deploy Pages",
+          "language": "yaml",
+          "afterCode": "name: Deploy Next.js static site\n\non:\n  push:\n    branches: [main]\n  workflow_dispatch:\n\npermissions:\n  contents: read\n  pages: write\n  id-token: write\n\nconcurrency:\n  group: pages\n  cancel-in-progress: false\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 22\n          cache: npm\n      - run: npm ci\n      - run: npm run validate:learning\n      - run: npm run typecheck\n      - run: npm run lint\n      - run: npm run build\n        env:\n          NEXT_TELEMETRY_DISABLED: 1\n      - uses: actions/upload-pages-artifact@v3\n        with:\n          path: out\n\n  deploy:\n    needs: build\n    runs-on: ubuntu-latest\n    environment:\n      name: github-pages\n      url: ${{ steps.pages.outputs.page_url }}\n    steps:\n      - id: pages\n        uses: actions/deploy-pages@v4",
+          "takeaway": "Deployment chỉ chạy sau mọi quality gate và chỉ nhận static artifact được tạo từ lockfile."
+        },
+        {
+          "title": "Lab 2 — Base path cho project site và custom domain",
+          "language": "typescript",
+          "afterCode": "// next.config.ts\nconst repository = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? '';\nconst isProjectSite =\n  process.env.GITHUB_ACTIONS === 'true' &&\n  repository !== '' &&\n  !repository.endsWith('.github.io');\n\nconst basePath = isProjectSite ? `/${repository}` : '';\n\nconst nextConfig: NextConfig = {\n  output: 'export',\n  basePath: basePath || undefined,\n  images: { unoptimized: true },\n};\n\n// Khi dùng custom domain ở root, đặt NEXT_PUBLIC_BASE_PATH rỗng\n// và thêm file public/CNAME chứa domain đã xác minh.",
+          "takeaway": "Sai basePath thường khiến HTML mở được nhưng CSS/JS trả 404; domain strategy phải được quyết định ở build time."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-deploy-02-1",
+          "question": "Thư mục nào nên upload làm Pages artifact cho Next static export?",
+          "options": [
+            { "key": "A", "text": "out" },
+            { "key": "B", "text": "src" },
+            { "key": "C", "text": "node_modules" },
+            { "key": "D", "text": ".git" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "`out/` là deployable static artifact; các thư mục còn lại không nên public."
+        },
+        {
+          "id": "q-deploy-02-2",
+          "question": "Trang mở nhưng mọi file `/_next/static/...` bị 404 trên repository site. Nguyên nhân thường gặp nhất?",
+          "options": [
+            { "key": "A", "text": "Thiếu basePath theo tên repository" },
+            { "key": "B", "text": "PM2 chưa chạy" },
+            { "key": "C", "text": "Database hết connection" },
+            { "key": "D", "text": "Docker thiếu volume" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Repository site được phục vụ dưới subpath; build phải tạo asset URL có cùng prefix."
+        },
+        {
+          "id": "q-deploy-02-3",
+          "question": "Ứng dụng checkout thương mại cần xử lý mật khẩu và thanh toán. GitHub Pages có phải target phù hợp?",
+          "options": [
+            { "key": "A", "text": "Có vì hoàn toàn miễn phí" },
+            {
+              "key": "B",
+              "text": "Không; cần runtime/backend phù hợp và hosting dành cho sản phẩm thương mại"
+            },
+            { "key": "C", "text": "Có nếu repository private" },
+            { "key": "D", "text": "Có nếu tắt HTTPS" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Pages là static publishing và chính sách không dành cho SaaS/e-commerce hay sensitive transactions."
+        }
+      ]
+    },
+    {
+      "id": "deploy-03",
+      "slug": "vercel-managed-nextjs-free-platforms",
+      "title": "Vercel & Managed Free Platforms",
+      "summary": "Deploy fullstack Next.js lên Vercel và biết lúc chọn Netlify, Cloudflare hoặc Render cho project học tập.",
+      "durationMinutes": 24,
+      "level": "intermediate",
+      "tags": ["Vercel", "Netlify", "Cloudflare", "Render"],
+      "mentalModel": "Managed platform nhận source/build artifact và vận hành compute, TLS, CDN cùng rollout. Free tier là quota để học và làm project cá nhân, không phải SLA hoặc cam kết miễn phí vĩnh viễn; luôn kiểm tra giới hạn hiện hành trước khi chọn production target.",
+      "keyPoints": [
+        "Vercel hỗ trợ Next.js sâu nhất và có preview deployment; Hobby dành cho dự án cá nhân phi thương mại và sẽ pause khi vượt quota.",
+        "Netlify Free dùng hệ thống credits; Cloudflare Pages phù hợp static, còn fullstack Next dùng Workers qua OpenNext adapter.",
+        "Render Free Web Service chạy Node/Docker nhưng sleep khi idle, cold start và filesystem ephemeral; phù hợp demo, không phải production SLA.",
+        "Đánh giá runtime compatibility, database region, timeout, logs, bandwidth, commercial terms và rollback — không chỉ nhìn giá $0."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Vercel preview và production deployment",
+          "language": "bash",
+          "afterCode": "# Đăng nhập và liên kết local repo với Vercel project\nnpx vercel login\nnpx vercel link\n\n# Kéo Development env về .env.local (không commit file này)\nnpx vercel env pull .env.local\n\n# Preview deployment\nnpx vercel\n\n# Production deployment sau khi preview đã được xác minh\nnpx vercel --prod\n\n# Kiểm tra trên dashboard:\n# - Build/runtime logs\n# - Environment scope: Development / Preview / Production\n# - Usage và project pause policy\n# - Domain và rollback deployment",
+          "takeaway": "Preview là release candidate có URL riêng; production chỉ được promote sau quality gates và smoke test."
+        },
+        {
+          "title": "Lab 2 — Scorecard chọn nền tảng miễn phí",
+          "language": "yaml",
+          "afterCode": "project:\n  commercial: false\n  needsNodeRuntime: true\n  needsWebSocket: false\n  toleratesColdStart: true\n  needsPreviewDeployments: true\n\ncandidates:\n  vercel-hobby:\n    fit: fullstack-next-personal\n    watch: [usage-cap, non-commercial, runtime-log-retention]\n  netlify-free:\n    fit: managed-next-or-static\n    watch: [monthly-credits, project-pause]\n  cloudflare-pages:\n    fit: static-export\n    watch: [file-and-build-limits]\n  cloudflare-workers-opennext:\n    fit: edge-fullstack-next\n    watch: [adapter-compatibility, worker-limits]\n  render-free:\n    fit: node-or-docker-demo\n    watch: [idle-sleep, cold-start, ephemeral-filesystem]",
+          "takeaway": "Scorecard ghi rõ trade-off giúp thay provider mà không thay đổi requirement một cách vô thức."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-deploy-03-1",
+          "question": "Vercel thuộc nhóm deployment nào?",
+          "options": [
+            { "key": "A", "text": "Managed platform" },
+            { "key": "B", "text": "VPS do người dùng quản trị trực tiếp" },
+            { "key": "C", "text": "GitHub Pages plugin" },
+            { "key": "D", "text": "Local process manager" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Vercel quản lý build/runtime/CDN/TLS và deployment lifecycle; người dùng không quản trị VM như VPS."
+        },
+        {
+          "id": "q-deploy-03-2",
+          "question": "Fullstack Next.js trên Cloudflare nên dùng hướng nào?",
+          "options": [
+            { "key": "A", "text": "Pages static artifact bất kể feature" },
+            {
+              "key": "B",
+              "text": "Workers với OpenNext adapter và kiểm tra compatibility"
+            },
+            { "key": "C", "text": "PM2 chạy trong browser" },
+            { "key": "D", "text": "Upload node_modules lên R2" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Pages phù hợp static assets; Workers/OpenNext cung cấp runtime cho SSR, handlers và Server Actions được hỗ trợ."
+        },
+        {
+          "id": "q-deploy-03-3",
+          "question": "Demo trên Render Free phản hồi chậm sau thời gian không truy cập. Giải thích phù hợp nhất?",
+          "options": [
+            { "key": "A", "text": "Free service sleep khi idle và cần cold start" },
+            { "key": "B", "text": "React luôn chờ 60 giây" },
+            { "key": "C", "text": "QueryKey bị mã hóa" },
+            { "key": "D", "text": "GitHub Pages đang rebuild" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Render Free Web Service có idle spin-down; request đầu sau đó phải đợi instance khởi động lại."
+        }
+      ]
+    },
+    {
+      "id": "deploy-04",
+      "slug": "vps-pm2-nginx-zero-downtime",
+      "title": "Deploy Next.js trên VPS bằng PM2 & Nginx",
+      "summary": "Quản lý Node process bằng ecosystem file, tự khởi động sau reboot và reload release qua reverse proxy.",
+      "durationMinutes": 28,
+      "level": "advanced",
+      "tags": ["PM2", "VPS", "Nginx", "Zero Downtime"],
+      "mentalModel": "Next.js server là process cần được giám sát; PM2 giữ process sống và quản lý release lifecycle, còn Nginx là public edge nhận TLS/request rồi proxy vào localhost. Build tạo immutable artifact trước, PM2 không phải build system.",
+      "keyPoints": [
+        "Dùng ecosystem file để version-control name, cwd, script, instances, timeouts và environment contract; secret thật nằm trong secret manager/server environment.",
+        "`pm2 reload` thay worker dần để giảm downtime; `restart` dừng rồi chạy lại. Reload vẫn cần timeout và health/smoke check.",
+        "`pm2 startup` tạo system service và `pm2 save` lưu process list để hồi phục sau reboot.",
+        "Cluster mode yêu cầu ứng dụng stateless; session-memory và Next in-memory cache không tự chia sẻ giữa worker."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — PM2 ecosystem cho standalone artifact",
+          "language": "javascript",
+          "afterCode": "// ecosystem.config.cjs\nmodule.exports = {\n  apps: [\n    {\n      name: 'next-pro',\n      cwd: '/srv/next-pro/current',\n      script: '.next/standalone/server.js',\n      instances: 1,\n      exec_mode: 'fork',\n      autorestart: true,\n      max_memory_restart: '768M',\n      min_uptime: '10s',\n      max_restarts: 10,\n      restart_delay: 2000,\n      listen_timeout: 10000,\n      kill_timeout: 15000,\n      env_production: {\n        NODE_ENV: 'production',\n        HOSTNAME: '127.0.0.1',\n        PORT: '3000',\n      },\n    },\n  ],\n};\n\n// Không ghi DATABASE_URL/JWT_SECRET vào file này.\n// Inject secret từ server environment hoặc secret manager.",
+          "takeaway": "Ecosystem file mô tả process contract; một instance là baseline an toàn trước khi giải quyết shared state/cache cho cluster."
+        },
+        {
+          "title": "Lab 2 — Release, reload và phục hồi sau reboot",
+          "language": "bash",
+          "afterCode": "# Artifact đã build được giải nén vào releases/<git-sha>\nln -sfn /srv/next-pro/releases/2026-08-25 /srv/next-pro/current\n\npm2 startOrReload /srv/next-pro/current/ecosystem.config.cjs --env production\npm2 save\n\n# Chạy một lần theo lệnh PM2 in ra để đăng ký systemd\npm2 startup\n\n# Xác minh release\npm2 status\npm2 logs next-pro --lines 100\ncurl --fail http://127.0.0.1:3000/api/health/live\n\n# Rollback: đổi symlink về release trước rồi reload\nln -sfn /srv/next-pro/releases/previous /srv/next-pro/current\npm2 reload next-pro",
+          "takeaway": "Release folder bất biến cộng symlink giúp rollback nhanh; health check phải chạy sau reload trước khi coi deployment thành công."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-deploy-04-1",
+          "question": "Khác biệt chính giữa `pm2 reload` và `pm2 restart` là gì?",
+          "options": [
+            { "key": "A", "text": "Reload thay worker dần; restart dừng rồi chạy lại" },
+            { "key": "B", "text": "Reload build Docker image" },
+            { "key": "C", "text": "Restart tạo CDN" },
+            { "key": "D", "text": "Không có khác biệt" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Reload hướng tới zero/low downtime trong cluster; nếu readiness timeout, PM2 có thể fallback về restart."
+        },
+        {
+          "id": "q-deploy-04-2",
+          "question": "Sau reboot, PM2 daemon chạy nhưng không phục hồi app. Bước thường bị thiếu là gì?",
+          "options": [
+            { "key": "A", "text": "pm2 startup và pm2 save" },
+            { "key": "B", "text": "npm run dev" },
+            { "key": "C", "text": "Xóa ecosystem file" },
+            { "key": "D", "text": "Đổi queryKey" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Startup tích hợp PM2 với init system, còn save lưu process list cần resurrect."
+        },
+        {
+          "id": "q-deploy-04-3",
+          "question": "Khi bật PM2 cluster với bốn worker, điều gì phải được xem xét?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Session/cache/tag coordination không được giữ riêng trong memory từng worker"
+            },
+            { "key": "B", "text": "Mỗi worker cần repository Git khác nhau" },
+            { "key": "C", "text": "Tắt HTTPS" },
+            { "key": "D", "text": "Dùng localStorage làm database" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Cluster nhân process và memory; state dùng chung phải đi qua storage/cache coordination bên ngoài."
+        }
+      ]
+    },
+    {
+      "id": "deploy-05",
+      "slug": "docker-production-multistage-static-node",
+      "title": "Docker Production Fundamentals: Static & Node Images",
+      "summary": "Hiểu layer, build context và multi-stage build trước khi tối ưu Next.js bằng standalone output.",
+      "durationMinutes": 28,
+      "level": "intermediate",
+      "tags": ["Docker", "Multi-stage", "Nginx", "Non-root"],
+      "mentalModel": "Image là artifact bất biến được tạo từ layers; container là một lần chạy image. Multi-stage build giữ compiler/dev dependencies ở builder và chỉ chuyển runtime artifact sang runner, giúp image nhỏ hơn và giảm attack surface.",
+      "keyPoints": [
+        "Dùng `.dockerignore` để loại `.git`, `.next`, `node_modules`, local env và artifact khỏi build context.",
+        "Copy lockfile trước source để cache dependency layer; dùng `npm ci` cho build tái lập.",
+        "Static export có thể chạy trong Nginx image không chứa Node; full Next runtime cần Node image và phải bind `0.0.0.0:$PORT`.",
+        "Runner nên non-root, không chứa build secrets và không ghi dữ liệu lâu dài vào filesystem ephemeral."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Multi-stage static image với Nginx",
+          "language": "dockerfile",
+          "afterCode": "FROM node:22-alpine AS builder\nWORKDIR /app\nCOPY package.json package-lock.json ./\nRUN npm ci\nCOPY . .\nENV NEXT_TELEMETRY_DISABLED=1 NEXT_OUTPUT=export\nRUN npm run build\n\nFROM nginx:1.27-alpine AS runner\nCOPY --from=builder /app/out /usr/share/nginx/html\nEXPOSE 80\nHEALTHCHECK --interval=30s --timeout=3s \\\n  CMD wget -qO- http://127.0.0.1/ || exit 1",
+          "takeaway": "Static runner không cần Node hay source code; Nginx chỉ nhận `out/` từ builder."
+        },
+        {
+          "title": "Lab 2 — Node image chạy `next start` để làm baseline",
+          "language": "dockerfile",
+          "afterCode": "FROM node:22-alpine AS deps\nWORKDIR /app\nCOPY package.json package-lock.json ./\nRUN npm ci\n\nFROM node:22-alpine AS builder\nWORKDIR /app\nCOPY --from=deps /app/node_modules ./node_modules\nCOPY . .\nRUN mkdir -p public\nENV NEXT_OUTPUT=node\nRUN npm run build\n\nFROM node:22-alpine AS runner\nWORKDIR /app\nENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0\nRUN addgroup -S nodejs && adduser -S nextjs -G nodejs\nCOPY --from=builder --chown=nextjs:nodejs /app/package.json ./\nCOPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules\nCOPY --from=builder --chown=nextjs:nodejs /app/.next ./.next\nCOPY --from=builder --chown=nextjs:nodejs /app/public ./public\nUSER nextjs\nEXPOSE 3000\nCMD [\"npm\", \"start\"]",
+          "takeaway": "Baseline `next start` dễ hiểu nhưng copy toàn node_modules; bài standalone tiếp theo sẽ dùng output tracing để thu nhỏ runner."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-deploy-05-1",
+          "question": "Lợi ích chính của multi-stage build là gì?",
+          "options": [
+            { "key": "A", "text": "Tách build tools khỏi runtime image" },
+            { "key": "B", "text": "Lưu secret trong layer" },
+            { "key": "C", "text": "Chạy nhiều database trong một container" },
+            { "key": "D", "text": "Thay thế CI" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Runner chỉ chứa artifact/runtime cần thiết nên nhỏ hơn và ít dependency có thể bị khai thác hơn."
+        },
+        {
+          "id": "q-deploy-05-2",
+          "question": "Vì sao copy package lockfile và chạy npm ci trước khi copy toàn source?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Tận dụng Docker layer cache khi source đổi nhưng dependencies không đổi"
+            },
+            { "key": "B", "text": "Để public secret" },
+            { "key": "C", "text": "Để tắt TypeScript" },
+            { "key": "D", "text": "Để container chạy root" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Dependency layer chỉ invalidated khi manifest/lockfile thay đổi, giúp build lặp lại nhanh hơn."
+        },
+        {
+          "id": "q-deploy-05-3",
+          "question": "App chỉ là static export. Runner tối giản phù hợp là gì?",
+          "options": [
+            { "key": "A", "text": "Nginx/Caddy/static file server chứa out/" },
+            { "key": "B", "text": "PM2 cluster bắt buộc" },
+            { "key": "C", "text": "Node dev server" },
+            { "key": "D", "text": "Database container duy nhất" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Static artifact không cần Next Node runtime; file server chuyên dụng đủ để phục vụ HTML/assets."
+        }
+      ]
+    },
+    {
+      "id": "deploy-06",
+      "slug": "docker-nextjs-standalone-deep-dive",
+      "title": "Docker Standalone Deep Dive: Output Tracing & Minimal Runner",
+      "summary": "Đóng gói `.next/standalone` đúng cách, copy static assets, chạy non-root và xử lý tracing trong monorepo.",
+      "durationMinutes": 32,
+      "level": "advanced",
+      "tags": ["Docker", "Next.js Standalone", "Output Tracing", "Minimal Image"],
+      "mentalModel": "Standalone không phải static export. Next.js trace import/require/fs ở build time rồi tạo một Node server tối giản cùng tập dependency cần thiết. Runner chỉ nhận traced server, static chunks và public assets — không cần cài toàn bộ node_modules.",
+      "keyPoints": [
+        "Bật `output: 'standalone'` để tạo `.next/standalone/server.js`; chạy bằng `node server.js`, không dùng `next start` cho artifact này.",
+        "`public/` và `.next/static/` không tự được copy vào standalone vì thường được phục vụ từ CDN; Docker runner phải copy chúng nếu server.js sẽ phục vụ assets.",
+        "Đặt `HOSTNAME=0.0.0.0` và đọc `PORT` để container nhận traffic từ bên ngoài network namespace.",
+        "Monorepo/native runtime assets có thể nằm ngoài tracing root hoặc không được phát hiện tĩnh; dùng `outputFileTracingRoot/Includes` hẹp và kiểm tra artifact thực tế."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Build và audit standalone artifact",
+          "language": "bash",
+          "afterCode": "NEXT_OUTPUT=standalone npm run build\n\n# Xác nhận minimal server và traced dependencies\ntest -f .next/standalone/server.js\nfind .next/standalone -maxdepth 3 -type f | sort | head -80\n\n# So sánh kích thước artifact\ndu -sh node_modules .next/standalone .next/static\n\n# Ghép artifact để chạy local giống runner\nmkdir -p .next/standalone/.next/static\ncp -R .next/static/. .next/standalone/.next/static/\nif [ -d public ]; then cp -R public .next/standalone/public; fi\n\nPORT=3000 HOSTNAME=127.0.0.1 node .next/standalone/server.js",
+          "takeaway": "Audit artifact trước khi viết Dockerfile giúp phát hiện asset/native file thiếu thay vì debug sau khi image đã phát hành."
+        },
+        {
+          "title": "Lab 2 — Production multi-stage standalone Dockerfile",
+          "language": "dockerfile",
+          "afterCode": "FROM node:22-alpine AS deps\nWORKDIR /app\nCOPY package.json package-lock.json ./\nRUN npm ci\n\nFROM node:22-alpine AS builder\nWORKDIR /app\nCOPY --from=deps /app/node_modules ./node_modules\nCOPY . .\nRUN mkdir -p public\nENV NEXT_TELEMETRY_DISABLED=1 NEXT_OUTPUT=standalone\nRUN npm run build\n\nFROM node:22-alpine AS runner\nWORKDIR /app\nENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 \\\n    HOSTNAME=0.0.0.0 PORT=3000\nRUN addgroup -S nodejs && adduser -S nextjs -G nodejs\nCOPY --from=builder --chown=nextjs:nodejs /app/public ./public\nCOPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./\nCOPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static\nUSER nextjs\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]",
+          "takeaway": "Runner không chạy npm install và không chứa source/build tool; standalone trace cung cấp đúng runtime dependency đã phát hiện."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-deploy-06-1",
+          "question": "Command đúng để chạy standalone artifact là gì?",
+          "options": [
+            { "key": "A", "text": "node .next/standalone/server.js" },
+            { "key": "B", "text": "next dev" },
+            { "key": "C", "text": "serve out" },
+            { "key": "D", "text": "tsc server.ts" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Next.js sinh minimal server.js trong standalone output để chạy trực tiếp bằng Node."
+        },
+        {
+          "id": "q-deploy-06-2",
+          "question": "Trang HTML chạy nhưng CSS/JS chunks trả 404 trong standalone container. File nào thường chưa được copy?",
+          "options": [
+            { "key": "A", "text": ".next/static vào .next/standalone/.next/static" },
+            { "key": "B", "text": ".git" },
+            { "key": "C", "text": "tsconfig.tsbuildinfo" },
+            { "key": "D", "text": "eslint.config.mjs" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Standalone trace không tự copy static chunks; runner hoặc CDN phải phục vụ chúng đúng path."
+        },
+        {
+          "id": "q-deploy-06-3",
+          "question": "Monorepo dùng native binary ngoài app folder nhưng container báo missing file. Cách xử lý phù hợp?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Cấu hình tracing root/include hẹp và kiểm tra artifact"
+            },
+            { "key": "B", "text": "Copy toàn filesystem root vào image" },
+            { "key": "C", "text": "Chạy container privileged" },
+            { "key": "D", "text": "Tắt lockfile" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Tracing cần biết file runtime không thể phát hiện tĩnh; include hẹp tránh bỏ sót mà không làm image phình vô hạn."
+        }
+      ]
+    },
+    {
+      "id": "deploy-07",
+      "slug": "production-health-graceful-scaling-rollback",
+      "title": "Production Operations: Health, Graceful Shutdown & Scaling",
+      "summary": "Đưa deployment từ trạng thái “chạy được” sang có readiness, streaming, multi-instance consistency và rollback.",
+      "durationMinutes": 30,
+      "level": "advanced",
+      "tags": ["Health Check", "Graceful Shutdown", "Scaling", "Rollback"],
+      "mentalModel": "Production là một vòng đời: instance khởi động, chỉ nhận traffic khi ready, phục vụ và quan sát được, ngừng nhận request khi deploy, drain công việc rồi thoát. Khi nhân instance, mọi key/cache/version cần consistency contract bên ngoài process.",
+      "keyPoints": [
+        "Liveness chỉ trả lời process còn sống; readiness kiểm tra dependency tối thiểu để phục vụ traffic. Không hard-code database/cache là `up` hoặc prerender health response lúc build.",
+        "Reverse proxy phải truyền host/protocol/client IP và không buffer streaming response nếu muốn RSC/PPR hiển thị dần.",
+        "Cho SIGTERM/SIGINT thời gian drain 10–30 giây; PM2/orchestrator chỉ gửi SIGKILL sau grace period và deployment phải có smoke check/rollback.",
+        "Nhiều instance cần cùng build, `deploymentId`, Server Actions encryption key và chiến lược shared cache/tag coordination; migration chạy một lần trước traffic, không chạy đồng thời ở mọi replica."
+      ],
+      "codeRecipes": [
+        {
+          "title": "Lab 1 — Tách liveness và readiness Route Handlers",
+          "language": "typescript",
+          "afterCode": "// app/api/health/live/route.ts\nimport { NextResponse } from 'next/server';\nexport const dynamic = 'force-dynamic';\n\nexport function GET() {\n  return NextResponse.json({\n    status: 'alive',\n    uptimeSeconds: Math.round(process.uptime()),\n    timestamp: new Date().toISOString(),\n  });\n}\n\n// app/api/health/ready/route.ts\nexport const dynamic = 'force-dynamic';\n\nexport async function GET() {\n  try {\n    await Promise.race([\n      db.$queryRaw`SELECT 1`,\n      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1500)),\n    ]);\n    return NextResponse.json({ status: 'ready' });\n  } catch {\n    return NextResponse.json({ status: 'not-ready' }, { status: 503 });\n  }\n}",
+          "takeaway": "Liveness không phụ thuộc database để tránh restart storm; readiness trả 503 để load balancer ngừng gửi traffic khi dependency thiết yếu lỗi."
+        },
+        {
+          "title": "Lab 2 — Nginx reverse proxy giữ streaming",
+          "language": "nginx",
+          "afterCode": "upstream next_app {\n  server 127.0.0.1:3000;\n  keepalive 32;\n}\n\nserver {\n  listen 443 ssl http2;\n  server_name app.example.com;\n\n  location / {\n    proxy_pass http://next_app;\n    proxy_http_version 1.1;\n    proxy_set_header Host $host;\n    proxy_set_header X-Forwarded-Proto $scheme;\n    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\n    # Không gom toàn response trước khi gửi: giữ RSC/PPR streaming.\n    proxy_buffering off;\n    proxy_read_timeout 60s;\n  }\n\n  location = /api/health/live {\n    proxy_pass http://next_app;\n    access_log off;\n  }\n}",
+          "takeaway": "Streaming phải được giữ xuyên suốt Next server → proxy → load balancer/CDN; một tầng buffer sẽ làm mất lợi ích hiển thị dần."
+        }
+      ],
+      "quizzes": [
+        {
+          "id": "q-deploy-07-1",
+          "question": "Database tạm thời lỗi. Endpoint nào nên trả 503 trong khi process vẫn sống?",
+          "options": [
+            { "key": "A", "text": "Readiness" },
+            { "key": "B", "text": "Liveness" },
+            { "key": "C", "text": "Static asset" },
+            { "key": "D", "text": "robots.txt" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Readiness loại instance khỏi traffic; liveness vẫn thành công để tránh orchestrator restart process liên tục vì dependency ngoài."
+        },
+        {
+          "id": "q-deploy-07-2",
+          "question": "PPR chỉ hiển thị sau khi toàn trang hoàn tất phía sau Nginx. Cấu hình cần kiểm tra đầu tiên?",
+          "options": [
+            { "key": "A", "text": "Proxy/load balancer response buffering" },
+            { "key": "B", "text": "ESLint rules" },
+            { "key": "C", "text": "Quiz score" },
+            { "key": "D", "text": "LocalStorage" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Buffering giữ chunks ở proxy và vô hiệu hóa trải nghiệm streaming dù Next server đã gửi dần."
+        },
+        {
+          "id": "q-deploy-07-3",
+          "question": "Hai container cùng deployment nhưng `revalidateTag` chỉ cập nhật một container. Nguyên nhân kiến trúc là gì?",
+          "options": [
+            {
+              "key": "A",
+              "text": "Cache/tag state đang cô lập theo instance và chưa có coordination"
+            },
+            { "key": "B", "text": "React thiếu useMemo" },
+            { "key": "C", "text": "Docker image quá nhỏ" },
+            { "key": "D", "text": "GitHub Pages thiếu PM2" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "In-memory/disk cache riêng không truyền invalidation giữa replicas; cần shared handler và tag coordination phù hợp."
+        }
+      ]
+    }
+  ]
+}
