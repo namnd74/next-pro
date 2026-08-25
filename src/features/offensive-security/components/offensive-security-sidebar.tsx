@@ -21,6 +21,7 @@ import {
   Zap,
   GraduationCap,
 } from 'lucide-react';
+import { ACADEMY_MODULES } from '../academy/academy-loader';
 import { OFFENSIVE_SECURITY_COLLECTIONS } from '../data/collection-loader';
 import { getCollectionsByPhase } from '../data/collection-loader';
 import { getMissionsByCollectionSlug } from '../data/collection-loader';
@@ -126,6 +127,11 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
     [mounted, launchedVectorIds, patchedVectorIds]
   );
 
+  const totalAcademyLessons = ACADEMY_MODULES.reduce(
+    (acc, m) => acc + m.lessons.length,
+    0
+  );
+
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto pb-4">
       {/* Brand */}
@@ -148,7 +154,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
       </Link>
 
       <Link
-        href="/offensive-security/academy/roles-and-boundaries"
+        href="/offensive-security/academy"
         onClick={onNavigate}
         className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 transition-colors ${
           pathname.startsWith('/offensive-security/academy')
@@ -162,7 +168,8 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
         <span className="min-w-0 flex-1">
           <span className="block text-xs font-bold">Core Academy</span>
           <span className="block font-mono text-[9px] tracking-wide">
-            {mounted ? completedAcademyLessonIds.length : 0}/3 bài hoàn thành
+            {mounted ? completedAcademyLessonIds.length : 0}/{totalAcademyLessons} bài
+            hoàn thành
           </span>
         </span>
       </Link>

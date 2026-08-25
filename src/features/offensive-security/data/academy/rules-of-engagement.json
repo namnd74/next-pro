@@ -1,0 +1,1123 @@
+{
+  "id": "os00-m02-rules-of-engagement",
+  "slug": "rules-of-engagement",
+  "trackId": "os00-ethics-authorization",
+  "title": "Phạm vi (Scope), Rules of Engagement & Deconfliction",
+  "summary": "Chuyển authority thành ranh giới phạm vi rõ ràng, thiết lập Rules of Engagement có điều kiện dừng khẩn cấp và vận hành cơ chế deconfliction với SOC/Blue Team.",
+  "difficulty": "foundation",
+  "estimatedMinutes": 120,
+  "careerPaths": [
+    "penetration-test",
+    "red-team",
+    "adversary-emulation",
+    "bug-bounty",
+    "purple-team"
+  ],
+  "domains": ["human", "network", "web"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os00-l04-scoping-boundaries-and-dependencies",
+      "slug": "scoping-boundaries-and-dependencies",
+      "title": "Thiết lập Phạm vi (Scope) & Ranh giới Phụ thuộc Bên thứ ba",
+      "summary": "Chuyển quyền hạn cấp cao thành danh mục in-scope/out-of-scope cụ thể; xử lý hạ tầng chia sẻ (Cloud, SaaS, CDN, Multi-tenant) và kiểm soát hiện tượng Scope Creep.",
+      "difficulty": "foundation",
+      "durationMinutes": 40,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân định rõ ràng in-scope và out-of-scope theo địa chỉ IP/CIDR, FQDN, API endpoint, identity tenant và khung thời gian.",
+        "Phân tích ranh giới sở hữu và trách nhiệm chia sẻ (Shared Responsibility) khi hệ thống phụ thuộc nhà cung cấp bên thứ ba (AWS, Azure, Cloudflare, SaaS).",
+        "Nhận diện và ngăn chặn hiện tượng Scope Creep thông qua quy trình Scope Change Request có phê duyệt bằng văn bản.",
+        "Xác minh quyền sở hữu tài sản (Asset Ownership Verification) trước khi thực hiện bất kỳ hoạt động thăm dò hay tác chiến nào."
+      ],
+      "careerPaths": [
+        "penetration-test",
+        "red-team",
+        "bug-bounty",
+        "adversary-emulation"
+      ],
+      "domains": ["human", "network", "web"],
+      "attackTactics": [],
+      "keywords": [
+        "scope",
+        "in-scope",
+        "out-of-scope",
+        "shared-responsibility",
+        "scope-creep",
+        "asset-ownership"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Scope là ranh giới kỹ thuật và pháp lý chuyển Authority thành danh sách tài sản cụ thể được phép tác động. Bất kỳ tài sản nào không được chỉ định tường minh trong danh sách in-scope đã ký duyệt đều mặc nhiên là out-of-scope. Hạ tầng phụ thuộc bên thứ ba (SaaS, CDN, hạ tầng ISP) không thuộc quyền sở hữu của khách hàng, do đó không thể được kiểm thử nếu thiếu sự chấp thuận của chính nhà cung cấp đó.",
+      "visual": {
+        "title": "Quy trình Xác lập Ranh giới Scope và Dependency",
+        "caption": "Từ định danh tài sản thô đến danh mục in-scope có chữ ký xác nhận của Asset Owner.",
+        "steps": [
+          {
+            "label": "Thu thập Tài sản Thô",
+            "detail": "Tiếp nhận danh sách domain, IP range, cloud tenant, API endpoint từ stakeholder.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Kiểm tra Quyền Sở hữu",
+            "detail": "Xác minh tài sản thuộc sở hữu tổ chức hay trỏ về hạ tầng bên thứ ba (SaaS/Shared Cloud/MSP).",
+            "tone": "caution"
+          },
+          {
+            "label": "Lọc Ranh giới Scope",
+            "detail": "Tách in-scope (tài sản sở hữu) và đánh dấu out-of-scope (shared assets, vendor platforms).",
+            "tone": "allow"
+          },
+          {
+            "label": "Ký biên bản Thống nhất",
+            "detail": "Khóa danh sách định danh kỹ thuật, time window và chữ ký pháp lý của Asset Owner.",
+            "tone": "allow"
+          },
+          {
+            "label": "Phát hiện Lệch Scope",
+            "detail": "Gặp tài sản lạ hoặc dịch vụ phụ thuộc ngoài danh sách -> Lập tức dừng và lập Change Request.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Chuyển Mục tiêu Kinh doanh thành Ranh giới Kỹ thuật Tuyệt đối",
+          "paragraphs": [
+            "Một bản mô tả phạm vi mơ hồ như 'hãy kiểm thử toàn bộ hệ thống e-commerce' là cội nguồn của mọi rủi ro pháp lý và sự cố vận hành. Để trở thành căn cứ tác chiến, phạm vi phải được phân rã thành các định danh kỹ thuật không thể nhầm lẫn: dải IP/CIDR cụ thể, danh sách FQDN đầy đủ, API routes, tài khoản thử nghiệm và môi trường (Staging, UAT hay Production).",
+            "Mọi tài sản không được liệt kê tường minh trong danh mục In-Scope đều được coi là Out-of-Scope theo nguyên tắc mặc định từ chối (Default Deny). Giả định một máy chủ nằm cùng dải mạng là được phép kiểm thử mà không có văn bản xác nhận là hành vi vi phạm nghiêm trọng."
+          ],
+          "points": [
+            "In-Scope: Chỉ bao gồm các tài sản được xác định rõ danh tính kỹ thuật và có chữ ký phê duyệt.",
+            "Out-of-Scope: Mọi hệ thống hỗ trợ, mạng phụ trợ, máy chủ chưa xác minh và các dịch vụ nhạy cảm bị loại trừ.",
+            "Môi trường: Rõ ràng ranh giới giữa Staging/Test và Production; không suy diễn quyền kiểm thử giữa các môi trường."
+          ]
+        },
+        {
+          "title": "Hạ tầng Đám mây, SaaS và Trách nhiệm Chia sẻ (Shared Responsibility)",
+          "paragraphs": [
+            "Khi doanh nghiệp vận hành trên Public Cloud (AWS, Azure, GCP) hoặc sử dụng dịch vụ SaaS (Salesforce, Zendesk, Office 365), quyền hạn của khách hàng chỉ giới hạn trong phạm vi cấu hình và dữ liệu của họ. Khách hàng không có quyền cho phép operator tấn công vào hypervisor, hạ tầng mạng vật lý của Cloud Provider, hay tenant của khách hàng khác.",
+            "Nhiều Cloud Provider có chính sách kiểm thử riêng (như AWS Penetration Testing Policy). Operator phải đối chiếu kịch bản kiểm thử với điều khoản dịch vụ của bên thứ ba để đảm bảo không vi phạm các hạn chế về DoS, tài nguyên chia sẻ hoặc tấn công tầng mạng cơ sở."
+          ],
+          "points": [
+            "Shared Responsibility: Chỉ kiểm thử phần ứng dụng và cấu hình thuộc quyền quản lý của khách hàng.",
+            "SaaS & Managed Services: Tuyệt đối không kiểm thử platform SaaS nếu không có thỏa thuận ba bên (Khách hàng - Operator - Nhà cung cấp).",
+            "Multi-Tenant Isolation: Nghiêm cấm mọi hành vi có thể làm lộ dữ liệu hoặc ảnh hưởng tới tenant láng giềng."
+          ]
+        },
+        {
+          "title": "Hiện tượng 'Scope Creep' và Kiểm soát Thay đổi (Scope Change Control)",
+          "paragraphs": [
+            "Scope Creep xảy ra khi phạm vi kiểm thử bị mở rộng không chính thức trong quá trình thực thi: người quản trị nhắn qua chat 'tiện thể kiểm tra luôn server này', hoặc operator phát hiện một domain liên quan trong quá trình recon rồi tự ý khai thác tiếp.",
+            "Mọi sự thay đổi về phạm vi (bổ sung IP, đổi môi trường, tăng thời gian) bắt buộc phải đi qua quy trình Scope Change Request chính thức: lập văn bản ghi rõ lý do, đánh giá rủi ro bổ sung, và nhận được phê duyệt bằng văn bản từ Asset Owner có thẩm quyền trước khi triển khai."
+          ],
+          "points": [
+            "Không nhận lệnh mở rộng scope qua tin nhắn miệng hoặc chat không được xác thực thẩm quyền.",
+            "Scope Change Request: Phải ghi rõ tài sản mới, mục đích, kỹ thuật áp dụng và chữ ký phê duyệt.",
+            "Dừng ngay hành vi mở rộng khi phát hiện luồng tấn công dẫn ra ngoài dải IP đã cam kết."
+          ]
+        },
+        {
+          "title": "Xác thực Quyền sở hữu Tài sản (Asset Ownership Verification)",
+          "paragraphs": [
+            "Trong môi trường hiện đại, một domain có thể trỏ CNAME sang một dịch vụ CDN hoặc bên thứ ba đã ngừng hoạt động (Subdomain Takeover risk). Nếu operator tấn công vào IP đó mà không xác minh, họ có thể đang tấn công một máy chủ thuộc sở hữu của người lạ.",
+            "Trước khi gửi gói tin khai thác, operator phải thực hiện kiểm tra đối soát (DNS records, WHOIS, IP allocation, Cloud resource tagging) để khẳng định tài sản tại thời điểm test thực sự thuộc quyền kiểm soát của bên ủy quyền."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Scope Boundary & Cloud Dependency Triage",
+        "objective": "Đánh giá các tình huống phát sinh trong quá trình nhận diện phạm vi, phân định in-scope/out-of-scope và xử lý rủi ro bên thứ ba.",
+        "scenario": "Bạn là Technical Lead chuẩn bị triển khai đánh giá an ninh cho một hệ thống bán lẻ trực tuyến kết hợp hạ tầng Hybrid Cloud và dịch vụ SaaS. Hãy đưa ra quyết định chuẩn xác cho từng trường hợp.",
+        "constraints": [
+          "Tuân thủ nguyên tắc Default Deny đối với mọi tài sản chưa có văn bản xác nhận.",
+          "Không tự ý suy diễn quyền hạn đối với hạ tầng của nhà cung cấp bên thứ ba.",
+          "Mọi thay đổi phạm vi phải có biên bản Scope Change Request."
+        ],
+        "cases": [
+          {
+            "id": "scope-case-01",
+            "title": "Subdomain CNAME trỏ về nền tảng SaaS bên thứ ba",
+            "context": "Trong danh mục in-scope có domain 'helpdesk.client-retail.com'. Quá trình DNS lookup cho thấy domain này đang là CNAME trỏ về 'custom-tenant.saas-crm-provider.com' do một nhà cung cấp CRM SaaS quản lý hạ tầng.",
+            "prompt": "Hành động đúng đắn và an toàn nhất của Operator là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tạm dừng kiểm thử tầng hạ tầng, chỉ kiểm tra cấu hình logic tenant nếu có văn bản đồng thuận từ bên SaaS hoặc loại subdomain ra khỏi active scope.",
+                "correct": true,
+                "rationale": "Hạ tầng máy chủ thuộc sở hữu của nhà cung cấp SaaS. Khách hàng không có thẩm quyền đơn phương cho phép kiểm thử thâm nhập lên máy chủ của nhà cung cấp nếu không có thỏa thuận hợp lệ."
+              },
+              {
+                "id": "B",
+                "label": "Tiến hành quét lỗ hổng và brute-force cổng dịch vụ vì tên miền chứa 'client-retail.com' thuộc in-scope.",
+                "correct": false,
+                "rationale": "Vi phạm ranh giới sở hữu: FQDN thuộc khách hàng nhưng hạ tầng máy chủ thực tế thuộc bên thứ ba, dễ dẫn đến vi phạm pháp lý và ảnh hưởng tenant khác."
+              },
+              {
+                "id": "C",
+                "label": "Tự động gửi thông báo cho bên SaaS rằng mình đang thực hiện pentest rồi tiếp tục quét.",
+                "correct": false,
+                "rationale": "Thông báo một chiều không tạo ra thẩm quyền (Authority). Cần có thỏa thuận và ủy quyền chính thức trước khi thực hiện."
+              },
+              {
+                "id": "D",
+                "label": "Tấn công vào các subdomain khác của nhà cung cấp SaaS để tìm đường vòng.",
+                "correct": false,
+                "rationale": "Hành vi hoàn toàn vượt ngoài phạm vi (Out-of-Scope) và vi phạm pháp luật nghiêm trọng."
+              }
+            ]
+          },
+          {
+            "id": "scope-case-02",
+            "title": "Phát hiện Internal Subnet của đơn vị MSP quản trị mạng",
+            "context": "Sau khi có được shell hợp lệ trên một máy chủ Web in-scope, bạn phát hiện một interface mạng thứ hai kết nối tới dải 10.200.0.0/24 thuộc về mạng quản trị vận hành của một công ty MSP bên ngoài.",
+            "prompt": "Operator cần xử lý tình huống phát hiện này như thế nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tiếp tục quét mạng dải 10.200.0.0/24 để chứng minh khả năng nhảy sang hạ tầng MSP.",
+                "correct": false,
+                "rationale": "Dải mạng MSP không nằm trong danh mục In-Scope được phê duyệt ban đầu; việc tự ý quét là hành vi xâm nhập trái phép."
+              },
+              {
+                "id": "B",
+                "label": "Dừng ngay việc thăm dò dải 10.200.0.0/24, ghi nhận cấu hình dual-homed vào log bằng chứng và báo cáo White Team để xin ý kiến về ranh giới.",
+                "correct": true,
+                "rationale": "Giữ đúng ranh giới an toàn: không mở rộng sang mạng đối tác khi chưa có thẩm quyền, đồng thời bảo toàn bằng chứng kiến trúc mạng có rủi ro."
+              },
+              {
+                "id": "C",
+                "label": "Cài đặt phần mềm đào coin hoặc persistence script trên máy chủ MSP để làm bằng chứng.",
+                "correct": false,
+                "rationale": "Hành vi phá hoại bị nghiêm cấm trong mọi hoạt động kiểm thử an ninh chuyên nghiệp."
+              },
+              {
+                "id": "D",
+                "label": "Xóa thông tin interface mạng khỏi máy chủ để tránh bị SOC phát hiện.",
+                "correct": false,
+                "rationale": "Xóa log/cấu hình làm mất tính toàn vẹn của bằng chứng và cản trở việc khắc phục của khách hàng."
+              }
+            ]
+          },
+          {
+            "id": "scope-case-03",
+            "title": "Yêu cầu kiểm thử thêm máy chủ Payment Gateway qua tin nhắn chat",
+            "context": "Trong lúc đang thực hiện pentest, Trưởng nhóm Dev của khách hàng nhắn tin riêng qua Slack: 'Nhờ team test luôn server thanh toán 192.168.50.10 giúp mình với, chiều nay sếp giục rồi'. Máy chủ này không có trong hợp đồng ban đầu.",
+            "prompt": "Quy trình xử lý chuẩn mực của Lead Operator là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chạy quét ngay lập tức vì người yêu cầu là Trưởng nhóm Dev của dự án.",
+                "correct": false,
+                "rationale": "Trưởng nhóm Dev có thể không có thẩm quyền đại diện pháp lý cho hệ thống thanh toán quan trọng, và tin nhắn chat không phải văn bản pháp lý."
+              },
+              {
+                "id": "B",
+                "label": "Từ chối thực hiện qua kênh không chính thức, yêu cầu lập Scope Change Request có đánh giá rủi ro và chữ ký của Asset Owner/Sponsor.",
+                "correct": true,
+                "rationale": "Ngăn chặn Scope Creep và rủi ro tác động hệ thống thanh toán nhạy cảm khi chưa có sự chuẩn bị và phê duyệt hợp lệ từ người có thẩm quyền cao nhất."
+              },
+              {
+                "id": "C",
+                "label": "Bí mật quét nhẹ vào ban đêm để không ai biết.",
+                "correct": false,
+                "rationale": "Hành động lén lút vi phạm đạo đức nghề nghiệp và phá vỡ tính minh bạch của hoạt động kiểm thử được ủy quyền."
+              },
+              {
+                "id": "D",
+                "label": "Hủy toàn bộ hợp đồng pentest hiện tại vì khách hàng vi phạm quy trình.",
+                "correct": false,
+                "rationale": "Phản ứng thái quá không cần thiết; giải pháp chuẩn là hướng dẫn khách hàng thực hiện quy trình kiểm soát thay đổi (Change Control)."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân định chính xác cả ba tình huống ranh giới và phụ thuộc bên thứ ba.",
+          "Áp dụng triệt để nguyên tắc Default Deny và quy trình Scope Change Control.",
+          "Bảo vệ an toàn cho hạ tầng của bên thứ ba và hệ thống production nhạy cảm."
+        ],
+        "evidenceTemplate": [
+          "Xác định trạng thái sở hữu của tài sản (Direct Ownership vs Third-party)",
+          "Trạng thái Scope hiện tại (In-Scope vs Out-of-Scope)",
+          "Hành động xử lý vi phạm hoặc thay đổi phạm vi (Change Request Log)",
+          "Biện pháp phòng ngừa rủi ro cho tenant/hệ thống chia sẻ"
+        ],
+        "reset": "Đặt lại lựa chọn để xem lại các tình huống phân định phạm vi từ đầu.",
+        "cleanup": "Toàn bộ bài tập là mô phỏng tư duy, không phát sinh kết nối mạng hay lưu trữ ngoài trình duyệt."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc đính kèm phụ lục kỹ thuật danh mục In-Scope (IP, CIDR, FQDN) vào hợp đồng dịch vụ.",
+          "Yêu cầu xác nhận văn bản từ nhà cung cấp bên thứ ba (Third-party SLA/Auth) nếu kiểm thử chạm tới dịch vụ liên quan.",
+          "Thiết lập quy trình Scope Change Request bằng văn bản có chữ ký của Asset Owner trước khi chạm vào tài sản mới."
+        ],
+        "observe": [
+          "Duy trì danh mục tài sản được phép theo thời gian thực trong tài liệu tác chiến của Operator.",
+          "Ghi nhận và gắn cờ (flag) ngay lập tức mọi IP/Domain xuất hiện trong quá trình recon nếu không khớp với danh sách ban đầu."
+        ],
+        "respond": [
+          "Dừng ngay thao tác tác chiến khi lưu lượng hoặc kết nối có dấu hiệu đi sang hệ thống đối tác ngoài phạm vi.",
+          "Gửi văn bản giải trình và đề xuất phương án xử lý tới White Team khi phát hiện điểm yếu ranh giới mạng (Cross-boundary vulnerability)."
+        ],
+        "residualRisk": [
+          "Thay đổi IP động (Dynamic Cloud IP allocation) có thể khiến một IP in-scope cũ bị chuyển nhượng cho bên thứ ba trong quá trình test dài ngày.",
+          "Sự nhầm lẫn giữa môi trường Staging có kết nối database thật của Production với môi trường isolated hoàn toàn."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Nếu khách hàng sở hữu tên miền, chúng ta có quyền test mọi máy chủ mà tên miền đó trỏ tới.",
+          "correction": "Tên miền có thể trỏ về CDN, SaaS hoặc Cloud Host của bên thứ ba. Quyền sở hữu domain không đồng nghĩa với quyền sở hữu hạ tầng máy chủ phía sau."
+        },
+        {
+          "claim": "Khách hàng yêu cầu bằng miệng hoặc qua Slack là đủ để thêm một máy chủ mới vào pentest.",
+          "correction": "Tin nhắn miệng không có giá trị bảo vệ pháp lý khi xảy ra sự cố gián đoạn dịch vụ. Bắt buộc phải có Scope Change Request có thẩm quyền phê duyệt."
+        },
+        {
+          "claim": "Mọi tài sản cùng dải mạng nội bộ với máy chủ in-scope đều mặc nhiên được phép thăm dò.",
+          "correction": "Nguyên tắc Default Deny áp dụng cho từng địa chỉ IP và dịch vụ. Việc phát hiện dải mạng nội bộ mới chỉ được ghi nhận để báo cáo, không được tự ý leo thang kiểm thử."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os00-l04-q1",
+          "difficulty": "easy",
+          "question": "Nguyên tắc cốt lõi nào chi phối việc xác định một tài sản có được phép kiểm thử an ninh hay không?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tài sản nào quét thấy mở cổng thì được phép kiểm thử"
+            },
+            {
+              "id": "B",
+              "label": "Mặc định từ chối (Default Deny): chỉ kiểm thử tài sản được liệt kê tường minh trong văn bản ủy quyền"
+            },
+            {
+              "id": "C",
+              "label": "Mọi máy chủ cùng tên miền phụ (subdomain) đều được kiểm thử tự do"
+            },
+            {
+              "id": "D",
+              "label": "Tùy thuộc vào việc công cụ quét có hỗ trợ target đó hay không"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Nguyên tắc Default Deny đảm bảo không có tài sản nào bị kiểm thử ngoài ý muốn. Chỉ những tài sản được định danh chính xác và có phê duyệt chính thức mới thuộc In-Scope."
+        },
+        {
+          "id": "os00-l04-q2",
+          "difficulty": "medium",
+          "question": "Trong quá trình đánh giá ứng dụng web lưu trữ trên AWS, Operator phát hiện một lỗ hổng có thể khai thác để truy cập máy chủ quản lý hypervisor vật lý của AWS. Operator nên làm gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tiếp tục khai thác sâu vào hypervisor để lấy bằng chứng chứng minh quyền kiểm soát toàn bộ cụm máy chủ"
+            },
+            {
+              "id": "B",
+              "label": "Dừng khai thác ngay tại ranh giới hypervisor, báo cáo finding với bằng chứng an toàn và thông báo theo quy trình Cloud Shared Responsibility"
+            },
+            {
+              "id": "C",
+              "label": "Cố tình làm sập hypervisor để kiểm tra khả năng phục hồi thảm họa của AWS"
+            },
+            {
+              "id": "D",
+              "label": "Không báo cáo cho ai và tự ý chia sẻ thông tin lên mạng xã hội"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Theo mô hình Shared Responsibility, hạ tầng vật lý và hypervisor thuộc quyền kiểm soát của Cloud Provider. Khách hàng không thể cấp quyền tấn công hạ tầng này. Operator phải dừng lại và báo cáo phối hợp an toàn."
+        },
+        {
+          "id": "os00-l04-q3",
+          "difficulty": "hard",
+          "question": "Khi đang tiến hành pentest theo hợp đồng, một quản trị viên gửi ticket yêu cầu mở rộng dải IP kiểm thử thêm 2 subnet mới vì hệ thống vừa mới nâng cấp. Quy trình đúng đắn nhất là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Thực hiện ngay vì yêu cầu đến từ nhân sự quản trị kỹ thuật của khách hàng"
+            },
+            {
+              "id": "B",
+              "label": "Yêu cầu lập biên bản Scope Change Request chính thức, phân tích rủi ro bổ sung và xin phê duyệt của người ký hợp đồng ủy quyền trước khi test"
+            },
+            {
+              "id": "C",
+              "label": "Quét nhanh 2 subnet mới nhưng không ghi vào báo cáo cuối cùng"
+            },
+            {
+              "id": "D",
+              "label": "Tự động trừ bớt thời gian kiểm thử của các subnet cũ để bù cho 2 subnet mới mà không cần giấy tờ"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Mở rộng phạm vi kỹ thuật cần đánh giá lại rủi ro, thời lượng và thẩm quyền pháp lý. Scope Change Request văn bản là yêu cầu bắt buộc để bảo vệ cả bên kiểm thử và bên được kiểm thử."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một tập đoàn đa quốc gia yêu cầu đánh giá an ninh một hệ thống quản lý kho vận chạy trên cụm Kubernetes đa người dùng (Multi-tenant) chia sẻ chung với 3 đối tác kinh doanh khác trên nền tảng Google Cloud (GCP).",
+        "tasks": [
+          "Xác định ranh giới In-Scope và Out-of-Scope giữa tài nguyên của tập đoàn và tài nguyên của các đối tác chia sẻ cụm.",
+          "Xây dựng danh mục các kỹ thuật bị cấm (như thoát container phá vỡ node, can thiệp kube-system) để tránh ảnh hưởng láng giềng.",
+          "Thiết lập biên bản cam kết ranh giới ba bên trước khi bắt đầu."
+        ],
+        "requiredEvidence": [
+          "Bản ma trận Scoping Boundary: Tenant Isolation vs Cluster Infrastructure.",
+          "Mẫu Scope Change Request với tiêu chí đánh giá tác động đa bên."
+        ]
+      },
+      "sources": [
+        {
+          "title": "NIST SP 800-115 — Technical Guide to Information Security Testing and Assessment (Section 2: Planning and Scoping)",
+          "url": "https://csrc.nist.gov/pubs/sp/800/115/final",
+          "publisher": "NIST",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Quy trình xác định phạm vi kiểm thử kỹ thuật",
+            "Phân định in-scope và out-of-scope trong môi trường doanh nghiệp",
+            "Quản lý rủi ro và phân định trách nhiệm kiểm thử"
+          ]
+        },
+        {
+          "title": "CISA / NICCS — Scoping and Pre-Engagement Guidance for Penetration Testing",
+          "url": "https://niccs.cisa.gov/about-niccs/glossary",
+          "publisher": "CISA / NICCS",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Khái niệm ranh giới ủy quyền và kiểm soát thay đổi phạm vi",
+            "Nguyên tắc bảo vệ hệ thống bên thứ ba và hạ tầng dùng chung"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os00-l05-rules-of-engagement-and-stop-conditions",
+      "slug": "rules-of-engagement-and-stop-conditions",
+      "title": "Xây dựng Rules of Engagement & Điều kiện Dừng Khẩn cấp",
+      "summary": "Thiết lập hợp đồng vận hành ROE: định rõ phương pháp kiểm thử, khung thời gian tác chiến, xử lý dữ liệu nhạy cảm, danh mục hành vi cấm và cơ chế Emergency Stop.",
+      "difficulty": "foundation",
+      "durationMinutes": 40,
+      "prerequisites": ["os00-l04-scoping-boundaries-and-dependencies"],
+      "outcomes": [
+        "Soạn thảo tài liệu Rules of Engagement (ROE) đầy đủ các thông số: test windows, allowed/prohibited techniques, communication matrix, và threshold.",
+        "Phân loại các hành vi bị cấm (Prohibited Actions): DoS, phá hủy dữ liệu, mass phishing không kiểm soát, sửa đổi cơ sở dữ liệu production.",
+        "Thiết lập điều kiện dừng kỹ thuật (Stop Conditions) và kích hoạt quy trình dừng khẩn cấp (Emergency Stop) khi chạm ngưỡng rủi ro an toàn.",
+        "Thực hiện quy trình đóng băng trạng thái, thông báo khẩn cấp và bàn giao hiện trường sau khi kích hoạt Emergency Stop."
+      ],
+      "careerPaths": [
+        "penetration-test",
+        "red-team",
+        "adversary-emulation",
+        "purple-team"
+      ],
+      "domains": ["human", "network", "web"],
+      "attackTactics": [],
+      "keywords": [
+        "rules-of-engagement",
+        "roe",
+        "prohibited-actions",
+        "stop-conditions",
+        "emergency-stop",
+        "incident-escalation"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Nếu Scope trả lời câu hỏi 'Ở ĐÂU', thì Rules of Engagement (ROE) trả lời câu hỏi 'NHƯ THẾ NÀO, KHI NÀO VÀ TỚI MỨC NÀO'. ROE là khế ước an toàn ràng buộc operator và tổ chức. Emergency Stop là công tắc ngắt khẩn cấp bắt buộc: khi chạm ngưỡng gián đoạn dịch vụ, nguy cơ mất dữ liệu sản xuất hoặc nghi ngờ xung đột với sự cố thật, mọi thao tác phải lập tức dừng về trạng thái an toàn tuyệt đối.",
+      "visual": {
+        "title": "Vòng đời Kích hoạt và Xử lý Emergency Stop",
+        "caption": "Quy trình chuyển trạng thái từ Tác chiến có kiểm soát sang Đóng băng khẩn cấp và Phục hồi.",
+        "steps": [
+          {
+            "label": "Tác chiến Chuẩn mực",
+            "detail": "Thực thi kịch bản trong khung giờ, lưu lượng và phương pháp đã phê duyệt trong ROE.",
+            "tone": "allow"
+          },
+          {
+            "label": "Cảnh báo Vượt Ngưỡng",
+            "detail": "Phát hiện CPU máy chủ tăng 95%, database lock kéo dài hoặc latency dịch vụ vượt ngưỡng.",
+            "tone": "caution"
+          },
+          {
+            "label": "Emergency Halt",
+            "detail": "Operator lập tức dừng script, ngắt luồng tải và đóng băng toàn bộ tiến trình tác chiến.",
+            "tone": "stop"
+          },
+          {
+            "label": "Báo động Escalation Matrix",
+            "detail": "Gọi điện khẩn cấp tới White Team và Technical Lead theo danh bạ khẩn cấp đã chốt.",
+            "tone": "caution"
+          },
+          {
+            "label": "Khôi phục & Đánh giá",
+            "detail": "Phối hợp hạ tầng xác nhận trạng thái ổn định, bàn giao log và chỉ tiếp tục khi có lệnh.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cấu trúc Cốt lõi của Bản Rules of Engagement (ROE)",
+          "paragraphs": [
+            "Rules of Engagement (Quy tắc Tác chiến) là văn bản thỏa thuận chi tiết giữa bên tấn công và tổ chức nhằm giới hạn rủi ro vận hành trong suốt thời gian diễn ra bài đánh giá. Một bản ROE chuyên nghiệp không thể thiếu 5 thành phần sống còn: Khung thời gian (Testing Windows), Kỹ thuật được phép và bị cấm (Allowed/Prohibited Methods), Kênh liên lạc khẩn cấp (Communication & Escalation Matrix), Xử lý dữ liệu nhạy cảm (Sensitive Data Handling), và Điều kiện dừng (Stop Conditions).",
+            "Khung thời gian xác định rõ ngày giờ bắt đầu và kết thúc; đối với các hệ thống nhạy cảm, ROE có thể yêu cầu chỉ kiểm thử ngoài giờ cao điểm (Off-peak hours) hoặc có sự giám sát trực tiếp của kỹ sư vận hành hệ thống."
+          ],
+          "points": [
+            "Testing Windows: Giờ giấc chính xác theo múi giờ thống nhất (ưu tiên ghi rõ UTC/Local).",
+            "Escalation Matrix: Danh sách số điện thoại khẩn cấp 24/7 của Sponsor, White Team Lead và SOC Manager.",
+            "Sensitive Data Rules: Quy định cụ thể không tải về dữ liệu PII/PCI-DSS mà chỉ chụp ảnh minh chứng có che mờ (masking)."
+          ]
+        },
+        {
+          "title": "Danh mục Hành vi Bị cấm (Prohibited Actions)",
+          "paragraphs": [
+            "Mục tiêu của Offensive Security là đánh giá và cải thiện an ninh, không phải chứng minh khả năng phá hoại. Vì vậy, ROE luôn thiết lập một danh mục các hành vi bị cấm tuyệt đối (Prohibited Actions).",
+            "Các hành vi này bao gồm: Tấn công từ chối dịch vụ (DoS/DDoS) gây nghẽn tài nguyên; Xóa, sửa đổi hoặc làm sai lệch dữ liệu kinh doanh thực tế; Đổi mật khẩu tài khoản người dùng thật làm gián đoạn công việc; Tấn công vật lý hoặc lừa đảo xã hội (Phishing) nhắm vào đối tượng không được chỉ định; và Sử dụng mã độc có khả năng tự nhân bản ngoài tầm kiểm soát (Self-propagating worms)."
+          ],
+          "points": [
+            "Cấm DoS/Resource Exhaustion trên môi trường Production.",
+            "Cấm sửa đổi cấu hình hoặc dữ liệu nghiệp vụ (Modify/Delete operational data).",
+            "Cấm sử dụng credential thật thu thập được để truy cập các dịch vụ cá nhân ngoài phạm vi bài đánh giá."
+          ]
+        },
+        {
+          "title": "Ngưỡng Dừng Vận hành và Cơ chế Emergency Stop",
+          "paragraphs": [
+            "Stop Condition là các chỉ số đo lường hoặc sự kiện kỹ thuật mà khi chạm tới, operator bắt buộc phải tạm dừng hoặc dừng toàn bộ hoạt động. Các ngưỡng phổ biến bao gồm: Tỷ lệ lỗi hệ thống (HTTP 5xx error rate) tăng quá 5%; Mức sử dụng CPU/RAM máy chủ mục tiêu vượt quá 85% trong 3 phút liên tục; Dịch vụ thanh toán hoặc xác thực người dùng bị chậm trễ rõ rệt; hoặc Phát hiện thấy dấu hiệu một threat actor thực sự đang hoạt động song song.",
+            "Quy trình Emergency Stop phải được phổ biến cho tất cả các thành viên trong đội ngũ: khi bất kỳ ai (Operator, Blue Team, Service Owner, White Team) kích hoạt Emergency Stop, toàn bộ hoạt động tấn công phải được ngắt tức thì trong vòng dưới 60 giây."
+          ],
+          "points": [
+            "Ngưỡng kỹ thuật (Technical Thresholds): Giới hạn về tải CPU, bộ nhớ, băng thông và tỷ lệ phản hồi lỗi.",
+            "Ngưỡng nghiệp vụ (Business Thresholds): Bất kỳ sự cố nào ảnh hưởng trực tiếp đến giao dịch tài chính hoặc trải nghiệm khách hàng thật.",
+            "Quyền kích hoạt: Bất kỳ bên nào trong ma trận phối hợp đều có quyền bấm nút Emergency Stop nếu phát hiện rủi ro nghiêm trọng."
+          ]
+        },
+        {
+          "title": "Giao thức Xử lý và Bàn giao Trạng thái Sau Emergency Stop",
+          "paragraphs": [
+            "Sau khi Emergency Stop được kích hoạt, operator không được tự ý thử nghiệm hay gửi thêm gói tin để 'kiểm tra xem hệ thống đã sống lại chưa'. Mọi hành động probe tiếp theo đều có thể làm tình trạng sập hệ thống trở nên trầm trọng hơn.",
+            "Quy trình chuẩn bao gồm: 1. Đóng toàn bộ công cụ và hủy các kết nối nền; 2. Gọi điện thoại trực tiếp cho đầu mối khẩn cấp trong Escalation Matrix; 3. Cung cấp timestamp, IP nguồn, target và payload cuối cùng đã gửi; 4. Phối hợp với đội hạ tầng để xác minh nguyên nhân; 5. Chỉ tái khởi động bài đánh giá khi có văn bản chấp thuận chính thức từ White Team Lead."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "ROE Boundary Enforcement & Emergency Stop Trigger",
+        "objective": "Thực hành nhận diện ngưỡng an toàn, áp dụng giới hạn ROE và kích hoạt quy trình Emergency Stop khi phát sinh sự cố.",
+        "scenario": "Bạn đang thực hiện đánh giá thâm nhập ứng dụng Web và API Cổng dịch vụ công trong khung giờ cho phép. Hãy đưa ra quyết định chính xác trước các sự kiện bất thường.",
+        "constraints": [
+          "Tuân thủ tuyệt đối danh mục Prohibited Actions được ký kết trong hợp đồng.",
+          "Dừng ngay lập tức khi chạm ngưỡng Stop Conditions mà không cần chờ lệnh cấp trên.",
+          "Không tự ý thao tác khắc phục làm sai lệch hiện trường sau khi kích hoạt dừng khẩn cấp."
+        ],
+        "cases": [
+          {
+            "id": "roe-case-01",
+            "title": "Phát hiện SQL Injection trong bảng chứa 2 triệu hồ sơ công dân",
+            "context": "Bạn phát hiện một tham số trên cổng thông tin bị dính lỗ hổng SQL Injection Union-based. Thử nghiệm 'SELECT 1' thành công. Bạn biết có thể dùng sqlmap để dump toàn bộ cơ sở dữ liệu 2 triệu hồ sơ người dân về máy local.",
+            "prompt": "Quyết định xử lý nào đúng chuẩn mực đạo đức và ROE nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chạy sqlmap dump toàn bộ 2 triệu bản ghi làm bằng chứng thuyết phục nhất cho báo cáo.",
+                "correct": false,
+                "rationale": "Vi phạm nghiêm trọng quy định xử lý dữ liệu nhạy cảm (Sensitive Data Handling) và tạo ra nguy cơ rò rỉ dữ liệu khổng lồ."
+              },
+              {
+                "id": "B",
+                "label": "Dừng việc dump dữ liệu lớn; chỉ trích xuất phiên bản database (@@version) hoặc 1 dòng dữ liệu giả định, che mờ thông tin nhạy cảm và báo cáo ngay finding mức Critical.",
+                "correct": true,
+                "rationale": "Tuân thủ nguyên tắc chứng minh PoC tối thiểu: đủ chứng minh tác động khai thác mà không xâm phạm quyền riêng tư và không gây tải nặng cho cơ sở dữ liệu."
+              },
+              {
+                "id": "C",
+                "label": "Thử nghiệm lệnh 'DROP TABLE' để xem tài khoản database có quyền dba hay không.",
+                "correct": false,
+                "rationale": "Hành vi phá hoại dữ liệu bị nghiêm cấm tuyệt đối trong mọi hoàn cảnh."
+              },
+              {
+                "id": "D",
+                "label": "Bỏ qua lỗ hổng và không ghi vào báo cáo vì dữ liệu quá nhạy cảm.",
+                "correct": false,
+                "rationale": "Bỏ qua finding nguy hiểm khiến tổ chức không khắc phục được điểm yếu nghiêm trọng."
+              }
+            ]
+          },
+          {
+            "id": "roe-case-02",
+            "title": "Máy chủ Production phản hồi chậm và CPU tăng vọt lên 98%",
+            "context": "Trong lúc bạn đang chạy một script kiểm thử race condition với 50 luồng đồng thời, hệ thống monitoring báo CPU máy chủ Database tăng từ 15% lên 98% và thời gian phản hồi trang chủ tăng từ 200ms lên 12 giây.",
+            "prompt": "Hành động tức thời mà Operator phải thực hiện là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tăng thêm số luồng lên 100 để kết thúc bài test thật nhanh trước khi server sập.",
+                "correct": false,
+                "rationale": "Hành vi liều lĩnh chắc chắn sẽ làm sập hoàn toàn hệ thống production (Denial of Service)."
+              },
+              {
+                "id": "B",
+                "label": "Kích hoạt Emergency Stop ngay lập tức: ngắt script, hủy toàn bộ luồng request và gọi điện cho White Team Lead thông báo sự cố.",
+                "correct": true,
+                "rationale": "Bảo vệ tính sẵn sàng của hệ thống: khi chạm ngưỡng tải nguy hiểm, bắt buộc phải dừng khẩn cấp và thông báo cho đầu mối kỹ thuật."
+              },
+              {
+                "id": "C",
+                "label": "Đợi 15 phút xem CPU có tự hạ xuống không rồi mới tính tiếp.",
+                "correct": false,
+                "rationale": "Trì hoãn xử lý trong lúc tải cao có thể dẫn đến crash dịch vụ và mất dữ liệu trong RAM của khách hàng."
+              },
+              {
+                "id": "D",
+                "label": "Khởi động lại máy chủ từ xa thông qua shell vừa chiếm được.",
+                "correct": false,
+                "rationale": "Operator không có quyền tự ý reboot hệ thống production khi chưa có lệnh từ đội ngũ hạ tầng."
+              }
+            ]
+          },
+          {
+            "id": "roe-case-03",
+            "title": "Kế hoạch Phishing nhắm vào nhân viên lễ tân và bảo vệ",
+            "context": "Trong kịch bản Red Team, một thành viên đề xuất gửi email lừa đảo mạo danh cơ quan công an triệu tập để lấy mật khẩu của nhân viên bảo vệ và tạp vụ ngoài danh sách cho phép.",
+            "prompt": "Trưởng nhóm Red Team cần xử lý đề xuất này như thế nào theo ROE?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đồng ý vì Red Team phải mô phỏng hacker thật không từ thủ đoạn nào.",
+                "correct": false,
+                "rationale": "Red Team là hoạt động có kiểm soát và đạo đức; không được vi phạm ranh giới đối tượng và sử dụng nội dung gây khủng hoảng tâm lý trái luật."
+              },
+              {
+                "id": "B",
+                "label": "Bác bỏ đề xuất vì vi phạm danh mục đối tượng được duyệt trong ROE và sử dụng nội dung mạo danh vi phạm pháp luật; điều chỉnh kịch bản theo đúng phạm vi nhân sự được phê duyệt.",
+                "correct": true,
+                "rationale": "Bảo đảm tính hợp pháp và nhân văn của bài tập: chỉ nhắm vào tập nhân sự và kịch bản đã được phê duyệt trong ROE."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ gửi cho nhân viên bảo vệ vào ban đêm để không ai phát hiện.",
+                "correct": false,
+                "rationale": "Thời điểm gửi không làm cho một hành vi sai trái trở thành hợp lệ."
+              },
+              {
+                "id": "D",
+                "label": "Yêu cầu nhân viên tạp vụ tự nguyện cung cấp mật khẩu mà không cần gửi email.",
+                "correct": false,
+                "rationale": "Vẫn vi phạm ranh giới đối tượng được ủy quyền đánh giá."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xử lý đúng cả ba tình huống giới hạn ROE và điều kiện dừng.",
+          "Áp dụng nguyên tắc PoC tối thiểu để bảo vệ dữ liệu nhạy cảm.",
+          "Thực thi quy trình Emergency Stop và Escalation Matrix không chậm trễ."
+        ],
+        "evidenceTemplate": [
+          "Tên hành vi hoặc ngưỡng rủi ro phát sinh",
+          "Trạng thái vi phạm ROE (Allowed vs Prohibited / Stop Threshold Triggered)",
+          "Thao tác kỹ thuật tức thời (Emergency Halt / Thread Termination)",
+          "Nhật ký cuộc gọi Escalation Matrix (Thời gian, Người tiếp nhận, Nội dung bàn giao)"
+        ],
+        "reset": "Đặt lại lựa chọn để làm lại các ca quyết định ROE.",
+        "cleanup": "Bài tập mô phỏng an toàn, không gửi bất kỳ payload thực tế nào."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc ký duyệt văn bản ROE chi tiết trước giờ triển khai ít nhất 48 giờ.",
+          "Cài đặt rate-limiting và thread ceiling cứng trên các công cụ tự động của operator.",
+          "Tổ chức buổi họp Kick-off làm rõ danh bạ Escalation Matrix và quy trình Emergency Stop."
+        ],
+        "observe": [
+          "Giám sát liên tục các chỉ số tài nguyên hệ thống (CPU, RAM, Error Rate) song song với quá trình kiểm thử.",
+          "Ghi nhận mọi sự kiện vượt ngưỡng vào nhật ký tác chiến thời gian thực."
+        ],
+        "respond": [
+          "Ngắt ngay toàn bộ luồng kiểm thử khi nhận được tín hiệu dừng từ bất kỳ bên nào.",
+          "Cung cấp báo cáo sự cố (Incident Briefing) trong vòng 2 giờ sau khi kích hoạt Emergency Stop."
+        ],
+        "residualRisk": [
+          "Một lỗ hổng zero-day trong chính dịch vụ mục tiêu có thể gây crash ngay từ request thăm dò đầu tiên dù operator tuân thủ đúng rate limit.",
+          "Độ trễ trong việc liên lạc qua điện thoại khẩn cấp nếu đầu mối phía khách hàng không trực máy 24/7."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Muốn chứng minh mức độ nguy hiểm của SQLi thì bắt buộc phải dump toàn bộ cơ sở dữ liệu.",
+          "correction": "PoC chỉ cần chứng minh khả năng thực thi câu lệnh thành công (ví dụ đọc phiên bản DB hoặc 1 bản ghi mẫu đã che mờ). Dump lượng lớn dữ liệu vi phạm nguyên tắc bảo mật và gây tải vô ích cho DB."
+        },
+        {
+          "claim": "Emergency Stop chỉ được phép kích hoạt bởi Giám đốc An ninh (CISO) của khách hàng.",
+          "correction": "Bất kỳ ai tham gia bài tập (Operator, White Team, SOC, Sysadmin) khi phát hiện nguy cơ sập hệ thống hoặc sự cố dữ liệu đều có quyền và trách nhiệm kích hoạt Emergency Stop ngay lập tức."
+        },
+        {
+          "claim": "Red Team không cần tuân theo ROE để giữ tính bất ngờ tối đa.",
+          "correction": "Bất ngờ là yếu tố với Blue Team, nhưng với White Team và Ban điều hành thì ROE là bắt buộc để kiểm soát rủi ro doanh nghiệp và đảm bảo tính hợp pháp."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os00-l05-q1",
+          "difficulty": "easy",
+          "question": "Hành vi nào sau đây luôn thuộc danh mục Bị cấm (Prohibited Actions) trong các cuộc đánh giá an ninh chuẩn mực trên môi trường Production?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Chụp ảnh màn hình cấu hình phân quyền bị sai sót làm minh chứng"
+            },
+            {
+              "id": "B",
+              "label": "Thực hiện tấn công từ chối dịch vụ (DDoS) làm gián đoạn hệ thống giao dịch của khách hàng"
+            },
+            { "id": "C", "label": "Gửi request kiểm tra phiên bản máy chủ web" },
+            {
+              "id": "D",
+              "label": "Thử nghiệm đăng nhập sai mật khẩu 2 lần bằng tài khoản test"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Tấn công từ chối dịch vụ (DoS/DDoS) trên môi trường Production gây thiệt hại trực tiếp cho hoạt động kinh doanh của tổ chức và luôn bị nghiêm cấm trong ROE chuẩn mực."
+        },
+        {
+          "id": "os00-l05-q2",
+          "difficulty": "medium",
+          "question": "Khi đang chạy công cụ kiểm thử, chỉ số CPU trên máy chủ web mục tiêu tăng vọt lên 95% và khách hàng báo trang web bị treo. Việc đầu tiên Operator phải làm là gì?",
+          "options": [
+            { "id": "A", "label": "Tiếp tục chạy cho xong kịch bản rồi mới tắt" },
+            {
+              "id": "B",
+              "label": "Lập tức dừng toàn bộ công cụ kiểm thử, ngắt kết nối và gọi điện thoại cho đầu mối khẩn cấp trong Escalation Matrix"
+            },
+            {
+              "id": "C",
+              "label": "Gửi email cho khách hàng giải thích rằng đây là do máy chủ yếu kém"
+            },
+            { "id": "D", "label": "Tự động restart lại dịch vụ web từ xa" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Quy trình Emergency Stop yêu cầu ngắt toàn bộ hoạt động kiểm thử ngay tức thì để tránh làm sập hoàn toàn hệ thống, sau đó liên lạc khẩn cấp qua Escalation Matrix để phối hợp xử lý."
+        },
+        {
+          "id": "os00-l05-q3",
+          "difficulty": "hard",
+          "question": "Trong ROE quy định khung giờ kiểm thử từ 20:00 đến 04:00 sáng hôm sau. Lúc 03:55 sáng, Operator đang ở bước cuối cùng để dump được NTLM hash của Domain Admin. Operator nên làm gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cố gắng chạy thêm 30 phút qua khung giờ vì chỉ còn 1 bước là hoàn thành mục tiêu lớn"
+            },
+            {
+              "id": "B",
+              "label": "Đúng 04:00 sáng phải dừng toàn bộ thao tác, lưu lại trạng thái phiên làm việc và chờ đến khung giờ kiểm thử tiếp theo hoặc xin gia hạn bằng văn bản"
+            },
+            {
+              "id": "C",
+              "label": "Chỉnh đồng hồ trên máy tính cá nhân lùi lại 1 tiếng để tiếp tục chạy"
+            },
+            { "id": "D", "label": "Để script tự động chạy ngầm suốt ban ngày" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Tuân thủ nghiêm ngặt Time Window là yêu cầu kỷ luật tác chiến tối cao. Tác chiến ngoài khung giờ được duyệt là hành vi không được ủy quyền và có thể gây xung đột với các hoạt động kinh doanh ban ngày."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được giao thiết kế ROE cho bài kiểm thử thâm nhập hệ thống thiết bị giám sát bệnh nhân (Medical IoT) tại một bệnh viện trung ương, nơi sự gián đoạn mạng dù chỉ 1 giây cũng có thể đe dọa tính mạng con người.",
+        "tasks": [
+          "Xác định các điều kiện Stop Conditions đặc thù cho môi trường y tế (ví dụ: mất kết nối telemetry, delay nhịp tim).",
+          "Thiết kế cơ chế Emergency Stop 'One-Click Kill Switch' có thể ngắt kết nối của mọi operator ngay lập tức.",
+          "Xây dựng ma trận phân quyền và kênh liên lạc trực tiếp giữa Operator và Bác sĩ trưởng ca trực."
+        ],
+        "requiredEvidence": [
+          "Bản quy ước ROE chuyên biệt cho hệ thống thiết bị y tế quan trọng.",
+          "Kịch bản thử nghiệm cơ chế Emergency Stop trước khi tiến hành test thật."
+        ]
+      },
+      "sources": [
+        {
+          "title": "NIST SP 800-115 — Technical Guide to Information Security Testing and Assessment (Section 2.3: Rules of Engagement)",
+          "url": "https://csrc.nist.gov/pubs/sp/800/115/final",
+          "publisher": "NIST",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Các thành phần tiêu chuẩn của Rules of Engagement",
+            "Thiết lập điều kiện dừng và ma trận liên lạc khẩn cấp",
+            "Bảo vệ tính toàn vẹn và sẵn sàng của hệ thống mục tiêu"
+          ]
+        },
+        {
+          "title": "SANS Institute — Penetration Testing Policy and Rules of Engagement Framework",
+          "url": "https://www.sans.org/white-papers/",
+          "publisher": "SANS Institute",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Quy trình xử lý dữ liệu nhạy cảm trong pentest",
+            "Kỹ thuật kiểm soát rủi ro tải và thời gian tác chiến"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os00-l06-deconfliction-and-operational-logging",
+      "slug": "deconfliction-and-operational-logging",
+      "title": "Quy trình Deconfliction, Phối hợp Tác chiến & Nhật ký Audit",
+      "summary": "Thiết lập ma trận phối hợp giữa Operator, White Team, SOC/Blue Team và Asset Owner; vận hành quy trình deconfliction để phân biệt sự cố thực với diễn tập và duy trì audit log chuẩn mực.",
+      "difficulty": "foundation",
+      "durationMinutes": 40,
+      "prerequisites": ["os00-l05-rules-of-engagement-and-stop-conditions"],
+      "outcomes": [
+        "Thiết kế và vận hành quy trình Deconfliction nhằm giải tỏa nghi ngờ giữa hoạt động diễn tập và tấn công thực tế từ adversary bên ngoài.",
+        "Ghi chép Operational Activity Log chuẩn mực (UTC timestamp, Source IP, Source Identity, Target, TTP, Payload Hash, Response Status).",
+        "Hiểu rõ vai trò của White Team (Trusted Agents) trong việc làm trọng tài giữ bí mật nhưng vẫn kiểm soát an toàn vận hành.",
+        "Thực hiện đối soát (Correlation) giữa nhật ký của Operator và log SIEM/EDR của Blue Team phục vụ đánh giá sau chiến dịch."
+      ],
+      "careerPaths": [
+        "red-team",
+        "adversary-emulation",
+        "purple-team",
+        "penetration-test"
+      ],
+      "domains": ["human", "network", "web"],
+      "attackTactics": [],
+      "keywords": [
+        "deconfliction",
+        "operational-logging",
+        "white-team",
+        "blue-team-correlation",
+        "trusted-agent",
+        "incident-handling"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Deconfliction là quy trình đối chiếu thời gian thực để trả lời câu hỏi sống còn: 'Hoạt động bất thường này là do Red Team hay do Hacker thực sự?'. White Team đóng vai trò trọng tài giữ bí mật. Nhật ký tác chiến (Operational Log) chính xác đến từng giây của Operator là bằng chứng pháp lý và kỹ thuật duy nhất để chứng minh nguồn gốc hành vi, bảo vệ tổ chức khỏi báo động giả hoặc bỏ lọt kẻ tấn công thật.",
+      "visual": {
+        "title": "Quy trình Xử lý Deconfliction giữa SOC và Red Team",
+        "caption": "Luồng phối hợp 5 bước khi SOC phát hiện cảnh báo nguy hiểm trong thời gian diễn tập.",
+        "steps": [
+          {
+            "label": "SOC Phát hiện Anomaly",
+            "detail": "SOC phát hiện alert nguy hiểm (C2 beacon, dumping LSASS) trên máy chủ quan trọng.",
+            "tone": "caution"
+          },
+          {
+            "label": "Gửi Yêu cầu Deconfliction",
+            "detail": "SOC gửi ticket khẩn cấp cho White Team (gồm UTC time, Source IP, Target host, Tool hash).",
+            "tone": "neutral"
+          },
+          {
+            "label": "White Team Tra cứu Log",
+            "detail": "White Team đối chiếu với Operational Activity Log thời gian thực của Red Team.",
+            "tone": "caution"
+          },
+          {
+            "label": "Khẳng định Diễn tập (MATCH)",
+            "detail": "Trùng khớp -> Xác nhận hoạt động diễn tập, hướng dẫn Blue Team tiếp tục giám sát/chặn theo bài tập.",
+            "tone": "allow"
+          },
+          {
+            "label": "Báo động Hacker Thật (NO MATCH)",
+            "detail": "Không trùng khớp -> Lập tức kích hoạt Incident Response P1 vì đang có sự cố tấn công thực.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bản chất và Tầm quan trọng của Quy trình Deconfliction",
+          "paragraphs": [
+            "Trong một cuộc diễn tập Red Team không báo trước (Blind/Black-box), Blue Team (SOC) không biết về sự hiện diện của Red Team. Khi SOC phát hiện các hành vi bất thường nghiêm trọng (như leo thang đặc quyền, rà quét mạng diện rộng, hoặc kết nối C2), họ sẽ đứng trước câu hỏi: Đây là bài tập hay tổ chức đang bị tấn công thật?",
+            "Quy trình Deconfliction (Giải tỏa xung đột) ra đời để giải quyết vấn đề này. Nếu không có deconfliction, SOC có thể lãng phí hàng trăm giờ ứng cứu sự cố giả, hoặc tệ hơn, bỏ qua một cuộc tấn công thực sự vì chủ quan nghĩ rằng 'chắc là Red Team đang làm'."
+          ],
+          "points": [
+            "Tránh lãng phí tài nguyên ứng phó sự cố (Incident Response) của doanh nghiệp.",
+            "Đảm bảo an toàn: Ngăn chặn nguy cơ adversary thật lợi dụng lúc diễn tập để thâm nhập.",
+            "Đo lường chính xác: Ghi nhận thời gian từ lúc tấn công đến lúc SOC phát hiện (Time-to-Detect)."
+          ]
+        },
+        {
+          "title": "Cơ chế Vận hành của White Team (Trusted Agents)",
+          "paragraphs": [
+            "White Team là nhóm trọng tài gồm các nhân sự cấp cao được tin cậy (Trusted Agents) từ phía khách hàng. White Team là bên duy nhất nắm rõ cả kịch bản của Red Team lẫn trạng thái phòng thủ của Blue Team.",
+            "Khi SOC phát hiện dấu hiệu đáng ngờ, SOC Lead sẽ gửi một mã yêu cầu Deconfliction tới White Team (kèm theo: Thời gian chính xác, IP nguồn, Máy chủ đích, Hành vi quan sát được). White Team sẽ tra cứu nhật ký của Red Team để đưa ra câu trả lời 'Match' (thuộc bài tập) hoặc 'No Match' (tấn công thật) mà không làm lộ các kịch bản tiếp theo của Red Team."
+          ],
+          "points": [
+            "White Team hoạt động như một bức tường ngăn cách thông tin để giữ tính khách quan cho diễn tập.",
+            "Kênh liên lạc an toàn: Sử dụng kênh chat mã hóa riêng biệt và số điện thoại trực tiếp đã được định sẵn.",
+            "Quyền điều phối: White Team có quyền điều chỉnh nhịp độ, tiêm inject (tình huống giả định) hoặc ra lệnh dừng."
+          ]
+        },
+        {
+          "title": "Chuẩn mực Nhật ký Tác chiến (Operator Operational Activity Log)",
+          "paragraphs": [
+            "Để White Team có thể deconflict chính xác, Operator bắt buộc phải duy trì một nhật ký tác chiến liên tục (Operational Log) được ghi lại theo thời gian thực. Mỗi hành vi thực thi (chạy lệnh, gửi payload, thiết lập persistence) phải được ghi chép với độ chính xác cao.",
+            "Nhật ký chuẩn mực phải bao gồm các trường dữ liệu: 1. Timestamp chuẩn UTC (đến giây); 2. Source IP và Source Port; 3. Identity/Account được sử dụng; 4. Target Host/IP và Service; 5. Lệnh chính xác hoặc TTP ID (MITRE ATT&CK); 6. Hash của payload/tool (SHA-256); 7. Kết quả phản hồi từ hệ thống mục tiêu."
+          ],
+          "points": [
+            "Đồng bộ thời gian (NTP Sync): Tất cả máy tính của operator phải đồng bộ giờ qua NTP trước khi bắt đầu.",
+            "Payload Hashing: Lưu hash SHA-256 của toàn bộ binary/script đưa lên môi trường mục tiêu.",
+            "Không xóa hay chỉnh sửa log tác chiến trong suốt chiến dịch."
+          ]
+        },
+        {
+          "title": "Quy trình Xử lý Trùng khớp (Match) và Bất đối xứng (No-Match)",
+          "paragraphs": [
+            "Khi White Team xác nhận 'MATCH': Hoạt động được xác nhận là do Red Team thực hiện. White Team sẽ ghi nhận Blue Team đã phát hiện thành công bước này (đánh giá điểm phòng thủ), và có thể chỉ đạo Blue Team tiếp tục theo dõi để xem Red Team đi tiếp tới đâu, hoặc cho phép cô lập máy chủ theo đúng quy trình.",
+            "Khi White Team xác nhận 'NO MATCH': Đây là tình huống nguy cấp nhất. Hoạt động bất thường không bắt nguồn từ Red Team, đồng nghĩa với việc có Hacker thật đang trong hệ thống. Ngay lập tức, White Team sẽ ra lệnh TẠM DỪNG toàn bộ cuộc diễn tập Red Team để dồn 100% lực lượng cho đội Incident Response xử lý sự cố thật."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "SOC Alert Deconfliction & Correlation Desk",
+        "objective": "Thực hành đối soát nhật ký tác chiến giữa Red Team và cảnh báo của Blue Team để đưa ra phán quyết Deconfliction chính xác.",
+        "scenario": "Bạn là White Team Lead đang giám sát một chiến dịch Red Team diễn ra trong 2 tuần. Bạn nhận được các yêu cầu Deconfliction khẩn cấp từ Trưởng ca trực SOC.",
+        "constraints": [
+          "Dựa trên bằng chứng log đối soát chính xác theo timestamp UTC và thông số kỹ thuật.",
+          "Bảo mật kịch bản của Red Team, không tiết lộ thông tin thừa cho Blue Team.",
+          "Kích hoạt Incident Response thật ngay lập tức nếu phát hiện hành vi không thuộc về Red Team."
+        ],
+        "cases": [
+          {
+            "id": "deconflict-case-01",
+            "title": "Cảnh báo PowerShell Obfuscation lúc 02:14:30 UTC",
+            "context": "SOC gửi ticket Deconfliction: Lúc 02:14:30 UTC, máy chủ WEB-SRV-01 (10.0.1.5) thực thi một lệnh PowerShell mã hóa Base64 kết nối về IP 198.51.100.22. Tra cứu nhật ký Operator: Lúc 02:14:28 UTC, Operator đã chạy script benign test discovery từ C2 IP 198.51.100.22 đến 10.0.1.5.",
+            "prompt": "Quyết định xử lý của White Team là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Khẳng định MATCH: Xác nhận hoạt động thuộc bài tập diễn tập, ghi nhận SOC phát hiện thành công TTP, hướng dẫn SOC tiếp tục theo dõi quy trình.",
+                "correct": true,
+                "rationale": "Thời gian (lệch 2 giây), IP nguồn, máy chủ đích và hành vi khớp hoàn toàn với nhật ký tác chiến của Operator."
+              },
+              {
+                "id": "B",
+                "label": "Báo động NO MATCH và yêu cầu ngắt internet toàn công ty.",
+                "correct": false,
+                "rationale": "Sai sót nghiêm trọng: Hành vi trùng khớp hoàn toàn với bài tập, không phải sự cố thật."
+              },
+              {
+                "id": "C",
+                "label": "Tiết lộ toàn bộ danh sách các máy chủ Red Team sắp tấn công cho SOC biết.",
+                "correct": false,
+                "rationale": "Làm mất tính khách quan và hủy hoại giá trị đánh giá của bài tập Red Team."
+              },
+              {
+                "id": "D",
+                "label": "Yêu cầu Red Team xóa hết nhật ký tác chiến để che giấu dấu vết.",
+                "correct": false,
+                "rationale": "Hành vi gian lận và vi phạm nghiêm trọng tính toàn vẹn của bằng chứng đánh giá."
+              }
+            ]
+          },
+          {
+            "id": "deconflict-case-02",
+            "title": "Phát hiện Ransomware Note trên Máy chủ Kế toán lúc 08:30:00 UTC",
+            "context": "SOC phát hiện máy chủ FIN-DB-02 xuất hiện file 'README_RECOVERY.txt' và hàng loạt file database bị mã hóa phần mở rộng lạ. Tra cứu nhật ký Red Team: Red Team chưa từng tương tác với máy chủ này và trong ROE nghiêm cấm hoàn toàn hành vi ransomware.",
+            "prompt": "Quyết định khẩn cấp mà White Team bắt buộc phải đưa ra là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Nói với SOC cứ yên tâm vì chắc chắn Red Team đang thử nghiệm bài mới.",
+                "correct": false,
+                "rationale": "Chủ quan sai lầm dẫn đến thảm họa: đây là dấu hiệu của mã độc tống tiền thật, không thuộc bài tập."
+              },
+              {
+                "id": "B",
+                "label": "Xác nhận NO MATCH ngay lập tức: Ra lệnh TẠM HOÃN toàn bộ bài tập Red Team và hỗ trợ SOC kích hoạt quy trình Incident Response P1 khẩn cấp.",
+                "correct": true,
+                "rationale": "Ưu tiên an toàn doanh nghiệp tuyệt đối: Khi phát hiện tấn công thật, mọi hoạt động diễn tập phải nhường chỗ cho ứng cứu sự cố thực."
+              },
+              {
+                "id": "C",
+                "label": "Chờ đến khi hết giờ làm việc mới gửi email trả lời ticket cho SOC.",
+                "correct": false,
+                "rationale": "Sự chậm trễ trong sự cố ransomware thực sự sẽ khiến toàn bộ dữ liệu bị mất vĩnh viễn."
+              },
+              {
+                "id": "D",
+                "label": "Yêu cầu Red Team nhận trách nhiệm về vụ việc để lấy thành tích.",
+                "correct": false,
+                "rationale": "Gian dối đạo đức nghiêm trọng và cản trở việc điều tra tội phạm mạng thực tế."
+              }
+            ]
+          },
+          {
+            "id": "deconflict-case-03",
+            "title": "Operator gửi payload nhưng quên ghi vào nhật ký tác chiến",
+            "context": "SOC phát hiện một chuỗi quét cổng bất thường từ dải VPN nội bộ lúc 14:00 UTC và gửi ticket deconfliction. White Team kiểm tra log của Operator thì thấy trống rỗng vì Operator quên cập nhật nhật ký trong suốt 2 giờ qua.",
+            "prompt": "Hậu quả và cách xử lý sự cố vi phạm kỷ luật này như thế nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tự động coi như mọi alert đều là của Red Team mà không cần kiểm tra lại.",
+                "correct": false,
+                "rationale": "Tạo ra điểm mù chết người, có thể bỏ lọt kẻ tấn công thật đang hoạt động cùng thời điểm."
+              },
+              {
+                "id": "B",
+                "label": "Tạm dừng thao tác của Operator đó, yêu cầu trích xuất ngay lịch sử terminal/proxy log để đối soát khẩn cấp, nhắc nhở kỷ luật và chấn chỉnh quy trình ghi log.",
+                "correct": true,
+                "rationale": "Khắc phục lỗ hổng quản trị: Bắt buộc phải có log đối soát chính xác trước khi đưa ra phán quyết deconfliction để bảo đảm an toàn."
+              },
+              {
+                "id": "C",
+                "label": "Đổ lỗi cho SOC đã theo dõi quá mức cần thiết.",
+                "correct": false,
+                "rationale": "SOC đang làm đúng phận sự; lỗi hoàn toàn thuộc về sự thiếu chuyên nghiệp của Operator."
+              },
+              {
+                "id": "D",
+                "label": "Hủy bỏ toàn bộ cuộc diễn tập và sa thải toàn bộ đội ngũ ngay lập tức.",
+                "correct": false,
+                "rationale": "Phản ứng thái quá; cần xử lý kỹ thuật khôi phục log đối soát và chấn chỉnh quy trình."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phán quyết chuẩn xác cả ba tình huống Deconfliction (Match, No-Match, Missing Log).",
+          "Kích hoạt đúng quy trình đóng băng diễn tập khi có dấu hiệu adversary thật.",
+          "Nhận thức rõ tầm quan trọng của Operational Activity Log đối với an toàn tác chiến."
+        ],
+        "evidenceTemplate": [
+          "Mã Ticket Deconfliction và Thời gian nhận yêu cầu",
+          "Bảng đối chiếu thông số (Timestamp, Source IP, Target, Tool Hash)",
+          "Phán quyết của White Team (MATCH / NO MATCH)",
+          "Hành động tiếp theo (Tiếp tục diễn tập / Emergency Freeze for Live Incident Response)"
+        ],
+        "reset": "Đặt lại lựa chọn để phân tích lại các tình huống deconfliction từ đầu.",
+        "cleanup": "Toàn bộ bài tập là mô phỏng logic đối soát, không phát sinh dữ liệu ngoài trình duyệt."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc cấu hình đồng bộ NTP trên toàn bộ máy chủ và thiết bị tham gia trước giờ tác chiến.",
+          "Sử dụng công cụ ghi log tự động (C2 automated operational logger) kết hợp với checklist ghi chép thủ công.",
+          "Thiết lập kênh liên lạc khẩn cấp dành riêng cho Deconfliction giữa SOC Manager và White Team Lead."
+        ],
+        "observe": [
+          "Theo dõi thời gian phản hồi ticket Deconfliction (SLA phản hồi dưới 15 phút).",
+          "Đối chiếu chéo (Cross-correlation) giữa log của Operator và log SIEM định kỳ mỗi ngày."
+        ],
+        "respond": [
+          "Ngay lập tức đóng băng toàn bộ bài tập Red Team khi xác nhận NO MATCH trong một sự cố nghiêm trọng.",
+          "Chuyển giao toàn bộ nhật ký tác chiến và mã băm cho đội Digital Forensics & Incident Response (DFIR) khi kết thúc bài tập."
+        ],
+        "residualRisk": [
+          "Sai lệch múi giờ hoặc đồng hồ hệ thống (Time Drift) có thể dẫn đến phán đoán sai lệch giữa Match và No-Match.",
+          "Kẻ tấn công thực tế sử dụng cùng một công cụ mã nguồn mở hoặc cùng dải IP công cộng trùng với Red Team."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Red Team không cần ghi chép log chi tiết vì mục đích là phải giữ bí mật tuyệt đối.",
+          "correction": "Bí mật chỉ áp dụng với Blue Team trong lúc diễn tập. Nhật ký tác chiến chi tiết từng giây là yêu cầu bắt buộc để phục vụ deconfliction, đối soát và báo cáo sau chiến dịch."
+        },
+        {
+          "claim": "Nếu SOC phát hiện ra Red Team thì nghĩa là bài tập Red Team thất bại.",
+          "correction": "Mục đích của Red Team là đo lường và rèn luyện năng lực của SOC. Việc SOC phát hiện và gửi deconfliction chứng minh hệ thống phòng thủ đang hoạt động hiệu quả."
+        },
+        {
+          "claim": "Khi xảy ra sự cố thật trong thời gian diễn tập, Red Team cứ tiếp tục làm việc bình thường.",
+          "correction": "Khi có tấn công thật, an toàn doanh nghiệp là ưu tiên số một. Red Team phải tạm dừng hoàn toàn để tránh gây nhiễu loạn cho đội ứng cứu sự cố."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os00-l06-q1",
+          "difficulty": "easy",
+          "question": "Mục đích quan trọng nhất của quy trình Deconfliction trong diễn tập Red Team là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Giúp Red Team biết cách né tránh các công cụ giám sát của SOC"
+            },
+            {
+              "id": "B",
+              "label": "Phân biệt kịp thời giữa hoạt động của bài tập diễn tập và cuộc tấn công thực sự từ bên ngoài"
+            },
+            { "id": "C", "label": "Tìm cách đổ lỗi cho Blue Team khi hệ thống bị chậm" },
+            { "id": "D", "label": "Tự động tắt các cảnh báo trên hệ thống SIEM" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Deconfliction giúp tổ chức xác định nhanh chóng một cảnh báo an ninh là do bài tập diễn tập có kiểm soát hay do hacker thật gây ra, tránh lãng phí nguồn lực hoặc bỏ sót sự cố nguy hiểm."
+        },
+        {
+          "id": "os00-l06-q2",
+          "difficulty": "medium",
+          "question": "Thành phần nào sau đây là BẮT BUỘC phải có trong một dòng nhật ký tác chiến (Operational Activity Log) của Operator?",
+          "options": [
+            { "id": "A", "label": "Cảm nghĩ của Operator khi gõ lệnh" },
+            {
+              "id": "B",
+              "label": "Timestamp chính xác (UTC), Source IP, Target, Lệnh/Kỹ thuật thực thi và Hash payload"
+            },
+            { "id": "C", "label": "Dự đoán xem SOC có phát hiện được hay không" },
+            { "id": "D", "label": "Tên bài hát đang nghe lúc thực hiện thao tác" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Một bản log chuẩn mực đòi hỏi đầy đủ các thông số kỹ thuật (thời gian chuẩn UTC, nguồn, đích, hành vi và mã băm) để phục vụ đối soát không thể chối cãi."
+        },
+        {
+          "id": "os00-l06-q3",
+          "difficulty": "hard",
+          "question": "Trong lúc diễn tập Red Team, White Team nhận được yêu cầu deconfliction về việc máy chủ Database chính bị xóa bảng dữ liệu khách hàng. Tra cứu log Red Team không có hành vi này. White Team cần làm gì ngay lập tức?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Xác nhận NO MATCH, ra lệnh tạm dừng bài tập Red Team và kích hoạt quy trình Incident Response khẩn cấp để ứng phó sự cố thật"
+            },
+            {
+              "id": "B",
+              "label": "Xác nhận MATCH để trấn an SOC rồi âm thầm kiểm tra lại sau"
+            },
+            {
+              "id": "C",
+              "label": "Bảo Red Team nhanh chóng viết script khôi phục lại database"
+            },
+            {
+              "id": "D",
+              "label": "Tiếp tục bài tập Red Team bình thường như không có chuyện gì xảy ra"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Khi một hành vi phá hoại nghiêm trọng không khớp với bài tập (NO MATCH), doanh nghiệp đang đứng trước một cuộc tấn công thực sự. Mọi hoạt động diễn tập phải dừng ngay để tập trung toàn lực ứng cứu sự cố."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một tập đoàn tài chính đa quốc gia tổ chức diễn tập Red Team trên 3 múi giờ (Mỹ, Châu Âu, Châu Á) với 2 nhà cung cấp dịch vụ giám sát an ninh (MSSP SOC) độc lập.",
+        "tasks": [
+          "Thiết kế quy trình Deconfliction Ticket tích hợp đồng bộ thời gian UTC chuẩn hóa giữa các múi giờ.",
+          "Xây dựng ma trận phân quyền xác thực giữa White Team toàn cầu và các MSSP SOC địa phương.",
+          "Lập kế hoạch phối hợp hậu diễn tập (Post-engagement Debrief & Correlation) để so sánh Detection Timeline giữa 2 MSSP."
+        ],
+        "requiredEvidence": [
+          "Sơ đồ luồng xử lý Deconfliction đa vùng lãnh thổ (Cross-region Deconfliction Flow).",
+          "Mẫu biên bản đối soát nhật ký tác chiến và thời gian phát hiện (Timeline Correlation Report)."
+        ]
+      },
+      "sources": [
+        {
+          "title": "NIST SP 800-115 — Technical Guide to Information Security Testing and Assessment (Section 3: Execution and Deconfliction)",
+          "url": "https://csrc.nist.gov/pubs/sp/800/115/final",
+          "publisher": "NIST",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Quy trình phối hợp và đối soát giữa đội ngũ kiểm thử và đội ngũ phòng thủ",
+            "Chuẩn mực duy trì nhật ký kiểm thử và xử lý sự cố phát sinh ngoài kế hoạch"
+          ]
+        },
+        {
+          "title": "CISA / NSA — Cybersecurity Advisory: Best Practices for Event Deconfliction in Adversary Emulation",
+          "url": "https://niccs.cisa.gov/about-niccs/glossary",
+          "publisher": "CISA / NSA",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Vai trò của White Team trong quản lý rủi ro bài tập an ninh mạng",
+            "Giao thức xử lý khi phát hiện hoạt động độc hại thực sự trong thời gian diễn tập"
+          ]
+        }
+      ]
+    }
+  ]
+}
