@@ -15,9 +15,7 @@ import {
   BrainCircuit,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { RED_TEAM_COMING_SOON } from '@/config/features';
 import {
   StatCard,
   StateTester,
@@ -77,32 +75,16 @@ export default function HomePage() {
             </Button>
           </Link>
 
-          {RED_TEAM_COMING_SOON ? (
+          <Link href="/offensive-security">
             <Button
               variant="outline"
               size="lg"
-              disabled
-              title="Red Team Ops — Coming Soon"
-              className="text-muted-foreground cursor-not-allowed gap-2 border-amber-500/30"
+              className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-2 font-semibold"
             >
-              <Crosshair className="h-4 w-4" aria-hidden="true" />
-              <span>Red Team Ops</span>
-              <span className="ml-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0 text-[10px] font-semibold text-amber-600 uppercase dark:text-amber-400">
-                Coming Soon
-              </span>
+              <Crosshair className="h-4 w-4" />
+              <span>Offensive Security Academy</span>
             </Button>
-          ) : (
-            <Link href="/rt">
-              <Button
-                variant="outline"
-                size="lg"
-                className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-2 font-semibold"
-              >
-                <Crosshair className="h-4 w-4" />
-                <span>Red Team Ops</span>
-              </Button>
-            </Link>
-          )}
+          </Link>
         </div>
       </section>
 
@@ -171,51 +153,26 @@ export default function HomePage() {
           </Card>
         </Link>
 
-        {RED_TEAM_COMING_SOON ? (
-          <Card
-            aria-disabled="true"
-            className="glass-card relative cursor-not-allowed overflow-hidden p-6 opacity-60"
-          >
+        <Link href="/offensive-security" className="group">
+          <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-amber-500" />
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-2">
                 <div className="bg-destructive/10 text-destructive flex h-10 w-10 items-center justify-center rounded-xl">
-                  <Crosshair className="h-5 w-5" aria-hidden="true" />
+                  <Crosshair className="h-5 w-5" />
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-foreground text-lg font-bold">Red Team Ops</h3>
-                  <Badge variant="warning" className="tracking-wide uppercase">
-                    Coming Soon
-                  </Badge>
-                </div>
+                <h3 className="text-foreground group-hover:text-destructive text-lg font-bold transition-colors">
+                  Offensive Security Academy
+                </h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Tính năng đang được hoàn thiện và hiện chưa sẵn sàng để sử dụng.
+                  Học từ authority và nền tảng hệ thống, sau đó củng cố qua Practice Range
+                  tấn công–phòng thủ an toàn.
                 </p>
               </div>
+              <ArrowRight className="text-muted-foreground group-hover:text-destructive mt-2 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1" />
             </div>
           </Card>
-        ) : (
-          <Link href="/rt" className="group">
-            <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-amber-500" />
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-2">
-                  <div className="bg-destructive/10 text-destructive flex h-10 w-10 items-center justify-center rounded-xl">
-                    <Crosshair className="h-5 w-5" />
-                  </div>
-                  <h3 className="text-foreground group-hover:text-destructive text-lg font-bold transition-colors">
-                    Red Team Ops
-                  </h3>
-                  <p className="text-muted-foreground text-xs leading-relaxed">
-                    Mô phỏng tấn công từng chủ đề: XSS, race condition, stale cache... rồi
-                    tự tay vá bằng Defense Patch.
-                  </p>
-                </div>
-                <ArrowRight className="text-muted-foreground group-hover:text-destructive mt-2 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1" />
-              </div>
-            </Card>
-          </Link>
-        )}
+        </Link>
       </section>
 
       {/* Live Server State Metrics (TanStack Query + Axios) */}
