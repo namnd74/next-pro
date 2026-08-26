@@ -1,0 +1,1117 @@
+{
+  "id": "os01-m02-link-routing-and-segmentation",
+  "slug": "link-routing-and-segmentation",
+  "trackId": "os01-network-foundations",
+  "title": "Ethernet, ARP, Routing, NAT, VLAN & VPN",
+  "summary": "Truy vết gói tin qua tầng liên kết dữ liệu (Ethernet frame, bảng MAC, ARP), cơ chế định tuyến longest-prefix-match và NAT, rồi phân tích các ranh giới phân đoạn VLAN/VPN — kèm kỹ thuật tấn công lớp 2 mô phỏng an toàn và biện pháp phòng thủ tương ứng.",
+  "difficulty": "foundation",
+  "estimatedMinutes": 210,
+  "careerPaths": ["penetration-test", "red-team", "bug-bounty"],
+  "domains": ["network"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os01-l04-ethernet-and-arp-trust-boundary",
+      "slug": "ethernet-and-arp-trust-boundary",
+      "title": "Ethernet Frame, Bảng MAC của Switch & Ranh giới Tin cậy ARP",
+      "summary": "Cấu trúc Ethernet frame và cách switch học bảng MAC; giao thức ARP phân giải IP sang MAC; cơ chế ARP cache poisoning dẫn đến tấn công Adversary-in-the-Middle trong cùng broadcast domain; phòng thủ bằng Dynamic ARP Inspection, DHCP Snooping và phát hiện bất thường.",
+      "difficulty": "foundation",
+      "durationMinutes": 70,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân tích cấu trúc Ethernet frame: Destination/Source MAC, EtherType và FCS, giải thích tại sao switch chuyển tiếp dựa trên MAC chứ không dựa trên IP.",
+        "Mô tả đầy đủ vòng đời ARP: kiểm tra cache, ARP Request broadcast, ARP Reply unicast và thời gian sống của cache.",
+        "Giải thích cơ chế ARP cache poisoning khiến nạn nhân gửi frame qua máy tấn công (vị trí on-path) và ràng buộc điều kiện phải ở cùng broadcast domain.",
+        "Thiết kế phòng thủ lớp 2: Dynamic ARP Inspection phụ thuộc DHCP Snooping binding, port security và phát hiện tỷ lệ ARP reply/gratuitous ARP bất thường."
+      ],
+      "careerPaths": ["penetration-test", "red-team"],
+      "domains": ["network"],
+      "attackTactics": ["TA0006", "TA0009"],
+      "keywords": [
+        "ethernet-frame",
+        "mac-address-table",
+        "arp-cache-poisoning",
+        "dynamic-arp-inspection",
+        "broadcast-domain"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Một LAN giống căn phòng họp mà mọi người đều nghe được: Ethernet frame là phong bì ghi địa chỉ MAC người nhận, switch là thư ký chỉ chuyển phong bì tới bàn đã đăng ký trong sổ (bảng MAC). ARP là cuốn danh bạ tự phát: ai gào lên 'IP này là của tôi', cả phòng mặc nhiên tin. Ranh giới tin cậy thực sự của lớp 2 là broadcast domain — mọi host trong cùng domain đều có thể giả mạo danh bạ của nhau, vì vậy phải kiểm chứng danh bạ bằng cơ chế hạ tầng (DHCP Snooping binding + DAI), không thể dựa vào thiện chí.",
+      "visual": {
+        "title": "Hành trình Frame và Điểm Chết của ARP",
+        "caption": "Frame đi từ NIC nguồn qua switch (học MAC) tới NIC đích; ARP Request broadcast chạm mọi host trong broadcast domain.",
+        "steps": [
+          {
+            "label": "NIC nguồn đóng frame",
+            "detail": "Gắn MAC đích, MAC nguồn, EtherType (0x0800 IPv4, 0x0806 ARP) và tính FCS để phát hiện hỏng dữ liệu.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Switch học và chuyển tiếp",
+            "detail": "Switch ghi MAC nguồn vào bảng CAM theo port, tra MAC đích; nếu chưa biết thì flood ra mọi port trong VLAN.",
+            "tone": "neutral"
+          },
+          {
+            "label": "ARP Request broadcast",
+            "detail": "Frame gửi tới FF:FF:FF:FF:FF:FF — mọi host trong broadcast domain đều phải xử lý; đây chính là ranh giới tin cậy lớp 2.",
+            "tone": "caution"
+          },
+          {
+            "label": "ARP Reply giả mạo",
+            "detail": "Kẻ tấn công gửi ARP Reply không lời mời ('IP gateway của tôi là MAC tôi') ghi đè cache của nạn nhân — điều kiện duy nhất: cùng broadcast domain.",
+            "tone": "stop"
+          },
+          {
+            "label": "DAI kiểm chứng",
+            "detail": "Switch đối chiếu (Sender IP, Sender MAC) trong ARP Reply với bảng DHCP Snooping binding; sai thì drop frame và ghi log vi phạm.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Ethernet Frame và Bảng MAC của Switch",
+          "paragraphs": [
+            "Ethernet frame lớp 2 gồm: Preamble (đồng bộ hóa, thường không tính vào payload), Destination MAC (6 byte), Source MAC (6 byte), EtherType (nội dung bên trên là IPv4 hay ARP), Payload và FCS (kiểm tra toàn vẹn). Switch hoạt động ở lớp này: nó không biết IP tồn tại.",
+            "Switch học ngược chiều dữ liệu: khi thấy frame đến từ port X mang MAC nguồn M, nó ghi M→X vào bảng MAC (bảng CAM). MAC đích đã có trong bảng thì chuyển tiếp đúng một port; chưa có thì flood ra mọi port cùng VLAN. Broadcast luôn được flood — đó là lý do broadcast domain định nghĩa ranh giới phẳng của lớp 2."
+          ],
+          "points": [
+            "MAC Table: ánh xạ MAC ↔ port, tự học tự già (aging timer), có thể bị làm đầy bằng MAC flooding.",
+            "EtherType 0x0806 đánh dấu frame ARP — tín hiệu hữu ích khi viết rule giám sát lớp 2.",
+            "FCS chỉ phát hiện lỗi truyền dẫn, tuyệt đối không phải cơ chế chống giả mạo."
+          ]
+        },
+        {
+          "title": "ARP: Danh bạ Tự phát của LAN",
+          "paragraphs": [
+            "Muốn gửi IP packet tới 10.0.0.1, host phải bọc packet trong frame có MAC đích. Nếu cache ARP chưa có ánh xạ, host gửi ARP Request broadcast: 'ai giữ 10.0.0.1?'. Host sở hữu IP trả lời bằng ARP Reply unicast chứa MAC của mình; người hỏi lưu cặp (IP, MAC) vào cache theo TTL (thường vài phút đến vài giờ).",
+            "Giao thức RFC 826 được thiết kế cho mạng tin cậy: host chấp nhận cập nhật cache từ ARP Reply mà mình không hề hỏi (unsolicited reply) và từ cả ARP Request của người khác. Gratuitous ARP — host chủ động loan báo ánh xạ của chính mình khi boot hay failover — cho thấy việc cập nhật không hỏi trước là hành vi bình thường của giao thức, và đó chính là kẽ hở."
+          ],
+          "points": [
+            "ARP chỉ hoạt động trong cùng subnet: khác subnet thì host đưa packet cho gateway, không phát ARP cho đích cuối.",
+            "Cache ARP tĩnh (static ARP entry) tồn tại nhưng không quản trị được ở quy mô lớn.",
+            "Gratuitous ARP hợp lệ khi failover HA pair — giám sát phải phân biệt failover thật với storm giả mạo."
+          ]
+        },
+        {
+          "title": "ARP Cache Poisoning: On-path Trong Một Phòng",
+          "paragraphs": [
+            "Kẻ tấn công trong cùng broadcast domain gửi ARP Reply liên tục: tới nạn nhân A nói 'gateway = MAC tôi', tới gateway nói 'A = MAC tôi'. Cả hai đầu cập nhật cache theo đúng luật RFC 826, dòng traffic A↔gateway bắt đầu chảy qua máy tấn công — trạng thái Adversary-in-the-Middle (MITRE ATT&CK T1557.002 ARP Cache Poisoning), phục vụ sniffing (T1040) và thao túng session.",
+            "Điều kiện tiên quyết là phải nằm trong cùng broadcast domain: khỏi VLAN khác, khỏi routed hop, không có gì để poisoning từ xa. Đây là ví dụ kinh điển về lỗ hổng thiết kế giao thức tin cậy-lẫn-nhau, không phải bug cài đặt của một hãng nào. Hệ quả bảo mật: đánh cắp thông tin đăng nhập chưa mã hóa, cắt kết nối (DoS cục bộ) hoặc sửa đổi dữ liệu đang truyền."
+          ],
+          "points": [
+            "On-path khác on-host: kẻ tấn công không chiếm máy nạn nhân, chỉ đứng chen giữa luồng frame.",
+            "Bidirectional poisoning là bắt buộc: poison một đầu thì traffic chiều ngược vẫn đi đường thẳng, kết nối TCP sẽ đứt vì bất đối xứng.",
+            "IPv6 dùng NDP thay ARP và chịu lớp vấn đề tương tự — giải pháp tương ứng là RA Guard/NDP inspection."
+          ]
+        },
+        {
+          "title": "Phòng Thủ và Kiểm chứng",
+          "paragraphs": [
+            "Dynamic ARP Inspection (DAI) biến switch thành thẩm phán danh bạ: mọi ARP packet trên các port không tin cậy được đối chiếu cặp (Sender IP, Sender MAC) với bảng DHCP Snooping binding (danh sách lease thật do DHCP server cấp). Không khớp thì drop, ghi log vi phạm kèm port — vừa ngăn chặn vừa tạo telemetry phát hiện.",
+            "Kiểm chứng mitigation phải đối chiếu trước–sau: trước khi bật DAI, mô phỏng poisoning thành công (trong lab cô lập); sau khi bật, cùng hành vi bị drop kèm log %DAI-5-DHCP_SNOOPING_DENY. Giám sát liên tục: đếm tỷ lệ ARP reply/gratuitous ARP mỗi giây mỗi port, cảnh báo khi vượt baseline. Rủi ro dư: thiết bị headless dùng IP tĩnh không có binding phải được allowlist thủ công — đây là chỗ cấu hình sai phổ biến nhất khiến DAI gây mất kết nối thật."
+          ],
+          "points": [
+            "Thứ tự triển khai đúng: DHCP Snooping trước, DAI sau, allowlist IP tĩnh cuối cùng.",
+            "Port security giới hạn số MAC mỗi port, chặn phụ trợ kiểu MAC flooding.",
+            "Telemetry lớp 2 (port violation log) phải được thu về SIEM mới tạo ra giá trị phát hiện."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "LAN Trust Boundary Desk — Phân tích ARP",
+        "objective": "Nhận diện dấu hiệu ARP cache poisoning từ log mô phỏng, lựa chọn biện pháp phòng thủ đúng thứ tự và kiểm chứng hiệu lực bằng telemetry.",
+        "scenario": "Bạn là Security Analyst của một chi nhánh văn phòng. Bộ phận hỗ trợ báo cáo người dùng liên tục mất kết nối nội bộ, và bạn được cung cấp bản ghi ARP/cache mô phỏng từ switch để phân tích. Mọi dữ liệu đều là mô phỏng chạy trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ log ARP và bảng MAC được cung cấp; không nhập địa chỉ hay tên miền tùy ý.",
+          "Mỗi quyết định phải chỉ ra ranh giới bị vi phạm và bằng chứng quan sát được.",
+          "Mitigation phải được kiểm chứng bằng so sánh telemetry trước–sau, không tính đã xong khi chỉ bật tính năng."
+        ],
+        "cases": [
+          {
+            "id": "arp-case-01",
+            "title": "Gateway có hai địa chỉ MAC",
+            "context": "Log ARP của ba máy trạm trong cùng VLAN 10: Máy K (10.0.10.51) cache ghi 10.0.10.1 → aa:bb:cc:00:11:22 lúc 09:00. Lúc 09:14, cache của K ghi 10.0.10.1 → de:ad:be:ef:12:34 dù không có thay đổi hạ tầng; đồng thời switch ghi nhận lượng lớn ARP reply unicast từ port 7 gửi đến nhiều port khác nhau, còn gateway thật (theo tài liệu) là aa:bb:cc:00:11:22.",
+            "prompt": "Chẩn đoán đúng nhất cho hiện tượng trên là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Gateway đổi NIC hợp lệ, không cần xử lý.",
+                "correct": false,
+                "rationale": "Không có thay đổi hạ tầng và pattern reply unicast loạn từ một port duy nhất trái ngược hoàn toàn với hành vi failover hợp lệ (gratuitous ARP từ chính port gateway)."
+              },
+              {
+                "id": "B",
+                "label": "ARP cache poisoning: port 7 đang giả mạo gateway để đứng on-path; cần xác minh port 7 là thiết bị gì và kích hoạt DAI có DHCP Snooping binding.",
+                "correct": true,
+                "rationale": "Unsolicited ARP reply ghi đè cache nhiều máy kèm nguồn tập trung một port là dấu hiệu đặc trưng của T1557.002; DAI + Snooping binding là mitigation tiêu chuẩn kiểm chứng được bằng log drop."
+              },
+              {
+                "id": "C",
+                "label": "Lỗi cáp làm hỏng frame, cần thay patch cord port 7.",
+                "correct": false,
+                "rationale": "Lỗi cáp biểu hiện qua FCS errors/CRC, không thể tạo ra ARP reply hợp lệ mang MAC giả mạo một cách có hệ thống."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần xóa cache ARP trên các máy trạm là kết thúc sự cố.",
+                "correct": false,
+                "rationale": "Xóa cache chỉ chữa triệu chứng: reply giả mạo tiếp tục ghi đè ngay sau đó vì nguyên nhân ở port 7 vẫn còn hoạt động."
+              }
+            ]
+          },
+          {
+            "id": "arp-case-02",
+            "title": "Triển khai DAI đúng thứ tự",
+            "context": "Bạn được quyền cấu hình switch. Trạng thái hiện tại: DHCP Snooping CHƯA bật; VLAN 10 có 180 máy lấy IP động và 6 thiết bị headless (máy in, cảm biến) cấu hình IP tĩnh không bao giờ nói chuyện DHCP.",
+            "prompt": "Trình tự triển khai nào giúp DAI chặn poisoning mà không cắt mạng các thiết bị IP tĩnh?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Bật DAI strict mode ngay trên mọi port, xử lý phiền toái sau.",
+                "correct": false,
+                "rationale": "Không có binding table thì DAI drop toàn bộ ARP kể cả hợp lệ — gây mất kết nối hàng loạt ngay lập tức."
+              },
+              {
+                "id": "B",
+                "label": "Bật DHCP Snooping trước, allowlist 6 thiết bị IP tĩnh vào bảng binding tĩnh, rồi bật DAI trên các port không tin cậy và theo dõi log vi phạm.",
+                "correct": true,
+                "rationale": "DAI cần nguồn chân lý (binding từ Snooping + static entry); port uplink tới DHCP server đặt trusted. Thứ tự này vừa chặn giả mạo vừa giữ kết nối thiết bị thật, và log drop trở thành telemetry phát hiện."
+              },
+              {
+                "id": "C",
+                "label": "Đặt mọi port thành trusted để DAI không chặn nhầm gì cả.",
+                "correct": false,
+                "rationale": "Port trusted bỏ qua kiểm tra ARP — DAI khi đó chỉ là hình thức, không chặn được port 7 của kẻ tấn công."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển toàn bộ máy in và cảm biến sang DHCP để khỏi cần allowlist.",
+                "correct": false,
+                "rationale": "Có thể giảm gánh nặng allowlist nhưng không phải bước an toàn bắt buộc; nhiều thiết bị OT/cảm biến bắt buộc IP tĩnh và vẫn cần static binding."
+              }
+            ]
+          },
+          {
+            "id": "arp-case-03",
+            "title": "Kiểm chứng mitigation bằng telemetry",
+            "context": "Sau khi bật DAI, bạn chạy lại tình huống giả mạo trong lab mô phỏng (đã được ủy quyền, môi trường cô lập). Số liệu thu được: Trước DAI — cache 40/40 máy trạm bị ghi đè trong 60 giây. Sau DAI — switch drop 512 ARP packet tại port 7, cache máy trạm giữ nguyên gateway đúng, log ghi %DAI-5-DHCP_SNOOPING_DENY kèm MAC/port nguồn.",
+            "prompt": "Kết luận nào phản ánh đúng trạng thái mitigated và giá trị phát hiện?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Mitigation chưa được chứng minh vì vẫn còn packet ARP đi lại trong mạng.",
+                "correct": false,
+                "rationale": "ARP hợp lệ vẫn phải chạy bình thường; tiêu chí là giả mạo bị drop trong khi traffic thật thông suốt, không phải vô hiệu hóa ARP."
+              },
+              {
+                "id": "B",
+                "label": "Mitigation đã kiểm chứng: hành vi tấn công cũ bị chặn tại port, cache không còn bị ghi đè, và log vi phạm cho phép xây analytic cảnh báo poisoning tái diễn (kèm residual risk là thiết bị allowlist bị nhầm cấu hình).",
+                "correct": true,
+                "rationale": "Bằng chứng before/after cụ thể (512 drop, cache sạch, log có MAC/port) thỏa mãn evidence contract; ghi nhận residual risk của allowlist tĩnh thể hiện đánh giá trưởng thành."
+              },
+              {
+                "id": "C",
+                "label": "Cần cài thêm antivirus lên toàn bộ máy trạm mới coi như an toàn.",
+                "correct": false,
+                "rationale": "Endpoint AV không nhìn thấy ARP giả mạo ở lớp 2 trước khi nó xảy ra; mitigation đúng chỗ là switch."
+              },
+              {
+                "id": "D",
+                "label": "Nên tắt gratuitous ARP trên gateway để không còn gì để giả mạo nữa.",
+                "correct": false,
+                "rationale": "Tắt gratuitous ARP làm hỏng failover HA hợp lệ và không ngăn được unsolicited reply từ kẻ tấn công — nhầm giữa hai loại ARP khác nhau."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Chẩn đoán đúng ARP cache poisoning từ pattern log thay vì phỏng đoán.",
+          "Trình bày đúng thứ tự phụ thuộc DHCP Snooping → static binding → DAI.",
+          "Kiểm chứng mitigation bằng số liệu before/after và chỉ ra telemetry dùng cho detection."
+        ],
+        "evidenceTemplate": [
+          "Bản trích log ARP bất thường (timestamp, sender IP/MAC, port)",
+          "Sơ đồ vị trí on-path trong broadcast domain VLAN 10",
+          "Bảng so sánh cache máy trạm trước/sau DAI",
+          "Quy tắc cảnh báo đề xuất từ %DAI-5-DHCP_SNOOPING_DENY"
+        ],
+        "reset": "Đặt lại lựa chọn để phân tích lại các tình huống ARP từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không tạo lưu lượng hay thay đổi cấu hình thật."
+      },
+      "governance": {
+        "prevent": [
+          "Bật DHCP Snooping và Dynamic ARP Inspection trên mọi access port; chỉ uplink tới DHCP server là trusted.",
+          "Allowlist có kiểm soát cho thiết bị IP tĩnh; rà soát định kỳ bảng binding tĩnh.",
+          "Không sử dụng VLAN 1 làm data VLAN; giới hạn broadcast domain theo chức năng."
+        ],
+        "observe": [
+          "Thu log %DAI-5-DHCP_SNOOPING_DENY và port-violation về SIEM; cảnh báo theo tỷ lệ ARP reply mỗi port/giây vượt baseline.",
+          "Theo dõi thay đổi MAC của gateway trong telemetry endpoint (so sánh arp -a định kỳ với cấu hình chuẩn)."
+        ],
+        "respond": [
+          "Khi phát hiện poisoning: xác định port nguồn, shut/no-shut hoặc cô lập port, truy vết thiết bị cắm trái phép.",
+          "Xóa cache ARP phía nạn nhân sau khi chặn nguồn giả mạo; xác minh lại traffic bằng capture đối chiếu."
+        ],
+        "residualRisk": [
+          "Thiết bị allowlist bị chiếm đoạt vẫn là nguồn giả mạo hợp lệ trong binding table.",
+          "Mạng IPv6 dùng NDP — nếu chỉ bật DAI mà bỏ quên RA Guard thì bề mặt tương đương vẫn mở."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Switch có FCS kiểm tra frame nên không thể có giả mạo lớp 2.",
+          "correction": "FCS chỉ phát hiện bit bị hỏng trên đường truyền; frame giả mạo hoàn chỉnh, hợp lệ vẫn qua kiểm tra FCS bình thường."
+        },
+        {
+          "claim": "ARP poisoning là tấn công qua Internet, cần truy cập từ xa vào máy nạn nhân.",
+          "correction": "ARP chỉ tồn tại trong broadcast domain cục bộ; kẻ tấn công buộc phải nằm trong cùng segment/VLAN — vì thế segmentation chính là lớp giảm thiểu đầu tiên."
+        },
+        {
+          "claim": "Bật DAI là xong, không cần DHCP Snooping.",
+          "correction": "DAI không có nguồn chân lý riêng: nó đối chiếu với bảng DHCP Snooping binding; thiếu bảng này DAI hoặc drop nhầm toàn bộ hoặc phải mở trusted rộng rãi và mất tác dụng."
+        },
+        {
+          "claim": "Static ARP cho toàn bộ host là giải pháp tốt nhất thay DAI.",
+          "correction": "Quản lý static ARP thủ công cho hàng trăm host không khả thi và không tự thích ứng khi NIC/IP thay đổi; DAI + Snooping tự động hóa chính việc đó."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l04-q1",
+          "difficulty": "easy",
+          "question": "Frame ARP Request đầu tiên được gửi tới địa chỉ MAC đích nào?",
+          "options": [
+            { "id": "A", "label": "MAC của gateway mặc định" },
+            { "id": "B", "label": "FF:FF:FF:FF:FF:FF (broadcast)" },
+            { "id": "C", "label": "MAC của DNS server" },
+            { "id": "D", "label": "01:80:C2:00:00:00 (STP multicast)" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Vì chưa biết MAC của IP mục tiêu, ARP Request phải dùng địa chỉ broadcast FF:FF:FF:FF:FF:FF để mọi host trong broadcast domain đều nhận và host sở hữu IP trả lời."
+        },
+        {
+          "id": "os01-l04-q2",
+          "difficulty": "medium",
+          "question": "Tại sao Dynamic ARP Inspection bắt buộc phải có DHCP Snooping (hoặc binding tĩnh) chạy trước?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì DHCP Snooping mã hóa các gói ARP trước khi switch kiểm tra"
+            },
+            {
+              "id": "B",
+              "label": "Vì DAI cần bảng ánh xạ (IP, MAC, port) đáng tin làm chuẩn đối chiếu; thiếu chuẩn đó nó không phân biệt được reply thật và giả"
+            },
+            {
+              "id": "C",
+              "label": "Vì DAI chỉ hoạt động trên cổng fiber cần Snooping khởi động driver"
+            },
+            { "id": "D", "label": "Vì RFC 826 quy định hai tính năng phải bật cùng lúc" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "DAI là bộ đối chiếu, không phải nguồn sự thật: nó so (Sender IP, Sender MAC) với DHCP Snooping binding table. Không có bảng này, DAI hoặc drop cả ARP hợp lệ hoặc phải tin hết mọi port và mất ý nghĩa."
+        },
+        {
+          "id": "os01-l04-q3",
+          "difficulty": "hard",
+          "question": "Sau khi bạn xóa toàn bộ cache ARP của nạn nhân, năm phút sau cache lại bị ghi đè bởi MAC giả. Điều này chứng minh điều gì về mô hình khắc phục và phát hiện?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cache ARP có TTL quá dài, chỉ cần rút ngắn TTL xuống 5 giây"
+            },
+            {
+              "id": "B",
+              "label": "Xóa cache là xử lý triệu chứng; nguồn giả mạo còn hoạt động trong broadcast domain, nên remediation phải chặn tại switch và detection phải theo dõi log vi phạm/tỷ lệ reply liên tục"
+            },
+            { "id": "C", "label": "Nạn nhân bị malware, cần cài lại Windows" },
+            { "id": "D", "label": "Gateway hỏng, cần restart router" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Việc tái diễn chứng minh có nguồn gửi unsolicited reply lặp lại. Remediation đúng là DAI drop tại port nguồn; detection là analytic trên log vi phạm và baseline ARP — không phải can thiệp phía host."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn chuyển sang một văn phòng mới dùng Wi-Fi doanh nghiệp (WPA2-Enterprise) trộn lẫn vùng dây mạng trong cùng building. Ban quản trị từ chối bật DAI vì switch Wi-Fi controller là thiết bị khác hãng, nhưng đồng ý cấp quyền đọc telemetry từ controller trong phạm vi lab nội bộ được ủy quyền.",
+        "tasks": [
+          "Thiết kế phương án phát hiện ARP/ND poisoning dựa trên telemetry controller và endpoint thay vì DAI, nêu rõ hypothesis kiểm chứng được.",
+          "Xác định những điểm khác biệt của IPv6 NDP so với ARP và bổ sung rule tương ứng (RA Guard nơi có thể).",
+          "Đề xuất kế hoạch kiểm chứng segmentation: chứng minh hai SSID/VLAN không thể poisoning lẫn nhau."
+        ],
+        "requiredEvidence": [
+          "Câu lệnh/log truy vấn telemetry ARP bất thường kèm ngưỡng cảnh báo cụ thể",
+          "So sánh ma trận phòng thủ ARP (wired/DAI) và NDP (wireless/RA Guard)",
+          "Kết quả kiểm thử segmentation dạng bảng: cặp nguồn–đích, kỳ vọng, kết quả"
+        ]
+      },
+      "sources": [
+        {
+          "title": "RFC 826 — An Ethernet Address Resolution Protocol",
+          "url": "https://www.rfc-editor.org/rfc/rfc826",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Quy trình ARP request/reply và hành vi cập nhật cache từ reply không lời mời",
+            "Ranh giới hoạt động của ARP trong cùng mạng cục bộ"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Adversary-in-the-Middle: ARP Cache Poisoning (T1557.002) & Network Sniffing (T1040)",
+          "url": "https://attack.mitre.org/techniques/T1557/002/",
+          "publisher": "MITRE Corporation",
+          "sourceType": "official-reference",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Ánh xạ ARP cache poisoning vào kỹ thuật T1557.002 và các tactic TA0006/TA0009",
+            "Hệ quả sniffing và thao túng phiên khi đứng on-path"
+          ]
+        },
+        {
+          "title": "Cisco — Dynamic ARP Inspection (DAI) and DHCP Snooping Configuration Guide",
+          "url": "https://www.cisco.com/c/en/us/td/docs/switches/lan/catalyst6500/ios/12-2SX/configuration/guide/book/dyn_arp_inspection.html",
+          "publisher": "Cisco Systems",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Thứ tự phụ thuộc DHCP Snooping trước DAI và vai trò trusted/untrusted port",
+            "Cơ chế log vi phạm %DAI-5-DHCP_SNOOPING_DENY dùng cho detection"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os01-l05-ip-routing-and-nat-boundaries",
+      "slug": "ip-routing-and-nat-boundaries",
+      "title": "Bảng Định tuyến, Longest Prefix Match & Ranh giới NAT",
+      "summary": "Router chuyển tiếp packet bằng longest-prefix-match trên bảng định tuyến; TTL và vai trò gateway; NAT dịch địa chỉ theo bảng trạng thái và phá vỡ mô hình end-to-end; hệ quả tới scope kiểm thử và phân đoạn mạng.",
+      "difficulty": "foundation",
+      "durationMinutes": 70,
+      "prerequisites": ["os01-l04-ethernet-and-arp-trust-boundary"],
+      "outcomes": [
+        "Tra cứu bảng định tuyến và chọn tuyến đúng theo longest-prefix-match, phân biệt tuyến cụ thể với default gateway.",
+        "Giải thích vai trò TTL và suy luận đường đi từ output traceroute mô phỏng.",
+        "Mô tả trạng thái NAT/PAT: ánh xạ (inside IP:port ↔ outside IP:port), timeout phiên và hệ quả khi trạng thái hết hạn hoặc đường đi bất đối xứng.",
+        "Đánh giá tác động của NAT chồng lấn (overlapping range) tới việc xác định scope kiểm thử và ranh giới trách nhiệm."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "bug-bounty"],
+      "domains": ["network"],
+      "attackTactics": [],
+      "keywords": [
+        "routing-table",
+        "longest-prefix-match",
+        "ttl",
+        "nat-pat",
+        "default-gateway"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Router là bưu cục phân loại theo bảng tra cứu: mỗi packet được đọc địa chỉ đích, rồi chọn tuyến dài khớp nhất (longest-prefix-match) — tuyến /24 cụ thể luôn thắng tuyến mặc định 0.0.0.0/0. NAT là quầy đổi phong bì: bên trong ghi địa chỉ riêng, quầy thay bằng địa chỉ công cộng và ghi sổ (bảng trạng thái) để biết trả lời về đâu. Sổ này là trạng thái có tuổi sống — hết hạn thì dòng trở về bị bỏ. Vì quầy giữ sổ, NAT phá vỡ kết nối end-to-end: bên ngoài không chủ động chạm được vào trong, đó vừa là 'tường' vô tình, vừa là nguồn lỗi khó hiểu khi kiểm thử.",
+      "visual": {
+        "title": "Packet Đi Qua Router và Quầy NAT",
+        "caption": "Mỗi hop giảm TTL 1 và tra bảng định tuyến; NAT ghi/xóa trạng thái phiên theo hướng packet.",
+        "steps": [
+          {
+            "label": "Host tra bảng cục bộ",
+            "detail": "Đích ngoài subnet → gửi tới default gateway; đích trong subnet → ARP trực tiếp (bài l04).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Router 1: longest-prefix-match",
+            "detail": "Chọn tuyến khớp dài nhất (/24 thắng /16, /16 thắng default /0); TTL giảm 1, MAC được ghi đè từng hop còn IP đích giữ nguyên.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Biên NAT: ghi sổ",
+            "detail": "Packet đi ra được thay nguồn thành (public_ip, port_mới) và ghi dòng trạng thái; reply khớp dòng này mới được dịch ngược vào trong.",
+            "tone": "caution"
+          },
+          {
+            "label": "Reply lạc hoặc trễ quá timeout",
+            "detail": "Dòng trạng thái đã xóa → packet bị drop âm thầm; biểu hiện bên ngoài là 'kết nối treo' không rõ nguyên nhân.",
+            "tone": "stop"
+          },
+          {
+            "label": "Scope kiểm thử đúng",
+            "detail": "Dải 10.x/172.16/192.168 là địa chỉ riêng có thể trùng nhau giữa các tổ chức — scope phải xác định theo biên vận hành, không theo địa chỉ.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bảng Định tuyến và Longest Prefix Match",
+          "paragraphs": [
+            "Mỗi router giữ bảng định tuyến: đích (dạng CIDR), next-hop, interface, metric. Khi packet đến, router tìm tất cả tuyến mà network prefix chứa địa chỉ đích, rồi chọn tuyến có prefix dài nhất — cụ thể thắng chung. Chỉ khi không tuyến nào khớp, tuyến mặc định 0.0.0.0/0 mới được dùng.",
+            "Điều này tạo ra hành vi bất ngờ có ý nghĩa bảo mật: thêm một tuyến /32 hoặc /24 hẹp hơn có thể hút traffic khỏi đường mong đợi (blackhole có chủ đích hoặc định tuyến sai), và metric thấp hơn không cứu được tuyến prefix ngắn hơn. Khi kiểm chứng segmentation, bạn phải đọc bảng định tuyến của từng hop chứ không thể suy từ sơ đồ."
+          ],
+          "points": [
+            "Default gateway chỉ là tuyến 0.0.0.0/0 — luôn thua mọi tuyến cụ thể hơn.",
+            "Route overlap không hợp lệ theo nghĩa 'một đường duy nhất': nhiều tuyến khớp là chuyện bình thường, độ dài prefix quyết định.",
+            "Traceroute hoạt động nhờ TTL exceeding: ICMP Time Exceeded từ từng hop lộ topology — cả cho bạn lẫn cho kẻ reconnaissance."
+          ]
+        },
+        {
+          "title": "TTL, Gateway và Hợp Lý Hóa Đường Đi",
+          "paragraphs": [
+            "Mỗi hop router giảm TTL đi 1; TTL về 0 thì packet bị hủy và router gửi ICMP Time Exceeded về nguồn. TTL không phải bảo mật — nó chống vòng lặp định tuyến — nhưng nó là công cụ suy luận: giá trị TTL trong packet bắt được cho biết packet đi qua bao nhiêu hop.",
+            "Asymmetric routing (đi một đường, về đường khác) xuất hiện khi có nhiều router/NAT trong lộ trình. Với firewall stateless thì bất đối xứng làm drop return traffic; với phân tích forensics thì hai đầu ghi thấy hai câu chuyện khác nhau. Luôn xác nhận đường đi hai chiều trước khi kết luận về ranh giới nào đã chặn traffic."
+          ],
+          "points": [
+            "TTL khởi tạo phổ biến: 64 (Linux/macOS), 128 (Windows) — manh mối fingerprint hệ điều hành nguồn.",
+            "Hairpin NAT: host nội bộ truy cập dịch vụ qua địa chỉ public của chính nó — nhiều NAT gia đình/doanh nghiệp không hỗ trợ, sinh lỗi khó truy vết.",
+            "ICMP cần cho PMTUD; chặn ICMP blanket có thể làm treo kết nối lớn (blackhole PMTUD)."
+          ]
+        },
+        {
+          "title": "NAT: Bảng Trạng Thái và Những Gì Nó Phá Vỡ",
+          "paragraphs": [
+            "SNAT/PAT (loại phổ biến nhất) dịch nhiều địa chỉ nội bộ ra một địa chỉ public bằng cách phân biệt theo cặp (IP nguồn, port nguồn). Router ghi dòng trạng thái (inside ip:port ↔ outside ip:port, timeout). Packet reply từ Internet phải khớp dòng đang sống mới được dịch ngược; packet chủ động từ ngoài vào không có dòng sẵn sẽ bị drop — đây là 'an toàn vô tình' của NAT, không phải firewall có chủ đích.",
+            "NAT phá mô hình end-to-end của Internet (RFC 3022 ghi nhận vai trò này): giao thức nhúng địa chỉ IP trong payload (FTP active, SIP) hỏng dưới NAT; UDP NAT có hành vi không thống nhất giữa các thiết bị (RFC 4787 liệt kê full-cone/restricted/port-restricted) ảnh hưởng trực tiếp tới WebRTC/P2P. Khi kiểm thử, timeout trạng thái NAT giải thích nhiều 'ghost issue': kết nối chết sau khoảng nghỉ dài chính vì dòng trạng thái đã bị xóa."
+          ],
+          "points": [
+            "Port forwarding/DMZ là DNAT tĩnh — mở đường chủ động từ ngoài vào trong, phải đi kèm ACL và logging.",
+            "Double NAT (modem ISP + router riêng) nhân đôi trạng thái, làm chẩn đoán khó gấp đôi.",
+            "CGNAT của nhà mạng khiến hàng nghìn khách hàng chung một IP public — ảnh hưởng nghiêm trọng tới attribution và rate-limit dựa trên IP."
+          ]
+        },
+        {
+          "title": "Scope Kiểm Thử Khi Địa chỉ Riêng Trùng Nhau",
+          "paragraphs": [
+            "RFC 1918 định nghĩa 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 là dải riêng — không đăng ký, không định tuyến công cộng, và vì vậy bị tái sử dụng vô hạn. Hai tổ chức khác nhau dùng cùng 192.168.1.0/24 là chuyện hết sức bình thường. Hệ quả: địa chỉ IP riêng KHÔNG đủ để định danh mục tiêu trong ROE.",
+            "Trong scoping phải gọi tên theo biên vận hành: 'site A, VLAN production, dải 10.20.0.0/16 sau NAT biên X' kèm sơ đồ. Nhầm dải chồng lấn là con đường đi tới truy cập ngoài phạm vi — vi phạm pháp lý của hợp đồng kiểm thử. Khi phát hiện route/NAT cho phép chạm vào dải không nằm trong scope (ví dụ site khác qua VPN hub), hành động đúng là dừng, ghi nhận bằng chứng, báo cáo lên điều phối — không tiếp tục khai thác."
+          ],
+          "points": [
+            "Scope document phải kèm sơ đồ NAT biên và bảng ánh xạ site↔dải.",
+            "VPN hub-spoke là chỗ dải chồng lấn bùng nổ: hai site cùng 10.0.0.0/16 không thể định tuyến lẫn nhau đúng.",
+            "Bằng chứng out-of-scope access chỉ cần tối thiểu để chứng minh (route exist + một handshake), không khai thác sâu."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Routing & NAT Desk — Tra Bảng và Đọc Trạng Thái",
+        "objective": "Chọn tuyến đúng theo longest-prefix-match, chẩn đoán lỗi phiên do trạng thái NAT và xử lý tình huống scope chồng lấn đúng quy trình ủy quyền.",
+        "scenario": "Bạn tham gia kiểm thử nội bộ cho công ty có 3 site nối qua VPN hub (mô phỏng trong trình duyệt). Bạn được cung cấp bảng định tuyến của các router, snapshot bảng NAT và tài liệu ROE. Mọi tình huống đều là mô phỏng dữ liệu tĩnh.",
+        "constraints": [
+          "Chỉ dùng dữ liệu bảng được cung cấp; không nhập địa chỉ/IP tùy ý.",
+          "Mọi kết luận đường đi phải chỉ rõ tuyến nào trong bảng thắng lý do gì.",
+          "Phát hiện rủi ro out-of-scope phải dừng và báo cáo, không tiếp tục thao tác."
+        ],
+        "cases": [
+          {
+            "id": "rt-case-01",
+            "title": "Chọn tuyến cho packet tới 10.20.30.40",
+            "context": "Bảng định tuyến router R1: (1) 10.0.0.0/8 via 10.255.0.1; (2) 10.20.0.0/16 via 10.255.0.2; (3) 10.20.30.0/24 via 10.255.0.3 metric 5; (4) 0.0.0.0/0 via 203.0.113.1. Packet cần đến 10.20.30.40.",
+            "prompt": "Next-hop nào được chọn và vì sao?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Via 10.255.0.1 vì 10.0.0.0/8 đứng đầu bảng.",
+                "correct": false,
+                "rationale": "Thứ tự trong bảng không quyết định; longest-prefix-match mới là luật chọn tuyến."
+              },
+              {
+                "id": "B",
+                "label": "Via 10.255.0.3 vì tuyến 10.20.30.0/24 có prefix dài nhất khớp đích (/24 > /16 > /8 > /0).",
+                "correct": true,
+                "rationale": "Ba tuyến đều chứa đích nhưng /24 khớp 24 bit — dài nhất, nên thắng bất kể metric và thứ tự."
+              },
+              {
+                "id": "C",
+                "label": "Via 203.0.113.1 vì đó là default gateway luôn dùng khi không chắc.",
+                "correct": false,
+                "rationale": "Default route chỉ dùng khi không có tuyến nào khớp; ở đây có ba tuyến khớp."
+              },
+              {
+                "id": "D",
+                "label": "Via 10.255.0.2 vì /16 cân bằng giữa tốc độ và cụ thể.",
+                "correct": false,
+                "rationale": "Không có 'cân bằng' trong lookup: prefix dài hơn luôn thắng tuyến prefix ngắn hơn."
+              }
+            ]
+          },
+          {
+            "id": "rt-case-02",
+            "title": "Kết nối chết sau 30 phút nghỉ",
+            "context": "Ứng dụng giữ kết nối TCP lâu dài tới server nội bộ qua NAT biên. Snapshot bảng NAT cho thấy timeout idle TCP là 900 giây. Log ứng dụng: kết nối đứt đúng sau mỗi khoảng nghỉ dài, gửi lại được ngay sau khi reconnect. Server không ghi nhận packet FIN/RST nào.",
+            "prompt": "Chẩn đoán và xử lý đúng nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Server crash, cần xem lại RAM server.",
+                "correct": false,
+                "rationale": "Server không thấy gì bất thường (không FIN/RST); triệu chứng nằm ở biên dịch địa chỉ, không phải phía server."
+              },
+              {
+                "id": "B",
+                "label": "Dòng trạng thái NAT hết hạn do idle vượt timeout, packet tiếp theo bị drop âm thầm; fix bằng keepalive ngắn hơn timeout (hoặc nâng timeout có kiểm soát) và kiểm chứng lại bằng đo khoảng nghỉ tối đa sống sót.",
+                "correct": true,
+                "rationale": "Triệu chứng chu kỳ đúng bằng timeout, không packet kết thúc phiên, reconnect được ngay — bộ ba dấu hiệu đặc trưng của NAT state expiry; keepalive giữ dòng trạng thái sống là fix kiểm chứng được."
+              },
+              {
+                "id": "C",
+                "label": "TTL quá thấp, tăng TTL lên 255.",
+                "correct": false,
+                "rationale": "TTL chỉ chống loop; nếu TTL hết giữa đường thì không có kết nối nào sống nổi 30 phút ban đầu."
+              },
+              {
+                "id": "D",
+                "label": "Bật port forwarding cho server để không phụ thuộc trạng thái.",
+                "correct": false,
+                "rationale": "Port forwarding (DNAT tĩnh) giải bài toán inbound từ ngoài, không giải bài outbound idle expiry; đồng thời mở bề mặt không cần thiết."
+              }
+            ]
+          },
+          {
+            "id": "rt-case-03",
+            "title": "Route bất ngờ chạm dải ngoài scope",
+            "context": "Trong lúc kiểm chứng segmentation trên VPN hub (trong scope), bạn thấy bảng hub có tuyến 192.168.50.0/24 trỏ về Site C — site KHÔNG nằm trong ROE. Từ jump host được ủy quyền, một TCP SYN tới 192.168.50.10 nhận SYN/ACK phản hồi, chứng tỏ đường đi tồn tại.",
+            "prompt": "Hành động đúng theo quy trình là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tiếp tục scan 192.168.50.0/24 vì đường đi đã mở sẵn, không cần xin lại.",
+                "correct": false,
+                "rationale": "Khả năng truy cập không bằng ủy quyền; tiếp tục là kiểm thử ngoài phạm vi hợp đồng dù technically possible."
+              },
+              {
+                "id": "B",
+                "label": "Dừng ngay, ghi nhận bằng chứng tối thiểu (route + một handshake đã có), báo cáo cho điều phối/ROE owner để mở rộng scope hoặc vá định tuyến, và không khai thác thêm.",
+                "correct": true,
+                "rationale": "Nguyên tắc authorization-first: bằng chứng tồn tại đường đi là đủ để lập finding segmentation gap; mọi bước sâu hơn phải nằm trong ủy quyền cập nhật."
+              },
+              {
+                "id": "C",
+                "label": "Xóa tuyến 192.168.50.0/24 trên hub để tự vá segmentation.",
+                "correct": false,
+                "rationale": "Thay đổi hạ tầng sản xuất không nằm trong nhiệm vụ kiểm thử và có thể cắt dịch vụ thật của Site C."
+              },
+              {
+                "id": "D",
+                "label": "Bỏ qua vì dải 192.168 là địa chỉ riêng, không thể là thật.",
+                "correct": false,
+                "rationale": "SYN/ACK thật chứng minh có host trả lời sau NAT; địa chỉ riêng vẫn là dịch vụ sản xuất thật của tổ chức."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Tra bảng định tuyến đúng luật longest-prefix-match kèm giải thích vì sao các tuyến còn lại thua.",
+          "Liên kết triệu chứng phiên chết với timeout trạng thái NAT và đề xuất fix kiểm chứng được.",
+          "Xử lý phát hiện out-of-scope đúng trình tự dừng–bằng chứng–báo cáo."
+        ],
+        "evidenceTemplate": [
+          "Bảng tra lookup: đích, các tuyến khớp, tuyến thắng + lý do prefix length",
+          "Timeline phiên: thời điểm nghỉ, timeout NAT cấu hình, thời điểm đứt",
+          "Ảnh chụp route/handshake tối thiểu chứng minh gap out-of-scope (đã che giấu dữ liệu nhạy cảm)",
+          "Đề xuất remediation: keepalive/timeout và review lại bảng định tuyến hub"
+        ],
+        "reset": "Đặt lại lựa chọn để tra cứu lại các bảng định tuyến và NAT từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không gửi packet hay thay đổi định tuyến thật."
+      },
+      "governance": {
+        "prevent": [
+          "Chuẩn hóa thiết kế định tuyến: tài liệu hóa mọi static route trên hub/biên, cấm route ad-hoc không review.",
+          "Thống nhất timeout NAT theo profile ứng dụng; bắt buộc keepalive cho phiên dài hạn.",
+          "Scoping checklist: sơ đồ NAT biên + bảng site↔dải bắt buộc đính kèm ROE trước khi kiểm thử."
+        ],
+        "observe": [
+          "Giám sát bảng trạng thái NAT: tỷ lệ drop do không khớp dòng trạng thái, cảnh báo spike bất thường.",
+          "Audit định tuyến định kỳ: so sánh bảng route chạy thật với thiết kế chuẩn, cảnh báo tuyến lạ (đặc biệt trỏ ra ngoài scope)."
+        ],
+        "respond": [
+          "Phát hiện đường đi tới dải ngoài scope: đóng route/firewall sau khi xác nhận với chủ sở hữu, không xóa vội.",
+          "Sự cố phiên hàng loạt: kiểm tra thay đổi timeout/NAT gần nhất trước khi can thiệp sâu vào ứng dụng."
+        ],
+        "residualRisk": [
+          "CGNAT của nhà mạng nằm ngoài tầm kiểm soát, làm attribution và rate-limit theo IP kém tin cậy.",
+          "NAT không phải kiểm soát bảo mật có chủ đích: bypass hợp lệ (VPN, reverse proxy) luôn tồn tại, không thể thay firewall stateful."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Default gateway được ưu tiên cao nhất vì mọi packet ngoài LAN đều đi qua nó.",
+          "correction": "Default route 0.0.0.0/0 có prefix ngắn nhất nên luôn THUA mọi tuyến cụ thể; nó chỉ được dùng khi không còn tuyến nào khớp."
+        },
+        {
+          "claim": "NAT là một lớp firewall bảo mật đáng tin cậy.",
+          "correction": "NAT chỉ drop packet không khớp trạng thái sẵn có; nó không inspect nội dung, không có policy có chủ đích, và bị bypass bởi bất kỳ cơ chế khởi tạo kết nối ngược (reverse shell qua kết nối ra, hole punching)."
+        },
+        {
+          "claim": "Metric nhỏ hơn sẽ giúp tuyến /16 thắng tuyến /24.",
+          "correction": "Longest-prefix-match xét độ dài prefix TRƯỚC; metric chỉ hòa giải giữa các tuyến cùng độ dài prefix."
+        },
+        {
+          "claim": "Dải 10.0.0.0/8 của khách hàng là định danh đủ để kiểm thử an toàn.",
+          "correction": "Dải riêng bị tái sử dụng ở mọi tổ chức; scope phải định danh theo biên vận hành (site, VLAN, biên NAT) — địa chỉ riêng trùng nhau là bẫy out-of-scope kinh điển."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l05-q1",
+          "difficulty": "easy",
+          "question": "Host muốn gửi packet tới địa chỉ NẰM NGOÀI subnet của mình sẽ làm gì?",
+          "options": [
+            { "id": "A", "label": "Phát ARP Request trực tiếp cho IP đích ở xa" },
+            {
+              "id": "B",
+              "label": "Đóng frame tới MAC của gateway và để gateway định tuyến tiếp"
+            },
+            { "id": "C", "label": "Gửi packet tới địa chỉ broadcast 255.255.255.255" },
+            { "id": "D", "label": "Giảm TTL về 0 để router bắt packet hộ" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Với đích ngoài subnet, host bọc packet trong frame gửi tới MAC gateway (đã có trong cache ARP) — gateway rồi tra bảng định tuyến chuyển tiếp; IP đích logic không đổi."
+        },
+        {
+          "id": "os01-l05-q2",
+          "difficulty": "medium",
+          "question": "Packet tới 172.16.8.9. Bảng có: 172.16.0.0/16 via A; 172.16.8.0/22 via B; 0.0.0.0/0 via C. Tuyến nào thắng?",
+          "options": [
+            {
+              "id": "A",
+              "label": "/16 via A vì 172.16.0.0/16 là mạng gốc của địa chỉ này"
+            },
+            { "id": "B", "label": "/22 via B vì 22 bit khớp dài hơn 16 và 0" },
+            { "id": "C", "label": "Default via C vì router luôn ưu tiên tuyến tổng" },
+            { "id": "D", "label": "Không định tuyến được vì /22 không hợp lệ với 172.16" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Longest-prefix-match: cả ba tuyến đều chứa đích nhưng /22 khớp nhiều bit nhất nên via B thắng. (/22 hợp lệ: 172.16.8.0/22 chia lưới trên biên 4.)"
+        },
+        {
+          "id": "os01-l05-q3",
+          "difficulty": "hard",
+          "question": "Một tổ chức dùng 10.40.0.0/16 ở TRỤC CHÍNH và 10.40.0.0/16 ở chi nhánh khác (qua VPN hub). Người quản lý yêu cầu kiểm thử 'toàn bộ 10.40.0.0/16'. Rủi ro kiến trúc cốt lõi là gì?",
+          "options": [
+            { "id": "A", "label": "Dải 10.x quá lớn nên scan sẽ rất chậm" },
+            {
+              "id": "B",
+              "label": "Dải riêng chồng lấn giữa hai site: cùng một địa chỉ đích có thể thuộc hai biên vận hành khác nhau, khiến scope mơ hồ và định tuyến VPN không thể phân giải đúng — scope phải được tách theo biên/site trước khi có bất kỳ thao tác nào"
+            },
+            { "id": "C", "label": "Địa chỉ riêng không được phép xuất hiện trong VPN" },
+            { "id": "D", "label": "Chỉ cần dùng IPv6 là giải quyết hết vấn đề" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Overlapping private space làm mất tính đơn ánh của (địa chỉ → mục tiêu). Router hub không biết đưa packet về site nào, và người kiểm thử không thể chứng minh mình chạm đúng mục tiêu được ủy quyền — bắt buộc re-address hoặc NAT tách bạch trước."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được mổ xẻ một lab cloud mini (được ủy quyền, môi trường riêng): VPC 10.200.0.0/16 nối về on-premise 10.40.0.0/16 qua IPsec VPN, giữa đường có NAT Gateway cho egress Internet. Ứng dụng legacy chèn địa chỉ IP nguồn vào bên trong payload giao thức.",
+        "tasks": [
+          "Dự đoán trước những gì NAT sẽ làm hỏng với giao thức chèn IP-in-payload và đề xuất cách kiểm chứng dự đoán đó.",
+          "Vẽ lộ trình hai chiều packet từ on-prem tới Internet và ngược lại, ghi rõ dòng trạng thái NAT nào phục vụ từng chiều.",
+          "Đề xuất quy tắc giám sát phát hiện route/NAT drift (thay đổi bảng định tuyến hoặc timeout) trên cả hai biên."
+        ],
+        "requiredEvidence": [
+          "Sơ đồ hai chiều kèm bảng trạng thái NAT dự kiến",
+          "Danh sách giao thức/chức năng bị ảnh hưởng bởi ALG/NAT kèm căn cứ RFC",
+          "Quy tắc giám sát drift dạng pseudo-query với ngưỡng cảnh báo"
+        ]
+      },
+      "sources": [
+        {
+          "title": "RFC 3022 — Traditional IP Network Address Translator (Traditional NAT)",
+          "url": "https://www.rfc-editor.org/rfc/rfc3022",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cơ chế SNAT/DNAT và bảng dịch địa chỉ/cổng",
+            "Tác động của NAT tới mô hình end-to-end và các giao thức nhúng địa chỉ"
+          ]
+        },
+        {
+          "title": "RFC 4787 — Network Address Translation (NAT) Behavioral Requirements for Unicast UDP",
+          "url": "https://www.rfc-editor.org/rfc/rfc4787",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Hành vi mapping/filtering khác nhau của NAT UDP (endpoint-independent/restricted)",
+            "Vai trò timeout trạng thái đối với phiên UDP dài hạn"
+          ]
+        },
+        {
+          "title": "RFC 1918 — Address Allocation for Private Internets",
+          "url": "https://www.rfc-editor.org/rfc/rfc1918",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Định nghĩa dải địa chỉ riêng 10/8, 172.16/12, 192.168/16",
+            "Tính chất tái sử dụng của dải riêng và hệ quả chồng lấn giữa các tổ chức"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os01-l06-vlan-vpn-segmentation",
+      "slug": "vlan-vpn-segmentation",
+      "title": "Phân Đoạn VLAN, Inter-VLAN Routing & Ranh giới VPN",
+      "summary": "802.1Q tagging, native VLAN và nguy cơ VLAN hopping; ranh giới inter-VLAN routing qua ACL; VPN tunnel như đường hầm tin cậy mở rộng, split-tunnel và rò rỉ DNS/IPv6; phương pháp kiểm chứng segmentation bằng kiểm thử có kiểm soát.",
+      "difficulty": "foundation",
+      "durationMinutes": 70,
+      "prerequisites": ["os01-l05-ip-routing-and-nat-boundaries"],
+      "outcomes": [
+        "Phân tích cấu trúc 802.1Q tag và phân biệt access port/trunk port, giải thích vai trò rủi ro của native VLAN.",
+        "Giải thích cơ chế VLAN hopping bằng double-tagging và điều kiện kiến trúc làm nó khả thi.",
+        "Thiết kế ranh giới inter-VLAN: router-on-a-stick/L3 switch với ACL đúng chiều, và chứng minh policy bằng kiểm thử hai chiều.",
+        "Đánh giá VPN split-tunnel: những lưu lượng nào ra ngoài tunnel (DNS leak, IPv6 leak) và đề xuất cách phát hiện."
+      ],
+      "careerPaths": ["penetration-test", "red-team"],
+      "domains": ["network"],
+      "attackTactics": [],
+      "keywords": [
+        "vlan-8021q",
+        "native-vlan",
+        "vlan-hopping",
+        "split-tunnel",
+        "segmentation-testing"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "VLAN là việc cắt một chiếc switch vật lý thành nhiều switch ảo không nhìn thấy nhau; tag 802.1Q là tem màu dán trên frame để switch biết frame thuộc 'chiếc switch' nào. Native VLAN là chiếc giỏ không tem — frame rơi vào đó bị coi là của VLAN mặc định, và chính sự bất đối xứng này mở kẽ hở double-tagging. Inter-VLAN routing là cửa kiểm soát duy nhất nối các hòn đảo: ACL quyết định ai được qua. VPN là hành lang hầm riêng băng qua mạng công cộng: mọi thứ trong hầm được mã hóa, nhưng split-tunnel để hé cửa sổ — một phần traffic (DNS, IPv6) chui ra ngoài hầm mà người dùng không hay.",
+      "visual": {
+        "title": "Hòn Đảo VLAN và Cửa Hầm VPN",
+        "caption": "Frame được tag theo VLAN trên trunk; chỉ inter-VLAN routing + ACL nối các đoạn; VPN tunnel bọc toàn bộ packet trong lớp mã hóa mới.",
+        "steps": [
+          {
+            "label": "Access port: vào VLAN đúng",
+            "detail": "Frame từ máy trạm vào port access không mang tag; switch gán tag theo PVID của port.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Trunk: tem 802.1Q",
+            "detail": "Trên trunk, frame mang tag 4 byte (VLAN ID 1–4094); native VLAN là ngoại lệ KHÔNG tag — nguồn gốc rủi ro double-tagging.",
+            "tone": "caution"
+          },
+          {
+            "label": "Inter-VLAN gate + ACL",
+            "detail": "Traffic giữa VLAN bắt buộc qua L3 interface; ACL quyết định chiều đi và dịch vụ được phép — segmentation policy sống tại đây.",
+            "tone": "allow"
+          },
+          {
+            "label": "Double-tagging attempt",
+            "detail": "Frame kẹp hai tag lợi dụng native VLAN của switch để 'nhảy' sang VLAN khác — chỉ hoạt động khi attacker cùng native VLAN và topology single-trunk.",
+            "tone": "stop"
+          },
+          {
+            "label": "Split-tunnel window",
+            "detail": "VPN chỉ bọc dải corporate; DNS query hay IPv6 đi ra đường công cộng — rò rỉ metadata dù tunnel 'đang bật'.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "VLAN 802.1Q: Cắt Switch Thành Nhiều Hòn Đảo",
+          "paragraphs": [
+            "Tag 802.1Q chèn 4 byte vào Ethernet frame sau Source MAC: TPID (0x8100) và TCI chứa VLAN ID 12-bit (1–4094). Port access gán VLAN theo cấu hình (PVID) và thường nối endpoint; port trunk chuyên chở nhiều VLAN với tag rõ ràng. Hai VLAN khác nhau không giao tiếp được ở lớp 2 dù cùng một chiếc switch — broadcast không xuyên qua.",
+            "Native VLAN là VLAN duy nhất đi trunk KHÔNG tag (chuỗi cũ/tương thích). Frame untagged rơi vào native VLAN của trunk. Nguy cơ: nếu hai đầu trunk cấu hình native VLAN KHÁC nhau, frame 'lạc đảo'; nếu native VLAN trùng VLAN của kẻ tấn công, điều kiện double-tagging hội tụ."
+          ],
+          "points": [
+            "Best practice: đặt native VLAN thành VLAN unused (vd 999), không dùng cho user traffic.",
+            "VLAN 1 mặc định trên nhiều thiết bị — nên loại khỏi mọi trunk data.",
+            "Segmentation L2 là điều kiện cần nhưng không đủ: policy thật nằm ở cửa L3."
+          ]
+        },
+        {
+          "title": "VLAN Hopping Double-Tagging: Cơ Chế và Điều Kiện",
+          "paragraphs": [
+            "Kẻ tấn công (nằm trên port access thuộc native VLAN của switch) gửi frame KÈM HAI tag: tag ngoài = native VLAN của switch, tag trong = VLAN đích. Switch nhận thấy tag ngoài khớp native VLAN → gỡ tag ngoài (đúng luật: native không tag) và chuyển tiếp frame 'đã sạch' trên trunk; switch kế tiếp đọc tag còn lại và chuyển frame vào VLAN đích. Kẻ tấn công chưa từng được phép vào VLAN đó.",
+            "Điều kiện bắt buộc: attacker cùng native VLAN với switch ingress, đích nằm trên cùng trunk (topology đơn giản), và giao tiếp thường là một chiều (attacker không nhận reply trực tiếp — phù hợp kiểu beacon/flood). Mitigation chuẩn: bỏ hẳn native VLAN dùng chung, ép native VLAN unused, tắt auto-trunking (không DTP), và bật vlan tag-all hoặc private VLAN nơi phù hợp."
+          ],
+          "points": [
+            "Switch không 'biết' frame nào ác ý — nó chỉ làm đúng luật native VLAN; lỗi nằm ở thiết kế.",
+            "DTP auto/negotiate là mặt trận khác: tắt hẳn negotiation, port access đặt mode access tường minh.",
+            "VoIP phone thường là bridge 2 VLAN (data+voice) — điểm kiểm tra khi audit trunk."
+          ]
+        },
+        {
+          "title": "Inter-VLAN Routing: Cửa Kiểm Soát Duy Nhất",
+          "paragraphs": [
+            "Muốn VLAN 10 nói chuyện VLAN 20 bắt buộc qua lớp 3: sub-interface router-on-a-stick hoặc SVI trên L3 switch. Tại đây ACL/firewall quyết định policy thật của segmentation: chiều nào, service nào, ai với ai. Sai lệch phổ biến: ACL chỉ chặn chiều khởi tạo nhưng quên chiều trả về (stateless ACL), hoặc permit ip any any ngầm ở cuối.",
+            "Kiểm chứng segmentation phải hai chiều và phủ phủ định: chứng minh LUẬT CHO PHÉP hoạt động (positive test) và LUẬT CHẶN thực sự chặn (negative test) từ cả hai phía. Một negative test thành công phải kèm bằng chứng traffic KHÔNG đến đích (không response) và log drop tại cửa — tránh kết luận nhầm từ lỗi DNS hay app-down."
+          ],
+          "points": [
+            "Stateful firewall giữa các VLAN giảm gánh nặng ACL hai chiều nhưng phải audit rule base.",
+            "East-west traffic nội bộ là sân chơi lateral movement — segmentation hạn chế bán kính tấn công sau khi một host bị chiếm.",
+            "Mọi exception policy (in, backup, monitoring) là cửa tiềm năng — phải có owner và review kỳ hạn."
+          ]
+        },
+        {
+          "title": "VPN Tunnel và Cửa Sổ Split-Tunnel",
+          "paragraphs": [
+            "IPsec (NIST SP 800-77) dựng tunnel qua IKE: xác thực hai bên, thương lượng SA, rồi ESP bọc toàn bộ IP packet trong lớp mã hóa mới — mạng công cộng chỉ thấy 'phong bì trong phong bì' giữa hai đầu hầm. Tunnel mở rộng ranh giới tin cậy: thiết bị VPN client về mặt logic trở thành một node trong mạng công ty.",
+            "Split-tunnel chỉ đẩy dải corporate qua hầm, phần còn lại ra Internet trực tiếp — tiết kiệm băng thông nhưng mở cửa sổ rò rỉ: DNS query có thể đi resolver công cộng (leak tên nội bộ đang truy vấn), IPv6 không nằm trong split-list chui ra ngoài tunnel (IPv6 leak), và kill-switch hỏng thì traffic corporate lộ ra đường khi tunnel rớt. Full-tunnel thu hẹp rủi ro này đổi băng thông. Detection: giám sát endpoint cho thấy DNS ra ngoài resolver công cộng, hoặc route table endpoint thiếu default qua adapter VPN."
+          ],
+          "points": [
+            "Always-on VPN + kill-switch là chuẩn cho thiết bị có dữ liệu nhạy cảm.",
+            "VPN concentrator là tài sản chiến lược: CVE của nó = cổng vào tổ chức, phải patch ưu tiên cao.",
+            "Post-quantum/algorithm agility là yếu tố đánh giá khi chọn nền tảng VPN mới (SP 800-77 Rev.1)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Segmentation Desk — Kiểm Chứng Hòn Đảo và Cửa Hầm",
+        "objective": "Nhận diện điều kiện VLAN hopping từ thiết kế trunk, chọn ACL inter-VLAN đúng chiều, và phát hiện rò rỉ split-tunnel bằng telemetry endpoint.",
+        "scenario": "Bạn review thiết kế mạng mô phỏng của một công ty bán lẻ: VLAN 10 (POS), VLAN 20 (Office), VLAN 30 (Servers), trunk nối hai switch, firewall L3 ở giữa; nhân viên dùng VPN split-tunnel truy cập hệ thống. Tất cả dữ liệu là mô phỏng tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ thiết kế và log mô phỏng được cấp; không nhập target/payload tùy ý.",
+          "Mọi kết luận segmentation phải đi kèm kiểm thử hai chiều (cho phép + chặn) và bằng chứng log.",
+          "Phát hiện rò rỉ phải chỉ rõ luồng nào ra ngoài tunnel và cách phát hiện tái diễn."
+        ],
+        "cases": [
+          {
+            "id": "seg-case-01",
+            "title": "Thiết kế trunk mời gọi hopping",
+            "context": "Thiết kế: trunk giữa SW1-SW2 dùng native VLAN 10 (trùng VLAN POS); port access của máy trạm văn phòng cũng thuộc VLAN 10; DTP để mặc định negotiate; VLAN 999 unused có sẵn nhưng không dùng. Kẻ tấn công chiếm một máy trạm office (VLAN 10).",
+            "prompt": "Đánh giá đúng nhất về khả năng VLAN hopping double-tagging và biện pháp sửa gốc?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không thể hopping vì switch luôn kiểm tra nguồn frame.",
+                "correct": false,
+                "rationale": "Switch không có khái niệm 'nguồn hợp lệ' ở lớp 2; nó chỉ tuân thủ luật native VLAN — chính luật đó bị lợi dụng."
+              },
+              {
+                "id": "B",
+                "label": "Điều kiện hopping hội tụ đủ (attacker cùng native VLAN, single trunk): sửa gốc bằng chuyển native VLAN sang VLAN unused 999 ở cả hai đầu, ép port access mode tường minh và tắt DTP negotiation.",
+                "correct": true,
+                "rationale": "Double-tagging chỉ hoạt động khi tag ngoài khớp native VLAN ingress; tách native VLAN khỏi mọi user VLAN + tắt auto-trunking triệt tiêu điều kiện tấn công từ gốc."
+              },
+              {
+                "id": "C",
+                "label": "Thêm firewall giữa hai switch là đủ để chặn hopping.",
+                "correct": false,
+                "rationale": "Hopping diễn ra ở lớp 2 bên dưới routing/firewall; frame đã vào nhầm VLAN trước khi bất kỳ policy L3 nào thấy nó."
+              },
+              {
+                "id": "D",
+                "label": "Đổi mật khẩu switch vì hopping là tấn công vào management plane.",
+                "correct": false,
+                "rationale": "Double-tagging khai thác data plane của trunk, không liên quan credential management."
+              }
+            ]
+          },
+          {
+            "id": "seg-case-02",
+            "title": "ACL inter-VLAN chặn nhầm chiều về",
+            "context": "Yêu cầu policy: VLAN Office (20) được khởi tạo HTTPS tới VLAN Servers (30); Servers KHÔNG được khởi tạo kết nối tới Office. ACL hiện tại áp lên SVI: deny ip 30.0.0.0 0.0.0.255 20.0.0.0 0.0.0.255 (stateless), rồi permit ip any any. Người dùng Office báo không mở được HTTPS tới Servers.",
+            "prompt": "Nguyên nhân và sửa đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "ACL sai protocol, đổi deny tcp thành deny udp.",
+                "correct": false,
+                "rationale": "HTTPS chạy TCP; vấn đề không phải chọn protocol mà là chiều áp và hành vi stateless."
+              },
+              {
+                "id": "B",
+                "label": "ACL stateless chặn luôn packet reply (SYN/ACK, data) từ Servers về Office vì nó khớp dòng deny theo chiều ngược; sửa bằng ACL có chủ đích: permit tcp 20→30 eq 443 established-return hoặc dùng firewall stateful, rồi kiểm chứng lại hai chiều positive+negative.",
+                "correct": true,
+                "rationale": "Policy 'chặn khởi tạo từ 30' không đồng nghĩa chặn mọi packet 30→20; reply của phiên hợp lệ cần được phép. Stateful firewall hoặc ACL đánh dấu established giải đúng bài, sau đó phải test cả chiều được phép lẫn chiều bị chặn."
+              },
+              {
+                "id": "C",
+                "label": "Xóa hẳn ACL vì nó gây lỗi, segmentation để sau.",
+                "correct": false,
+                "rationale": "Bỏ policy để chữa lỗi áp policy là mất phân đoạn; đúng hơn là viết lại rule đúng semantics."
+              },
+              {
+                "id": "D",
+                "label": "permit ip any any cuối ACL là thừa, xóa đi sẽ hết lỗi.",
+                "correct": false,
+                "rationale": "Dòng permit cuối không phải nguyên nhân (implicit deny sẽ nặng hơn); xóa nó chỉ làm mọi thứ không khớp deny bị chặn hết."
+              }
+            ]
+          },
+          {
+            "id": "seg-case-03",
+            "title": "Split-tunnel hé cửa sổ",
+            "context": "Telemetry endpoint mô phỏng của laptop nhân viên khi VPN 'đang bật': (1) nslookup erp.internal → gửi tới 8.8.8.8; (2) route table: 10.0.0.0/8 qua adapter VPN, 0.0.0.0/0 qua Wi-Fi nhà; (3) có interface IPv6 công cộng còn active, không route IPv6 qua VPN; (4) truy cập https://erp.internal thành công qua tunnel.",
+            "prompt": "Đọc telemetry này, rủi ro và biện pháp đúng nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không có rủi ro vì VPN đang bật và truy cập nội bộ thành công.",
+                "correct": false,
+                "rationale": "Truy cập corporate thành công không phủ nhận hai luồng rò rỉ quan sát được ngay trong telemetry."
+              },
+              {
+                "id": "B",
+                "label": "Hai lỗ hổng split-tunnel: DNS leak (query tên nội bộ ra resolver công cộng 8.8.8.8 — lộ metadata) và IPv6 bypass (route IPv6 không qua tunnel). Fix: ép corporate DNS qua tunnel + thêm IPv6 vào split-list/full-tunnel + always-on kill-switch; detection: cảnh báo khi endpoint thấy DNS corporate đi resolver ngoài hoặc route default không qua VPN.",
+                "correct": true,
+                "rationale": "Cả hai luồng đều có bằng chứng trực tiếp trong telemetry (resolver + route table); remediation và detection tương ứng đều kiểm chứng được ở endpoint."
+              },
+              {
+                "id": "C",
+                "label": "Cần đổi giao thức VPN từ IPsec sang SSL VPN mới hết rò rỉ.",
+                "correct": false,
+                "rationale": "Loại giao thức không quyết định split-tunnel policy; SSL VPN cấu hình split sai vẫn leak y hệt."
+              },
+              {
+                "id": "D",
+                "label": "Chặn 8.8.8.8 trên firewall biên là giải quyết tận gốc.",
+                "correct": false,
+                "rationale": "Chặn một resolver cụ thể chỉ đẩy query sang resolver khác (1.1.1.1...); gốc vấn đề là cấu hình DNS/route phía client và policy tunnel."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Chỉ ra đủ điều kiện kiến trúc của double-tagging và mitigation sửa gốc (native VLAN unused, tắt DTP).",
+          "Phân biệt stateful/stateless khi viết policy hai chiều và đề xuất kiểm chứng positive+negative.",
+          "Nhận diện DNS/IPv6 leak từ telemetry và gắn remediation + detection cụ thể cho từng leak."
+        ],
+        "evidenceTemplate": [
+          "Sơ đồ VLAN/trunk với native VLAN hiện trạng vs đề xuất",
+          "Bảng kiểm thử segmentation: cặp VLAN, chiều, kỳ vọng, kết quả, log drop tương ứng",
+          "Snapshot telemetry endpoint: resolver dùng, route table, trạng thái kill-switch",
+          "Danh sách leak + remediation + analytic cảnh báo tái diễn"
+        ],
+        "reset": "Đặt lại lựa chọn để review lại thiết kế segmentation từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không gửi frame hay dựng tunnel thật."
+      },
+      "governance": {
+        "prevent": [
+          "Chuẩn trunk: native VLAN unused (999+), tắt DTP/auto-trunking, VLAN 1 loại khỏi data path.",
+          "Inter-VLAN policy dùng firewall stateful hoặc ACL established có review; mọi exception có owner và hạn hiệu lực.",
+          "VPN managed device: always-on, kill-switch bắt buộc, corporate DNS ép qua tunnel, IPv6 nằm trong policy tunnel."
+        ],
+        "observe": [
+          "Telemetry endpoint: route table và resolver thực tế của client VPN — cảnh báo default-route không qua VPN hoặc DNS corporate ra resolver công cộng.",
+          "Network telemetry: log drop tại cửa inter-VLAN, đếm theo cặp VLAN/service; spike drop bất thường là signal misconfig hoặc probing nội bộ."
+        ],
+        "respond": [
+          "Phát hiện hopping/trunk misconfig: cô lập port nguồn, sửa native VLAN, rà soát toàn bộ trunk còn lại theo cùng mẫu lỗi.",
+          "Leak VPN: thu hồi phiên, đẩy cấu hình remediation qua MDM, xác minh endpoint bằng kiểm tra route/resolver trước khi cấp lại quyền."
+        ],
+        "residualRisk": [
+          "Exception policy tồn tại lâu hơn dự kiến (backup agent, printer) — cửa east-west tiềm ẩn.",
+          "BYOD không quản trị được endpoint telemetry đầy đủ — detection leak phụ thuộc mức độ kiểm soát thiết bị."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "VLAN là biên bảo mật mạnh vì các VLAN 'không nhìn thấy nhau'.",
+          "correction": "VLAN chỉ tách lớp 2; mọi giao tiếp liên VLAN đi qua cửa L3 mà bạn cấu hình. Segmentation policy thật nằm ở cửa đó — VLAN chỉ là điều kiện cần."
+        },
+        {
+          "claim": "Double-tagging hoạt động trên mọi mạng có VLAN.",
+          "correction": "Cần điều kiện hội tụ: attacker cùng native VLAN với switch ingress và topology trunk phù hợp; tách native VLAN khỏi user VLAN + tắt DTP triệt tiêu điều kiện này."
+        },
+        {
+          "claim": "VPN bật là mọi traffic của thiết bị đã an toàn.",
+          "correction": "Split-tunnel để lộ DNS và IPv6 ra ngoài tunnel; chỉ dải corporate đi hầm. Phải kiểm tra route table và resolver thực tế của endpoint."
+        },
+        {
+          "claim": "Test một chiều đủ để chứng minh segmentation.",
+          "correction": "Policy có thể cho đi mà không cho về (hoặc ngược lại); kiểm chứng chuẩn là positive test (luồng được phép hoạt động) + negative test (luồng bị chặn, kèm log drop) từ cả hai phía."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l06-q1",
+          "difficulty": "easy",
+          "question": "Native VLAN trên một trunk có đặc điểm gì?",
+          "options": [
+            { "id": "A", "label": "Là VLAN được mã hóa riêng bằng 802.1AE" },
+            { "id": "B", "label": "Là VLAN whose frame đi trunk KHÔNG mang tag 802.1Q" },
+            {
+              "id": "C",
+              "label": "Là VLAN dành riêng cho management switch, không thể đổi"
+            },
+            { "id": "D", "label": "Là VLAN có priority cao nhất trong QoS" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Native VLAN là ngoại lệ không tag của 802.1Q nhằm tương thích thiết bị cũ; frame untagged đi trunk bị coi là thuộc native VLAN — nguồn gốc rủi ro double-tagging."
+        },
+        {
+          "id": "os01-l06-q2",
+          "difficulty": "medium",
+          "question": "Vì sao ACL stateless dạng 'deny ip VLAN30→VLAN20' lại làm hỏng phiên HTTPS do VLAN20 khởi tạo?",
+          "options": [
+            { "id": "A", "label": "Vì HTTPS không hoạt động qua router" },
+            {
+              "id": "B",
+              "label": "Vì packet reply từ VLAN30 (SYN/ACK, dữ liệu) cũng khớp dòng deny theo chiều ngược, bị drop dù phiên là hợp lệ"
+            },
+            { "id": "C", "label": "Vì ACL phải viết bằng wildcard mask ngược mới chạy" },
+            { "id": "D", "label": "Vì SVI không áp được ACL" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "ACL stateless xét từng packet độc lập, không biết phiên nào đang chạy; reply của phiên hợp lệ đi chiều ngược và bị chặn. Cần firewall stateful hoặc permit established cho return traffic."
+        },
+        {
+          "id": "os01-l06-q3",
+          "difficulty": "hard",
+          "question": "Một công ty muốn vừa giữ split-tunnel tiết kiệm băng thông, vừa không rò rỉ metadata DNS của hệ thống nội bộ. Thiết kế kiểm chứng nào đáp ứng cả hai và có thể tự động phát hiện regression?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tin tưởng nhà cung cấp VPN vì tài liệu nói 'DNS protected'"
+            },
+            {
+              "id": "B",
+              "label": "Ép resolver corporate chạy trong tunnel cho tên miền nội bộ (split-DNS), thêm IPv6 vào split-list, rồi triển khai analytic endpoint so sánh resolver thực tế + route table mỗi lần connect — cảnh báo khi query tên .internal ra resolver công cộng hoặc route default không qua VPN"
+            },
+            { "id": "C", "label": "Cấm nhân viên dùng Wi-Fi nhà riêng" },
+            {
+              "id": "D",
+              "label": "Chỉ cần chặn port 53 ra Internet trên firewall biên công ty"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Split-DNS + IPv6 trong policy giải quyết rò rỉ tại nguồn; analytic trên endpoint (resolver thực tế vs kỳ vọng, route table) tạo detection kiểm chứng được và bắt regression khi update client/OS — đúng mô hình prevention + detection."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được mời review segmentation cho một bệnh viện mô phỏng (môi trường huấn luyện được ủy quyền): VLAN Devices y tế (thiết bị legacy không nâng cấp firmware được), VLAN EMR (hồ sơ bệnh án), VLAN Guest Wi-Fi, và VPN cho bác sĩ làm việc từ xa. Yêu cầu pháp lý: guest không bao giờ chạm EMR; thiết bị y tế chỉ nói chuyện với server chỉ định; remote access tối thiểu hóa rò rỉ.",
+        "tasks": [
+          "Thiết kế ma trận VLAN + policy cửa L3 cho ba nhóm trên, chỉ rõ chiều và service, đánh dấu mọi exception cần owner.",
+          "Chọn chiến lược VPN (full vs split có split-DNS/IPv6) cho bác sĩ và biện luận theo ràng buộc pháp lý + telemetry khả thi.",
+          "Viết bộ kiểm thử segmentation hai chiều (positive+negative) đủ để chứng minh compliance, kèm bằng chứng log cần thu."
+        ],
+        "requiredEvidence": [
+          "Ma trận policy VLAN↔VLAN có chiều/service/exception owner",
+          "Quyết định VPN có phân tích leak surface (DNS, IPv6, kill-switch) kèm telemetry kiểm chứng",
+          "Bảng test cases segmentation với cột bằng chứng log tương ứng"
+        ]
+      },
+      "sources": [
+        {
+          "title": "IEEE Std 802.1Q-2022 — Bridges and Bridged Networks (VLAN tagging, native VLAN)",
+          "url": "https://standards.ieee.org/standard/802_1Q-2022.html",
+          "publisher": "IEEE Standards Association",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cấu trúc tag 802.1Q và VLAN ID 12-bit",
+            "Hành vi native VLAN (untagged) trên trunk port"
+          ]
+        },
+        {
+          "title": "NIST SP 800-77 Rev.1 — Guide to IPsec VPNs",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-77/rev-1/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Kiến trúc IPsec: IKE, Security Association, ESP tunnel mode",
+            "Khuyến nghị lựa chọn và đánh giá nền tảng VPN doanh nghiệp"
+          ]
+        },
+        {
+          "title": "RFC 4026 — Provider Provisioned Virtual Private Network (VPN) Terminology",
+          "url": "https://www.rfc-editor.org/rfc/rfc4026",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Thuật ngữ VPN chuẩn (overlay, tunnel, reachability) dùng khi mô tả ranh giới tin cậy"
+          ]
+        }
+      ]
+    }
+  ]
+}
