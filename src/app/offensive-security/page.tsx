@@ -103,7 +103,7 @@ export default function OffensiveSecurityHomePage() {
         </div>
 
         <Link
-          href="/offensive-security/academy/roles-and-boundaries"
+          href="/offensive-security/academy/os00-ethics-authorization/roles-and-boundaries"
           className="group block"
         >
           <Card className="glass-card glass-card-hover relative overflow-hidden p-5 sm:p-6">

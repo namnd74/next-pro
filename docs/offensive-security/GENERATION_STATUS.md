@@ -98,6 +98,24 @@ Third paired cycle: `os02-m03-linux-boundaries-and-telemetry` (Linux, 300 min) +
 endpoint-controls-and-events` (Windows, 300 min) — both eligible; completing either track's
 foundation tier. Lesson numbering continues `os02-l22..l24`, `os03-l22..l24`.
 
+## Tree restructure (owner-approved, pre-cycle 3)
+
+The academy was flattened while bootstrapping (flat data dir, flat URLs, flat index list).
+Owner approved full restructuring before cycle 3:
+
+- Data layout: module JSONs now live under `data/academy/<track-id>/…` (e.g.
+  `os02-linux-foundations/files-identity-permissions.json`). Future batches write directly
+  into their track folder.
+- URL scheme: `/offensive-security/academy/[trackSlug]/[moduleSlug]/{,[lessonSlug]}` with
+  `trackSlug = track id` (e.g. `/academy/os00-ethics-authorization/roles-and-boundaries`).
+  Flat academy URLs never shipped (all PRs still open), so no redirects are required.
+- Index page groups modules by track with per-track lesson counts; link generation centralized
+  in new `academy-tracks.ts` (`ACADEMY_TRACKS`, `groupAcademyModulesByTrack`,
+  `academyModuleHref`, `academyLessonHref`).
+- Content validator updated to walk `data/academy` recursively.
+- Open follow-up (tracked below): derive `ACADEMY_TRACKS` from the manifest at build time and
+  consider a Zod/JSON-Schema parser boundary as module count grows toward 64.
+
 ## Required decisions before content migration
 
 - Extend the UI information architecture beyond the current module view with
@@ -139,13 +157,11 @@ foundation tier. Lesson numbering continues `os02-l22..l24`, `os03-l22..l24`.
   invalid escape sequence in `os03-m02`; stray-field regression (`reasonale`) caught pre-commit.
 - `npm run lint`: passed.
 - `npm run typecheck` (`tsc --noEmit`): passed.
-- Production build: **deferred this cycle** per approved cadence (build every 2–3 batches); last
-  full build passed at paired cycle 1 with 175 static pages. Next build due at cycle 3.
+- Production build: **passed** after tree restructure — 183 static pages; academy routes now
+  nested under `[trackSlug]/[moduleSlug]/[lessonSlug]` (11 module + 33 lesson routes verified).
 - `git diff --check`: passed.
 
-Runtime integration: `/offensive-security/academy/processes-services-shell` and
-`/offensive-security/academy/services-powershell-remote` plus 6 statically generated lesson
-routes (`processes-signals-and-procfs`, `systemd-units-and-journal`, `packages-cron-and-shell-env`,
-`services-scm-and-path-security`, `scheduled-tasks-and-autoruns`,
-`powershell-logging-and-remote-admin`), persistent completion state, and Core Academy navigation
-(routes derive automatically from `ACADEMY_MODULES`).
+Runtime integration: all 11 modules served from
+`/offensive-security/academy/<track-id>/<module-slug>` plus 33 statically generated lesson
+routes beneath them; index page renders the track → module tree via
+`groupAcademyModulesByTrack`; routes derive automatically from `ACADEMY_MODULES`.

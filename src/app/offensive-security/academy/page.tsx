@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowRight, GraduationCap } from 'lucide-react';
-import { ACADEMY_MODULES } from '@/features/offensive-security';
+import { ArrowRight, FolderTree, GraduationCap } from 'lucide-react';
+import {
+  ACADEMY_MODULES,
+  academyModuleHref,
+  groupAcademyModulesByTrack,
+} from '@/features/offensive-security';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 
@@ -11,6 +15,12 @@ export const metadata: Metadata = {
 };
 
 export default function OffensiveSecurityAcademyPage() {
+  const groups = groupAcademyModulesByTrack(ACADEMY_MODULES);
+  const totalLessons = ACADEMY_MODULES.reduce(
+    (sum, module) => sum + module.lessons.length,
+    0
+  );
+
   return (
     <div className="space-y-8">
       <section className="space-y-4">
@@ -28,31 +38,56 @@ export default function OffensiveSecurityAcademyPage() {
         </p>
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-foreground text-lg font-extrabold">Module đã phát hành</h2>
-        {ACADEMY_MODULES.map((module) => (
-          <Link
-            key={module.id}
-            href={`/offensive-security/academy/${module.slug}`}
-            className="group block"
-          >
-            <Card className="glass-card glass-card-hover flex items-start justify-between gap-4 p-5 sm:p-6">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-foreground group-hover:text-primary text-base font-extrabold transition-colors">
-                    {module.title}
-                  </h3>
-                  <Badge variant="success" className="text-[9px] uppercase">
-                    {module.lessons.length} lessons
-                  </Badge>
-                </div>
-                <p className="text-muted-foreground text-xs leading-6">
-                  {module.summary}
-                </p>
-              </div>
-              <ArrowRight className="text-muted-foreground group-hover:text-primary h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" />
-            </Card>
-          </Link>
+      <section className="space-y-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-foreground flex items-center gap-2 text-lg font-extrabold">
+            <FolderTree className="text-primary h-5 w-5" />
+            Curriculum tree
+          </h2>
+          <Badge variant="success" className="text-[10px] uppercase">
+            {ACADEMY_MODULES.length} modules · {totalLessons} lessons
+          </Badge>
+        </div>
+
+        {groups.map((group) => (
+          <div key={group.track.id} className="space-y-3">
+            <div className="border-border/60 flex flex-wrap items-center gap-2 border-b pb-2">
+              <h3 className="text-foreground text-sm font-extrabold tracking-wide uppercase">
+                {group.track.title}
+              </h3>
+              <code className="text-muted-foreground text-[11px]">{group.track.id}</code>
+              <Badge variant="info" className="text-[9px] uppercase">
+                {group.modules.length} modules ·{' '}
+                {group.modules.reduce((sum, module) => sum + module.lessons.length, 0)}{' '}
+                lessons
+              </Badge>
+            </div>
+
+            {group.modules.map((module) => (
+              <Link
+                key={module.id}
+                href={academyModuleHref(module)}
+                className="group block"
+              >
+                <Card className="glass-card glass-card-hover flex items-start justify-between gap-4 p-5 sm:p-6">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-foreground group-hover:text-primary text-base font-extrabold transition-colors">
+                        {module.title}
+                      </h4>
+                      <Badge variant="success" className="text-[9px] uppercase">
+                        {module.lessons.length} lessons
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground text-xs leading-6">
+                      {module.summary}
+                    </p>
+                  </div>
+                  <ArrowRight className="text-muted-foreground group-hover:text-primary h-4 w-4 shrink-0 transition-transform group-hover:translate-x-1" />
+                </Card>
+              </Link>
+            ))}
+          </div>
         ))}
       </section>
     </div>

@@ -9,5 +9,6 @@ export * from './components/mission-tabs-view';
 export * from './components/ui-demo-stage';
 export * from './academy/types';
 export * from './academy/academy-loader';
+export * from './academy/academy-tracks';
 export * from './academy/academy-module-overview';
 export * from './academy/academy-lesson-viewer';
