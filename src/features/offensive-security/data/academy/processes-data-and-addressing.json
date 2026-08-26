@@ -1,0 +1,1033 @@
+{
+  "id": "os01-m01-processes-data-and-addressing",
+  "slug": "processes-data-and-addressing",
+  "trackId": "os01-network-foundations",
+  "title": "Tiến trình, Biểu diễn Dữ liệu & Địa chỉ Mạng IPv4/IPv6",
+  "summary": "Nắm vững bản chất tiến trình, phân bổ bộ nhớ ảo, biểu diễn dữ liệu nhị phân/hex, kỹ thuật chia mạng con CIDR và các ranh giới an ninh trong môi trường Dual-Stack.",
+  "difficulty": "foundation",
+  "estimatedMinutes": 180,
+  "careerPaths": ["penetration-test", "red-team", "bug-bounty", "vulnerability-research"],
+  "domains": ["network", "linux", "windows"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os01-l01-process-memory-and-data-representation",
+      "slug": "process-memory-and-data-representation",
+      "title": "Tiến trình (Process), Bộ nhớ & Biểu diễn Dữ liệu (Hex, Endian, Encoding)",
+      "summary": "Mô hình tiến trình trong hệ điều hành (PID, User context, File descriptors, Sockets); giải phẫu bố cục bộ nhớ (Stack, Heap, Code, Data); và cách biểu diễn dữ liệu nhị phân (Binary, Hexadecimal, ASCII, UTF-8, Big/Little Endian) trong an ninh mạng.",
+      "difficulty": "foundation",
+      "durationMinutes": 60,
+      "prerequisites": [],
+      "outcomes": [
+        "Giải thích vòng đời và cấu trúc quản lý tiến trình của OS: Process ID (PID), UID/GID context, File Descriptors, và Network Sockets.",
+        "Phân tích bố cục không gian bộ nhớ ảo (Virtual Memory Layout): Text/Code segment, Data segment, BSS, Heap và Stack.",
+        "Chuyển đổi và phân tích dữ liệu dạng nhị phân, Hexadecimal, Base64, ASCII và nhận diện thứ tự byte (Little Endian vs Big Endian).",
+        "Xác định ranh giới cách ly bộ nhớ giữa các tiến trình (Process Memory Isolation) và cơ chế can thiệp qua System Calls (syscalls)."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["linux", "windows", "network"],
+      "attackTactics": [],
+      "keywords": [
+        "process",
+        "virtual-memory",
+        "hexadecimal",
+        "little-endian",
+        "stack-heap",
+        "encoding"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Một chương trình trên đĩa chỉ là dữ liệu tĩnh; khi được thực thi, nó trở thành Tiến trình (Process) sống động trong không gian bộ nhớ ảo riêng biệt do OS cấp phát. Dữ liệu chạy trong bộ nhớ hay truyền qua dây mạng suy cho cùng đều là các bit 0 và 1, được mã hóa dưới các định dạng quy ước (ASCII, Hex, Endianness). Hiểu cách máy tính lưu trữ byte là nền tảng để đọc payload, phân tích gói tin và hiểu lỗ hổng tràn bộ nhớ.",
+      "visual": {
+        "title": "Giải phẫu Không gian Bộ nhớ Ảo của Tiến trình",
+        "caption": "Bố cục vùng nhớ từ địa chỉ thấp (Low Memory) đến địa chỉ cao (High Memory) trong kiến trúc chuẩn.",
+        "steps": [
+          {
+            "label": "Text / Code Segment",
+            "detail": "Chứa mã máy thực thi (Read-Only/Execute), không cho phép ghi để chống sửa code.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Data & BSS Segments",
+            "detail": "Chứa biến toàn cục (Global) và biến tĩnh (Static) đã hoặc chưa khởi tạo.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Heap (Phát triển LÊN)",
+            "detail": "Bộ nhớ cấp phát động (malloc/new), phát triển từ địa chỉ thấp lên địa chỉ cao.",
+            "tone": "allow"
+          },
+          {
+            "label": "Stack (Phát triển XUỐNG)",
+            "detail": "Chứa biến cục bộ, con trỏ khung (EBP/RBP) và địa chỉ trả về (Return Address), phát triển từ cao xuống thấp.",
+            "tone": "caution"
+          },
+          {
+            "label": "Kernel Space",
+            "detail": "Vùng nhớ đặc quyền của hệ điều hành, bảo vệ tuyệt đối không cho User Space đọc/ghi trực tiếp.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bản chất Tiến trình và Ngữ cảnh Thực thi (Execution Context)",
+          "paragraphs": [
+            "Tiến trình (Process) là một thực thể đang chạy của chương trình máy tính. Mỗi tiến trình được hệ điều hành gán một định danh duy nhất (Process ID - PID) và chạy dưới một ngữ cảnh bảo mật cụ thể (User/Group ID trên Linux hoặc Token/SID trên Windows). Ngữ cảnh này quyết định tiến trình có quyền đọc/ghi file nào, mở cổng mạng nào, và gửi tín hiệu tới tiến trình nào.",
+            "Tiến trình giao tiếp với thế giới bên ngoài thông qua các File Descriptor (trên Linux) hoặc Handle (trên Windows), bao gồm stdin (0), stdout (1), stderr (2) và các Network Sockets (TCP/UDP)."
+          ],
+          "points": [
+            "Process ID (PID) & Parent PID (PPID): Cây tiến trình giúp truy vết nguồn gốc thực thi lệnh.",
+            "Security Context: Tiến trình kế thừa quyền hạn của người dùng khởi tạo nó trừ khi có cơ chế leo quyền (SUID hoặc RunAs).",
+            "File Descriptors: Mọi kết nối mạng và file mở đều là file descriptor gắn liền với tiến trình."
+          ]
+        },
+        {
+          "title": "Giải phẫu Bố cục Bộ nhớ Ảo (Virtual Memory Layout)",
+          "paragraphs": [
+            "Mỗi tiến trình chạy trong một không gian bộ nhớ ảo (Virtual Address Space) độc lập được Memory Management Unit (MMU) của CPU ánh xạ vào RAM vật lý. Điều này đảm bảo tiến trình A không thể tự ý đọc hay ghi đè lên bộ nhớ của tiến trình B.",
+            "Không gian bộ nhớ người dùng (User Space) được chia thành các phân vùng chức năng rõ rệt: Text (Code) chứa lệnh máy; Data/BSS chứa biến toàn cục; Heap dùng cho cấp phát bộ nhớ động trong lúc chạy; và Stack dùng cho việc gọi hàm, lưu trữ biến cục bộ và địa chỉ trả về (Return Address)."
+          ],
+          "points": [
+            "Memory Isolation: Bảo vệ phân vùng giữa các tiến trình ngăn chặn rò rỉ dữ liệu chéo.",
+            "Heap Allocation: Quản lý thủ công qua malloc/free, dễ phát sinh lỗi Use-After-Free hoặc Heap Overflow.",
+            "Stack Frame: Lưu trữ Return Address; nếu bị ghi đè có thể dẫn đến chiếm quyền điều khiển con trỏ lệnh (EIP/RIP)."
+          ]
+        },
+        {
+          "title": "Biểu diễn Dữ liệu: Binary, Hexadecimal, ASCII và Base64",
+          "paragraphs": [
+            "Máy tính chỉ hiểu bit nhị phân (0 và 1). Nhóm 8 bit tạo thành 1 Byte (giá trị từ 0 đến 255). Trong an ninh mạng, dạng nhị phân quá dài để đọc trực tiếp, vì vậy người ta dùng hệ đếm Thập lục phân (Hexadecimal - Base 16) với các ký tự từ 0-9 và A-F. Một byte được biểu diễn gọn gàng bởi đúng 2 ký tự Hex (ví dụ: '0xFF' = 255, '0x41' = 65 = chữ 'A').",
+            "Base64 là kỹ thuật mã hóa biểu diễn dữ liệu nhị phân tùy ý thành chuỗi văn bản ASCII có thể in được gồm 64 ký tự (A-Z, a-z, 0-9, +, /). Base64 KHÔNG PHẢI là mã hóa bảo mật (Encryption) mà chỉ là chuyển đổi định dạng (Encoding); bất kỳ ai cũng có thể giải mã Base64 tức thì mà không cần chìa khóa."
+          ],
+          "points": [
+            "Hex Representation: 1 Byte = 2 ký tự Hex (0x00 đến 0xFF).",
+            "ASCII / UTF-8: Ánh xạ giữa giá trị số nguyên và ký tự hiển thị trên màn hình.",
+            "Encoding vs Encryption: Base64/Hex là encoding công khai; Encryption đòi hỏi thuật toán mật mã và khóa bí mật."
+          ]
+        },
+        {
+          "title": "Thứ tự Byte: Little-Endian vs Big-Endian",
+          "paragraphs": [
+            "Khi một giá trị chiếm nhiều byte (ví dụ số nguyên 32-bit 0x12345678) được lưu vào bộ nhớ, thứ tự lưu các byte có thể khác nhau tùy theo kiến trúc CPU.",
+            "Kiến trúc x86/x64 sử dụng Little-Endian: byte có trọng số thấp nhất (Least Significant Byte - LSB) được lưu ở địa chỉ bộ nhớ thấp trước (lưu thành: '78 56 34 12'). Ngược lại, giao thức mạng (Network Byte Order trong TCP/IP) sử dụng Big-Endian: byte có trọng số cao nhất (MSB) được lưu ở địa chỉ thấp trước (lưu thành: '12 34 56 78'). Việc nhầm lẫn Endianness là nguyên nhân hàng đầu khiến payload khai thác bị lỗi."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Process Context, Memory & Hex Analysis Desk",
+        "objective": "Thực hành phân tích quyền hạn tiến trình, đọc hiểu bố cục bộ nhớ và dịch ngược payload nhị phân/hexadecimal.",
+        "scenario": "Bạn là Security Analyst đang phân tích một tiến trình lạ đang chạy trên máy chủ Linux và trích xuất chuỗi payload thu được từ lưu lượng mạng.",
+        "constraints": [
+          "Xác định chính xác ngữ cảnh bảo mật và ranh giới bộ nhớ của tiến trình.",
+          "Phân biệt rõ ràng giữa encoding (Base64/Hex) và encryption.",
+          "Áp dụng quy tắc chuyển đổi Endianness chuẩn xác giữa kiến trúc x64 và Network Byte Order."
+        ],
+        "cases": [
+          {
+            "id": "mem-case-01",
+            "title": "Tiến trình Web Server chạy dưới tài khoản root qua cờ SUID",
+            "context": "Kiểm tra danh sách tiến trình trên máy chủ: phát hiện binary custom web server '/opt/web' có thuộc tính quyền '-rwsr-xr-x' (SUID bit bật) thuộc sở hữu của root, đang lắng nghe cổng 8080.",
+            "prompt": "Rủi ro an ninh đối với ngữ cảnh thực thi (Execution Context) của tiến trình này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không có rủi ro vì cổng 8080 là cổng người dùng thông thường.",
+                "correct": false,
+                "rationale": "Cổng mạng không quyết định đặc quyền của tiến trình; SUID root nghĩa là bất kỳ ai chạy chương trình cũng sẽ nhận quyền root."
+              },
+              {
+                "id": "B",
+                "label": "Cực kỳ nguy hiểm: Bất kỳ lỗ hổng nào (RCE/Buffer Overflow) trong tiến trình này đều sẽ cấp quyền root toàn quyền hệ thống cho kẻ tấn công.",
+                "correct": true,
+                "rationale": "Tiến trình có cờ SUID root sẽ thực thi với quyền hạn cao nhất của hệ điều hành, phá vỡ nguyên tắc đặc quyền tối thiểu (Least Privilege)."
+              },
+              {
+                "id": "C",
+                "label": "Tiến trình tự động an toàn vì hệ điều hành đã tự cách ly Virtual Memory.",
+                "correct": false,
+                "rationale": "Cách ly bộ nhớ chỉ ngăn tiến trình khác can thiệp vào nó, không ngăn được kẻ tấn công khai thác lỗ hổng nội tại của chính tiến trình để chiếm quyền."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ có người dùng root mới kết nối được vào cổng 8080.",
+                "correct": false,
+                "rationale": "Cổng mạng mở ra cho toàn bộ mạng nội bộ hoặc public kết nối vào."
+              }
+            ]
+          },
+          {
+            "id": "mem-case-02",
+            "title": "Dịch ngược chuỗi Payload Hex trong gói tin mạng",
+            "context": "Bạn bắt được một chuỗi hex trong gói tin HTTP body: '41 41 41 41 78 56 34 12'. Bạn biết ứng dụng mục tiêu chạy trên kiến trúc Intel x86_64 (Little-Endian) và 4 byte cuối đại diện cho một địa chỉ con trỏ hàm 32-bit.",
+            "prompt": "Địa chỉ bộ nhớ thực tế mà 4 byte cuối ('78 56 34 12') trỏ tới là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "0x78563412",
+                "correct": false,
+                "rationale": "Đây là cách đọc Big-Endian, sai với quy tắc lưu trữ Little-Endian của kiến trúc Intel x86_64."
+              },
+              {
+                "id": "B",
+                "label": "0x12345678",
+                "correct": true,
+                "rationale": "Theo kiến trúc Little-Endian, byte '78' là byte thấp nhất (LSB) nằm ở địa chỉ đầu tiên, do đó giá trị số nguyên hoàn chỉnh được đọc theo thứ tự ngược lại là 0x12345678."
+              },
+              {
+                "id": "C",
+                "label": "0x41414141",
+                "correct": false,
+                "rationale": "'41 41 41 41' là 4 ký tự chữ 'AAAA' ở đầu chuỗi payload, không phải 4 byte cuối."
+              },
+              {
+                "id": "D",
+                "label": "0x87654321",
+                "correct": false,
+                "rationale": "Endianness đảo ngược theo từng BYTE (2 ký tự hex), không đảo ngược từng nibble (nửa byte)."
+              }
+            ]
+          },
+          {
+            "id": "mem-case-03",
+            "title": "Hiểu lầm về chuỗi Base64 trong Authorization Header",
+            "context": "Một lập trình viên khẳng định: 'Hệ thống của chúng tôi an toàn vì mật khẩu đã được mã hóa bằng Base64 trong header Authorization: Basic dXNlcjpwYXNzMTIz'.",
+            "prompt": "Nhận định chính xác về tính bảo mật của khẳng định trên là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Hoàn toàn an toàn vì Base64 là thuật toán mã hóa bất đối xứng mạnh nhất.",
+                "correct": false,
+                "rationale": "Khẳng định sai lầm hoàn toàn: Base64 là bảng mã hóa công khai (encoding), không phải mật mã học (encryption)."
+              },
+              {
+                "id": "B",
+                "label": "Cực kỳ rủi ro: Base64 chỉ là định dạng Encoding công khai, bất kỳ ai bắt được gói tin đều có thể decode ngược lại thành chuỗi rõ 'user:pass123' trong 1 mili-giây mà không cần khóa.",
+                "correct": true,
+                "rationale": "Base64 không cung cấp tính bảo mật; muốn bảo vệ thông tin bắt buộc phải dùng giao thức mã hóa đường truyền (HTTPS/TLS) và thuật toán băm mật khẩu có muối."
+              },
+              {
+                "id": "C",
+                "label": "Muốn giải mã Base64 thì phải có siêu máy tính giải mã trong 50 năm.",
+                "correct": false,
+                "rationale": "Giải mã Base64 là phép biến đổi toán học đơn giản diễn ra tức thì."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần đổi tên header thành 'Authorization: Secret' là sẽ an toàn.",
+                "correct": false,
+                "rationale": "Đổi tên header không thay đổi bản chất dữ liệu không được mã hóa bên trong."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Đánh giá chuẩn xác rủi ro quyền hạn tiến trình SUID và ngữ cảnh thực thi.",
+          "Chuyển đổi chính xác thứ tự byte Little-Endian trong bộ nhớ máy tính.",
+          "Phân biệt rạch ròi giữa Encoding (Base64/Hex) và Cryptographic Encryption."
+        ],
+        "evidenceTemplate": [
+          "Thông số tiến trình (PID, UID/GID, SUID flags, File Descriptors)",
+          "Bản đồ phân vùng bộ nhớ (Stack, Heap, Code, Data offsets)",
+          "Bảng dịch chuyển đổi (Raw Hex -> Little Endian Value -> ASCII string)",
+          "Đánh giá rủi ro bảo mật kiến trúc tiến trình"
+        ],
+        "reset": "Đặt lại lựa chọn để phân tích lại các tình huống tiến trình và bộ nhớ.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt."
+      },
+      "governance": {
+        "prevent": [
+          "Thực thi nguyên tắc đặc quyền tối thiểu: Không chạy dịch vụ mạng dưới quyền root/Administrator.",
+          "Loại bỏ cờ SUID/SGID không cần thiết trên các file nhị phân của hệ thống.",
+          "Bắt buộc sử dụng giao thức HTTPS/TLS để bảo vệ dữ liệu encoding trên đường truyền."
+        ],
+        "observe": [
+          "Giám sát liên tục các tiến trình mới được sinh ra (Process Creation Telemetry - Sysmon Event ID 1 / Linux auditd).",
+          "Kiểm toán các vùng nhớ có quyền vừa ghi vừa thực thi (W^X / Read-Write-Execute memory allocations)."
+        ],
+        "respond": [
+          "Lập tức dừng và cô lập các tiến trình lạ mở cổng lắng nghe hoặc có tiến trình con bất thường (e.g. web server gọi /bin/sh).",
+          "Thu hồi quyền SUID của các ứng dụng bị phát hiện có điểm yếu bảo mật."
+        ],
+        "residualRisk": [
+          "Các kỹ thuật tấn công tiêm mã trực tiếp trong bộ nhớ (In-Memory Injection / Fileless Malware) có thể lẩn tránh phát hiện của phần mềm quét file tĩnh.",
+          "Lỗi lập trình trong xử lý con trỏ (Memory Safety bugs) trong ngôn ngữ C/C++ vẫn tồn tại dù OS có ASLR/DEP."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Mã hóa Base64 là một phương thức bảo mật mật khẩu an toàn.",
+          "correction": "Base64 là Encoding để vận chuyển dữ liệu, không phải Encryption. Bất kỳ ai cũng có thể giải mã Base64 về dạng rõ ngay lập tức."
+        },
+        {
+          "claim": "Các tiến trình chạy trên cùng một máy tính có thể đọc bộ nhớ của nhau tùy ý.",
+          "correction": "Cơ chế Virtual Memory của hệ điều hành và phần cứng MMU cách ly không gian bộ nhớ của từng tiến trình riêng biệt, trừ khi có quyền root/admin hoặc qua cơ chế IPC/ptrace được cấp phép."
+        },
+        {
+          "claim": "Thứ tự byte Little-Endian áp dụng cho cả việc truyền gói tin trên mạng Internet.",
+          "correction": "Giao thức mạng TCP/IP sử dụng Big-Endian (Network Byte Order). Kiến trúc CPU x86/x64 dùng Little-Endian (Host Byte Order). Cần dùng hàm chuyển đổi (như htons/ntohs) khi giao tiếp."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l01-q1",
+          "difficulty": "easy",
+          "question": "Phân vùng bộ nhớ nào trong tiến trình chịu trách nhiệm lưu trữ các biến cục bộ (Local Variables) và địa chỉ trả về (Return Address) khi gọi hàm?",
+          "options": [
+            { "id": "A", "label": "Text / Code Segment" },
+            { "id": "B", "label": "Stack Segment" },
+            { "id": "C", "label": "Heap Segment" },
+            { "id": "D", "label": "BSS Segment" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Stack là vùng nhớ hoạt động theo cơ chế LIFO lưu trữ các Stack Frame chứa tham số hàm, biến cục bộ và địa chỉ trả về của lệnh tiếp theo."
+        },
+        {
+          "id": "os01-l01-q2",
+          "difficulty": "medium",
+          "question": "Trong kiến trúc vi xử lý Intel x86_64 (Little-Endian), chuỗi 4 byte '0xEF 0xBE 0xAD 0xDE' được lưu trong bộ nhớ sẽ đại diện cho giá trị số nguyên 32-bit nào?",
+          "options": [
+            { "id": "A", "label": "0xEFBEADDE" },
+            { "id": "B", "label": "0xDEADBEEF" },
+            { "id": "C", "label": "0xADDEEFBE" },
+            { "id": "D", "label": "0x00000000" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Little-Endian lưu byte thấp nhất trước (0xEF), do đó khi đọc toàn bộ số nguyên 32-bit theo đúng thứ tự MSB đến LSB, giá trị thực tế là 0xDEADBEEF."
+        },
+        {
+          "id": "os01-l01-q3",
+          "difficulty": "hard",
+          "question": "Tại sao việc một tiến trình mạng chạy với cờ SUID root (hoặc dịch vụ Windows chạy dưới quyền NT AUTHORITY\\SYSTEM) lại là rủi ro bảo mật nghiêm trọng nhất?",
+          "options": [
+            { "id": "A", "label": "Vì nó làm máy tính tiêu thụ gấp đôi lượng điện năng" },
+            {
+              "id": "B",
+              "label": "Vì nếu tiến trình bị khai thác lỗ hổng thực thi mã từ xa (RCE), kẻ tấn công sẽ lập tức có toàn quyền kiểm soát tối cao trên hệ điều hành mà không cần qua bước leo thang đặc quyền"
+            },
+            { "id": "C", "label": "Vì nó làm giảm tốc độ đường truyền cáp quang" },
+            { "id": "D", "label": "Vì tiến trình sẽ không thể ghi log được nữa" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Chạy dưới quyền root/SYSTEM vi phạm nguyên tắc đặc quyền tối thiểu. Mã độc thực thi trong ngữ cảnh này sẽ kế thừa toàn bộ quyền hạn cao nhất của máy chủ."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn đang phân tích một mẫu shellcode trích xuất từ một gói tin khai thác lỗ hổng dịch vụ FTP chạy trên kiến trúc ARM64 (vốn có thể cấu hình Bi-endian nhưng mặc định Little-endian trên Linux).",
+        "tasks": [
+          "Xác định cách bố trí thanh ghi con trỏ lệnh (PC - Program Counter) và phân vùng Stack trên kiến trúc ARM64.",
+          "Phân tích chuỗi Hex Bytecode của shellcode để trích xuất system call ID và các tham số file descriptor.",
+          "Xây dựng quy tắc phát hiện (YARA / Snort Rule) dựa trên mẫu Hex đặc trưng của shellcode."
+        ],
+        "requiredEvidence": [
+          "Bản giải mã Bytecode ARM64 thành các lệnh Assembly tương ứng.",
+          "Mẫu quy tắc YARA rule nhận diện chuỗi Hex payload có kiểm soát Endianness."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Computer Systems: A Programmer's Perspective (CS:APP) — Chapter 3: Machine-Level Representation of Programs & Virtual Memory",
+          "url": "https://csapp.cs.cmu.edu/",
+          "publisher": "Carnegie Mellon University",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Bố cục không gian bộ nhớ ảo của tiến trình",
+            "Cơ chế quản lý Stack và Heap",
+            "Thứ tự lưu trữ byte Little-Endian vs Big-Endian"
+          ]
+        },
+        {
+          "title": "Linux man-pages — proc(5) & syscalls(2) Virtual Memory and Process Architecture",
+          "url": "https://man7.org/linux/man-pages/man5/proc.5.html",
+          "publisher": "Linux Kernel Organization",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Cấu trúc tiến trình, file descriptors và ngữ cảnh bảo mật UID/GID",
+            "Giao tiếp hệ điều hành qua System Calls"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os01-l02-ipv4-addressing-and-cidr-subnetting",
+      "slug": "ipv4-addressing-and-cidr-subnetting",
+      "title": "Địa chỉ IPv4, Phân lớp Mạng & Kỹ thuật Chia mạng con CIDR",
+      "summary": "Cấu trúc 32-bit của địa chỉ IPv4; chuyển đổi nhị phân sang thập phân có chấm; phân tích Subnet Mask và ký hiệu CIDR (/8 đến /32); tính toán Network Address, Broadcast Address, Usable Host Range và Wildcard Mask trong thiết kế hạ tầng và quét mạng.",
+      "difficulty": "foundation",
+      "durationMinutes": 60,
+      "prerequisites": ["os01-l01-process-memory-and-data-representation"],
+      "outcomes": [
+        "Phân tích cấu trúc 32-bit của địa chỉ IPv4: Network Portion vs Host Portion dựa trên Subnet Mask.",
+        "Tính toán chính xác Network ID, Broadcast ID, First Usable IP, Last Usable IP và Total Hosts từ ký hiệu CIDR (/24, /27, /30, /32).",
+        "Phân biệt các dải địa chỉ đặc biệt theo RFC 1918 (Private IP), Loopback (127.0.0.0/8), APIPA (169.254.0.0/16) và Multicast (224.0.0.0/4).",
+        "Ứng dụng kiến thức subnetting để định nghĩa Scope kiểm thử an ninh chính xác, tránh quét nhầm dải mạng ngoài phạm vi."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "bug-bounty"],
+      "domains": ["network"],
+      "attackTactics": [],
+      "keywords": [
+        "ipv4",
+        "cidr",
+        "subnetting",
+        "network-id",
+        "broadcast-address",
+        "rfc1918"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Địa chỉ IPv4 là một số nguyên 32-bit được chia thành 4 Octet (8 bit mỗi octet). Subnet Mask hoạt động như một tấm lưới lọc bit (Bitmask): các bit 1 đại diện cho Tên mạng (Network ID), và các bit 0 đại diện cho Định danh máy (Host ID). Phép toán logic AND giữa IPv4 và Subnet Mask giúp mọi router và máy tính biết ngay một gói tin là cùng mạng nội bộ (giao tiếp trực tiếp) hay khác mạng (phải gửi qua Default Gateway).",
+      "visual": {
+        "title": "Phép toán Phân định Subnet bằng Logic Bitwise AND",
+        "caption": "Xác định Network ID và Broadcast Address từ IP và Subnet Mask dạng nhị phân.",
+        "steps": [
+          {
+            "label": "IP Address (32 bits)",
+            "detail": "192.168.1.130 -> 11000000.10101000.00000001.10000010",
+            "tone": "neutral"
+          },
+          {
+            "label": "Subnet Mask (/25)",
+            "detail": "255.255.255.128 -> 11111111.11111111.11111111.10000000 (25 bit 1)",
+            "tone": "caution"
+          },
+          {
+            "label": "Bitwise AND -> Network ID",
+            "detail": "192.168.1.128 -> 11000000.10101000.00000001.10000000 (Địa chỉ mạng)",
+            "tone": "allow"
+          },
+          {
+            "label": "Host Bits all 1 -> Broadcast",
+            "detail": "192.168.1.255 -> 11000000.10101000.00000001.11111111 (Địa chỉ quảng bá)",
+            "tone": "caution"
+          },
+          {
+            "label": "Usable Host Range",
+            "detail": "192.168.1.129 đến 192.168.1.254 (Tổng cộng 126 địa chỉ khả dụng)",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cấu trúc 32-bit của IPv4 và Dấu chấm Thập phân (Dotted-Decimal)",
+          "paragraphs": [
+            "Giao thức Internet phiên bản 4 (IPv4 - RFC 791) sử dụng không gian địa chỉ 32-bit, cung cấp tổng cộng xấp xỉ 4,29 tỷ địa chỉ. Để con người dễ đọc, 32 bit này được chia thành 4 khối 8-bit (gọi là Octet), mỗi octet được chuyển đổi sang số thập phân từ 0 đến 255 và ngăn cách bởi dấu chấm (ví dụ: '192.168.1.1').",
+            "Mỗi địa chỉ IPv4 luôn chứa 2 thành phần: Network Portion (phần định danh mạng) và Host Portion (phần định danh máy chủ). Tỷ lệ phân chia giữa 2 phần này do Subnet Mask quyết định."
+          ],
+          "points": [
+            "32 bits = 4 Octets = 4 Bytes.",
+            "Giá trị mỗi Octet: 00000000 (0) đến 11111111 (255).",
+            "Dotted-Decimal Notation: Định dạng chuẩn biểu diễn địa chỉ IP cho người dùng."
+          ]
+        },
+        {
+          "title": "Ký hiệu CIDR và Kỹ thuật Tính toán Mạng con (Subnetting)",
+          "paragraphs": [
+            "Trước đây, IPv4 được chia thành các lớp cố định (Class A, B, C). Mô hình này gây lãng phí địa chỉ trầm trọng, dẫn đến sự ra đời của Classless Inter-Domain Routing (CIDR - RFC 4632) với ký hiệu gạch chéo '/n' (Prefix Length), trong đó 'n' là số lượng bit 1 liên tục trong Subnet Mask.",
+            "Công thức tính toán cơ bản cho một subnet CIDR /n: Số lượng bit dành cho Host là h = 32 - n. Tổng số địa chỉ IP trong subnet là 2^h. Số lượng IP gán được cho máy chủ (Usable Hosts) là (2^h - 2), do phải trừ 2 địa chỉ đặc biệt: Địa chỉ Mạng (Network ID - tất cả host bits là 0) và Địa chỉ Quảng bá (Broadcast Address - tất cả host bits là 1)."
+          ],
+          "points": [
+            "/24 (Mask 255.255.255.0): h=8 -> 256 tổng IP -> 254 usable hosts.",
+            "/27 (Mask 255.255.255.224): h=5 -> 32 tổng IP -> 30 usable hosts.",
+            "/30 (Mask 255.255.255.252): h=2 -> 4 tổng IP -> 2 usable hosts (chuyên dùng cho Point-to-Point link giữa 2 router).",
+            "/32 (Mask 255.255.255.255): h=0 -> 1 IP duy nhất (chỉ định chính xác 1 máy chủ cụ thể)."
+          ]
+        },
+        {
+          "title": "Các Dải Địa chỉ Đặc biệt: RFC 1918, Loopback và APIPA",
+          "paragraphs": [
+            "Không phải địa chỉ IPv4 nào cũng có thể định tuyến trực tiếp trên mạng Internet toàn cầu. Chuẩn RFC 1918 định nghĩa 3 dải địa chỉ Private (Mạng riêng nội bộ): 10.0.0.0/8 (10.0.0.0 - 10.255.255.255), 172.16.0.0/12 (172.16.0.0 - 172.31.255.255), và 192.168.0.0/16 (192.168.0.0 - 192.168.255.255). Các địa chỉ này bắt buộc phải qua Network Address Translation (NAT) để ra Internet.",
+            "Các dải đặc biệt khác bao gồm: Loopback (127.0.0.0/8 - giao tiếp nội bộ trong máy tính, phổ biến là 127.0.0.1); APIPA / Link-Local (169.254.0.0/16 - tự động gán khi máy không nhận được IP từ DHCP); và Multicast (224.0.0.0/4)."
+          ],
+          "points": [
+            "RFC 1918 Private IP: Không được định tuyến trên Internet công cộng.",
+            "Loopback 127.0.0.1: Lưu lượng không bao giờ đi ra ngoài card mạng vật lý.",
+            "APIPA 169.254.x.x: Dấu hiệu máy tính bị mất kết nối tới DHCP Server."
+          ]
+        },
+        {
+          "title": "Ứng dụng Subnetting trong Xác định Scope và Quét Mạng An toàn",
+          "paragraphs": [
+            "Trong Offensive Security, hiểu sai ký hiệu CIDR có thể dẫn tới việc quét nhầm hàng triệu máy chủ của người khác. Ví dụ: Nếu hợp đồng ủy quyền cho phép kiểm thử '10.50.10.0/24' (256 IP) nhưng operator gõ nhầm lệnh 'nmap 10.50.0.0/16' (65.536 IP) hoặc '10.0.0.0/8' (16,7 triệu IP), operator đã xâm phạm trái phép vào toàn bộ mạng của tập đoàn.",
+            "Thành thạo chia mạng con giúp phân tách các phân vùng mạng (DMZ, Internal Servers, User Workstations, Management VLAN) và thiết lập target file chính xác tuyệt đối."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "IPv4 Subnet Calculation & Scope Scrutiny Desk",
+        "objective": "Thực hành tính toán dải IP khả dụng, nhận diện địa chỉ mạng đặc biệt và xác thực cú pháp CIDR trong phân định phạm vi.",
+        "scenario": "Bạn là Network Assessment Lead được bàn giao danh sách các dải mạng khách hàng yêu cầu quét lỗ hổng an ninh. Hãy phân tích và tính toán chính xác thông số mạng.",
+        "constraints": [
+          "Tính toán chính xác Network ID, Broadcast ID và số lượng Usable Hosts.",
+          "Phát hiện ngay lập tức các dải IP vượt ngoài ranh giới ủy quyền.",
+          "Áp dụng đúng quy tắc loại trừ Network ID và Broadcast ID khỏi danh sách gán IP cho máy chủ."
+        ],
+        "cases": [
+          {
+            "id": "subnet-case-01",
+            "title": "Tính toán dải máy chủ khả dụng cho Subnet /28",
+            "context": "Khách hàng cấp phạm vi đánh giá an ninh cho cụm máy chủ cơ sở dữ liệu với thông số: Địa chỉ IP đại diện '172.20.5.68' và Subnet Mask '/28' (255.255.255.240).",
+            "prompt": "Dải địa chỉ IP máy chủ khả dụng (Usable Host Range) của mạng con này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "172.20.5.1 đến 172.20.5.254",
+                "correct": false,
+                "rationale": "Đây là dải của mạng /24, không phải mạng /28."
+              },
+              {
+                "id": "B",
+                "label": "172.20.5.65 đến 172.20.5.78 (Network ID: 172.20.5.64, Broadcast: 172.20.5.79, tổng cộng 14 hosts khả dụng)",
+                "correct": true,
+                "rationale": "Với /28 (khối bước nhảy 16), dải chứa IP .68 có Network ID là 172.20.5.64 và Broadcast là 172.20.5.79. Dải IP gán được cho host là .65 đến .78 (14 địa chỉ)."
+              },
+              {
+                "id": "C",
+                "label": "172.20.5.64 đến 172.20.5.79",
+                "correct": false,
+                "rationale": "Sai lầm vì tính cả địa chỉ Network ID (.64) và Broadcast (.79) vào dải máy chủ sử dụng được."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ có duy nhất địa chỉ 172.20.5.68",
+                "correct": false,
+                "rationale": "/28 đại diện cho một mạng con gồm 16 địa chỉ, không phải địa chỉ đơn lẻ /32."
+              }
+            ]
+          },
+          {
+            "id": "subnet-case-02",
+            "title": "Phát hiện lỗi gõ nhầm CIDR đe dọa quét nhầm toàn bộ hạ tầng",
+            "context": "Trong file cấu hình tool tự động của một thành viên mới, target được nhập là '192.168.0.0/16' thay vì '192.168.100.0/24' như trong hợp đồng ROE ký kết.",
+            "prompt": "Hậu quả kỹ thuật và pháp lý nếu lệnh quét này được thực thi là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không có ảnh hưởng gì vì cả hai đều là dải mạng lớp C.",
+                "correct": false,
+                "rationale": "/16 chứa 65.536 IP trong khi /24 chỉ chứa 256 IP; sự khác biệt là 256 lần về số lượng mục tiêu."
+              },
+              {
+                "id": "B",
+                "label": "Công cụ sẽ quét tràn sang 65.280 địa chỉ IP nằm ngoài phạm vi được phép (Out-of-Scope), có thể làm sập router mạng nội bộ và vi phạm nghiêm trọng hợp đồng ủy quyền.",
+                "correct": true,
+                "rationale": "Lỗi gõ nhầm prefix length từ /24 sang /16 mở rộng phạm vi quét lên gấp 256 lần, dẫn đến hành vi quét trái phép các hệ thống ngoài hợp đồng."
+              },
+              {
+                "id": "C",
+                "label": "Lệnh quét sẽ tự động bị router hủy bỏ vì router không hiểu CIDR.",
+                "correct": false,
+                "rationale": "Mọi router hiện đại đều hoạt động theo CIDR và sẽ chuyển tiếp lưu lượng quét đi khắp toàn mạng."
+              },
+              {
+                "id": "D",
+                "label": "Tốc độ quét sẽ nhanh hơn 256 lần.",
+                "correct": false,
+                "rationale": "Số lượng target tăng gấp 256 lần khiến thời gian quét lâu hơn và tạo tải cực lớn."
+              }
+            ]
+          },
+          {
+            "id": "subnet-case-03",
+            "title": "Nhận diện máy chủ nhận địa chỉ APIPA 169.254.x.x",
+            "context": "Trong lúc thực hiện đánh giá mạng nội bộ, một máy chủ Windows in-scope có IP là '169.254.120.45'. Operator không thể ping thấy Default Gateway của doanh nghiệp.",
+            "prompt": "Nguyên nhân kỹ thuật chính xác của trạng thái này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Máy chủ đang chạy chế độ bảo mật cao cấp không thể xâm nhập.",
+                "correct": false,
+                "rationale": "169.254.x.x là địa chỉ tự động gán khi mất mạng, không phải tính năng bảo mật."
+              },
+              {
+                "id": "B",
+                "label": "Máy chủ bị lỗi không nhận được cấu hình IP từ DHCP Server và hệ điều hành tự gán địa chỉ APIPA (Link-Local); máy chủ này đang bị cô lập khỏi mạng chính.",
+                "correct": true,
+                "rationale": "Dải 169.254.0.0/16 là chuẩn Automatic Private IP Addressing (APIPA) trên Windows/Linux khi DHCP fail, chỉ có thể giao tiếp với các máy cùng subnet cục bộ không qua router."
+              },
+              {
+                "id": "C",
+                "label": "Đây là địa chỉ Public IP công cộng của tập đoàn Microsoft.",
+                "correct": false,
+                "rationale": "169.254.0.0/16 là dải Link-Local không thể định tuyến ra Internet."
+              },
+              {
+                "id": "D",
+                "label": "Máy chủ đã bị nhiễm virus tống tiền làm thay đổi card mạng.",
+                "correct": false,
+                "rationale": "Suy diễn vô căn cứ; đây là cơ chế mạng bình thường của hệ điều hành khi mất DHCP."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Tính toán chính xác Network ID, Broadcast ID và Usable Host Range cho các prefix CIDR khác nhau.",
+          "Nhận diện đúng mức độ nguy hiểm của lỗi cấu hình sai Prefix CIDR đối với ranh giới Scope.",
+          "Phân loại chính xác các dải địa chỉ đặc biệt (RFC 1918, APIPA, Loopback)."
+        ],
+        "evidenceTemplate": [
+          "Địa chỉ IP và Prefix CIDR đầu vào",
+          "Bảng phân tích nhị phân (Network bits vs Host bits)",
+          "Bảng thông số Subnet (Network ID, First Usable, Last Usable, Broadcast, Mask)",
+          "Kiểm tra ranh giới phạm vi (Scope Boundary Validation)"
+        ],
+        "reset": "Đặt lại lựa chọn để tính toán lại các bài toán subnetting từ đầu.",
+        "cleanup": "Mô phỏng toán học trong trình duyệt, không gửi gói tin thực tế."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc kiểm tra chéo (Peer Review) file danh sách mục tiêu (target list) trước khi nạp vào công cụ quét mạng.",
+          "Sử dụng công cụ tính toán mạng chuẩn (ipcalc / cidr tools) để tự động sinh danh sách IP từ CIDR.",
+          "Cấu hình Blacklist/Exclude List trong công cụ quét để chặn các dải nhạy cảm và ngoài scope."
+        ],
+        "observe": [
+          "Theo dõi lưu lượng mạng ra từ máy scan để phát hiện sớm các gói tin đi lạc ra ngoài dải subnet đã duyệt.",
+          "Ghi nhận nhật ký ARP/ICMP để đối soát số lượng host thực tế phản hồi so với tính toán lý thuyết."
+        ],
+        "respond": [
+          "Lập tức ngắt tiến trình quét nếu phát hiện tool đang gửi request tới dải IP không có trong hợp đồng.",
+          "Báo cáo ngay cho White Team nếu phát hiện sự trùng lặp địa chỉ IP (IP Conflict) trên mạng nội bộ."
+        ],
+        "residualRisk": [
+          "Thay đổi phân vùng mạng VLAN đột ngột từ phía khách hàng trong lúc diễn ra bài test mà không báo trước.",
+          "Cấu hình định tuyến bất đối xứng (Asymmetric Routing) khiến gói tin phản hồi đi theo đường mạng khác."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Địa chỉ IP 192.168.1.0 luôn luôn là Network ID và không thể gán cho máy tính.",
+          "correction": "Trong mạng /24 thì .0 là Network ID, nhưng trong mạng lớn hơn như /23 hoặc /16 (ví dụ 192.168.0.0/23), địa chỉ 192.168.1.0 là một Usable Host IP hoàn toàn hợp lệ."
+        },
+        {
+          "claim": "Mạng /30 và mạng /32 có số lượng máy chủ sử dụng được như nhau.",
+          "correction": "/30 có 4 IP tổng và 2 usable hosts (dành cho kết nối router-to-router). /32 là địa chỉ Host Route đơn lẻ đại diện cho đúng 1 máy duy nhất."
+        },
+        {
+          "claim": "Địa chỉ Private IP (10.x, 192.168.x) hoàn toàn không thể bị tấn công từ xa qua Internet.",
+          "correction": "Dù không định tuyến trực tiếp, kẻ tấn công có thể thâm nhập qua lỗ hổng SSRF (Server-Side Request Forgery), VPN compromise, hoặc mã độc chạy trên máy nhân viên nội bộ."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l02-q1",
+          "difficulty": "easy",
+          "question": "Dải địa chỉ nào sau đây là dải địa chỉ mạng riêng nội bộ (Private IP) theo chuẩn RFC 1918?",
+          "options": [
+            { "id": "A", "label": "8.8.8.0/24" },
+            { "id": "B", "label": "10.0.0.0/8" },
+            { "id": "C", "label": "1.1.1.0/24" },
+            { "id": "D", "label": "203.113.130.0/24" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "RFC 1918 quy định 3 dải Private IP là 10.0.0.0/8, 172.16.0.0/12 và 192.168.0.0/16. Các dải còn lại là Public IP."
+        },
+        {
+          "id": "os01-l02-q2",
+          "difficulty": "medium",
+          "question": "Một mạng con có ký hiệu CIDR là 192.168.10.0/26. Địa chỉ Broadcast của mạng con này là gì và có bao nhiêu địa chỉ gán được cho máy chủ (Usable Hosts)?",
+          "options": [
+            { "id": "A", "label": "Broadcast: 192.168.10.255 và 254 usable hosts" },
+            { "id": "B", "label": "Broadcast: 192.168.10.63 và 62 usable hosts" },
+            { "id": "C", "label": "Broadcast: 192.168.10.127 và 126 usable hosts" },
+            { "id": "D", "label": "Broadcast: 192.168.10.31 và 30 usable hosts" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "/26 có 6 bit dành cho host (2^6 = 64 tổng IP). Dải đầu tiên từ .0 đến .63, trong đó .0 là Network ID, .63 là Broadcast, và từ .1 đến .62 là 62 usable hosts."
+        },
+        {
+          "id": "os01-l02-q3",
+          "difficulty": "hard",
+          "question": "Khi thực hiện cấu hình bộ lọc tường lửa (Firewall Rule) hoặc phạm vi quét, ký hiệu CIDR nào đại diện chính xác và duy nhất cho một máy chủ mục tiêu (Host Route)?",
+          "options": [
+            { "id": "A", "label": "/0" },
+            { "id": "B", "label": "/24" },
+            { "id": "C", "label": "/32" },
+            { "id": "D", "label": "/30" }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Prefix /32 có Subnet Mask là 255.255.255.255 (toàn bộ 32 bit là 1), nghĩa là không có host bit nào, đại diện cho chính xác 1 địa chỉ IP duy nhất."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một doanh nghiệp thương mại điện tử triển khai kiến trúc mạng Microservices trên AWS VPC với dải mạng chính 10.100.0.0/16. Doanh nghiệp cần chia tách thành 4 phân vùng: 2 Public Subnet cho Load Balancers (mỗi subnet cần 100 IP), 2 Private Subnet cho Ứng dụng (mỗi subnet cần 500 IP), và 2 Database Subnet (mỗi subnet cần 50 IP).",
+        "tasks": [
+          "Thiết kế sơ đồ phân bổ CIDR tối ưu nhất không bị chồng lấn (Non-overlapping Subnet Allocation).",
+          "Xác định Network ID, Broadcast ID và Subnet Mask cho từng phân vùng.",
+          "Xây dựng danh mục Network Access Control List (NACL) giới hạn luồng quét an ninh theo từng subnet."
+        ],
+        "requiredEvidence": [
+          "Bảng ma trận phân bổ Subnet CIDR (Subnet Plan Matrix).",
+          "Sơ đồ luồng lưu lượng cách ly giữa các subnet."
+        ]
+      },
+      "sources": [
+        {
+          "title": "RFC 791 — Internet Protocol (DARPA Internet Program Protocol Specification)",
+          "url": "https://www.rfc-editor.org/rfc/rfc791",
+          "publisher": "IETF",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Định dạng và cấu trúc 32-bit của địa chỉ IPv4",
+            "Cơ chế phân đoạn gói tin và đánh địa chỉ mạng"
+          ]
+        },
+        {
+          "title": "RFC 4632 — Classless Inter-domain Routing (CIDR): The Internet Address Assignment and Aggregation Plan",
+          "url": "https://www.rfc-editor.org/rfc/rfc4632",
+          "publisher": "IETF",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Ký hiệu tiền tố CIDR và kỹ thuật chia mạng con không phân lớp",
+            "Nguyên tắc gom cụm tuyến đường mạng (Route Aggregation)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os01-l03-ipv6-foundations-and-dual-stack-boundaries",
+      "slug": "ipv6-foundations-and-dual-stack-boundaries",
+      "title": "Nền tảng IPv6, Ranh giới Dual-Stack & Bẫy Cấu hình An ninh",
+      "summary": "Cấu trúc 128-bit của địa chỉ IPv6; quy tắc viết gọn Hexadecimal; các loại địa chỉ (Global Unicast, Link-Local fe80::, Loopback ::1); cơ chế SLAAC và Neighbor Discovery (NDP); rủi ro rò rỉ lưu lượng (IPv6 Leakage) và điểm mù phòng thủ trong môi trường Dual-Stack.",
+      "difficulty": "foundation",
+      "durationMinutes": 60,
+      "prerequisites": ["os01-l02-ipv4-addressing-and-cidr-subnetting"],
+      "outcomes": [
+        "Đọc hiểu và rút gọn địa chỉ IPv6 128-bit theo chuẩn RFC 5952 (loại bỏ số 0 dẫn đầu, nhóm dấu hai chấm ::).",
+        "Phân biệt các phạm vi địa chỉ IPv6: Link-Local (fe80::/10), Unique Local (fc00::/7 - ULA), Global Unicast (2000::/3), và Multicast (ff00::/8).",
+        "Giải thích cơ chế tự động cấu hình địa chỉ không trạng thái (SLAAC) và giao thức Neighbor Discovery Protocol (NDP).",
+        "Phân tích rủi ro an ninh trong môi trường Dual-Stack (IPv4/IPv6 song song): điểm mù tường lửa IPv6, IPv6 VPN Bypass, và cơ chế phòng chống."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "bug-bounty"],
+      "domains": ["network"],
+      "attackTactics": [],
+      "keywords": [
+        "ipv6",
+        "dual-stack",
+        "link-local",
+        "slaac",
+        "neighbor-discovery",
+        "ipv6-leakage"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "IPv6 mở rộng không gian địa chỉ từ 32 bit lên 128 bit (biểu diễn bằng 8 nhóm 4 chữ số Hex). Trong thời kỳ quá độ, hầu hết hệ điều hành hiện đại mặc định bật Dual-Stack (chạy song song cả IPv4 và IPv6) và thường ưu tiên kết nối IPv6 trước. Điểm mù an ninh xuất hiện khi quản trị viên chỉ cấu hình tường lửa và giám sát trên IPv4, để hở hoàn toàn bề mặt tấn công IPv6.",
+      "visual": {
+        "title": "Điểm Mù An Ninh trong Môi Trường Dual-Stack (IPv4 vs IPv6)",
+        "caption": "Kẻ tấn công bypass tường lửa IPv4 thông qua kết nối IPv6 không được kiểm soát.",
+        "steps": [
+          {
+            "label": "Máy chủ Dual-Stack",
+            "detail": "Máy chủ chạy cả IPv4 (192.168.1.50) và IPv6 (2001:db8::50).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Tường lửa IPv4 (Chặn)",
+            "detail": "Firewall chặn cổng 22/3389 trên IPv4 rất chặt chẽ.",
+            "tone": "caution"
+          },
+          {
+            "label": "Tường lửa IPv6 (Bỏ ngỏ)",
+            "detail": "Quản trị viên quên cấu hình ip6tables/IPv6 Firewall rules -> Mặc định mở!",
+            "tone": "stop"
+          },
+          {
+            "label": "Kết nối qua IPv6",
+            "detail": "Operator/Attacker kết nối trực tiếp tới 2001:db8::50 trên cổng 22 thành công.",
+            "tone": "allow"
+          },
+          {
+            "label": "Phòng vệ Toàn diện",
+            "detail": "Đồng bộ chính sách Firewall trên cả IPv4 và IPv6 hoặc vô hiệu hóa IPv6 nếu không dùng.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cấu trúc 128-bit của IPv6 và Quy tắc Rút gọn (RFC 5952)",
+          "paragraphs": [
+            "IPv6 (RFC 8200) sử dụng địa chỉ 128 bit, cung cấp không gian địa chỉ khổng lồ (khoảng 3,4 x 10^38 địa chỉ). Địa chỉ được chia thành 8 nhóm 16-bit (gọi là Hextet), mỗi nhóm biểu diễn bằng 4 chữ số Hex và ngăn cách bằng dấu hai chấm (ví dụ: '2001:0db8:0000:0000:0000:ff00:0042:8329').",
+            "Để rút gọn theo chuẩn RFC 5952: 1. Loại bỏ các số 0 dẫn đầu trong mỗi hextet ('0db8' -> 'db8', '0042' -> '42'); 2. Thay thế dãy hextet toàn số 0 liên tục dài nhất bằng cặp dấu hai chấm duy nhất '::' (chỉ được dùng đúng 1 lần trong toàn bộ địa chỉ). Địa chỉ trên rút gọn thành: '2001:db8::ff00:42:8329'."
+          ],
+          "points": [
+            "128 bits = 8 Hextets = 16 Bytes.",
+            "Loopback Address: 0000:...:0001 rút gọn thành '::1'.",
+            "Unspecified Address: 0000:...:0000 rút gọn thành '::'."
+          ]
+        },
+        {
+          "title": "Các Phạm vi Địa chỉ IPv6: Link-Local, ULA và Global Unicast",
+          "paragraphs": [
+            "Khác với IPv4 thường chỉ có 1 IP trên 1 card mạng, một máy chủ IPv6 luôn luôn sở hữu đồng thời nhiều địa chỉ thuộc các phạm vi (Scope) khác nhau.",
+            "Các loại địa chỉ cốt lõi bao gồm: 1. Link-Local (fe80::/10): Tự động sinh ra trên mọi interface, chỉ có giá trị trong cùng một mạng LAN vật lý, không bao giờ đi qua router; 2. Unique Local Address (ULA - fc00::/7 / fd00::/8): Tương đương Private IP của IPv4, dùng cho mạng nội bộ doanh nghiệp; 3. Global Unicast Address (GUA - 2000::/3): Địa chỉ công cộng định tuyến toàn cầu; 4. Multicast (ff00::/8): Thay thế hoàn toàn cơ chế Broadcast của IPv4 (IPv6 không còn khái niệm Broadcast)."
+          ],
+          "points": [
+            "Link-Local (fe80::/10): Bắt buộc có trên mọi interface để chạy các giao thức nền tảng.",
+            "No Broadcast in IPv6: Toàn bộ lưu lượng quảng bá được chuyển sang Multicast chuyên biệt (như ff02::1 cho all-nodes).",
+            "Scope Identifier: Khi ping Link-Local bắt buộc phải chỉ định interface (ví dụ: ping fe80::1%eth0)."
+          ]
+        },
+        {
+          "title": "Cơ chế Tự cấu hình SLAAC và Giao thức Neighbor Discovery (NDP)",
+          "paragraphs": [
+            "IPv6 không bắt buộc phải có DHCP Server nhờ cơ chế Stateless Address Autoconfiguration (SLAAC - RFC 4862). Router định kỳ gửi gói Router Advertisement (RA) thông báo Prefix mạng (/64); máy khách tự ghép Prefix này với mã định danh giao diện (Interface ID) để tự tạo IPv6 hoàn chỉnh.",
+            "Neighbor Discovery Protocol (NDP - RFC 4861) thay thế cho ARP của IPv4, sử dụng các thông điệp ICMPv6 (Router Solicitation, Router Advertisement, Neighbor Solicitation, Neighbor Advertisement). Do NDP mặc định không có xác thực, mạng LAN có thể bị tấn công Rogue Router Advertisement (mạo danh router để chiếm quyền định tuyến IPv6)."
+          ],
+          "points": [
+            "SLAAC Autoconfiguration: Tự động gán IP dựa trên Router Advertisement.",
+            "NDP over ICMPv6: Thay thế ARP; nếu chặn toàn bộ ICMPv6 sẽ làm tê liệt mạng IPv6.",
+            "Rogue RA Attack: Kẻ tấn công cắm thiết bị phát RA giả mạo để chuyển hướng toàn bộ lưu lượng mạng."
+          ]
+        },
+        {
+          "title": "Rủi ro An ninh Dual-Stack và Hiện tượng IPv6 Leakage",
+          "paragraphs": [
+            "Hầu hết các hệ điều hành (Windows, Linux, macOS, iOS, Android) đều ưu tiên sử dụng kết nối IPv6 trước IPv4 (theo chuẩn Happy Eyeballs - RFC 8305). Điều này tạo ra 2 nguy cơ an ninh kinh điển:",
+            "1. Firewall Asymmetry: Doanh nghiệp thiết lập chính sách bảo mật ngặt nghèo trên IPv4 nhưng bỏ quên IPv6, cho phép attacker truy cập các cổng quản trị qua địa chỉ IPv6; 2. IPv6 VPN Leakage: Người dùng bật VPN chỉ hỗ trợ IPv4; khi truy cập website có hỗ trợ IPv6, lưu lượng IPv6 sẽ đi thẳng ra ngoài qua ISP thay vì chui qua đường hầm VPN, làm lộ toàn bộ danh tính và dữ liệu thực tế của người dùng."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Dual-Stack Security & IPv6 Configuration Triage",
+        "objective": "Thực hành rút gọn địa chỉ IPv6, phát hiện điểm mù tường lửa Dual-Stack và ngăn chặn rò rỉ IPv6 VPN Leakage.",
+        "scenario": "Bạn là Security Auditor đang kiểm tra hệ thống mạng doanh nghiệp vừa nâng cấp lên Dual-Stack để phục vụ chuyển đổi số.",
+        "constraints": [
+          "Rút gọn và chuẩn hóa địa chỉ IPv6 đúng quy tắc RFC 5952.",
+          "Phát hiện các dịch vụ mở cổng trên IPv6 nhưng không được bảo vệ bởi tường lửa.",
+          "Đề xuất giải pháp đồng bộ chính sách bảo mật trên cả hai ngăn xếp giao thức."
+        ],
+        "cases": [
+          {
+            "id": "ipv6-case-01",
+            "title": "Rút gọn địa chỉ IPv6 theo chuẩn RFC 5952",
+            "context": "Hệ thống ghi nhận một địa chỉ IPv6 dạng đầy đủ: '2001:0db8:0000:0000:0000:0000:0000:0001'.",
+            "prompt": "Dạng rút gọn chuẩn mực và chính xác nhất theo RFC 5952 là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "2001:db8::1",
+                "correct": true,
+                "rationale": "Loại bỏ số 0 dẫn đầu trong '0db8' thành 'db8' và thay thế chuỗi 6 hextet toàn số 0 liên tục bằng cặp dấu hai chấm '::'."
+              },
+              {
+                "id": "B",
+                "label": "2001:0db8::1",
+                "correct": false,
+                "rationale": "Chưa loại bỏ số 0 dẫn đầu trong hextet thứ hai ('0db8')."
+              },
+              {
+                "id": "C",
+                "label": "2001::db8::1",
+                "correct": false,
+                "rationale": "Vi phạm nghiêm trọng quy tắc RFC 5952: Cặp dấu '::' chỉ được xuất hiện DUY NHẤT một lần trong toàn bộ địa chỉ IPv6."
+              },
+              {
+                "id": "D",
+                "label": "2001:db8:0:0:0:0:0:1",
+                "correct": false,
+                "rationale": "Chưa áp dụng quy tắc nén chuỗi số 0 liên tục bằng cặp dấu '::'."
+              }
+            ]
+          },
+          {
+            "id": "ipv6-case-02",
+            "title": "Điểm mù tường lửa trên máy chủ Database Dual-Stack",
+            "context": "Máy chủ cơ sở dữ liệu có IP '10.0.0.50' và '2001:db8:acad::50'. Tường lửa iptables chặn cổng 3306 (MySQL) từ bên ngoài. Tuy nhiên, khi kiểm tra từ máy tester kết nối IPv6, cổng 3306 vẫn kết nối được bình thường.",
+            "prompt": "Nguyên nhân kỹ thuật và giải pháp khắc phục triệt để là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Do hệ điều hành MySQL bị lỗi không hỗ trợ bảo mật.",
+                "correct": false,
+                "rationale": "Lỗi thuộc về cấu hình tường lửa hệ điều hành, không phải do phần mềm MySQL."
+              },
+              {
+                "id": "B",
+                "label": "Quản trị viên chỉ cấu hình luật chặn trên 'iptables' (IPv4) mà quên cấu hình trên 'ip6tables' (IPv6). Cần đồng bộ toàn bộ luật chặn cổng 3306 sang cả ip6tables hoặc bind MySQL chỉ nghe trên 127.0.0.1 và ::1.",
+                "correct": true,
+                "rationale": "Trong Linux, iptables chỉ lọc gói tin IPv4; ip6tables lọc gói tin IPv6. Bỏ quên ip6tables tạo ra điểm mù bảo mật nghiêm trọng trong môi trường Dual-Stack."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần đổi mật khẩu MySQL sang chuỗi dài hơn là sẽ chặn được kết nối mạng.",
+                "correct": false,
+                "rationale": "Mật khẩu mạnh không thay thế được việc kiểm soát truy cập tầng mạng (Network Access Control)."
+              },
+              {
+                "id": "D",
+                "label": "Khởi động lại card mạng 3 lần để tự đồng bộ luật tường lửa.",
+                "correct": false,
+                "rationale": "Hành động vô nghĩa không giải quyết được vấn đề thiếu luật tường lửa IPv6."
+              }
+            ]
+          },
+          {
+            "id": "ipv6-case-03",
+            "title": "Phát hiện rò rỉ lưu lượng IPv6 VPN Leakage",
+            "context": "Nhân viên làm việc từ xa kết nối VPN công ty để bảo mật dữ liệu. Khi truy cập trang kiểm tra IP 'whatismyip.com', trang web vẫn hiển thị địa chỉ IPv6 thực tế của gia đình thay vì IP của công ty.",
+            "prompt": "Nguy cơ bảo mật và phương án xử lý trên client là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Bình thường vì IPv6 không cần bảo mật qua VPN.",
+                "correct": false,
+                "rationale": "Sai lầm nghiêm trọng: Rò rỉ IPv6 làm lộ vị trí địa lý, ISP và danh tính thực tế của người dùng."
+              },
+              {
+                "id": "B",
+                "label": "Hiện tượng IPv6 Leakage do phần mềm VPN chỉ hỗ trợ định tuyến IPv4; cần bật tính năng IPv6 Leak Protection trong VPN client hoặc tắt hoàn toàn IPv6 trên card mạng khi dùng VPN IPv4.",
+                "correct": true,
+                "rationale": "Bảo vệ danh tính và tính toàn vẹn kênh truyền: ngăn chặn việc lưu lượng IPv6 đi vòng ngoài đường hầm VPN (Split-Tunneling ngoài ý muốn)."
+              },
+              {
+                "id": "C",
+                "label": "Yêu cầu ISP cắt đường truyền cáp quang của gia đình.",
+                "correct": false,
+                "rationale": "Phản ứng thái quá và không giải quyết đúng nguyên nhân phần mềm VPN."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ duyệt web bằng trình duyệt ẩn danh (Incognito) là sẽ không bị lộ IPv6.",
+                "correct": false,
+                "rationale": "Chế độ ẩn danh chỉ xóa cookie trên máy, không can thiệp vào định tuyến gói tin ở tầng mạng."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Rút gọn địa chỉ IPv6 chính xác theo quy tắc chuẩn RFC 5952.",
+          "Phát hiện và chỉ rõ cơ chế gây ra điểm mù tường lửa Dual-Stack (iptables vs ip6tables).",
+          "Xử lý dứt điểm nguy cơ IPv6 VPN Leakage và Rogue RA trong mạng nội bộ."
+        ],
+        "evidenceTemplate": [
+          "Địa chỉ IPv6 dạng thô và Dạng rút gọn chuẩn RFC 5952",
+          "Phân loại Scope (Link-Local, ULA, Global Unicast)",
+          "Bảng đối soát luật tường lửa Dual-Stack (IPv4 Rules vs IPv6 Rules)",
+          "Bằng chứng kiểm tra rò rỉ lưu lượng IPv6 Leakage"
+        ],
+        "reset": "Đặt lại lựa chọn để phân tích lại các tình huống IPv6.",
+        "cleanup": "Mô phỏng an toàn trong trình duyệt, không làm thay đổi cấu hình mạng máy tính."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc áp dụng nguyên tắc chính sách kép: Mọi firewall rule tạo trên IPv4 phải có rule tương ứng trên IPv6.",
+          "Vô hiệu hóa hoàn toàn IPv6 trên các máy chủ và thiết bị không có nhu cầu sử dụng kết nối IPv6.",
+          "Bật tính năng RA Guard (Router Advertisement Guard) trên Switch mạng để ngăn chặn Rogue RA Attack."
+        ],
+        "observe": [
+          "Giám sát lưu lượng ICMPv6 và DNS AAAA records trên toàn bộ hệ thống SIEM.",
+          "Kiểm toán định kỳ việc mở cổng dịch vụ trên địa chỉ IPv6 công cộng."
+        ],
+        "respond": [
+          "Lập tức cách ly các máy phát tán gói tin Router Advertisement giả mạo trong mạng LAN.",
+          "Cập nhật cấu hình dịch vụ mạng chỉ bind trên địa chỉ loopback (127.0.0.1 và ::1) đối với các dịch vụ nội bộ."
+        ],
+        "residualRisk": [
+          "Một số thiết bị IoT hoặc máy in cũ không hỗ trợ cấu hình bảo mật IPv6 nhưng mặc định bật sẵn IPv6 Link-Local.",
+          "Độ phức tạp trong việc quản lý và ghi log địa chỉ IPv6 ngẫu nhiên thay đổi liên tục (IPv6 Privacy Extensions - RFC 4941)."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Địa chỉ IPv6 có thể chứa nhiều cặp dấu hai chấm '::' trong cùng một chuỗi.",
+          "correction": "Quy tắc RFC 5952 quy định cặp dấu '::' chỉ được xuất hiện DUY NHẤT một lần để đảm bảo tính duy nhất khi máy tính giải nén địa chỉ về 128 bit."
+        },
+        {
+          "claim": "Tắt IPv4 thì mạng sẽ tự động an toàn hơn vì hacker chưa biết tấn công IPv6.",
+          "correction": "Các công cụ tấn công hiện đại đều hỗ trợ đầy đủ IPv6. Điểm mù và thiếu kinh nghiệm quản trị IPv6 mới là nguyên nhân gây ra nhiều sự cố an ninh nghiêm trọng."
+        },
+        {
+          "claim": "Địa chỉ Link-Local (fe80::) có thể bị quét và tấn công trực tiếp từ bên kia bán cầu qua Internet.",
+          "correction": "Địa chỉ Link-Local chỉ có phạm vi trong mạng LAN cục bộ và không thể định tuyến qua bất kỳ router nào ra Internet."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l03-q1",
+          "difficulty": "easy",
+          "question": "Địa chỉ IPv6 nào sau đây đại diện cho địa chỉ Loopback (tương đương 127.0.0.1 trong IPv4)?",
+          "options": [
+            { "id": "A", "label": "fe80::1" },
+            { "id": "B", "label": "::1" },
+            { "id": "C", "label": "2001:db8::" },
+            { "id": "D", "label": "ff02::1" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Địa chỉ Loopback trong IPv6 là '0000:...:0001', được rút gọn chuẩn mực thành '::1'."
+        },
+        {
+          "id": "os01-l03-q2",
+          "difficulty": "medium",
+          "question": "Tại sao trong môi trường Dual-Stack (IPv4 và IPv6 chạy song song), máy chủ lại dễ bị tấn công bỏ qua tường lửa (Firewall Bypass)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì gói tin IPv6 có khả năng tự động bẻ khóa mật khẩu"
+            },
+            {
+              "id": "B",
+              "label": "Vì quản trị viên thường chỉ cấu hình chặn trên tường lửa IPv4 (iptables) mà quên cấu hình tường lửa IPv6 (ip6tables), trong khi hệ điều hành ưu tiên kết nối IPv6 trước"
+            },
+            { "id": "C", "label": "Vì cáp mạng không truyền tải được dữ liệu IPv6" },
+            { "id": "D", "label": "Vì IPv6 không sử dụng địa chỉ IP" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Sự bất đối xứng trong chính sách bảo mật giữa 2 ngăn xếp giao thức tạo ra điểm mù nguy hiểm, cho phép lưu lượng truy cập trái phép chui qua cổng IPv6 không bị kiểm soát."
+        },
+        {
+          "id": "os01-l03-q3",
+          "difficulty": "hard",
+          "question": "Giao thức nào trong IPv6 đảm nhận vai trò phân giải địa chỉ IP sang MAC và tự cấu hình mạng (thay thế cho ARP và hỗ trợ SLAAC)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Neighbor Discovery Protocol (NDP) hoạt động qua các thông điệp ICMPv6"
+            },
+            { "id": "B", "label": "Address Resolution Protocol (ARP)" },
+            { "id": "C", "label": "Domain Name System (DNS)" },
+            { "id": "D", "label": "Border Gateway Protocol (BGP)" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "NDP (RFC 4861) sử dụng các gói tin ICMPv6 để thực hiện phân giải địa chỉ láng giềng (thay thế ARP), tìm kiếm router (Router Discovery) và hỗ trợ tự động gán địa chỉ SLAAC."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một trung tâm dữ liệu đám mây (Cloud Data Center) triển khai kiến trúc IPv6-Only cho các máy chủ backend nhưng vẫn duy trì IPv4 Ingress thông qua cổng dịch vụ NAT64/DNS64 cho người dùng Internet cũ.",
+        "tasks": [
+          "Phân tích cơ chế chuyển đổi gói tin giữa IPv4 và IPv6 qua bộ dịch địa chỉ NAT64 và tiền tố Well-Known Prefix 64:ff9b::/96.",
+          "Xác định các bề mặt tấn công tiềm ẩn trên DNS64 Server (DNS Spoofing làm lệch ánh xạ IP).",
+          "Thiết lập bộ quy tắc kiểm soát truy cập (Access Control) trên hệ thống Gateway để ngăn chặn việc khai thác lỗ hổng dịch ngược địa chỉ."
+        ],
+        "requiredEvidence": [
+          "Sơ đồ luồng dữ liệu NAT64/DNS64 Translation Flow.",
+          "Bản quy định chính sách bảo mật dành riêng cho cổng chuyển đổi giao thức IPv4/IPv6."
+        ]
+      },
+      "sources": [
+        {
+          "title": "RFC 8200 — Internet Protocol, Version 6 (IPv6) Specification",
+          "url": "https://www.rfc-editor.org/rfc/rfc8200",
+          "publisher": "IETF",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Cấu trúc và thông số kỹ thuật chuẩn của địa chỉ IPv6 128-bit",
+            "Định dạng tiêu đề gói tin IPv6 và Extension Headers"
+          ]
+        },
+        {
+          "title": "RFC 5952 — A Recommendation for IPv6 Address Text Representation",
+          "url": "https://www.rfc-editor.org/rfc/rfc5952",
+          "publisher": "IETF",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Quy tắc chuẩn mực rút gọn địa chỉ IPv6",
+            "Sử dụng cặp dấu hai chấm và loại bỏ số 0 dẫn đầu"
+          ]
+        }
+      ]
+    }
+  ]
+}
