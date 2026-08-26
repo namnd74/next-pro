@@ -1,0 +1,1084 @@
+{
+  "id": "os02-m01-files-identity-permissions",
+  "slug": "files-identity-permissions",
+  "trackId": "os02-linux-foundations",
+  "title": "Filesystem, Users, Groups & Permissions",
+  "summary": "Cấu trúc filesystem Linux và các loại file qua inode; mô hình danh tính UID/GID với root là ranh giới tối thượng; permission bits và các mode đặc biệt SUID/SGID/sticky — kèm phương pháp kiểm toán world-writable và SUID inventory.",
+  "difficulty": "foundation",
+  "estimatedMinutes": 180,
+  "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+  "domains": ["linux"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os02-l13-filesystem-hierarchy-and-file-types",
+      "slug": "filesystem-hierarchy-and-file-types",
+      "title": "Cây Filesystem, Inode & Các Loại File",
+      "summary": "Chuẩn FHS và vai trò từng thư mục hệ thống; khái niệm inode tách tên khỏi dữ liệu; phân biệt regular/directory/symlink/device/socket và hệ quả bảo mật của symlink.",
+      "difficulty": "foundation",
+      "durationMinutes": 60,
+      "prerequisites": [],
+      "outcomes": [
+        "Giải thích vai trò của các thư mục chuẩn theo FHS: /etc (cấu hình), /var/log (log), /home vs /root, /tmp và /dev.",
+        "Mô tả inode là cấu trúc metadata tách biệt tên file khỏi dữ liệu và liên kết nó với khái niệm hard link.",
+        "Phân biệt 5 loại file (regular, directory, symlink, device, socket) qua ký tự đầu trong ls -l.",
+        "Đánh giá rủi ro symlink trong kịch bản ghi file có kiểm soát: tại sao script ghi vào path cố định trong /tmp có thể bị đánh tráo đích."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["linux"],
+      "attackTactics": [],
+      "keywords": ["fhs", "inode", "symlink", "file-types", "tmp-directory"],
+      "safetyLevel": "safe",
+      "mentalModel": "Linux là một cây duy nhất bắt đầu từ / — không có 'ổ C', chỉ có điểm gắn (mount) ghép thêm cành. Mỗi file thật sự nằm trong một hộp hồ sơ gọi là inode (chứa quyền, chủ sở hữu, vị trí dữ liệu), còn TÊN file chỉ là nhãn dán trỏ vào hộp; nhiều nhãn có thể trỏ cùng hộp (hard link), và symlink là tờ giấy ghi địa chỉ của nhãn khác — xé nhãn gốc thì tờ giấy chỉ vào khoảng trống. Hiểu được 'tên ≠ dữ liệu' là chìa khóa đọc mọi lỗi an ninh filesystem: script ghi vào '/tmp/data.log' thực chất ghi vào INODE mà cái tên đó đang trỏ tới — nếu ai đó thay nhãn bằng symlink trước, dữ liệu chảy đúng chỗ kẻ khác muốn.",
+      "visual": {
+        "title": "Cây Thư mục Chuẩn và Bản đồ Inode",
+        "caption": "FHS định nghĩa chỗ nào chứa gì; tên file là nhãn trỏ tới inode giữ metadata + vị trí dữ liệu thật.",
+        "steps": [
+          {
+            "label": "/etc — cấu hình",
+            "detail": "passwd, shadow, sshd_config… ai đọc được /etc/shadow là câu hỏi quyền đầu tiên cần trả lời trên bất kỳ host nào.",
+            "tone": "caution"
+          },
+          {
+            "label": "/var/log — lịch sử",
+            "detail": "Log hệ thống/app; attacker muốn xóa dấu vết thường ghé đây — vì vậy log phải ship ra nơi khác.",
+            "tone": "neutral"
+          },
+          {
+            "label": "/tmp — sân chung",
+            "detail": "World-writable + sticky bit; nơi script hay ghi tạm — điểm nóng cho symlink race nếu code ghi path cố định.",
+            "tone": "stop"
+          },
+          {
+            "label": "Inode: hộp hồ sơ",
+            "detail": "Giữ permission/owner/timestamps/con trỏ dữ liệu; đổi tên KHÔNG đổi inode, hard link chia sẻ cùng inode.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Symlink: tờ giấy địa chỉ",
+            "detail": "Trỏ tới PATH (không phải inode); đích xóa thì link treo — và attacker có thể tạo link trỏ tới file họ không có quyền mở trực tiếp.",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "FHS: Mỗi Thư mục Một Nhiệm vụ",
+          "paragraphs": [
+            "Filesystem Hierarchy Standard quy ước: /etc chứa cấu hình dạng text (đọc được = hiểu được hệ thống), /bin–/usr/bin chứa binary, /var chứa dữ liệu biến đổi (log, queue, cache), /home là nhà user thường còn /root là nhà của root — tách riêng để khi /home đầy hoặc bị unmount, admin vẫn đăng nhập được. /dev chứa device node (đĩa, terminal) — 'mọi thứ đều là file' ở Linux kể cả phần cứng.",
+            "Về an ninh, ba thư mục được hỏi đầu tiên trong mọi assessment: /etc (ai đọc được shadow?), /var/log (log còn nguyên không?), /tmp (ai ghi được gì vào đây?). Chúng tương ứng ba câu chuyện: thông tin xác thực, chứng cứ, và vùng giằng co giữa các user."
+          ],
+          "points": [
+            "/tmp và /var/tmp là hai thư mục world-writable chuẩn — mọi script ghi tạm ở đây cần tự phòng symlink.",
+            "noexec/nodev/nosuid mount options cho partition tách biệt là hardening kinh điển (vd /tmp).",
+            "df -i kiểm tra inode exhaustion — attack 'hết inode' cũng làm hệ thống hỏng như hết dung lượng."
+          ]
+        },
+        {
+          "title": "Inode: Tên Chỉ là Nhãn Dán",
+          "paragraphs": [
+            "Inode lưu metadata: owner/group, permission bits, timestamps, kích thước, con trỏ tới data block — nhưng KHÔNG lưu tên file. Tên nằm trong directory entry (bản thân directory là một loại file liệt kê cặp name→inode). Vì vậy: mv trong cùng filesystem chỉ đổi nhãn; hard link là thêm một nhãn nữa cùng trỏ một inode; xóa file chỉ xóa nhãn, inode giải phóng khi nhãn cuối biến mất (và không tiến trình nào còn giữ handle).",
+            "Hệ quả điều tra: file bị 'xóa' vẫn chiếm disk nếu tiến trình còn mở (thấy qua /proc/PID/fd); log đã xóa đôi lúc phục hồi từ descriptor còn sống. Ngược lại, attacker che giấu bằng cách giữ file mở rồi unlink — file 'không tồn tại' trên ls nhưng vẫn chạy trong bộ nhớ."
+          ],
+          "points": [
+            "ls -i hiển thị inode number; find <dir> -inum N tìm mọi tên của một inode.",
+            "Directory cũng có permission riêng: w trên directory = quyền tạo/xóa ENTRY (tức đổi nhãn) bên trong.",
+            "Rename là thao tác trên directory entry — đó là lý do symlink race tập trung vào thời điểm ghi."
+          ]
+        },
+        {
+          "title": "Năm Loại File và Ký Hiệu Nhận diện",
+          "paragraphs": [
+            "Ký tự đầu dòng ls -l: '-' regular, 'd' directory, 'l' symlink, 'c/b' character/block device, 's' socket, 'p' FIFO. Device node đặc biệt về an ninh: chúng là CỔNG vào kernel/hardware — một device node tạo sai chỗ (vd dd trỏ nhầm) phá hủy dữ liệu; container escape cổ điển liên quan mount nhầm /dev.",
+            "Symlink đáng chú ý nhất cho assessment: nó trỏ tới PATH nên quyền kiểm tra khi TRUY CẬP qua link là quyền trên ĐÍCH (kernel follow link rồi áp permission đích); nhưng một số cơ chế (O_NOFOLLOW, sticky /tmp) tồn tại chính để chống việc lợi dụng link. Hard link ngược lại KHÔNG thể trỏ xuyên filesystem và không trỏ tới directory — ít rủi ro hơn symlink."
+          ],
+          "points": [
+            "readlink -f <path> in đường dẫn thật sau khi giải toàn bộ chain symlink.",
+            "find / -type l -user root kiểm tra symlink do root tạo — nguồn kinh điển của race condition.",
+            "Socket file (/run/*.sock) là cửa IPC local — lộ socket nhạy cảm = lộ giao tiếp nội bộ."
+          ]
+        },
+        {
+          "title": "Symlink Race: Bài Học Kinh điển Về /tmp",
+          "paragraphs": [
+            "Kịch bản giáo khoa: script chạy bằng root ghi log vào '/tmp/app.log'. Attacker (user thường) xóa/nhanh tay tạo trước symlink '/tmp/app.log' → '/etc/shadow' hoặc tới file quan trọng khác. Khi script mở path để ghi, kernel follow link và — tùy flag — GHI LÊN ĐÍCH với quyền của root. Đây là lớp lỗi TOCTOU (time-of-check-to-time-of-use): kiểm tra lúc t=1 không bảo đảm trạng thái lúc t=2.",
+            "Phòng thủ chuẩn: dùng O_CREAT|O_EXCL (fail nếu file tồn tại — không ghi đè lên link), mktemp tạo file với tên khó đoán + mở an toàn, hoặc đặt thư mục tạm per-user thay vì /tmp chung. Phát hiện: audit script chạy bằng root có pattern 'echo > /tmp/...' hay 'cat /tmp/...'; monitor symlink mới xuất hiện trong /tmp trỏ ra ngoài /tmp."
+          ],
+          "points": [
+            "Sticky bit trên /tmp (rwxrwxrwt) chỉ ngăn XÓA file người khác, KHÔNG ngăn tạo symlink mới.",
+            "open(2) với O_NOFOLLOW khiến open qua symlink fail — biện pháp code-level trực tiếp.",
+            "Kernel hiện đại có protected_symlinks (fs.protected_symlinks=1): hạn chế follow symlink trong sticky dir khi owner lệch nhau."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Filesystem Desk — Đọc Output và Nhận Diện Rủi ro",
+        "objective": "Đọc ls/route output mô phỏng để nhận diện loại file, suy luận inode relationship, và phát hiện pattern symlink-race trong script mô phỏng.",
+        "scenario": "Bạn review một máy chủ Linux mô phỏng trước khi đưa vào production: có output ls -li của vài thư mục, đoạn script backup chạy bằng cron root, và cấu hình fstab. Toàn bộ là dữ liệu tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ output được cấp; không chạy lệnh trên hệ thống thật.",
+          "Mỗi nhận định loại file phải dựa ký tự/ký hiệu cụ thể trong output.",
+          "Finding phải kèm đề xuất fix kiểm chứng được (flag/mount option/thay đổi code)."
+        ],
+        "cases": [
+          {
+            "id": "fs-case-01",
+            "title": "Đọc ls -li trong /tmp",
+            "context": "Output: '1042 -rw------- 1 root root 512 Jan 10 09:00 app.log' | '2049 lrwxrwxrwx 1 alice alice 14 Jan 10 08:59 data.log -> /etc/shadow' | '4096 drwxrwxrwt 12 root root 4096 Jan 10 08:00 .' | Script cron root (09:00 hằng ngày) chứa dòng: cat /tmp/data.log >> /var/log/collect.log",
+            "prompt": "Nhận định đúng nhất về tình huống?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không sao — data.log chỉ là shortcut alice tạo cho tiện.",
+                "correct": false,
+                "rationale": "Symlink trỏ /etc/shadow trong /tmp kết hợp cron root đọc path đó là pattern thu thập file nhạy cảm — không thể coi là tiện lợi vô hại."
+              },
+              {
+                "id": "B",
+                "label": "Symlink race/toàn vẹn dữ liệu bị lợi dụng: cron root đọc qua path có thể bị đánh tráo đích; fix: script dùng mktemp/O_EXCL hoặc path trong thư mục riêng 0700, đồng thời điều tra alice vì symlink trỏ /etc/shadow là dấu hiệu khai thác có chủ đích.",
+                "correct": true,
+                "rationale": "Timestamp cho thấy link tạo TRƯỚC app.log 1 phút — chuẩn bị sẵn cho job 09:00; đây là evidence của hành động khai thác chứ không phải tai nạn, cần cả fix code lẫn incident view."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần xóa symlink data.log là xử lý xong gốc rễ.",
+                "correct": false,
+                "rationale": "Xóa link chữa triệu chứng: script vẫn ghi/đọc path cố định trong /tmp — lỗi thiết kế còn đó, alice còn đó."
+              },
+              {
+                "id": "D",
+                "label": "Sticky bit 't' trên /tmp đã chặn mọi tấn công symlink.",
+                "correct": false,
+                "rationale": "Sticky chỉ chặn XÓA file của người khác; alice tạo symlink của CHÍNH MÌNH hoàn toàn hợp lệ dưới sticky."
+              }
+            ]
+          },
+          {
+            "id": "fs-case-02",
+            "title": "Hard link hay copy?",
+            "context": "ls -li cho thấy: '5200 -rw-r--r-- 2 root root 1.2M report.pdf' và '5200 -rw-r--r-- 2 root root 1.2M report_backup.pdf' (cùng inode 5200, link count 2). User yêu cầu: 'backup độc lập với bản chính — sửa bản chính không được ảnh hưởng backup'.",
+            "prompt": "Đánh giá và hành động đúng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Ổn rồi — hai file khác tên là độc lập.",
+                "correct": false,
+                "rationale": "Cùng inode = cùng dữ liệu vật lý; đây là hard link, không phải bản sao độc lập."
+              },
+              {
+                "id": "B",
+                "label": "Đây là hard link (same inode, link count 2) — KHÔNG đáp ứng yêu cầu: mọi sửa nội dung qua một tên đều thấy qua tên kia. Fix: tạo bản sao thật (cp không -l/-al) hoặc snapshot; kiểm chứng bằng so sánh inode number sau khi tạo.",
+                "correct": true,
+                "rationale": "Yêu cầu nghiệp vụ là 'độc lập' nhưng kỹ thuật đang là 'chung hộp hồ sơ'; phân biệt hard-link vs copy qua inode number chính là test pass/fail."
+              },
+              {
+                "id": "C",
+                "label": "Hard link an toàn hơn copy vì tiết kiệm dung lượng — khuyến nghị giữ nguyên.",
+                "correct": false,
+                "rationale": "Tiết kiệm đúng, nhưng trái yêu cầu nghiệp vụ về tính độc lập; lựa chọn kỹ thuật phục vụ yêu cầu, không ngược lại."
+              },
+              {
+                "id": "D",
+                "label": "Cần đổi tên report_backup.pdf sang tên khác để tách inode.",
+                "correct": false,
+                "rationale": "Tên không quyết định inode — đổi tên vẫn cùng inode; phải copy thật mới tách được."
+              }
+            ]
+          },
+          {
+            "id": "fs-case-03",
+            "title": "fstab và vùng tạm",
+            "context": "fstab hiện tại: '/' ext4 defaults; '/tmp' nằm TRONG root (không partition riêng); đề xuất cải tiến A: tách /tmp thành partition tmpfs với options 'rw,nosuid,nodev,noexec,mode=1777'; đề xuất B: giữ nguyên vì 'tmpfs mất dữ liệu khi reboot'. Ứng dụng trên host ghi tạm file upload lớn (đến 4GB) vào /tmp.",
+            "prompt": "Đánh giá hai đề xuất trong ngữ cảnh này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chọn A nguyên bản — mọi host đều nên tách /tmp như vậy.",
+                "correct": false,
+                "rationale": "A đúng hướng hardening NHƯNG tmpfs nằm trong RAM: 4GB upload + default size-limit sẽ đầy/tràn RAM; thiếu sizing (size=) là sự cố treo hệ thống chờ xảy ra."
+              },
+              {
+                "id": "B",
+                "label": "A đúng hướng nhưng phải sizing: tmpfs,size=8G (hoặc dùng partition đĩa riêng cho /tmp khi workload lớn) + nosuid,nodev,noexec + mode=1777; B phản ánh trade-off thật nhưng bỏ quên mục tiêu security — cân bằng bằng sizing + giám sát dung lượng, kiểm chứng bằng df -h /tmp sau deploy.",
+                "correct": true,
+                "rationale": "Hardening phải đi kèm capacity planning; câu trả lời trưởng thành là điều chỉnh tham số của control thay vì chọn/bỏ control, và luôn có verification step."
+              },
+              {
+                "id": "C",
+                "label": "Chọn B — an ninh không quan trọng bằng tiện lợi.",
+                "correct": false,
+                "rationale": "Bỏ hardening vùng world-writable nổi tiếng nhất hệ thống để tránh phiền là đánh đổi kém; vấn đề của A là tham số, không phải nguyên tắc."
+              },
+              {
+                "id": "D",
+                "label": "Tách /tmp và chmod 000 để không ai ghi được.",
+                "correct": false,
+                "rationale": "Phá vỡ chức năng: hàng loạt service cần /tmp hợp lệ (mode 1777 là chuẩn sticky+world-writable); chặn cứng = outage."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Nhận diện đúng 5 loại file qua ký tự ls -l và giải thích ý nghĩa mỗi loại.",
+          "Sử dụng inode number để phân biệt hard link và copy đúng ngữ cảnh nghiệp vụ.",
+          "Đề xuất hardening /tmp có cân nhắc sizing/workload kèm bước kiểm chứng."
+        ],
+        "evidenceTemplate": [
+          "Bảng file: ký tự loại, inode, link count, ý nghĩa an ninh",
+          "Timeline symlink case: thời gian tạo link vs giờ cron",
+          "So sánh hard-link vs copy theo yêu cầu nghiệp vụ",
+          "Đề xuất mount options + sizing + verification step"
+        ],
+        "reset": "Đặt lại lựa chọn để review lại filesystem từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không thao tác trên hệ thống thật."
+      },
+      "governance": {
+        "prevent": [
+          "Mount /tmp (và /var/tmp) riêng với nosuid,nodev,noexec; cân nhắc tmpfs có sizing rõ ràng.",
+          "Code standard: mọi ghi tạm dùng mktemp/O_EXCL, cấm path cố định trong thư mục chung.",
+          "Bật fs.protected_symlinks và protected_hardlinks trên host production."
+        ],
+        "observe": [
+          "Monitor symlink mới trong /tmp trỏ ra ngoài /tmp; alert file world-writable ngoài whitelist.",
+          "Kiểm toán định kỳ SUID inventory và inode usage (df -i) — lệch baseline là signal."
+        ],
+        "respond": [
+          "Phát hiện symlink nghi vấn: không xóa vội trước khi chụp evidence (ls -li, readlink), trace owner + process liên quan.",
+          "Xử lý script có lỗi race: vá code (O_EXCL) rồi mới quay lại vận hành; review các job cron chạy root cùng pattern."
+        ],
+        "residualRisk": [
+          "Kernel sysctl protected_symlinks giảm nhưng không triệt tiêu symlink abuse trên cấu hình lạ.",
+          "tmpfs sizing sai gây availability issue — control security phải đi kèm capacity plan."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Xóa file là mất dữ liệu ngay lập tức.",
+          "correction": "Unlink chỉ gỡ nhãn; inode + dữ liệu còn sống tới khi link count về 0 VÀ không tiến trình nào giữ file descriptor mở — forensics tận dụng được điều này."
+        },
+        {
+          "claim": "Sticky bit trên /tmp chặn được symlink attack.",
+          "correction": "Sticky chỉ hạn chế quyền XÓA entry của người khác; tạo symlink mới thuộc sở hữu mình vẫn hợp lệ — chống symlink phải bằng code-level flags hoặc fs.protected_symlinks."
+        },
+        {
+          "claim": "Hai file khác tên luôn là hai dữ liệu khác nhau.",
+          "correction": "Hard link cho phép hai tên cùng trỏ một inode — same content, same permission, link count >1 là dấu hiệu nhận diện."
+        },
+        {
+          "claim": "'Mọi thứ đều là file' chỉ là cách nói, không có hệ quả an ninh.",
+          "correction": "Device node là cổng vào kernel/hardware; mount nhầm /dev trong container hay chạm /dev/mem sai cách là vector escalation thực tế."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os02-l13-q1",
+          "difficulty": "easy",
+          "question": "Ký tự đầu tiên 'l' trong dòng ls -l cho biết đây là loại file nào?",
+          "options": [
+            { "id": "A", "label": "Regular file" },
+            { "id": "B", "label": "Symbolic link" },
+            { "id": "C", "label": "Directory" },
+            { "id": "D", "label": "Socket" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "l = symlink (trỏ tới PATH); d = directory; '-' = regular; s = socket; c/b = device."
+        },
+        {
+          "id": "os02-l13-q2",
+          "difficulty": "medium",
+          "question": "Vì sao sticky bit trên /tmp KHÔNG chặn được kịch bản symlink race?",
+          "options": [
+            { "id": "A", "label": "Vì sticky bit chỉ dành cho root" },
+            {
+              "id": "B",
+              "label": "Vì sticky chỉ hạn chế quyền XÓA entry của người khác; tạo symlink mới thuộc sở hữu bản thân vẫn hoàn toàn hợp lệ trong /tmp"
+            },
+            { "id": "C", "label": "Vì sticky bit mã hóa tên file" },
+            { "id": "D", "label": "Vì sticky bit chỉ tác động trên hard link" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Mode 1777 = everyone tạo/xóa file CỦA MÌNH. Attacker tạo symlink của chính họ trỏ tới target nhạy cảm — sticky không can thiệp; cần O_EXCL/O_NOFOLLOW hoặc fs.protected_symlinks."
+        },
+        {
+          "id": "os02-l13-q3",
+          "difficulty": "hard",
+          "question": "Một tiến trình đang chạy vẫn ghi log vào file mà bạn vừa 'rm' — df cho thấy dung lượng chưa được giải phóng. Giải thích đúng?",
+          "options": [
+            { "id": "A", "label": "Lỗi filesystem, cần fsck" },
+            {
+              "id": "B",
+              "label": "rm chỉ gỡ directory entry; inode vẫn sống vì tiến trình còn giữ file descriptor mở — dung lượng chỉ giải phóng khi fd đóng; thấy được qua /proc/<pid>/fd"
+            },
+            { "id": "C", "label": "File đã vào thùng rác ẩn của hệ thống" },
+            { "id": "D", "label": "rm cần thêm flag -f mới xóa thật" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Vòng đời inode: giải phóng khi link count = 0 AND open-handle count = 0. Đây vừa là bẫy vận hành (disk full 'ma') vừa là kỹ thuật forensics/che giấu."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn chuyển sang review một container runtime mô phỏng: image base Debian, container chạy app với volume mount '/hostlogs:/var/log/app' và app ghi tạm vào /tmp bên trong container. Team lo ngại container breakout qua filesystem.",
+        "tasks": [
+          "Liệt kê các điểm mount/device nào trong container là ranh giới nguy hiểm nhất nếu cấu hình sai (theo bài học device node).",
+          "Thiết kế checklist hardening filesystem cho container (readonly rootfs, no-new-privileges, tmpfs sizing cho /tmp).",
+          "Viết analytic phát hiện pattern symlink-race trong log volume mount ra host."
+        ],
+        "requiredEvidence": [
+          "Bảng ranh giới mount/device xếp theo rủi ro",
+          "Checklist hardening có mục kiểm chứng pass/fail",
+          "Analytic pseudo-query với ngưỡng cảnh báo"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Filesystem Hierarchy Standard (FHS) 3.0",
+          "url": "https://refspecs.linuxfoundation.org/FHS_3.0/fhs/index.html",
+          "publisher": "Linux Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Vai trò chuẩn của /etc, /var, /tmp, /root trong cây thư mục",
+            "Quy ước thư mục tạm world-writable"
+          ]
+        },
+        {
+          "title": "Linux man-pages — inode(7), symlink(7), path_resolution(7)",
+          "url": "https://man7.org/linux/man-pages/man7/inode.7.html",
+          "publisher": "Linux Kernel Organization",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cấu trúc inode và mối quan hệ tên↔inode",
+            "Hành vi resolve symlink và các flag O_EXCL/O_NOFOLLOW"
+          ]
+        },
+        {
+          "title": "Kernel Documentation — fs.protected_symlinks / protected_hardlinks sysctls",
+          "url": "https://www.kernel.org/doc/Documentation/sysctl/fs.txt",
+          "publisher": "The Linux Kernel Organization",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cơ chế mitigations của kernel chống symlink/hardlink abuse trong sticky directories"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os02-l14-users-groups-and-identity-boundaries",
+      "slug": "users-groups-and-identity-boundaries",
+      "title": "UID/GID, /etc/passwd–shadow & Ranh giới root/sudo",
+      "summary": "Mô hình danh tính số của Linux: UID/GID quyết định mọi quyền; cấu trúc passwd/shadow/group; root UID 0 như trust boundary tuyệt đối; sudo vs su và nguyên tắc cấp quyền tối thiểu cho service account.",
+      "difficulty": "foundation",
+      "durationMinutes": 60,
+      "prerequisites": ["os02-l13-filesystem-hierarchy-and-file-types"],
+      "outcomes": [
+        "Giải thích rằng kernel quyết định quyền bằng UID/GID số chứ không phải tên user, và hệ quả khi hai tài khoản trùng UID.",
+        "Đọc cấu trúc /etc/passwd, /etc/shadow, /etc/group: từng field nghĩa là gì và vì sao shadow phải 0640/0600 root-only.",
+        "Phân biệt su và sudo về mô hình ủy quyền, và đọc sudoers rule để đánh giá phạm vi được cấp.",
+        "Thiết kế service account an toàn: nologin shell, dedicated UID, không shared account, sudo scope hẹp."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["linux"],
+      "attackTactics": ["TA0006"],
+      "keywords": [
+        "uid-gid",
+        "etc-shadow",
+        "sudoers",
+        "service-account",
+        "least-privilege"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Kernel không biết 'Nam là ai' — nó chỉ thấy những con số: UID 1000, GID 1000. Quyền sở hữu file, khả năng mở port, phạm vi kill process đều là so sánh số với số. Root là số 0: mọi check quyền đều có nhánh đặc biệt 'nếu uid==0 thì cho qua' — vì thế UID 0 là ranh giới thần linh, và 'leo lên 0' là mục tiêu của mọi escalation. sudo là người gác cổng có sổ ủy quyền (sudoers): ai, trên máy nào, chạy lệnh nào, với tư cách ai. Su thì khác: nó hỏi mật khẩu của NGƯỜI ĐI ĐẾN (target) chứ không kiểm soát lệnh — một phát trúng là full shell.",
+      "visual": {
+        "title": "Từ Tên đăng nhập tới Con số Kernel",
+        "caption": "Login map tên → UID/GID; mọi quyền sau đó là phép so sánh số; UID 0 bypass mọi check.",
+        "steps": [
+          {
+            "label": "Đăng nhập: tên → số",
+            "detail": "getpwnam tra /etc/passwd: nam:x:1000:1000:… — từ đây kernel chỉ làm việc với 1000.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Shadow: mật khẩu tách riêng",
+            "detail": "/etc/passwd có 'x' ở field password; hash thật nằm /etc/shadow mode 0640/0600 — tách để user thường không đọc được hash.",
+            "tone": "allow"
+          },
+          {
+            "label": "Check quyền: so sánh số",
+            "detail": "Open file? kernel so file-owner-uid với process-uid/effective-uid + group list. Không tên nào xuất hiện ở tầng này.",
+            "tone": "neutral"
+          },
+          {
+            "label": "UID 0: nhánh đặc biệt",
+            "detail": "Root bypass capability checks — vì vậy trùng UID 0 với user thường (hacking classic) là leo thang tức thì.",
+            "tone": "stop"
+          },
+          {
+            "label": "sudo: sổ ủy quyền",
+            "detail": "sudoers quy định ai chạy lệnh gì as whom; NOPASSWD rộng = ủy quyền không kiểm soát.",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "/etc/passwd, /etc/shadow, /etc/group",
+          "paragraphs": [
+            "passwd mỗi dòng: username:x:UID:GID:GECOS:home:shell. Field 'x' nghĩa là hash chuyển sang shadow. Shell cuối dòng quyết định tài khoản có đăng nhập interactive được không: /sbin/nologin cho service account là hardening chuẩn. group: groupname:x:GID:members — user có thể thuộc nhiều nhóm supplementary.",
+            "shadow: username:hash:lastchg:min:max:warn:…. Hash format hiện đại $y$ (yescrypt)/$6$ (sha512crypt) kèm salt. File này phải không thể đọc bởi thường-user: mode 0640 root:shadow hoặc 0600. Nếu thường-user đọc được hash → offline cracking chỉ còn là bài toán thời gian; đây là finding mức P1 khi gặp."
+          ],
+          "points": [
+            "UID range: 0 root, 1–999 system/service accounts (distro-dependent), 1000+ human users.",
+            "Two accounts same UID = kernel coi là MỘT identity — backdoor kinh điển (user mới uid 0).",
+            "chkconfig-style: kiểm 'x' trong passwd + shadow permissions là hai check 30 giây đầu tiên."
+          ]
+        },
+        {
+          "title": "su vs sudo: Hai Triết lý Lên Quyền",
+          "paragraphs": [
+            "su - : đổi identity sang user khác, hỏi mật khẩu của TARGET. Trúng password root = full shell vô hạn định, không audit lệnh. sudo: hỏi mật khẩu của CHÍNH MÌNH (mặc định) và đối chiếu sudoers: user/host/runas/command. Ưu điểm: ủy quyền tối thiểu ('nam được systemctl restart nginx'), có timestamp timeout, và LOG đầy đủ (sudo log từng command) — phục vụ cả vận hành lẫn forensics.",
+            "Sudoers dễ cấu hình sai thành lỗ hổng: 'NOPASSWD: ALL' cho mọi user; wildcard 'ALL' trong cmd; EDITOR-based escape (sudo vim/:e!:shell; sudo less → !sh) — quy tắc review: mọi rule cho chương trình có khả năng spawn shell (vi/less/more/find/awk…) thực tế là ALL trừ khi dùng NOEXEC/SudoEdit cẩn trọng."
+          ],
+          "points": [
+            "visudo kiểm syntax trước khi save — sai cú pháp sudoers có thể khóa mọi người khỏi sudo.",
+            "use_pty + logfile trong sudoers tăng cường audit phiên.",
+            "sudo -l là lệnh đầu tiên của pentester trên Linux: liệt kê chính xác mình được chạy gì as ai."
+          ]
+        },
+        {
+          "title": "Service Account: Khách Cường háo Hay Người Ở Trọ Gọn gàng?",
+          "paragraphs": [
+            "Service (nginx, postgres, app custom) cần chạy dưới account riêng — không phải root, không phải nhân viên. Chuẩn hardening: dedicated UID/GID (không shared giữa hai dịch vụ khác owner), shell /usr/sbin/nologin, không password hợp lệ (hash ! hoặc *), home dir không cần thiết hoặc readonly, và sudo scope = rỗng. Shared service account ('appuser cho mọi app') là anti-pattern: một app bị chiếm là mọi app cùng chết.",
+            "Mapping sang threat model: khi app bị RCE, attacker kế thừa ĐÚNG UID đó — mọi file service account sở hữu, mọi nhóm nó thuộc, mọi sudo rule nó có. Thu hẹp identity của service = thu hẹp blast radius. Đây là nguyên tắc least privilege ở tầng danh tính, nền cho toàn bộ track os02."
+          ],
+          "points": [
+            "systemd unit có User=/Group=/NoNewPrivileges=yes — đọc unit file là đọc identity của service.",
+            " Supplementary groups là nguồn quyền ẩn: user 'hình như không có quyền' nhưng thuộc group docker/wheel là chuyện khác.",
+            "Account inventory: useradd mặc định tạo UID tuần tự — UID lạ ngoài dải chuẩn là điểm hỏi."
+          ]
+        },
+        {
+          "title": "Kiểm toán Danh tính 30 Giây",
+          "paragraphs": [
+            "Bộ check nhanh khi đặt chân lên host (trong ROE): (1) id — tôi là ai, thuộc nhóm gì; (2) sudo -l — được ủy quyền gì; (3) ls -l /etc/shadow — permission chuẩn chưa; (4) awk -F: '$3==0{print}' /etc/passwd — có bao nhiêu UID 0 (phải đúng 1: root); (5) grep sh$ /etc/passwd — ai có login shell (human + service sai cấu hình). Năm check này phủ phần lớn finding identity-level phổ biến.",
+            "Blue team mirror: monitor useradd/usermod (auditd), alert UID 0 mới, periodic review sudoers diff, và inventory service account với owner. Residual risk: sudoers phức tạp khó audit tay — cần tool parse (sudo -U root -l cho từng user) và CI check cho sudoers change."
+          ],
+          "points": [
+            "Auditd rules cho /etc/passwd,/etc/shadow,/etc/sudoers write — bắt thay đổi identity sớm.",
+            "Shared human account ('devteam') phá vỡ attribution trong forensics — cấm trong policy.",
+            "SSH key audit song song: authorized_keys của root là cửa hậu phổ biến ngang sudoers."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Identity Desk — Kiểm toán 30 Giây",
+        "objective": "Đọc passwd/shadow/sudoers mô phỏng để phát hiện UID trùng, shadow lộ quyền, sudo rule quá rộng, và thiết kế service account chuẩn.",
+        "scenario": "Bạn audit một server staging Linux mô phỏng. Có: /etc/passwd excerpt, permission listing của /etc/shadow, đoạn sudoers, và danh sách service account đang chạy. Toàn bộ dữ liệu tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ dữ liệu mô phỏng; không thử đăng nhập/crack gì thật.",
+          "Mọi finding phải trích field/line cụ thể làm bằng chứng.",
+          "Fix đề xuất phải có bước verify tương ứng."
+        ],
+        "cases": [
+          {
+            "id": "id-case-01",
+            "title": "passwd excerpt khả nghi",
+            "context": "root:x:0:0:root:/root:/bin/bash | nam:x:1000:1000:Nam:/home/nam:/bin/bash | svc-api:x:1002:1002::/opt/api:/usr/sbin/nologin | backup:x:0:0:Backup Operator:/var/backups:/bin/bash | postgres:x:114:118::/var/lib/postgresql:/bin/bash",
+            "prompt": "Tìm mọi bất thường và xếp mức độ?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cần sửa shell của postgres thành nologin là hết vấn đề.",
+                "correct": false,
+                "rationale": "Đó là finding phụ (P3). Vấn đề nghiêm trọng nhất nằm ở dòng backup — không phải postgres shell."
+              },
+              {
+                "id": "B",
+                "label": "P1: backup có UID=0 — kernel coi nó là root thứ hai, mọi check 'if uid==0' đều qua; đây là backdoor/legacy cực nguy hiểm. P2: postgres có bash shell (service nên nologin). P3: svc-api chuẩn mực — dùng làm mẫu. Verify fix: awk -F:'$3==0' phải chỉ còn root.",
+                "correct": true,
+                "rationale": "Đọc đúng field thứ 3 (UID): trùng 0 là finding nặng nhất vì phá vỡ giả định 'root duy nhất'; xếp hạng theo impact và có verify step cụ thể."
+              },
+              {
+                "id": "C",
+                "label": "Backup Operator có GID 0 nên chỉ là thành viên nhóm root, không sao.",
+                "correct": false,
+                "rationale": "Field 3 là UID (primary identity), không phải GID membership — UID 0 nghĩa là identity ROOT thứ hai, mạnh hơn nhiều so với thuộc nhóm."
+              },
+              {
+                "id": "D",
+                "label": "svc-api có nologin nên chắc chắn không thể bị lạm dụng.",
+                "correct": false,
+                "rationale": "nologin chặn interactive login nhưng service vẫn chạy code dưới UID đó khi bị RCE — nologin không phải cách ly runtime."
+              }
+            ]
+          },
+          {
+            "id": "id-case-02",
+            "title": "sudoers rule quá tay",
+            "context": "Đoạn sudoers: 'nam ALL=(ALL) NOPASSWD: /usr/bin/vim' | 'deploy ALL=(root) NOPASSWD: /usr/bin/find /var/www -name *' | 'ops ALL=(root) NOPASSWD: ALL' | 'svc-backup ALL=(root) NOPASSWD: /usr/local/bin/backup.sh'",
+            "prompt": "Đánh giá từng rule và fix đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tất cả đều ổn vì đã chỉ định đường dẫn binary cụ thể.",
+                "correct": false,
+                "rationale": "Chỉ định path không đủ: vim/find đều có khả năng spawn shell hoặc đọc file tùy ý — rule trở thành root-equivalent trên thực tế."
+              },
+              {
+                "id": "B",
+                "label": "vim NOPASSWD = root-equivalent (vim :!sh, :e file) — thay bằng sudoedit; find với -exec hoặc wildcards = escape — chấm dứt hoặc NOEXEC + argument whitelist; ops ALL NOPASSWD là shared god-mode — tách nhỏ theo task; backup.sh ổn nếu script an toàn tự thân + owned root không writable-by-others. Verify: sudo -l từng user sau fix + thử escape path trong lab.",
+                "correct": true,
+                "rationale": "Hiểu đúng GTFOBins-style escapes cho vim/find; phân biệt rule an toàn (script fixed-path) và rule nguy hiểm; mọi fix có verify step."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần bỏ NOPASSWD (bắt buộc nhập mật khẩu) là mọi rule an toàn.",
+                "correct": false,
+                "rationale": "Password prompt không cứu được vim/find escape — user nhập pass xong vẫn spawn shell root; bản chất rule mới là vấn đề."
+              },
+              {
+                "id": "D",
+                "label": "Xóa toàn bộ sudoers, mọi người dùng su - root.",
+                "correct": false,
+                "rationale": "Su quay lại mô hình shared-root-password không audit — lùi một bước so với sudo; hướng đúng là siết rule chứ không bỏ framework."
+              }
+            ]
+          },
+          {
+            "id": "id-case-03",
+            "title": "Thiết kế service account cho app mới",
+            "context": "Team sẽ deploy app Python (chỉ bind port 8080, đọc config /opt/app/config.yml, ghi log /var/log/app/). Đề xuất A: chạy bằng root cho 'đỡ phiền'; đề xuất B: account app01 (UID 1101, nologin, no-password-hash), owns /opt/app + /var/log/app, systemd unit NoNewPrivileges=yes; đề xuất C: dùng chung account svc-shared đang tồn tại cho 5 app khác.",
+            "prompt": "Chọn và biện luận?",
+            "options": [
+              {
+                "id": "A",
+                "label": "A hợp lý vì app cần bind port thấp — root là bắt buộc.",
+                "correct": false,
+                "rationale": "Port 8080 > 1024 không cần đặc quyền; và ngay cả port thấp cũng có CAP_NET_BIND_SERVICE thay vì full root."
+              },
+              {
+                "id": "B",
+                "label": "B đúng chuẩn least-privilege: dedicated UID tách blast radius, nologin chặn interactive, ownership chỉ phủ đúng path cần, NoNewPrivileges chặn escalation từ process compromised. Verify: chạy app, kiểm ps -o uid, thử ghi ngoài /opt/app phải fail.",
+                "correct": true,
+                "rationale": "Áp đúng nguyên tắc identity-minimization từ mental model; mỗi thuộc tính gắn một lý do bảo vệ; có verification cụ thể."
+              },
+              {
+                "id": "C",
+                "label": "C tiết kiệm quản lý — một account cho tất cả app là gọn nhất.",
+                "correct": false,
+                "rationale": "Shared service account = blast radius gộp: một app RCE là 5 app cùng identity, forensics không phân biệt được ai làm gì."
+              },
+              {
+                "id": "D",
+                "label": "B nhưng cho thêm group wheel để tiện debug sau này.",
+                "correct": false,
+                "rationale": "Thêm wheel = mở cửa sudo cho service account — phá chính ưu điểm của B; debug access nên đi đường riêng có audit."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Đọc đúng từng field của passwd/shadow/sudoers và trích evidence chính xác.",
+          "Nhận diện sudo rule có khả năng escape thành root-equivalent.",
+          "Thiết kế service account theo least-privilege với verify step cụ thể."
+        ],
+        "evidenceTemplate": [
+          "Bảng finding: line/field → ý nghĩa → severity → fix → verify",
+          "Kết quả sudo -l mô phỏng trước/sau fix",
+          "Spec service account: UID, shell, ownership, systemd directives",
+          "Danh sách check 30-giây áp dụng được cho host tiếp theo"
+        ],
+        "reset": "Đặt lại lựa chọn để audit lại identity từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không đăng nhập hay crack thật."
+      },
+      "governance": {
+        "prevent": [
+          "Policy: một service một account, nologin, không password hash; cấm shared human account.",
+          "Sudoers review qua CI (parse + deny-pattern vim/find/less NOPASSWD ALL…); visudo mandatory.",
+          "Baseline: shadow 0640/0600, chỉ 1 UID 0, system accounts dải 1–999 không có shell hợp lệ."
+        ],
+        "observe": [
+          "Auditd watch /etc/passwd,/etc/shadow,/etc/sudoers,/etc/sudoers.d — alert mọi write ngoài pipeline.",
+          "Periodic: awk UID==0 scan; diff sudoers; authorized_keys inventory cho root."
+        ],
+        "respond": [
+          "Phát hiện UID 0 lạ: khóa ngay, điều tra nguồn tạo (auditd log), xoay mọi credential host nghi ngờ.",
+          "Sudoers drift: rollback qua git-managed config, xác minh bằng sudo -l matrix cho toàn bộ user."
+        ],
+        "residualRisk": [
+          "sudoers phức tạp (wildcard, runas alias) vẫn khó audit tay — cần tooling hỗ trợ.",
+          "Service account vẫn là identity bị nhắm khi app RCE — least-privilege giảm thiểu chứ không zero hóa."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Kernel biết user theo tên, nên đổi tên user ảnh hưởng quyền.",
+          "correction": "Kernel chỉ làm việc với UID/GID số; đổi tên trong passwd không đổi quyền — ngược lại, trùng UID là trùng identity dù tên khác nhau."
+        },
+        {
+          "claim": "nologin shell giúp service account an toàn tuyệt đối.",
+          "correction": "nologin chỉ chặn interactive SSH/console login; khi app bị RCE, attacker vẫn chạy code dưới UID đó qua chính service — isolation thật đến từ OS controls (systemd sandbox, capabilities)."
+        },
+        {
+          "claim": "sudo an toàn hơn su vì phải nhập mật khẩu.",
+          "correction": "Khác biệt cốt lõi là SCOPING + AUDIT: sudo giới hạn lệnh theo sudoers và log từng lần; su trao full identity. Rule sudo sai (vim/find NOPASSWD) thì vẫn root-equivalent dù có mật khẩu."
+        },
+        {
+          "claim": "Thuộc nhóm wheel/sudo là điều kiện đủ để lên root.",
+          "correction": "Membership chỉ mở ĐIỀU KIỆN dùng sudo; phạm vi thật sự do sudoers quyết định — và ngược lại, không thuộc wheel vẫn có thể có rule riêng trong sudoers.d."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os02-l14-q1",
+          "difficulty": "easy",
+          "question": "Field 'x' ở vị trí password trong dòng /etc/passwd có ý nghĩa gì?",
+          "options": [
+            { "id": "A", "label": "User bị khóa, không thể đăng nhập" },
+            { "id": "B", "label": "Hash mật khẩu đã chuyển sang /etc/shadow" },
+            { "id": "C", "label": "User không có mật khẩu" },
+            { "id": "D", "label": "User chỉ đăng nhập bằng SSH key" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "x = password hash nằm trong /etc/shadow (tách quyền đọc); '!'/ '*' mới thường ám chỉ không-login-by-password."
+        },
+        {
+          "id": "os02-l14-q2",
+          "difficulty": "medium",
+          "question": "Rule sudoers 'dev1 ALL=(root) NOPASSWD: /usr/bin/less /var/log/app.log' có vấn đề gì?",
+          "options": [
+            { "id": "A", "label": "Không có — đường dẫn và file đã cố định" },
+            {
+              "id": "B",
+              "label": "less có khả năng chạy lệnh ngoài (!command) và mở file khác — thực tế trở thành root shell; cần NOEXEC hoặc thay bằng công cụ không-spawn-shell"
+            },
+            { "id": "C", "label": "Vấn đề duy nhất là thiếu mật khẩu" },
+            { "id": "D", "label": "Rule sai cú pháp, sudo sẽ báo lỗi" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Pager (less/more) cho phép '!sh' từ giao diện — mọi binary có khả năng spawn process khi chạy qua sudo là root-escape trừ khi NOEXEC được áp đúng cách."
+        },
+        {
+          "id": "os02-l14-q3",
+          "difficulty": "hard",
+          "question": "awk -F: '$3==0' trên /etc/passwd trả về 2 dòng: root và backupadm. Tại sao đây là finding P1 thay vì P3?",
+          "options": [
+            { "id": "A", "label": "Vì tên backupadm nghe không chính thống" },
+            {
+              "id": "B",
+              "label": "Vì UID 0 là identity root THỨ HAI: mọi permission check của kernel nhánh uid==0 đều cho qua — backupadm có toàn quyền root mà không xuất hiện trong nhóm sudo/admin nào, rất khó bị policy và monitoring thông thường bắt được"
+            },
+            { "id": "C", "label": "Vì hai dòng giống nhau dễ gây nhầm lẫn parser" },
+            { "id": "D", "label": "Vì backupadm nên dùng GID 0 thay vì UID 0" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Quyền root nằm ở SO SÁNH SỐ, không ở nhóm danh nghĩa. UID 0 thứ hai là root ngầm — vượt qua mọi control dựa trên membership/monitoring nhóm admin."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn thiết kế identity scheme cho một fleet 50 server Linux mô phỏng gồm 3 lớp: web tier (nginx), app tier (Python apps), DB tier (PostgreSQL), quản trị qua bastion + Ansible (ansible user chạy trên mọi host). Yêu cầu: attribution rõ ràng khi incident, không shared account, sudo scope đo được.",
+        "tasks": [
+          "Thiết kế naming + UID allocation scheme cho human/service/automation accounts trên cả fleet (tránh UID collision khi merge mạng).",
+          "Viết sudoers template cho ansible user: chỉ cần gì cho automation, không ALL — và cách verify matrix bằng sudo -l.",
+          "Đề xuất auditd + alerting rule set cho identity changes (useradd, sudoers, authorized_keys) với ngưỡng cụ thể."
+        ],
+        "requiredEvidence": [
+          "Bảng allocation scheme: lớp, dải UID, shell, password policy",
+          "Sudoers template + matrix verify",
+          "Auditd ruleset với action/alert tương ứng"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Linux man-pages — passwd(5), shadow(5), group(5)",
+          "url": "https://man7.org/linux/man-pages/man5/passwd.5.html",
+          "publisher": "Linux Kernel Organization",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cấu trúc field của passwd/shadow/group",
+            "Ý nghĩa placeholder 'x' và hash formats"
+          ]
+        },
+        {
+          "title": "sudo — Sudoers Manual (sudoers(5))",
+          "url": "https://www.sudo.ws/docs/man/sudoers.man/",
+          "publisher": "Sudo Project",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cú pháp rule user/host/runas/command",
+            "Tags NOPASSWD/NOEXEC và hành vi logging"
+          ]
+        },
+        {
+          "title": "NIST SP 800-123 — Guide to General Server Security (account & privilege sections)",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-123/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Khuyến nghị least privilege cho service accounts",
+            "Nguyên tắc tách quyền admin và audit"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os02-l15-permission-bits-and-special-modes",
+      "slug": "permission-bits-and-special-modes",
+      "title": "Permission Bits, Umask & SUID/SGID/Sticky",
+      "summary": "Cơ chế rwx cho owner/group/other và octal notation; umask quyết định quyền mặc định; ba mode đặc biệt SUID/SGID/sticky và giá trị an ninh của chúng; quy trình kiểm toán world-writable và SUID inventory.",
+      "difficulty": "foundation",
+      "durationMinutes": 60,
+      "prerequisites": ["os02-l14-users-groups-and-identity-boundaries"],
+      "outcomes": [
+        "Giải mã chuỗi permission (vd -rwsr-xr-x, drwxrwsr-t) thành owner/group/other + special bits và chuyển đổi octal tương ứng.",
+        "Giải thích vai trò umask trong việc quyết định permission mặc định khi tạo file và tính toán kết quả cụ thể (0666 & ~umask).",
+        "Phân tích cơ chế SUID/SGID: khi nào binary chạy với euid của owner thay vì invoker, và vì sao SUID là mặt trận leo thang đặc quyền số một trên Linux.",
+        "Thực hành quy trình kiểm toán: tìm world-writable files/dirs, SUID binaries lạ, và đề xuất remediation theo whitelist."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["linux"],
+      "attackTactics": ["TA0004"],
+      "keywords": ["permission-bits", "umask", "suid", "sticky-bit", "privilege-audit"],
+      "safetyLevel": "safe",
+      "mentalModel": "Permission là ba vòng rào đồng tâm quanh mỗi inode: vòng trong cho OWNER, giữa cho GROUP, ngoài cho OTHERS — mỗi vòng ba chốt đọc/ghi/chạy. Umask là khuôn đúc: khi tạo file mới, khuôn cắt bớt chốt nào thì chốt đó đóng sẵn. Ba mode đặc biệt là những con tem vàng dán lên rào: SUID nói 'ai mở cánh cửa này cũng tạm mặc áo của chủ nhà' — mạnh và nguy hiểm nhất vì nó tạm mượn identity; SGID tương tự cho nhóm (hoặc ép nhóm trên directory); sticky nói 'chỉ chủ mới được dọn đồ trong phòng chung'. Leo thang đặc quyền trên Linux phần lớn là săn tìm chỗ nào tem vàng dán sai chỗ.",
+      "visual": {
+        "title": "Ba Vòng Rào và Tem Vàng",
+        "caption": "rwx × (owner,group,other) + 3 special bits; SUID biến binary thành cây cầu mượn identity owner.",
+        "steps": [
+          {
+            "label": "Owner ring",
+            "detail": "uid khớp file owner → áp cột owner; không khớp mới nhìn xuống group/other — kernel chọn MỘT cột duy nhất.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Group/Other rings",
+            "detail": "GID process ∈ file group → cột group; else cột other. 'Other' là cả thế giới — mọi chốt mở ở đây là lời mời.",
+            "tone": "caution"
+          },
+          {
+            "label": "SUID tem vàng",
+            "detail": "-rws trên owner-exec: process chạy với EUID = owner (thường root). Binary SUID-root có bug = root cho mọi local user.",
+            "tone": "stop"
+          },
+          {
+            "label": "SGID & sticky",
+            "detail": "SGID trên dir: file mới kế thừa group dir (chuẩn cho share nhóm); sticky trên dir: chỉ owner được xóa entry (/tmp).",
+            "tone": "allow"
+          },
+          {
+            "label": "Umask khuôn đúc",
+            "detail": "0666 & ~022 = 0644 cho file; 0777 & ~022 = 0755 cho dir — umask 077 cho môi trường nhạy cảm.",
+            "tone": "neutral"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Giải Mã Chuỗi Permission và Octal",
+          "paragraphs": [
+            "Chuỗi 10 ký tự: [type][owner rwx][group rwx][other rwx]. Kernel quyết định áp cột nào theo identity của process so với file (owner match → cột owner, else group match → group, else other) — chỉ MỘT cột có hiệu lực, không cộng dồn. Octal: r=4,w=2,x=1; vd 754 = rwxr-xr--.",
+            "Chi tiết hay bỏ sót: (1) x trên DIRECTORY nghĩa là traverse (đi xuyên qua để chạm path sâu hơn) — không có x, kể cả có r cũng không chạm được file con theo path; (2) w trên directory = quyền sửa DANH SÁCH entry (tạo/xóa/rename) bất kể quyền của chính file bên trong; (3) r mà không x trên dir chỉ cho liệt kê tên, không stat được."
+          ],
+          "points": [
+            "chmod 000 vẫn không chặn root — root bypass DAC checks (CAP_DAC_OVERRIDE).",
+            "Permission của symlink hầu như bị bỏ qua (luôn lrwxrwxrwx) — quyền xét trên đích.",
+            "stat -c '%a %U:%G %n' là cách in nhanh octal + owner cho audit."
+          ]
+        },
+        {
+          "title": "Umask: Khuôn Đúc Quyền Mặc định",
+          "paragraphs": [
+            "Khi process tạo file/dir, kernel lấy mode yêu cầu AND NOT(umask): file 0666 & ~022 → 0644; dir 0777 & ~022 → 0755. Umask 022 (mặc định phổ biến) cắt w cho group/other; umask 077 cắt hết trừ owner — phù hợp môi trường dữ liệu nhạy cảm; umask 000 là thảm họa tiệm cận (mọi file mới world-writable).",
+            "Vận hành: umask đặt trong profile/systemd Environment/unit file; mỗi service có thể có umask riêng — kiểm audit là so sánh permission THỰC TẾ của file mới sinh ra với kỳ vọng, không chỉ đọc config. File nhạy cảm sinh ra đã 0644 (như dump DB vào /backup) là finding dù umask config 'đẹp'."
+          ],
+          "points": [
+            "cp giữ mode nguồn (trừ umask ảnh hưởng theo cách gọi); tar/rsync mang permission theo — copy cross-system cần review lại.",
+            "setgid directory + umask 002 là combo chuẩn cho thư mục nhóm chia sẻ.",
+            "ACL POSIX mở rộng khi permission bits truyền thống không đủ biểu diễn (dấu '+' cuối chuỗi)."
+          ]
+        },
+        {
+          "title": "SUID: Tem Vàng Nguy hiểm Nhất",
+          "paragraphs": [
+            "SUID (octal 4000, ký tự s tại owner-exec): khi EXECUTE, process nhận Effective UID = owner của file thay vì invoker. Mục đích hợp lệ: passwd cần ghi /etc/shadow nên binary /usr/bin/passwd là SUID-root — user thường tạm mượn quyền root CHỈ trong program đó. Rủi ro: nếu binary đó có lối thoái (shell escape), buffer overflow, hoặc có thể được nuôi env để hành xử khác — quyền root rơi vào tay invoker. Lịch sử leo thang Linux đầy các case SUID: binary SUID-root lạ do admin chừa, nmap cũ cài setuid, script interpreter SUID (bash bỏ hỗ trợ vì vô ích về an ninh).",
+            "SGID (2000) tương tự cho group; trên DIRECTORY nghĩa khác: file mới sinh trong dir kế thừa GROUP của dir — dùng cho workspace nhóm. Sticky (1000) trên directory: chỉ owner của entry (hoặc dir owner) được xóa/rename — /tmp là ví dụ quốc dân."
+          ],
+          "points": [
+            "Script shell SUID vô ích (kernel bỏ SUID cho interpreter) — thấy .sh SUID là dấu hiệu cấu hình nhảm.",
+            "SUID trên binary do USER thường own = user đó có thể trở root bất cứ lúc nào (binary của họ, quyền của root).",
+            "noSUID mount option cho partition không cần SUID (vd /home) cắt gọn mặt trận."
+          ]
+        },
+        {
+          "title": "Quy trình Kiểm toán và Remediation",
+          "paragraphs": [
+            "Bộ lọc kiểm toán chuẩn: find / -xdev -type f -perm -0002 (world-writable files); -type d -perm -0002 ! -perm -1000 (world-writable dirs thiếu sticky); -type f -perm -4000 (SUID inventory); -perm -2000 (SGID). So kết quả với WHITELIST tài liệu hóa — mọi dòng ngoài whitelist là finding. Với SUID: hỏi ba câu — cần không? owner đúng không? binary này có escape history không?",
+            "Remediation theo thứ tự an toàn: (1) chmod o-w cho world-writable (kiểm app không vỡ), (2) chown lại file lạ, (3) gỡ SUID không cần (chmod u-s), (4) với SUID cần giữ: xem xét capabilities granular (setcap cap_net_raw=ep thay vì SUID toàn quyền). Telemetry: auditd watch chmod/setuid events; AIDE/tripwire baseline permission tree — drift là alarm."
+          ],
+          "points": [
+            "World-writable + sticky (/tmp-like) là hợp lệ; world-writable KHÔNG sticky là finding ngay.",
+            "SUID inventory phải so với package manager: rpm -Va / debsums phát hiện binary hệ thống bị thêm SUID.",
+            "Home directory 777 hoặc authorized_keys 666 = SSH từ chối hoạt động — một số 'lỗi' là safety feature."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Permission Desk — Giải Mã và Kiểm toán",
+        "objective": "Giải mã chuỗi permission/octal chính xác, tính umask result, và chạy quy trình audit SUID/world-writable trên dữ liệu mô phỏng để ra finding + remediation.",
+        "scenario": "Bạn hardening một server legacy Linux mô phỏng trước khi internet-expose. Dữ liệu: bảng ls -la của /srv, /usr/local/bin và /home; umask của service user; kết quả find SUID. Toàn bộ tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ output mô phỏng; không chmod/find thật.",
+          "Mỗi giải mã phải chỉ ra cột owner/group/other + special bits rõ ràng.",
+          "Remediation theo thứ tự an toàn và kèm bước kiểm chứng không phá ứng dụng."
+        ],
+        "cases": [
+          {
+            "id": "perm-case-01",
+            "title": "Bảng ls -la của /srv/share",
+            "context": "drwxrwxrwx 3 root root . | -rw-rw-rw- 1 app1 app1 data.csv | drwxrwsr-x 2 devteam devteam projects | -rwsr-xr-x 1 root root 16K helper | drwxr-xr-x 2 root root configs",
+            "prompt": "Xếp hạng rủi ro từng dòng và fix tương ứng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "configs (755 root) là rủi ro cao nhất vì root-owned.",
+                "correct": false,
+                "rationale": "755 root-owned là pattern chuẩn; root ownership không tự thành rủi ro."
+              },
+              {
+                "id": "B",
+                "label": "P1: '.' và data.csv world-WRITABLE (bất kỳ user nào sửa/xóa nội dung); P2: helper SUID-root cần justify — nếu là custom binary phải audit escape, nếu không cần thì chmod u-s; OK: projects có setgid+755 chuẩn workspace nhóm, configs chuẩn. Fix theo thứ tự: o-w trước, SUID review sau, verify bằng re-run find.",
+                "correct": true,
+                "rationale": "World-writable là exposure tức thời cho mọi local user; SUID-root là mặt trận escalation cần justify từng binary; setgid-dir là pattern hợp lệ; thứ tự remediation tránh phá app."
+              },
+              {
+                "id": "C",
+                "label": "projects (setgid) nguy hiểm nhất — setgid là SUID của group, phải gỡ ngay.",
+                "correct": false,
+                "rationale": "Setgid trên DIRECTORY là tính năng kế thừa group hợp lệ cho workspace; không phải escalation vector như SUID-binary."
+              },
+              {
+                "id": "D",
+                "label": "data.csv rw-rw- chỉ cho owner+group nên an toàn.",
+                "correct": false,
+                "rationale": "Chuỗi là rw-rw-RW-: other cũng có rw — world-writable file chứa dữ liệu app là exposure đầy đủ."
+              }
+            ]
+          },
+          {
+            "id": "perm-case-02",
+            "title": "Umask của service user",
+            "context": "Service user 'reportgen' có umask 022 trong profile, nhưng systemd unit chạy service với Environment=UMASK không set và systemd default UMASK=0022. Service tạo báo cáo vào /srv/reports. Audit thấy file mới nhất: -rw-rw---- 1 reportgen reportgen q3.xlsx — team khẳng định 'do umask 022 nên phải là 644, file này lạ'.",
+            "prompt": "Diễn giải đúng hiện tượng là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "File bị hacker sửa quyền — isolate server ngay.",
+                "correct": false,
+                "rationale": "Nhảy vào kết luận tấn công khi có giải pháp cấu hình đơn giản hơn là thiếu kỷ luật; cần kiểm ứng dụng trước."
+              },
+              {
+                "id": "B",
+                "label": "Ứng dụng tự gọi chmod/fopen với mode cụ thể (0660) SAU khi tạo file — application-level override thắng umask; verify bằng strace open/chmod của service trong lab; đây không phải anomaly an ninh trừ khi app không chủ động làm điều đó.",
+                "correct": true,
+                "rationale": "Umask chỉ áp cho mode REQUEST lúc create; app có thể chmod sau — hiểu đúng thứ tự quyết định quyền giúp tránh false-positive trong audit và biết chỗ cần fix (app config) thay vì nghi ngờ."
+              },
+              {
+                "id": "C",
+                "label": "systemd bỏ qua umask của user — phải set UMask= trong unit.",
+                "correct": false,
+                "rationale": "UMask= trong unit là cách ĐẶT đúng, nhưng hiện tượng 660 không giải thích bằng 'bị bỏ qua' — 0022 sẽ cho 644 chứ không tự sinh 660."
+              },
+              {
+                "id": "D",
+                "label": "660 là mode mặc định của xlsx nên không liên quan permission Linux.",
+                "correct": false,
+                "rationale": "Mode file do OS quyết định; nội dung định dạng không mang permission — nhầm lẫn tầng."
+              }
+            ]
+          },
+          {
+            "id": "perm-case-03",
+            "title": "Kết quả find SUID",
+            "context": "find / -xdev -perm -4000 trả về: /usr/bin/passwd, /usr/bin/sudo, /usr/bin/mount, /usr/lib/openssh/ssh-keysign (chuẩn distro) — cộng thêm: /usr/local/bin/dbadmin (custom, owner dba1, mode 4755), /home/carlos/tools/nmap (owner carlos, 4755). Package verify: hai file custom KHÔNG thuộc package nào.",
+            "prompt": "Phân tích và remediation đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cả hai file custom là backdoor chắc chắn — format lại server.",
+                "correct": false,
+                "rationale": "Có thể là công cụ admin cài tay (dbadmin) — nghi ngờ hợp lệ nhưng kết luận backdoor cần evidence (inspect binary, hỏi owner, so checksum); format lại bỏ sót root cause."
+              },
+              {
+                "id": "B",
+                "label": "P1: nmap SUID trong /home/carlos — nmap interactive mode cho shell với EUID owner; owner carlos thường-user nghĩa là CARLOS có root-on-demand, và mọi người chạy nó cũng nhận EUID carlos; gỡ SUID ngay (nmap không cần). P1: dbadmin SUID-root owned by dba1 — root bridge cho dba1; inspect + hỏi purpose, nếu cần thì thay bằng sudo scoped rule. Chuẩn distro giữ nguyên. Verify: re-run find + so whitelist.",
+                "correct": true,
+                "rationale": "Hiểu đúng cơ chế: SUID binary của user thường = cây cầu cá nhân lên quyền owner; phân tích theo risk từng file thay vì paint-all; remediation giữ binary hợp lệ, gỡ cái lạm dụng."
+              },
+              {
+                "id": "C",
+                "label": "Chmod 000 hai file custom để vô hiệu hóa.",
+                "correct": false,
+                "rationale": "Phá chức năng có thể đang được dùng hợp lệ; đúng hơn là gỡ SUID bit (giữ binary chạy non-privileged) trong khi điều tra."
+              },
+              {
+                "id": "D",
+                "label": "Không sao — SUID là cơ chế bình thường của Linux.",
+                "correct": false,
+                "rationale": "Cơ chế bình thường, nhưng SUID ngoài whitelist của distro là anomaly cần giải thích — 'bình thường' không đồng nghĩa 'mọi instance đều an toàn'."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Giải mã chính xác chuỗi permission + octal + special bits từ ls output.",
+          "Giải thích đúng thứ tự quyết định quyền: requested mode → umask → app chmod.",
+          "Chạy audit SUID/world-writable theo whitelist và xếp remediation an toàn."
+        ],
+        "evidenceTemplate": [
+          "Bảng giải mã: chuỗi → owner/group/other + special → octal → đánh giá",
+          "Tính toán umask: mode request & ~umask → kết quả",
+          "SUID inventory: file, owner, whitelist?, verdict",
+          "Remediation plan theo thứ tự + verification commands"
+        ],
+        "reset": "Đặt lại lựa chọn để kiểm toán lại permission từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không chmod/find thật."
+      },
+      "governance": {
+        "prevent": [
+          "Whitelist permission baseline (SUID + world-writable) quản lý bằng config management; drift tự động revert/alert.",
+          "Standard umask theo tier (077 cho DB/backup hosts); systemd UMask= trong unit file.",
+          "Policy cấm script-interpreter SUID và SUID binary của user thường; ưu tiên capabilities granular thay SUID."
+        ],
+        "observe": [
+          "Auditd watch chmod/setresuid events; AIDE integrity cho /usr + /etc permission tree.",
+          "Scheduled find SUID/world-writable so với whitelist — diff là alert."
+        ],
+        "respond": [
+          "SUID lạ: gỡ bit (giữ binary), inspect origin (package? checksum?), truy vết ai cài (auditd/bash history).",
+          "World-writable drift: thu hồi o-w, kiểm ứng dụng liên quan, cập nhật whitelist nếu hợp lệ có owner."
+        ],
+        "residualRisk": [
+          "Capabilities misconfigured (cap_setuid+) có thể tái tạo rủi ro SUID — audit cả getcap.",
+          "App tự chmod sau khi tạo file làm umask-level control thiếu hiệu lực — cần app-level review."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Kernel cộng dồn quyền owner + group + other cho process.",
+          "correction": "Chọn ĐÚNG MỘT cột theo thứ tự owner→group→other; process là owner thì cột other/group không còn nghĩa — hiểu sai này gây đánh giá quyền lệch."
+        },
+        {
+          "claim": "Sticky bit và SUID là một cơ chế trên directory.",
+          "correction": "Trên DIRECTORY chỉ có ý nghĩa: setgid (kế thừa group) và sticky (bảo vệ xóa); SUID trên directory vô nghĩa theo POSIX. SUID/SGID trên FILE mới là mượn identity khi execute."
+        },
+        {
+          "claim": "umask áp dụng cả khi app chủ động chmod.",
+          "correction": "umask chỉ cắt mode tại thời điểm CREATE; app gọi chmod/fopen(mode) sau đó thì quyền cuối theo app — audit permission phải nhìn kết quả thực tế."
+        },
+        {
+          "claim": "SUID-root binary của distro đều an toàn vì 'của hãng'.",
+          "correction": "An toàn tương đối theo version: SUID binary cũ có CVE leo thang (vd các case pkexec/pwnkit) — inventory phải đi kèm patch management, không chỉ whitelist tên."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os02-l15-q1",
+          "difficulty": "easy",
+          "question": "Octal permission 754 tương ứng chuỗi nào?",
+          "options": [
+            { "id": "A", "label": "rwxr-xr--" },
+            { "id": "B", "label": "rwxrwxr-x" },
+            { "id": "C", "label": "r-xr-xr--" },
+            { "id": "D", "label": "rwx------" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "7=rwx (owner), 5=r-x (group), 4=r-- (other)."
+        },
+        {
+          "id": "os02-l15-q2",
+          "difficulty": "medium",
+          "question": "Với umask 027, file mới được tạo với mode request 0666 sẽ có permission cuối là gì?",
+          "options": [
+            { "id": "A", "label": "644 (rw-r--r--)" },
+            { "id": "B", "label": "640 (rw-r-----)" },
+            { "id": "C", "label": "600 (rw-------)" },
+            { "id": "D", "label": "664 (rw-rw-r--)" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "0666 & ~027 = 0640: cắt w cho group (7=cắt rwx... cụ thể mask 027 cắt group-w và everything-other trừ r). Công thức: 666 − 027 tính bitwise AND-NOT = 640."
+        },
+        {
+          "id": "os02-l15-q3",
+          "difficulty": "hard",
+          "question": "Vì sao SUID trên binary owned by USER THƯỜNG được xem là finding nghiêm trọng?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì kernel cấm SUID cho file của user thường — presence nghĩa là filesystem lỗi"
+            },
+            {
+              "id": "B",
+              "label": "Vì execute sẽ đặt EUID = owner (user thường đó) — nhưng quan trọng hơn: owner kiểm soát NỘI DUNG binary, nên owner có thể sửa binary thành bất kỳ payload nào và bất kỳ ai chạy nó cũng hành xử dưới identity owner; ngược lại owner tự có cây cầu mượn bất kỳ quyền nào gán"
+            },
+            { "id": "C", "label": "Vì SUID làm binary chạy chậm" },
+            {
+              "id": "D",
+              "label": "Vì user thường không thể chmod 4755 — appearance nghĩa là có attacker"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Chủ sở hữu kiểm soát file = kiểm soát hành vi của mọi phiên thực thi mang EUID owner; kết hợp writable-by-others thì bất kỳ ai cũng có thể biến nó thành root-bridge nếu owner là root — chuỗi này là nền của hàng loạt CVE leo thang."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn hardening một CI runner Linux mô phỏng: nhiều job build chạy cùng host, artifacts lưu /srv/builds, docker socket được mount cho job build-image, và một số tool legacy được cài SUID 'cho nhanh' (gcc-env wrapper do dev tự viết).",
+        "tasks": [
+          "Thiết kế permission model cho /srv/builds theo job isolation (per-job user/group + setgid dir + umask) — không job nào đọc artifacts job khác.",
+          "Đánh giá rủi ro docker socket mount và đề xuất alternative (rootless docker, socket proxy) ở mức khái niệm.",
+          "Audit SUID wrappers tự viết: xây decision tree giữ/gỡ/thay-thế (capabilities/sudo-scoped) với tiêu chí rõ ràng."
+        ],
+        "requiredEvidence": [
+          "Permission model dạng bảng: path → owner:group → mode → lý do",
+          "Phân tích docker-socket risk + alternatives so sánh",
+          "Decision tree SUID với tiêu chí pass/fail từng nhánh"
+        ]
+      },
+      "sources": [
+        {
+          "title": "POSIX / Linux man-pages — chmod(2), umask(2), credentials(7)",
+          "url": "https://man7.org/linux/man-pages/man2/umask.2.html",
+          "publisher": "Linux Kernel Organization",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cơ chế umask trong phép tính mode lúc create",
+            "Semantics S_ISUID/S_ISGID/S_ISVTX trên file và directory"
+          ]
+        },
+        {
+          "title": "Linux man-pages — capabilities(7) (CAP_DAC_OVERRIDE, setuid alternatives)",
+          "url": "https://man7.org/linux/man-pages/man7/capabilities.7.html",
+          "publisher": "Linux Kernel Organization",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Root bypass DAC qua capabilities",
+            "Granular capabilities như thế nào thay thế SUID toàn quyền"
+          ]
+        },
+        {
+          "title": "NIST SP 800-123 — Guide to General Server Security (file permission guidance)",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-123/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": ["Khuyến nghị permission baseline và audit định kỳ cho server"]
+        }
+      ]
+    }
+  ]
+}
