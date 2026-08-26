@@ -10,7 +10,7 @@ Updated: 2026-08-26
 - Machine-readable manifest: verified
 - Generation skill: active
 - Curriculum validator: verified
-- Full lesson migration/generation: in progress — 3 modules validated (9 lessons, 330 minutes) — Track 00 complete
+- Full lesson migration/generation: in progress — 4 modules validated (12 lessons, 510 minutes)
 - Existing Practice Range collections: preserved as auxiliary practice range
 
 The current `/offensive-security` content remains operational. It has not been declared equivalent to
@@ -19,13 +19,13 @@ Windows, Active Directory, cloud, research, or adversary-emulation tracks.
 
 ## Latest validated batch
 
-`os00-m03-evidence-and-disclosure` — Evidence, data handling and coordinated disclosure.
+`os01-m01-processes-data-and-addressing` — Processes, data representation, IP addressing and subnetting.
 
-Generated three closely related lessons (120 minutes total):
+Generated three closely related lessons (180 minutes total):
 
-- `os00-l07-evidence-collection-and-chain-of-custody` (40 min) — collect reproducible technical artifacts (raw HTTP request/response, command transcripts, PCAP), enforce cryptographic integrity with SHA-256 checksums, maintain Chain of Custody ledgers, and adhere to Minimum Viable PoC principles.
-- `os00-l08-sensitive-data-handling-and-redaction` (40 min) — classify sensitive compliance data (PII, PCI-DSS, HIPAA, Credentials), execute solid-fill redaction and format-preserving masking, enforce full-disk and GPG end-to-end encryption, and conduct verifiable NIST SP 800-88 secure data purging.
-- `os00-l09-coordinated-vulnerability-disclosure` (40 min) — operationalize ISO/IEC 29147 and CERT/CC Coordinated Vulnerability Disclosure (CVD) workflows, manage standard 90-day and emergency 7-day in-the-wild timelines, draft international Security Advisories with CVE/CWE/CVSS metadata, and resolve vendor non-responsiveness through trusted coordinators.
+- `os01-l01-process-memory-and-data-representation` (60 min) — analyze OS process lifecycles, execution security context (UID/GID, SUID), virtual memory architecture (Text, Data, BSS, Heap, Stack), binary data representations (Hex, ASCII, Base64), and Endianness byte orders (Little-Endian vs Big-Endian Network Order).
+- `os01-l02-ipv4-addressing-and-cidr-subnetting` (60 min) — decompose 32-bit IPv4 addresses, apply bitwise AND subnet masking, calculate Network ID, Broadcast ID, and usable host ranges from CIDR prefixes (/8 to /32), categorize special purpose ranges (RFC 1918 Private IP, APIPA 169.254.0.0/16, Loopback), and prevent out-of-scope scanning collisions.
+- `os01-l03-ipv6-foundations-and-dual-stack-boundaries` (60 min) — master 128-bit IPv6 hexadecimal syntax and RFC 5952 compression rules, differentiate address scopes (Link-Local fe80::/10, ULA, Global Unicast), trace SLAAC autoconfiguration and ICMPv6 Neighbor Discovery (NDP), and mitigate Dual-Stack firewall asymmetry and IPv6 VPN Leakage vulnerabilities.
 
 All labs are browser-only decision simulations. They accept no external target,
 credential, command or arbitrary payload. Completion requires all three lab cases and
@@ -41,13 +41,17 @@ all three quiz questions to be correct.
   - `os00-l04-scoping-boundaries-and-dependencies`
   - `os00-l05-rules-of-engagement-and-stop-conditions`
   - `os00-l06-deconfliction-and-operational-logging`
+- `os00-m03-evidence-and-disclosure` (120 min, 3 lessons):
+  - `os00-l07-evidence-collection-and-chain-of-custody`
+  - `os00-l08-sensitive-data-handling-and-redaction`
+  - `os00-l09-coordinated-vulnerability-disclosure`
 
 ## Next eligible batch
 
-`os01-m01-processes-data-and-addressing` — Processes, data representation, IP addressing and subnetting.
+`os01-m02-link-routing-and-segmentation` — Ethernet, ARP, routing, NAT, VLAN and VPN.
 
 Do not generate it in the current batch. It becomes eligible because
-`os00-ethics-authorization` (and all its modules) is validated.
+`os01-m01-processes-data-and-addressing` is validated.
 
 ## Required decisions before content migration
 
@@ -70,23 +74,23 @@ Do not generate it in the current batch. It becomes eligible because
   from similar keywords and do not copy the old content into the new JSON.
 - Completing a legacy mission does not automatically complete an academy lesson. The
   academy assessment remains the competency gate.
-- Module `os00-m03` intentionally has no legacy reference because none of the current
-  frontend-oriented missions teaches cryptographic chain of custody, data redaction standards, or coordinated vulnerability disclosure.
+- Module `os01-m01` intentionally has no legacy reference because none of the current
+  frontend-oriented missions teaches process memory layouts, IPv4 CIDR bitmath, or IPv6 dual-stack firewall boundaries.
 
 ## Evidence log
 
 - `npm run validate:offensive-security-curriculum`: passed — 19 tracks, 64 modules; next
-  eligible module is `os01-m01-processes-data-and-addressing`.
-- `npm run validate:offensive-security-content`: passed — validated `os00-m01`, `os00-m02`, and `os00-m03` (9 lessons, 330m).
-- Quality rubric review: 22/22 for each lesson in `os00-m03`; no dimension scored zero. The bounded
+  eligible module is `os01-m02-link-routing-and-segmentation`.
+- `npm run validate:offensive-security-content`: passed — validated `os00-m01`, `os00-m02`, `os00-m03`, and `os01-m01` (12 lessons, 510m).
+- Quality rubric review: 22/22 for each lesson in `os01-m01`; no dimension scored zero. The bounded
   decision labs provide reproducible evidence, governance sections cover prevention,
   observable records, response and residual risk, and each lesson ends with a new-context
   transfer challenge.
-- Authoritative sources: NIST SP 800-115, NIST SP 800-88 Rev. 1, ISO/IEC 27037:2012, ISO/IEC 29147:2018, CERT/CC CVD Guide, PCI SSC standards.
+- Authoritative sources: CS:APP (Carnegie Mellon), Linux man-pages, RFC 791 (IPv4), RFC 4632 (CIDR), RFC 8200 (IPv6), RFC 5952 (IPv6 representation).
 - `npm run lint`: passed.
 - `npx tsc --noEmit --incremental false`: passed.
 - `npm run build -- --webpack`: passed.
 - `git diff --check`: passed.
 
-Runtime integration: `/offensive-security/academy/evidence-and-disclosure` plus 3 statically generated
-lesson routes (`/evidence-collection-and-chain-of-custody`, `/sensitive-data-handling-and-redaction`, `/coordinated-vulnerability-disclosure`), persistent completion state, and Core Academy navigation.
+Runtime integration: `/offensive-security/academy/processes-data-and-addressing` plus 3 statically generated
+lesson routes (`/process-memory-and-data-representation`, `/ipv4-addressing-and-cidr-subnetting`, `/ipv6-foundations-and-dual-stack-boundaries`), persistent completion state, and Core Academy navigation.
