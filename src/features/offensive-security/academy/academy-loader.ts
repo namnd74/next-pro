@@ -1,14 +1,14 @@
-import rolesAndBoundariesData from '../data/academy/roles-and-boundaries.json';
-import rulesOfEngagementData from '../data/academy/rules-of-engagement.json';
-import evidenceAndDisclosureData from '../data/academy/evidence-and-disclosure.json';
-import processesDataAndAddressingData from '../data/academy/processes-data-and-addressing.json';
-import linkRoutingAndSegmentationData from '../data/academy/link-routing-and-segmentation.json';
-import dnsTransportAndTlsData from '../data/academy/dns-transport-and-tls.json';
-import enterpriseProtocolsAndPacketsData from '../data/academy/enterprise-protocols-and-packets.json';
-import filesIdentityPermissionsData from '../data/academy/files-identity-permissions.json';
-import windowsArchitectureIdentitiesAclsData from '../data/academy/windows-architecture-identities-acls.json';
-import processesServicesShellData from '../data/academy/processes-services-shell.json';
-import servicesPowershellRemoteData from '../data/academy/services-powershell-remote.json';
+import rolesAndBoundariesData from '../data/academy/os00-ethics-authorization/roles-and-boundaries.json';
+import rulesOfEngagementData from '../data/academy/os00-ethics-authorization/rules-of-engagement.json';
+import evidenceAndDisclosureData from '../data/academy/os00-ethics-authorization/evidence-and-disclosure.json';
+import processesDataAndAddressingData from '../data/academy/os01-network-foundations/processes-data-and-addressing.json';
+import linkRoutingAndSegmentationData from '../data/academy/os01-network-foundations/link-routing-and-segmentation.json';
+import dnsTransportAndTlsData from '../data/academy/os01-network-foundations/dns-transport-and-tls.json';
+import enterpriseProtocolsAndPacketsData from '../data/academy/os01-network-foundations/enterprise-protocols-and-packets.json';
+import filesIdentityPermissionsData from '../data/academy/os02-linux-foundations/files-identity-permissions.json';
+import windowsArchitectureIdentitiesAclsData from '../data/academy/os03-windows-foundations/windows-architecture-identities-acls.json';
+import processesServicesShellData from '../data/academy/os02-linux-foundations/processes-services-shell.json';
+import servicesPowershellRemoteData from '../data/academy/os03-windows-foundations/services-powershell-remote.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {

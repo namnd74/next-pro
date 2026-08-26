@@ -35,10 +35,20 @@ function requireTextArray(value, location, minimum = 1) {
 
 let fileNames = [];
 try {
-  const entries = await readdir(academyDir, { withFileTypes: true });
-  fileNames = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
-    .map((entry) => entry.name);
+  async function collectJsonFiles(dir) {
+    const found = [];
+    const entries = await readdir(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const entryPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        found.push(...(await collectJsonFiles(entryPath)));
+      } else if (entry.isFile() && entry.name.endsWith('.json')) {
+        found.push(entryPath);
+      }
+    }
+    return found;
+  }
+  fileNames = (await collectJsonFiles(academyDir)).sort();
 } catch (error) {
   console.error(`Unable to read academy directory: ${error.message}`);
   process.exit(1);
@@ -53,7 +63,7 @@ const quizDifficulties = ['easy', 'medium', 'hard'];
 const validatedModules = [];
 
 for (const fileName of fileNames) {
-  const contentPath = path.join(academyDir, fileName);
+  const contentPath = fileName;
   let academyModule;
   try {
     academyModule = JSON.parse(await readFile(contentPath, 'utf8'));
