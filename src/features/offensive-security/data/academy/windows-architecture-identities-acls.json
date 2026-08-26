@@ -1,0 +1,1100 @@
+{
+  "id": "os03-m01-architecture-identities-acls",
+  "slug": "windows-architecture-identities-acls",
+  "trackId": "os03-windows-foundations",
+  "title": "Kiến trúc Windows, Danh tính, Token, UAC & ACL",
+  "summary": "Tách user/kernel mode và mô hình Security Principal với SID; cấu trúc Access Token và cơ chế UAC filtered token; Security Descriptor với DACL/SACL và thứ tự đánh giá ACE — nền tảng đọc hiểu mọi ranh giới quyền trên Windows.",
+  "difficulty": "foundation",
+  "estimatedMinutes": 240,
+  "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+  "domains": ["windows"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os03-l16-windows-architecture-and-principals",
+      "slug": "windows-architecture-and-principals",
+      "title": "Kiến trúc Windows & Security Principals (SID)",
+      "summary": "Tách user mode/kernel mode và vai trò của subsystem; SID là danh tính số duy nhất; SAM local so với AD database; tài khoản máy và các tài khoản dịch vụ SYSTEM/NetworkService/LocalService.",
+      "difficulty": "foundation",
+      "durationMinutes": 80,
+      "prerequisites": [],
+      "outcomes": [
+        "Giải thích sự tách biệt user mode/kernel mode và tại sao hành vi đặc quyền đều phải đi qua kernel.",
+        "Phân tích cấu trúc SID (S-R-I-A-SA-RID), giải mã well-known SID như S-1-5-18 (SYSTEM) và ý nghĩa domain prefix.",
+        "So sánh SAM database (local) và Active Directory (domain) về nơi lưu trữ danh tính và phạm vi xác thực.",
+        "Phân biệt các tài khoản dịch vụ built-in: LocalSystem, LocalService, NetworkService về phạm vi quyền và mạng."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["windows"],
+      "attackTactics": [],
+      "keywords": [
+        "sid",
+        "security-principal",
+        "sam-database",
+        "localsystem",
+        "kernel-mode"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Windows chia thế giới thành hai tầng: tầng người (user mode — app của bạn sống ở đây, không chạm được phần cứng) và tầng thần (kernel mode — driver và nhân hệ điều hành). Mọi yêu cầu đặc quyền đều phải 'cầu nguyện' qua system call để kernel xét. Trong tầng người, mọi thực thể có tên đều mang một con số vĩnh viễn gọi là SID — người dùng, nhóm, máy tính, service đều vậy. Kernel không hỏi 'Nam là ai', nó đối chiếu SID trong token với ACL trên resource: giống hệt triết lý UID/GID của Linux nhưng phức tạp hơn vì SID mang cả 'họ tộc' (domain) bên trong. Hiểu SID là hiểu địa chỉ nhà; hiểu token (bài sau) là hiểu chiếc chìa khóa đang cầm.",
+      "visual": {
+        "title": "Hai Tầng Windows và Bản đồ SID",
+        "caption": "App chạy ở user mode, xin qua system call vào kernel; mọi principal mang SID định danh vĩnh viễn.",
+        "steps": [
+          {
+            "label": "User mode",
+            "detail": "Ứng dụng, service process — không truy cập trực tiếp hardware/memory của process khác; mọi thao tác nhạy cảm phải qua API.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Kernel mode",
+            "detail": "NT kernel + drivers — toàn quyền; driver độc hại/lỗi = game over, vì vậy driver signing là control bắt buộc.",
+            "tone": "stop"
+          },
+          {
+            "label": "SID cấu trúc",
+            "detail": "S-1-5-21-domain-1000: revision, authority, domain identifier, RID cuối = relative ID của principal.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Well-known SID",
+            "detail": "S-1-5-18 LocalSystem, S-1-5-32-544 Administrators, S-1-1-0 Everyone — cố định mọi máy, không phụ thuộc tên hiển thị.",
+            "tone": "caution"
+          },
+          {
+            "label": "SAM vs AD",
+            "detail": "Máy workgroup lưu account trong SAM (%SystemRoot%\\system32\\config\\SAM); domain join thì danh tính tập trung ở AD — cùng một máy, hai nguồn danh tính khác nhau.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "User Mode vs Kernel Mode: Ranh giới Đầu tiên",
+          "paragraphs": [
+            "CPU chạy code ở một trong hai chế độ: user mode (ring 3) bị chặn truy cập trực tiếp memory/IO; kernel mode (ring 0) toàn quyền. App muốn đọc file, mở network, tạo process đều phát sinh system call chuyển sang kernel xử lý rồi trả kết quả. Đây là ranh giới bảo mật số một của hệ điều hành: lỗ hổng trong app chỉ chiếm app; lỗ hổng trong kernel driver = toàn hệ thống.",
+            "Vì vậy assessment Windows luôn phân loại mục tiêu: exploit app-level (browser, office) cho user-context; exploit driver/kernel (BYOVD, driver CVE) cho SYSTEM/kernel context. Detection engineering cũng vậy — telemetry từ user mode (ETW, AMSI) có thể bị attacker ở kernel vô hiệu hóa nếu họ đã thắng tầng dưới."
+          ],
+          "points": [
+            "Driver signing + HVCI/VBS làm khó load driver độc hại — BYOVD (bring your own vulnerable driver) là cách né hiện đại.",
+            "Service chạy LocalSystem vẫn là user-mode process — đừng nhầm SYSTEM với kernel mode.",
+            "System call numbering không contract công khai — hook trực tiếp là kỹ thuật rootkit cổ điển."
+          ]
+        },
+        {
+          "title": "SID: Con số Vĩnh viễn Thay cho Cái Tên",
+          "paragraphs": [
+            "SID dạng S-R-I-A-SA…-RID: S-1 (revision), 5 (NT authority), chuỗi giữa xác định authority/domain, RID cuối định danh principal trong scope đó. Ví dụ S-1-5-21-<domain>-1103 là user 1103 trong domain; RID 500 luôn Administrator built-in, 501 Guest — vì vậy đổi tên Administrator không giấu được nó (SID không đổi). Well-known SID không phụ thuộc máy: S-1-5-18 = LocalSystem, S-1-5-20 = NetworkService, S-1-5-19 = LocalService, S-1-5-32-544 = Builtin Administrators.",
+            "Hệ quả thực chiến: khi rename/rename user, ACL vẫn theo SID nên quyền giữ nguyên; khi xóa user rồi tạo user mới TRÙNG TÊN, SID mới khác → mất quyền cũ (an toàn); khi clone máy không sysprep, các máy dùng chung SID domain-prefix gây nhiễu — lý do sysprep tồn tại. Trong report, luôn ghi SID kèm tên vì tên dễ giả mạo hơn."
+          ],
+          "points": [
+            "whoami /user /groups là lệnh đầu tiên xem identity của phiên hiện hành.",
+            "RID 500 Administrator: disable nó rồi tạo admin giả tên khác là best practice chống targeted attack theo tên.",
+            "History SID (S-1-5-21-…-1125) xuất hiện khi user migrate qua AD — ACL cũ vẫn ghi nhận."
+          ]
+        },
+        {
+          "title": "SAM vs Active Directory: Hai Kho Danh tính",
+          "paragraphs": [
+            "Máy Windows standalone/member lưu local accounts trong SAM registry hive (hash NTLM của password nằm đó — bảo vệ bởi SYSKEY/Boot-key era cũ, giờ bằng encryption gắn machine). Domain-joined machines vẫn có SAM riêng cho local accounts (local admin!), nhưng danh tính mạng chính nằm ở AD: domain login xác thực với DC, token nhận group SIDs toàn domain.",
+            "Điều này tạo ra HAI ranh giới trên một máy: local boundary (SAM local admin) và domain boundary (AD). Pentest luôn phân biệt: chiếm local admin của workstation ≠ domain admin; nhưng local admin là bàn đạp (credential harvesting, lateral) — chuỗi này là xương sống của track AD (os08) sau này."
+          ],
+          "points": [
+            "Local Administrator Password Solution (LAPS) hóa random per-machine — chống pass-the-hash nội bộ từ một image chung.",
+            "Domain cached credentials trong registry (mscache v2) tồn tại trên laptop offline — mục tiêu cracking phổ biến.",
+            "Machine account (computer$) cũng là principal có password tự rotate — bỏ quên là vector (như PrintNightmare-era scenarios)."
+          ]
+        },
+        {
+          "title": "Tài khoản Dịch vụ Built-in: Ba Mức Quyền Chuẩn",
+          "paragraphs": [
+            "LocalSystem (S-1-5-18): gần như root của máy — toàn quyền local, nói chuyện mạng với identity MACHINE ACCOUNT. LocalService: quyền hạn chế hơn, mạng ẩn danh. NetworkService: quyền hạn chế + mạng với machine account. Khuyến nghị thiết kế: service third-party không cần đặc quyền cao thì chạy LocalService/NetworkService hoặc virtual account, KHÔNG mặc định LocalSystem.",
+            "Assessment angle: liệt kê services chạy LocalSystem là inventory bề mặt leo thang — service LocalSystem có binary writable-by-user = local privesc chắc chắn (chuỗi này đào sâu ở os03-m02/m03). Blue team: audit service configuration drift là control nền."
+          ],
+          "points": [
+            "sc query / Get-Service liệt kê service + account chạy — đầu ra đầu tiên của mọi review Windows host.",
+            "Virtual accounts (NT SERVICE\\MyApp) auto-managed password — sạch hơn manual service account.",
+            "Managed Service Accounts (gMSA) trong domain: password xoay tự động bởi AD — chuẩn hiện đại."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Principal Desk — Giải Mã SID và Phân Loại Tài khoản",
+        "objective": "Giải mã SID từ output whoami/registry mô phỏng, phân loại SAM vs AD identity, đánh giá cấu hình service account theo least-privilege.",
+        "scenario": "Bạn review một workstation domain-joined mô phỏng: output `whoami /user`, `/groups` rút gọn, danh sách service với logon account, và vài dòng registry SAM path. Toàn bộ dữ liệu tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ dữ liệu cấp sẵn; không chạy lệnh trên hệ thống thật.",
+          "Mỗi claim về SID phải decode từng thành phần.",
+          "Khuyến nghị service account phải kèm lý do least-privilege và cách verify."
+        ],
+        "cases": [
+          {
+            "id": "win-case-01",
+            "title": "Decode SID",
+            "context": "whoami /user: DESKTOP-A7\\nam → S-1-5-21-3623811015-3361044348-30300820-1013. Một ACL entry khác tham chiếu S-1-5-21-3623811015-3361044348-30300820-500. Registry path ghi: HKLM\\SAM\\SAM\\Domains\\Account\\Users\\000003E9.",
+            "prompt": "Đọc đúng các SID và path là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "-500 là Guest vì số nhỏ, -1013 là admin vì số lớn.",
+                "correct": false,
+                "rationale": "RID cố định quy ước: 500 = built-in Administrator, 501 = Guest. Số lớn nhỏ không quyết định vai trò."
+              },
+              {
+                "id": "B",
+                "label": "Cả hai SID cùng domain prefix (S-1-5-21-3623…) nên cùng nguồn danh tính; -1013 là user nam thường; -500 là built-in Administrator của máy — việc ACL tham chiếu RID 500 nghĩa là quyền gán theo builtin admin bất kể tên hiển thị. Path 000003E9 hex = 1001 decimal là key account trong SAM.",
+                "correct": true,
+                "rationale": "Decode đúng cấu trúc: prefix domain khớp nhau, RID quy ước 500/501, và đọc hex registry key — ba kỹ năng nền khi làm việc với Windows identity."
+              },
+              {
+                "id": "C",
+                "label": "S-1-5-18 cũng thuộc domain này vì đều bắt đầu S-1-5.",
+                "correct": false,
+                "rationale": "S-1-5-18 là well-known LocalSystem — không có sub-authority domain; nhầm well-known với domain SID là lỗi kinh điển."
+              },
+              {
+                "id": "D",
+                "label": "Đổi tên Administrator thành 'sysadmin' sẽ đổi RID thành số khác để giấu.",
+                "correct": false,
+                "rationale": "Rename không đổi SID/RID — đây chính là lý do security dựa SID chứ không dựa tên."
+              }
+            ]
+          },
+          {
+            "id": "win-case-02",
+            "title": "Service account review",
+            "context": "Danh sách service: AppWeb — LocalSystem, binary C:\\Apps\\web\\webserver.exe (folder writable bởi Users); BackupAgent — NetworkService, binary Program Files chuẩn; PrinterSpooferTool — LocalSystem, do user cài thêm, không thuộc vendor nào; SqlExpress — NT SERVICE\\MSSQLSERVER virtual account.",
+            "prompt": "Xếp hạng rủi ro và đề xuất đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cả bốn ổn — Microsoft khuyến khích LocalSystem cho hiệu năng tốt nhất.",
+                "correct": false,
+                "rationale": "LocalSystem không phải 'hiệu năng tốt' — nó là đặc quyền tối đa local; khuyến nghị hiện đại là mức thấp nhất đủ dùng."
+              },
+              {
+                "id": "B",
+                "label": "P1: AppWeb LocalSystem + folder writable-by-Users = local privesc chắc chắn (thay binary → restart service → SYSTEM). P1/P2: PrinterSpooferTool LocalSystem lạ không vendor — điều tra nguồn. BackupAgent NetworkService hợp lý. SqlExpress virtual account chuẩn modern. Fix AppWeb: hạ xuống dedicated low-priv account + sửa ACL folder; verify bằng thử ghi folder bằng user thường phải fail.",
+                "correct": true,
+                "rationale": "Chuỗi 'service privileged + binary writable' là công thức privesc kinh điển — nhận diện đúng và có remediation + verification cụ thể; các service khác được phân loại đúng chuẩn."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần AV quét các binary là đủ kiểm soát.",
+                "correct": false,
+                "rationale": "AV không thay đổi quyền: binary hợp lệ chạy LocalSystem với folder writable vẫn là cửa privesc không cần malware signature nào."
+              },
+              {
+                "id": "D",
+                "label": "NetworkService nguy hiểm nhất vì có network access.",
+                "correct": false,
+                "rationale": "Có network với credential máy là thiết kế có chủ đích của NetworkService; quyền LOCAL của nó thấp hơn LocalSystem nhiều — so sánh phải cùng chiều."
+              }
+            ]
+          },
+          {
+            "id": "win-case-03",
+            "title": "Local hay Domain?",
+            "context": "Workstation DESKTOP-A7 domain-joined CORP. Tình huống: (1) user 'nam' đăng nhập CORP\\nam; (2) local account 'fixit' trên máy dùng cho repair; (3) attacker chiếm fixit local admin; (4) team hỏi: có cần LAPS cho fixit không?",
+            "prompt": "Đánh giá đúng các ranh giới danh tính?",
+            "options": [
+              {
+                "id": "A",
+                "label": "fixit là local nên không liên quan an ninh domain — bỏ qua.",
+                "correct": false,
+                "rationale": "Local admin là bàn đạp kinh điển: harvest credential từ LSASS, dump SAM, pivot — ranh giới local yếu kéo sập ranh giới domain theo thời gian."
+              },
+              {
+                "id": "B",
+                "label": "(1) nam xác thực qua AD — token mang group SIDs domain; (2) fixit sống trong SAM local, chỉ giá trị trên máy này; (3) chiếm fixit = local admin: dump cache/LSASS, tấn công users khác trên máy — bước đầu của chuỗi domain attack; (4) CÓ — LAPS đặt password ngẫu nhiên riêng từng máy, xoay định kỳ, ngăn 'một password local admin dùng chung toàn công ty' scenario.",
+                "correct": true,
+                "rationale": "Phân biệt đúng SAM/AD boundary và hiểu vai trò bàn đạp của local admin; LAPS trả lời đúng gốc rễ shared-password risk — nền cho chuỗi attack-path ở track AD."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần rename fixit thành tên khó đoán là an toàn tương đương LAPS.",
+                "correct": false,
+                "rationale": "Rename không đổi bản chất: password tĩnh dùng chung/vĩnh viễn vẫn là vấn đề; LAPS giải quyết password lifecycle, không phải cái tên."
+              },
+              {
+                "id": "D",
+                "label": "Nên disable hẳn fixit và dùng CORP admin cho mọi repair local.",
+                "correct": false,
+                "rationale": "Dùng domain admin cho tác vụ local là anti-pattern (mở rộng exposure của tài khoản cao quý nhất); đúng hướng là local admin được quản trị password (LAPS) + tiering model."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Decode SID từng thành phần và tra được well-known RID 500/501/18.",
+          "Phân loại đúng tài khoản theo nguồn danh tính SAM vs AD vs virtual/gMSA.",
+          "Nhận diện công thức privesc 'privileged service + writable binary' và đề xuất verify."
+        ],
+        "evidenceTemplate": [
+          "Bảng SID decoded: từng sub-authority + RID meaning",
+          "Bảng service: account, binary location, ACL note, verdict",
+          "So sánh SAM vs AD boundary cho từng tình huống",
+          "LAPS recommendation với cách verify deployment"
+        ],
+        "reset": "Đặt lại lựa chọn để review lại kiến trúc danh tính từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không thao tác trên hệ thống thật."
+      },
+      "governance": {
+        "prevent": [
+          "Service third-party chạy mức đặc quyền thấp nhất (virtual account/NetworkService), cấm default LocalSystem khi không cần.",
+          "ACL folder binary service: chỉ admin write — quét định kỳ writable-by-non-admin của service paths.",
+          "LAPS/Windows LAPS cho mọi máy; tiered admin model tách domain admin khỏi workstation tasks."
+        ],
+        "observe": [
+          "Alert service creation/change ngoài whitelist (Event 7045/4697); monitor service binary path ACL drift.",
+          "Inventory SID 500 usage; alert logon RID-500 bất thường (nên disabled hoặc monitored sát)."
+        ],
+        "respond": [
+          "Phát hiện service writable-binary: sửa ACL + hạ account ngay, truy vết ai thay đổi (4697/7045 history).",
+          "Nghi nhiễm local admin: isolate host, rotate local password (LAPS), scan credential artifacts trước khi rejoin."
+        ],
+        "residualRisk": [
+          "gMSA/virtual account giảm nhưng không xóa rủi ro service compromise — còn phụ thuộc binary integrity.",
+          "Cached domain credentials trên laptop là mặt trận riêng cần Credential Guard/WDigest hardening (os03-m03)."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "LocalSystem chạy ở kernel mode vì nó là 'tài khoản hệ thống'.",
+          "correction": "LocalSystem là user-mode account với đặc quyền local rất rộng; kernel mode chỉ dành cho kernel/drivers — hai khái niệm ở hai tầng khác nhau."
+        },
+        {
+          "claim": "Rename tài khoản Administrator là che giấu được nó.",
+          "correction": "RID 500 không đổi theo tên; mọi check dựa SID vẫn thấy. Giá trị của rename là chống user-enumeration kiểu social, không phải technical hiding."
+        },
+        {
+          "claim": "Chiếm được local admin của một máy = chiếm domain.",
+          "correction": "Local admin chỉ toàn quyền TRÊN MÁY ĐÓ. Nó là bàn đạp thu thập credential/pivot, nhưng tới domain admin cần thêm các bước (đào sâu ở track AD)."
+        },
+        {
+          "claim": "SID chỉ là tên khác, đổi tên user thì quyền theo tên mới.",
+          "correction": "Quyền gắn SID; user mới trùng tên có SID mới và MẤT hết quyền cũ — đây là behavior an toàn, không phải bug."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os03-l16-q1",
+          "difficulty": "easy",
+          "question": "RID 500 trong một SID local đại diện cho gì?",
+          "options": [
+            { "id": "A", "label": "Guest account" },
+            { "id": "B", "label": "Built-in Administrator" },
+            { "id": "C", "label": "LocalSystem service" },
+            { "id": "D", "label": "Domain Controller" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "RID cố định: 500 = built-in Administrator, 501 = Guest. Well-known: S-1-5-18 LocalSystem, S-1-5-19 LocalService, S-1-5-20 NetworkService."
+        },
+        {
+          "id": "os03-l16-q2",
+          "difficulty": "medium",
+          "question": "Khác biệt quan trọng nhất về MẠNG giữa LocalSystem và NetworkService?",
+          "options": [
+            { "id": "A", "label": "NetworkService không thể mở socket nào" },
+            {
+              "id": "B",
+              "label": "LocalSystem nói chuyện mạng với identity của machine account; NetworkService cũng dùng machine credentials nhưng với đặc quyền local thấp hơn đáng kể"
+            },
+            { "id": "C", "label": "LocalSystem không có network stack" },
+            { "id": "D", "label": "Không khác gì nhau về mạng" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Cả hai dùng computer account khi ra mạng; khác biệt chủ yếu ở phạm vi đặc quyền LOCAL — NetworkService hạn chế hơn nhiều, phù hợp service không cần đặc quyền cao."
+        },
+        {
+          "id": "os03-l16-q3",
+          "difficulty": "hard",
+          "question": "Một service chạy LocalSystem với binary nằm C:\\Apps\\web\\ (Users có Write). Vì sao đây là local privilege escalation 'chắc chắn' chứ không phải 'rủi ro tiềm năng'?",
+          "options": [
+            { "id": "A", "label": "Vì Users có thể đọc source code của service" },
+            {
+              "id": "B",
+              "label": "Vì chuỗi hoàn tất không cần bug nào: user thay/thêm binary trong folder mình có Write → khi service restart, Windows chạy file đó dưới LocalSystem → attacker nhận SYSTEM. Không cần vulnerability — misconfiguration tự nó là exploit"
+            },
+            {
+              "id": "C",
+              "label": "Vì LocalSystem cho phép chỉnh sửa registry trực tiếp"
+            },
+            { "id": "D", "label": "Vì folder writable khiến service chạy chậm lại" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Misconfiguration (writable path + privileged service + restart trigger) tự thân là exploit deterministic — đây là dạng finding 'configuration-as-exploit' mà mọi Windows assessment đều săn."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn xây baseline hardening cho fleet 200 workstation domain-joined mô phỏng: mixed legacy (Win10 cũ) và hiện đại (Win11 + VBS). Yêu cầu: chuẩn hóa service account, quản trị local admin, và telemetry identity-level cho SOC.",
+        "tasks": [
+          "Thiết kế matrix service-account policy: loại service → account chuẩn (virtual/NetworkService/gMSA) + verify command mỗi dòng.",
+          "Thiết kế rollout Windows LAPS + tiered local admin: ai được local admin trên đâu, password lifecycle thế nào.",
+          "Đề xuất 5 detection identity-level (RID-500 logon, service install, SAM dump pattern…) kèm event ID và ngưỡng."
+        ],
+        "requiredEvidence": [
+          "Matrix service-account có cột verify",
+          "Kế hoạch LAPS/tiering theo giai đoạn rollback được",
+          "5 detections với Event ID + rationale"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Security Identifiers (SID) architecture",
+          "url": "https://learn.microsoft.com/en-us/windows-server/security/identifiers/security-identifiers",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cấu trúc SID và well-known RID/authority values",
+            "Hành vi SID khi rename/delete accounts"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — LocalSystem, LocalService, and NetworkService accounts",
+          "url": "https://learn.microsoft.com/en-us/windows/security/identity-protection/access-control/local-accounts",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Phạm vi quyền và hành vi mạng của các built-in service accounts",
+            "Virtual accounts và managed service accounts"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — How Security Principals work (SAM vs Directory database)",
+          "url": "https://learn.microsoft.com/en-us/windows/security/identity-protection/access-control/security-principals",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Nơi lưu trữ danh tính local (SAM) so với domain (AD)",
+            "Khái niệm security principal và machine accounts"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os03-l17-access-tokens-and-uac",
+      "slug": "access-tokens-and-uac",
+      "title": "Access Token & UAC Filtered Token",
+      "summary": "Cấu trúc access token: user/group SIDs, privileges, integrity level; cơ chế UAC tách filtered token cho admin; hành vi consent prompt theo mức; ý nghĩa bảo mật của token duplication và 'run as'.",
+      "difficulty": "foundation",
+      "durationMinutes": 80,
+      "prerequisites": ["os03-l16-windows-architecture-and-principals"],
+      "outcomes": [
+        "Liệt kê các thành phần chính của access token (user SID, group SIDs, privileges, integrity level, logon session) và vai trò từng phần khi kernel check quyền.",
+        "Giải thích cơ chế UAC Admin Approval Mode: admin nhận HAI token (full + filtered) và hậu quả 'member of Administrators nhưng chưa có quyền admin'.",
+        "So sánh các mức UAC prompt behavior và đánh giá cấu hình phù hợp cho môi trường enterprise.",
+        "Diễn giải ý nghĩa an ninh của token: sở hữu handle token = khả năng hành xử như principal đó; liên hệ nguyên tắc bảo vệ token trong thiết kế service."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["windows"],
+      "attackTactics": ["TA0004"],
+      "keywords": [
+        "access-token",
+        "uac",
+        "filtered-token",
+        "integrity-level",
+        "consent-prompt"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Nếu SID là CMND thì Access Token là 'bộ hồ sơ di chuyển' bạn mang theo mọi lúc: bên trong có CMND (user SID), giấy tờ hội viên (group SIDs), đặc ân riêng (privileges như SeDebugPrivilege), và tem màu mức tin cậy (integrity level). Khi bạn logon, LSASS đúc token; MỌI process bạn mở đều mang BẢN SAO token đó — kernel check quyền là soi hồ sơ này, không phải soi database. UAC dành cho admin một chiêu thú vị: đúc HAI token, bản đầy đủ cất két (chỉ dùng khi bạn đồng ý qua prompt), bản rút gọn (filtered — group Administrators bị 'vô hiệu hóa') dùng hàng ngày. Vì vậy 'thành viên nhóm Admin' và 'đang có quyền admin' là hai câu chuyện khác nhau — và kẻ tấn công chiếm process thường-day của admin sẽ thấy token filtered, phải tìm cách 'kéo két' mới lên full.",
+      "visual": {
+        "title": "Hai Token của Một Admin",
+        "caption": "Logon admin → LSASS đúc full token + filtered token; explorer và app thường chạy bản filtered.",
+        "steps": [
+          {
+            "label": "Logon & LSASS đúc token",
+            "detail": "Xác thực xong, LSASS build token chứa user SID + mọi group SID + privileges + integrity level.",
+            "tone": "neutral"
+          },
+          {
+            "label": "UAC split",
+            "detail": "Admin nhận full token (két) + filtered token (deny-only Administrators, bỏ privileges nhạy cảm) — shell chạy bản filtered.",
+            "tone": "caution"
+          },
+          {
+            "label": "Consent prompt",
+            "detail": "Chạy-elevated: UAC UI hỏi trên Secure Desktop; đồng ý ⇒ process mới sinh từ FULL token.",
+            "tone": "allow"
+          },
+          {
+            "label": "Integrity level",
+            "detail": "Low < Medium < High < System: process thấp không GHI được object của mức cao — IE Protected Mode/Edge dùng Low cho content không tin.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Token là chìa khóa",
+            "detail": "Ai cầm handle token (duplicate) thì tạo process như principal đó — bảo vệ token = bảo vệ quyền; SeDebugPrivilege là chìa khóa của chìa khóa.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bên Trong Một Access Token",
+          "paragraphs": [
+            "Token chứa: user SID; group SIDs (bao gồm cả 'deny-only' marks và 'integrity' SID như S-1-16-8192 Medium); privileges — các đặc quyền điểm-hơn-quyền-file như SeBackupPrivilege (đọc mọi file bỏ qua ACL), SeDebugPrivilege (mở process bất kỳ), SeImpersonatePrivilege (mượn identity client — quan trọng với IIS/SQL service); logon session reference; và default owner/primary group.",
+            "Khi process mở object, kernel so các SID trong token với DACL của object (chi tiết bài l18) và kiểm privileges cho các thao tác đặc biệt. Vì token snapshot tại LOGON (group membership thay đổi sau đó không phản ánh ngay tới token đang chạy — cần relogon), đây là nguồn nhiều hiểu nhầm vận hành: 'đã add vào group mà vẫn bị deny' — đáp án: sign out/in."
+          ],
+          "points": [
+            "whoami /priv liệt kê privileges của phiên hiện tại; whoami /all cho toàn cảnh.",
+            "SeImpersonatePrivilege trên service account là mỏ vàng escalation (chuỗi Potato-family) — đào ở os03-m03.",
+            "Restricted tokens/isolated tokens dùng cho sandboxing (AppContainer là thế hệ sau)."
+          ]
+        },
+        {
+          "title": "UAC: Hai Token Cho Một Người",
+          "paragraphs": [
+            "Với account trong nhóm Administrators, UAC (Admin Approval Mode) khiến logon tạo hai token: FULL token giữ nguyên mọi group/privilege; FILTERED token đánh dấu nhóm admin thành 'deny-only' (membership vô hiệu cho check allow), strip các đặc quyền admin. Explorer và mọi app khởi động bình thường chạy filtered — đó là lý do user admin vẫn không ghi được C:\\Windows hay đọc file của user khác mà không elevate.",
+            "Khi cần elevated: process phải được khởi tạo QUA consent (Run as administrator/UAC prompt trên Secure Desktop) — process MỚI nhận bản full token; process đang chạy không 'upgrade' được chính nó. Hệ quả assessment: malware chạy trong filtered session phải tìm bypass UAC (auto-elevate binaries, task scheduler tricks…) — mỗi bypass là một class finding; và blue team monitor event 4688 với elevated token flag để thấy hành vi elevation bất thường."
+          ],
+          "points": [
+            "Built-in Administrator (RID 500) mặc định KHÔNG bị filter (Admin Approval Mode for built-in Admin = disabled by default) — hành vi khác user admin thường.",
+            "UAC levels: AlwaysNotify chặt nhất; default là notify chỉ khi app thay đổi máy; NeverNotify = UAC hình thức (khuyến cáo cấm enterprise).",
+            "Integrity level phối hợp: filtered token vẫn High integrity khi elevated; non-elevated là Medium."
+          ]
+        },
+        {
+          "title": "Prompt Behavior: Chọn Mức Nào Cho Doanh nghiệp?",
+          "paragraphs": [
+            "Các mức chính: (1) Elevate without prompting — nguy hiểm: elevation im lặng, malware auto-elevate thoải mái; (2) Prompt for credentials — hỏi user/pass admin (phù hợp kiosk/user thường); (3) Prompt for consent (DEFAULT) — chỉ Yes/No trên Secure Desktop; (4) Elevate without prompting cho admin signed apps (Auto-approve) — cân bằng tiện/nghiệp nhưng mở cửa signed-abuse. Enterprise chuẩn: giữ default consent + Secure Desktop, cấm NeverNotify qua GPO.",
+            "Secure Desktop là chi tiết hay bị bỏ sót: prompt hiện trên desktop riêng, process khác không chụp/sửa — chống clickjacking UAC. Nếu attacker ở cùng session với user (không phải secure desktop), họ có thể spam prompt (UAC fatigue) — mitigation là giáo dục + AlwaysNotify cho role nhạy cảm + giám sát tần suất prompt."
+          ],
+          "points": [
+            "GPO keys: ConsentPromptBehaviorAdmin, ConsentPromptBehaviorUser, EnableInstallerDetection, ValidateAdminCodeSignatures.",
+            "Color-coded prompt: màu cam/xanh theo publisher/signature — tín hiệu dạy user đọc.",
+            "UAC không phải antivirus: nó là consent gate — malware đã elevated thì UAC hết chuyện để làm."
+          ]
+        },
+        {
+          "title": "Token Như Chìa Khóa: Impersonation và Bảo vệ",
+          "paragraphs": [
+            "Windows cho phép một process 'mặc áo' principal khác thông qua token: impersonation (thread dùng token của client — nền của client/server auth model) và token duplication/handle inheritance. Ai có HANDLE tới token đủ quyền có thể tạo process với identity đó (CreateProcessWithToken/CreateProcessAsUser). Do đó: leak token handle = leak quyền; SeDebugPrivilege cho phép mở process của người khác lấy token — chuỗi kinh điển từ service account có SeImpersonate/SeDebug.",
+            "Bảo vệ phía design: service không cần SeDebug/SeImpersonate thì strip (qua LocalSecurityPolicy/GPO); chạy service ở ít đặc quyền nhất để token nó giữ cũng nghèo; Process Mitigation policies (RunAsPPL cho LSASS — bảo vệ 'két đúc token') chặn truy cập LSASS từ tool dump. Telemetry: alert khi lsass bị open với PROCESS_VM_READ từ process lạ (Sysmon Event 10)."
+          ],
+          "points": [
+            "RunAsPPL (Protected Process Light cho LSASS) làm credential dumping khó hơn đáng kể — baseline enterprise.",
+            "Credential Guard giữ domain secrets trong isolated VTL — lớp bảo vệ phần cứng cho 'két'.",
+            "Primary vs impersonation token: primary cho CreateProcess; impersonation gắn thread — hiểu để đọc đúng log/token tools."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Token Desk — Đọc Token Output và Đánh giá UAC",
+        "objective": "Đọc whoami /priv//groups mô phỏng để suy luận trạng thái elevated, đánh giá cấu hình UAC policy, và nhận diện rủi ro token-related trong thiết kế service.",
+        "scenario": "Bạn review ba phiên làm việc mô phỏng: (A) user thường, (B) admin chưa elevate, (C) admin elevated — cùng output GPO UAC và spec một service IIS-like. Toàn bộ tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ output cấp sẵn; không chạy tool token thật.",
+          "Kết luận elevated/non-elevated phải trích bằng chứng (deny-only mark, integrity level).",
+          "Đánh giá UAC phải nêu trade-off vận hành."
+        ],
+        "cases": [
+          {
+            "id": "tok-case-01",
+            "title": "Ba output whoami",
+            "context": "A: Groups: … Everyone, BUILTIN\\Users, Mandatory Level\\Medium | B: … Everyone, BUILTIN\\Users, BUILTIN\\Administrators (Label: Deny-only), Mandatory Level\\Medium | C: … BUILTIN\\Administrators, Mandatory Level\\High, Privileges: SeDebugPrivilege enabled, SeBackupPrivilege enabled",
+            "prompt": "Suy luận đúng trạng thái ba phiên?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cả ba đều non-elevated vì đều thấy Everyone group.",
+                "correct": false,
+                "rationale": "Everyone có ở mọi token; dấu hiệu phân biệt nằm ở integrity level và deny-only marks."
+              },
+              {
+                "id": "B",
+                "label": "A = user thường (Medium, no admin groups); B = admin NON-elevated (Administrators xuất hiện nhưng Deny-only + Medium — đúng chữ ký filtered token); C = admin ELEVATED (High + SeDebug/SeBackup enabled). Phiên B muốn nâng phải qua consent tạo process mới — không tự upgrade.",
+                "correct": true,
+                "rationale": "Đọc đúng ba chữ ký token: plain, filtered (deny-only + medium), full (high + privileges enabled) — kỹ năng nền để hiểu mọi token-related finding."
+              },
+              {
+                "id": "C",
+                "label": "B là elevated vì tên nhóm Administrators xuất hiện trong groups.",
+                "correct": false,
+                "rationale": "Trong filtered token, nhóm admin xuất hiện dưới dạng DENY-ONLY — presence không bằng active membership; integrity Medium xác nhận chưa elevate."
+              },
+              {
+                "id": "D",
+                "label": "C chỉ khác A vì có thêm privileges — không liên quan elevation.",
+                "correct": false,
+                "rationale": "High integrity + admin privileges enabled chính là định nghĩa của phiên elevated/full-token."
+              }
+            ]
+          },
+          {
+            "id": "tok-case-02",
+            "title": "Chọn UAC policy cho phòng kế toán",
+            "context": "Phòng kế toán dùng app legacy cần chạy-as-admin mỗi lần mở (dev không fix được). Đề xuất: (1) set ConsentPromptBehaviorAdmin=0 (elevate without prompting) cho cả phòng để hết phiền; (2) giữ default consent + đào tạo bấm Yes; (3) chạy user thường + cung cấp app qua RDS/app-v elevated ở server.",
+            "prompt": "Đánh giá ba phương án?",
+            "options": [
+              {
+                "id": "A",
+                "label": "(1) hợp lý — phòng ít rủi ro, tắt prompt cho tiện.",
+                "correct": false,
+                "rationale": "Elevate-without-prompting biến UAC thành trang trí: malware trong session auto-elevate không tiếng động — phòng kế toán là mục tiêu BEC/fraud, càng không phải chỗ tắt gate."
+              },
+              {
+                "id": "B",
+                "label": "(3) là kiến trúc đúng: tách app legacy khỏi endpoint user (chạy nơi có kiểm soát), user thường giữ token filtered suốt ngày — giảm cả UAC fatigue lẫn attack surface. (2) chấp nhận được ngắn hạn nhưng UAC-fatigue training decay nhanh. Verify: audit event 4688 elevated-flag giảm mạnh sau triển khai (3).",
+                "correct": true,
+                "rationale": "Giải quyết GỐC (app cần admin) thay vì nới gate; kèm metric verification — tư duy architecture-over-toggle."
+              },
+              {
+                "id": "C",
+                "label": "(2) tốt nhất vì Secure Desktop chống clickjacking là đủ.",
+                "correct": false,
+                "rationale": "Secure Desktop chống giả mạo prompt nhưng không chống 'user tự bấm Yes 20 lần/ngày' — fatigue làm consent mất nghĩa."
+              },
+              {
+                "id": "D",
+                "label": "Thêm user kế toán vào nhóm Administrators để app chạy thẳng.",
+                "correct": false,
+                "rationale": "Admin-everywhere phá vỡ mọi ranh giới: token filtered/full luôn sẵn, malware không cần bypass gì nữa — hướng đi ngược hoàn toàn."
+              }
+            ]
+          },
+          {
+            "id": "tok-case-03",
+            "title": "Service giữ chìa khóa nào?",
+            "context": "Spec service web nội bộ: chạy dưới account svc-web; account thuộc nhóm 'IIS_IUSRS'; policy gán SeImpersonatePrivilege cho svc-web (theo template mặc định của ứng dụng); LSASS RunAsPPL=1; service KHÔNG cần gọi API nào dùng impersonation.",
+            "prompt": "Đánh giá và đề xuất đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Giữ nguyên — SeImpersonate là privilege vô hại, chỉ dùng cho debug.",
+                "correct": false,
+                "rationale": "SeImpersonate trên service account tiếp xúc request là mỏ escalation (Potato-family): ép auth từ SYSTEM rồi mượn token — không vô hại."
+              },
+              {
+                "id": "B",
+                "label": "Strip SeImpersonate vì service không dùng impersonation (verify bằng audit API calls trong staging); giữ RunAsPPL=1 tốt đã có; bổ sung monitoring Sysmon E10 target lsass. Nguyên tắc: token nghèo = blast radius nhỏ — privilege không dùng là liability.",
+                "correct": true,
+                "rationale": "Áp đúng nguyên tắc token-minimization với verify trước-strip (tránh vỡ app), và ghi nhận control tốt sẵn có + telemetry bổ sung."
+              },
+              {
+                "id": "C",
+                "label": "Thay svc-web bằng LocalSystem để 'token mạnh dễ xử lý sự cố'.",
+                "correct": false,
+                "rationale": "Ngược hoàn toàn: token mạnh = khi service bị RCE, attacker có SYSTEM tức thì; hướng đúng là token NGHÈO hơn nữa."
+              },
+              {
+                "id": "D",
+                "label": "RunAsPPL đã đủ — không cần quan tâm privileges của svc-web.",
+                "correct": false,
+                "rationale": "PPL bảo vệ LSASS (két), không bảo vệ chính service; escalation qua SeImpersonate diễn ra trong ngữ cảnh service, không cần chạm LSASS."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Nhận diện đúng trạng thái token (plain/filtered/full) qua integrity + deny-only evidence.",
+          "Đánh giá UAC policy theo trade-off bảo mật/vận hành, không toggle-mù.",
+          "Áp nguyên tắc token-minimization cho service account kèm verify."
+        ],
+        "evidenceTemplate": [
+          "Bảng token: groups/integrity/privileges → trạng thái suy luận → evidence line",
+          "So sánh UAC options: security impact × operational cost",
+          "Service spec review: privilege cần/không cần → keep/strip decision",
+          "Verification plan cho mọi thay đổi"
+        ],
+        "reset": "Đặt lại lựa chọn để review lại token/UAC từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không truy xuất token thật."
+      },
+      "governance": {
+        "prevent": [
+          "Baseline UAC enterprise: consent + Secure Desktop, cấm NeverNotify/Elevate-silent qua GPO.",
+          "Token minimization cho service: strip SeDebug/SeImpersonate khi không dùng; RunAsPPL + Credential Guard bật.",
+          "Người dùng làm việc daily với filtered token; tách tác vụ elevated sang tài khoản/quy trình riêng (PAW)."
+        ],
+        "observe": [
+          "Sysmon E10 (process access) target lsass.exe — alert read từ process không whitelist.",
+          "Monitor 4688 token-elevated type + UAC prompt frequency anomaly (fatigue/spam indicator)."
+        ],
+        "respond": [
+          "Nghi token theft trên host: isolate, reset credential của user + machine, review processes với SeDebug.",
+          "UAC fatigue incident: kiểm tra nguồn spam prompt, tạm nâng AlwaysNotify cho OU affected."
+        ],
+        "residualRisk": [
+          "UAC bypass techniques tồn tại dai dẳng — UAC là consent layer, không phải isolation boundary.",
+          "Credential Guard/PPL có ngoại lệ platform cũ — legacy hosts vẫn lộ diện dump."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "User thuộc nhóm Administrators thì process của họ luôn có quyền admin.",
+          "correction": "Với UAC bật, process daily chạy filtered token (admin = deny-only); chỉ process sinh ra qua consent mới mang full token."
+        },
+        {
+          "claim": "Process đang chạy có thể tự nâng cấp token của mình khi cần.",
+          "correction": "Không có self-elevation: elevation tạo PROCESS MỚI qua consent; process hiện hành giữ nguyên token đến khi chết."
+        },
+        {
+          "claim": "UAC là biên giới bảo mật chặn malware triệt để.",
+          "correction": "UAC là consent gate chống thay đổi hệ thống vô ý/tự phong; malware trong filtered session vẫn đọc dữ liệu user và săn bypass — nó không phải isolation như AppContainer."
+        },
+        {
+          "claim": "SeImpersonatePrivilege chỉ hữu ích cho dev/debug nên để mặc định vô hại.",
+          "correction": "Trên service account tiếp xúc network, SeImpersonate là nền của họ kỹ thuật Potato-escalation (mượn token SYSTEM) — privilege không dùng phải strip."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os03-l17-q1",
+          "difficulty": "easy",
+          "question": "Filtered token (UAC) xử lý nhóm Administrators như thế nào?",
+          "options": [
+            { "id": "A", "label": "Xóa hẳn nhóm admin khỏi token" },
+            {
+              "id": "B",
+              "label": "Giữ nhóm nhưng đánh dấu deny-only — membership không đóng góp cho phép truy cập"
+            },
+            { "id": "C", "label": "Đổi tên nhóm thành Users" },
+            { "id": "D", "label": "Mã hóa tên nhóm" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Deny-only mark khiến group SID không dùng để GRANT (chỉ dùng cho deny evaluation), đồng thời strip admin privileges — đó là chữ ký 'Administrators (Deny-only)' trong whoami /groups."
+        },
+        {
+          "id": "os03-l17-q2",
+          "difficulty": "medium",
+          "question": "Integrity level khác biệt với group SID ở điểm nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Integrity chỉ áp dụng cho file, group áp cho process"
+            },
+            {
+              "id": "B",
+              "label": "Integrity là mức TIN CẬY đơn chiều: process mức thấp không GHI được object mức cao bất kể ACL cho phép — bổ sung trục 'no write-up' lên trên mô hình DACL"
+            },
+            { "id": "C", "label": "Integrity chỉ tồn tại khi tắt UAC" },
+            { "id": "D", "label": "Integrity là mật khẩu thứ hai của token" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "DACL trả lời 'ai được', integrity policy trả lời 'mức nào được ghi lên mức nào' (no write-up, no read-down tùy policy) — hai cơ chế độc lập cùng chạy."
+        },
+        {
+          "id": "os03-l17-q3",
+          "difficulty": "hard",
+          "question": "Malware đang chạy trong filtered token (Medium) của user admin. Nó muốn full token. Con đường ĐÚNG theo mô hình là gì?",
+          "options": [
+            { "id": "A", "label": "Tự sửa token của mình thêm SeDebugPrivilege" },
+            {
+              "id": "B",
+              "label": "Phải tìm cách khiến MỘT PROCESS MỚI được sinh từ full token: abuse auto-elevate component (signed binary tự nâng không prompt), hoặc lừa/ép user đồng ý consent — vì elevation không thể in-place trên process đang chạy"
+            },
+            { "id": "C", "label": "Restart explorer.exe là tự có full token" },
+            {
+              "id": "D",
+              "label": "Đổi mật khẩu user rồi đăng nhập lại là có full token ngay trong process hiện tại"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Token gắn lúc process creation; không có API 'nâng token hiện hành'. Mọi UAC-bypass đều quy về: sinh process mới từ full token mà không qua consent thật của user."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn thiết kế mô hình quyền cho môi trường VDI mô phỏng: 300 user finance làm việc daily, 15 IT support cần elevate thường xuyên, 2 kiosk public. Yêu cầu: giảm UAC fatigue, chống token theft, attribution đầy đủ khi incident.",
+        "tasks": [
+          "Thiết kế ma trận: nhóm user → UAC behavior → loại token daily → quy trình elevate (khi nào, ai duyệt, log gì).",
+          "Cho IT support: thiết kế PAW/separate-admin-account model thay vì dùng-thường-có-admin.",
+          "Đề xuất detection pack: token theft indicators (lsass access, SeDebug usage, abnormal elevation) với Sysmon events + thresholds."
+        ],
+        "requiredEvidence": [
+          "Ma trận user-type → UAC/token/elevation flow",
+          "PAW design ngắn gọn có luồng break-glass",
+          "Detection table: indicator → event ID → threshold → response"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Access Tokens",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/secauthz/access-tokens",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Thành phần của access token: user/group SIDs, privileges, integrity, logon session",
+            "Primary vs impersonation token semantics"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — How User Account Control (UAC) works",
+          "url": "https://learn.microsoft.com/en-us/windows/security/identity-protection/user-account-control/how-user-account-control-works",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Filtered token mechanism và Admin Approval Mode",
+            "Các mức consent behavior và secure desktop"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — Privileges (SeDebug/SeImpersonate reference)",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/secauthz/privileges",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Ý nghĩa từng privilege và constant tương ứng",
+            "Quan hệ privilege ↔ quyền vượt ACL"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os03-l18-acls-and-permission-evaluation",
+      "slug": "acls-and-permission-evaluation",
+      "title": "Security Descriptor, DACL & Thứ tự Đánh giá ACE",
+      "summary": "Cấu trúc security descriptor: owner, DACL, SACL; ACE structure và canonical order; thuật toán đánh giá allow/deny với explicit-deny ưu tiên; inheritance và effective access; đọc output icacls và các misconfiguration phổ biến.",
+      "difficulty": "foundation",
+      "durationMinutes": 80,
+      "prerequisites": ["os03-l17-access-tokens-and-uac"],
+      "outcomes": [
+        "Phân tích cấu trúc security descriptor: owner, primary group, DACL (ai được), SACL (audit cái nào).",
+        "Giải mã một ACE: type (allow/deny), trustee SID, rights mask, inheritance flags.",
+        "Mô phỏng thuật toán đánh giá DACL theo canonical order và xác định effective access cho token cho trước, bao gồm case explicit-deny.",
+        "Đọc output icacls để phát hiện misconfiguration: inheritance broken, Authenticated Users quá tay, empty DACL vs NULL DACL khác nhau thế nào."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["windows"],
+      "attackTactics": [],
+      "keywords": ["dacl", "sacl", "ace-order", "icacls", "effective-access"],
+      "safetyLevel": "safe",
+      "mentalModel": "Mỗi object (file, registry key, service, printer…) mang một tờ khai an ninh — Security Descriptor — gồm: CHỦ SỞ HỮU (owner, ai có quyền đổi luật), DANH SÁCH ĐIỀU KHIỂN DACL (dòng nào ai được làm gì, xếp theo thứ tự), và NHẬT KÝ YÊU CẦU SACL (muốn audit thao tác nào). Khi process chạm object, kernel cầm token (bộ hồ sơ SID) đọc DACL TỪ TRÊN XUỐNG, gặp ACE khớp SID đầu tiên là PHÁN NGAY allow hay deny — không đọc tiếp. Vì vậy THỨ TỰ ACE là luật: một explicit-deny đứng sai vị trí có thể nuốt trọn allow. Đây là bảng chân ái khác hẳn Linux (chỉ một cột permission) — sức mạnh và độ phức tạp của Windows đều đến từ đây.",
+      "visual": {
+        "title": "Kernel Soi DACL: Dừng Ở ACE Đầu Tiên Khớp",
+        "caption": "Token SID đối chiếu từng ACE theo thứ tự; first-match-wins giữa allow/deny của cùng access type.",
+        "steps": [
+          {
+            "label": "Owner field",
+            "detail": "Owner có implicit right WRITE_DAC/WRITE_OWNER — chủ sở hữu luôn đổi được luật dù DACL không cho (khác Linux!).",
+            "tone": "caution"
+          },
+          {
+            "label": "ACE Allow",
+            "detail": "(Type=Allow, Trustee=S-1-5-…-nam, Rights=Read+Execute) — khớp SID và chưa có deny cho rights này → grant.",
+            "tone": "allow"
+          },
+          {
+            "label": "ACE Deny",
+            "detail": "Explicit deny đứng TRƯỚC allow (canonical order) → chặn ngay, kể cả allow phía sau rộng hơn.",
+            "tone": "stop"
+          },
+          {
+            "label": "Inheritance flags",
+            "detail": "ACE cha truyền xuống con (OI/CI); break-inheritance khiến child 'có đời riêng' — nguồn confusion số một.",
+            "tone": "neutral"
+          },
+          {
+            "label": "SACL audit",
+            "detail": "ACE type=Audit: success/failure ghi event 4663/4656 — nền của detection trên object nhạy cảm.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Security Descriptor: Owner, DACL, SACL",
+          "paragraphs": [
+            "Bốn thành phần chính: OWNER (SID có quyền WRITE_DAC ngầm — đổi được DACL, tức 'đổi luật'), Primary Group (thường ít ý nghĩa thực chiến trên Windows), DACL — Discretionary ACL: danh sách ACE quyết định ai được access gì; SACL — System ACL: quy định thao tác nào được AUDIT (success/failure) đổ về event log.",
+            "Phân biệt hai trạng thái dễ nhầm: DACL = NULL (không có DACL) → EVERYONE FULL CONTROL (nguy hiểm nhất); DACL rỗng (có DACL nhưng 0 ACE) → KHÔNG AI access được (kể cả admin qua DACL — nhưng owner vẫn đổi lại được nhờ implicit right). Đọc icacls: 'NULL DACL' in rõ, DACL rỗng thì 'no permissions' — hai câu hai số phận."
+          ],
+          "points": [
+            "Owner là backdoor hợp pháp: bất kỳ DACL nào cũng không khóa được owner — review ownership khi audit.",
+            "SACL không ảnh hưởng truy cập — chỉ sinh telemetry; object nhạy cảm thiếu SACL = mù detection.",
+            "Registry/services/AD objects đều dùng chung mô hình SD — học một chỗ dùng mọi nơi."
+          ]
+        },
+        {
+          "title": "ACE Structure và Canonical Order",
+          "paragraphs": [
+            "Một ACE gồm: Type (Allow/Deny/Audit), Trustee (SID áp dụng), Access Mask (quyền cụ thể: Read/Write/Execute/Full hay granular bits như FILE_WRITE_DATA, KEY_SET_VALUE), Flags (inheritance: OI object-inherit, CI container-inherit, IO inherit-only…). Thứ tự canonical mà Windows khuyến nghị: access-denied ACEs TRƯỚC, access-allowed sau, inherit-only cuối — vì evaluation là FIRST-MATCH-WINS cho từng access bit.",
+            "Thuật toán (giản lược) khi process yêu cầu access: duyệt DACL từ đầu; gặp ACE khớp trustee SID trong token (active, không deny-only) và che phủ requested bits: nếu Deny → DENY ngay; nếu Allow → tích bits; đủ tất cả bits yêu cầu → ALLOW; hết DACL mà chưa đủ → DENY ngầm (implicit deny). Lưu ý deny-only group (filtered token) KHÔNG dùng cho allow nhưng VẪN khớp deny — chi tiết tinh tế khi phân tích UAC + ACL cùng lúc."
+          ],
+          "points": [
+            "icacls hiển thị theo đúng thứ tự lưu trữ — order sai do tool cũ là finding (khó gặp, nhưng có).",
+            "Everyone ≠ Authenticated Users: Everyone gồm anonymous (tùy config), Authenticated Users loại anonymous — chọn trustee sai là lộ anonymous access.",
+            "CREATOR OWNER là placeholder-SID: tại runtime thay bằng SID người tạo — dùng cho profile-style dirs."
+          ]
+        },
+        {
+          "title": "Inheritance và Effective Access",
+          "paragraphs": [
+            "Child object nhận ACE thừa kế từ parent (flags OI/CI + inherited marker trong icacls '(I)'). Break inheritance ('disable inheritance') tạo hai lựa chọn: convert inherited→explicit (giữ nguyên quyền, từ nay độc lập) hay remove all (trống trải) — chọn nhầm là sự cố. Effective access của user = tổng hợp mọi đường: direct SID, group SIDs, inheritance từ cha, deny chồng lên allow — mắt thường khó tổng hợp khi >3 ACE; tool 'Effective Access' tab hoặc icacls --find-side-effecting giúp.",
+            "Misconfig phổ biến trong thực tế: (1) Authenticated Users:Modify trên share dữ liệu — mọi user domain ghi/xóa lẫn nhau; (2) broken inheritance rải rác khiến 'vùng mù' không theo chuẩn; (3) service key HKLM\\SYSTEM\\CurrentControlSet\\Services\\<name> cho Users SetValue — service config hijack → privesc (liên hệ l16); (4) empty-DACL do script restore sai."
+          ],
+          "points": [
+            "icacls <path> /reset tái áp inheritance — lệnh chữa cháy chuẩn nhưng cần hiểu trước khi chạy.",
+            "Takeown/icacls combo là 'master key' của admin — attacker elevated cũng dùng y hệt.",
+            "AD delegation (OU-level ACL) dùng cùng mô hình — nền cho BloodHound attack-path graphs (os08)."
+          ]
+        },
+        {
+          "title": "Đọc icacls và Audit Checklist",
+          "paragraphs": [
+            "Output icacls mẫu: dòng đầu path; mỗi ACE dạng '<account>:(flag)(rights)' — F=full, M=modify, RX=read-execute, (I)=inherited, (OI)(CI) inheritance apply-to. Checklist review một path: (1) owner ai? (2) có NULL/rỗng DACL? (3) trustee nào ngoài whitelist có Write/Full? (4) Authenticated Users/Everyone xuất hiện ở đâu? (5) inheritance còn liền mạch? (6) SACL có cho object nhạy cảm?",
+            "Blue team mirror: baseline ACL bằng icacls /save, diff định kỳ; SACL bắt buộc cho paths nhạy cảm (event 4663); alert GPO-driven ACL change lớn. Residual risk: ACL sprawl theo thời gian (năm năm merge công ty) — cần periodic recertification có owner, không thể one-time-clean."
+          ],
+          "points": [
+            "Get-Acl (PowerShell) cho output structured dễ parse hơn icacls khi automation.",
+            "Rights mask granular (WRITE_DAC vs WRITE_DATA) — 'Modify' không bao gồm WRITE_DAC/CHANGE_PERMISSIONS; Full thì có.",
+            "Audit 'who can own': ownership review là mảng hay bị bỏ — owner đổi được mọi DACL."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "ACL Desk — Mô Phỏng Đánh giá DACL",
+        "objective": "Chạy thủ công thuật toán first-match-wins cho token cho trước, đọc icacls phát hiện misconfig, và đề xuất SACL cho object nhạy cảm.",
+        "scenario": "Bạn review file server mô phỏng: một security descriptor dạng icacls output cho thư mục \\Finance\\Payroll\\, một token description (user + groups + deny-only marks), và vài descriptor khác (service registry key, folder legacy). Toàn bộ tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ đánh giá theo dữ liệu cấp; mô phỏng thuật toán từng bước trên giấy/tư duy.",
+          "Mọi verdict phải chỉ ra ACE cụ thể (type/trustee/order) làm căn cứ.",
+          "Remediation ACL phải nêu lệnh icacls tương đương + verify."
+        ],
+        "cases": [
+          {
+            "id": "acl-case-01",
+            "title": "Payroll folder evaluation",
+            "context": "Token: user nam (CORP\\nam), groups: Domain Users, Finance-Staff; NOT deny-only. icacls \\\\FS01\\Finance\\Payroll: CORP\\Domain Users:(DENY)(RX) | CORP\\Finance-Staff:(M) | CORP\\nam:(DENY)(F) | BUILTIN\\Administrators:(I)(F) | [inherited markers]. Nam yêu cầu đọc payroll.dat trong folder.",
+            "prompt": "Kết quả đánh giá và giải thích đúng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Nam được Modify qua Finance-Staff — deny của Domain Users không liên quan vì anh ấy cũng thuộc Finance-Staff.",
+                "correct": false,
+                "rationale": "First-match-wins: ACE khớp TRƯỚC quyết định; thứ tự trong output là căn cứ — không cộng dồn hay 'nhóm thắng'."
+              },
+              {
+                "id": "B",
+                "label": "Duyệt theo thứ tự: ACE-1 Domain Users DENY(RX) khớp token (nam ∈ Domain Users) trước tiên → READ bị DENY ngay, các ACE sau không còn nghĩa cho read. Kết luận: nam bị chặn đọc DESPITE Finance-Staff(M) — đúng canonical order; nếu muốn Finance-Staff đọc, deny phải scope hẹp hơn hoặc reorder (icacls không hỗ trợ reorder trực tiếp — rebuild DACL).",
+                "correct": true,
+                "rationale": "Mô phỏng đúng thuật toán first-match; chỉ ra hệ quả thực tế (rebuild DACL thay vì chèn ACE) — hiểu sâu về order semantics."
+              },
+              {
+                "id": "C",
+                "label": "Explicit deny cho nam (F) đứng sau nên không ảnh hưởng — allow của Finance-Staff thắng.",
+                "correct": false,
+                "rationale": "Order là tất cả: deny của Domain Users đứng đầu đã chặn read; deny(F) của nam đứng sau chỉ ảnh hưởng các bits chưa quyết định."
+              },
+              {
+                "id": "D",
+                "label": "Administrators (I)(F) cho phép nam vì anh ta có thể xin admin help.",
+                "correct": false,
+                "rationale": "Evaluation chỉ nhìn token CỦA process hiện hành; 'xin admin giúp' là quy trình con người, không phải DACL mechanics."
+              }
+            ]
+          },
+          {
+            "id": "acl-case-02",
+            "title": "Legacy folder và NULL DACL",
+            "context": "icacls \\Legacy\\Temp: hiển thị 'NULL DACL' | \\Legacy\\Archive: 'no permissions' (DACL rỗng) | \\Legacy\\Data: Authenticated Users:(M), (I) missing — inheritance broken từ parent \\Legacy.",
+            "prompt": "Đánh giá từng descriptor và fix đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cả ba đều ổn vì đều nằm trong Legacy ít ai dùng.",
+                "correct": false,
+                "rationale": "'Ít ai dùng' không đổi semantics: NULL DACL = everyone-full; empty DACL = nobody (gây sự cố bí ẩn); broken inheritance = drift."
+              },
+              {
+                "id": "B",
+                "label": "Temp NULL DACL = P1 (mọi principal full control — icacls /reset + set proper ACL ngay); Archive empty-DACL = P2 availability bug (chỉ owner/admin via WRITE_DAC cứu — /grant owner); Data broken-inheritance + Authenticated Users:M = P2 (xác định chủ đích, /remove Authenticated Users + /reset nếu muốn theo chuẩn). Mỗi fix kèm verify: icacls re-read + test access bằng user thử nghiệm.",
+                "correct": true,
+                "rationale": "Phân biệt đúng ba trạng thái descriptor và hậu quả khác nhau (open-to-all vs closed-to-all vs drift); remediation cụ thể theo lệnh + verification."
+              },
+              {
+                "id": "C",
+                "label": "Empty DACL là an toàn nhất — không ai vào được là tốt.",
+                "correct": false,
+                "rationale": "Closed-to-all phá ứng dụng cần truy cập; và owner vẫn đổi được — 'an toàn' giả tạo kèm sự cố vận hành."
+              },
+              {
+                "id": "D",
+                "label": "Authenticated Users:Modify ổn hơn Everyone — cứ để nguyên.",
+                "correct": false,
+                "rationale": "Hợp lệ về semantics nhưng Modify cho TOÀN bộ domain users trên data folder là over-permission — phải theo whitelist nhóm chức năng."
+              }
+            ]
+          },
+          {
+            "id": "acl-case-03",
+            "title": "Service registry key",
+            "context": "icacls 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\BackupSvc': CORP\\srv-admins:(F) | BUILTIN\\Users:(I)(SetValue) | Owner: CORP\\srv-admins. Service BackupSvc chạy LocalSystem, ImagePath trỏ C:\\Program Files\\Backup\\bk.exe. Bạn biết SetValue trên service key cho phép đổi ImagePath/Parameters.",
+            "prompt": "Phân tích và remediation?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Users chỉ có SetValue không có Full — không thể đổi ImagePath.",
+                "correct": false,
+                "rationale": "SetValue CHÍNH là quyền ghi value trong key — ImagePath là một value; có SetValue = đổi được đường dẫn binary."
+              },
+              {
+                "id": "B",
+                "label": "P1 privesc: Users có SetValue → đổi ImagePath tới payload → chờ/cầu restart service → payload chạy LocalSystem. Fix: icacls remove Users ACE, chỉ srv-admins Full + SYSTEM; SACL thêm audit SetValue failures; verify bằng thử ghi ImagePath bằng user thường phải Access Denied + event 4656 failure xuất hiện.",
+                "correct": true,
+                "rationale": "Liên kết ACL-registry với chuỗi privesc service (từ l16); remediation + SACL + verification trọn bộ — đúng mô hình prevent/detect/verify."
+              },
+              {
+                "id": "C",
+                "label": "Đổi service sang NetworkService là đủ, không cần sửa ACL.",
+                "correct": false,
+                "rationale": "Hạ account giúp giảm impact SAU khi hijack nhưng cửa hijack (SetValue) vẫn mở — vá ACL mới là gốc."
+              },
+              {
+                "id": "D",
+                "label": "Move binary sang path khác là giải quyết tận gốc.",
+                "correct": false,
+                "rationale": "Attacker không cần đụng binary — họ đổi ImagePath VALUE trỏ tới payload của họ; move binary không đóng quyền ghi value."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Mô phỏng đúng thuật toán first-match-wins từng bước với token cụ thể.",
+          "Phân biệt NULL DACL / empty DACL / broken inheritance và hậu quả riêng.",
+          "Nhận diện chuỗi ACL→service-hijack privesc và viết remediation+SACL+verify trọn bộ."
+        ],
+        "evidenceTemplate": [
+          "Bảng walk-through DACL: step, ACE matched, decision, bits satisfied",
+          "Descriptor verdicts: state → impact → fix command → verify",
+          "Privesc chain diagram: ACL gap → action → result → patch point",
+          "SACL proposal: object, operation, success/failure, event id"
+        ],
+        "reset": "Đặt lại lựa chọn để đánh giá lại các descriptor từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không chỉnh ACL thật."
+      },
+      "governance": {
+        "prevent": [
+          "ACL baseline bằng icacls /save cho paths chuẩn; CI check cấm NULL DACL + Authenticated Users:Write trên data paths.",
+          "Enforce LDAP/service-key ACL chuẩn qua GPO/DCM; chặn Users:SetValue trên HKLM\\Services.",
+          "Ownership review định kỳ — owner là implicit backdoor."
+        ],
+        "observe": [
+          "SACL bắt buộc cho object nhạy cảm (4663/4656); alert ACL change spike (event 4670 modify-DACL).",
+          "Diff icacls /save snapshot định kỳ — drift ngoài change-window là alarm."
+        ],
+        "respond": [
+          "ACL hijack nghi vấn: so snapshot, revert qua /restore, điều tra account thực hiện (4670).",
+          "Service-config tampering: restore ImagePath, rotate service credentials, hunt persistence khác cùng host."
+        ],
+        "residualRisk": [
+          "ACL sprawl đa thế hệ — recertification là marathon, không phải sprint.",
+          "Effective-access phức tạp (deny+inheritance+deny-only) dễ đánh giá sai tay — ưu tiên tool tính hộ."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Explicit Deny luôn thắng mọi Allow ở bất kỳ đâu.",
+          "correction": "First-match-wins THEO THỨ TỰ trong cùng DACL: deny chỉ thắng khi đứng TRƯỚC allow cho bits đó; order sai thì allow trước nuốt deny sau. Canonical order tồn tại vì lý do này."
+        },
+        {
+          "claim": "Administrator luôn truy cập được mọi file vì 'toàn quyền'.",
+          "correction": "Admin có SeBackup/SeRestore + quyền TAKE_OWNERSHIP ngầm — nhưng phải CHỦ ĐỘNG takeown/backup-semantics; qua DACL thông thường, empty-DACL vẫn chặn admin."
+        },
+        {
+          "claim": "Authenticated Users ≈ Everyone, dùng interchangeably.",
+          "correction": "Authenticated Users loại anonymous; Everyone có thể gồm anonymous (tùy Anonymous-SID setting) — trên share/permission public, chọn sai là mở cửa unauthenticated."
+        },
+        {
+          "claim": "Disable inheritance là hành động an toàn mặc định.",
+          "correction": "Break inheritance tạo drift: child không nhận update policy từ parent; chỉ break khi có chủ đích + documented, kèm kế hoạch review riêng."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os03-l18-q1",
+          "difficulty": "easy",
+          "question": "DACL = NULL (không có DACL) có nghĩa gì?",
+          "options": [
+            { "id": "A", "label": "Không ai truy cập được" },
+            { "id": "B", "label": "Mọi người được full control (implicit grant to all)" },
+            { "id": "C", "label": "Chỉ owner truy cập được" },
+            { "id": "D", "label": "Chỉ SYSTEM truy cập được" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Không DACL = không có gì để chặn → mọi access granted. Ngược lại DACL rỗng (có nhưng 0 ACE) = implicit deny all."
+        },
+        {
+          "id": "os03-l18-q2",
+          "difficulty": "medium",
+          "question": "Token chứa Group G1. DACL theo thứ tự: (1) Deny G1 Write; (2) Allow User-U Write; (3) Allow G1 Read. User U (thành viên G1) yêu cầu Write. Kết quả?",
+          "options": [
+            { "id": "A", "label": "Allowed — ACE 2 cho User-U cá nhân thắng group deny" },
+            {
+              "id": "B",
+              "label": "Denied — ACE 1 khớp token (U ∈ G1) đứng trước và phủ Write; first-match-wins dừng ngay"
+            },
+            { "id": "C", "label": "Allowed Read only" },
+            { "id": "D", "label": "Depends on SACL" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Duyệt tuần tự: ACE 1 khớp trustee G1 (token có G1 active) với bits Write → DENY dừng. Personal allow phía sau không cứu được — order là luật."
+        },
+        {
+          "id": "os03-l18-q3",
+          "difficulty": "hard",
+          "question": "Filtered token (UAC non-elevated) chứa Administrators dạng deny-only. Khi đánh giá DACL có ACE 'Allow Administrators Full', hiệu lực thế nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Grant Full — vì SID Administrators vẫn present trong token"
+            },
+            {
+              "id": "B",
+              "label": "Không grant qua ACE đó — deny-only SID chỉ dùng cho DENY evaluation, không dùng để match ALLOW; process phải elevated (full token) mới hưởng ACE admin"
+            },
+            { "id": "C", "label": "Bị DENY ngay lập tức vì deny-only" },
+            { "id": "D", "label": "Tùy SACL quyết định" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Deny-only mark = SID chỉ tham gia khi ACE là Deny. Đây là cơ chế khiến filtered token 'nhớ' membership nhưng không hưởng quyền allow — khớp với hành vi UAC."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn thiết kế permission model cho thư mục dữ liệu HR mô phỏng: HR-Staff đọc/ghi, HR-Managers full, Helpdesk chỉ cần reset-permission khi sự cố (không đọc nội dung), Auditor chỉ đọc, và mọi access phải để lại audit trail. Parent tree có policy chuẩn không được phá.",
+        "tasks": [
+          "Viết DACL hoàn chỉnh (thứ tự ACE + trustees + rights) đạt yêu cầu trên, giải thích canonical order từng vị trí.",
+          "Thiết kế SACL: operations nào audit success/failure, đổ event nào, volume ước tính để tránh log-flood.",
+          "Viết runbook 'helpdesk emergency access' không phá model: dùng quyền gì (take ownership? WRITE_DAC?), audit ra sao, restore thế nào."
+        ],
+        "requiredEvidence": [
+          "DACL spec dạng ordered list kèm rationale order",
+          "SACL spec với event mapping + volume estimate",
+          "Runbook emergency-flow có steps + audit checkpoints"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Access Control Lists (ACL/DACL/SACL)",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/secauthz/access-control-lists",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cấu trúc DACL/SACL và ACE types",
+            "Thuật toán đánh giá access-check và implicit deny"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — ACE Order in an ACL (canonical order)",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/secauthz/order-of-aces-in-an-acl",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Thứ tự canonical: deny trước allow, non-inherit trước inherit"]
+        },
+        {
+          "title": "Microsoft Learn — icacls command reference",
+          "url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Cú pháp hiển thị/grant/remove/reset và shorthand rights (F/M/RX)"]
+        }
+      ]
+    }
+  ]
+}
