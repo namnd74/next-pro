@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, BookOpenCheck, Clock, Scale, ShieldCheck } from 'lucide-react';
 import type { AcademyModule } from './types';
+import { academyLessonHref } from './academy-tracks';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 
@@ -55,7 +56,7 @@ export function AcademyModuleOverview({ module }: { module: AcademyModule }) {
           {module.lessons.map((lesson, index) => (
             <Link
               key={lesson.id}
-              href={`/offensive-security/academy/${module.slug}/${lesson.slug}`}
+              href={academyLessonHref(module, lesson.slug)}
               className="group"
             >
               <Card className="glass-card glass-card-hover flex items-start gap-4 p-5 sm:p-6">

@@ -13,6 +13,7 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { AcademyAssessment } from './academy-assessment';
+import { academyLessonHref, academyModuleHref } from './academy-tracks';
 import type { AcademyLesson, AcademyModule, AcademyVisualStep } from './types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -39,7 +40,7 @@ export function AcademyLessonViewer({ module, lesson }: AcademyLessonViewerProps
   return (
     <article className="space-y-8">
       <Link
-        href={`/offensive-security/academy/${module.slug}`}
+        href={academyModuleHref(module)}
         className="text-muted-foreground hover:text-primary inline-flex items-center gap-1.5 text-xs font-semibold transition-colors"
       >
         <ArrowLeft className="h-3.5 w-3.5" />
@@ -261,9 +262,7 @@ export function AcademyLessonViewer({ module, lesson }: AcademyLessonViewerProps
 
       <div className="border-border/50 flex flex-col justify-between gap-3 border-t pt-6 sm:flex-row">
         {previousLesson ? (
-          <Link
-            href={`/offensive-security/academy/${module.slug}/${previousLesson.slug}`}
-          >
+          <Link href={academyLessonHref(module, previousLesson.slug)}>
             <Button variant="outline" size="sm" className="w-full gap-2 sm:w-auto">
               <ArrowLeft className="h-3.5 w-3.5" />
               {previousLesson.title}
@@ -273,14 +272,14 @@ export function AcademyLessonViewer({ module, lesson }: AcademyLessonViewerProps
           <div />
         )}
         {nextLesson ? (
-          <Link href={`/offensive-security/academy/${module.slug}/${nextLesson.slug}`}>
+          <Link href={academyLessonHref(module, nextLesson.slug)}>
             <Button size="sm" className="w-full gap-2 sm:w-auto">
               {nextLesson.title}
               <ArrowRight className="h-3.5 w-3.5" />
             </Button>
           </Link>
         ) : (
-          <Link href={`/offensive-security/academy/${module.slug}`}>
+          <Link href={academyModuleHref(module)}>
             <Button variant="outline" size="sm">
               Hoàn tất module
             </Button>
