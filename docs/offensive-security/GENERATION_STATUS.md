@@ -10,14 +10,15 @@ Updated: 2026-08-25
 - Machine-readable manifest: verified
 - Generation skill: active
 - Curriculum validator: verified
-- Full lesson migration/generation: in progress — **9 modules validated (27 lessons, 1,620 minutes);
+- Full lesson migration/generation: in progress — **11 modules validated (33 lessons, 2,130 minutes);
   tracks `os01-network-foundations` fully validated (4/4); `os02-linux-foundations` and
-  `os03-windows-foundations` each started with their first module**
+  `os03-windows-foundations` at 2/3 modules each**
 - Existing Practice Range collections: preserved as auxiliary practice range
-- Publishing state: PR #4 (foundation), PR #5 (`os01-m02`), PR #6 (`os01-m03`), PR #7 (`os01-m04`) open
-  for review; each new batch stacks on the previous branch.
+- Publishing state: PR #4 (foundation), PR #5 (`os01-m02`), PR #6 (`os01-m03`), PR #7 (`os01-m04`),
+  PR #9 (paired cycle 1: `os02-m01` + `os03-m01`) open for review; each new batch stacks on the
+  previous branch.
 - Batch policy: raised to 2 modules / 6 lessons per run by owner approval (2026-08-25) to pair
-  independent tracks; the first pair (`os02-m01` + `os03-m01`) is complete.
+  independent tracks; paired cycles 1 and 2 are complete.
 
 The current `/offensive-security` content remains operational. It has not been declared equivalent to
 the new academy and must not be counted as completion of foundation, network, Linux,
@@ -25,31 +26,29 @@ Windows, Active Directory, cloud, research, or adversary-emulation tracks.
 
 ## Latest validated batch
 
-**First paired cycle** — two independent modules generated in one run:
+**Second paired cycle** — two independent modules generated in one run:
 
-1. `os02-m01-files-identity-permissions` — Linux filesystem/identity/permission foundations
-   (180 minutes total):
-   - `os02-l13-filesystem-hierarchy-and-file-types` (60 min) — FHS roles, inode vs name model,
-     five file types, symlink-race (TOCTOU) mechanics on `/tmp`, O_EXCL/O_NOFOLLOW and
-     `fs.protected_symlinks` mitigations.
-   - `os02-l14-users-groups-and-identity-boundaries` (60 min) — UID/GID numeric identity,
-     passwd/shadow/group field reading, su-vs-sudo authorization models, sudoers escape review
-     (vim/find), least-privilege service account design, 30-second identity audit checklist.
-   - `os02-l15-permission-bits-and-special-modes` (60 min) — permission ring selection semantics,
-     umask computation order (requested mode → create → app chmod override), SUID/SGID/sticky
-     mechanics, SUID inventory audit with whitelist remediation ordering.
+1. `os02-m02-processes-services-shell` — Linux runtime foundations (240 minutes total):
+   - `os02-l16-processes-signals-and-procfs` (80 min) — process tree reasoning via PID/PPID,
+     fork/exec env-inheritance risks, TERM/KILL/HUP evidence trade-offs, /proc forensics
+     (cmdline, environ, exe-deleted masquerading, fd).
+   - `os02-l17-systemd-units-and-journal` (80 min) — unit-file anatomy with drop-in overrides,
+     sandbox directives (NoNewPrivileges, ProtectSystem, CapabilityBoundingSet, PrivateTmp),
+     privileged-unit + writable-content privesc chain, journalctl multi-unit incident timeline.
+   - `os02-l18-packages-cron-and-shell-env` (80 min) — dpkg -V verification decoding,
+     wildcard-cron privesc triple (privileged job + wildcard + writable dir), PATH resolution
+     across contexts (interactive vs cron), auth-log triage basics.
 
-2. `os03-m01-architecture-identities-acls` — Windows architecture/identity foundations
-   (240 minutes total):
-   - `os03-l16-windows-architecture-and-principals` (80 min) — user/kernel mode split, SID
-     structure decoding with well-known RIDs (500/501/S-1-5-18), SAM vs AD databases,
-     LocalSystem/LocalService/NetworkService privilege ranges.
-   - `os03-l17-access-tokens-and-uac` (80 min) — access token contents (SIDs, privileges,
-     integrity level), UAC filtered-token split with deny-only marks, consent prompt levels,
-     token-minimization principle for service accounts.
-   - `os03-l18-acls-and-permission-evaluation` (80 min) — security descriptor anatomy
-     (owner/DACL/SACL), first-match-wins ACE evaluation with canonical order, NULL-DACL vs
-     empty-DACL semantics, registry service-key SetValue privesc chain, SACL audit design.
+2. `os03-m02-services-powershell-remote` — Windows services & administration (270 minutes total):
+   - `os03-l19-services-scm-and-path-security` (90 min) — SCM registry profiles (ImagePath/
+     ObjectName/Start), unquoted-path interception mechanics, service SDDL decode with
+     SERVICE_CHANGE_CONFIG privesc, recovery-option abuse patterns.
+   - `os03-l20-scheduled-tasks-and-autoruns` (90 min) — task XML anatomy (trigger/action/principal
+     incl. S4U), Run-key hive matrix + startup folders, edit-in-place persistence (event 4702),
+     baseline-diff inventory methodology and detection mapping.
+   - `os03-l21-powershell-logging-and-remote-admin` (90 min) — three logging layers (module/
+     script-block 4104/transcription), execution-policy guard-vs-boundary framework, WinRM
+     listener hardening, JEA role-capability design for least-privilege remote admin.
 
 All six labs are browser-only decision simulations with fixed datasets. They accept no external
 target, credential, command or arbitrary payload. Completion requires all three lab cases and
@@ -61,6 +60,8 @@ before `published` status remains pending, as for all batches.
 
 ## Previous validated batches
 
+- **Paired cycle 1** — `os02-m01-files-identity-permissions` (180 min) +
+  `os03-m01-architecture-identities-acls` (240 min): lessons `os02-l13..l15`, `os03-l16..l18`.
 - `os01-m04-enterprise-protocols-and-packets` (240 min, 3 lessons):
   - `os01-l10-smb-ldap-enterprise-protocols`
   - `os01-l11-packet-capture-methodology`
@@ -93,9 +94,9 @@ before `published` status remains pending, as for all batches.
 
 ## Next eligible batch
 
-Second paired cycle: `os02-m02-processes-services-shell` (Linux, 240 min) + `os03-m02-services-
-powershell-remote` (Windows, 270 min) — both now eligible after their respective first modules
-validated; continue per-track lesson numbering (`os02-l16..l18`, `os03-l19..l21`).
+Third paired cycle: `os02-m03-linux-boundaries-and-telemetry` (Linux, 300 min) + `os03-m03-
+endpoint-controls-and-events` (Windows, 300 min) — both eligible; completing either track's
+foundation tier. Lesson numbering continues `os02-l22..l24`, `os03-l22..l24`.
 
 ## Required decisions before content migration
 
@@ -124,25 +125,27 @@ validated; continue per-track lesson numbering (`os02-l16..l18`, `os03-l19..l21`
 ## Evidence log
 
 - `npm run validate:offensive-security-curriculum`: passed — 19 tracks, 64 modules; next
-  eligible module is `os02-m02-processes-services-shell`.
-- `npm run validate:offensive-security-content`: passed — validated all nine modules
-  `os00-m01`, `os00-m02`, `os00-m03`, `os01-m01`, `os01-m02`, `os01-m03`, `os01-m04`,
-  `os02-m01`, `os03-m01` (27 lessons, 1,620m).
+  eligible module is `os02-m03-linux-boundaries-and-telemetry`.
+- `npm run validate:offensive-security-content`: passed — validated all eleven modules
+  `os00-m01`–`os00-m03`, `os01-m01`–`os01-m04`, `os02-m01`, `os02-m02`, `os03-m01`, `os03-m02`
+  (33 lessons, 2,130m).
 - Quality rubric review: 22/22 self-assessed for each of the six lessons in this batch;
   no dimension scored zero.
-- Authoritative sources: FHS 3.0 standard, Linux man-pages (inode/symlink/passwd/umask/capabilities),
-  kernel sysctl fs docs, NIST SP 800-123, sudo sudoers(5) manual; Microsoft Learn SID/security
-  principals/access tokens/UAC/ACL canonical-order documentation.
-- CJK-leakage grep across all nine data files: clean after fixing one leak in `os03-m01`.
+- Authoritative sources: Linux man-pages (proc/signal/systemd.exec/journalctl/crontab/dpkg),
+  freedesktop.org systemd docs, GNU bash manual; Microsoft Learn services registry/SDDL,
+  task-scheduler schema, audit events 4698/4702, Sysinternals Autoruns, PowerShell
+  about_Logging_Windows/about_Execution_Policies, JEA overview.
+- CJK-leakage grep across all eleven data files: clean after fixing one leak (`签名`) and one
+  invalid escape sequence in `os03-m02`; stray-field regression (`reasonale`) caught pre-commit.
 - `npm run lint`: passed.
 - `npm run typecheck` (`tsc --noEmit`): passed.
-- Production build: **passed** — 175 static pages including all 9 academy module routes and
-  27 lesson routes (previous build at `os01-m03` had 163 pages).
+- Production build: **deferred this cycle** per approved cadence (build every 2–3 batches); last
+  full build passed at paired cycle 1 with 175 static pages. Next build due at cycle 3.
 - `git diff --check`: passed.
 
-Runtime integration: `/offensive-security/academy/files-identity-permissions` and
-`/offensive-security/academy/windows-architecture-identities-acls` plus 6 statically generated
-lesson routes (`filesystem-hierarchy-and-file-types`, `users-groups-and-identity-boundaries`,
-`permission-bits-and-special-modes`, `windows-architecture-and-principals`,
-`access-tokens-and-uac`, `acls-and-permission-evaluation`), persistent completion state, and Core
-Academy navigation (routes derive automatically from `ACADEMY_MODULES`).
+Runtime integration: `/offensive-security/academy/processes-services-shell` and
+`/offensive-security/academy/services-powershell-remote` plus 6 statically generated lesson
+routes (`processes-signals-and-procfs`, `systemd-units-and-journal`, `packages-cron-and-shell-env`,
+`services-scm-and-path-security`, `scheduled-tasks-and-autoruns`,
+`powershell-logging-and-remote-admin`), persistent completion state, and Core Academy navigation
+(routes derive automatically from `ACADEMY_MODULES`).
