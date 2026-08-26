@@ -1,0 +1,1099 @@
+{
+  "id": "os01-m03-dns-transport-and-tls",
+  "slug": "dns-transport-and-tls",
+  "trackId": "os01-network-foundations",
+  "title": "DNS, DHCP, TCP/UDP, HTTP & TLS",
+  "summary": "Truy vết vòng đời phân giải tên phân cấp và cấp phát địa chỉ qua DHCP; mô hình trạng thái của TCP/UDP và các tấn công khai thác trạng thái; ranh giới tin cậy HTTP/TLS từ cookie đến chuỗi chứng thực CA — kèm phòng thủ và phát hiện tương ứng.",
+  "difficulty": "foundation",
+  "estimatedMinutes": 240,
+  "careerPaths": ["penetration-test", "red-team", "bug-bounty"],
+  "domains": ["network", "web"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os01-l07-dns-resolution-and-dhcp-boundaries",
+      "slug": "dns-resolution-and-dhcp-boundaries",
+      "title": "Phân giải DNS Phân cấp & Ranh giới Tin cậy DHCP",
+      "summary": "Kiến trúc DNS recursive/authoritative và ý nghĩa bảo mật của TTL; cơ chế DHCP DORA và rủi ro rogue DHCP; cache poisoning và dấu hiệu tunneling qua DNS; phòng thủ bằng DNSSEC, DoH/DoT, egress filtering và DHCP Snooping.",
+      "difficulty": "foundation",
+      "durationMinutes": 80,
+      "prerequisites": [],
+      "outcomes": [
+        "Mô tả đường đi của một truy vấn DNS qua stub resolver, recursive cache, root/TLD/authoritative và giải thích vai trò của TTL ở từng tầng cache.",
+        "Giải thích trình tự DHCP DORA (Discover-Offer-Request-Ack) và xác định điều kiện khiến một rogue DHCP server chiếm được vị trí gateway/DNS của segment.",
+        "Nhận diện dấu hiệu cache poisoning (record bất thường kèm TTL dài) và traffic tunneling qua DNS (pattern subdomain dài, tỷ lệ NXDOMAIN cao) từ log mô phỏng.",
+        "Lựa chọn và xếp thứ tự phòng thủ: DNSSEC cho tính toàn vẹn nguồn gốc, DoH/DoT cho mã hóa kênh tới resolver, egress filtering ép DNS ra resolver được phép, DHCP Snooping cho tầng cấp phát."
+      ],
+      "careerPaths": ["penetration-test", "red-team"],
+      "domains": ["network"],
+      "attackTactics": ["TA0007"],
+      "keywords": ["dns-resolution", "ttl-cache", "dhcp-dora", "rogue-dhcp", "dnssec"],
+      "safetyLevel": "safe",
+      "mentalModel": "DNS là danh bạ phân cấp nhiều tầng: máy hỏi 'thư ký' (recursive resolver), chưa có trong sổ thì thư ký đi hỏi lên chuỗi root → TLD → authoritative, rồi ghi nhớ câu trả lời theo hạn TTL. Mỗi tầng cache là một lớp bộ nhớ dùng chung — ai nhét được bản ghi sai vào bộ nhớ nào, mọi người hỏi sau đều đọc sai theo. DHCP là quầy đăng ký tạm trú: máy mới vào mạng gào tìm quầy (Discover), quầy cấp giấy (Offer/Ack) kèm ba dòng quyết định vận mệnh: IP, gateway, DNS server. Host mặc nhiên tin cả hai dịch vụ này — vì vậy điểm tin cậy thật nằm ở việc kiểm chứng ai được quyền trả lời, chứ không phải ở thiện chí giao thức.",
+      "visual": {
+        "title": "Chuỗi Trả lời DNS và Quầy Cấp DHCP",
+        "caption": "Truy vấn đi từ cache gần nhất ra authoritative; DHCP cấp cấu hình qua bốn bước DORA — cả hai đều là điểm giả mạo tiềm năng trong segment.",
+        "steps": [
+          {
+            "label": "Stub resolver hỏi cache",
+            "detail": "OS/app hỏi recursive resolver; hit cache trả lời ngay theo TTL còn lại — nhanh nhưng kế thừa mọi lỗi của cache.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Đi lên chuỗi phân cấp",
+            "detail": "Cache miss: recursive hỏi root (referral), rồi TLD (.vn, .com), rồi authoritative của zone — mỗi bước là một lần tin câu trả lời.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Ghi cache theo TTL",
+            "detail": "Câu trả lời được cache đúng TTL do zone chủ định; TTL dài tiết kiệm băng thông nhưng kéo dài 'cửa sổ sai' nếu bản ghi bị nhét sai.",
+            "tone": "caution"
+          },
+          {
+            "label": "Rogue DHCP chen vào",
+            "detail": "Máy mới broadcast Discover; bất kỳ ai trong segment cũng có thể Offer 'gateway/DNS của tôi' — host không có cách phân biệt quầy thật giả.",
+            "tone": "stop"
+          },
+          {
+            "label": "Kiểm chứng hạ tầng",
+            "detail": "DHCP Snooping chỉ nhận Offer/Ack từ port trusted; DNSSEC xác minh chữ ký nguồn gốc bản ghi; egress filter ép DNS ra resolver được phép.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "DNS Phân cấp: Ai Được Trả lời Cho Ai",
+          "paragraphs": [
+            "Không gian tên là cây: root ('.'), TLD, zone của tổ chức. Authoritative server giữ dữ liệu zone và trả lời có thẩm quyền; recursive resolver thay mặt client đi hỏi toàn bộ chuỗi. Bản ghi phổ biến: A (IPv4), AAAA (IPv6), CNAME (bí danh), MX (thư), NS (ủy quyền zone), TXT (ghi chú xác thực/spf…).",
+            "TTL là hợp đồng cache: 'được tin bản ghi này trong N giây'. Giảm TTL trước khi đổi DNS là thao tác chuyển hạ tầng chuẩn — nhưng cũng có nghĩa khi một bản ghi sai đã vào cache, nó tồn tại đúng bằng TTL đó ở mọi tầng (browser, OS, resolver ISP). Điều tra sự kiện DNS luôn phải hỏi: sai ở tầng nào, hết hạn lúc nào."
+          ],
+          "points": [
+            "Negative caching: câu trả lời NXDOMAIN cũng được cache — khiến tên miền tạm thời 'biến mất' thêm một khoảng.",
+            "Zone transfer (AXFR) phải giới hạn cho secondary DNS; mở rộng rãi là lộ toàn bộ sơ đồ tên nội bộ.",
+            "Split-horizon DNS: bản ghi khác nhau cho view trong/ngoài — nguồn nhầm lẫn kinh điển khi scoping kiểm thử."
+          ]
+        },
+        {
+          "title": "Khi Danh bạ Bị Ghé Tay: Poisoning và Tunneling",
+          "paragraphs": [
+            "Cache poisoning lợi dụng việc resolver chấp nhận phản hồi khớp (domain, TXID, port) mà chưa xác minh nguồn gốc: nếu entropy của truy vấn thấp (TXID 16-bit, cổng nguồn cố định), kẻ on-path hoặc có khả năng đoán được nhét phản hồi giả trước phản hồi thật; bản ghi sai được cache và phục vụ mọi client sau đó. Giao thức DNS gốc (RFC 1034/1035) không có xác thực — DNSSEC bổ sung chữ ký số trên chuỗi tin cậy từ root.",
+            "DNS cũng là kênh dữ liệu hai chiều: truy vấn mang tên miền ra ngoài, nên payload có thể giấu trong label subdomain dài (exfiltration/C2 tunneling). Detection không cần giải mã đầy đủ: tỷ lệ NXDOMAIN cao bất thường, độ dài/nhãn ngẫu nhiên vượt baseline, volume query một host tăng đột biến. Đây là lý do egress policy 'chỉ DNS ra resolver nội bộ' là control nền tảng — không ép tập trung thì không đo được gì."
+          ],
+          "points": [
+            "Source port randomization + TXID nâng entropy chống poisoning (hậu KH patch năm 2008).",
+            "DoH/DoT mã hóa đoạn client↔resolver, chống nghe lén/giả mạo trên đường — nhưng chuyển điểm tin cậy sang resolver, cần policy chọn resolver rõ ràng.",
+            "Host-based: process nào query DNS cũng là tín hiệu — resolver log kèm PID giúp truy vết malware nhanh nhất."
+          ]
+        },
+        {
+          "title": "DHCP: Quầy Đăng ký Tạm trú và Rogue Server",
+          "paragraphs": [
+            "Bốn bước DORA: Discover (broadcast tìm quầy), Offer (quầy đề xuất IP + options), Request (client chọn quầy), Ack (chốt lease kèm gateway, DNS, domain, thời hạn). Client nhận option đầu tiên đến trước — không xác thực người cấp. Một rogue DHCP trong segment chỉ cần trả lời nhanh hơn server thật là trở thành gateway/DNS của nạn nhân: mọi traffic và mọi truy vấn tên chảy qua kẻ tấn công.",
+            "Mitigation chuẩn là DHCP Snooping (đã đặt nền ở bài l04 với DAI): switch chỉ coi port nối DHCP server thật là trusted, drop Offer/Ack từ port untrusted, đồng thời xây bảng binding (IP, MAC, port, lease) — chính bảng này nuôi Dynamic ARP Inspection. Hai control là một cặp; bật cái này thiếu cái kia là bỏ hở nửa ranh giới lớp 2."
+          ],
+          "points": [
+            "DHCP starvation (rút cạn pool bằng MAC giả) là dạng phủ nhận dịch vụ cục bộ — phát hiện qua tốc độ lease tăng bất thường.",
+            "Option 82 (relay info) giúp xác định vị trí port của request — hữu ích cho forensics.",
+            "Thiết bị headless/IP tĩnh nằm ngoài DHCP nhưng vẫn chịu ảnh hưởng rogue DNS nếu hard-code trỏ về gateway bị giả."
+          ]
+        },
+        {
+          "title": "Xếp Thứ tự Phòng thủ và Kiểm chứng",
+          "paragraphs": [
+            "Thứ tự hợp lý cho doanh nghiệp: (1) DHCP Snooping + DAI khóa tầng cấp phát/lớp 2; (2) egress filtering chỉ cho phép DNS ra resolver doanh nghiệp (block UDP/TCP 53 ra ngoài, khuyến nghị redirect); (3) bật validation: DNSSEC validating resolver + giám sát SERVFAIL spike; (4) client sensitive dùng DoH/DoT tới resolver được quản trị. Mỗi lớp phải kiểm chứng riêng: giả mạo thử trong lab cô lập và xác nhận bị drop kèm log, không tính 'đã bật' là an toàn.",
+            "Detection matrix: DNS — alert NXDOMAIN ratio > baseline 3σ, nhãn ngẫu nhiên dài, query tới newly registered domain; DHCP — Offer/Ack từ port untrusted (snooping violation log), lease rate spike. Residual risk: DNSSEC không mã hóa (vẫn nhìn thấy được tên đang hỏi), DoH có thể bị malware lạm dụng để né egress filter — nên allowlist DoH endpoint thay vì block mù."
+          ],
+          "points": [
+            "Kiểm chứng segmentation DNS: từ host thường, truy cập trực tiếp 8.8.8.8:53 phải FAIL theo policy — negative test bắt buộc.",
+            "Log resolver là tài sản forensics: giữ đủ lâu, đồng bộ giờ, kèm client IP + PID nơi khả thi.",
+            "Residual: kênh DNS-over-HTTPS của browser có thể bypass resolver nội bộ nếu không có policy nhóm chặn."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Name Resolution Desk — Đọc Log DNS/DHCP",
+        "objective": "Chẩn đoán cache poisoning và rogue DHCP từ log mô phỏng, nhận diện pattern tunneling, và xếp thứ tự phòng thủ kiểm chứng được.",
+        "scenario": "Bạn là Security Analyst tại một công ty có 400 máy trạm. Helpdesk nhận ba báo cáo khác nhau trong ngày; bạn được cấp log resolver nội bộ, log switch snooping và telemetry endpoint (tất cả là dữ liệu mô phỏng tĩnh trong trình duyệt).",
+        "constraints": [
+          "Chỉ suy luận từ log được cung cấp; không nhập domain/IP tùy ý để 'thử'.",
+          "Mỗi chẩn đoán phải nêu bằng chứng cụ thể trong log và tầng bị vi phạm.",
+          "Mitigation đề xuất phải kèm cách kiểm chứng (negative test hoặc log drop)."
+        ],
+        "cases": [
+          {
+            "id": "dns-case-01",
+            "title": "Ngân hàng trực tuyến mở trang lạ",
+            "context": "Log resolver nội bộ cho thấy: 10:02 nhiều máy trạm hỏi bank-viet.example (A record) và nhận 198.51.100.77; bản ghi này được cache với TTL 86400. Chủ domain xác nhận IP thật là 203.0.113.10 và không thay đổi gần đây. Resolver chạy KHÔNG bật DNSSEC validation, source port randomization bị tắt do 'tương thích phần mềm cũ'.",
+            "prompt": "Chẩn đoán và xử lý đúng nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Domain của ngân hàng bị hack; chặn toàn bộ domain này.",
+                "correct": false,
+                "rationale": "Bằng chứng chỉ ra resolver trả lời sai (IP lệch khỏi authoritative), không chứng minh hệ thống phía ngân hàng bị xâm nhập; chặn domain là chữa lấn sân."
+              },
+              {
+                "id": "B",
+                "label": "Cache poisoning tại resolver (entropy thấp do tắt port randomization): flush cache bản ghi sai, bật lại randomization, bật DNSSEC validation, và kiểm chứng bằng truy cập trực tiếp authoritative so với cache.",
+                "correct": true,
+                "rationale": "Ba yếu tố hội tụ: trả lời sai nguồn gốc + TTL 86400 kéo dài cửa sổ + entropy bị hạ. Fix đúng chỗ (validation + entropy) và có bước xác minh đối chiếu nguồn thật."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần đợi 24 giờ cho TTL hết hạn, không cần làm gì khác.",
+                "correct": false,
+                "rationale": "Trong 24 giờ mọi user tiếp tục bị dẫn sai; chờ là chấp nhận rủi ro đang diễn ra, và nguyên nhân entropy chưa được khắc phục thì tái diễn ngay."
+              },
+              {
+                "id": "D",
+                "label": "Đổi DNS server cho máy trạm sang 8.8.8.8 là giải quyết tận gốc.",
+                "correct": false,
+                "rationale": "Trỏ thẳng resolver ngoài phá vỡ egress control và visibility; đúng hơn là vá resolver nội bộ và giữ mô hình tập trung."
+              }
+            ]
+          },
+          {
+            "id": "dhcp-case-02",
+            "title": "Máy mới nhận gateway lạ",
+            "context": "Một laptop vừa cắm dây nhận lease từ 10.20.5.9 với gateway 10.20.5.250 (không phải gateway chuẩn 10.20.5.1) và DNS 10.20.5.250. Log switch: gói Offer đến từ MAC lạ trên port 22 của access switch VLAN 5; DHCP server thật nằm ở data center qua uplink. Chưa bật DHCP Snooping trên VLAN này.",
+            "prompt": "Phân tích và biện pháp đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Rogue DHCP trên port 22: bật DHCP Snooping, đặt port uplink là trusted, port 22 và mọi access port untrusted; xác minh bằng cách để laptop xin lease lại và xác nhận chỉ nhận Offer từ server thật + log violation nếurogue còn hoạt động.",
+                "correct": true,
+                "rationale": "Triệu chứng Offer từ port không phải uplink là dấu hiệu kinh điển; Snooping đúng topology (trusted = uplink tới server thật) chặn đúng nguồn và tạo log vi phạm làm telemetry."
+              },
+              {
+                "id": "B",
+                "label": "Laptop bị malware tự cấu hình IP tĩnh; cài lại Windows.",
+                "correct": false,
+                "rationale": "Lease có trình tự DORA và nguồn Offer xác định từ port 22 — đây là server giả trong mạng, không phải cấu hình cục bộ của laptop."
+              },
+              {
+                "id": "C",
+                "label": "Đổi dải IP của VLAN sang dải khác để né rogue server.",
+                "correct": false,
+                "rationale": "Rogue server trả lời trên bất kỳ dải nào nó nghe thấy; đổi dải chỉ xoay bài toán, không loại bỏ nguồn giả mạo."
+              },
+              {
+                "id": "D",
+                "label": "Tắt hẳn DHCP, cấp IP tĩnh cho toàn công ty.",
+                "correct": false,
+                "rationale": "Vô hiệu hóa DHCP không chặn được giả mạo gateway/DNS ở lớp 2 và gây gánh nặng vận hành khổng lồ; vấn đề thuộc về enforcement tại switch."
+              }
+            ]
+          },
+          {
+            "id": "dns-case-03",
+            "title": "Pattern truy vấn đáng ngờ",
+            "context": "Baseline resolver: 12.000 query/giờ toàn công ty, NXDOMAIN chiếm 2%. Trong 30 phút, host 10.20.8.141 gửi 9.500 query với các tên kiểu 'a7f3d91c.tunnel-update.example', 'b2e84a0f.tunnel-update.example'… 87% trả NXDOMAIN; kích thước label đầu tiên luôn 8-16 ký tự ngẫu nhiên; các host khác không có pattern này. Không có ứng dụng hợp lệ nào trên catalog dùng domain đó.",
+            "prompt": "Hành động ứng xử đúng theo evidence-first là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Block ngay toàn bộ domain 'tunnel-update.example' cho toàn công ty rồi kết thúc vụ việc.",
+                "correct": false,
+                "rationale": "Block là biện pháp chứa hợp lý NHƯNG không đủ: chưa xác định được tiến trình/nguyên nhân trên host, kẻ tấn công chỉ cần đổi domain là tiếp tục; phải đi kèm điều tra endpoint."
+              },
+              {
+                "id": "B",
+                "label": "Cô lập host khỏi mạng (hoặc choke DNS của nó), trích mẫu query phân tích payload label, xác định tiến trình nguồn bằng log endpoint, rồi block domain + remediate nguyên nhân; theo dõi metric NXDOMAIN ratio quay về baseline làm tiêu chí đóng vụ.",
+                "correct": true,
+                "rationale": "Pattern (volume ×15, NXDOMAIN 87%, nhãn ngẫu nhiên) đủ để xếp nghi vấn tunneling cao — response chuẩn là chứa + điều tra nguồn + block có bằng chứng, với tiêu chí đóng vụ đo được."
+              },
+              {
+                "id": "C",
+                "label": "Bỏ qua: NXDOMAIN là chuyện bình thường của internet.",
+                "correct": false,
+                "rationale": "Baseline toàn công ty là 2%; 87% tập trung một host với nhãn ngẫu nhiên là lệch 40 lần — bỏ qua là bỏ sót tín hiệu exfiltration/C2."
+              },
+              {
+                "id": "D",
+                "label": "Format lại máy 10.20.8.141 ngay không cần phân tích thêm.",
+                "correct": false,
+                "rationale": "Phá hủy bằng chứng trước khi biết vector tấn công và phạm vi ảnh hưởng; còn có thể vi phạm quy trình forensic của tổ chức."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Chẩn đoán đúng tầng bị lỗi (cache/resolver/cấp phát) kèm bằng chứng log cụ thể.",
+          "Trình bày đúng quan hệ nhân quả DHCP Snooping ↔ DAI ↔ bảng binding.",
+          "Đề xuất mitigation kèm negative test/log drop để xác minh hiệu lực."
+        ],
+        "evidenceTemplate": [
+          "Bản trích log resolver/snooping: timestamp, query/option, giá trị bất thường",
+          "So sánh giá trị cache với authoritative (poisoning case)",
+          "Biểu đồ NXDOMAIN/volume so với baseline (tunneling case)",
+          "Checklist phòng thủ xếp thứ tự + cách kiểm chứng từng lớp"
+        ],
+        "reset": "Đặt lại lựa chọn để phân tích lại các tình huống DNS/DHCP từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không gửi truy vấn hay thay đổi cấu hình thật."
+      },
+      "governance": {
+        "prevent": [
+          "Egress filtering: chỉ resolver doanh nghiệp được nói DNS ra ngoài; block UDP/TCP 53 trực tiếp từ LAN.",
+          "Bật DNSSEC validation trên resolver; giữ source port randomization; rà soát TTL lớn cho bản ghi dễ thay đổi.",
+          "DHCP Snooping trên mọi VLAN user với trusted port duy nhất hướng tới DHCP server thật; ghép cặp với DAI."
+        ],
+        "observe": [
+          "Alert NXDOMAIN ratio và volume/query-host vượt baseline 3σ; cảnh báo nhãn ngẫu nhiên dài và newly-registered-domain.",
+          "Log snooping violation (Offer/Ack từ port untrusted) và tốc độ cấp lease bất thường."
+        ],
+        "respond": [
+          "Poisoning: flush cache có kiểm soát, đối chiếu authoritative, vá entropy/validation trước khi mở lại.",
+          "Nghi tunneling: cô lập/choked DNS cho host, truy vết tiến trình nguồn, block domain có bằng chứng, đóng vụ khi metric về baseline."
+        ],
+        "residualRisk": [
+          "DNSSEC xác thực nguồn gốc nhưng không mã hóa — metadata truy vấn vẫn quan sát được trên đường.",
+          "DoH của trình duyệt có thể né resolver nội bộ nếu không có group policy allowlist endpoint."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Flush cache DNS là xử lý gốc của poisoning.",
+          "correction": "Flush chỉ xóa triệu chứng tạm thời; nếu entropy (port randomization) và validation (DNSSEC) chưa bật, bản ghi sai quay lại ngay ở lần truy vấn kế tiếp."
+        },
+        {
+          "claim": "Rogue DHCP chỉ nguy hiểm khi nằm trong phòng server.",
+          "correction": "Chỉ cần cùng broadcast domain với nạn nhân — một cổng LAN văn phòng cắm router nhỏ là đủ chiếm vị trí gateway/DNS của cả khu vực."
+        },
+        {
+          "claim": "NXDOMAIN nhiều là lỗi DNS server.",
+          "correction": "NXDOMAIN là câu trả lời hợp lệ 'không tồn tại'; tỷ lệ NXDOMAIN lệch baseline theo từng HOST mới là tín hiệu — nó thường phản ánh hành vi tiến trình trên host, không phải health của resolver."
+        },
+        {
+          "claim": "Bật DoH ở trình duyệt luôn làm an toàn hơn.",
+          "correction": "DoH mã hóa kênh tới resolver đó, nhưng nếu endpoint DoH nằm ngoài kiểm soát, tổ chức mất visibility và bypass egress policy; cần quản trị endpoint DoH, không phải bật tự do."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l07-q1",
+          "difficulty": "easy",
+          "question": "Trình tự bốn bước của DHCP được gọi là gì?",
+          "options": [
+            { "id": "A", "label": "SYN – SYN/ACK – ACK – DATA" },
+            { "id": "B", "label": "Discover – Offer – Request – Acknowledge (DORA)" },
+            { "id": "C", "label": "Query – Referral – Response – Cache" },
+            { "id": "D", "label": "Probe – Announce – Lease – Renew" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Client broadcast Discover, server Offer, client chọn và Request, server chốt bằng Ack kèm các option (gateway, DNS, lease time)."
+        },
+        {
+          "id": "os01-l07-q2",
+          "difficulty": "medium",
+          "question": "Tại sao việc TẮT source port randomization trên recursive resolver làm tăng nguy cơ cache poisoning?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì port cố định làm resolver chậm hơn, kẻ tấn công có thời gian gửi phản hồi sớm hơn"
+            },
+            {
+              "id": "B",
+              "label": "Vì phản hồi giả phải khớp (domain, TXID 16-bit, port nguồn); mất chiều port thì không gian đoán chỉ còn 65.536 giá trị TXID, khả thi với băng thông đủ"
+            },
+            { "id": "C", "label": "Vì port cố định vô hiệu hóa TTL của bản ghi cache" },
+            {
+              "id": "D",
+              "label": "Vì randomization là yêu cầu bắt buộc của DNSSEC, tắt thì chữ ký sai"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Entropy của truy vấn = TXID × port. Giữ port ngẫu nhiên nhân không gian cần đoán lên hàng tỷ tổ hợp; tắt đi thu về một chiều 16-bit — đây là bản chất lỗ hổng Kaminsky 2008."
+        },
+        {
+          "id": "os01-l07-q3",
+          "difficulty": "hard",
+          "question": "Tổ chức A block toàn bộ DNS ra ngoài trừ resolver nội bộ. Một máy vẫn 'phone home' thành công qua DNS. Control nào SẼ bắt được hành vi này sớm nhất?",
+          "options": [
+            { "id": "A", "label": "Firewall log các kết nối ra cổng 53" },
+            {
+              "id": "B",
+              "label": "Analytic trên log resolver nội bộ: NXDOMAIN ratio và độ dài/nhãn ngẫu nhiên của tên được query bởi từng host"
+            },
+            { "id": "C", "label": "Antivirus trên server DNS" },
+            { "id": "D", "label": "Giám sát băng thông tổng của đường truyền" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Kênh DNS buộc phải đi qua resolver được phép — vậy log resolver chính là điểm quan sát duy nhất thấy được pattern tunneling (nhãn ngẫu nhiên, NXDOMAIN spike, volume lệch baseline theo host). Firewall chỉ thấy 'DNS bình thường tới resolver'."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn chuyển sang một môi trường hybrid mô phỏng: workload trên cloud VPC dùng internal DNS của nhà cung cấp, máy trạm on-premise dùng Active Directory DNS, hai bên nối nhau qua VPN với conditional forwarding hai chiều. Chính sách hiện tại cho phép mọi workload mở cổng 53 ra Internet.",
+        "tasks": [
+          "Thiết kế lại luồng DNS hai chiều có kiểm soát: ai forward cho ai, nơi đặt validation, nơi chặn egress 53.",
+          "Xác định các điểm giả mạo mới xuất hiện trong kiến trúc forwarding (forwarder tin mù, split-brain record) và đề cập cách kiểm chứng từng điểm.",
+          "Viết bộ analytic phát hiện tunneling hoạt động đúng cho cả hai phía (cloud flow log + resolver log) với ngưỡng cụ thể."
+        ],
+        "requiredEvidence": [
+          "Sơ đồ luồng DNS hybrid đánh dấu điểm tin cậy và điểm kiểm chứng",
+          "Bảng threat→control→kiểm chứng cho các forwarder",
+          "Hai pseudo-query analytic (cloud + on-prem) kèm ngưỡng cảnh báo"
+        ]
+      },
+      "sources": [
+        {
+          "title": "RFC 1034 / RFC 1035 — Domain Names: Concepts and Implementation",
+          "url": "https://www.rfc-editor.org/rfc/rfc1034",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Kiến trúc phân cấp DNS, vai trò recursive/authoritative",
+            "Cơ chế cache và ý nghĩa TTL của bản ghi"
+          ]
+        },
+        {
+          "title": "RFC 2131 — Dynamic Host Configuration Protocol",
+          "url": "https://www.rfc-editor.org/rfc/rfc2131",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Trình tự DORA và các option cấu hình (router, DNS)",
+            "Đặc tính không xác thực của giao thức DHCP gốc"
+          ]
+        },
+        {
+          "title": "NIST SP 800-81 Rev.2 — Secure Domain Name System (DNS) Deployment Guide",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-81/rev-2/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Khuyến nghị triển khai DNSSEC và phân tách resolver authoritative/recursive",
+            "Chiến lược hardened resolver và giám sát DNS doanh nghiệp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os01-l08-tcp-udp-transport-state",
+      "slug": "tcp-udp-transport-state",
+      "title": "Trạng Thái Transport: TCP Handshake, UDP & Khai thác Trạng thái",
+      "summary": "Three-way handshake và cờ TCP; sliding window, retransmit và đóng kết nối; đặc tính connectionless của UDP; các khai thác dựa trên trạng thái (SYN flood, RST injection, port scanning) dưới ủy quyền, cùng mitigation SYN cookies/stateful firewall.",
+      "difficulty": "foundation",
+      "durationMinutes": 80,
+      "prerequisites": ["os01-l07-dns-resolution-and-dhcp-boundaries"],
+      "outcomes": [
+        "Phân tích three-way handshake và vai trò sequence number; đọc log handshake để phân biệt kết nối hoàn chỉnh, half-open và bị RST.",
+        "Giải thích sliding window/retransmission ở mức khái niệm và suy luận nghẽn mạng từ pattern retransmit trong capture mô phỏng.",
+        "So sánh TCP và UDP về đảm bảo giao nhận, chọn đúng giao thức cho từng loại dịch vụ và giải thích hậu quả bảo mật của 'stateless' ở transport.",
+        "Nhận diện SYN flood từ telemetry (half-open queue đầy), trình bày cơ chế SYN cookies/rate limiting và phân biệt kết quả scan open/closed/filtered dưới ủy quyền."
+      ],
+      "careerPaths": ["penetration-test", "red-team"],
+      "domains": ["network"],
+      "attackTactics": ["TA0007"],
+      "keywords": [
+        "tcp-handshake",
+        "syn-flood",
+        "udp-stateless",
+        "port-scanning",
+        "stateful-firewall"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "TCP là cuộc điện thoại: bắt tay ba bước để hai bên thống nhất 'mình đang nói tới câu số mấy' (sequence number), mỗi bên ghi sổ trạng thái (SYN_SENT, ESTABLISHED, TIME_WAIT…) và xác nhận từng đoạn dữ liệu, thiếu thì nói lại (retransmit). UDP là loa phường: hét một lần không cần xác nhận — nhẹ, nhanh, nhưng không biết người nghe có còn đó hay không. Vấn đề an ninh nằm ở CUỐN SỔ: mọi bảng trạng thái (bộ nhớ kernel, bảng NAT, bảng firewall) có kích thước hữu hạn, và kẻ tấn công thích làm đầy cuốn sổ (SYN flood) hơn là phá luật chơi. Vì vậy phòng thủ transport là quản lý trạng thái: giới hạn, già hóa, và không cấp phát tài nguyên trước khi đối phương chứng minh được địa chỉ.",
+      "visual": {
+        "title": "Bắt tay Ba bước và Cuốn Sổ Trạng thái",
+        "caption": "TCP thiết lập kết nối bằng SYN → SYN/ACK → ACK; mỗi bước tiêu thụ tài nguyên trạng thái ở một đầu — điểm khai thác của SYN flood.",
+        "steps": [
+          {
+            "label": "SYN: mở sổ",
+            "detail": "Client gửi SYN kèm ISN; server cấp phát entry trong backlog queue CHƯA xác thực được nguồn — đây là tài nguyên bị đánh cắp trong SYN flood.",
+            "tone": "caution"
+          },
+          {
+            "label": "SYN/ACK: đợi hồi âm",
+            "detail": "Server trả lời và giữ entry half-open chờ ACK; kẻ gửi SYN giả không bao giờ trả lời → queue đầy, khách thật bị từ chối.",
+            "tone": "stop"
+          },
+          {
+            "label": "ACK: ESTABLISHED",
+            "detail": "Cả hai bên chuyển sang trạng thái truyền dữ liệu có đánh số thứ tự và xác nhận (ACK) từng đoạn.",
+            "tone": "allow"
+          },
+          {
+            "label": "Đóng kết nối 4 bước",
+            "detail": "FIN/ACK hai chiều rồi TIME_WAIT — trạng thái 'ma' tồn tại thêm vài phút, cũng là tài nguyên phải theo dõi.",
+            "tone": "neutral"
+          },
+          {
+            "label": "UDP: không sổ",
+            "detail": "Gửi và quên; 'kết nối' chỉ tồn tại trong bảng NAT/firewall — stateless ở transport nhưng stateful ở middleware.",
+            "tone": "neutral"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Handshake, Cờ và Cuốn Sổ Trạng thái",
+          "paragraphs": [
+            "TCP (RFC 9293, thế chân RFC 793) thiết lập kết nối bằng SYN → SYN/ACK → ACK: hai bên trao Initial Sequence Number để đánh số byte. Các cờ chính: SYN (mở), ACK (xác nhận), FIN (đóng lịch sự), RST (đóng ép/kết thúc bất thường), PSH, URG. Trạng thái client: CLOSED → SYN_SENT → ESTABLISHED → …; server: LISTEN → SYN_RCVD → ESTABLISHED.",
+            "Mỗi entry trạng thái chiếm bộ nhớ và slot hữu hạn (backlog queue của socket listen, conntrack table của firewall/NAT). Nguyên tắc khai thác trạng thái: không cần phá mật mã hay logic — chỉ cần khiến đối phương cấp phát nhanh hơn giải phóng. Đây là khung nhìn đúng để hiểu SYN flood, slowloris ở tầng app, và cả TIME_WAIT exhaustion."
+          ],
+          "points": [
+            "RST là 'tiếng nói to nhất' của TCP: một RST hợp lệ (seq trong cửa sổ) giết kết nối tức thì — ai đứng on-path (bài l04/l05) đều có thể gửi.",
+            "ISN ngẫu nhiên hóa là chống hijack/prediction, không phải mã hóa dữ liệu.",
+            "Keepalive và application heartbeat khác nhau về tầng — nhầm lẫn gây chẩn đoán sai khi kết nối chết qua NAT (liên hệ bài l05)."
+          ]
+        },
+        {
+          "title": "Tin cậy Có giá: Window, Retransmit và Nghẽn",
+          "paragraphs": [
+            "Sliding window cho phép gửi nhiều đoạn chưa xác nhận song song — window size quảng cáo phía nhận quyết định 'ống' rộng bao nhiêu. Đoạn mất thì timer kích hoạt retransmit; fast retransmit nhận biết qua 3 duplicate ACK. Ở tầng congestion (khái niệm): slow start, congestion avoidance, phản ứng với mất gói.",
+            "Với phân tích viên: pattern retransmit trong capture là manh mối chẩn đoán — retransmit liên tục một chiều gợi mất gói/nghẽn; zero-window gợi ứng dụng nhận chậm; RST ngay sau handshake gợi firewall reset hoặc dịch vụ sập. Phân biệt nguyên nhân mạng và nguyên nhân ứng dụng là kỹ năng nền trước khi đổ lỗi cho 'bị tấn công'."
+          ],
+          "points": [
+            "MTU/PMTUD: fragment đen tối — chặn ICMP làm PMTUD hỏng, biểu hiện 'connect được mà không truyền được dữ liệu lớn'.",
+            "Out-of-order và duplicate ACK trong môi trường đa đường là bình thường — đừng báo động nhầm.",
+            "Capture point quyết định câu chuyện: bắt ở client và server thấy hai hình khác nhau khi NAT/asymmetric (liên hệ l05)."
+          ]
+        },
+        {
+          "title": "UDP: Stateless ở Transport, Stateful ở Middleware",
+          "paragraphs": [
+            "UDP (RFC 768) chỉ thêm port + checksum lên IP: không handshake, không xác nhận, không thứ tự. DNS (bài l07), media streaming, game dùng UDP vì độ trễ quan trọng hơn đảm bảo. 'Kết nối' UDP chỉ tồn tại trong bảng NAT/firewall với timeout ngắn — bài học NAT state expiry của l05 áp dụng nặng hơn với UDP.",
+            "Hệ quả bảo mật: (1) ICMP Port Unreachable là cách UDP báo 'cổng đóng' — scanner dựa vào đó phân biệt closed vs open|filtered khi không có phản hồi; (2) amplification: giao thức UDP trả lời to hơn câu hỏi (DNS, NTP, memcached) bị lợi dụng làm gương phản chiếu — nguyên tắc phòng thủ là hạn chế phản hồi cho nguồn không xác thực và rate-limit ở biên."
+          ],
+          "points": [
+            "QUIC/HTTP3 chạy trên UDP nhưng tự dựng mã hóa + độ tin cậy ở tầng trên — 'UDP không tin cậy' không đồng nghĩa 'QUIC kém tin cậy'.",
+            "Spoofed-source UDP là nguyên liệu của reflection attack; biên mạng nên chặn egress packet có IP nguồn không thuộc dải mình (BCP38).",
+            "Long-lived UDP flows cần keepalive app-level vì NAT timeout UDP ngắn hơn TCP."
+          ]
+        },
+        {
+          "title": "Khai thác Trạng thái dưới Ủy quyền và Phòng thủ",
+          "paragraphs": [
+            "Trong phạm vi ủy quyền (lab cô lập), hiểu trạng thái giúp đánh giá đúng: SYN flood làm đầy half-open queue — telemetry nhận diện là tỷ lệ SYN không hoàn tất handshake tăng vọt kèm service degradation; mitigation: SYN cookies (không cấp phát cho tới khi ACK chứng minh nguồn), backlog tuning, rate-limit per-source, và scrubbing upstream khi là DDoS thật. RST injection và session hijack đòi hỏi vị trí on-path — quay lại bài học ranh giới l04/l05: phòng thủ nằm ở tầng dưới, không phải 'cứng hóa TCP'.",
+            "Port scanning là kỹ thuật đánh giá cơ bản: SYN scan (half-open) ít để lại dấu vết hơn connect scan; kết quả open / closed (nhận RST) / filtered (im lặng do firewall) phải đọc kèm ngữ cảnh. Quy tắc nghề: chỉ scan mục tiêu trong ROE; scan nhầm dải ngoài phạm vi là vi phạm hợp đồng dù technically chỉ là các gói SYN. Phòng thủ phía blue team: giảm bề mặt (chỉ mở port cần), nhưng đừng tin 'stealth' — telemetry flow + log firewall thấy SYN đến dù không trả lời."
+          ],
+          "points": [
+            "Stateful firewall giữ conntrack: bản thân nó cũng có giới hạn bảng — DDoS conntrack exhaustion là vector thật.",
+            "SYN cookies đánh đổi: không giữ state ⇒ mất vài option TCP nâng cao trong handshake.",
+            "Scan 'filtered' không chứng minh port đóng — chỉ chứng minh có device chặn im lặng trên đường."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Transport State Desk — Đọc Handshake và Telemetry",
+        "objective": "Phân biệt trạng thái kết nối từ log handshake, chẩn đoán SYN flood vs tải cao thật, và diễn giải kết quả scan dưới ủy quyền.",
+        "scenario": "Bạn trực ca SOC của một công ty SaaS (môi trường mô phỏng). Trong một giờ bạn nhận ba cảnh báo từ hệ thống: web portal chậm, cảnh báo firewall, và một báo cáo pentest nội bộ (có ROE đính kèm) cần diễn giải kết quả. Toàn bộ dữ liệu là mô phỏng tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ dùng dữ liệu log/telemetry mô phỏng được cấp; không gửi packet hay scan thật.",
+          "Mọi kết luận phải trích bằng chứng: tỷ lệ, trạng thái, cờ cụ thể trong log.",
+          "Diễn giải scan chỉ trong phạm vi ROE đính kèm; phát hiện ngoài phạm vi phải dừng và báo cáo."
+        ],
+        "cases": [
+          {
+            "id": "tcp-case-01",
+            "title": "Portal chậm: nghẽn thật hay bị đánh?",
+            "context": "Telemetry 5 phút: (A) 09:50 — 800 SYN/phút tới portal, 97% hoàn tất handshake, latency tăng 2 lần, CPU app 85%; marketing vừa chạy email campaign. (B) 10:30 — 45.000 SYN/phút từ 3.000 nguồn khác nhau, chỉ 0,4% hoàn tất handshake, backlog queue 100%, CPU app 12%, hầu hết SYN không bao giờ ACK lại.",
+            "prompt": "Đọc đúng hai hiện tượng và xử lý tương ứng là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cả hai đều là SYN flood, cần bật scrubbing ngay từ 09:50.",
+                "correct": false,
+                "rationale": "Hiện tượng A có tỷ lệ hoàn tất 97% và tương ứng chiến dịch thật — đó là tải hợp lệ; bật scrubbing sẽ cắt khách thật."
+              },
+              {
+                "id": "B",
+                "label": "A là tải hợp lệ (handshake hoàn tất cao, có nguyên nhân kinh doanh) — scale app/cache. B là SYN flood điển hình (SYN khổng lồ, hoàn tất 0,4%, nguồn phân tán, CPU app nhàn rỗi vì chưa tới app) — kích hoạt SYN cookies + rate-limit + scrubbing upstream.",
+                "correct": true,
+                "rationale": "Tiêu chí phân biệt nằm ở tỷ lệ hoàn tất handshake và phân bố nguồn; CPU app thấp + backlog đầy là chữ ký tài nguyên trạng thái bị làm đầy, không phải quá tải xử lý."
+              },
+              {
+                "id": "C",
+                "label": "B là lỗi phần cứng NIC của server, cần thay card mạng.",
+                "correct": false,
+                "rationale": "NIC lỗi tạo CRC error/loss ngẫu nhiên, không tạo ra pattern SYN một chiều từ 3.000 nguồn với tỷ lệ hoàn tất cực thấp."
+              },
+              {
+                "id": "D",
+                "label": "Chặn RST toàn bộ để 'giữ' kết nối không bị đứt.",
+                "correct": false,
+                "rationale": "RST là cơ chế báo lỗi hợp lệ; chặn mù RST phá vỡ teardown bình thường và không giải quyết việc queue bị làm đầy bởi SYN."
+              }
+            ]
+          },
+          {
+            "id": "tcp-case-02",
+            "title": "Đọc kết quả scan trong ROE",
+            "context": "ROE cho phép kiểm thử dải 10.30.0.0/24 (lab nội bộ). Kết quả SYN scan từ report: .10:443 open; .11:3389 closed (RST); .12:22 filtered (không phản hồi); .13:80 open; .14:* filtered toàn dải. Bạn cũng thấy trong firewall log các SYN tới 10.30.0.99:5900 — IP KHÔNG có trong ROE.",
+            "prompt": "Diễn giải đúng nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": ".12 và .14 chắc chắn không chạy dịch vụ nào vì không phản hồi.",
+                "correct": false,
+                "rationale": "Filtered chỉ chứng minh có device drop im lặng trên đường; host/service phía sau có thể sống khỏe."
+              },
+              {
+                "id": "B",
+                "label": "Ghi nhận kết quả theo ngữ cảnh (open/closed/filtered nghĩa khác nhau), và dừng mọi thao tác liên quan 10.30.0.99 — ghi finding out-of-scope attempt, xác minh nguồn (có thể scan tràn từ dải lân cận) và báo cáo điều phối.",
+                "correct": true,
+                "rationale": "Ba trạng thái scan phải đọc đúng định nghĩa; còn hành vi chuyên nghiệp là dừng khi thấy target ngoài ROE — kể cả khi bạn chỉ là người nhận log, việc tiếp tục chạm .99 là vi phạm ủy quyền."
+              },
+              {
+                "id": "C",
+                "label": "Tiếp tục scan .99 để biết nó chạy gì rồi báo cáo một thể.",
+                "correct": false,
+                "rationale": "'Quan tâm trước rồi báo sau' vẫn là truy cập ngoài ủy quyền; quy trình đúng là báo cáo với bằng chứng tối thiểu đã có sẵn trong log."
+              },
+              {
+                "id": "D",
+                "label": "closed nghĩa là port bị firewall chặn.",
+                "correct": false,
+                "rationale": "closed = host trả lời RST (port không mở nhưng host reachable); bị chặn im lặng là filtered."
+              }
+            ]
+          },
+          {
+            "id": "tcp-case-03",
+            "title": "UDP 'kết nối' thần kỳ biến mất",
+            "context": "Ứng dụng VoIP nội bộ (UDP/RTP) hoạt động tốt; sau 65 giây im lặng (cuộc họp im lặng), audio mất cả hai chiều khoảng 10 giây rồi tự hồi phục. Firewall biên ghi: UDP session timeout = 60s; không có packet drop nào trong khoảng sự cố. Endpoint không đổi port.",
+            "prompt": "Chẩn đoán đúng và fix phù hợp nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Packet loss mạng do cáp; thay switch.",
+                "correct": false,
+                "rationale": "Không có drop trong log và sự cố tái diễn đúng chu kỳ 60–65s — pattern trạng thái, không phải lỗi vật lý ngẫu nhiên."
+              },
+              {
+                "id": "B",
+                "label": "Bảng trạng thái UDP trên firewall hết hạn sau 60s im lặng; các gói RTP mới bị drop cho tới khi luồng mới tạo session lại. Fix: RTP keepalive ngắn hơn timeout (hoặc nâng timeout có kiểm soát cho dải media), kiểm chứng bằng đo khoảng im lặng tối đa còn sống.",
+                "correct": true,
+                "rationale": "Đúng mô hình 'stateless ở transport, stateful ở middleware': phiên UDP chỉ sống trong conntrack theo timeout; keepalive giữ entry là fix kiểm chứng được, giống bài học NAT của l05."
+              },
+              {
+                "id": "C",
+                "label": "UDP không có trạng thái nên không thể có lỗi liên quan timeout.",
+                "correct": false,
+                "rationale": "Transport không có trạng thái, nhưng NAT/firewall có — và chính bảng đó quyết định luồng UDP sống hay chết."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển VoIP sang TCP để có keepalive sẵn.",
+                "correct": false,
+                "rationale": "TCP thêm head-of-line blocking và jitter cho real-time media; giải đúng bài là quản lý timeout/keepalive, không phải đổi giao thức."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân biệt tải hợp lệ và SYN flood bằng metric định lượng (tỷ lệ hoàn tất handshake, phân bố nguồn).",
+          "Đọc đúng ba trạng thái scan (open/closed/filtered) và xử lý out-of-scope đúng quy trình.",
+          "Liên kết triệu chứng phiên UDP với timeout bảng trạng thái middleware và đề xuất fix kiểm chứng được."
+        ],
+        "evidenceTemplate": [
+          "Bảng telemetry: thời điểm, SYN/phút, tỷ lệ hoàn tất, phân bố nguồn, CPU/backlog",
+          "Bản dịch kết quả scan theo ROE kèm hành động cho mỗi trạng thái",
+          "Timeline sự cố UDP: khoảng im lặng, timeout cấu hình, thời điểm hồi phục",
+          "Đề xuất mitigation kèm cách đo before/after"
+        ],
+        "reset": "Đặt lại lựa chọn để phân tích lại các tình huống transport từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không gửi packet hay thay đổi cấu hình thật."
+      },
+      "governance": {
+        "prevent": [
+          "Bật SYN cookies/tuning backlog trên dịch vụ public; rate-limit per-source ở biên.",
+          "Thu hẹp bề mặt: chỉ expose port cần thiết; default-deny inbound với stateful firewall.",
+          "Egress BCP38: chặn packet ra có nguồn không thuộc dải nội bộ (chống tham gia reflection attack)."
+        ],
+        "observe": [
+          "Metric tỷ lệ hoàn tất handshake theo service; alert khi giảm sâu trong khi SYN volume tăng.",
+          "Conntrack utilization của firewall/NAT — cảnh báo khi gần đầy (trước khi khách thật bị từ chối)."
+        ],
+        "respond": [
+          "SYN flood: kích hoạt mitigation theo nấc (cookies → rate-limit → scrubbing upstream), thông báo stakeholder, lưu sample packet cho phân tích sau.",
+          "Phát hiện scan/quét ngoài ROE: ghi finding, xác minh nguồn, phối hợp điều phối — không phản công hay truy đuổi ngoài phạm vi."
+        ],
+        "residualRisk": [
+          "DDoS volumetric băng thông vượt khả năng on-premise — bắt buộc kế hoạch scrubbing nhà mạng.",
+          "Conntrack/stateful devices là điểm nghẽn đơn: cần redundancy và capacity planning."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "SYN flood là tấn công băng thông, mạng chậm là bị flood.",
+          "correction": "SYN flood tấn công TÀI NGUYÊN TRẠNG THÁI (backlog/conntrack), có thể với băng thông rất nhỏ; chẩn đoán đúng phải dựa tỷ lệ hoàn tất handshake và utilization bảng trạng thái, không phải cảm giác 'mạng chậm'."
+        },
+        {
+          "claim": "Port filtered nghĩa là dịch vụ không chạy.",
+          "correction": "Filtered chỉ nghĩa là có device drop im lặng trên đường; phía sau vẫn có thể là service sống. Closed (nhận RST) mới phản ánh host trả lời 'không mở port này'."
+        },
+        {
+          "claim": "UDP 'an toàn hơn' vì không có handshake để khai thác.",
+          "correction": "UDP chuyển bài toán sang middleware (bảng NAT/firewall) và mở vector khác (spoofed source, amplification); không có handshake không đồng nghĩa không có bề mặt tấn công."
+        },
+        {
+          "claim": "TIME_WAIT là bug cần tắt nhanh càng tốt.",
+          "correction": "TIME_WAIT đảm bảo packet lạc trong mạng chết sạch trước khi tái sử dụng kết nối; tắt vội gây nhiễu dữ liệu. Quản lý bằng tuning hợp lý, không phải xóa bỏ."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l08-q1",
+          "difficulty": "easy",
+          "question": "Trình tự three-way handshake của TCP là gì?",
+          "options": [
+            { "id": "A", "label": "SYN → ACK → FIN" },
+            { "id": "B", "label": "SYN → SYN/ACK → ACK" },
+            { "id": "C", "label": "Discover → Offer → Request" },
+            { "id": "D", "label": "Hello → Certificate → Finished" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Client SYN, server SYN/ACK, client ACK — hai bên trao ISN để đánh số byte và chuyển sang ESTABLISHED."
+        },
+        {
+          "id": "os01-l08-q2",
+          "difficulty": "medium",
+          "question": "SYN cookies giúp chống SYN flood bằng cách nào?",
+          "options": [
+            { "id": "A", "label": "Chặn mọi SYN từ nguồn lạ dựa trên blacklist" },
+            {
+              "id": "B",
+              "label": "Không cấp phát trạng thái server-side cho tới khi client ACK lại được kiểm tra cryptographic — SYN giả không bao giờ hoàn tất nên không tiêu tốn backlog"
+            },
+            { "id": "C", "label": "Mã hóa toàn bộ payload để botnet không đọc được" },
+            { "id": "D", "label": "Tự động RST mọi kết nối sau 3 giây" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Thông tin trạng thái được nhúng vào số thứ tự trả về (cookie); chỉ client thật (nhận được SYN/ACK) mới ACK đúng cookie — server chỉ cấp phát khi chứng minh hoàn tất."
+        },
+        {
+          "id": "os01-l08-q3",
+          "difficulty": "hard",
+          "question": "Trong một capture, bạn thấy server liên tục gửi [TCP ZeroWindow] và client đáp [TCP Window Update] chu kỳ dài. Ứng dụng phía client chậm xử lý. Ai đó kết luận 'server đang bị DoS'. Đánh giá của bạn?",
+          "options": [
+            { "id": "A", "label": "Đồng ý — ZeroWindow là dấu hiệu tấn công nổi tiếng" },
+            {
+              "id": "B",
+              "label": "Không đủ căn cứ: ZeroWindow là cơ chế flow-control bình thường báo 'bộ đệm nhận đầy'; ở đây phía NHẬN (client) chậm tiêu thụ. Đây là vấn đề hiệu năng phía client, cần đo trước khi gắn mán tấn công"
+            },
+            { "id": "C", "label": "Chắc chắn lỗi NIC server, thay card" },
+            { "id": "D", "label": "ZeroWindow nghĩa là kết nối bị firewall chặn" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Flow-control là cơ chế thiết kế của TCP: receiver quảng cáo window=0 khi bộ đệm đầy. Pattern này phản ánh nghẽn tiêu thụ phía ứng dụng client — gắn mán tấn công mà không có bằng chứng nguồn/ý đồ là chẩn đoán thiếu kỷ luật."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn thiết kế lại tầng transport cho một dịch vụ API public mô phỏng (được ủy quyền trong lab): front-end là load balancer, backend là pool server, phía trước có CDN. Yêu cầu: chịu được burst SYN, giữ phiên dài cho mobile qua NAT, và telemetry đủ để phân biệt flash crowd vs flood trong 60 giây.",
+        "tasks": [
+          "Chọn cấu hình trạng thái cho từng tầng (LB/backend/CDN): timeout, backlog, cookies, keepalive — nêu lý do từng giá trị.",
+          "Thiết kế dashboard 4 metric phân biệt flash crowd và SYN flood, kèm ngưỡng cảnh báo cụ thể.",
+          "Viết runbook phản ứng 3 bậc khi flood xảy ra, mỗi bậc kèm tiêu chí kích hoạt và tiêu chí rollback."
+        ],
+        "requiredEvidence": [
+          "Bảng cấu hình trạng thái theo tầng kèm lý do",
+          "Đặc tả 4 metric + ngưỡng (ví dụ handshake-completion ratio, SYN rate, conntrack utilization, p99 latency)",
+          "Runbook 3 bậc dạng checklist có trigger/rollback"
+        ]
+      },
+      "sources": [
+        {
+          "title": "RFC 9293 — Transmission Control Protocol (TCP)",
+          "url": "https://www.rfc-editor.org/rfc/rfc9293",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Three-way handshake, trạng thái kết nối và cờ TCP",
+            "Sliding window, retransmission và cơ chế flow control"
+          ]
+        },
+        {
+          "title": "RFC 768 — User Datagram Protocol",
+          "url": "https://www.rfc-editor.org/rfc/rfc768",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": ["Cấu trúc header UDP tối giản và đặc tính connectionless"]
+        },
+        {
+          "title": "RFC 4987 — TCP SYN Flooding Attacks and Common Mitigations",
+          "url": "https://www.rfc-editor.org/rfc/rfc4987",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cơ chế SYN flood khai thác half-open backlog",
+            "Phân tích mitigation: SYN cookies, backlog tuning, filtering"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os01-l09-http-tls-trust-boundaries",
+      "slug": "http-tls-trust-boundaries",
+      "title": "HTTP Semantics & Ranh giới Tin cậy TLS",
+      "summary": "HTTP request/response, cookie và cờ bảo mật; TLS handshake, chuỗi chứng thực và anchor CA; các chỗ thủng ranh giới (mixed content, down-grade, chứng chỉ sai) và phòng thủ kiểm chứng được: HSTS, Secure/HttpOnly/SameSite, cấu hình TLS chuẩn.",
+      "difficulty": "foundation",
+      "durationMinutes": 80,
+      "prerequisites": ["os01-l08-tcp-udp-transport-state"],
+      "outcomes": [
+        "Phân tích cấu trúc HTTP request/response (method, status, header) và vai trò bảo mật của cookie attributes: Secure, HttpOnly, SameSite, Domain/Path scope.",
+        "Mô tả TLS handshake ở mức ranh giới: đàm phán phiên bản/cipher, xác thực chuỗi chứng chỉ lên anchor CA, và ý nghĩa từng bảo đảm (confidentiality/integrity/server identity).",
+        "Nhận diện các lỗi ranh giới phổ biến từ evidence: mixed content, thiếu HSTS, certificate name/expiry mismatch, cookie thiếu cờ — và đề xuất remediation tương ứng.",
+        "Thiết kế kiểm chứng cấu hình TLS/HTTP an toàn: checklist test có tiêu chí pass/fail dựa trên RFC 9110/8446/6797."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "web"],
+      "domains": ["web", "api", "network"],
+      "attackTactics": [],
+      "keywords": [
+        "http-semantics",
+        "tls-handshake",
+        "certificate-chain",
+        "hsts",
+        "cookie-attributes"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "HTTP là thư từ phi trạng thái: mỗi request tự mang đầy đủ ý định (method, đường, header), server trả lời rồi… quên. Cookie là chiếc thẻ khách quen server phát để nhớ lại — thẻ bị lấy cắp thì kẻ khác vào thay bạn, nên thẻ cần niêm phong (Secure), che mắt script (HttpOnly), và hạn chế nơi đưa ra (SameSite). TLS là lớp niêm phong + giấy tờ tủ: mã hóa nội dung thư, bảo vệ sửa chữa trên đường, và — quan trọng nhất — chứng thực 'máy này ĐÚNG LÀ bank.example' bằng chuỗi chứng chỉ neo vào các CA trong kho tin cậy của OS/browser. Ranh giới vỡ không cần phá mã hóa: chỉ cần một tài nguyên http:// lẫn trong trang https:// (mixed content), một redirect xuống cấp, hay một chứng chỉ mà trình duyệt không xác thực được.",
+      "visual": {
+        "title": "Thư HTTP trong Phong bì TLS",
+        "caption": "Request đi qua lớp TLS (mã hóa + xác thực server) trước khi ra mạng; chuỗi chứng chỉ neo vào CA anchor quyết định độ tin của identity.",
+        "steps": [
+          {
+            "label": "Request HTTP dựng thư",
+            "detail": "Method/path/version + headers (Cookie, Authorization…) + body; phi trạng thái — mọi 'nhớ' nằm ở cookie/token client giữ.",
+            "tone": "neutral"
+          },
+          {
+            "label": "TLS handshake",
+            "detail": "Trao phiên bản/cipher, server đưa chuỗi chứng chỉ; client xác thực tên (SAN) + hạn + chuỗi lên CA anchor rồi trao khóa phiên.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Anchor CA quyết định",
+            "detail": "Chuỗi kết tới root CA trong kho tin cậy → identity hợp lệ; không kết được (self-signed, thiếu intermediate, sai tên) → cảnh báo — bỏ qua cảnh báo là tự mở ranh giới.",
+            "tone": "caution"
+          },
+          {
+            "label": "Mixed content thủng niêm phong",
+            "detail": "Một asset http:// trong trang https:// bị MITM thay đổi được → trang bị nhiễm; HSTS ép trình duyệt từ chối hạ cấp.",
+            "tone": "stop"
+          },
+          {
+            "label": "Cookie niêm phong đúng",
+            "detail": "Set-Cookie với Secure; HttpOnly; SameSite=Lax/Strict — thẻ khách chỉ đi trong phong bì, script không đọc được, cross-site không mang theo.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "HTTP: Thư Từ Phi trạng thái và Chiếc Thẻ Khách",
+          "paragraphs": [
+            "Request gồm method (GET/POST/PUT/DELETE…) + path + version + headers + optional body; response gồm status class (2xx thành công, 3xx redirect, 4xx lỗi client, 5xx lỗi server) + headers + body. Phi trạng thái nghĩa là server không 'nhớ' giữa các request — trạng thái phiên được ngoại hóa vào cookie/token mà client mang theo mỗi lần gửi (RFC 9110 định nghĩa semantics chung).",
+            "Cookie là điểm giao thoa bảo mật-web đầu tiên cần đọc đúng: Domain/Path quyết định scope gửi kèm; Secure chỉ cho gửi qua TLS; HttpOnly chặn JavaScript đọc (hạn chế tác hại XSS đánh cắp phiên); SameSite (Lax/Strict/None) kiểm soát việc cookie đi kèm request cross-site — tuyến phòng thủ CSRF nền tảng. Session token nằm trong cookie hay header đều tuân một luật: bị lộ là mất phiên, nên bảo vệ token = bảo vệ tài khoản."
+          ],
+          "points": [
+            "3xx redirect là lệnh di chuyển — redirect từ https xuống http là tự hạ cấp ranh giới.",
+            "CORS ≠ CSRF: CORS là chính sách trình duyệt đọc response cross-origin; CSRF là hành vi gửi kèm cookie tự động — giải bằng SameSite/token, không phải CORS header.",
+            "Header bảo mật nền: CSP, X-Content-Type-Options, Referrer-Policy — mỗi cái đóng một khe riêng, không thay thế nhau."
+          ]
+        },
+        {
+          "title": "TLS: Niêm Phong, Giấy Tờ và Chuỗi Tin cậy",
+          "paragraphs": [
+            "TLS 1.3 (RFC 8446) rút gọn handshake: hello → thương lượng cipher → server đưa chứng chỉ → xác thực → trao khóa phiên (ECDHE cho forward secrecy) → dữ liệu được AEAD mã hóa ( confidentiality + integrity cùng lúc). Ba bảo đảm: mã hóa nội dung, phát hiện sửa đổi, và xác thực 'đối diện là ai'. Thiếu xác thực thì hai bảo đảm còn lại vô nghĩa — mã hóa cho sai đối tượng là mã hộ kẻ tấn công (MITM hai lớp).",
+            "Chuỗi chứng chỉ: leaf (SAN khớp tên miền) → intermediate(s) → root CA trong trust store của OS/trình duyệt. Trình duyệt kiểm: chữ ký từng tầng, thời hạn còn hiệu lực, revocation (nơi khả thi), tên khớp. Anchor là TOFU của thế giới web: mọi CA trong kho đều có quyền phát chứng chỉ cho bất kỳ domain nào — vì vậy Certificate Transparency log tồn tại để phát hiện CA cấp trái phép. Tự ký/self-signed trong nội bộ không sai — nhưng phải qua trust store riêng được quản trị, không phải bấm 'tiếp tục bất chấp cảnh báo'."
+          ],
+          "points": [
+            "SNI gửi tên miền dưới dạng rõ trong handshake — cơ sở cho virtual hosting và cũng là metadata quan sát được; ECH đang chuẩn hóa để che.",
+            "Cipher suite legacy (RC4, CBC cũ, RSA key exchange tĩnh) là nợ kỹ thuật — cấu hình hiện đại chỉ cần AEAD + ECDHE.",
+            "Forward secrecy: khóa phiên hôm nay lộ cũng không giải mã được lưu lượng đã ghi âm trước đó."
+          ]
+        },
+        {
+          "title": "Các Chỗ Thủng Ranh giới Thường gặp",
+          "paragraphs": [
+            "Ranh giới hiếm khi vỡ bằng phá mã hóa — nó rò qua lỗ cấu hình: (1) Mixed content: trang https tải script/iframe http → nội dung sửa được trên đường; trình duyệt hiện đại block active mixed content nhưng passive vẫn rò metadata; (2) Thiếu HSTS: lần truy cập đầu (hoặc gõ tay http://) vẫn cho attacker on-path giữ nạn nhân ở http — HSTS (RFC 6797) ghi nhớ 'domain này chỉ nói HTTPS' trong thời hạn max-age; preload mở rộng cho lần đầu tiên; (3) Chứng chỉ sai: hết hạn, SAN lệch tên, chuỗi thiếu intermediate — khi người dùng bị dạy 'bấm tiếp' qua cảnh báo thì tuyến phòng thủ cuối cùng sụp đổ.",
+            "Downgrade là họ bài bản: kẻ on-path cố ép hai bên thương lượng phiên bản/cipher yếu hơn. TLS 1.3 có signaling chống downgrade (server appends special value vào Random), nhưng hệ vẫn chạy TLS 1.0/1.1 thì khe còn đó. Remediation là tắt legacy protocol ở server + giám sát: telemetry TLS cho thấy phiên bản/cipher thực tế đang dùng — nếu vẫn thấy TLS 1.0 handshake thành công nghĩa là config chưa sạch."
+          ],
+          "points": [
+            "HSTS cần max-age đủ dài và áp cho cả subdomain (includeSubDomains) nơi khả thi; cẩn thận khi rollout vì sai cấu hình 'khóa' domain trong max-age.",
+            "Cookie không có Secure sẽ đi kèm request http:// cùng domain — một redirect lừa là lộ token.",
+            "Public key pinning (HPKP) đã bị deprecated vì rủi ro brick — thay bằng CT monitoring + CA quản trị tốt."
+          ]
+        },
+        {
+          "title": "Kiểm chứng Cấu hình: Checklist Có Tiêu chí",
+          "paragraphs": [
+            "Kiểm chứng TLS/HTTP là việc đo được, không phải cảm tính: (1) handshake test — chỉ chấp nhận TLS 1.2+/AEAD/ECDHE, các protocol legacy phải handshake FAIL; (2) certificate test — chuỗi đầy đủ, SAN đúng, còn hạn > 30 ngày, monitor expiry tự động; (3) HSTS present với max-age ≥ 15768000, cân nhắc preload; (4) cookie audit — mọi Set-Cookie có Secure + HttpOnly (nơi dùng được) + SameSite rõ ràng; (5) mixed content scan = zero http:// reference từ trang https. Mỗi mục là pass/fail khách quan — đúng tinh thần evidence contract của chương trình.",
+            "Telemetry vận hành: proxy/CDN log phiên bản TLS thực tế của client — thấy còn TLS1.0 thành công nghĩa là config chưa tắt sạch; alert chứng chỉ sắp hết hạn trước 30/14/7 ngày; CT log monitoring cho domain của bạn để bắt CA phát hành lạ. Residual risk: CA compromise nằm ngoài tầm kiểm soát đơn lẻ (giảm thiểu bằng CT + multi-CA strategy); người dùng bấm qua warning là risk không thể fix thuần kỹ thuật — cần đào tạo + UX cảnh báo tốt."
+          ],
+          "points": [
+            "Test TLS config bằng công cụ chuẩn hóa (vd testssl.sh/sslyze concept) trong lab được ủy quyền — mỗi kết quả map về một RFC clause.",
+            "Rollout HSTS nên bắt đầu max-age nhỏ (300s) rồi tăng dần — tránh brick domain production.",
+            "API non-browser vẫn cần TLS validation đúng — client code tắt verify chứng chỉ là finding P1 kinh điển."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Web Trust Desk — Audit HTTP/TLS từ Evidence",
+        "objective": "Đọc evidence phiên TLS và header/cookie để phát hiện lỗi ranh giới, ưu tiên remediation và viết checklist kiểm chứng pass/fail.",
+        "scenario": "Bạn review báo cáo cấu hình của hai dịch vụ web mô phỏng: shop.example (e-commerce) và api.example (REST API nội bộ cho partner). Bạn được cung cấp: transcript handshake, response header mẫu, danh sách Set-Cookie và kết quả scan mixed content (toàn bộ là dữ liệu tĩnh trong trình duyệt).",
+        "constraints": [
+          "Chỉ đánh giá trên evidence được cấp; không gửi request hay scan thật.",
+          "Mỗi finding phải map về một tiêu chí RFC/checklist và mức độ ưu tiên rõ ràng.",
+          "Remediation phải kèm cách xác minh pass/fail sau khi vá."
+        ],
+        "cases": [
+          {
+            "id": "tls-case-01",
+            "title": "Transcript handshake của shop.example",
+            "context": "Kết quả probe cấu hình (lab ủy quyền): TLS 1.3 handshake OK (ECDHE+AES-GCM); TLS 1.2 OK; TLS 1.0 vẫn handshake THÀNH CÔNG với RSA key exchange tĩnh; chứng chỉ leaf: CN shop.example, SAN khớp, còn hạn 45 ngày, chuỗi đủ intermediate; HSTS: không có header.",
+            "prompt": "Bộ kết luận + ưu tiên vá đúng nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Mọi thứ ổn vì TLS 1.3 hoạt động và chứng chỉ còn hạn 45 ngày.",
+                "correct": false,
+                "rationale": "TLS 1.0 còn chấp nhận là lỗ hổng downgrade thực tế (protocol legacy vẫn negotiated được); chứng chỉ 45 ngày không có monitor là rủi ro sắp-expiry; thiếu HSTS bỏ trống lần truy cập đầu."
+              },
+              {
+                "id": "B",
+                "label": "P1: tắt TLS 1.0/1.1 + RSA static exchange (kiểm chứng: probe lại phải FAIL); P2: thêm HSTS max-age rollout từ nhỏ; P3: monitor chứng chỉ tự động. TLS 1.3/1.2 AEAD giữ nguyên.",
+                "correct": true,
+                "rationale": "Ưu tiên theo tác động: legacy protocol còn negotiated được là cửa downgrade; HSTS vá cửa sổ lần-đầu; expiry monitoring phòng sự cố availability. Mỗi item có tiêu chí pass/fail rõ."
+              },
+              {
+                "id": "C",
+                "label": "Chuyển ngay sang self-signed certificate để khỏi phụ thuộc CA.",
+                "correct": false,
+                "rationale": "Self-signed cho dịch vụ public phá vỡ mô hình xác thực — khách hàng không có cách xác minh identity; vấn đề ở đây là protocol policy, không phải CA."
+              },
+              {
+                "id": "D",
+                "label": "Bật HPKP pinning khóa chứng chỉ hiện tại 5 năm.",
+                "correct": false,
+                "rationale": "HPKP đã deprecated vì rủi ro brick domain khi key mất/rotate; giải pháp hiện đại là CT monitoring và quản trị multi-CA."
+              }
+            ]
+          },
+          {
+            "id": "tls-case-02",
+            "title": "Cookie audit của shop.example",
+            "context": "Các Set-Cookie quan sát được: (1) SESSIONID=abc123; Path=/ — không có cờ nào khác; (2) cart=SKU-99; SameSite=None; Secure — không HttpOnly (do JS cần đọc); (3) locale=vi; Secure; SameSite=Lax. Trang có form thanh toán nhúng từ payment-partner.example.",
+            "prompt": "Đánh giá đúng cho từng cookie là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cả ba đều ổn vì đã có Secure hoặc Path.",
+                "correct": false,
+                "rationale": "SESSIONID — token phiên định danh — không có bất kỳ cờ bảo mật nào là finding nghiêm trọng nhất; Path=/ không phải lớp bảo vệ."
+              },
+              {
+                "id": "B",
+                "label": "(1) P1: SESSIONID cần Secure + HttpOnly + SameSite=Lax — token phiên bị JS đọc được là chuỗi XSS→session-hijack hoàn chỉnh; (2) chấp nhận được nếu JS thực sự cần đọc, nhưng cân nhắc tách token nhạy cảm khỏi cart; (3) ổn. Với form partner embed, SameSite=None cần đi cặp Secure (đã có) và CSRF token riêng.",
+                "correct": true,
+                "rationale": "Ưu tiên theo giá trị tài sản: session token là chìa khóa tài khoản; các cờ đóng từng khe riêng (Secure=lộ qua http, HttpOnly=XSS đọc, SameSite=CSRF). SameSite=None + Secure là combo bắt buộc cho cross-site embed."
+              },
+              {
+                "id": "C",
+                "label": "Thêm Domain=.example cho cả ba cookie để dùng chung tiện hơn.",
+                "correct": false,
+                "rationale": "Nới Domain tăng scope phát gửi cookie sang mọi subdomain — mở rộng bề mặt tấn công ngược với hướng hardening."
+              },
+              {
+                "id": "D",
+                "label": "Xóa HttpOnly khỏi SESSIONID để JS debug dễ hơn.",
+                "correct": false,
+                "rationale": "Đi ngược hardening: HttpOnly chính là lớp chặn XSS lấy cắp phiên; nhu cầu debug không justify mở khe production."
+              }
+            ]
+          },
+          {
+            "id": "tls-case-03",
+            "title": "api.example: mixed content và cảnh báo chứng chỉ",
+            "context": "Partner report hai sự việc: (1) trang docs https://shop.example/docs nhúng ảnh schema từ http://api.example/img/schema.png; (2) một partner kết nối api.example bằng client code có flag 'verify=False' (tắt xác thực chứng chỉ) và gặp cảnh báo chuỗi thiếu intermediate. API thực tế cấu hình TLS chuẩn, chỉ quên bundle intermediate cert.",
+            "prompt": "Phân tích gốc rễ và remediation đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Yêu cầu partner bỏ flag verify=False là đủ, chuyện intermediate không quan trọng.",
+                "correct": false,
+                "rationale": "verify=False là finding P1 phía client, NHƯNG gốc rễ phía server (thiếu intermediate) chính là lý do partner 'phải' tắt verification — vá cả hai đầu mới chấm dứt vòng lặp."
+              },
+              {
+                "id": "B",
+                "label": "Ba gốc rễ: (1) mixed content passive từ docs — sửa link sang https + thêm CSP upgrade-insecure-requests; (2) server thiếu intermediate trong chuỗi — bundle đầy đủ (kiểm chứng: openssl-style probe trả chuỗi complete); (3) partner client tắt verification — yêu cầu bật lại SAU khi chuỗi chuẩn, kèm pin-to-public-CA policy. Mỗi mục có test pass/fail.",
+                "correct": true,
+                "rationale": "Chuỗi nguyên nhân liên hoàn: cấu hình sai server tạo 'lý do chính đáng' cho client xấu; remediation phải theo thứ tự vá server trước rồi ép client xác thực, và mixed content vá bằng rewrite + policy header — tất cả đo được."
+              },
+              {
+                "id": "C",
+                "label": "Chấp nhận http:// cho ảnh vì ảnh 'chỉ là nội dung tĩnh'.",
+                "correct": false,
+                "rationale": "Passive mixed content vẫn rò URL/metadata và tạo tiền lệ hạ cấp; active content thì bị block — chuẩn hóa toàn https là rẻ và sạch hơn."
+              },
+              {
+                "id": "D",
+                "label": "Đổi api.example sang cổng khác để partner không gặp cảnh báo nữa.",
+                "correct": false,
+                "rationale": "Cảnh báo do chuỗi chứng chỉ thiếu intermediate, không liên quan cổng; đổi cổng chỉ giấu triệu chứng."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Map mỗi finding về tiêu chí cụ thể (RFC/checklist) kèm mức ưu tiên theo giá trị tài sản.",
+          "Giải thích đúng vai trò từng cookie attribute và hậu quả thiếu từng cờ.",
+          "Đề xuất remediation kèm test pass/fail kiểm chứng được sau khi vá."
+        ],
+        "evidenceTemplate": [
+          "Bảng audit: mục kiểm tra, evidence, tiêu chí pass/fail, kết quả",
+          "Transcript handshake annotate: protocol/cipher/chain từng tầng",
+          "Danh sách cookie với từng cờ và khe hở tương ứng",
+          "Kế hoạch remediation ưu tiên P1→P3 kèm cách xác minh"
+        ],
+        "reset": "Đặt lại lựa chọn để audit lại các dịch vụ web từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không gửi request hay quét dịch vụ thật."
+      },
+      "governance": {
+        "prevent": [
+          "Chuẩn hóa TLS policy: chỉ 1.2+/AEAD/ECDHE; tắt legacy có lịch trình và kiểm chứng probe FAIL.",
+          "Cookie policy tổ chức: Secure + HttpOnly + SameSite bắt buộc cho session; template code review có checklist.",
+          "HSTS rollout theo nấc max-age; mixed-content CI scan cho mọi property https."
+        ],
+        "observe": [
+          "Telemetry phiên bản TLS thực tế từ CDN/proxy — alert khi thấy legacy negotiated thành công.",
+          "Monitor chứng chỉ (expiry −30/14/7 ngày) và Certificate Transparency cho domain của tổ chức."
+        ],
+        "respond": [
+          "CA phát hành trái phép: revoke qua CA, kiểm CT log, cân nhắc rotate key + gia tăng monitor.",
+          "Phát hiện client nội bộ tắt verification: sửa cấu hình gốc server trước, rồi enforce client policy có exception rõ ràng."
+        ],
+        "residualRisk": [
+          "CA compromise nằm ngoài tầm kiểm soát đơn lẻ — giảm thiểu bằng CT monitoring và multi-CA.",
+          "Người dùng bỏ qua cảnh báo chứng chỉ là rủi ro con người — cần đào tạo + UX cảnh báo chặt."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Có biểu tượng ổ khóa HTTPS nghĩa là trang an toàn.",
+          "correction": "TLS chỉ bảo đảm kênh tới server ĐÓ (mã hóa + identity). Trang an toàn về nội dung là chuyện khác: site lừa đảo hợp pháp dùng HTTPS miễn phí — ổ khóa không đánh giá uy tín."
+        },
+        {
+          "claim": "HttpOnly là mã hóa cookie.",
+          "correction": "HttpOnly chỉ chặn JavaScript ĐỌC cookie (giảm tác hại XSS); cookie vẫn đi nguyên bản trong header mỗi request — không liên quan mã hóa."
+        },
+        {
+          "claim": "CORS chặn CSRF.",
+          "correction": "CORS kiểm soát việc ĐỌC response cross-origin phía trình duyệt; CSRF lợi ích việc request được GỬI kèm cookie tự động — phòng CSRF bằng SameSite/CSRF token, CORS không giải bài này."
+        },
+        {
+          "claim": "Self-signed certificate an toàn hơn vì không ai cấp giả được.",
+          "correction": "Self-signed chỉ an toàn khi trust store phía client được quản trị chặt (internal PKI); cho dịch vụ public nó phá xác thực — khi người dùng bị dạy bấm qua cảnh báo thì tuyến phòng thủ cuối cùng sụp đổ."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l09-q1",
+          "difficulty": "easy",
+          "question": "Cookie attribute nào ngăn JavaScript của trang đọc được cookie?",
+          "options": [
+            { "id": "A", "label": "Secure" },
+            { "id": "B", "label": "HttpOnly" },
+            { "id": "C", "label": "SameSite=Lax" },
+            { "id": "D", "label": "Path=/admin" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "HttpOnly loại cookie khỏi API document.cookie của JavaScript — giảm thiệt hại khi XSS xảy ra; cookie vẫn được gửi trong header mỗi request."
+        },
+        {
+          "id": "os01-l09-q2",
+          "difficulty": "medium",
+          "question": "HSTS (RFC 6797) vá đúng lỗ hổng nào?",
+          "options": [
+            { "id": "A", "label": "Ngăn hacker đọc nội dung cookie bằng JavaScript" },
+            {
+              "id": "B",
+              "label": "Ép trình duyệt chỉ nói HTTPS với domain đã ghi nhớ — vá cửa sổ downgrade/first-request khi attacker on-path giữ nạn nhân ở http://"
+            },
+            { "id": "C", "label": "Mã hóa DNS query trước khi gửi ra ngoài" },
+            { "id": "D", "label": "Chặn mọi request cross-origin" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "HSTS là chính sách do server khai báo, trình duyệt ghi nhớ: mọi truy cập sau đó bắt buộc HTTPS trong max-age, không cho hạ cấp — điểm còn hở duy nhất là lần đầu tiên (preload giải quyết)."
+        },
+        {
+          "id": "os01-l09-q3",
+          "difficulty": "hard",
+          "question": "Một MITM on-path chặn lần truy cập ĐẦU TIÊN của nạn nhân tới bank.example (chưa có HSTS cache, chưa preload) và giữ kết nối ở http:// để đánh cắp credentials. Biện pháp nào giảm đúng cửa sổ này cho TOÀN bộ người dùng trước khi họ truy cập lần đầu?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Đặt cookie Secure cho session — trình duyệt sẽ từ chối mọi http"
+            },
+            {
+              "id": "B",
+              "label": "Đăng ký HSTS Preload list — trình duyệt biết trước domain chỉ nói HTTPS ngay cả trước lần truy cập đầu tiên; đi kèm max-age lớn + includeSubDomains"
+            },
+            { "id": "C", "label": "Tăng độ dài mật khẩu tối thiểu lên 20 ký tự" },
+            {
+              "id": "D",
+              "label": "Chuyển website sang cổng 8443 để attacker không ngờ tới"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Secure cookie chỉ giúp nếu có cookie từ trước — lần đầu chưa có gì để gửi. Preload là cơ chế duy nhất xóa cửa sổ first-contact; cookie Secure vẫn cần thiết nhưng không giải bài first-request."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được giao hardening một nền tảng SaaS mô phỏng đa tenant: app.example (SPA), api.example (REST), cdn.example (static assets), và một landing page marketing do agency ngoài vận hành trên infra khác. Partner integration dùng webhook inbound (họ gọi vào api.example) và outbound (app gọi ra API của partner).",
+        "tasks": [
+          "Thiết kế ma trận TLS/HSTS/cookie policy cho 4 property, xử lý riêng trường hợp agency infra ngoài tầm kiểm soát.",
+          "Thiết kế xác thực webhook hai chiều an toàn (outbound: pin/validate; inbound: signature + replay protection) ở mức khái niệm, không code chi tiết.",
+          "Viết bộ CI checks (pass/fail) tự động chặn regression: mixed content, cookie thiếu cờ, TLS legacy, chứng chỉ expiry."
+        ],
+        "requiredEvidence": [
+          "Ma trận policy 4 property kèm ghi chú rủi ro agency-infra",
+          "Mô hình xác thực webhook hai chiều với điểm tin cậy đánh dấu rõ",
+          "Danh sách CI checks dạng bảng: check, tiêu chí fail, hành động block"
+        ]
+      },
+      "sources": [
+        {
+          "title": "RFC 9110 — HTTP Semantics",
+          "url": "https://www.rfc-editor.org/rfc/rfc9110",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Semantics method/status/header của HTTP",
+            "Định nghĩa cookie handling và trạng thái phiên ngoại hóa"
+          ]
+        },
+        {
+          "title": "RFC 8446 — The Transport Layer Security (TLS) Protocol Version 1.3",
+          "url": "https://www.rfc-editor.org/rfc/rfc8446",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "TLS 1.3 handshake, ECDHE forward secrecy và AEAD",
+            "Cơ chế anti-downgrade signaling"
+          ]
+        },
+        {
+          "title": "RFC 6797 — HTTP Strict Transport Security (HSTS)",
+          "url": "https://www.rfc-editor.org/rfc/rfc6797",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cơ chế max-age/includeSubDomains và preload chống downgrade lần đầu"
+          ]
+        }
+      ]
+    }
+  ]
+}
