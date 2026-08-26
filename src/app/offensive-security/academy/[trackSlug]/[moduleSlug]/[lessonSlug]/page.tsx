@@ -7,12 +7,13 @@ import {
 } from '@/features/offensive-security';
 
 interface AcademyLessonPageProps {
-  params: Promise<{ moduleSlug: string; lessonSlug: string }>;
+  params: Promise<{ trackSlug: string; moduleSlug: string; lessonSlug: string }>;
 }
 
 export function generateStaticParams() {
   return ACADEMY_MODULES.flatMap((module) =>
     module.lessons.map((lesson) => ({
+      trackSlug: module.trackId,
       moduleSlug: module.slug,
       lessonSlug: lesson.slug,
     }))
@@ -22,9 +23,11 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: AcademyLessonPageProps): Promise<Metadata> {
-  const { moduleSlug, lessonSlug } = await params;
+  const { trackSlug, moduleSlug, lessonSlug } = await params;
   const result = getAcademyLessonBySlug(moduleSlug, lessonSlug);
-  if (!result) return { title: 'Academy Lesson Not Found | NextPro' };
+  if (!result || result.module.trackId !== trackSlug) {
+    return { title: 'Academy Lesson Not Found | NextPro' };
+  }
   return {
     title: `${result.lesson.title} | NextPro`,
     description: result.lesson.summary,
@@ -32,8 +35,8 @@ export async function generateMetadata({
 }
 
 export default async function AcademyLessonPage({ params }: AcademyLessonPageProps) {
-  const { moduleSlug, lessonSlug } = await params;
+  const { trackSlug, moduleSlug, lessonSlug } = await params;
   const result = getAcademyLessonBySlug(moduleSlug, lessonSlug);
-  if (!result) notFound();
+  if (!result || result.module.trackId !== trackSlug) notFound();
   return <AcademyLessonViewer module={result.module} lesson={result.lesson} />;
 }

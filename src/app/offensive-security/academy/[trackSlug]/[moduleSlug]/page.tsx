@@ -7,11 +7,12 @@ import {
 } from '@/features/offensive-security';
 
 interface AcademyModulePageProps {
-  params: Promise<{ moduleSlug: string }>;
+  params: Promise<{ trackSlug: string; moduleSlug: string }>;
 }
 
 export function generateStaticParams() {
   return ACADEMY_MODULES.map((academyModule) => ({
+    trackSlug: academyModule.trackId,
     moduleSlug: academyModule.slug,
   }));
 }
@@ -19,9 +20,11 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: AcademyModulePageProps): Promise<Metadata> {
-  const { moduleSlug } = await params;
+  const { trackSlug, moduleSlug } = await params;
   const academyModule = getAcademyModuleBySlug(moduleSlug);
-  if (!academyModule) return { title: 'Academy Module Not Found | NextPro' };
+  if (!academyModule || academyModule.trackId !== trackSlug) {
+    return { title: 'Academy Module Not Found | NextPro' };
+  }
   return {
     title: `${academyModule.title} | NextPro`,
     description: academyModule.summary,
@@ -29,8 +32,8 @@ export async function generateMetadata({
 }
 
 export default async function AcademyModulePage({ params }: AcademyModulePageProps) {
-  const { moduleSlug } = await params;
+  const { trackSlug, moduleSlug } = await params;
   const academyModule = getAcademyModuleBySlug(moduleSlug);
-  if (!academyModule) notFound();
+  if (!academyModule || academyModule.trackId !== trackSlug) notFound();
   return <AcademyModuleOverview module={academyModule} />;
 }
