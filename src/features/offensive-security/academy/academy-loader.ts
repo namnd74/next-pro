@@ -3,6 +3,7 @@ import rulesOfEngagementData from '../data/academy/rules-of-engagement.json';
 import evidenceAndDisclosureData from '../data/academy/evidence-and-disclosure.json';
 import processesDataAndAddressingData from '../data/academy/processes-data-and-addressing.json';
 import linkRoutingAndSegmentationData from '../data/academy/link-routing-and-segmentation.json';
+import dnsTransportAndTlsData from '../data/academy/dns-transport-and-tls.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -83,6 +84,7 @@ export const PROCESSES_DATA_AND_ADDRESSING_MODULE = parseAcademyModule(
 export const LINK_ROUTING_AND_SEGMENTATION_MODULE = parseAcademyModule(
   linkRoutingAndSegmentationData
 );
+export const DNS_TRANSPORT_AND_TLS_MODULE = parseAcademyModule(dnsTransportAndTlsData);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
@@ -90,6 +92,7 @@ export const ACADEMY_MODULES: AcademyModule[] = [
   EVIDENCE_AND_DISCLOSURE_MODULE,
   PROCESSES_DATA_AND_ADDRESSING_MODULE,
   LINK_ROUTING_AND_SEGMENTATION_MODULE,
+  DNS_TRANSPORT_AND_TLS_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {

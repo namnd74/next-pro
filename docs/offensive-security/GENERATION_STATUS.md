@@ -10,10 +10,10 @@ Updated: 2026-08-25
 - Machine-readable manifest: verified
 - Generation skill: active
 - Curriculum validator: verified
-- Full lesson migration/generation: in progress — 5 modules validated (15 lessons, 720 minutes)
+- Full lesson migration/generation: in progress — 6 modules validated (18 lessons, 960 minutes)
 - Existing Practice Range collections: preserved as auxiliary practice range
-- Publishing state: validated foundation is open for review as PR #4
-  (`feature/offensive-security-004` → `main`); batch os01-m02 stacks on a new branch.
+- Publishing state: PR #4 (foundation, `feature/offensive-security-004` → `main`) and
+  PR #5 (`os01-m02`, stacked) open for review; each new batch stacks on the previous branch.
 
 The current `/offensive-security` content remains operational. It has not been declared equivalent to
 the new academy and must not be counted as completion of foundation, network, Linux,
@@ -21,13 +21,13 @@ Windows, Active Directory, cloud, research, or adversary-emulation tracks.
 
 ## Latest validated batch
 
-`os01-m02-link-routing-and-segmentation` — Ethernet/ARP trust boundary, routing/NAT, VLAN/VPN segmentation.
+`os01-m03-dns-transport-and-tls` — DNS/DHCP trust boundaries, TCP/UDP transport state, HTTP/TLS.
 
-Generated three closely related lessons (210 minutes total):
+Generated three closely related lessons (240 minutes total):
 
-- `os01-l04-ethernet-and-arp-trust-boundary` (70 min) — Ethernet frame anatomy and switch MAC learning; ARP resolution lifecycle per RFC 826; ARP cache poisoning as an on-path position requirement inside one broadcast domain (ATT&CK T1557.002 / T1040, tactics TA0006/TA0009); defense via DHCP Snooping → static binding → Dynamic ARP Inspection with before/after telemetry verification.
-- `os01-l05-ip-routing-and-nat-boundaries` (70 min) — longest-prefix-match route selection and default-gateway semantics; TTL/asymmetric-path reasoning; NAT/PAT translation state, idle timeout failure signature, end-to-end breakage (RFC 3022/4787); RFC 1918 overlap as an out-of-scope trap with stop-and-report handling.
-- `os01-l06-vlan-vpn-segmentation` (70 min) — 802.1Q tagging, access/trunk ports and native-VLAN risk; double-tagging VLAN hopping conditions and root fixes (unused native VLAN, DTP off); inter-VLAN routing ACLs with two-way positive/negative verification; IPsec VPN tunnel boundaries (NIST SP 800-77), split-tunnel DNS/IPv6 leak detection and remediation.
+- `os01-l07-dns-resolution-and-dhcp-boundaries` (80 min) — hierarchical resolution and TTL semantics per RFC 1034/1035; cache poisoning entropy (TXID × port) and DNS tunneling detection via NXDOMAIN/label-pattern baselines; DHCP DORA and rogue-server takeover conditions; defense ordering: DHCP Snooping+DAI → egress filtering → DNSSEC validation → managed DoH (NIST SP 800-81 Rev.2).
+- `os01-l08-tcp-udp-transport-state` (80 min) — three-way handshake and connection states per RFC 9293; sliding window/retransmit diagnosis patterns; UDP as stateless transport with stateful middleware (RFC 768); SYN flood mechanics against half-open backlog and mitigations per RFC 4987; authorized scan result interpretation (open/closed/filtered) with out-of-scope stop-and-report.
+- `os01-l09-http-tls-trust-boundaries` (80 min) — HTTP semantics and cookie attributes (Secure/HttpOnly/SameSite) per RFC 9110; TLS 1.3 handshake, certificate chain to CA anchors and anti-downgrade signaling (RFC 8446); mixed content/HSTS gaps (RFC 6797); evidence-driven config audit checklist with pass/fail criteria.
 
 All labs are browser-only decision simulations with fixed datasets. They accept no external target,
 credential, command or arbitrary payload. Completion requires all three lab cases and
@@ -35,12 +35,16 @@ all three quiz questions to be correct.
 
 Quality rubric review (generation-agent self-assessment against `references/quality-rubric.md`):
 22/22 for each of the three lessons; automatic-rejection checklist clear — no arbitrary targets or
-credentials, mitigations are verified against the demonstrated failure (DAI drop log case, split-tunnel
-telemetry case), simulation output is never presented as real network proof. Independent re-review
-before `published` status remains pending, as for all batches.
+credentials, mitigations verified against demonstrated failures (resolver log case, handshake telemetry
+case, cookie/header audit case), simulation output never presented as real protocol proof. Independent
+re-review before `published` status remains pending, as for all batches.
 
 ## Previous validated batches
 
+- `os01-m02-link-routing-and-segmentation` (210 min, 3 lessons):
+  - `os01-l04-ethernet-and-arp-trust-boundary`
+  - `os01-l05-ip-routing-and-nat-boundaries`
+  - `os01-l06-vlan-vpn-segmentation`
 - `os01-m01-processes-data-and-addressing` (180 min, 3 lessons):
   - `os01-l01-process-memory-and-data-representation`
   - `os01-l02-ipv4-addressing-and-cidr-subnetting`
@@ -60,10 +64,10 @@ before `published` status remains pending, as for all batches.
 
 ## Next eligible batch
 
-`os01-m03-dns-transport-and-tls` — DNS, TCP, UDP, HTTP and TLS.
+`os01-m04-enterprise-protocols-and-packets` — Enterprise protocols, packet capture and topology reasoning.
 
 Do not generate it in the current batch. It becomes eligible because
-`os01-m02-link-routing-and-segmentation` is validated (confirmed by the curriculum validator).
+`os01-m03-dns-transport-and-tls` is validated (confirmed by the curriculum validator).
 
 ## Required decisions before content migration
 
@@ -86,28 +90,27 @@ Do not generate it in the current batch. It becomes eligible because
   from similar keywords and do not copy the old content into the new JSON.
 - Completing a legacy mission does not automatically complete an academy lesson. The
   academy assessment remains the competency gate.
-- Module `os01-m01` intentionally has no legacy reference because none of the current
-  frontend-oriented missions teaches process memory layouts, IPv4 CIDR bitmath, or IPv6 dual-stack firewall boundaries.
-- Module `os01-m02` intentionally has no legacy reference: no existing collection teaches
-  L2 trust boundaries, NAT state behavior, or segmentation verification.
+- Modules `os01-m01`, `os01-m02`, and `os01-m03` intentionally have no legacy reference:
+  none of the current frontend-oriented missions teaches process memory/subnetting,
+  L2/NAT/segmentation boundaries, or DNS/TCP/TLS trust mechanisms at this depth.
 
 ## Evidence log
 
 - `npm run validate:offensive-security-curriculum`: passed — 19 tracks, 64 modules; next
-  eligible module is `os01-m03-dns-transport-and-tls`.
+  eligible module is `os01-m04-enterprise-protocols-and-packets`.
 - `npm run validate:offensive-security-content`: passed — validated `os00-m01`, `os00-m02`, `os00-m03`,
-  `os01-m01`, and `os01-m02` (15 lessons, 720m).
-- Quality rubric review: 22/22 self-assessed for each lesson in `os01-m02`; no dimension scored zero;
-  bounded decision labs provide reproducible evidence, governance covers prevention, observable records,
-  response and residual risk, each lesson ends with a new-context transfer challenge.
-- Authoritative sources: RFC 826 (ARP), MITRE ATT&CK T1557.002/T1040, Cisco DAI/DHCP Snooping guide,
-  RFC 3022 (NAT), RFC 4787 (UDP NAT behavior), RFC 1918 (private space),
-  IEEE 802.1Q-2022 (VLAN), NIST SP 800-77 Rev.1 (IPsec), RFC 4026 (VPN terminology).
+  `os01-m01`, `os01-m02`, and `os01-m03` (18 lessons, 960m).
+- Quality rubric review: 22/22 self-assessed for each lesson in `os01-m03`; no dimension scored zero;
+  assessments test recall/diagnosis/transfer; every lab requires observable evidence beyond clicking.
+- Authoritative sources: RFC 1034/1035 (DNS), RFC 2131 (DHCP), NIST SP 800-81 Rev.2 (secure DNS),
+  RFC 9293 (TCP), RFC 768 (UDP), RFC 4987 (SYN flooding), RFC 9110 (HTTP semantics),
+  RFC 8446 (TLS 1.3), RFC 6797 (HSTS); MITRE ATT&CK T1590.002/T1046 mapping kept conservative.
 - `npm run lint`: passed.
 - `npm run typecheck` (`tsc --noEmit`): passed.
-- `npm run build -- --webpack`: passed — 159 static pages; new module and lesson routes prerendered.
+- `npm run build -- --webpack`: passed — 163 static pages; new module and lesson routes prerendered.
 - `git diff --check`: passed.
 
-Runtime integration: `/offensive-security/academy/link-routing-and-segmentation` plus 3 statically generated
-lesson routes (`/ethernet-and-arp-trust-boundary`, `/ip-routing-and-nat-boundaries`, `/vlan-vpn-segmentation`),
-persistent completion state, and Core Academy navigation (routes derive automatically from `ACADEMY_MODULES`).
+Runtime integration: `/offensive-security/academy/dns-transport-and-tls` plus 3 statically generated
+lesson routes (`/dns-resolution-and-dhcp-boundaries`, `/tcp-udp-transport-state`,
+`/http-tls-trust-boundaries`), persistent completion state, and Core Academy navigation
+(routes derive automatically from `ACADEMY_MODULES`).
