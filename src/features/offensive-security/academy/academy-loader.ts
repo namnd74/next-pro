@@ -7,6 +7,8 @@ import dnsTransportAndTlsData from '../data/academy/dns-transport-and-tls.json';
 import enterpriseProtocolsAndPacketsData from '../data/academy/enterprise-protocols-and-packets.json';
 import filesIdentityPermissionsData from '../data/academy/files-identity-permissions.json';
 import windowsArchitectureIdentitiesAclsData from '../data/academy/windows-architecture-identities-acls.json';
+import processesServicesShellData from '../data/academy/processes-services-shell.json';
+import servicesPowershellRemoteData from '../data/academy/services-powershell-remote.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -97,6 +99,12 @@ export const FILES_IDENTITY_PERMISSIONS_MODULE = parseAcademyModule(
 export const WINDOWS_ARCHITECTURE_IDENTITIES_ACLS_MODULE = parseAcademyModule(
   windowsArchitectureIdentitiesAclsData
 );
+export const PROCESSES_SERVICES_SHELL_MODULE = parseAcademyModule(
+  processesServicesShellData
+);
+export const SERVICES_POWERSHELL_REMOTE_MODULE = parseAcademyModule(
+  servicesPowershellRemoteData
+);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
@@ -108,6 +116,8 @@ export const ACADEMY_MODULES: AcademyModule[] = [
   ENTERPRISE_PROTOCOLS_AND_PACKETS_MODULE,
   FILES_IDENTITY_PERMISSIONS_MODULE,
   WINDOWS_ARCHITECTURE_IDENTITIES_ACLS_MODULE,
+  PROCESSES_SERVICES_SHELL_MODULE,
+  SERVICES_POWERSHELL_REMOTE_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {

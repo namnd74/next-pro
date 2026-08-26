@@ -1,0 +1,1079 @@
+{
+  "id": "os03-m02-services-powershell-remote",
+  "slug": "services-powershell-remote",
+  "trackId": "os03-windows-foundations",
+  "title": "Services, Tasks, Registry, PowerShell & Remote Administration",
+  "summary": "Service Control Manager và các misconfig kinh điển của service; Task Scheduler cùng bản đồ autoruns cho audit persistence; PowerShell với logging và WinRM/JEA làm ranh giới remote administration an toàn.",
+  "difficulty": "beginner",
+  "estimatedMinutes": 270,
+  "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+  "domains": ["windows"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os03-l19-services-scm-and-path-security",
+      "slug": "services-scm-and-path-security",
+      "title": "SCM, Service Registry & Path Security",
+      "summary": "Cách SCM quản lý vòng đời service; cấu trúc registry config (ImagePath, DependOnService); unquoted-path interception; service security descriptor và recovery options như mặt trận abuse.",
+      "difficulty": "beginner",
+      "durationMinutes": 90,
+      "prerequisites": [],
+      "outcomes": [
+        "Mô tả vai trò Service Control Manager: đọc config từ registry, khởi động process theo account, giám sát trạng thái.",
+        "Đọc các value registry chính của service: ImagePath, ObjectName, Start type, DependOnService, Parameters\\ServiceDll.",
+        "Giải thích cơ chế unquoted-path interception khi ImagePath chứa khoảng trắng và điều kiện để trở thành privesc.",
+        "Đánh giá service security descriptor (ai start/stop/change-config) và recovery-option abuse trong thiết kế hardening."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["windows"],
+      "attackTactics": ["TA0003", "TA0004"],
+      "keywords": [
+        "scm",
+        "imagepath",
+        "unquoted-path",
+        "service-acl",
+        "recovery-options"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Service Control Manager (SCM) là 'systemd của Windows': nó đọc hồ sơ từng service trong registry (HKLM\\SYSTEM\\CurrentControlSet\\Services\\<name>), khởi động process đúng binary, đúng account, đúng lúc. Hồ sơ đó là nguồn sự thật: ImagePath nói chạy file nào (khoảng trắng không quote = chỗ chèn payload — Windows đoán path từng đoạn), ObjectName nói mặc áo ai (LocalSystem/NetworkService/account), Start nói khi nào (auto/demand/disabled). Ai ĐỔI được hồ sơ (service ACL) thì kiểm soát được service đó hoàn toàn — vì vậy review service trên Windows = review ba lớp: file binary writable không, registry key SetValue ai có, service ACL giao quyền gì.",
+      "visual": {
+        "title": "Hồ sơ Service trong Registry",
+        "caption": "SCM đọc Services\\<name>; ImagePath không-quote + writable key + ACL rộng = chuỗi hijack.",
+        "steps": [
+          {
+            "label": "ImagePath",
+            "detail": "'C:\\Program Files\\App\\svc.exe' KHÔNG quote → Windows thử C:\\Program.exe rồi Files\\App… — file đầu tìm thấy thắng.",
+            "tone": "stop"
+          },
+          {
+            "label": "ObjectName",
+            "detail": "Account chạy service: LocalSystem / NT AUTHORITY\\NetworkService / .\\svc-user — quyết định impact khi hijack (liên hệ os03-l16).",
+            "tone": "caution"
+          },
+          {
+            "label": "Start + DependOn",
+            "detail": "Auto = boot-run (persistence giá trị cao); Demand = on-request; Disabled = off. Dependencies định thứ tự khởi động.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Service SD",
+            "detail": "Security descriptor của service: ai được Start/Stop/ChangeConfig (SD) — sc sdshow đọc, sdset sửa; Users có DC/SF là đỏ.",
+            "tone": "stop"
+          },
+          {
+            "label": "Recovery options",
+            "detail": "Restart-on-failure hữu ích vận hành nhưng attacker set action='run binary X' biến crash thành execution — review cả tab Recovery.",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "SCM: Người Quản gia Dịch vụ",
+          "paragraphs": [
+            "Khi boot hoặc khi có yêu cầu API, SCM đọc profile từ HKLM\\SYSTEM\\CurrentControlSet\\Services\\<name>, tạo process theo ImagePath dưới identity ObjectName, rồi giám sát: trạng thái (RUNNING/STOPPED/PAUSED), chấp nhận control codes (stop/pause). Service có thể là Win32 exe, driver (kernel!), hoặc DLL host chung svchost (Parameters\\ServiceDll) — loại này đặc biệt nhạy: DLL nằm đâu, ai ghi được vào đó.",
+            "Event log ghi vòng đời: 7045 (service installed — alert vàng cho persistence mới), 7036 (entered running/stopped), 7009/7011 (timeout). Blue team baseline: whitelist service set chuẩn per-host-image, mọi 7045 ngoài whitelist đi investigation — đây là detection đơn giản nhất mà hiệu quả nhất trên Windows."
+          ],
+          "points": [
+            "sc query / Get-CimInstance Win32_Service liệt kê service kèm account + path — đầu ra đầu tiên mọi assessment Windows.",
+            "svchost sharing: nhiều service một process — xác định service nào bằng tasklist /svc; DLL hijack trong svchost context = SYSTEM.",
+            "CurrentControlSet là snapshot đang chạy; ControlSet001/002 là bản lưu — forensics so sánh phát hiện rollback tampering."
+          ]
+        },
+        {
+          "title": "Unquoted ImagePath: Phỏng đoán Nguy hiểm",
+          "paragraphs": [
+            "ImagePath 'C:\\Program Files\\Vendor\\app.exe' (không quote): CreateProcess resolve từng prefix như executable candidate — C:\\Program.exe, C:\\Program Files\\Vendor\\app.exe... Nếu attacker ghi được file 'C:\\Program.exe' (folder gốc thường cần admin, NHƯNG 'C:\\Program Files\\' đôi khi writable-by-authenticated-users do misconfig) thì service khởi động CHẠY FILE CỦA HỌ với identity service. Quote đầy đủ ('C:\\Program Files\\Vendor\\app.exe') khử luôn lớp phỏng đoán.",
+            "Ba yếu tố xếp severity: (1) folder nào trong path writable bởi non-admin; (2) service chạy account gì (LocalSystem = P1); (3) trigger restart dễ không. Chuỗi hoàn chỉnh: writable folder + privileged service + restart trigger = privesc deterministic — anh em song song với 'writable-binary' case ở lesson trước, chỉ khác điểm chèn (path resolution thay vì file thay thế)."
+          ],
+          "points": [
+            "wmic service get name,pathname,startmode | findstr /i /v '\"' — quick scan unquoted services (hoặc PowerShell equivalent).",
+            "icacls từng folder trong path — writable đoạn nào quyết định exploitability thật.",
+            "Fix hai tầng: quote ImagePath + sửa ACL folder về admin-only."
+          ]
+        },
+        {
+          "title": "Service Security Descriptor: Ai Điều Khiển Service?",
+          "paragraphs": [
+            "Service có security descriptor riêng (khác ACL file!): quyền kiểu SC_MANAGER_* và SERVICE_* — SERVICE_START, SERVICE_STOP, SERVICE_CHANGE_CONFIG (đổi ImagePath/account!), SERVICE_ALL_ACCESS. sc sdshow <name> in SDDL; ACE như (A;;CCLCSWRPWPDTLOCRRC;;;AU) cần decode: AU = Authenticated Users, RP = start, WP = stop, DT/LO/CR... Đặc biệt: Users/Authenticated Users có SERVICE_CHANGE_CONFIG = privesc trực tiếp (đổi ImagePath tới payload, restart).",
+            "Review flow: sdshow decode → trustee nào ngoài admin có WP/RP/DC/SD? → cross-check account service chạy. Hardening chuẩn: default descriptor Windows đã hợp lý; rủi ro đến từ tool cài thêm mở rộng (installers hay grant Everyone). Baseline: script quét sdshow toàn bộ service, flag mọi non-admin WRITE-ish right."
+          ],
+          "points": [
+            "SDDL reference: SY=SYSTEM, BA=Built-in Admins, AU=Authenticated Users, WD=Everyone, BU=Users.",
+            "Change-config còn đổi ObjectName — chạy-as-account khác cũng bị hijack theo.",
+            "Query service qua Get-Acl trên SCM object cho output structured dễ automation hơn sc sdshow."
+          ]
+        },
+        {
+          "title": "Recovery Options và Restart Abuse",
+          "paragraphs": [
+            "Tab Recovery của service định nghĩa hành vi khi crash: lần 1/2/subsequent — Restart service / Run a program / Reboot. Vận hành yêu thích Restart; nhưng 'Run a program' với binary attacker-controlled biến crash-thuật thành execution-trigger: gây crash đủ số lần → chương trình chạy với identity service. Attacker cũng dùng chính restart-on-failure để hồi sinh payload sau khi bị kill (liên hệ systemd Restart=always ở track Linux — pattern xuyên-platform).",
+            "Audit: enumerate failure actions (sc qfailure <name>), flag 'Run a program' trỏ tới path user-writable hoặc script lạ. IR: khi diệt payload service-based, phải xử lý CẢ recovery action + disable service, nếu không nó tự sống lại — quy tắc 'kill the resurrect mechanic first'."
+          ],
+          "points": [
+            "sc failure <name> reset= 86400 actions= restart/6000 — format command-line của recovery config.",
+            "Event 7031/7032 (service crashed unexpectedly) là telemetry trigger-side của recovery abuse.",
+            "Legit use-case tồn tại (watchdog patterns) — verdict phải theo whitelist + path ownership, không paint-all."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Service Desk — Đọc Hồ sơ và Bắt Hijack Chain",
+        "objective": "Decode registry/service-descriptor mô phỏng để đánh giá hijack feasibility, nhận diện unquoted-path và recovery-abuse, đề xuất hardening giữ chức năng.",
+        "scenario": "Bạn review server ứng dụng Windows mô phỏng: registry excerpts của 3 service, output sc sdshow, folder permission listing, recovery config. Toàn bộ tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ dữ liệu cấp; không sc/regedit thật.",
+          "Verdict hijack phải nêu đủ: điểm chèn + identity + trigger.",
+          "Hardening đề xuất phải bảo toàn chức năng service."
+        ],
+        "cases": [
+          {
+            "id": "svc-case-01",
+            "title": "Ba hồ sơ cạnh nhau",
+            "context": "SvcA: ImagePath=\"C:\\Program Files\\GoodCo\\a.exe\" (quoted), ObjectName=LocalSystem, key ACL admin-only. SvcB: ImagePath=C:\\Program Files\\ToolCo\\tool svc.exe (UNQUOTED), ObjectName=LocalSystem, ACL: 'C:\\Program Files\\ToolCo\\' writable bởi Users. SvcC: ImagePath quoted, ObjectName=NetworkService, Parameters\\ServiceDll=C:\\temp\\plug.dll, C:\\temp writable Users.",
+            "prompt": "Xếp hạng và fix?",
+            "options": [
+              {
+                "id": "A",
+                "label": "SvcA nguy hiểm nhất vì chạy LocalSystem.",
+                "correct": false,
+                "rationale": "LocalSystem chỉ là impact-ceiling; SvcA có quoted path + admin-only ACL — attack surface đóng; SvcB/SvcC mới có entry point hở."
+              },
+              {
+                "id": "B",
+                "label": "P1 SvcB: unquoted + space ('tool svc.exe') → Windows thử 'C:\\Program Files\\ToolCo\\tool.exe' — folder Users-writable nên attacker đặt tool.exe, đợi/restart service → LocalSystem. Fix: quote ImagePath + ACL admin-only. P1 SvcC: ServiceDll trong C:\\temp writable → DLL replacement khi svchost load → SYSTEM; fix: move DLL vào Program Files + ACL. SvcA exemplar. Verify sau fix: re-check ACL + test create-file bằng user thường phải fail.",
+                "correct": true,
+                "rationale": "Nắm hai biến thể hijack (path-interception vs ServiceDll-replacement), xếp theo identity impact, fix kép path+ACL, có verify — checklist trọn vẹn."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần chuyển SvcB/C sang NetworkService là giải quyết xong.",
+                "correct": false,
+                "rationale": "Hạ account giảm ceiling nhưng entry point (unquote/writable-dll) vẫn mở — attacker vẫn có code-exec-as-service-user; vá entry point là gốc."
+              },
+              {
+                "id": "D",
+                "label": "SvcC ổn vì NetworkService ít quyền hơn LocalSystem.",
+                "correct": false,
+                "rationale": "So sánh sai chiều: vấn đề SvcC là DLL writable-by-users — code-exec bất kể account; ít-quyền-hơn chỉ giảm hậu quả sau khi đã thua entry."
+              }
+            ]
+          },
+          {
+            "id": "svc-case-02",
+            "title": "sdshow decode",
+            "context": "sc sdshow BackupAgent → D:(A;;CCLCSWRPWPDTLOCRRC;;;BA)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;SY)(A;;RPWPLCSWLOCRRC;;;BU). Decode: BA admins, SY system, BU = Builtin Users; RP=start, WP=stop, CC=query, DC=change-config? (chú ý: DC trong service SDDL = SERVICE_CHANGE_CONFIG), WD=write-DACL.",
+            "prompt": "Tìm quyền quá tay và đánh giá?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không sao — Users chỉ start/stop service thôi.",
+                "correct": false,
+                "rationale": "BU có RP+WP+DC+WD: ngoài start/stop còn CHANGE_CONFIG (đổi ImagePath!) và WRITE_DAC — vượt xa 'start/stop thôi'."
+              },
+              {
+                "id": "B",
+                "label": "P1: BU (Users) mang DC (SERVICE_CHANGE_CONFIG) + WD (WRITE_DAC) → user thường đổi ImagePath/chạy-as rồi start service = privesc tới LocalSystem (tùy ObjectName). Fix: sdset lại descriptor chuẩn (BA/SY full, BU bỏ hẳn hoặc chỉ query); hunt ai đã grant (installer?). Verify: sc sdshow sau-fix + thử change-config bằng user thường phải Access Denied + event 4670/7045 monitor.",
+                "correct": true,
+                "rationale": "Decode đúng SDDL flags hiếm, liên kết change-config→hijack→privesc, fix bằng sdset với verification + telemetry — mức review trưởng thành."
+              },
+              {
+                "id": "C",
+                "label": "Disable service là fix nhanh nhất.",
+                "correct": false,
+                "rationale": "Phá chức năng backup agent; descriptor sai vẫn còn trên service khác — sửa ACL mới chữa gốc."
+              },
+              {
+                "id": "D",
+                "label": "SY (SYSTEM) có quyền quá lớn cần thu hẹp.",
+                "correct": false,
+                "rationale": "SYSTEM full-access là design chuẩn; thu hẹp SYSTEM vô ích và có thể vỡ SCM operation."
+              }
+            ]
+          },
+          {
+            "id": "svc-case-03",
+            "title": "Recovery abuse",
+            "context": "MonitorSvc: recovery lần 1 = Restart (5000ms), subsequent = Run 'C:\\Scripts\\restart-handler.ps1' (folder C:\\Scripts writable by Users). Event log: 7031 MonitorSvc crashed 12 lần/giờ gần đây. Service chạy LocalSystem. Team nghĩ crash là bug app.",
+            "prompt": "Diễn giải đúng toàn cảnh?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Bug app thôi — tăng retry interval là ổn.",
+                "correct": false,
+                "rationale": "Crash-rate bất thường + recovery-action trỏ script writable-by-users là combo abuse: crash có thể là TỰ GÂY để kích hoạt execution."
+              },
+              {
+                "id": "B",
+                "label": "Nghi recovery-abuse: attacker ghi restart-handler.ps1 (Users-writable) → tự gây crash 2 lần → subsequent-action chạy script AS LocalSystem. Crash-storm 12/h là signal chủ đích. Response: (1) capture script + hash trước khi sửa; (2) tạm set recovery=restart-only; (3) ACL C:\\Scripts admin-only; (4) inspect crash root-cause (7031 stack/log) xem có deliberate-null-deref không; rotate credentials LocalSystem-context dùng.",
+                "correct": true,
+                "rationale": "Ghép ba mảnh (crash rate + recovery target writable + identity) thành hypothesis có cơ chế; response đúng thứ tự evidence-first rồi contain; không quên root-cause crash."
+              },
+              {
+                "id": "C",
+                "label": "Xóa recovery action hết — service không cần recovery.",
+                "correct": false,
+                "rationale": "Có thể phá SLA service thật; đúng hơn là whitelist recovery action + khóa path — giữ chức năng, đóng abuse."
+              },
+              {
+                "id": "D",
+                "label": "PS1 không thể chạy qua recovery vì recovery chỉ chạy .exe.",
+                "correct": false,
+                "rationale": "Recovery run-program thực thi qua shell association/script host tùy cách cấu hình — và dù bắt buộc .exe thì wrapper exe trỏ ps1 vẫn tương đương; đừng dựa chi tiết format để cảm thấy an toàn."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Nhận diện cả hai biến thể hijack: unquoted-path interception và ServiceDll/DLL replacement.",
+          "Decode SDDL service descriptor và liên kết change-config/write-dacl tới privesc chain.",
+          "Nhận diện recovery-abuse pattern và viết response evidence-first."
+        ],
+        "evidenceTemplate": [
+          "Service profile table: ImagePath/ObjectName/ACL → verdict từng service",
+          "SDDL decode: trustee → rights → risk mapping",
+          "Hijack chain diagrams: entry-point → trigger → identity gained",
+          "Response order: capture → contain → eradicate → verify"
+        ],
+        "reset": "Đặt lại lựa chọn để review lại hồ sơ service từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không thao tác service thật."
+      },
+      "governance": {
+        "prevent": [
+          "Policy: mọi ImagePath quoted + folders binary admin-only; CI/GPO check unquoted paths fleet-wide.",
+          "Baseline service descriptors (sdshow export) — drift ngoài installer-whitelist revert/alert.",
+          "Recovery actions whitelist: restart-only mặc định; run-program chỉ với admin-owned path."
+        ],
+        "observe": [
+          "Alert event 7045 (new service) + 7031 spike per-service; monitor registry Services key writes.",
+          "Periodic scan: unquoted ImagePath, writable service-folders, non-admin DC/WD rights."
+        ],
+        "respond": [
+          "Service hijack confirmed: capture binary/hash, disable + clear recovery, restore ImagePath from package, rotate service credentials.",
+          "Mass 7045 anomaly: isolate host, diff against known-deploy pipeline, hunt lateral same-pattern."
+        ],
+        "residualRisk": [
+          "Third-party installers tái tạo misconfig sau update — scan phải định kỳ, không one-time.",
+          "svchost shared-DLL model giữ rủi ro nền cần DLL-hijack mitigations (safe search order)."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Unquoted path là lỗi hiển thị nhỏ, không phải security issue.",
+          "correction": "Với khoảng trắng trong path + folder-prefix writable + privileged service, nó là privesc deterministic — severity phụ thuộc ba yếu tố đó chứ không phải 'cosmetic'."
+        },
+        {
+          "claim": "Service ACL và file ACL là cùng một cơ chế.",
+          "correction": "Service SD kiểm soát thao tác SCM (start/stop/change-config) với quyền kiểu SERVICE_* và SDDL riêng — file writable không tự cho phép đổi ImagePath; ngược lại cũng vậy. Hai lớp phải audit song song."
+        },
+        {
+          "claim": "Recovery 'Run a program' là tính năng chết, chẳng ai dùng.",
+          "correction": "Watchdog-legit dùng thật; chính vì vậy nó là trigger-value: attacker tự-gây-crash để kích — audit theo whitelist + path ownership."
+        },
+        {
+          "claim": "Chuyển service sang NetworkService giải quyết mọi hijack risk.",
+          "correction": "Account thấp hơn giảm IMPACT nhưng entry point (path/key/ACL) quyết định ATTACK CÓ THÀNH CÔNG hay không — vá entry point trước, tối ưu account sau."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os03-l19-q1",
+          "difficulty": "easy",
+          "question": "Registry key chứa cấu hình service trên Windows?",
+          "options": [
+            {
+              "id": "A",
+              "label": "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"
+            },
+            { "id": "B", "label": "HKLM\\SYSTEM\\CurrentControlSet\\Services\\<name>" },
+            { "id": "C", "label": "HKCU\\Environment" },
+            { "id": "D", "label": "HKLM\\SAM" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Services\\<name> là hồ sơ SCM đọc: ImagePath, ObjectName, Start, Parameters. Run keys là autoruns (lesson sau); SAM là database account."
+        },
+        {
+          "id": "os03-l19-q2",
+          "difficulty": "medium",
+          "question": "ImagePath = C:\\Program Files\\Tool Co\\app.exe (unquoted), service LocalSystem. Folder nào attacker CẦN ghi được để intercept?",
+          "options": [
+            { "id": "A", "label": "Chỉ cần ghi app.exe trực tiếp" },
+            {
+              "id": "B",
+              "label": "Một folder-prefix TRƯỚC vị trí có khoảng trắng: ví dụ đặt 'C:\\Program Files\\Tool.exe' — Windows resolve từng prefix như candidate executable; folder chứa candidate đó phải writable"
+            },
+            { "id": "C", "label": "C:\\Windows\\System32" },
+            { "id": "D", "label": "Không thể intercept nếu file cuối tồn tại" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Resolution thử mỗi prefix-cắt-tại-space như executable; candidate sớm nhất tìm thấy thắng — writable folder chứa prefix đó là entry point."
+        },
+        {
+          "id": "os03-l19-q3",
+          "difficulty": "hard",
+          "question": "Trong service SDDL, quyền nào nguy hiểm nhất khi rơi vào tay Builtin Users?",
+          "options": [
+            { "id": "A", "label": "CC (QUERY_STATUS)" },
+            {
+              "id": "B",
+              "label": "DC (SERVICE_CHANGE_CONFIG) — cho phép đổi ImagePath/ObjectName: user ghi payload path rồi start service → code chạy với identity service (thường LocalSystem)"
+            },
+            { "id": "C", "label": "RP (SERVICE_START) một mình" },
+            { "id": "D", "label": "LO (INTERROGATE)" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Start/Stop một mình chỉ điều khiển service hợp lệ; ChangeConfig đổi ĐỊNH NGHĨA service (binary/account) — chìa khóa viết lại hồ sơ, privesc trực tiếp."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn xây baseline service-security cho farm 40 server Windows mô phỏng (web/app/db tiers): third-party agents đa dạng (backup, AV, monitoring), lịch sử cài đặt 5 năm, chưa từng audit service ACL.",
+        "tasks": [
+          "Thiết kế scan-spec: unquoted paths, writable service-folders, SDDL non-admin rights, recovery run-program — output format + severity mapping.",
+          "Viết remediation playbook theo tier: quote/ACL fixes batch được, exception process cho vendor tools không fix được (compensating controls).",
+          "Đề xuất detection pack: 7045 whitelist-alerting, 7031 spike thresholds, Services-registry watch với Sysmon."
+        ],
+        "requiredEvidence": [
+          "Scan spec với severity rubric",
+          "Playbook có exception workflow",
+          "Detection table: signal → event/threshold → action"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Services registry tree and keys (Services\\<name> values)",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/services/configuring-a-service-using-the-registry",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Value semantics: ImagePath, ObjectName, Start, Parameters\\ServiceDll"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — Service Security and Access Rights (SDDL for services)",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/services/service-security-and-access-rights",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["SERVICE_* access rights và service security descriptor structure"]
+        },
+        {
+          "title": "Microsoft Learn — ChangeServiceConfig / failure actions (recovery)",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-changeserviceconfig2w",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Failure action configuration semantics (restart/run-program)"]
+        }
+      ]
+    },
+    {
+      "id": "os03-l20-scheduled-tasks-and-autoruns",
+      "slug": "scheduled-tasks-and-autoruns",
+      "title": "Task Scheduler & Bản đồ Autoruns",
+      "summary": "Cấu trúc scheduled task (trigger/action/principal); các vị trí autoruns quan trọng (Run keys, startup folders, WMI subscription khái niệm); phương pháp inventory persistence cho cả blue team lẫn assessment; detection events tương ứng.",
+      "difficulty": "beginner",
+      "durationMinutes": 90,
+      "prerequisites": ["os03-l19-services-scm-and-path-security"],
+      "outcomes": [
+        "Đọc cấu trúc task XML: triggers (boot/logon/time), actions (exec/comhandler), principal (run-as account, logon-type, S4U nuance).",
+        "Liệt kê các autoruns locations hàng đầu: Run/RunOnce keys (HKLM/HKCU), Startup folders, scheduled tasks, services — và vai trò tương đối của từng vị trí.",
+        "Thực hiện inventory-persistence methodology: enumerate → baseline-diff → verdict theo owner/whitelist.",
+        "Ánh xạ persistence locations tới detection events (4698 task created, Sysmon registry/process events) để thiết kế monitoring."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["windows"],
+      "attackTactics": ["TA0003"],
+      "keywords": [
+        "task-scheduler",
+        "autoruns",
+        "run-key",
+        "persistence-inventory",
+        "s4u-logon"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Persistence là câu trả lời cho 'làm sao sống sót qua reboot'. Trên Windows có một bản đồ các cửa sẽ tự mở lại: Task Scheduler (việc định kỳ/sự kiện — linh hoạt nhất), Run/RunOnce keys (chạy lúc logon, mỗi hive một phạm vi), Startup folders (giống Run nhưng dạng shortcut), Services (đã học), và tầng sâu hơn (WMI subscription, COM hijack — chỉ cần biết tên ở level này). Mỗi cửa có chữ ký riêng: task ghi XML vào C:\\Windows\\System32\\Tasks + event 4698; Run key là registry write. Audit persistence = đi hết bản đồ, diff với baseline, hỏi mỗi mục ba câu: ai sở hữu, chạy gì, trigger khi nào. Attacker giỏi chọn cửa ít ai nhìn — người phòng thủ giỏi nhìn TẤT CẢ cửa theo lịch.",
+      "visual": {
+        "title": "Bản đồ Cửa Persistence",
+        "caption": "Mỗi autorun location có scope + trigger + signature riêng; audit phủ hết bản đồ theo lịch.",
+        "steps": [
+          {
+            "label": "Scheduled Task",
+            "detail": "XML tại System32\\Tasks; principal quyết định identity — RunLevel=highest + S4U là combo đáng ngờ (chạy high không cần password).",
+            "tone": "stop"
+          },
+          {
+            "label": "Run keys",
+            "detail": "HKLM\\...\\Run (mọi user logon) vs HKCU\\...\\Run (user cụ thể) — value-name tùy ý, data là lệnh; signature: registry write event.",
+            "tone": "caution"
+          },
+          {
+            "label": "Startup folders",
+            "detail": "%APPDATA%\\...\\Startup (user) + ProgramData (all users) — shortcut/.lnk hoặc script; hay bị quên trong audit scripts-only.",
+            "tone": "caution"
+          },
+          {
+            "label": "Services",
+            "detail": "Auto-start service = persistence mạnh nhất (boot-time, SYSTEM-capable) — đã đào sâu ở l19.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Deeper doors",
+            "detail": "WMI event subscription, COM object hijack, IFEO — biết tồn tại; đào ở track AD/malware-analysis nâng cao.",
+            "tone": "neutral"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Anatomy of a Scheduled Task",
+          "paragraphs": [
+            "Một task gồm: TRIGGER (boot, logon, idle, calendar-time, event-based), ACTION (Exec: command + arguments; hoặc COM handler), PRINCIPAL (account chạy + LogonType: Interactive/Token — user phải online; S4U — mã hóa bằng machine, không cần password nhưng network không delegate; Password — lưu credential; Group-managed), SETTINGS (multiple instances, stop-if-running-longer, hidden flag). Task definitions lưu XML dưới C:\\Windows\\System32\\Tasks (cây thư mục theo path tên task).",
+            "Chi tiết assessment-worthy: Hidden task không hiện trong GUI mặc định (schtasks /query /v vẫn thấy); RunLevel Highest = elevated; S4U + High + action user-writable là combo privesc-persistence gọn (task chạy as admin/system khi trigger, action file attacker sửa được). Trigger event-based (XML EventTrigger) tinh vi hơn time-based — ít bị chú ý schedule sweep."
+          ],
+          "points": [
+            "schtasks /query /fo LIST /v hoặc Get-ScheduledTask | Export — dump toàn bộ kèm state/action/principal.",
+            "Task library paths có namespace (\\Microsoft\\Windows\\...) — task lạ ngoài namespace chuẩn là flag nhanh.",
+            "Author field trong XML tự khai — không tin; owner ACL + action path mới là evidence."
+          ]
+        },
+        {
+          "title": "Run Keys, Startup Folders và Scope",
+          "paragraphs": [
+            "Run key: HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run áp cho MỌI user logon (cần admin để ghi); HKCU\\...\\Run áp user hiện tại (user tự ghi được — malware user-level ưa chuộng). RunOnce tương tự nhưng tự xóa sau một lần (stealth-lite). Value data là dòng lệnh — resolve qua PATH, có thể trỏ .lnk/script/exe. Wow6432Node variant cho 32-bit view trên 64-bit — audit phải phủ cả hai view.",
+            "Startup folders: shell:startup (per-user) và shell:common startup (all-users) — item ở đây được shell mở lúc logon (.lnk, script). Khác Run key ở layer (shell-launch vs registry) — một số policy block Run key nhưng quên startup folder. Audit rule-of-thumb: liệt kê CẢ registry-view × hive × folder — ma trận 2×2×2 ít nhất."
+          ],
+          "points": [
+            "Autoruns (Sysinternals) tổng hợp mọi location + hide-Windows-entries filter — công cụ tham chiếu de-facto.",
+            "Run-key value pointing to cmd /c powershell -enc ... là pattern loader phổ biến — decode base64 trong sandbox/lab only.",
+            "User-writable locations (HKCU, %APPDATA% startup) = persistence user-level; HKLM/all-users cần admin — phân tầng severity theo ghi-quyền."
+          ]
+        },
+        {
+          "title": "Inventory Methodology: Enumerate → Diff → Verdict",
+          "paragraphs": [
+            "Quy trình audit persistence (áp cho cả defensive review lẫn assessment reporting): (1) ENUMERATE — dump tasks + run-keys both hives + startup folders + auto-services (+ timers/cron nếu mixed-fleet); (2) DIFF — so với baseline image/golden snapshot: mục mới, mục sửa (action path đổi?), mục enabled-lại; (3) VERDICT mỗi mục: owner ai? binary ở đâu, writable không? trigger gì? có logic nghiệp vụ giải thích không? — verdict chỉ khi đủ cả bốn.",
+            "Anti-pattern cần tránh: verdict theo TÊN (task 'UpdateCheck' nghe legit) — tên tự khai; verdict theo PATH + OWNER + WHITELIST. Ngược lại blue-team side: mọi persistence location cần baseline snapshot versioned (git-friendly export) + diff alert định kỳ. Residual: WMI-subscription khó enumerate native (Get-WmiObject __EventConsumer) — đưa vào sweep quý thay vì daily."
+          ],
+          "points": [
+            "Golden-image diff: export từ clean build, version-control, so theo hash action-path.",
+            "Assessment reporting: persistence findings kèm screenshot schtasks/XML — reproducibility.",
+            "Hidden-task check: compare GUI count vs schtasks /query count — lệch = suspicious."
+          ]
+        },
+        {
+          "title": "Detection Mapping: Sự kiện Nào Cho Cửa Nào",
+          "paragraphs": [
+            "Scheduled task lifecycle: 4698 (task created), 4699 (deleted), 4700/4701 (enabled/disabled), 4702 (updated — quan trọng: attacker sửa task sẵn có thay vì tạo mới!). Registry run-key writes: Sysmon E13/E14 (registry set/remove value) với target Run/RunOnce; process creation từ those commands: Sysmon E1 với parent explorer/userinit. Service persistence: 7045 + Sysmon E1 parent services.exe.",
+            "Thiết kế monitoring thực tế: (1) 4698/4702 alert ngoài deployment-window/whitelist; (2) Sysmon registry-watch Run keys (value-set từ process không-whitelist); (3) startup-folder file-create watch; (4) correlation: same-binary appearing ở ≥2 persistence locations trong window ngắn = strong indicator campaign. Volume control qua whitelist golden entries — noise là kẻ giết detection."
+          ],
+          "points": [
+            "4702 (update) hay bị thiếu trong rule-set — attacker edit-in-place để né 'new task' alerts.",
+            "Sysmon config cần registry-value targeting cụ thể Run/RunOnce — catch-all registry logging là log-flood.",
+            "Telemetry từ EID 4698 cần Advanced-Audit-Policy bật (Audit Other Logon/Logoff Events) — kiểm trước khi tưởng 'không có attack'."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Autoruns Desk — Inventory và Verdict",
+        "objective": "Dump mô phỏng tasks/run-keys/startup để diff-baseline, phát hiện edit-in-place persistence, và map detections cho từng cửa.",
+        "scenario": "Bạn audit workstation nghi nhiễm mô phỏng: schtasks export excerpt (5 tasks), Run keys cả HKLM/HKCU, startup folder listing, baseline golden-export. Toàn bộ tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ đánh giá dữ liệu cấp; không schtasks/regedit thật.",
+          "Verdict theo path+owner+whitelist, cấm theo tên.",
+          "Detection mapping nêu event ID cụ thể."
+        ],
+        "cases": [
+          {
+            "id": "aut-case-01",
+            "title": "Diff với baseline",
+            "context": "Baseline: GoogleUpdateTask (chrome updater, Program Files path), AdobeAcrobatInvoker (vendor-signed), Defrag Scheduled (windows namespace). Current dump thêm: '\\SyncHelper' — Action: C:\\Users\\nam\\AppData\\Roaming\\sync.exe, Trigger: logon, Principal: nam, RunLevel Highest; đồng thời AdobeAcrobatInvoker action path ĐỔI từ Program Files → C:\\Users\\Public\\acrotray.exe.",
+            "prompt": "Verdict đúng từng mục?",
+            "options": [
+              {
+                "id": "A",
+                "label": "SyncHelper nghe legit — chỉ cần hỏi IT.",
+                "correct": false,
+                "rationale": "Verdict-theo-tên là anti-pattern: user-profile path + RunLevel Highest là combo đáng ngờ bất kể tên."
+              },
+              {
+                "id": "B",
+                "label": "P1 SyncHelper: NEW + user-writable path + Highest + logon-trigger = persistence-privesc combo (chạy elevated code user sửa được). P1 AdobeInvoker EDITED-IN-PLACE: action path đổi sang Public (world-writable) — kỹ thuật né 'new-item' alerts bằng 4702-update. Cả hai: capture XML/hash, trace creator (4698/4702 + Sysmon), remove + restore baseline. GoogleUpdate/Defrag khớp baseline — pass.",
+                "correct": true,
+                "rationale": "Bắt đúng cả new-persistence LẪN edit-in-place evasion; verdict theo path/owner/diff; response có evidence-first ordering."
+              },
+              {
+                "id": "C",
+                "label": "Adobe path-change chỉ là update di chuyển file — bình thường.",
+                "correct": false,
+                "rationale": "Vendor updates không dời action sang world-writable Public folder; đây chính là kỹ thuật edit-in-place né alert — diff-baseline sinh ra để bắt việc này."
+              },
+              {
+                "id": "D",
+                "label": "RunLevel Highest bình thường vì mọi task đều vậy.",
+                "correct": false,
+                "rationale": "Highest nghĩa elevated; kết hợp action user-writable biến nó thành privesc loop — context quyết định, không mặc định hóa."
+              }
+            ]
+          },
+          {
+            "id": "aut-case-02",
+            "title": "Run key matrix",
+            "context": "HKLM\\...\\Run: 'OneDriveTray' → C:\\Program Files\\Microsoft OneDrive\\OneDrive.exe (signed, admin-written). HKCU\\...\\Run: 'OneDriveTray' → %APPDATA%\\onedrive\\onedrive.exe (fake path mimic), 'Updater' → powershell -w hidden -enc SQBFAFgA...(base64). Startup common: OneDrive.lnk hợp lệ. Wow6432View: empty.",
+            "prompt": "Đọc đúng ma trận và ưu tiên?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cả hai OneDrive entry là một — dedupe và bỏ qua.",
+                "correct": false,
+                "rationale": "HKLM entry signed-vendor path chuẩn; HKCU entry là TYPOSQUAT path (%APPDATA%) mimic tên — hai thực thể khác nhau về mọi mặt trừ display-name."
+              },
+              {
+                "id": "B",
+                "label": "P1: HKCU Updater = hidden-powershell + -enc base64 loader (user-level persistence, decode payload chỉ trong lab/isolated). P1: HKCU fake-OneDrive = masquerading via path-mimic — check hash/signature của onedrive.exe đó. HKLM + .lnk pass (baseline). Detection mapping: Sysmon E13 target HKCU Run + E1 hidden-window powershell + signature-check mismatch alerts.",
+                "correct": true,
+                "rationale": "Phân biệt đúng signed-vendor vs path-mimic vs encoded-loader; ưu tiên theo stealth+impact; mapping detections cụ thể từng pattern."
+              },
+              {
+                "id": "C",
+                "label": "-enc base64 chỉ là encoding bình thường của Microsoft tools.",
+                "correct": false,
+                "rationale": "-w hidden + -enc combo trong RUN KEY (tự chạy lúc logon) là loader-pattern kinh điển; legit software hiếm khi cần cả hai trong autorun."
+              },
+              {
+                "id": "D",
+                "label": "HKCU persistence vô hại vì chỉ chạy cho một user.",
+                "correct": false,
+                "rationale": "Scope-narrow ≠ harmless: user-level malware đạt mục tiêu data-theo-user hoàn chỉnh; severity xếp theo mục tiêu campaign, không phải breadth alone."
+              }
+            ]
+          },
+          {
+            "id": "aut-case-03",
+            "title": "Thiết kế detection",
+            "context": "SOC mô phỏng có budget telemetry giới hạn: chọn 3 signals hiệu quả nhất cho persistence trên endpoint fleet: (A) alert mọi 4698; (B) alert 4698/4702 filtered theo whitelist golden-tasks + deployment windows; (C) Sysmon E13 watch Run/RunOnce both hives từ process non-whitelist; (D) file-create watch startup folders; (E) weekly full Autoruns diff manual; (F) alert mọi powershell.exe execution.",
+            "prompt": "Chọn combo tối ưu và biện luận trade-off?",
+            "options": [
+              {
+                "id": "A",
+                "label": "A+F — càng nhiều alert càng an toàn.",
+                "correct": false,
+                "rationale": "4698 raw + all-powershell là noise-machine: analyst fatigue khiến signal thật chìm — volume control là thiết kế, không phải afterthought."
+              },
+              {
+                "id": "B",
+                "label": "B+C+D là combo core: (B) task create/update whitelisted — bắt cả edit-in-place; (C) run-key writes scoped — coverage persistence phổ biến nhất với noise thấp; (D) startup-folder cheap watch. E giữ làm quarterly sweep (WMI/deeper doors), F bỏ (noise). Trade-off: B cần maintenance whitelist — chấp nhận vì precision.",
+                "correct": true,
+                "rationale": "Chọn theo precision-per-telemetry-cost, hiểu whitelist-maintenance là cost chính đáng, và phân tầng sweep sâu theo quý — thiết kế detection trưởng thành."
+              },
+              {
+                "id": "C",
+                "label": "E+E — manual diff định kỳ là đủ.",
+                "correct": false,
+                "rationale": "Weekly-manual miss window giữa hai sweep; real-time signals (B/C/D) cần thiết cho active-compromise; manual chỉ bổ trợ depth."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần F powershell-all — đa số malware là PS.",
+                "correct": false,
+                "rationale": "Persistence không chỉ PS (exe/dll/lnk); all-PS alert volume cực cao mà miss non-PS persistence — coverage lệch cả trục technique lẫn volume."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Diff-baseline phát hiện cả new-persistence và edit-in-place modification.",
+          "Verdict theo path/owner/whitelist, phân biệt signed-vendor vs path-mimic vs encoded-loader.",
+          "Thiết kế detection combo theo precision-per-cost với trade-off rõ."
+        ],
+        "evidenceTemplate": [
+          "Diff table: entry, baseline?, action-path, writable?, verdict",
+          "Pattern classification: mimic/loader/legit với evidence",
+          "Detection matrix: location → event ID → filter → action",
+          "Quarterly deep-sweep checklist (deeper doors)"
+        ],
+        "reset": "Đặt lại lựa chọn để audit lại persistence map từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không enumerate thật."
+      },
+      "governance": {
+        "prevent": [
+          "Golden-baseline persistence exports versioned per-host-image; deployment pipelines đăng ký whitelist trước.",
+          "Application control (WDAC/AppLocker) hạn chế executable từ user-writable paths — cắt giá trị persistence user-level.",
+          "GPO: chặn user-write Run keys khi khả thi; standardize task naming/namespace cho corporate tasks."
+        ],
+        "observe": [
+          "Alerts: 4698/4702 ngoài whitelist/window; Sysmon E13 Run-key writes; startup-folder creates; 7045 (service door).",
+          "Quarterly deep sweep: WMI subscriptions, hidden-task diff, orphaned binaries referenced by any autorun."
+        ],
+        "respond": [
+          "Persistence confirmed: capture XML/value + binary hash → remove/disable → restore baseline → hunt same-binary across OTHER locations (multi-door pattern) → rotate user creds.",
+          "Edit-in-place detected: diff history xác định original action, review 4702 source account, tighten task-ACL."
+        ],
+        "residualRisk": [
+          "Deeper doors (WMI/COM/IFEO) ngoài daily telemetry — quarterly sweep là compromise-aware choice.",
+          "Whitelist decay theo deployments — cần process đăng ký task mới vào baseline như phần release."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Tên task/quen thuộc quyết định verdict.",
+          "correction": "Tên và Author field tự khai — evidence là action path + owner ACL + baseline diff; mimicry tên vendor là kỹ thuật cơ bản của malware."
+        },
+        {
+          "claim": "Tạo task mới là cách duy nhất attacker persist qua scheduler.",
+          "correction": "4702 UPDATE task hợp lệ sẵn (updater thật) né new-task alerts — diff phải cover modification, không chỉ addition."
+        },
+        {
+          "claim": "HKCU persistence không đáng lo vì scope một user.",
+          "correction": "User-level persistence đủ cho data-targeting campaigns và là bước đầu leo lên user khác/admin — severity theo mục tiêu, không chỉ breadth."
+        },
+        {
+          "claim": "Hidden task không thể thấy bằng query.",
+          "correction": "Hidden chỉ ẩn khỏi GUI view mặc định; schtasks/PowerShell export đầy đủ — hidden-flag itself (so với GUI count) là indicator."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os03-l20-q1",
+          "difficulty": "easy",
+          "question": "Event ID nào báo một scheduled task vừa được TẠO?",
+          "options": [
+            { "id": "A", "label": "7045" },
+            { "id": "B", "label": "4698" },
+            { "id": "C", "label": "4624" },
+            { "id": "D", "label": "4663" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "4698 = task created (4699 deleted, 4700/4701 enable/disable, 4702 updated). 7045 là service-installed; 4624 logon; 4663 object access."
+        },
+        {
+          "id": "os03-l20-q2",
+          "difficulty": "medium",
+          "question": "LogonType S4U trên task có đặc điểm gì khiến nó đáng chú ý trong assessment?",
+          "options": [
+            { "id": "A", "label": "Nó yêu cầu nhập password mỗi lần chạy" },
+            {
+              "id": "B",
+              "label": "Chạy dưới account chỉ định KHÔNG cần password lưu (dùng machine-credential logon) — cho phép chạy-elevated code không-password; kết hợp action user-writable là privesc-persistence gọn"
+            },
+            { "id": "C", "label": "S4U chỉ chạy khi user đang online" },
+            { "id": "D", "label": "S4U là loại trigger, không phải logon-type" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "S4U (logon type 4-ish scheduling) dùng machine identity để logon-as-user không password; trade-off network không delegate — nhưng local exec-elevated là đủ cho nhiều chuỗi tấn công."
+        },
+        {
+          "id": "os03-l20-q3",
+          "difficulty": "hard",
+          "question": "Vì sao event 4702 (task updated) quan trọng ngang 4698 trong detection?",
+          "options": [
+            { "id": "A", "label": "Vì 4702 xảy ra thường xuyên hơn nên dễ alert" },
+            {
+              "id": "B",
+              "label": "Vì attacker edit-in-place: sửa action của task hợp lệ sẵn (updater/vendor) thay vì tạo task mới — né rule chỉ theo dõi creation; 4702 filtered-theo-whitelist bắt được kỹ thuật này với noise thấp"
+            },
+            { "id": "C", "label": "Vì 4702 chứa password của task" },
+            { "id": "D", "label": "Vì 4702 chỉ xảy ra khi máy boot" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Creation-only monitoring là blind spot kinh điển; modification-event với whitelist-filter là cách rẻ bắt edit-in-place — nguyên tắc chung: mọi state-transition đều có thể bị abuse."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn thiết kế persistence-monitoring cho mixed-fleet mô phỏng (300 Win11 workstations + 40 servers): deployment teams thường xuyên tạo tasks hợp lệ, SOC muốn precision cao nhưng không chặn deploy velocity.",
+        "tasks": [
+          "Thiết kế whitelist-workflow: cách deployment team đăng ký task vào golden-baseline (schema, approval, TTL review).",
+          "Xây detection matrix: location × event × filter × severity, với volume estimate per-fleet-size.",
+          "Viết quarterly deep-sweep runbook cho deeper doors (WMI subscription, COM hijack indicators) với tooling khái niệm."
+        ],
+        "requiredEvidence": [
+          "Workflow diagram/schema cho baseline registration",
+          "Detection matrix với volume math",
+          "Deep-sweep runbook theo bước"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Task Scheduler structures (Task XML schema, principals, logon types)",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/taskschd/task-scheduler-schema",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Trigger/action/principal elements và logon-type semantics"]
+        },
+        {
+          "title": "Microsoft Learn — 4698/4702 Scheduled Task events (Security Auditing)",
+          "url": "https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/event-4698",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Task lifecycle audit events và required audit policy"]
+        },
+        {
+          "title": "Microsoft Sysinternals — Autoruns for Windows",
+          "url": "https://learn.microsoft.com/en-us/sysinternals/downloads/autoruns",
+          "publisher": "Microsoft",
+          "sourceType": "official-tool-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Comprehensive autoruns location taxonomy used as industry reference"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os03-l21-powershell-logging-and-remote-admin",
+      "slug": "powershell-logging-and-remote-admin",
+      "title": "PowerShell Logging, Execution Policy & WinRM/JEA",
+      "summary": "Vì sao PowerShell là cả công cụ quản trị lẫn công cụ tấn công; ba lớp logging (module/script-block/transcription) và giá trị forensic từng lớp; execution policy là gì và không phải là gì; WinRM remoting ranh giới và JEA constrained administration.",
+      "difficulty": "beginner",
+      "durationMinutes": 90,
+      "prerequisites": ["os03-l20-scheduled-tasks-and-autoruns"],
+      "outcomes": [
+        "Giải thích vì sao PowerShell trở thành lingua-franca của cả admin lẫn adversary (in-memory execution, .NET reach, native presence).",
+        "Phân biệt ba lớp logging: Module Logging, Script Block Logging (event 4104), Transcription — và cái gì mỗi lớp bắt được/bỏ lỡ.",
+        "Diễn giải đúng Execution Policy: safety-guard chống vô tình chạy script, KHÔNG phải security boundary — và các bypass phổ biến chỉ để hiểu tư duy.",
+        "Mô tả WinRM remoting model (listener, TrustedHosts, HTTPS vs HTTP/Kerberos) và JEA role-capability concept cho least-privilege remote admin."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["windows"],
+      "attackTactics": ["TA0002"],
+      "keywords": [
+        "scriptblock-logging",
+        "transcription",
+        "execution-policy",
+        "winrm",
+        "jea"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "PowerShell giống dao phay để bếp nhà bạn: mọi máy Windows đều có, gọi được toàn bộ .NET/API, chạy code NGAY TRÊN RAM không cần file — tiện cho admin, tuyệt hảo cho attacker (không artifact, blend vào traffic admin hợp lệ). Ba lớp logging là camera ba góc: Module Logging chụp lệnh module-level, Script Block Logging chụp CODE THỰC SỰ chạy (kể cả obfuscated — deobfuscate xong mới log, event 4104), Transcription là bản ghi màn hình mọi input/output ra file. Execution Policy KHÔNG phải khóa an ninh — chỉ là chặn-vô-tình (người dùng chủ ý bypass được trivially); hiểu đúng để không đặt niềm tin sai chỗ. WinRM là cánh cửa remote-admin: cấu hình sai (HTTP + TrustedHosts lỏng) là cánh cửa attacker; JEA là phiên bản 'cho đúng người vào đúng phòng chỉ làm đúng việc' của cánh cửa đó.",
+      "visual": {
+        "title": "Ba Camera và Một Cánh cửa",
+        "caption": "ScriptBlock log deobfuscated-code; Transcription full-session; WinRM listener là cổng vào cần JEA hóa.",
+        "steps": [
+          {
+            "label": "Module Logging",
+            "detail": "Log pipeline execution của modules chỉ định — coverage phụ thuộc whitelist module, legacy layer.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Script Block (4104)",
+            "detail": "Log code-block SAU deobfuscation — base64/-enc payload lộ rõ nội dung; lớp giá-trị nhất cho detection.",
+            "tone": "allow"
+          },
+          {
+            "label": "Transcription",
+            "detail": "Full session transcript (input/output) ra file — heavy nhưng gold cho forensics replay.",
+            "tone": "allow"
+          },
+          {
+            "label": "Execution Policy",
+            "detail": "Restricted by default: chặn .ps1 vô tình; bypass bằng -ExecutionPolicy Bypass hay paste-interactive — guard, not boundary.",
+            "tone": "caution"
+          },
+          {
+            "label": "WinRM/JEA",
+            "detail": "Listener HTTP/5985 (Kerberos domain) vs HTTPS/5986; JEA role-capabilities giới hạn cmdlets/session — remote-admin least-privilege.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Vì sao PowerShell là Chiến trường",
+          "paragraphs": [
+            "PowerShell có mặt trên mọi Windows hiện đại, expose .NET Framework/Core toàn bộ (network, crypto, process, registry, AD qua module), thực thi script in-memory (DownloadString | IEX style không ghi file — 'fileless'), và traffic PS-remoting trông giống admin-traffic hợp lệ. Kết hợp: attacker không cần drop binary (né AV file-scan), không cần upload tool (living-off-the-land), và có ngôn ngữ scripting đầy đủ ngay sau shell đầu tiên.",
+            "Defense phản ứng bằng chính telemetry PowerShell: vì script-block logging chụp code sau khi engine decode, obfuscation của attacker tự đưa nội dung thật vào log — 'their obfuscation is our gift wrap'. Hiểu vòng xoáy offense-defense này giúp đánh giá đúng giá trị từng control phía sau."
+          ],
+          "points": [
+            "AMSI (Antimalware Scan Interface) quét script-content runtime — lớp defense thứ tư song song logging.",
+            "Constrained Language Mode (CLM) giới hạn .NET/types — chế độ AppLocker-enforced cho user-context.",
+            "PS7 (Core) side-by-side: logging config riêng — audit phải cover CẢ powershell.exe VÀ pwsh.exe."
+          ]
+        },
+        {
+          "title": "Ba Lớp Logging: Cái Gì Bắt được Cái Gì",
+          "paragraphs": [
+            "(1) Module Logging: log pipeline execution per-module (whitelist trong GPO) — cũ, verbose, dễ miss non-module code; (2) Script Block Logging: event 4104 ghi mỗi code-block compile — QUAN TRỌNG NHẤT vì content là post-deobfuscation; automatic logging bắt suspicious-patterns ngay cả khi GPO chưa bật full (engine tự log blocks matching known-bad patterns); (3) Transcription: file transcript đầy đủ input/output per-session vào central share — nặng storage, gold-standard forensics replay.",
+            "Gap cần biết: 4104 log code-block nhưng không log OUTPUT; transcription log cả hai nhưng có thể bị tắt nếu attacker đủ đặc quyền (local admin can flip config) — vì vậy transcript-share phải ghi ra nơi host KHÔNG có quyền xóa (central collector). Deep-cover attackers down-grade to cmd.exe để né PS-telemetry — correlation multi-shell (process-tree) là complement, không chỉ PS-centric view."
+          ],
+          "points": [
+            "GPO paths: Administrative Templates → Windows Components → Windows PowerShell (turn on all three layers).",
+            "Protected Event Logging (PEL) encrypt logs cho untrusted-host scenarios (DMZ) — advanced option.",
+            "4104 volume: full scriptblock logging noisy on build servers — tune per-tier, không tắt sạch."
+          ]
+        },
+        {
+          "title": "Execution Policy: Guard Không phải Boundary",
+          "paragraphs": [
+            "Execution Policy quyết định .ps1 có chạy qua file-double-click/script-invocation hay không: Restricted (default client), RemoteSigned (local scripts OK, downloaded cần chữ ký), AllSigned (mỗi script cần signature), Bypass/Unrestricted. Mục đích thiết kế: chống người dùng VÔ TÌNH chạy script internet-download (Mark-of-the-Web integration) — một seatbelt, KHÔNG phải security boundary: Microsoft document chính thức nói rõ.",
+            "Bypass vectors (hiểu để không đặt niềm tin sai): -ExecutionPolicy Bypass flag, paste-code-into-interactive-session (policy không áp REPL), Invoke-Command script-blocks, .ps1 rename/shortcuts... Vì vậy hardening đúng: AllSigned cho production automation + signature pipeline; coi EP như hygiene-layer, boundary thật là AppLocker/WDAC + CLM + JEA."
+          ],
+          "points": [
+            "Get-ExecutionPolicy -List hiển thị precedence (MachinePolicy > UserPolicy > Process > ...).",
+            "GPO-enforced policies không bypass được bằng flag Process-scope — MachinePolicy wins.",
+            "RemoteSigned + MOTW: file download từ internet có zone-identifier stream — Unblock-File xóa; audit zone-streams khi triage."
+          ]
+        },
+        {
+          "title": "WinRM Remoting và JEA: Cửa Có Người Gác",
+          "paragraphs": [
+            "WinRM = SOAP-over-HTTP(S) listener (5985 plain/5986 TLS) cho PS Remoting: Enter-PSSession/Invoke-Command chạy code trên remote host. Ranh giới auth: domain environment dùng Kerberos (an toàn mặc định); WORKGROUP cần TrustedHosts list — list 'lỏng' (*) + HTTP = credential-exposure surface (basic auth over plaintext). Hardening baseline: HTTPS listener cert + Kerberos nơi có thể; hạn chế membership 'Remote Management Users'; firewall scope listener.",
+            "JEA (Just Enough Administration): constrained remoting endpoints với RoleCapability files — user vào session chỉ có: specific cmdlets/functions whitelisted, virtual accounts (chạy-as ephemeral local-admin per-session), NoLanguage/Constrained language mode. Kết quả: helpdesk reset-password mà không xem file, ops restart-service mà không shell-full. JEA là implementation mẫu của least-privilege-remote — blueprint cho track AD sau này (tiered admin)."
+          ],
+          "points": [
+            "Enable-PSRemoting tạo listener; winrm quickconfig là shortcut — inventory listeners: winrm enumerate winrm/config/listener.",
+            "PSSessionConfiguration + SessionCapabilities: Get-PSSessionConfiguration liệt kê endpoints incl. JEA ones.",
+            "Just-In-Time access pattern: JEA + time-boxed group-membership (PIM) là evolution hướng tới zero-standing-admin."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "PS Desk — Đọc Telemetry và Thiết kế Remoting An toàn",
+        "objective": "Đọc 4104/transcript excerpt để suy luận hành vi, đánh giá execution-policy posture đúng nghĩa, và thiết kế WinRM/JEA access-model cho use-case cho trước.",
+        "scenario": "Bạn hardening một server Windows mô phỏng: 4104 events excerpt (có base64-encoded block), transcript snippet, Get-ExecutionPolicy -List output, winrm listener config, và yêu cầu nghiệp vụ helpdesk-reset-password. Toàn bộ tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ telemetry mô phỏng; decode base64 chỉ ở mức nhận-diện-pattern (không execute).",
+          "EP assessment phải phân biệt guard-vs-boundary.",
+          "JEA design nêu role-capability scope cụ thể."
+        ],
+        "cases": [
+          {
+            "id": "ps-case-01",
+            "title": "4104 excerpt",
+            "context": "Event 4104: ScriptBlock text = 'IEX([System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(\"SQBFAFgAKABOAGUAdwAtAE8AYgBqAGUAQwB0ACA...\")))' từ process powershell.exe parent winword.exe, user finance01.",
+            "prompt": "Suy luận và response đúng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ là admin chạy script encoded — normal ops.",
+                "correct": false,
+                "rationale": "Parent winword (Word) spawn powershell + IEX-base64 là chuỗi macro-loader kinh điển — không phải normal ops của finance user."
+              },
+              {
+                "id": "B",
+                "label": "Macro-delivered loader pattern: Word→PowerShell→download-and-execute-in-memory. Script-block logging đã làm việc đúng: obfuscated payload bị log POST-decode (nội dung thật trong event). Response: isolate host, capture 4104 full + transcript, hunt same-parent-chain fleet-wide, review Word macro policy. Không cần decode payload để verdict — parent-child + IEX-pattern đã đủ triage signal.",
+                "correct": true,
+                "rationale": "Nhận diện chain qua process-parent + pattern; hiểu giá trị 4104 post-deobfuscation; response đúng thứ tự và fleet-wide hunt — detection-engineering maturity."
+              },
+              {
+                "id": "C",
+                "label": "Phải decode base64 trước rồi mới được kết luận.",
+                "correct": false,
+                "rationale": "Triage-level verdict không cần decode: parent-chain + IEX-from-base64 đã là pattern-match đủ mạnh; decode phục vụ IOC-extraction sau isolation, không phải tiền điều kiện."
+              },
+              {
+                "id": "D",
+                "label": "Tắt script-block logging vì nó log nội dung nhạy cảm.",
+                "correct": false,
+                "rationale": "Logging chính là thứ bắt được vụ này; privacy-tuning (scope/retention) ok, tắt-sạch = mù telemetry trên vector phổ biến nhất."
+              }
+            ]
+          },
+          {
+            "id": "ps-case-02",
+            "title": "Execution policy posture",
+            "context": "Get-ExecutionPolicy -List: MachinePolicy=Undefined, UserPolicy=Undefined, Process=Undefined,CurrentUser=RemoteSigned, LocalMachine=Restricted. Server production chạy scheduled automation scripts từ D:\\automation\\ (scripts unsigned, dev push qua git pull). Ops complaint: 'bật Restricted là automation vỡ'.",
+            "prompt": "Đánh giá và đề xuất đúng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Set LocalMachine=Bypass — automation chạy, hết chuyện.",
+                "correct": false,
+                "rationale": "Bypass toàn máy hạ guard-layer xuống 0 và che mất script-tampering signal; đúng hướng là signing pipeline chứ không phải bỏ seatbelt."
+              },
+              {
+                "id": "B",
+                "label": "Hiểu đúng: EP là guard-chống-vô-tình, không phải boundary — automation vỡ vì UNSIGNED scripts. Fix trưởng thành: code-signing cert nội bộ + sign trong CI (AllSigned cho D:\\automation) → vừa automation chạy vừa có integrity-guarantee; giữ RemoteSigned làm fallback interim. Nhớ EP không chặn attacker có shell — boundary thật là WDAC/CLM/JEA layer.",
+                "correct": true,
+                "rationale": "Phân biệt guard/boundary đúng giáo khoa; giải pháp signing-CI vừa giữ automation vừa nâng integrity; không oversell EP như security control."
+              },
+              {
+                "id": "C",
+                "label": "EP vô nghĩa nên cứ Bypass — không ảnh hưởng an ninh thật.",
+                "correct": false,
+                "rationale": "Guard-layer vẫn bắt được lớp vô-tình (phishing .ps1 double-click, drive-by) — 'không phải boundary' ≠ 'vô giá trị'; bỏ free-layer là sai."
+              },
+              {
+                "id": "D",
+                "label": "Đổi tất cả scripts sang .bat để né policy.",
+                "correct": false,
+                "rationale": "Chuyển sang batch mất structured-logging/param hygiene và vẫn là arbitrary-execution — giải pháp né tránh làm telemetry tệ hơn."
+              }
+            ]
+          },
+          {
+            "id": "ps-case-03",
+            "title": "Helpdesk remote access design",
+            "context": "Nghiệp vụ: helpdesk (5 người) cần reset password user + unlock account trên DCs, không cần gì khác. Hiện trạng: họ là members Domain Admins (!), dùng RDP tới DC bằng DA account. Đề xuất A: giữ nguyên + MFA RDP. Đề xuất B: JEA endpoint trên DC với role-capability chỉ Unlock-ADAccount/Set-ADAccountPassword, virtual-account, group Helpdesk-JEA; remove DA membership.",
+            "prompt": "Đánh giá hai đề xuất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "A đủ tốt — MFA che hết rủi ro.",
+                "correct": false,
+                "rationale": "MFA bảo vệ authentication step; standing Domain-Admin session vẫn là crown-jewel exposure (token theft trên DC, phishing-post-MFA) — giảm xác suất chứ không giảm blast-radius."
+              },
+              {
+                "id": "B",
+                "label": "B đúng architecture: JEA role-capability whitelist 2 cmdlets + virtual-account (no standing privilege) + remove DA membership → helpdesk có đúng quyền cần, blast-radius từ helpdesk-compromise co lại gần 0. Kèm: transcript JEA session (tự động) → SOC visibility; tiering-model roadmap cho admin roles khác. A giữ làm interim-MFA trong migration window.",
+                "correct": true,
+                "rationale": "Least-privilege-remote đúng blueprint: capability-scoped + no-standing-privilege + built-in transcripts; migration pragmatic (A interim) — thiết kế access trưởng thành."
+              },
+              {
+                "id": "C",
+                "label": "JEA phức tạp — chỉ cần gỡ DA, thêm group 'Account Operators'.",
+                "correct": false,
+                "rationale": "Account-Operators rộng hơn nhu cầu (quản được nhiều object types) và vẫn là standing-privilege; JEA scope-đúng-hai-cmdlet là precision khác biệt."
+              },
+              {
+                "id": "D",
+                "label": "Cho helpdesk dùng chung 1 DA account để 'dễ audit'.",
+                "correct": false,
+                "rationale": "Shared-account phá attribution hoàn toàn — ngược hẳn audit goal; mỗi person một identity luôn là baseline."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Triage PowerShell telemetry qua parent-chain + pattern không cần decode payload.",
+          "Đánh giá execution-policy theo guard-vs-boundary framework với solution giữ automation.",
+          "Thiết kế JEA role-capability scope đúng nghiệp vụ kèm transcript/visibility."
+        ],
+        "evidenceTemplate": [
+          "Telemetry reading: event fields → inference chain",
+          "EP decision table: scope, value, rationale",
+          "JEA spec: role-capability cmdlets, virtual-account, transcript destination",
+          "Migration plan: interim controls → target state"
+        ],
+        "reset": "Đặt lại lựa chọn để phân tích lại từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt; không decode payload ngoài lab môi trường riêng."
+      },
+      "governance": {
+        "prevent": [
+          "GPO bật đủ 3 lớp logging + transcript-share central (host không delete-right); cover cả pwsh7.",
+          "Code-signing pipeline cho internal automation; AllSigned trên production servers.",
+          "Remote management: Kerberos/HTTPS only; JEA cho mọi recurring-admin-usecase; kill standing-DA-workstations pattern."
+        ],
+        "observe": [
+          "Analytics 4104: IEX/from-base64/downloadstring patterns; parent-chain Word/Excel→powershell alerts.",
+          "WinRM listener inventory diff; JEA session transcript review sampling; CLM-violation events."
+        ],
+        "respond": [
+          "Suspicious PS activity: preserve 4104+transcript trước khi kill process; hunt same-scriptblock-hash fleet-wide.",
+          "Listener drift: revert config, review who changed (4688 winrm cmds), validate cert-based listeners."
+        ],
+        "residualRisk": [
+          "Attacker with local-admin có thể flip local logging config — central-collector + PEL mitigate, không zero.",
+          "Downgrade-to-cmd/wmic né PS-telemetry — process-tree analytics phải shell-agnostic."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Set ExecutionPolicy Restricted là chặn được malware PowerShell.",
+          "correction": "EP chỉ gate .ps1 invocation thông thường; interactive-paste, -Bypass flag, encoded-command đều qua — Microsoft tự document EP không phải security boundary. Boundary thật: WDAC/CLM/JEA."
+        },
+        {
+          "claim": "Obfuscated PowerShell né script-block logging.",
+          "correction": "Engine log code-block SA KHI decode — obfuscation chỉ che mắt static-file-scan; 4104 chứa nội dung thật, đây là lý do layer này giá trị nhất."
+        },
+        {
+          "claim": "TrustedHosts '*' tiện cho lab nên giữ trên prod.",
+          "correction": "TrustedHosts-wide + HTTP remoting mở credential-relay/plaintext surface; prod dùng Kerberos domain hoặc HTTPS-cert listener với scope hẹp."
+        },
+        {
+          "claim": "JEA là tool phức tạp chỉ cho enterprise lớn.",
+          "correction": "JEA là role-capability file + endpoint registration — effort vừa phải, giá trị tức thì: mọi use-case 'nhóm X chỉ cần làm Y trên server Z' đều fit; scale không đổi bản chất thiết kế."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os03-l21-q1",
+          "difficulty": "easy",
+          "question": "Event ID nào ghi script-block content trong PowerShell logging?",
+          "options": [
+            { "id": "A", "label": "4624" },
+            { "id": "B", "label": "4104" },
+            { "id": "C", "label": "7045" },
+            { "id": "D", "label": "4702" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "4104 = Script Block Logging event — nội dung post-deobfuscation; giá trị detection cao nhất trong ba lớp."
+        },
+        {
+          "id": "os03-l21-q2",
+          "difficulty": "medium",
+          "question": "Khẳng định đúng về Execution Policy?",
+          "options": [
+            { "id": "A", "label": "Là security boundary chặn attacker chạy code" },
+            {
+              "id": "B",
+              "label": "Là safety-guard chống chạy-script-vô-tình; bypassable by-design, Microsoft documents nó không phải security boundary"
+            },
+            { "id": "C", "label": "Chỉ áp dụng cho powershell.exe, không áp pwsh" },
+            { "id": "D", "label": "Không thể bị override bởi flag" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Seatbelt-analogy đúng: chặn accidental-execution (MOTW integration), không phải adversarial-boundary; GPO-enforced levels vẫn worth setting như hygiene."
+        },
+        {
+          "id": "os03-l21-q3",
+          "difficulty": "hard",
+          "question": "Transcription log nên ghi tới đâu và vì sao?",
+          "options": [
+            { "id": "A", "label": "Ghi local C:\\Transcripts — nhanh và đủ" },
+            {
+              "id": "B",
+              "label": "Central share/collector mà HOST KHÔNG có quyền xóa — vì attacker local-admin có thể xóa local transcripts (anti-forensics); central immutable copy đảm bảo replay-ability sau incident"
+            },
+            { "id": "C", "label": "Không cần transcription nếu đã có 4104" },
+            { "id": "D", "label": "Ghi tới USB gắn trên máy cho offline safety" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "4104 thiếu output; transcript đầy đủ nhưng local-storage vulnerable tới chính attacker nó ghi — write-path asymmetry (host write-only tới collector) là design principle."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn thiết kế PowerShell + remote-admin posture cho môi trường mô phỏng: 200 workstations (finance/dev/support), 60 servers (prod/staging), 10 helpdesk cần limited admin. Yêu cầu: telemetry đủ cho SOC, automation không vỡ, standing-privilege giảm tối đa.",
+        "tasks": [
+          "Thiết kế logging matrix: tier × 3 lớp logging × retention × destination (central), kèm volume estimates.",
+          "Xây signing/execution-policy rollout cho automation repos: CI-sign flow, policy per-tier, fallback plan.",
+          "Design JEA roles cho 3 use-case: helpdesk-reset, ops-service-restart, dba-backup — role-capability specs + virtual accounts + JIT evolution path."
+        ],
+        "requiredEvidence": [
+          "Logging matrix với volume math",
+          "Signing rollout với rollback stages",
+          "3 JEA role specs + migration timeline"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — about_Logging_Windows (PowerShell logging layers)",
+          "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_logging_windows",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Module/script-block/transcription logging semantics và event sources"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — about_Execution_Policies",
+          "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies",
+          "publisher": "Microsoft",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Policy scopes/levels và tuyên bố không-phải-security-boundary"]
+        },
+        {
+          "title": "Microsoft Learn — Just Enough Administration (JEA) overview",
+          "url": "https://learn.microsoft.com/en-us/powershell/scripting/learn/remoting/jea/overview",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": ["Role-capability/virtual-account/session-transcript architecture"]
+        }
+      ]
+    }
+  ]
+}
