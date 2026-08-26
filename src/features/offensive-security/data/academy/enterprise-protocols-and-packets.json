@@ -1,0 +1,1103 @@
+{
+  "id": "os01-m04-enterprise-protocols-and-packets",
+  "slug": "enterprise-protocols-and-packets",
+  "trackId": "os01-network-foundations",
+  "title": "Giao thức Doanh nghiệp, Bắt Gói tin & Suy luận Topology",
+  "summary": "Cơ chế SMB và LDAP cùng ranh giới xác thực của chúng; phương pháp bắt và phân tích gói tin có kỷ luật dưới ủy quyền; kỹ thuật dựng sơ đồ mạng từ bằng chứng thụ động/tích cực trước khi dùng công cụ quét.",
+  "difficulty": "beginner",
+  "estimatedMinutes": 240,
+  "careerPaths": ["penetration-test", "red-team", "bug-bounty"],
+  "domains": ["network", "windows"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os01-l10-smb-ldap-enterprise-protocols",
+      "slug": "smb-ldap-enterprise-protocols",
+      "title": "SMB & LDAP: Giao thức Chia sẻ và Thư mục của Doanh nghiệp",
+      "summary": "Vai trò của SMB trong chia sẻ file/in ấn và các ranh giới xác thực NTLM/signing; cấu trúc thư mục LDAP, các kiểu bind và rủi ro truy vấn nặc danh; giá trị liệt kê có kiểm soát và biện pháp giảm thiểu bề mặt.",
+      "difficulty": "foundation",
+      "durationMinutes": 80,
+      "prerequisites": [],
+      "outcomes": [
+        "Mô tả vai trò và luồng hoạt động cơ bản của SMB (negotiate dialect, session setup, tree connect) theo đặc tả MS-SMB2 và giải thích tại sao nó là bề mặt giá trị cao trong mạng Windows.",
+        "Giải thích cơ chế SMB signing và ý nghĩa bảo mật khi signing bị tắt hoặc bị downgrade.",
+        "Phân tích cấu trúc cây thư mục LDAP (DN, OU, attribute) và phân biệt anonymous bind, simple bind, authenticated bind về mức độ tiếp cận dữ liệu.",
+        "Đánh giá bề mặt liệt kê của SMB/LDAP trong phạm vi ủy quyền và đề xuất giảm thiểu: hạn chế share, chặn anonymous bind, thu hẹp thông tin lộ qua null session."
+      ],
+      "careerPaths": ["penetration-test", "red-team"],
+      "domains": ["network", "windows"],
+      "attackTactics": ["TA0007"],
+      "keywords": [
+        "smb-signing",
+        "ldap-bind",
+        "null-session",
+        "share-enumeration",
+        "directory-structure"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Nếu TCP/IP là hệ đường phố thì SMB là hệ thống phòng làm việc chung: mở 'cửa chia sẻ' (share) để máy khác vào đọc/ghi tài liệu — cửa nào quên khóa thì cả tòa nhà đi ngang qua được. LDAP là cuốn danh bạ tổng của tổ chức: mọi người, nhóm, máy in đều là mục (entry) trên cây thư mục; ai có quyền tra thì thấy đúng phần được phép — nhưng nhiều thư mục để chế độ tra tự do (anonymous bind) cho tiện rồi quên thu lại. Cả hai giao thức sinh ra cho mạng tin cậy nội bộ, vì thế mức mặc định của chúng thường hào phóng hơn mức an toàn hiện nay: việc đánh giá là so sánh 'đang mở bao nhiêu' với 'cần mở bao nhiêu'.",
+      "visual": {
+        "title": "Phiên SMB và Cây Thư mục LDAP",
+        "caption": "SMB đi qua ba lớp thương lượng trước khi chạm file; LDAP trả dữ liệu theo subtree tùy quyền bind.",
+        "steps": [
+          {
+            "label": "Negotiate dialect",
+            "detail": "Client/server thống nhất phiên bản SMB2/SMB3 và bật/tắt signing, encryption — điểm downgrade kinh điển nếu policy lỏng.",
+            "tone": "caution"
+          },
+          {
+            "label": "Session setup (xác thực)",
+            "detail": "Kerberos ưu tiên trong domain; NTLM fallback là điểm yếu kế thừa — hash-based, dễ bị relay khi signing tắt.",
+            "tone": "stop"
+          },
+          {
+            "label": "Tree connect tới share",
+            "detail": "Truy cập \\\\server\\share với ACL riêng từng share + NTFS — hai lớp ACL phải cùng chặt mới kín.",
+            "tone": "neutral"
+          },
+          {
+            "label": "LDAP bind",
+            "detail": "Anonymous/simple/authenticated quyết định scope nhìn thấy trên cây Directory Information Tree.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Search theo subtree",
+            "detail": "Truy vấn (objectClass=*) từ base DN liệt kê users/groups/machines — giá trị recon lớn nếu quyền bind hào phóng.",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "SMB: Ba Lớp Thương lượng Trước Khi Chạm File",
+          "paragraphs": [
+            "Một phiên SMB (đặc tả MS-SMB2) đi qua: Protocol Negotiate (chọn dialect cao nhất hai bên hỗ trợ, thống nhất signing/encryption capability), Session Setup (xác thực — Kerberos trong domain, NTLM fallback), rồi Tree Connect (gắn vào share cụ thể). Mỗi share có ACL riêng, chồng thêm ACL NTFS bên dưới — hiệu lực thật là giao của hai lớp.",
+            "SMB là bề mặt giá trị cao vì ba lý do: nó có mặt trên gần như 100% máy Windows; lịch sử chứa các lỗ hổng remote-code-execution nghiêm trọng (gia đình EternalBlue 2017 là ví dụ kinh điển đã dẫn tới WannaCry/NotPetya); và nó mang xác thực mạng — mọi lần truy cập share đều kèm credential material. Vì vậy hardening SMB (bật signing required, tắt SMB1, vá định kỳ) là việc nền tảng, không phải tùy chọn."
+          ],
+          "points": [
+            "Signing required ngăn relay: attacker không thể chuyển tiếp authentication giữa client và server khác.",
+            "SMB1 phải tắt tuyệt đối: dialect cổ, không có modern hardening, là phương tiện mang mã khai thác EternalBlue.",
+            "Share 'mở rộng rãi' (Everyone/Full Control) trên máy người dùng là cách dữ liệu rò ra ngoài thiết kế."
+          ]
+        },
+        {
+          "title": "NTLM Fallback và Bài toán Signing",
+          "paragraphs": [
+            "Trong môi trường domain lý tưởng, xác thực SMB dùng Kerberos (ticket-based, không gửi hash qua dây). Nhưng khi client không tìm được DC, dùng IP thay hostname, hoặc kết nối tới thiết bị non-domain, NTLM xuất hiện như phương án dự phòng: thách thức-phản hồi dựa trên hash mật khẩu. Bản chất challenge/response khiến NTLM dễ tổn thương với relay nếu kẻ tấn công đứng ở vị trí on-path (liên hệ bài l04/l05): nhận challenge từ server này, chuyển cho nạn nhân ở nơi khác.",
+            "Chống relay chuẩn hóa quanh hai trụ: SMB signing bắt buộc (phản hồi bị tamper sẽ fail) và hạn chế NTLM itself (policy chặn NTLM dần, audit trước khi block). Đây là ví dụ giáo khoa về việc một cơ chế kế thừa (fallback) phá vỡ mô hình tin cậy của cơ chế hiện đại — đánh giá doanh nghiệp luôn hỏi: 'fallback nào vẫn đang bật?'"
+          ],
+          "points": [
+            "LDAP signing và Channel Binding là bản sao cùng một tư tưởng cho LDAP (chống relay tương tự).",
+            "EPA/channel binding gắn TLS outer channel với inner auth — chống relay qua lớp mã hóa.",
+            "Audit NTLM log (4624 type NTLM) trước khi chặn — block vội cắt dịch vụ legacy."
+          ]
+        },
+        {
+          "title": "LDAP: Danh bạ Tổng và Mức Độ Hào Phóng của Bind",
+          "paragraphs": [
+            "LDAP (RFC 4511) tổ chức dữ liệu thành cây: mỗi entry có DN (distinguished name) như 'CN=Nam Nguyen,OU=People,DC=corp,DC=example', mang các attribute (mail, memberOf…). Muốn đọc phải bind: Anonymous bind (không credential) — mức thấy tùy server config; Simple bind (DN + password gửi gần như dạng rõ dưới LDAPS/startTLS) — cần kênh mã hóa; SASL/Kerberos bind — chuẩn doanh nghiệp.",
+            "Giá trị liệt kê: một authenticated user bình thường thường search được toàn bộ users/groups/machines trong subtree (thông tin cần cho ứng dụng hoạt động) — đó là lý do LDAP là mỏ recon hàng đầu trong đánh giá Windows, và cũng là lý do cần review: anonymous bind nên tắt, schema nhạy cảm giới hạn quyền đọc, và 'user thường biết gì' phải được xem là thiết kế chủ đích chứ không phải mặc nhiên."
+          ],
+          "points": [
+            "Null session (kết nối ẩn danh tới IPC$ thời cổ) là tiền thân khái niệm của anonymous enumeration — vẫn gặp trên hệ cũ.",
+            "RootDSE cho biết meta server (naming context, version) ngay cả với bind thấp — điểm khởi đầu liệt kê chuẩn.",
+            "startTLS/LDAPS (636) bắt buộc khi simple bind — password trên ldap://384 rõ là finding P1."
+          ]
+        },
+        {
+          "title": "Liệt kê Có kỷ luật và Giảm thiểu Bề mặt",
+          "paragraphs": [
+            "Dưới ROE, liệt kê SMB/LDAP trả lời ba câu hỏi: những gì đang expose (shares, spn, users), ai được thấy (mapping quyền bind/ACL), cái nào vượt nhu cầu (finding). Kỹ thuật an toàn: ưu tiên read-only operations, rate thấp, ghi log đầy đủ để tái lập — tránh lockout account (password spray là kỹ thuật cần chấp thuận riêng vì gây lockout hàng loạt).",
+            "Giảm thiểu phía blue team: inventory share định kỳ (xóa share mồ côi), 'Access Enum' style review ACL, tắt anonymous bind + enforce LDAP signing/channel binding qua GPO, giám sát: alert khi có volume query bất thường từ một nguồn (enumeration pattern), log event 4662 (directory access) cho object nhạy cảm. Residual risk: ứng dụng legacy cần anonymous LDAP — phải allowlist có owner, không block mù."
+          ],
+          "points": [
+            "Mỗi share/OU nên có owner ghi danh — không owner = không ai dám xóa = tích tụ rủi ro.",
+            "SPN liệt kê được (setspn -L) tiết lộ dịch vụ chạy dưới account nào — đầu vào cho kerberoasting ở track AD sau này.",
+            "Telemetry LDAP: đếm search per-source; spike từ host không phải app-server là signal."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Enterprise Protocol Desk — Đọc Evidence SMB/LDAP",
+        "objective": "Nhận diện cấu hình SMB/LDAP rủi ro từ output cấu hình mô phỏng, xếp ưu tiên finding và đề xuất remediation kiểm chứng được.",
+        "scenario": "Bạn đánh giá hai server mô phỏng của khách hàng (trong ROE): FILE01 (Windows file server) và DC01 (domain controller chạy LDAP). Bạn được cấp: output policy SMB, danh sách share + ACL, cấu hình bind LDAP và mẫu search result. Toàn bộ là dữ liệu tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ đánh giá trên evidence được cung cấp; không thao tác lên hệ thống thật.",
+          "Mỗi finding phải chỉ ra cấu hình cụ thể vi phạm chuẩn/thực hành nào.",
+          "Remediation phải kèm cách kiểm chứng (probe/log) và đánh giá tác động dịch vụ."
+        ],
+        "cases": [
+          {
+            "id": "ent-case-01",
+            "title": "Policy SMB của FILE01",
+            "context": "Output policy: EnableSMB1Protocol=True; RequireSecuritySignature=False (client-side enabled); Encryption=False; Shares: \\\\FILE01\\HR-Payroll — ACL: Everyone:Read; \\\\FILE01\\Temp — Everyone:Change; \\\\FILE01\\Users$ — ACL chuẩn per-user.",
+            "prompt": "Xếp hạng và remediation đúng nhất cho bộ evidence này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không có vấn đề nghiêm trọng vì HR-Payroll chỉ là Read.",
+                "correct": false,
+                "rationale": "Dữ liệu payroll readable bởi Everyone là vi phạm need-to-know rõ ràng; Read đủ để rò rỉ thông tin nhạy cảm."
+              },
+              {
+                "id": "B",
+                "label": "P1: tắt SMB1 (carrier của EternalBlue-class RCE); P1: HR-Payroll thu hẹp ACL theo nhóm HR; P2: Temp Everyone:Change là bãi rác malware/staging — giới hạn; P2: bật signing required + encryption cho share nhạy cảm; kiểm chứng bằng probe negotiate lại và re-review ACL.",
+                "correct": true,
+                "rationale": "Ưu tiên theo impact: RCE potential (SMB1) và data exposure (payroll) đứng đầu; signing/encryption là chống-relay; mọi item có probe xác minh pass/fail."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần bật firewall chặn cổng 445 là giải quyết tất cả.",
+                "correct": false,
+                "rationale": "Chặn 445 vô hiệu hóa chức năng chia sẻ file hợp lệ của file server; đúng hướng là siết policy/ACL chứ không phủi hết dịch vụ."
+              },
+              {
+                "id": "D",
+                "label": "Users$ ACL chuẩn chứng tỏ admin giỏi, các share khác chắc chắn ổn.",
+                "correct": false,
+                "rationale": "Cấu hình từng share độc lập; một share đúng không suy ra share khác đúng — evidence cho thấy ngược lại."
+              }
+            ]
+          },
+          {
+            "id": "ent-case-02",
+            "title": "Bind LDAP trên DC01",
+            "context": "Cấu hình: ldap://389 cho phép anonymous bind; startTLS available nhưng app legacy vẫn simple-bind qua 389 không TLS; LDAPS 636 bật với cert hợp lệ; test search anonymous trả về danh sách 1.200 user objects kèm email + phone. LDAP signing chưa enforce.",
+            "prompt": "Phân tích rủi ro và trình tự remediation?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Anonymous thấy user list là bình thường của AD, không cần sửa.",
+                "correct": false,
+                "rationale": "AD mặc định hạn chế anonymous; việc expose 1.200 objects kèm PII (email/phone) cho unauthenticated là cấu hình sai, không phải mặc định."
+              },
+              {
+                "id": "B",
+                "label": "P1: simple-bind không TLS = credential trên dây — migrate app sang LDAPS/startTLS có deadline; P1: tắt anonymous bind (kiểm chứng: probe lại phải fail); P2: enforce LDAP signing + channel binding qua GPO với audit-first; telemetry: alert volume search bất thường.",
+                "correct": true,
+                "rationale": "Credential rõ trên dây là mức P1 tuyệt đối; anonymous exposure P1 theo data sensitivity; signing enforcement đi audit-first để không cắt legacy — đúng khuôn mẫu prevent→verify→observe."
+              },
+              {
+                "id": "C",
+                "label": "Đổi port LDAP sang số lạ để giấu dịch vụ.",
+                "correct": false,
+                "rationale": "Security through obscurity: scan phát hiện tức thì; không giải quyết được anonymous bind hay plaintext credential."
+              },
+              {
+                "id": "D",
+                "label": "Block toàn bộ LDAP cho mọi app để an toàn tuyệt đối.",
+                "correct": false,
+                "rationale": "LDAP là hạ tầng vận hành cốt lõi (auth, address book); block mù gây sự cố hàng loạt — cần inventory app rồi chuyển đổi có kiểm soát."
+              }
+            ]
+          },
+          {
+            "id": "ent-case-03",
+            "title": "Liệt kê trong ROE: giới hạn ở đâu?",
+            "context": "ROE cho phép 'liệt kê SMB/LDAP read-only trên dải 10.40.0.0/24'. Trong quá trình làm, bạn thấy: (a) một share \\\\FS01\\Backup$ world-readable chứa file backup DB; (b) password spray có thể thử được vì không có lockout policy — bạn cân nhắc thử 50 mật khẩu phổ biến; (c) log cho thấy có traffic LDAP tới 10.99.0.5 — IP ngoài ROE.",
+            "prompt": "Quyết định đúng cho từng tình huống?",
+            "options": [
+              {
+                "id": "A",
+                "label": "(a) Ghi finding P1; (b) thử spray vì không có lockout nghĩa là được phép; (c) tiếp tục vì traffic tự chạm tới.",
+                "correct": false,
+                "rationale": "(b) spray gây lockout/risk thực dù policy thiếu — cần chấp thuận riêng; (c) IP ngoài ROE thì dừng, khả năng tiếp cận không bằng ủy quyền."
+              },
+              {
+                "id": "B",
+                "label": "(a) Finding P1 có bằng chứng metadata tối thiểu (không tải nội dung backup); (b) KHÔNG spray — đề xuất trong report như 'risk confirmed by config', yêu cầu ủy quyền riêng nếu muốn test active; (c) dừng, ghi nhận out-of-scope contact, báo cáo điều phối.",
+                "correct": true,
+                "rationale": "Read-only enumeration đúng ROE; active credential attack vượt phạm vi 'read-only'; out-of-scope xử lý stop-and-report như bài l05 — ba quyết định đều theo evidence contract và ủy quyền."
+              },
+              {
+                "id": "C",
+                "label": "(a) Tải nguyên backup về làm bằng chứng đầy đủ.",
+                "correct": false,
+                "rationale": "Tải DB backup (có thể chứa PII hàng loạt) vượt needs-to-prove; bằng chứng metadata (tên file, size, quyền) là đủ và đạo đức hơn."
+              },
+              {
+                "id": "D",
+                "label": "(c) Ping 10.99.0.5 một lần để xác nhận sống rồi thôi.",
+                "correct": false,
+                "rationale": "Mọi packet chủ động tới ngoài ROE đều là vi phạm — kể cả một ping; bằng chứng traffic trong log đã đủ để báo cáo."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Map cấu hình sai SMB/LDAP về chuẩn/thực hành (MS-SMB2, RFC 4511, hardening guide).",
+          "Xếp ưu tiên finding theo impact + kèm probe kiểm chứng remediation.",
+          "Phân biệt rõ thao tác nằm trong/ngoài ủy quyền khi liệt kê."
+        ],
+        "evidenceTemplate": [
+          "Bảng finding: evidence → tiêu chí vi phạm → severity → remediation → probe",
+          "So sánh policy hiện tại vs baseline hardening",
+          "Danh sách share/bind với owner + quyền tối thiểu đề xuất",
+          "Ghi nhận out-of-scope kèm bằng chứng log"
+        ],
+        "reset": "Đặt lại lựa chọn để đánh giá lại hai server từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt, không kết nối tới hệ thống thật."
+      },
+      "governance": {
+        "prevent": [
+          "SMB: signing required + encryption cho share nhạy cảm, SMB1 tắt tuyệt đối, inventory share định kỳ có owner.",
+          "LDAP: tắt anonymous bind, enforce LDAP signing/channel binding (audit-first), bắt buộc LDAPS cho simple bind.",
+          "Thu hẹp ACL theo need-to-know; review quyền 'user thường nhìn được gì' như thiết kế chủ đích."
+        ],
+        "observe": [
+          "Alert volume search LDAP per-source vượt baseline; event 4662 cho object nhạy cảm.",
+          "Log negotiate SMB xuống dialect thấp/signing-off; monitor share ACL drift bằng scheduled review."
+        ],
+        "respond": [
+          "Phát hiện enumeration pattern: xác minh nguồn (app hợp lệ vs host lạ), cô lập nếu nghi ngờ, rà ACL object liên quan.",
+          "Share lộ dữ liệu nhạy cảm: thu hẹp ACL ngay, truy vết access log, đánh giá breach scope."
+        ],
+        "residualRisk": [
+          "App legacy buộc giữ anonymous/NTLM — allowlist có owner vẫn là cửa hẹp tồn tại.",
+          "Liệt kê authenticated là tính năng cần cho ứng dụng — không thể zero hóa, chỉ quản trị."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "SMB signing bật phía client là đủ chống relay.",
+          "correction": "Signing phải được REQUIRE phía server (và client hỗ trợ) — nếu server chỉ 'enabled' mà không 'required', attacker downgrade được thành unsigned."
+        },
+        {
+          "claim": "Anonymous LDAP vô hại vì chỉ đọc tên người.",
+          "correction": "User list + thuộc tính (email, phone, department, memberOf) là nguyên liệu recon trực tiếp cho phishing và targeting; exposure phải tỉ lệ thuận với nhu cầu ứng dụng thật."
+        },
+        {
+          "claim": "Share chỉ đọc (Read) không phải rủi ro dữ liệu.",
+          "correction": "Read đủ để exfiltrate; payroll/danh sách lương readable-by-everyone là breach bảo mật dữ liệu, không phụ thuộc write permission."
+        },
+        {
+          "claim": "Password spray không cần ủy quyền riêng vì nó chỉ 'đăng nhập thử'.",
+          "correction": "Spray tạo lockout hàng loạt và log đăng nhập thất bại — ảnh hưởng vận hành thật; ROE read-only không bao gồm active credential attack."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l10-q1",
+          "difficulty": "easy",
+          "question": "Ba bước chính của một phiên SMB2 theo thứ tự là gì?",
+          "options": [
+            { "id": "A", "label": "Discover – Offer – Request" },
+            { "id": "B", "label": "Negotiate → Session Setup → Tree Connect" },
+            { "id": "C", "label": "SYN → SYN/ACK → ACK" },
+            { "id": "D", "label": "Bind – Search – Unbind" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Hai bên thương lượng dialect/capability (Negotiate), xác thực phiên (Session Setup), rồi gắn vào share cụ thể (Tree Connect). Bind–Search là của LDAP."
+        },
+        {
+          "id": "os01-l10-q2",
+          "difficulty": "medium",
+          "question": "Tại sao SMB signing 'required' mới chống được relay, còn 'enabled' thì chưa?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì enabled chỉ dành cho server, required mới dành cho client"
+            },
+            {
+              "id": "B",
+              "label": "Vì khi chỉ enabled, attacker downgrade được thương lượng thành không-signing; required khiến phản hồi không ký bị từ chối tuyệt đối"
+            },
+            {
+              "id": "C",
+              "label": "Vì required mã hóa payload còn enabled chỉ kiểm tra checksum"
+            },
+            { "id": "D", "label": "Vì required tăng tốc độ handshake" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Relay tấn công diễn ra lúc thương lượng: nếu server không BẮT BUỘC signing, kẻ on-path ép phiên xuống unsigned rồi chuyển tiếp auth. Required loại bỏ nhánh downgrade."
+        },
+        {
+          "id": "os01-l10-q3",
+          "difficulty": "hard",
+          "question": "App legacy vẫn simple-bind tới ldap://389 không TLS. Team đề xuất: (1) block ngay cổng 389 toàn công ty; (2) migrate app sang LDAPS có deadline, trong lúc chờ bật monitoring credential-on-wire; (3) giữ nguyên vì 'mạng nội bộ an toàn'. Đánh giá đúng?",
+          "options": [
+            { "id": "A", "label": "(1) tốt nhất — an toàn tuyệt đối trước đã" },
+            {
+              "id": "B",
+              "label": "(2) đúng khuôn mẫu: credential rõ trên dây là P1 nhưng block mù cắt dịch vụ; migration có deadline + monitoring tạm thời + audit app inventory là con đường vừa an toàn vừa khả thi"
+            },
+            { "id": "C", "label": "(3) đúng — mạng nội bộ không có kẻ xấu" },
+            { "id": "D", "label": "Cả ba đều sai, không có phương án đúng" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Plaintext credential là finding thật (P1) nhưng remediation phải khả thi: inventory app → migrate → enforce. (1) gây outage hàng loạt; (3) phủ nhận threat model đã chứng minh (on-path trong segment là khả thi — bài l04/l05)."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn chuyển sang đánh giá một môi trường hybrid mô phỏng: file server Linux dùng Samba tham gia domain Windows, cùng một DC LDAP. Samba export hai share cho team kỹ thuật; policy signing của Samba cấu hình thủ công khác với GPO của Windows.",
+        "tasks": [
+          "Thiết kế checklist audit SMB nhất quán cho cả Windows và Samba (signing/encryption/SMB1) — chỉ ra chỗ hai nền tảng dễ lệch nhau.",
+          "Đề xuất ma trận quyền LDAP tối thiểu cho ba lớp đối tượng: app service account, user thường, admin.",
+          "Viết runbook phản ứng khi phát hiện enumeration bất thường trên LDAP, phân biệt app spike và recon thật."
+        ],
+        "requiredEvidence": [
+          "Checklist audit đa nền tảng có cột 'điểm lệch dễ xảy ra'",
+          "Ma trận quyền bind/search theo lớp đối tượng",
+          "Runbook với ngưỡng cảnh báo và decision tree phân loại nguồn"
+        ]
+      },
+      "sources": [
+        {
+          "title": "MS-SMB2 — Server Message Block (SMB) Protocol Version 2 and 3 Specification",
+          "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/",
+          "publisher": "Microsoft Open Specifications",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Luồng Negotiate/Session Setup/Tree Connect của SMB2/3",
+            "Semantics của signing và encryption capability"
+          ]
+        },
+        {
+          "title": "RFC 4511 — Lightweight Directory Access Protocol (LDAP): The Protocol",
+          "url": "https://www.rfc-editor.org/rfc/rfc4511",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Các kiểu bind (anonymous, simple, SASL) và mô hình search",
+            "Cấu trúc DN/entry/attribute của thư mục"
+          ]
+        },
+        {
+          "title": "Microsoft — Securing Active Directory Domain Services (LDAP signing & channel binding guidance)",
+          "url": "https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/enable-ldap-signing-in-windows-server",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Khuyến nghị enforce LDAP signing và channel binding",
+            "Tác động tới client legacy và cách audit trước khi block"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os01-l11-packet-capture-methodology",
+      "slug": "packet-capture-methodology",
+      "title": "Bắt & Phân tích Gói tin: Phương pháp Có kỷ luật",
+      "summary": "Nguyên lý capture (capture point, filter BPF, ring buffer); đọc luồng TCP/UDP từ pcap mô phỏng; ranh giới pháp lý và quyền riêng tư khi capture; chuyển capture thành finding có bằng chứng.",
+      "difficulty": "beginner",
+      "durationMinutes": 80,
+      "prerequisites": ["os01-l10-smb-ldap-enterprise-protocols"],
+      "outcomes": [
+        "Lựa chọn capture point phù hợp mục tiêu phân tích và giải thích tại sao cùng một phiên nhìn khác nhau từ hai vị trí bắt khác nhau.",
+        "Viết bộ lọc BPF cơ bản (host/port/net) để thu hẹp nhiễu và giải thích chi phí của việc capture không lọc.",
+        "Đọc summary của một pcap mô phỏng: nhận diện handshake, phiên DNS, cảnh báo plaintext credential và suy luận timeline sự kiện.",
+        "Thực hành capture trong phạm vi ủy quyền: phân đoạn được phép, xử lý dữ liệu PII bắt được, và lưu trữ evidence an toàn."
+      ],
+      "careerPaths": ["penetration-test", "red-team"],
+      "domains": ["network"],
+      "attackTactics": [],
+      "keywords": ["pcap", "capture-filter", "bpf", "wireshark", "evidence-handling"],
+      "safetyLevel": "safe",
+      "mentalModel": "Capture là đặt camera ghi lại đường phố: vị trí camera quyết định nhìn thấy gì (đầu ngõ thấy xe ra vào, ngã tư thấy cả hướng rẽ), filter là khung hình chỉ quay đúng làn cần, còn buffer là băng ghi — băng đầy thì ghi đè mất chứng cứ. Ba quyết định nghề nghiệp: ĐÂU đặt camera (capture point), QUAY AI (filter), GIỮ BĂNG THẾ NÀO (storage/PII). Capture không phép là nghe lén — kể cả trên mạng 'của công ty', phân đoạn VOIP/phần nhân sự có luật riêng; vì vậy capture luôn bắt đầu từ giấy phép (ROE) chứ không bắt đầu từ phần mềm.",
+      "visual": {
+        "title": "Chuỗi Capture: Từ Camera tới Hồ sơ",
+        "caption": "Packet đi qua filter → ring buffer → phân tích → evidence; mỗi bước có quyết định pháp lý và kỹ thuật riêng.",
+        "steps": [
+          {
+            "label": "Capture point",
+            "detail": "SPAN/mirror trên switch, tap vật lý, hay local interface — mỗi vị trí thấy một lát cắt khác nhau của cùng phiên (liên hệ asymmetric l05).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Capture filter (BPF)",
+            "detail": "Lọc ở tầng kernel trước khi ghi: 'host 10.20.8.141 and port 443' — tiết kiệm disk/CPU, giảm PII bắt nhầm.",
+            "tone": "allow"
+          },
+          {
+            "label": "Ring buffer + snapshot",
+            "detail": "Giới hạn kích thước file/tổng dung lượng; snapshot length cắt payload — cân bằng chứng cứ và dữ liệu thừa.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Phát hiện plaintext",
+            "detail": "HTTP basic auth, FTP, telnet, LDAP simple-bind lộ credential trong payload — khi bắt được phải xử lý như dữ liệu nhạy cảm NGAY.",
+            "tone": "stop"
+          },
+          {
+            "label": "Evidence hóa",
+            "detail": "Ghi metadata (thời gian, vị trí, filter, người thực hiện), hash file pcap, lưu kho hạn chế — phục vụ tái lập và pháp lý.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Capture Point: Vị trí Quyết định Sự thật",
+          "paragraphs": [
+            "Cùng một phiên HTTPS, capture trên máy client thấy handshake + encrypted payload; capture trên switch trunk thấy cả VLAN tag và traffic của nhiều host; capture sau NAT (bài l05) thấy địa chỉ đã dịch. Không có 'bản capture đúng duy nhất' — chỉ có lát cắt phù hợp câu hỏi. Trước khi bắt, trả lời: mình cần trả lời câu hỏi gì, lát cắt nào chứa câu trả lời?",
+            "Kỹ thuật đặt điểm bắt: SPAN/mirror port trên switch (linh hoạt, có thể oversubscribe khi bão hòa), network TAP vật lý (thấy cả lỗi physical, không ảnh hưởng switch), hay đơn giản là local interface trên host bị nghi ngờ. Với chẩn đoán asymmetric routing, bắt HAI đầu rồi so sánh là phương pháp chuẩn — khác biệt giữa hai capture chính là câu chuyện."
+          ],
+          "points": [
+            "Switch không broadcast unicast — cắm wireshark vào port thường chỉ thấy broadcast + traffic của chính mình (đó là tính năng, không phải lỗi).",
+            "SPAN bão hòa làm drop packet im lặng — metric quan trọng khi làm bằng chứng.",
+            "Timestamp đồng bộ (NTP) giữa các capture point là điều kiện để ghép timeline."
+          ]
+        },
+        {
+          "title": "Filter: Thu hẹp Trước Khi Ghi",
+          "paragraphs": [
+            "Capture filter (BPF/tcpdump) lọc ở tầng kernel: 'host 10.20.8.141', 'net 10.20.8.0/24 and port 53', 'tcp[tcpflags] & (tcp-syn|tcp-ack) == tcp-syn and not tcp-ack' (chỉ SYN thuần — hữu ích đo flood). Display filter trong wireshark lọc sau khi đã ghi — mạnh hơn nhưng không tiết kiệm disk.",
+            "Chi phí của capture không lọc: 1Gbps đầy ≈ ~500GB/giờ — đầy disk trong giờ làm việc, ghi đè evidence cũ, và kéo theo PII của cả công ty vào một file. Nguyên tắc: lọc hẹp nhất mà vẫn trả lời được câu hỏi; snapshot-len cắt payload khi chỉ cần header (vd chỉ cần TCP flags để đo flood)."
+          ],
+          "points": [
+            "'not port 22' tránh ghi chính phiên SSH của bạn — vừa giảm nhiễu vừa không tự ghi credential của mình.",
+            "Display filter mạnh về ngữ nghĩa (http.request, dns.qry.name contains...) — dùng sau khi đã ghi hẹp.",
+            "Ring buffer nhiều file (files N, filesize M) giữ window thời gian dài hơn mà không đầy disk."
+          ]
+        },
+        {
+          "title": "Đọc Pcap: Từ Bytes tới Câu chuyện",
+          "paragraphs": [
+            "Quy trình đọc một capture: (1) tổng quan protocol hierarchy — cái gì chiếm nhiều bất thường; (2) conversations — ai nói chuyện nhiều nhất; (3) zoom vào phiên nghi vấn: handshake đầy đủ? RST từ ai? retransmit pattern nào?; (4) payload nơi được phép nhìn: DNS queries (rõ), HTTP headers (rõ), TLS chỉ thấy SNI + cert — nội dung mã hóa (liên hệ l09).",
+            "Những phát hiện giá trị cao trong capture doanh nghiệp: credential plaintext (FTP/telnet/HTTP-basic/LDAP-simple) — đây vừa là finding P1 vừa là dữ liệu phải xử lý khẩn; beacon pattern (khoảng cách đều, size nhỏ đều — C2 heartbeat); data exfil (upload lớn bất thường tới destination lạ). Mỗi phát hiện phải gắn timestamp + frame number trong file gốc để tái lập được."
+          ],
+          "points": [
+            "Follow stream (tcp stream index) là cách nhanh nhất đọc một phiên trọn vẹn.",
+            "Expert info của wireshark gom anomaly (retransmit, zero window, checksum lỗi) — điểm khởi đầu tốt nhưng đừng tin mù.",
+            "DNS là 'log miễn phí': mọi truy vấn lộ intent của host — đọc DNS trước khi đọc anything else."
+          ]
+        },
+        {
+          "title": "Pháp lý, Riêng tư và Evidence Handling",
+          "paragraphs": [
+            "Capture là thu thập dữ liệu cá nhân: email content, chat, credential, hành vi nhân viên có thể lọt vào băng ghi. Phạm vi pháp lý đến từ ROE + chính sách dữ liệu: phân đoạn nào được bắt, ai được đọc, giữ bao lâu, khi nào xóa. Capture ngoài phạm vi — dù kỹ thuật dễ dàng — là vi phạm giống truy cập ngoài scope (bài l05/l10): dừng và báo cáo.",
+            "Evidence handling chuẩn: ghi chú bối cảnh (ai, khi nào, ở đâu, filter gì) TRƯỚC khi quên; hash file (SHA-256) để chứng minh không bị sửa; lưu kho truy cập hạn chế; khi chia sẻ, lọc/redact PII hoặc cắt chỉ phần liên quan (editcap concept). Một finding kèm pcap có hash + context đáng tin gấp mười finding 'tôi thấy trên wireshark'."
+          ],
+          "points": [
+            "Chain of custody của pcap y hệt bài os00-l07 (evidence collection) — áp dụng nguyên tắc đó xuống tầng packet.",
+            "Credential bắt được trong capture: đổi ngay sau khi dùng làm bằng chứng, không lưu trong report dạng rõ.",
+            "Retention ngắn mặc định; gia hạn chỉ khi vụ việc đang điều tra."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Packet Desk — Đọc Capture và Ra Finding",
+        "objective": "Chọn capture point/filter phù hợp, đọc summary pcap mô phỏng để phát hiện plaintext credential và beacon pattern, xử lý evidence đúng quy trình.",
+        "scenario": "Bạn hỗ trợ đội SOC phân tích hai tình huống trên mạng văn phòng mô phỏng: (A) nghi ngờ một host bị nhiễm; (B) kiểm chứng khiếu nại 'ứng dụng gửi mật khẩu dạng rõ'. Bạn được cung cấp: summary pcap tĩnh, bảng conversation, và đoạn follow-stream đã redact một phần. Toàn bộ trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ summary/pcap mô phỏng được cấp; không bắt gói thật.",
+          "Mọi phát hiện phải trích được frame number/timestamp từ evidence.",
+          "Credential xuất hiện trong evidence phải được xử lý theo quy trình dữ liệu nhạy cảm."
+        ],
+        "cases": [
+          {
+            "id": "pcap-case-01",
+            "title": "Host 10.20.8.141 quay lại — lần này có capture",
+            "context": "Summary: host 10.20.8.141 mỗi 60 giây gửi DNS query tới 'a7f3.tunnel-update.example' (nhớ lại case l07), sau đó mở TCP tới 198.51.100.23:443, gửi ~120 bytes mỗi lần, nhận ~2KB, đóng sạch FIN. Các phiên khác của host là traffic web bình thường. Firewall cho phép outbound 443 tới mọi nơi.",
+            "prompt": "Đọc đúng pattern và bước tiếp theo là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Traffic 443 mã hóa nên không thể làm gì thêm, đóng vụ.",
+                "correct": false,
+                "rationale": "Metadata vẫn kể chuyện: chu kỳ 60s đều đặn, size nhỏ cố định, destination duy nhất, kèm DNS tunneling pattern đã biết — đủ để xếp nghi vấn C2 cao."
+              },
+              {
+                "id": "B",
+                "label": "Beacon signature rõ (chu kỳ + size đều + dest cố định + DNS pattern khớp vụ l07): cô lập host, block domain/IP có bằng chứng, điều tra endpoint tiến trình nguồn; capture point tiếp theo nên là SPAN lên gateway để xác nhận không host nào khác nói chuyện với dest đó.",
+                "correct": true,
+                "rationale": "Kết hợp DNS pattern (l07) + beacon timing + fixed peer = evidence đủ mạnh để chứa và điều tra; mở rộng capture có mục tiêu trả lời câu hỏi 'phạm vi ảnh hưởng'."
+              },
+              {
+                "id": "C",
+                "label": "Block ngay toàn bộ outbound 443 của công ty để an toàn.",
+                "correct": false,
+                "rationale": "Chặn Internet cho cả tổ chức vì một host là phản ứng quá tay; containment đúng scope là host-level trước."
+              },
+              {
+                "id": "D",
+                "label": "Chờ thêm 24h dữ liệu nữa mới hành động để chắc chắn.",
+                "correct": false,
+                "rationale": "Evidence đã hội tụ nhiều tín hiệu độc lập (DNS + timing + sizing + dest); chờ là cho C2 thêm một ngày hoạt động."
+              }
+            ]
+          },
+          {
+            "id": "pcap-case-02",
+            "title": "Khiếu nại 'app gửi mật khẩu dạng rõ'",
+            "context": "Follow-stream (đã redact): POST http://legacy-app.internal/login body 'user=tnam&pass=Welc0me2026!'; response 302 → dashboard. App chạy trên VLAN nội bộ, không qua TLS. Người quản lý nói: 'nội bộ mà, không sao'. Bạn cũng thấy trong cùng capture có 3 credential của user khác đi qua cùng giao thức.",
+            "prompt": "Đánh giá và xử lý đúng nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Quản lý đúng — VLAN nội bộ khó bị nghe lén, ghi nhận low risk.",
+                "correct": false,
+                "rationale": "Bài l04 đã chứng minh on-path trong segment là khả năng thực tế (ARP poisoning); plaintext credential là P1 bất kể 'nội bộ'."
+              },
+              {
+                "id": "B",
+                "label": "Finding P1 có bằng chứng frame cụ thể; xử lý kép: (1) remediation bắt buộc TLS cho app (deadline + verify probe), (2) evidence hygiene — password bắt được phải báo cho owner đổi NGAY, redact khỏi report, hash pcap; đồng thời đánh giá phạm vi: 3 credential khác nghĩa là mọi user của app đều exposed.",
+                "correct": true,
+                "rationale": "Evidence-first: chỉ ra frame, xếp P1 đúng chuẩn (credential transmission cleartext); dual duty của pentester — vừa báo cáo vừa bảo vệ người bị ảnh hưởng (rotate + redact). Đây là chuẩn nghề nghiệp."
+              },
+              {
+                "id": "C",
+                "label": "Lưu password vào report để minh chứng rõ ràng nhất.",
+                "correct": false,
+                "rationale": "Report lan truyền credential — biến một finding kỹ thuật thành rò rỉ dữ liệu thứ cấp; redact + hash là chuẩn."
+              },
+              {
+                "id": "D",
+                "label": "Dùng luôn password bắt được đăng nhập thử các hệ thống khác của user đó.",
+                "correct": false,
+                "rationale": "Password reuse testing cần ủy quyền rõ ràng riêng; dùng credential bắt được để truy cập ngoài phạm vi là vi phạm nặng."
+              }
+            ]
+          },
+          {
+            "id": "pcap-case-03",
+            "title": "Chọn điểm bắt cho câu hỏi đúng",
+            "context": "BA câu hỏi cần capture: (1) host X có nói chuyện với server Y không (yes/no); (2) tại sao phiên client↔server đôi lúc đứt giữa chừng (nghi asymmetric/NAT); (3) nhân viên A có truy cập site cấm trong giờ làm việc không (yêu cầu từ HR có phê duyệt).",
+            "prompt": "Ghép từng câu hỏi với chiến lược capture đúng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cả ba: capture trên laptop của người phân tích, không filter, ghi 8 tiếng.",
+                "correct": false,
+                "rationale": "Local interface của người phân tích không thấy traffic của host X/A; không filter 8 tiếng = 4TB+ dữ liệu PII vô nghĩa."
+              },
+              {
+                "id": "B",
+                "label": "(1) SPAN trunk hoặc capture trên gateway — thấy cả hai chiều flow; (2) bắt SONG SONG hai đầu (client-side + server-side, NTP đồng bộ) rồi diff — khác biệt lộ NAT/asymmetric; (3) capture có filter host=A trên phân đoạn được phê duyệt, retention ngắn, chỉ HR-requested fields — đúng pháp lý.",
+                "correct": true,
+                "rationale": "Mỗi câu hỏi cần lát cắt khác nhau; câu (2) là ứng dụng trực tiếp bài học asymmetric l05; câu (3) cho thấy capture giám sát nhân viên cần phê duyệt + minimize — pháp lý đi trước kỹ thuật."
+              },
+              {
+                "id": "C",
+                "label": "(2) chỉ cần capture ở server là đủ kết luận đứt vì đâu.",
+                "correct": false,
+                "rationale": "Asymmetric/NAT loss thường CHỈ thấy ở một bên; single-point capture không giải thích được 'đứt giữa chừng' — cần two-ended comparison."
+              },
+              {
+                "id": "D",
+                "label": "(3) capture toàn VLAN 30 ngày để chắc không sót.",
+                "correct": false,
+                "rationale": "Over-collection vi phạm minimize principle, rủi ro pháp lý và lưu trữ; scope phải khớp phê duyệt HR đã cấp."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Ghép đúng capture point/filter với từng loại câu hỏi phân tích.",
+          "Nhận diện beacon/plaintext-credential từ summary và trích được timestamp/frame làm bằng chứng.",
+          "Áp dụng evidence hygiene: hash, redact, rotate, retention đúng quy trình."
+        ],
+        "evidenceTemplate": [
+          "Bảng pattern: timestamp/frame, src/dst, signature nhận diện",
+          "Timeline beacon so sánh với baseline host",
+          "Biên bản xử lý credential (owner, rotate, redact)",
+          "Checklist capture plan: point, filter, buffer, retention, phê duyệt"
+        ],
+        "reset": "Đặt lại lựa chọn để phân tích lại các tình huống capture từ đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt; không capture hay lưu dữ liệu thật."
+      },
+      "governance": {
+        "prevent": [
+          "Chính sách capture: ai được bắt ở đâu, phê duyệt thế nào, retention mặc định ngắn.",
+          "Ép TLS mọi nơi có thể — giảm lượng credential có thể lộ qua capture (phòng thủ kép với l09).",
+          "Template capture-plan bắt buộc trước mỗi chiến dịch: point/filter/buffer/PII plan."
+        ],
+        "observe": [
+          "NIDS/NDR giám sát beacon pattern (chu kỳ, size entropy) và plaintext protocol usage trên mạng.",
+          "Alert khi có capture tool chạy ngoài danh sách được phép trên endpoint."
+        ],
+        "respond": [
+          "Bắt được credential plaintext: rotate ngay, thông báo owner, redact mọi bản sao evidence.",
+          "Xác nhận beacon/C2: contain host, block IOCs có bằng chứng, mở rộng capture có mục tiêu xác định blast radius."
+        ],
+        "residualRisk": [
+          "Encrypted traffic hạn chế visibility — phải dựa metadata/JA3-style fingerprint, độ chính xác có hạn.",
+          "Capture tool song song với malware có thể bị lợi dụng nếu endpoint đã compromised."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Cắm wireshark vào switch là thấy traffic của mọi người.",
+          "correction": "Switch chuyển tiếp unicast theo bảng MAC — port thường chỉ thấy broadcast/multicast + traffic của chính nó; muốn thấy traffic người khác cần SPAN/TAP (và quyền)."
+        },
+        {
+          "claim": "Traffic HTTPS không thể phân tích nên vô dụng capture.",
+          "correction": "Payload mã hóa nhưng metadata rất giàu: who-talks-to-whom, timing, size, SNI, cert chain — đủ cho beacon detection và nhiều chẩn đoán (như case 1)."
+        },
+        {
+          "claim": "Capture trên mạng công ty là việc kỹ thuật, không cần giấy phép riêng.",
+          "correction": "Capture thu thập dữ liệu cá nhân và credential — luôn cần căn cứ (ROE/chính sách/phê duyệt HR cho monitoring nhân viên); phạm vi bắt đầu từ giấy phép, không từ tool."
+        },
+        {
+          "claim": "File pcap to là bằng chứng tốt.",
+          "correction": "Bằng chứng tốt là pcap CÓ KIỂM SOÁT: filter hẹp, metadata bối cảnh, hash, retention rõ. 4TB không filter là nợ PII chứ không phải kho chứng cứ."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l11-q1",
+          "difficulty": "easy",
+          "question": "Capture filter (BPF) khác display filter của wireshark ở điểm nào?",
+          "options": [
+            { "id": "A", "label": "BPF lọc sau khi ghi, display filter lọc trước" },
+            {
+              "id": "B",
+              "label": "BPF lọc ở kernel TRƯỚC khi ghi (tiết kiệm disk/CPU), display filter lọc trên dữ liệu đã ghi"
+            },
+            { "id": "C", "label": "BPF chỉ dùng cho UDP, display filter cho TCP" },
+            { "id": "D", "label": "Không khác gì nhau, chỉ là cú pháp khác" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Capture filter giảm lượng dữ liệu ghi xuống ngay từ đầu; display filter linh hoạt hơn về ngữ nghĩa nhưng không cứu được disk đã đầy."
+        },
+        {
+          "id": "os01-l11-q2",
+          "difficulty": "medium",
+          "question": "Bạn cần chẩn đoán 'phiên đôi lúc đứt giữa chừng' nghi do asymmetric/NAT. Chiến lược capture đúng?",
+          "options": [
+            { "id": "A", "label": "Capture ở server 24h rồi đọc chậm" },
+            {
+              "id": "B",
+              "label": "Bắt đồng thời HAI đầu (client + server) có NTP đồng bộ, filter hẹp cho phiên đó, rồi so sánh — phía nào gửi RST/retransmit lệch sẽ lộ đường đi bất đối xứng hoặc timeout trạng thái"
+            },
+            { "id": "C", "label": "Chỉ cần ping liên tục là đủ chẩn đoán" },
+            { "id": "D", "label": "Restart router rồi xem có hết không" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Bài học l05: mỗi điểm nhìn thấy một lát cắt; so sánh hai đầu với timestamp đồng bộ là cách duy nhất xác định packet bị drop/hủy ở đâu trên đường."
+        },
+        {
+          "id": "os01-l11-q3",
+          "difficulty": "hard",
+          "question": "Trong capture được ủy quyền, bạn phát hiện credential plaintext của 15 user. Hành động SET đúng theo evidence contract là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Đăng full password vào report để minh chứng; giữ pcap nguyên vẹn không đụng tới"
+            },
+            {
+              "id": "B",
+              "label": "Ghi finding với frame reference; thông báo rotate credential cho 15 owner NGAY; redact password trong mọi bản sao report; hash + khóa pcap gốc theo chain-of-custody; đề xuất remediation TLS bắt buộc"
+            },
+            {
+              "id": "C",
+              "label": "Thử password trên các dịch vụ khác để đo mức độ nguy hiểm"
+            },
+            { "id": "D", "label": "Xóa luôn pcap để không ai lấy được password" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Bộ hành động cân bằng ba nghĩa vụ: chứng minh finding (frame ref + hash), bảo vệ nạn nhân (rotate + redact), giữ pháp lý (chain of custody). Xóa evidence (D) phá pháp lý; lan truyền password (A) và reuse test (C) vi phạm phạm vi."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được giao xây dựng năng lực capture cho một phòng SOC mô phỏng: ba vị trí cần phủ — access switch tầng 2 (traffic user), DMZ (traffic public services), và VPN concentrator (remote workers). Yêu cầu pháp lý: không ghi nội dung email/chat của nhân viên; dữ liệu VN phải lưu trong nước.",
+        "tasks": [
+          "Thiết kế kiến trúc capture ba vùng: chọn point (SPAN/TAP), filter mặc định, ring-buffer sizing theo băng thông từng vùng.",
+          "Viết policy PII handling: loại traffic nào được ghi payload, loại nào chỉ header, quy trình redact/xóa.",
+          "Đề xuất 5 analytic chạy trên capture feed (beacon, plaintext cred, scan, exfil, DNS anomaly) kèm ngưỡng khởi đầu."
+        ],
+        "requiredEvidence": [
+          "Sơ đồ kiến trúc 3 vùng với thông số buffer/bandwidth",
+          "Ma trận payload-vs-header theo loại traffic + căn cứ pháp lý",
+          "5 analytic với ngưỡng và nguồn dữ liệu tương ứng"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Wireshark User's Guide — Capture Filters, Ring Buffers, Expert Information",
+          "url": "https://www.wireshark.org/docs/",
+          "publisher": "Wireshark Foundation",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cú pháp capture/display filter và khác biệt ứng dụng",
+            "Ring buffer, snapshot length và expert info workflow"
+          ]
+        },
+        {
+          "title": "tcpdump & libpcap — Official Documentation (BPF filter syntax)",
+          "url": "https://www.tcpdump.org/manpages/",
+          "publisher": "The Tcpdump Group",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cú pháp BPF primitive (host/net/port/flags)",
+            "Hành vi snapshot length và file rotation"
+          ]
+        },
+        {
+          "title": "NIST SP 800-115 — Technical Guide to Information Security Testing and Assessment",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-115/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Khung ủy quyền và quy trình thu thập evidence trong security testing",
+            "Nguyên tắc minimization và xử lý dữ liệu nhạy cảm khi kiểm thử"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os01-l12-topology-reasoning-from-evidence",
+      "slug": "topology-reasoning-from-evidence",
+      "title": "Suy luận Topology: Dựng Bản đồ Mạng từ Bằng chứng",
+      "summary": "Kết hợp ARP table, routing table, TTL, DNS và traceroute để dựng sơ đồ mạng; chiến lược khám phá thụ động-tích cực theo thứ tự xâm nhập tăng dần; tài liệu hóa attack surface dưới ROE.",
+      "difficulty": "beginner",
+      "durationMinutes": 80,
+      "prerequisites": ["os01-l11-packet-capture-methodology"],
+      "outcomes": [
+        "Trích xuất thông tin topology từ các nguồn thụ động: ARP cache (neighbors cùng segment), routing table (gateway/vlan kế tiếp), DNS zone hints, TTL fingerprint.",
+        "Suy luận số hop và hệ điều hành ước lượng từ giá trị TTL trong capture, hiểu giới hạn độ tin cậy của suy luận này.",
+        "Thiết kế trình tự khám phá theo mức xâm nhập tăng dần (passive → arp/ping sweep → targeted scan) với điểm dừng khi chạm biên scope.",
+        "Tài liệu hóa sơ đồ mạng + attack surface thành artifact có thể review, mỗi cạnh/knot đều truy vết được về bằng chứng."
+      ],
+      "careerPaths": ["penetration-test", "red-team"],
+      "domains": ["network"],
+      "attackTactics": ["TA0043", "TA0007"],
+      "keywords": [
+        "arp-cache",
+        "ttl-fingerprint",
+        "traceroute",
+        "network-mapping",
+        "attack-surface"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Dựng bản đồ mạng giống khảo sát hang động trong bóng tối: mỗi công cụ là một nguồn ánh sáng yếu — ARP cache cho biết 'hàng xóm phòng này là ai', routing table cho biết 'cửa ra tiếp theo ở đâu', TTL cho biết 'đã đi qua mấy cánh cửa', traceroute vẽ đường đi từng chặng. Nghề nghiệp không nằm ở bật đèn sáng nhất (scan ầm ầm), mà ở thứ tự bật: ánh sáng thụ động trước (đọc những gì hệ thống TỰ nói), ánh sáng chủ động có kiểm soát sau, và ghi lại mỗi bước để bản đồ truy vết được về bằng chứng — bản đồ không truy vết được là tiểu thuyết.",
+      "visual": {
+        "title": "Từ Cache tới Bản đồ: Nguồn Ánh sáng Tăng dần",
+        "caption": "Mỗi nguồn evidence tiết lộ một lớp topology; thứ tự khai thác quyết định độ ồn và độ phủ.",
+        "steps": [
+          {
+            "label": "ARP cache của host",
+            "detail": "Danh sách neighbor cùng segment mà host TỰ học — bản đồ tầng 2 miễn phí, im lặng tuyệt đối.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Routing table + interface",
+            "detail": "Cho biết subnet nào nối đâu, gateway kế tiếp là ai — khung xương tầng 3.",
+            "tone": "neutral"
+          },
+          {
+            "label": "TTL & traceroute",
+            "detail": "TTL còn lại ⇒ ước lượng hop (64−ttl nếu giả định Linux); traceroute vẽ chuỗi router trung gian.",
+            "tone": "caution"
+          },
+          {
+            "label": "Active sweep có kiểm soát",
+            "detail": "Ping/ARP sweep subnet trong ROE — ồn hơn nhưng phủ được host im lặng; rate thấp, ghi log từng probe.",
+            "tone": "stop"
+          },
+          {
+            "label": "Bản đồ truy vết được",
+            "detail": "Mỗi node/cạnh gắn nguồn evidence [frame/log/timestamp] — sẵn sàng cho report và cho defender đối chiếu.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Nguồn Thụ động: Những gì Mạng Tự Khai",
+          "paragraphs": [
+            "Trước khi gửi bất kỳ probe nào, một host đã mang theo bản đồ mini: ARP cache liệt kê neighbors cùng segment đã giao tiếp gần đây (bao cả gateway, printer, camera); routing table cho thấy các subnet biết đến và next-hop; DNS cache chứa tên miền host hay nói chuyện; established connections (netstat) cho thấy dịch vụ nào đang dùng. Trên Windows/Linux, cả bộ này đọc bằng lệnh read-only trong vài giây.",
+            "Giá trị của tầng thụ động: (1) im lặng tuyệt đối — IDS không thấy gì; (2) phản ánh traffic THẬT chứ không phải tiềm năng — ARP cache nói 'host này hay nói chuyện với server tài chính', thông tin mà scan không cho; (3) rẻ. Hạn chế: chỉ thấy thế giới quanh MỘT host — phải gom từ nhiều điểm nhìn mới dựng được bức tranh lớn."
+          ],
+          "points": [
+            "ARP cache aging vài phút—vài giờ: snapshot sớm sau khi host hoạt động là giàu nhất.",
+            "Interface metric + multiple routes hé lộ kiến trúc redundant/failover.",
+            "DHCP lease info (bài l07) bổ sung: ai cấp IP cho segment này → vị trí DHCP server."
+          ]
+        },
+        {
+          "title": "TTL, Traceroute và Giới hạn Suy luận",
+          "paragraphs": [
+            "TTL khởi tạo là hằng số theo OS (64 Linux/macOS, 128 Windows, 255 một số network device). TTL quan sát được trong packet ⇒ ước tính số hop đã đi: hops ≈ init − ttl. Đây là heuristic, không phải chân lý: init value có thể bị middleware ghi đè, một số device set giá trị lạ — nên diễn giải luôn kèm 'giả định init=64/128' và đối chiếu chéo với traceroute.",
+            "Traceroute (UDP/ICMP theo variant, hoặc TCP-traceroute qua firewall-friendly) nhờ ICMP Time Exceeded ở từng hop (bài l05). Mỗi hop phản hồi hoặc im lặng (***); firewall có thể fake hop cuối; load-balanced path cho kết quả nhảy loạn. Đọc traceroute là đọc bằng chứng có nhiễu — vẽ bản đồ từ MỘT traceroute là sai nghề, cần nhiều lần chạy nhiều thời điểm."
+          ],
+          "points": [
+            "TCP traceroute tới port 443 thường xuyên xuyên qua firewall hơn UDP-traceroute cổ điển.",
+            "MPLS/SD-WAN che hop thật — traceroute hiện đại thường thấy hop 'ẩn danh' của carrier.",
+            "TTL mismatch giữa hai chiều (in=63, out=125) là dấu hiệu NAT/proxy xen giữa."
+          ]
+        },
+        {
+          "title": "Thang Xâm nhập: Từ Nghe tới Hỏi tới Soi",
+          "paragraphs": [
+            "Khám phá có thang độ ồn: (0) thụ động — đọc cache/log/traffic có sẵn; (1) ARP/ping sweep nhẹ trong subnet được phép — xác nhận host sống; (2) targeted port check trên host sống — xác nhận dịch vụ; (3) full scan/service-version — nặng nhất, cần lý do rõ. Nguyên tắc: mỗi bậc chỉ chạy khi bậc trước không trả lời được, và luôn trong scope. Điều này không chỉ 'lịch sự' — nó giữ noise floor thấp để defender (và attacker thật) không nhận ra có khảo sát đang chạy, đồng thời giảm rủi ro làm sập thiết bị nhạy cảm (printer/IoT chết vì scan là chuyện có thật).",
+            "Điểm dừng bắt buộc: mọi kết quả gợi ý mở rộng ra ngoài dải ROE (route lạ, DNS trỏ ra ngoài, share nhắc tới server khác) → ghi nhận, không đuổi theo — khuôn mẫu stop-and-report đã rèn từ l05/l10."
+          ],
+          "points": [
+            "Rate-limit sweep (vd ≤ 10 probe/s) vừa giảm ồn vừa tránh làm treo switch kém chất lượng.",
+            "Ghi probe log song song với kết quả — phục vụ tái lập và chứng minh tuân thủ scope.",
+            "Thời điểm khảo sát cũng là dữ liệu: tránh giờ cao điểm production trừ khi mục tiêu chính là đo tải."
+          ]
+        },
+        {
+          "title": "Artifact hóa: Bản đồ Truy vết được",
+          "paragraphs": [
+            "Sản phẩm của topology reasoning không phải bức tranh đẹp — mà là đồ thị có truy vết: mỗi NODE (host/router) có thuộc tính (IP, role guess, OS guess + độ tin) và nguồn; mỗi CẠNH (link/flow) có loại (L2 neighbor / routed / NAT) và bằng chứng [ARP entry @time, route line, traceroute hop N]. Format đơn giản: YAML/JSON graph + bảng evidence index — defender có thể đối chiếu từng claim với log của họ.",
+            "Attack surface layer trên bản đồ: đánh dấu node internet-facing, node chứa dữ liệu nhạy cảm (theo role guess), đường ngắn nhất từ untrusted tới sensitive. Chính bản đồ này nuôi các track sau (os06 blind enterprise network, os08 AD attack-path graphs) — đầu tư dựng đúng chuẩn bây giờ là nền cho toàn bộ lộ trình."
+          ],
+          "points": [
+            "Độ tin (confidence) là trường bắt buộc: 'OS guess: Windows 85% (TTL=128 + port 445 open)' khác hẳn 'Windows'.",
+            "Bản đồ là living document: mỗi lần khảo sát lại cập nhật + version, không vẽ một lần rồi bỏ.",
+            "Chia sẻ bản đồ có kiểm soát: topology map là tài sản nhạy cảm — leak bản đồ = leak half the battle plan."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Topology Desk — Dựng Bản đồ từ Bằng chứng",
+        "objective": "Gom evidence thụ động từ 3 điểm nhìn, suy luận topology có confidence, và quyết định thứ tự khám phá tích cực trong phạm vi ROE.",
+        "scenario": "Bạn có quyền đọc output lệnh từ 3 host mô phỏng trong một chi nhánh (trong ROE dải 10.50.0.0/24): HOST-A (workstation kế toán), SRV-B (server nội bộ), GW-C (gateway). Output gồm: arp -a, route print/ip route, netstat, vài dòng TTL từ capture. Nhiệm vụ: dựng bản đồ + đề xuất bậc khám phá kế tiếp. Toàn bộ dữ liệu tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận từ output được cấp; mỗi claim phải trỏ về evidence cụ thể.",
+          "Mọi đề xuất active probing phải nêu bậc thang xâm nhập + phạm vi ROE.",
+          "Kết quả ngoài dải ROE xuất hiện trong evidence → dừng và báo cáo, không truy đuổi."
+        ],
+        "cases": [
+          {
+            "id": "topo-case-01",
+            "title": "Ghép ba điểm nhìn",
+            "context": "HOST-A arp: 10.50.0.1 (GW-C), 10.50.0.55 (không rõ), 10.50.0.90 (không rõ). SRV-B arp: 10.50.0.1, 10.50.0.90. Route GW-C: 10.50.0.0/24 (LAN), 10.60.0.0/24 via 10.50.0.90, 0.0.0.0/0 via 203.0.113.1. Capture tại GW-C thấy TTL=62 trên packet từ 10.60.x tới Internet.",
+            "prompt": "Suy luận topology đúng nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "10.50.0.90 là printer vì xuất hiện trong ARP của hai host.",
+                "correct": false,
+                "rationale": "ARP chỉ chứng minh 'neighbor đã giao tiếp'; route table của GW-C lại chỉ 10.60.0.0/24 via .90 — đó là vai trò router, không phải printer."
+              },
+              {
+                "id": "B",
+                "label": ".90 là router/L3 device nối subnet 10.60.0.0/24 (routing table GW-C trỏ via .90); TTL=62 ⇒ ~2 hop từ 10.60 ra Internet (init 64), khớp .90 là hop thứ nhất; HOST-A và SRV-B cùng segment với .90/.55/.1. Confidence: cao cho vai trò .90 (hai nguồn độc lập), trung bình cho hop-count (heuristic TTL).",
+                "correct": true,
+                "rationale": "Đúng quy trình: cross-check nhiều nguồn độc lập (route table + TTL), gắn confidence rõ ràng, phân biệt fact (route line) với inference (hop count)."
+              },
+              {
+                "id": "C",
+                "label": "TTL=62 chứng tỏ có NAT ở .90.",
+                "correct": false,
+                "rationale": "TTL giảm ở mỗi ROUTED hop; 62 chỉ nói 2 hop với giả định init=64. NAT không bắt buộc — và không có bằng chứng dịch địa chỉ trong evidence."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần chạy nmap toàn dải 10.50.0.0/24 là biết ngay tất cả.",
+                "correct": false,
+                "rationale": "Bỏ qua tầng thụ động đã có sẵn; full scan là bậc 3 — chỉ khi bậc thấp hơn không trả lời được, và phải rate-limited trong ROE."
+              }
+            ]
+          },
+          {
+            "id": "topo-case-02",
+            "title": "Route lạ ngoài scope",
+            "context": "Trong route table của GW-C còn một dòng bạn chưa ngờ: 172.31.0.0/16 via 10.50.0.90 (metric 10). Dải 172.31 không nằm trong ROE (chỉ 10.50.0.0/24). Ping test được phép theo ROE cho mục đích xác nhận route sống — nhưng 172.31 là target khác.",
+            "prompt": "Xử lý đúng là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Ping thử 172.31.1.1 một phát xác nhận route rồi ghi note — một gói không sao.",
+                "correct": false,
+                "rationale": "Probe chủ động vào dải ngoài ROE là vi phạm bất kể 1 gói; khuôn mẫu stop-and-report từ l05 áp dụng nguyên xi."
+              },
+              {
+                "id": "B",
+                "label": "Ghi nhận vào bản đồ như 'route tồn tại tới dải ngoài scope (evidence: route line)' — không probe; đưa vào report như segmentation finding tiềm năng; đề xuất điều phối xác minh phía họ vì đây là thông tin họ cần biết.",
+                "correct": true,
+                "rationale": "Route line trong output ĐÃ là bằng chứng tồn tại đường — không cần probe để chứng minh thêm; việc route nội bộ chạm dải khác là finding segmentation gap thuộc về owner hạ tầng."
+              },
+              {
+                "id": "C",
+                "label": "Bỏ qua hoàn toàn vì ngoài scope — không ghi vào đâu cả.",
+                "correct": false,
+                "rationale": "Bỏ qua = bỏ sót finding giá trị; ghi nhận (không khai thác) vừa đúng phạm vi vừa có giá trị cho khách hàng."
+              },
+              {
+                "id": "D",
+                "label": "Scan 172.31.0.0/16 để 'biết bề mặt giúp khách hàng' — good faith.",
+                "correct": false,
+                "rationale": "Good-faith không thay thế ủy quyền; scan 65k địa chỉ ngoài scope là vi phạm hợp đồng nghiêm trọng."
+              }
+            ]
+          },
+          {
+            "id": "topo-case-03",
+            "title": "Chọn bậc khám phá kế tiếp",
+            "context": "Bản đồ hiện có: GW-C, SRV-B, HOST-A, .90 (router), .55 (unknown, chỉ thấy trong ARP của HOST-A). ROE cho phép active probing trong 10.50.0.0/24 rate ≤10/s. Thiết bị trong chi nhánh có máy in và camera IP nhạy cảm với scan dồn dập (đã cảnh báo trong brief).",
+            "prompt": "Trình tự bước kế tiếp đúng kỷ luật là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Full nmap -A toàn dải ngay để có mọi thứ trong một lượt.",
+                "correct": false,
+                "rationale": "-A (version+script) là bậc nặng nhất và dồn dập — vi phạm cảnh báo thiết bị nhạy cảm, bỏ qua thang bậc, và over-collect so với câu hỏi đang có ('.55 là gì')."
+              },
+              {
+                "id": "B",
+                "label": "Bậc 1: ARP/ping sweep rate-limit cho 10.50.0.0/24 xác định host sống (kể cả .55); bậc 2: targeted port check chỉ trên host sống và ports liên quan câu hỏi; dừng sớm khi .55 nhận diện được role; log từng probe kèm timestamp.",
+                "correct": true,
+                "rationale": "Đúng thang xâm nhập: mỗi bậc trả lời tối đa câu hỏi với noise tối thiểu; rate-limit bảo vệ thiết bị nhạy cảm; probe-log giữ tính truy vết của bản đồ."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ dùng thông tin thụ động, không được phép bất kỳ probe nào.",
+                "correct": false,
+                "rationale": "ROE CHO PHÉP active probing rate ≤10/s — từ chối hoàn toàn là quá bảo thủ và để '.55' mãi mù mờ dù công cụ hợp lệ có sẵn."
+              },
+              {
+                "id": "D",
+                "label": "Ping sweep không cần rate limit vì ICMP nhẹ.",
+                "correct": false,
+                "rationale": "ICMP nhẹ với server nhưng không nhẹ với camera/printer kém; ROE đã set rate ≤10/s — tuân thủ là điều kiện, không phải tùy chọn."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Cross-check ≥2 nguồn evidence độc lập trước khi kết luận topology, gắn confidence cho mỗi inference.",
+          "Phân biệt rõ fact (route/arp line) và inference (role guess, hop count) trong bản đồ.",
+          "Áp dụng đúng thang xâm nhập + điểm dừng out-of-scope trong mọi đề xuất probing."
+        ],
+        "evidenceTemplate": [
+          "Graph JSON/YAML: nodes + edges + confidence + evidence refs",
+          "Bảng evidence index: [nguồn, timestamp, trích dòng]",
+          "Thang khám phá: bậc, phạm vi, rate, điều kiện dừng",
+          "Danh sách out-of-scope observation kèm đề xuất cho owner"
+        ],
+        "reset": "Đặt lại lựa chọn để dựng lại bản đồ từ ba điểm nhìn ban đầu.",
+        "cleanup": "Bài tập mô phỏng logic an toàn trong trình duyệt; không gửi probe tới mạng thật."
+      },
+      "governance": {
+        "prevent": [
+          "Segmentation + ACL hạn chế 'nhìn ngang' giữa các segment — giảm giá trị của ARP/enum từ một host bị chiếm.",
+          "Chuẩn hóa process khảo sát nội bộ: thang xâm nhập + ROE template + rate-limit mặc định.",
+          "Inventory chủ động (CMDB) giảm phụ thuộc vào recon ad-hoc khi cần biết mạng có gì."
+        ],
+        "observe": [
+          "IDS alert sweep pattern (ICMP/ARP rate từ một nguồn); log probe của đội internal để phân biệt với threat thật.",
+          "Monitor route/table drift trên core devices — route lạ xuất hiện là signal cấu hình sai hoặc xâm nhập."
+        ],
+        "respond": [
+          "Phát hiện khảo sát trái phép: trace nguồn, cô lập nếu cần, đối chiếu với lịch kiểm thử ủy quyền trước khi gọi incident.",
+          "Sau mỗi assessment: đối chiếu bản đồ assessment với CMDB — chênh lệch là finding cho cả hai phía."
+        ],
+        "residualRisk": [
+          "Heuristic TTL/OS-fingerprint có tỷ lệ sai nhất định — không bao giờ dùng làm quyết định blocking duy nhất.",
+          "Bản đồ topology là tài sản nhạy cảm: leak làm tăng tốc độ tấn công thật."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "TTL=128 nghĩa là máy Windows, TTL=64 nghĩa là Linux — chắc chắn.",
+          "correction": "Đó là heuristic với init values phổ biến, nhưng middleware có thể rewrite TTL và một số stack dùng giá trị khác; diễn giải luôn kèm giả định và đối chiếu nguồn khác."
+        },
+        {
+          "claim": "Một traceroute đủ để vẽ đường đi.",
+          "correction": "Load-balancing, MPLS và rate-limit làm traceroute nhảy/miss hop; cần nhiều lần chạy, nhiều thời điểm, nhiều variant (TCP/UDP/ICMP) mới dựng được đường tin cậy."
+        },
+        {
+          "claim": "Passive recon là vô dụng vì 'không thấy gì mới'.",
+          "correction": "Passive cho thấy traffic THẬT (ai hay nói chuyện với ai) — thông tin mà active scan không có; nó còn im lặng tuyệt đối với IDS. Thứ tự đúng là passive trước, active sau."
+        },
+        {
+          "claim": "Rate-limit chỉ cần khi scan production, lab thì thoải mái.",
+          "correction": "Rate-limit là kỷ luật nghề và điều kiện ROE — thiết bị nhạy cảm (camera, printer, OT) có mặt cả trong lab; thói quen rate-limit phải thành mặc định."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os01-l12-q1",
+          "difficulty": "easy",
+          "question": "ARP cache của một workstation cho biết điều gì có giá trị topology nhất?",
+          "options": [
+            { "id": "A", "label": "Danh sách mọi host trong công ty" },
+            {
+              "id": "B",
+              "label": "Các neighbor CÙNG SEGMENT mà host đã giao tiếp gần đây (bao gồm gateway)"
+            },
+            { "id": "C", "label": "Bản đồ router toàn Internet" },
+            { "id": "D", "label": "Password của các máy trong LAN" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "ARP chỉ tồn tại trong broadcast domain — nó là bản đồ tầng 2 cục bộ, miễn phí và im lặng, phản ánh traffic thật gần đây."
+        },
+        {
+          "id": "os01-l12-q2",
+          "difficulty": "medium",
+          "question": "Packet bắt được có TTL=57. Với giả định init=64, suy luận nào hợp lý?",
+          "options": [
+            { "id": "A", "label": "Packet đã đi qua 7 hop router" },
+            { "id": "B", "label": "Có 7 NAT trên đường" },
+            { "id": "C", "label": "Sender là Windows" },
+            { "id": "D", "label": "Packet đã bị sửa đổi gian lận" }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Mỗi routed hop giảm TTL 1: 64−57=7 hop. Đây là heuristic (phụ thuộc giả định init) — luôn ghi rõ assumption khi báo cáo."
+        },
+        {
+          "id": "os01-l12-q3",
+          "difficulty": "hard",
+          "question": "Trong khi dựng bản đồ từ evidence thụ động, bạn thấy route table của gateway có tuyến tới dải KHÔNG nằm trong ROE. Vì sao 'chỉ ghi nhận, không probe' vừa đúng quy trình vừa có giá trị?",
+          "options": [
+            { "id": "A", "label": "Vì probe dải ngoài sẽ bị firewall chặn, phí công" },
+            {
+              "id": "B",
+              "label": "Vì route line trong output ĐÃ là bằng chứng tồn tại đường — không cần probe để chứng minh thêm; ghi nhận giúp owner phát hiện segmentation gap, còn probe chủ động ngoài ROE là vi phạm ủy quyền bất kể mục đích tốt"
+            },
+            { "id": "C", "label": "Vì dải 172.16+ chắc chắn trống, không đáng probe" },
+            { "id": "D", "label": "Vì route table hay sai, không nên tin" }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Hai lý do độc lập cùng chỉ về một hành động: (1) pháp lý — probe chủ động ngoài ROE là vi phạm; (2) giá trị — bằng chứng đã có sẵn trong tay, và route-gap là finding hữu ích cho owner hạ tầng."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được mời xây quy trình 'network discovery standard' cho đội red team mô phỏng của một tổ chức có 5 site (mỗi site một dải /24, nối hub-spoke qua VPN). ROE mẫu chỉ cho phép khảo sát 1 site/lần theo yêu cầu; thiết bị OT (camera, door control) nằm rải rác trong các site.",
+        "tasks": [
+          "Viết chuẩn trình tự khám phá 3 bậc (passive → light-active → deep) với điều kiện chuyển bậc, rate-limit và logging bắt buộc cho từng bậc.",
+          "Thiết kế format bản đồ topology chuẩn hóa (schema node/edge/confidence/evidence-ref) để tái sử dụng giữa các engagement.",
+          "Đề xuất cách xử lý OT devices trong khảo sát: nhận diện không xâm hại, điểm dừng bắt buộc, escalation khi nghi ngờ thiết bị an toàn chịu ảnh hưởng."
+        ],
+        "requiredEvidence": [
+          "Tài liệu chuẩn 3 bậc dạng bảng: bậc / công cụ / rate / log / điều kiện dừng",
+          "Schema bản đồ + 1 ví dụ instance từ lab của bài",
+          "OT handling playbook với checkpoint an toàn rõ ràng"
+        ]
+      },
+      "sources": [
+        {
+          "title": "NIST SP 800-115 — Technical Guide to Information Security Testing and Assessment (Section: Discovery & Enumeration)",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-115/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Khung trình tự discovery/enumeration có kiểm soát trong security testing",
+            "Nguyên tắc authorization và documentation của kết quả khảo sát"
+          ]
+        },
+        {
+          "title": "RFC 1122 — Requirements for Internet Hosts (default TTL semantics)",
+          "url": "https://www.rfc-editor.org/rfc/rfc1122",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Yêu cầu TTL mặc định và hành vi decrement trên từng hop",
+            "Cơ sở heuristic suy luận hop count từ TTL"
+          ]
+        },
+        {
+          "title": "Wireshark User's Guide — Statistics: Conversations, Endpoints, Protocol Hierarchy",
+          "url": "https://www.wireshark.org/docs/",
+          "publisher": "Wireshark Foundation",
+          "sourceType": "official-documentation",
+          "accessedAt": "2026-08-25",
+          "supports": ["Công cụ tổng hợp traffic phục vụ dựng bản đồ từ capture thụ động"]
+        }
+      ]
+    }
+  ]
+}
