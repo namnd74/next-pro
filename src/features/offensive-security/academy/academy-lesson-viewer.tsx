@@ -1,3 +1,6 @@
+'use client';
+
+import * as React from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -10,11 +13,15 @@ import {
   RotateCcw,
   Scale,
   ShieldCheck,
+  Terminal,
   TriangleAlert,
+  Zap,
 } from 'lucide-react';
 import { AcademyAssessment } from './academy-assessment';
 import { academyLessonHref, academyModuleHref } from './academy-tracks';
 import type { AcademyLesson, AcademyModule, AcademyVisualStep } from './types';
+import { getWorkbenchPresetForLesson } from '../workbench/workbench-presets';
+import { AcademyLiveWorkbench } from '../workbench/components/academy-live-workbench';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -24,14 +31,69 @@ interface AcademyLessonViewerProps {
   lesson: AcademyLesson;
 }
 
-const VISUAL_TONE: Record<AcademyVisualStep['tone'], string> = {
-  neutral: 'border-sky-500/30 bg-sky-500/5',
-  allow: 'border-emerald-500/35 bg-emerald-500/10',
-  caution: 'border-amber-500/35 bg-amber-500/10',
-  stop: 'border-destructive/35 bg-destructive/10',
+const VISUAL_TONE_CONFIG: Record<
+  AcademyVisualStep['tone'],
+  { border: string; bg: string; dot: string; badge: string; badgeText: string }
+> = {
+  neutral: {
+    border: 'border-sky-500/30 hover:border-sky-500/55',
+    bg: 'bg-sky-500/5 hover:bg-sky-500/10',
+    dot: 'bg-sky-400 shadow-sky-500/50',
+    badge: 'border-sky-500/30 bg-sky-950/40 text-sky-400',
+    badgeText: 'Info',
+  },
+  allow: {
+    border: 'border-emerald-500/30 hover:border-emerald-500/55',
+    bg: 'bg-emerald-500/5 hover:bg-emerald-500/10',
+    dot: 'bg-emerald-400 shadow-emerald-500/50',
+    badge: 'border-emerald-500/30 bg-emerald-950/40 text-emerald-400',
+    badgeText: 'Allow / Trusted',
+  },
+  caution: {
+    border: 'border-amber-500/30 hover:border-amber-500/55',
+    bg: 'bg-amber-500/5 hover:bg-amber-500/10',
+    dot: 'bg-amber-400 shadow-amber-500/50',
+    badge: 'border-amber-500/30 bg-amber-950/40 text-amber-400',
+    badgeText: 'Caution / Probe',
+  },
+  stop: {
+    border: 'border-rose-500/30 hover:border-rose-500/55',
+    bg: 'bg-rose-500/5 hover:bg-rose-500/10',
+    dot: 'bg-rose-400 shadow-rose-500/50',
+    badge: 'border-rose-500/30 bg-rose-950/40 text-rose-400',
+    badgeText: 'Block / Boundary',
+  },
 };
 
+function getGridColsClass(stepCount: number): string {
+  switch (stepCount) {
+    case 1:
+      return 'grid-cols-1 max-w-xl mx-auto';
+    case 2:
+      return 'grid-cols-1 md:grid-cols-2';
+    case 3:
+      return 'grid-cols-1 md:grid-cols-3';
+    case 4:
+      return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4';
+    case 5:
+      return 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-5';
+    case 6:
+      return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6';
+    default:
+      return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
+  }
+}
+
 export function AcademyLessonViewer({ module, lesson }: AcademyLessonViewerProps) {
+  const [practiceMode, setPracticeMode] = React.useState<'workbench' | 'assessment'>(
+    'workbench'
+  );
+  const workbenchConfig = React.useMemo(
+    () =>
+      getWorkbenchPresetForLesson(lesson.slug) || getWorkbenchPresetForLesson(lesson.id),
+    [lesson.id, lesson.slug]
+  );
+
   const currentIndex = module.lessons.findIndex((item) => item.id === lesson.id);
   const previousLesson = currentIndex > 0 ? module.lessons[currentIndex - 1] : null;
   const nextLesson =
@@ -103,33 +165,52 @@ export function AcademyLessonViewer({ module, lesson }: AcademyLessonViewerProps
       </section>
 
       <section className="space-y-4">
-        <div>
-          <h2 className="text-foreground flex items-center gap-2 text-lg font-extrabold">
-            <Scale className="text-primary h-5 w-5" />
-            {lesson.visual.title}
-          </h2>
-          <p className="text-muted-foreground mt-1 text-xs">{lesson.visual.caption}</p>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-foreground flex items-center gap-2 text-lg font-extrabold">
+              <Scale className="text-primary h-5 w-5" />
+              {lesson.visual.title}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-xs">{lesson.visual.caption}</p>
+          </div>
+          <Badge variant="outline" className="font-mono text-[10px]">
+            {lesson.visual.steps.length} Bước Trình Tự
+          </Badge>
         </div>
-        <Card className="glass-card p-4 sm:p-5">
-          <div className="grid gap-2 lg:grid-cols-5">
-            {lesson.visual.steps.map((step, index) => (
-              <div key={step.label} className="flex items-stretch gap-2 lg:block">
-                <div className={`h-full rounded-xl border p-3 ${VISUAL_TONE[step.tone]}`}>
-                  <span className="text-muted-foreground font-mono text-[9px]">
-                    STEP {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <h3 className="text-foreground mt-1 text-xs font-extrabold">
-                    {step.label}
-                  </h3>
-                  <p className="text-muted-foreground mt-1 text-[11px] leading-5">
-                    {step.detail}
-                  </p>
+        <Card className="glass-card p-4 sm:p-6">
+          <div
+            className={`grid gap-3 sm:gap-4 ${getGridColsClass(lesson.visual.steps.length)}`}
+          >
+            {lesson.visual.steps.map((step, index) => {
+              const tone = VISUAL_TONE_CONFIG[step.tone];
+              return (
+                <div
+                  key={step.label}
+                  className={`group relative flex flex-col justify-between rounded-2xl border p-4 transition-all duration-200 ${tone.border} ${tone.bg}`}
+                >
+                  <div className="space-y-3">
+                    <div className="border-border/40 flex items-center justify-between border-b pb-2.5">
+                      <div className="text-muted-foreground flex items-center gap-1.5 font-mono text-[10px] font-bold">
+                        <span className={`h-2 w-2 rounded-full shadow-xs ${tone.dot}`} />
+                        <span>STEP {String(index + 1).padStart(2, '0')}</span>
+                      </div>
+                      <span
+                        className={`rounded-md border px-1.5 py-0.5 text-[9px] font-bold tracking-wider uppercase ${tone.badge}`}
+                      >
+                        {tone.badgeText}
+                      </span>
+                    </div>
+
+                    <h3 className="text-foreground text-xs leading-snug font-extrabold">
+                      {step.label}
+                    </h3>
+                    <p className="text-muted-foreground text-[11.5px] leading-relaxed">
+                      {step.detail}
+                    </p>
+                  </div>
                 </div>
-                {index < lesson.visual.steps.length - 1 && (
-                  <ArrowRight className="text-muted-foreground/50 my-auto h-4 w-4 shrink-0 lg:mx-auto lg:my-2 lg:rotate-90" />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Card>
       </section>
@@ -199,7 +280,54 @@ export function AcademyLessonViewer({ module, lesson }: AcademyLessonViewerProps
         </div>
       </section>
 
-      <AcademyAssessment lesson={lesson} />
+      {/* Practical Practice Navigation: Live Workbench vs Assessment Mode */}
+      <section className="space-y-4 pt-2">
+        <div className="border-border/60 flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+          <div>
+            <h2 className="text-foreground flex items-center gap-2 text-xl font-extrabold tracking-tight">
+              <Zap className="h-5 w-5 text-emerald-500" />
+              Thực hành & Kiểm tra Năng lực
+            </h2>
+            <p className="text-muted-foreground mt-1 text-xs">
+              Chuyển đổi giữa phòng Lab thực thi thật (Live WASM Workbench) và Kiểm tra lý
+              thuyết ra quyết định (Decision Matrix).
+            </p>
+          </div>
+
+          <div className="border-border/80 bg-secondary/40 flex items-center rounded-2xl border p-1">
+            <button
+              type="button"
+              onClick={() => setPracticeMode('workbench')}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+                practiceMode === 'workbench'
+                  ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Terminal className="h-3.5 w-3.5" />
+              🚀 Live Real-Workbench
+            </button>
+            <button
+              type="button"
+              onClick={() => setPracticeMode('assessment')}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+                practiceMode === 'assessment'
+                  ? 'bg-primary text-primary-foreground shadow-primary/20 shadow-md'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Scale className="h-3.5 w-3.5" />
+              📋 Decision Lab & Quiz
+            </button>
+          </div>
+        </div>
+
+        {practiceMode === 'workbench' && workbenchConfig ? (
+          <AcademyLiveWorkbench config={workbenchConfig} />
+        ) : (
+          <AcademyAssessment lesson={lesson} />
+        )}
+      </section>
 
       <section className="space-y-4">
         <h2 className="text-foreground text-lg font-extrabold">Transfer challenge</h2>

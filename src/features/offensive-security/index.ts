@@ -12,3 +12,4 @@ export * from './academy/academy-loader';
 export * from './academy/academy-tracks';
 export * from './academy/academy-module-overview';
 export * from './academy/academy-lesson-viewer';
+export * from './workbench';
