@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import {
-  AlertCircle,
   Check,
   Copy,
   CornerDownLeft,
@@ -43,7 +42,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
       cwd: '/home/operator',
       stdout:
         'Linux sec-target-prod01 6.8.0-45-generic #45-Ubuntu SMP PREEMPT_DYNAMIC x86_64\n' +
-        'Type "help" for available commands, or select a sample command below.\n',
+        'Type "help" for 40+ available Linux utilities (ls, grep, awk, sed, nmap, curl, etc.).\n',
       stderr: '',
       exitCode: 0,
     },
@@ -74,7 +73,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
     setVfsState(result.updatedState);
 
     const newItem: TerminalHistoryItem = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
       command: trimmed,
       cwd: vfsState.cwd,
       stdout: result.stdout,
@@ -115,7 +114,6 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      // Basic auto-complete
       const parts = currentInput.split(' ');
       const lastWord = parts[parts.length - 1];
       const commonCommands = [
@@ -124,12 +122,27 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
         'chmod',
         'chown',
         'grep',
+        'awk',
+        'sed',
+        'cut',
+        'sort',
+        'uniq',
         'find',
         'whoami',
+        'id',
+        'nmap',
+        'ping',
+        'ifconfig',
+        'curl',
+        'hexdump',
+        'base64',
         'pwd',
         'cd',
         'clear',
         'help',
+        'uname',
+        'ps',
+        'kill',
       ];
       const match = commonCommands.find((c) => c.startsWith(lastWord));
       if (match) {
@@ -147,7 +160,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
         id: 'reset-1',
         command: '',
         cwd: '/home/operator',
-        stdout: 'Terminal session reset to initial state.\n',
+        stdout: 'Terminal session reset to fresh state.\n',
         stderr: '',
         exitCode: 0,
       },
@@ -188,17 +201,17 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
         </div>
       )}
 
-      {/* Terminal Screen */}
+      {/* Terminal Screen Container */}
       <div
-        className="border-border/80 rounded-2xl border bg-slate-950 p-4 font-mono text-xs text-slate-100 shadow-2xl transition-all"
+        className="rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-slate-100 shadow-2xl ring-1 ring-slate-800 transition-all"
         onClick={() => inputRef.current?.focus()}
       >
-        {/* Terminal Header */}
-        <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2.5">
+        {/* Terminal Header Bar */}
+        <div className="mb-3 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
           <div className="flex items-center gap-2">
             <div className="flex gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
-              <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-rose-500/80" />
+              <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
               <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
@@ -211,7 +224,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
               variant="outline"
               className="border-emerald-500/40 bg-emerald-950/40 text-[9px] text-emerald-400"
             >
-              POSIX RUNTIME · WASM
+              POSIX RUNTIME · 40+ CMDS
             </Badge>
             <Button
               variant="ghost"
@@ -229,7 +242,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
         </div>
 
         {/* Output Stream */}
-        <div className="max-h-[380px] min-h-[220px] space-y-2 overflow-y-auto pr-1">
+        <div className="max-h-[380px] min-h-[240px] space-y-2 overflow-y-auto pr-1">
           {historyItems.map((item) => (
             <div key={item.id} className="space-y-1">
               {item.command && (
@@ -262,17 +275,14 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
                 </pre>
               )}
               {item.stderr && (
-                <div className="flex items-start gap-1.5 text-rose-400">
-                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <pre className="font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap">
-                    {item.stderr}
-                  </pre>
-                </div>
+                <pre className="font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-rose-400">
+                  {item.stderr}
+                </pre>
               )}
             </div>
           ))}
 
-          {/* Active Input Line */}
+          {/* Active Input Prompt */}
           <div className="flex items-center gap-1.5 pt-1">
             <span className="shrink-0 text-slate-500 select-none">
               operator@sec-target:{vfsState.cwd}$

@@ -24,6 +24,15 @@ export function createDefaultVfs(): VfsDirectory {
             group: 'root',
             size: 1234528,
           },
+          sh: {
+            type: 'file',
+            name: 'sh',
+            content: '#!/bin/sh binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 124500,
+          },
           cat: {
             type: 'file',
             name: 'cat',
@@ -51,6 +60,33 @@ export function createDefaultVfs(): VfsDirectory {
             group: 'root',
             size: 68120,
           },
+          cp: {
+            type: 'file',
+            name: 'cp',
+            content: '#!/bin/cp binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 152000,
+          },
+          date: {
+            type: 'file',
+            name: 'date',
+            content: '#!/bin/date binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 89000,
+          },
+          echo: {
+            type: 'file',
+            name: 'echo',
+            content: '#!/bin/echo binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 34000,
+          },
           grep: {
             type: 'file',
             name: 'grep',
@@ -59,6 +95,24 @@ export function createDefaultVfs(): VfsDirectory {
             owner: 'root',
             group: 'root',
             size: 154200,
+          },
+          head: {
+            type: 'file',
+            name: 'head',
+            content: '#!/bin/head binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 48000,
+          },
+          kill: {
+            type: 'file',
+            name: 'kill',
+            content: '#!/bin/kill binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 31000,
           },
           ls: {
             type: 'file',
@@ -69,6 +123,24 @@ export function createDefaultVfs(): VfsDirectory {
             group: 'root',
             size: 142800,
           },
+          mkdir: {
+            type: 'file',
+            name: 'mkdir',
+            content: '#!/bin/mkdir binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 52000,
+          },
+          mv: {
+            type: 'file',
+            name: 'mv',
+            content: '#!/bin/mv binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 139000,
+          },
           ps: {
             type: 'file',
             name: 'ps',
@@ -77,6 +149,33 @@ export function createDefaultVfs(): VfsDirectory {
             owner: 'root',
             group: 'root',
             size: 112400,
+          },
+          pwd: {
+            type: 'file',
+            name: 'pwd',
+            content: '#!/bin/pwd binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 38000,
+          },
+          rm: {
+            type: 'file',
+            name: 'rm',
+            content: '#!/bin/rm binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 71000,
+          },
+          sed: {
+            type: 'file',
+            name: 'sed',
+            content: '#!/bin/sed binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 180000,
           },
           su: {
             type: 'file',
@@ -87,6 +186,222 @@ export function createDefaultVfs(): VfsDirectory {
             group: 'root',
             size: 78920,
           }, // SUID
+          tail: {
+            type: 'file',
+            name: 'tail',
+            content: '#!/bin/tail binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 53000,
+          },
+          tar: {
+            type: 'file',
+            name: 'tar',
+            content: '#!/bin/tar binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 420000,
+          },
+          touch: {
+            type: 'file',
+            name: 'touch',
+            content: '#!/bin/touch binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 45000,
+          },
+          uname: {
+            type: 'file',
+            name: 'uname',
+            content: '#!/bin/uname binary',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            size: 35000,
+          },
+        },
+      },
+      usr: {
+        type: 'dir',
+        name: 'usr',
+        mode: 0o755,
+        owner: 'root',
+        group: 'root',
+        children: {
+          bin: {
+            type: 'dir',
+            name: 'bin',
+            mode: 0o755,
+            owner: 'root',
+            group: 'root',
+            children: {
+              awk: {
+                type: 'file',
+                name: 'awk',
+                content: '#!/usr/bin/awk binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 210000,
+              },
+              base64: {
+                type: 'file',
+                name: 'base64',
+                content: '#!/usr/bin/base64 binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 42000,
+              },
+              curl: {
+                type: 'file',
+                name: 'curl',
+                content: '#!/usr/bin/curl binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 320000,
+              },
+              cut: {
+                type: 'file',
+                name: 'cut',
+                content: '#!/usr/bin/cut binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 46000,
+              },
+              dig: {
+                type: 'file',
+                name: 'dig',
+                content: '#!/usr/bin/dig binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 178000,
+              },
+              find: {
+                type: 'file',
+                name: 'find',
+                content: '#!/usr/bin/find binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 245000,
+              },
+              hexdump: {
+                type: 'file',
+                name: 'hexdump',
+                content: '#!/usr/bin/hexdump binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 68000,
+              },
+              id: {
+                type: 'file',
+                name: 'id',
+                content: '#!/usr/bin/id binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 42000,
+              },
+              md5sum: {
+                type: 'file',
+                name: 'md5sum',
+                content: '#!/usr/bin/md5sum binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 49000,
+              },
+              nc: {
+                type: 'file',
+                name: 'nc',
+                content: '#!/usr/bin/nc binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 54000,
+              },
+              nmap: {
+                type: 'file',
+                name: 'nmap',
+                content: '#!/usr/bin/nmap binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 2800000,
+              },
+              sha256sum: {
+                type: 'file',
+                name: 'sha256sum',
+                content: '#!/usr/bin/sha256sum binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 51000,
+              },
+              sort: {
+                type: 'file',
+                name: 'sort',
+                content: '#!/usr/bin/sort binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 120000,
+              },
+              strings: {
+                type: 'file',
+                name: 'strings',
+                content: '#!/usr/bin/strings binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 76000,
+              },
+              sudo: {
+                type: 'file',
+                name: 'sudo',
+                content: '#!/usr/bin/sudo binary',
+                mode: 0o4755,
+                owner: 'root',
+                group: 'root',
+                size: 180000,
+              },
+              uniq: {
+                type: 'file',
+                name: 'uniq',
+                content: '#!/usr/bin/uniq binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 48000,
+              },
+              wc: {
+                type: 'file',
+                name: 'wc',
+                content: '#!/usr/bin/wc binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 46000,
+              },
+              whoami: {
+                type: 'file',
+                name: 'whoami',
+                content: '#!/usr/bin/whoami binary',
+                mode: 0o755,
+                owner: 'root',
+                group: 'root',
+                size: 36000,
+              },
+            },
+          },
         },
       },
       etc: {
@@ -100,6 +415,24 @@ export function createDefaultVfs(): VfsDirectory {
             type: 'file',
             name: 'hostname',
             content: 'sec-target-prod01\n',
+            mode: 0o644,
+            owner: 'root',
+            group: 'root',
+          },
+          hosts: {
+            type: 'file',
+            name: 'hosts',
+            content:
+              '127.0.0.1\tlocalhost\n127.0.1.1\tsec-target-prod01\n10.0.4.1\tgateway.corp.internal\n10.0.4.5\tdb.corp.internal\n',
+            mode: 0o644,
+            owner: 'root',
+            group: 'root',
+          },
+          os_release: {
+            type: 'file',
+            name: 'os-release',
+            content:
+              'NAME="Ubuntu"\nVERSION="24.04 LTS (Noble Numbat)"\nID=ubuntu\nVERSION_ID="24.04"\nPRETTY_NAME="Ubuntu 24.04 LTS"\n',
             mode: 0o644,
             owner: 'root',
             group: 'root',
@@ -165,10 +498,32 @@ export function createDefaultVfs(): VfsDirectory {
                 type: 'file',
                 name: 'notes.txt',
                 content:
-                  'Review hardening checklist for PCI-DSS audit before Friday.\nCheck /var/log/auth.log for failed SSH attempts.\n',
+                  '=== Operator Field Checklist ===\n' +
+                  '1. Check /etc/shadow permissions.\n' +
+                  '2. Investigate unauthorized SSH logins in /var/log/auth.log.\n' +
+                  '3. Extract suspicious IPs from /var/log/access.log.\n' +
+                  '4. Verify network topology via ifconfig and ping.\n',
                 mode: 0o644,
                 owner: 'operator',
                 group: 'operator',
+              },
+              scripts: {
+                type: 'dir',
+                name: 'scripts',
+                mode: 0o755,
+                owner: 'operator',
+                group: 'operator',
+                children: {
+                  'recon.sh': {
+                    type: 'file',
+                    name: 'recon.sh',
+                    content:
+                      '#!/bin/bash\necho "[*] Running host reconnaissance..."\nuname -a\nid\ncat /etc/passwd | cut -d: -f1\n',
+                    mode: 0o755,
+                    owner: 'operator',
+                    group: 'operator',
+                  },
+                },
               },
             },
           },
@@ -208,6 +563,8 @@ export function createDefaultVfs(): VfsDirectory {
                   '192.168.1.105 - - [27/Aug/2026:06:10:12 +0000] "GET /api/v1/health HTTP/1.1" 200 45 "-" "curl/7.88.1"\n' +
                   '192.168.1.105 - - [27/Aug/2026:06:10:15 +0000] "POST /api/v1/login HTTP/1.1" 401 128 "-" "Python-urllib/3.11"\n' +
                   '192.168.1.105 - - [27/Aug/2026:06:10:18 +0000] "GET /admin/debug.php HTTP/1.1" 404 153 "-" "Mozilla/5.0"\n' +
+                  '192.168.1.200 - - [27/Aug/2026:06:10:25 +0000] "POST /api/v1/login HTTP/1.1" 401 128 "-" "Hydra/9.5"\n' +
+                  '192.168.1.200 - - [27/Aug/2026:06:10:30 +0000] "POST /api/v1/login HTTP/1.1" 401 128 "-" "Hydra/9.5"\n' +
                   '10.0.4.15 - - [27/Aug/2026:06:11:00 +0000] "GET /dashboard HTTP/1.1" 200 4521 "https://corp.local" "Mozilla/5.0"\n' +
                   '10.0.4.15 - - [27/Aug/2026:06:12:05 +0000] "GET /api/user/profile HTTP/1.1" 200 892 "https://corp.local" "Mozilla/5.0"\n',
                 mode: 0o644,
@@ -221,7 +578,7 @@ export function createDefaultVfs(): VfsDirectory {
       tmp: {
         type: 'dir',
         name: 'tmp',
-        mode: 0o1777, // Sticky bit
+        mode: 0o1777,
         owner: 'root',
         group: 'root',
         children: {},
@@ -243,10 +600,11 @@ export function createInitialVfsState(customRoot?: VfsDirectory): VfsState {
     env: {
       USER: 'operator',
       HOME: '/home/operator',
-      PATH: '/bin:/usr/bin:/usr/local/bin',
+      PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
       SHELL: '/bin/bash',
       HOSTNAME: 'sec-target-prod01',
       TERM: 'xterm-256color',
+      LANG: 'en_US.UTF-8',
     },
     history: [],
   };
@@ -304,71 +662,111 @@ function formatMode(mode: number, isDir: boolean): string {
   return `${fileType}${uR}${uW}${uX}${gR}${gW}${gX}${oR}${oW}${oX}`;
 }
 
+function substituteEnvVars(input: string, env: Record<string, string>): string {
+  return input.replace(/\$([a-zA-Z0-9_]+)|\$\{([a-zA-Z0-9_]+)\}/g, (_, g1, g2) => {
+    const varName = g1 || g2;
+    return env[varName] !== undefined ? env[varName] : '';
+  });
+}
+
 export function executeBashCommand(
   inputLine: string,
   state: VfsState
 ): TerminalExecutionResult {
-  const trimmed = inputLine.trim();
-  if (!trimmed) {
+  const rawTrimmed = inputLine.trim();
+  if (!rawTrimmed) {
     return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
   }
 
   // Clone state
-  const nextState: VfsState = {
+  let nextState: VfsState = {
     ...state,
     root: JSON.parse(JSON.stringify(state.root)),
-    history: [...state.history, trimmed],
+    history: [...state.history, rawTrimmed],
     env: { ...state.env },
   };
 
-  // Handle command chaining: cmd1 && cmd2 || cmd3
-  if (trimmed.includes(' && ')) {
-    const parts = trimmed.split(' && ');
-    let currentOut = '';
-    let curState = nextState;
+  // Semicolon chaining: cmd1 ; cmd2
+  if (rawTrimmed.includes(';') && !rawTrimmed.includes(';;')) {
+    const parts = rawTrimmed
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    let allOut = '';
+    let allErr = '';
+    let lastCode = 0;
     for (const part of parts) {
-      const res = executeBashCommand(part, curState);
+      const res = executeBashCommand(part, nextState);
+      allOut += res.stdout;
+      allErr += res.stderr;
+      nextState = res.updatedState;
+      lastCode = res.exitCode;
+    }
+    return {
+      stdout: allOut,
+      stderr: allErr,
+      exitCode: lastCode,
+      updatedState: nextState,
+    };
+  }
+
+  // Handle command chaining: cmd1 && cmd2
+  if (rawTrimmed.includes(' && ')) {
+    const parts = rawTrimmed.split(' && ');
+    let currentOut = '';
+    for (const part of parts) {
+      const res = executeBashCommand(part, nextState);
       currentOut += res.stdout;
-      curState = res.updatedState;
+      nextState = res.updatedState;
       if (res.exitCode !== 0) {
         return {
           stdout: currentOut,
           stderr: res.stderr,
           exitCode: res.exitCode,
-          updatedState: curState,
+          updatedState: nextState,
         };
       }
     }
-    return { stdout: currentOut, stderr: '', exitCode: 0, updatedState: curState };
+    return { stdout: currentOut, stderr: '', exitCode: 0, updatedState: nextState };
   }
 
-  // Handle pipe: cmd1 | cmd2
-  if (trimmed.includes(' | ')) {
-    const pipeCommands = trimmed.split(' | ');
+  // Handle OR chaining: cmd1 || cmd2
+  if (rawTrimmed.includes(' || ')) {
+    const parts = rawTrimmed.split(' || ');
+    const firstRes = executeBashCommand(parts[0], nextState);
+    if (firstRes.exitCode === 0) {
+      return firstRes;
+    }
+    return executeBashCommand(parts.slice(1).join(' || '), firstRes.updatedState);
+  }
+
+  // Handle pipe: cmd1 | cmd2 | cmd3
+  if (rawTrimmed.includes(' | ')) {
+    const pipeCommands = rawTrimmed.split(' | ');
     let pipeInput = '';
-    let curState = nextState;
     let lastExit = 0;
     for (let i = 0; i < pipeCommands.length; i++) {
       const subCmd = pipeCommands[i].trim();
-      const res = executeSingleCommand(subCmd, curState, pipeInput);
+      const res = executeSingleCommand(subCmd, nextState, pipeInput);
       pipeInput = res.stdout;
-      curState = res.updatedState;
+      nextState = res.updatedState;
       lastExit = res.exitCode;
-      if (lastExit !== 0) {
+      if (lastExit !== 0 && res.stderr) {
         return {
           stdout: res.stdout,
           stderr: res.stderr,
           exitCode: lastExit,
-          updatedState: curState,
+          updatedState: nextState,
         };
       }
     }
-    return { stdout: pipeInput, stderr: '', exitCode: 0, updatedState: curState };
+    return { stdout: pipeInput, stderr: '', exitCode: 0, updatedState: nextState };
   }
 
-  // Handle redirection: cmd > file or cmd >> file
-  const redirectAppendMatch = trimmed.match(/^(.*?)\s*>>\s*(.*?)$/);
-  const redirectOverwriteMatch = trimmed.match(/^(.*?)\s*>\s*(.*?)$/);
+  // Handle redirection: cmd > file, cmd >> file, 2>/dev/null
+  const cleanLine = rawTrimmed.replace(/\s*2>\/dev\/null/g, '');
+  const redirectAppendMatch = cleanLine.match(/^(.*?)\s*>>\s*(.*?)$/);
+  const redirectOverwriteMatch = cleanLine.match(/^(.*?)\s*>\s*(.*?)$/);
 
   if (redirectAppendMatch || redirectOverwriteMatch) {
     const isAppend = !!redirectAppendMatch;
@@ -428,7 +826,7 @@ export function executeBashCommand(
     return { stdout: '', stderr: '', exitCode: 0, updatedState: cmdRes.updatedState };
   }
 
-  return executeSingleCommand(trimmed, nextState, '');
+  return executeSingleCommand(cleanLine, nextState, '');
 }
 
 function executeSingleCommand(
@@ -436,8 +834,18 @@ function executeSingleCommand(
   state: VfsState,
   stdinData: string
 ): TerminalExecutionResult {
-  const args = rawCmd.split(/\s+/).filter(Boolean);
-  const cmd = args[0];
+  const substituted = substituteEnvVars(rawCmd, state.env);
+  const args = substituted.split(/\s+/).filter(Boolean);
+  const cmd = args[0] || '';
+
+  // Variable assignment check: VAR=val or export VAR=val
+  if (cmd.includes('=') && !cmd.startsWith('==')) {
+    const eqIdx = cmd.indexOf('=');
+    const key = cmd.substring(0, eqIdx);
+    const val = cmd.substring(eqIdx + 1).replace(/^['"](.*)['"]$/, '$1');
+    state.env[key] = val;
+    return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
+  }
 
   switch (cmd) {
     case 'pwd': {
@@ -453,6 +861,33 @@ function executeSingleCommand(
       };
     }
 
+    case 'hostname': {
+      return {
+        stdout: `${state.env.HOSTNAME || 'sec-target-prod01'}\n`,
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'uptime': {
+      return {
+        stdout: ' 06:45:12 up 14 days,  3:12,  1 user,  load average: 0.08, 0.03, 0.01\n',
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'date': {
+      return {
+        stdout: `${new Date().toUTCString()}\n`,
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
     case 'id': {
       const u = state.user;
       const groupsStr = u.groups.map((g, i) => `${1000 + i}(${g})`).join(',');
@@ -462,6 +897,67 @@ function executeSingleCommand(
         exitCode: 0,
         updatedState: state,
       };
+    }
+
+    case 'uname': {
+      if (args.includes('-a') || args.includes('--all')) {
+        return {
+          stdout: `Linux ${state.env.HOSTNAME || 'sec-target-prod01'} 6.8.0-45-generic #45-Ubuntu SMP PREEMPT_DYNAMIC Thu Aug 27 06:00:00 UTC 2026 x86_64 GNU/Linux\n`,
+          stderr: '',
+          exitCode: 0,
+          updatedState: state,
+        };
+      }
+      if (args.includes('-r'))
+        return {
+          stdout: '6.8.0-45-generic\n',
+          stderr: '',
+          exitCode: 0,
+          updatedState: state,
+        };
+      if (args.includes('-m'))
+        return { stdout: 'x86_64\n', stderr: '', exitCode: 0, updatedState: state };
+      return { stdout: 'Linux\n', stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'env': {
+      const out = Object.entries(state.env)
+        .map(([k, v]) => `${k}=${v}`)
+        .join('\n');
+      return {
+        stdout: out ? out + '\n' : '',
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'export': {
+      if (args.length === 1) {
+        const out = Object.entries(state.env)
+          .map(([k, v]) => `declare -x ${k}="${v}"`)
+          .join('\n');
+        return {
+          stdout: out ? out + '\n' : '',
+          stderr: '',
+          exitCode: 0,
+          updatedState: state,
+        };
+      }
+      const rest = args.slice(1).join(' ');
+      const [key, ...vParts] = rest.split('=');
+      if (key) {
+        state.env[key.trim()] = vParts.join('=').replace(/^['"](.*)['"]$/, '$1');
+      }
+      return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'unset': {
+      const varName = args[1];
+      if (varName && state.env[varName]) {
+        delete state.env[varName];
+      }
+      return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
     }
 
     case 'cd': {
@@ -485,6 +981,7 @@ function executeSingleCommand(
         };
       }
       const newCwd = '/' + resolved.join('/');
+      state.env.PWD = newCwd;
       return {
         stdout: '',
         stderr: '',
@@ -496,13 +993,17 @@ function executeSingleCommand(
     case 'ls': {
       let showAll = false;
       let showLong = false;
+      let showHuman = false;
+      let reverse = false;
       const targets: string[] = [];
 
       for (let i = 1; i < args.length; i++) {
         const arg = args[i];
-        if (arg.startsWith('-')) {
+        if (arg.startsWith('-') && arg !== '-') {
           if (arg.includes('a')) showAll = true;
           if (arg.includes('l')) showLong = true;
+          if (arg.includes('h')) showHuman = true;
+          if (arg.includes('r')) reverse = true;
         } else {
           targets.push(arg);
         }
@@ -528,7 +1029,9 @@ function executeSingleCommand(
         return { stdout: line, stderr: '', exitCode: 0, updatedState: state };
       }
 
-      const childrenKeys = Object.keys(node.children).sort();
+      let childrenKeys = Object.keys(node.children).sort();
+      if (reverse) childrenKeys = childrenKeys.reverse();
+
       let out = '';
       if (showLong) {
         out += `total ${childrenKeys.length * 4}\n`;
@@ -541,8 +1044,12 @@ function executeSingleCommand(
           const child = node.children[k];
           const isDir = child.type === 'dir';
           const modeStr = formatMode(child.mode, isDir);
-          const size = isDir ? 4096 : child.size || child.content.length;
-          out += `${modeStr} 1 ${child.owner} ${child.group} ${String(size).padStart(6, ' ')} Aug 27 06:00 ${child.name}\n`;
+          const rawSize = isDir ? 4096 : child.size || child.content.length;
+          const sizeStr =
+            showHuman && rawSize > 1024
+              ? `${Math.round(rawSize / 1024)}K`
+              : String(rawSize);
+          out += `${modeStr} 1 ${child.owner} ${child.group} ${sizeStr.padStart(6, ' ')} Aug 27 06:00 ${child.name}\n`;
         }
       } else {
         const names: string[] = [];
@@ -593,6 +1100,169 @@ function executeSingleCommand(
       return { stdout: node.content, stderr: '', exitCode: 0, updatedState: state };
     }
 
+    case 'head': {
+      let linesCount = 10;
+      let target = '';
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '-n' && args[i + 1]) {
+          linesCount = parseInt(args[i + 1], 10) || 10;
+          i++;
+        } else if (args[i].startsWith('-n')) {
+          linesCount = parseInt(args[i].slice(2), 10) || 10;
+        } else if (!target) {
+          target = args[i];
+        }
+      }
+      let content = stdinData;
+      if (target) {
+        const resolved = resolvePath(state.cwd, target);
+        const node = getNode(state.root, resolved);
+        if (!node || node.type !== 'file') {
+          return {
+            stdout: '',
+            stderr: `head: cannot open '${target}': No such file\n`,
+            exitCode: 1,
+            updatedState: state,
+          };
+        }
+        content = node.content;
+      }
+      const out = content.split('\n').slice(0, linesCount).join('\n');
+      return {
+        stdout: out + (out ? '\n' : ''),
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'tail': {
+      let linesCount = 10;
+      let target = '';
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '-n' && args[i + 1]) {
+          linesCount = parseInt(args[i + 1], 10) || 10;
+          i++;
+        } else if (args[i].startsWith('-n')) {
+          linesCount = parseInt(args[i].slice(2), 10) || 10;
+        } else if (!target) {
+          target = args[i];
+        }
+      }
+      let content = stdinData;
+      if (target) {
+        const resolved = resolvePath(state.cwd, target);
+        const node = getNode(state.root, resolved);
+        if (!node || node.type !== 'file') {
+          return {
+            stdout: '',
+            stderr: `tail: cannot open '${target}': No such file\n`,
+            exitCode: 1,
+            updatedState: state,
+          };
+        }
+        content = node.content;
+      }
+      const allLines = content.split('\n').filter(Boolean);
+      const out = allLines.slice(Math.max(0, allLines.length - linesCount)).join('\n');
+      return {
+        stdout: out + (out ? '\n' : ''),
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'touch': {
+      const target = args[1];
+      if (!target)
+        return {
+          stdout: '',
+          stderr: 'touch: missing file operand\n',
+          exitCode: 1,
+          updatedState: state,
+        };
+      const resolved = resolvePath(state.cwd, target);
+      const fileName = resolved.pop()!;
+      const parent = getNode(state.root, resolved);
+      if (!parent || parent.type !== 'dir') {
+        return {
+          stdout: '',
+          stderr: `touch: cannot touch '${target}': No such file or directory\n`,
+          exitCode: 1,
+          updatedState: state,
+        };
+      }
+      if (!parent.children[fileName]) {
+        parent.children[fileName] = {
+          type: 'file',
+          name: fileName,
+          content: '',
+          mode: 0o644,
+          owner: state.user.username,
+          group: state.user.username,
+          size: 0,
+          mtime: new Date().toISOString(),
+        };
+      }
+      return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'mkdir': {
+      const target = args.find((a) => !a.startsWith('-'));
+      if (!target)
+        return {
+          stdout: '',
+          stderr: 'mkdir: missing operand\n',
+          exitCode: 1,
+          updatedState: state,
+        };
+      const resolved = resolvePath(state.cwd, target);
+      const dirName = resolved.pop()!;
+      const parent = getNode(state.root, resolved);
+      if (!parent || parent.type !== 'dir') {
+        return {
+          stdout: '',
+          stderr: `mkdir: cannot create directory '${target}': No such file or directory\n`,
+          exitCode: 1,
+          updatedState: state,
+        };
+      }
+      parent.children[dirName] = {
+        type: 'dir',
+        name: dirName,
+        mode: 0o755,
+        owner: state.user.username,
+        group: state.user.username,
+        children: {},
+      };
+      return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'rm': {
+      const target = args.find((a) => !a.startsWith('-'));
+      if (!target)
+        return {
+          stdout: '',
+          stderr: 'rm: missing operand\n',
+          exitCode: 1,
+          updatedState: state,
+        };
+      const resolved = resolvePath(state.cwd, target);
+      const name = resolved.pop()!;
+      const parent = getNode(state.root, resolved);
+      if (!parent || parent.type !== 'dir' || !parent.children[name]) {
+        return {
+          stdout: '',
+          stderr: `rm: cannot remove '${target}': No such file or directory\n`,
+          exitCode: 1,
+          updatedState: state,
+        };
+      }
+      delete parent.children[name];
+      return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
+    }
+
     case 'chmod': {
       if (args.length < 3) {
         return {
@@ -616,14 +1286,14 @@ function executeSingleCommand(
         };
       }
 
-      // Support octal: 600, 755, 4755, 644
+      // Octal support
       const octalMatch = modeStr.match(/^[0-7]{3,4}$/);
       if (octalMatch) {
         node.mode = parseInt(modeStr, 8);
         return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
       }
 
-      // Support symbolic: +x, -w, u+s
+      // Symbolic support
       if (modeStr === '+x' || modeStr === 'a+x') {
         node.mode |= 0o111;
       } else if (modeStr === '-w') {
@@ -674,6 +1344,7 @@ function executeSingleCommand(
       let ignoreCase = false;
       let invert = false;
       let showLineNum = false;
+      let countOnly = false;
       let pattern = '';
       let fileArg = '';
 
@@ -683,6 +1354,7 @@ function executeSingleCommand(
           if (a.includes('i')) ignoreCase = true;
           if (a.includes('v')) invert = true;
           if (a.includes('n')) showLineNum = true;
+          if (a.includes('c')) countOnly = true;
         } else if (!pattern) {
           pattern = a.replace(/^['"](.*)['"]$/, '$1');
         } else {
@@ -694,18 +1366,10 @@ function executeSingleCommand(
       if (fileArg) {
         const resolved = resolvePath(state.cwd, fileArg);
         const node = getNode(state.root, resolved);
-        if (!node) {
+        if (!node || node.type !== 'file') {
           return {
             stdout: '',
             stderr: `grep: ${fileArg}: No such file or directory\n`,
-            exitCode: 2,
-            updatedState: state,
-          };
-        }
-        if (node.type === 'dir') {
-          return {
-            stdout: '',
-            stderr: `grep: ${fileArg}: Is a directory\n`,
             exitCode: 2,
             updatedState: state,
           };
@@ -735,6 +1399,15 @@ function executeSingleCommand(
         }
       }
 
+      if (countOnly) {
+        return {
+          stdout: `${matched.length}\n`,
+          stderr: '',
+          exitCode: 0,
+          updatedState: state,
+        };
+      }
+
       return {
         stdout: matched.length > 0 ? matched.join('\n') + '\n' : '',
         stderr: '',
@@ -744,7 +1417,6 @@ function executeSingleCommand(
     }
 
     case 'awk': {
-      // Basic awk field extractor support: awk '{print $1}' or awk -F: '{print $1}'
       let delimiter = /\s+/;
       let program = '';
       for (let i = 1; i < args.length; i++) {
@@ -779,8 +1451,101 @@ function executeSingleCommand(
       };
     }
 
+    case 'sed': {
+      // Basic sed support: sed 's/foo/bar/g'
+      const expr = args[1]?.replace(/^['"](.*)['"]$/, '$1') || '';
+      const sedMatch = expr.match(/^s\/([^/]+)\/([^/]*)\/(g?)/);
+      if (!sedMatch) {
+        return { stdout: stdinData, stderr: '', exitCode: 0, updatedState: state };
+      }
+      const findText = sedMatch[1];
+      const replaceText = sedMatch[2];
+      const flags = sedMatch[3] ? 'g' : '';
+      const regex = new RegExp(findText, flags);
+      const out = stdinData.replace(regex, replaceText);
+      return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'sort': {
+      let reverse = false;
+      let numeric = false;
+      let unique = false;
+      for (const a of args) {
+        if (a.includes('r')) reverse = true;
+        if (a.includes('n')) numeric = true;
+        if (a.includes('u')) unique = true;
+      }
+      let lines = stdinData.split('\n').filter(Boolean);
+      if (unique) lines = Array.from(new Set(lines));
+      lines.sort((a, b) => {
+        if (numeric) {
+          return parseFloat(a) - parseFloat(b);
+        }
+        return a.localeCompare(b);
+      });
+      if (reverse) lines.reverse();
+      return {
+        stdout: lines.join('\n') + (lines.length ? '\n' : ''),
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'uniq': {
+      let count = false;
+      for (const a of args) {
+        if (a.includes('c')) count = true;
+      }
+      const lines = stdinData.split('\n').filter(Boolean);
+      const counts: Record<string, number> = {};
+      lines.forEach((l) => {
+        counts[l] = (counts[l] || 0) + 1;
+      });
+      const out = Object.keys(counts)
+        .map((k) => (count ? `${String(counts[k]).padStart(7, ' ')} ${k}` : k))
+        .join('\n');
+      return {
+        stdout: out ? out + '\n' : '',
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'wc': {
+      let countLines = false;
+      let countWords = false;
+      let countChars = false;
+      for (const a of args) {
+        if (a.includes('l')) countLines = true;
+        if (a.includes('w')) countWords = true;
+        if (a.includes('c') || a.includes('m')) countChars = true;
+      }
+      if (!countLines && !countWords && !countChars) {
+        countLines = true;
+        countWords = true;
+        countChars = true;
+      }
+      const text = stdinData;
+      const l = text.split('\n').filter(Boolean).length;
+      const w = text.trim().split(/\s+/).filter(Boolean).length;
+      const c = text.length;
+
+      const outParts: string[] = [];
+      if (countLines) outParts.push(String(l));
+      if (countWords) outParts.push(String(w));
+      if (countChars) outParts.push(String(c));
+
+      return {
+        stdout: outParts.join('\t') + '\n',
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
     case 'find': {
-      // find / -perm -4000 or find . -name "*.log"
       const pathArg = args[1] || '.';
       let permCheck: number | null = null;
       let nameCheck: RegExp | null = null;
@@ -788,11 +1553,7 @@ function executeSingleCommand(
       for (let i = 2; i < args.length; i++) {
         if (args[i] === '-perm' && args[i + 1]) {
           const p = args[i + 1];
-          if (p.startsWith('-')) {
-            permCheck = parseInt(p.slice(1), 8);
-          } else {
-            permCheck = parseInt(p, 8);
-          }
+          permCheck = p.startsWith('-') ? parseInt(p.slice(1), 8) : parseInt(p, 8);
           i++;
         } else if (args[i] === '-name' && args[i + 1]) {
           const pattern = args[i + 1].replace(/\*/g, '.*');
@@ -815,15 +1576,9 @@ function executeSingleCommand(
       const results: string[] = [];
       function walk(n: VfsNode, currentPath: string) {
         let matches = true;
-        if (permCheck !== null) {
-          if ((n.mode & permCheck) !== permCheck) matches = false;
-        }
-        if (nameCheck !== null) {
-          if (!nameCheck.test(n.name)) matches = false;
-        }
-        if (matches && currentPath) {
-          results.push(currentPath);
-        }
+        if (permCheck !== null && (n.mode & permCheck) !== permCheck) matches = false;
+        if (nameCheck !== null && !nameCheck.test(n.name)) matches = false;
+        if (matches && currentPath) results.push(currentPath);
         if (n.type === 'dir') {
           for (const k of Object.keys(n.children)) {
             walk(n.children[k], `${currentPath}/${k}`.replace(/\/+/g, '/'));
@@ -855,20 +1610,73 @@ function executeSingleCommand(
       return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
     }
 
-    case 'echo': {
-      const msg = args
-        .slice(1)
-        .join(' ')
-        .replace(/^['"](.*)['"]$/, '$1');
-      return { stdout: `${msg}\n`, stderr: '', exitCode: 0, updatedState: state };
+    case 'kill': {
+      const pid = args.find((a) => !a.startsWith('-'));
+      if (!pid)
+        return {
+          stdout: '',
+          stderr:
+            'kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ...\n',
+          exitCode: 1,
+          updatedState: state,
+        };
+      return {
+        stdout: `[+] Terminated process PID ${pid}\n`,
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'nmap': {
+      const target = args.find((a) => !a.startsWith('-') && a !== 'nmap') || '10.0.4.1';
+      const out =
+        `Starting Nmap 7.94 ( https://nmap.org ) at 2026-08-27 06:50 UTC\n` +
+        `Nmap scan report for ${target}\n` +
+        `Host is up (0.00042s latency).\n` +
+        `Not shown: 996 closed tcp ports (reset)\n` +
+        `PORT     STATE SERVICE VERSION\n` +
+        `22/tcp   open  ssh     OpenSSH 9.6p1 Ubuntu 3ubuntu13\n` +
+        `80/tcp   open  http    nginx 1.24.0 (Ubuntu)\n` +
+        `443/tcp  open  ssl/http nginx 1.24.0\n` +
+        `5432/tcp open  postgresql PostgreSQL DB 16.2\n\n` +
+        `Nmap done: 1 IP address (1 host up) scanned in 0.84 seconds\n`;
+      return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'ifconfig':
+    case 'ip': {
+      const out =
+        'eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500\n' +
+        '        inet 10.0.4.15  netmask 255.255.255.0  broadcast 10.0.4.255\n' +
+        '        inet6 fe80::216:3eff:feaa:bbcc  prefixlen 64  scopeid 0x20<link>\n' +
+        '        ether 00:16:3e:aa:bb:cc  txqueuelen 1000  (Ethernet)\n' +
+        '        RX packets 14208  bytes 12894102 (12.8 MB)\n' +
+        '        TX packets 9812  bytes 841209 (841.2 KB)\n\n' +
+        'lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536\n' +
+        '        inet 127.0.0.1  netmask 255.0.0.0\n';
+      return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'ping': {
+      const host = args.find((a) => !a.startsWith('-') && a !== 'ping') || '10.0.4.1';
+      const out =
+        `PING ${host} (${host}) 56(84) bytes of data.\n` +
+        `64 bytes from ${host}: icmp_seq=1 ttl=64 time=0.412 ms\n` +
+        `64 bytes from ${host}: icmp_seq=2 ttl=64 time=0.389 ms\n` +
+        `64 bytes from ${host}: icmp_seq=3 ttl=64 time=0.401 ms\n\n` +
+        `--- ${host} ping statistics ---\n` +
+        `3 packets transmitted, 3 received, 0% packet loss, time 2004ms\n` +
+        `rtt min/avg/max/mdev = 0.389/0.400/0.412/0.009 ms\n`;
+      return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
     }
 
     case 'base64': {
-      if (args[1] === '-d') {
-        const text = stdinData || (args[2] ? args[2] : '');
+      if (args.includes('-d') || args.includes('--decode')) {
+        const text = stdinData || args.slice(2).join(' ');
         try {
           const decoded = atob(text.trim());
-          return { stdout: decoded, stderr: '', exitCode: 0, updatedState: state };
+          return { stdout: decoded + '\n', stderr: '', exitCode: 0, updatedState: state };
         } catch {
           return {
             stdout: '',
@@ -883,10 +1691,29 @@ function executeSingleCommand(
       return { stdout: encoded + '\n', stderr: '', exitCode: 0, updatedState: state };
     }
 
+    case 'hexdump': {
+      const content = stdinData || 'Security Practice Payload Data';
+      let out = '';
+      for (let i = 0; i < content.length; i += 16) {
+        const chunk = content.slice(i, i + 16);
+        const hex = Array.from(chunk)
+          .map((c) => c.charCodeAt(0).toString(16).padStart(2, '0'))
+          .join(' ');
+        const offset = i.toString(16).padStart(8, '0');
+        out += `${offset}  ${hex.padEnd(48, ' ')}  |${chunk}|\n`;
+      }
+      return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'echo': {
+      const msg = args
+        .slice(1)
+        .join(' ')
+        .replace(/^['"](.*)['"]$/, '$1');
+      return { stdout: `${msg}\n`, stderr: '', exitCode: 0, updatedState: state };
+    }
+
     case 'curl': {
-      const _url =
-        args.find((a) => a.startsWith('http://') || a.startsWith('https://')) ||
-        'http://localhost:8080';
       const isHead = args.includes('-I') || args.includes('--head');
       if (isHead) {
         const headerRes =
@@ -914,16 +1741,19 @@ function executeSingleCommand(
 
     case 'help': {
       const helpMsg =
-        'Supported POSIX commands in this Web Workbench:\n' +
-        '  ls, cd, pwd, cat, chmod, chown, grep, awk, find, ps, echo, base64, curl, clear\n' +
-        '  Pipes (|), redirects (>, >>), and chaining (&&) are fully supported.\n';
+        '=== Web POSIX / BusyBox Command Suite (40+ Utilities) ===\n' +
+        '  File System:  ls, cd, pwd, cat, head, tail, touch, mkdir, rm, cp, mv, chmod, chown\n' +
+        '  Search & Text: grep, awk, sed, cut, sort, uniq, wc, find, strings, hexdump\n' +
+        '  System Info:   whoami, id, uname, hostname, env, export, unset, uptime, date, ps, kill\n' +
+        '  Network Recon: nmap, ifconfig, ip, ping, curl, dig, nc\n' +
+        '  Pipelines (|), Chaining (&&, ||, ;), and Redirections (>, >>) are fully active.\n';
       return { stdout: helpMsg, stderr: '', exitCode: 0, updatedState: state };
     }
 
     default: {
       return {
         stdout: '',
-        stderr: `bash: ${cmd}: command not found. Type 'help' for available commands.\n`,
+        stderr: `bash: ${cmd}: command not found. Type 'help' to see all 40+ supported commands.\n`,
         exitCode: 127,
         updatedState: state,
       };
