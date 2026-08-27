@@ -51,11 +51,18 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
   const [historyIndex, setHistoryIndex] = React.useState<number | null>(null);
   const [copiedCmd, setCopiedCmd] = React.useState<string | null>(null);
 
-  const terminalEndRef = React.useRef<HTMLDivElement>(null);
+  const outputContainerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const isMountedRef = React.useRef(false);
 
   React.useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      return;
+    }
+    if (outputContainerRef.current) {
+      outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+    }
   }, [historyItems]);
 
   const handleRunCommand = (cmdToRun: string): void => {
@@ -251,7 +258,10 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
         </div>
 
         {/* Output Stream */}
-        <div className="max-h-[380px] min-h-[240px] space-y-2 overflow-y-auto pr-1">
+        <div
+          ref={outputContainerRef}
+          className="max-h-[380px] min-h-[240px] space-y-2 overflow-y-auto pr-1"
+        >
           {historyItems.map((item) => (
             <div key={item.id} className="space-y-1">
               {item.command && (
@@ -305,10 +315,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
               className="flex-1 bg-transparent font-mono text-[11.5px] text-emerald-300 caret-emerald-400 outline-none"
               autoComplete="off"
               spellCheck="false"
-              autoFocus
             />
           </div>
-          <div ref={terminalEndRef} />
         </div>
       </div>
     </div>
