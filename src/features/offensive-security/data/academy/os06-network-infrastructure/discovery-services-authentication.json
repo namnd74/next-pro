@@ -1,0 +1,1052 @@
+{
+  "id": "os06-m01-discovery-services-authentication",
+  "slug": "discovery-services-authentication",
+  "trackId": "os06-network-infrastructure",
+  "title": "Discovery, common services and authentication weaknesses",
+  "summary": "Master enterprise network infrastructure discovery: enumerate SMB/RPC protocols, audit misconfigured infrastructure services (SNMP, NFS, Databases), and execute rate-controlled password spraying without account lockouts.",
+  "difficulty": "intermediate",
+  "estimatedMinutes": 300,
+  "careerPaths": ["penetration-test", "red-team", "vulnerability-assessment"],
+  "domains": ["network", "linux", "windows"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os06-l43-enterprise-network-discovery-and-smb-rpc-enumeration",
+      "slug": "enterprise-network-discovery-and-smb-rpc-enumeration",
+      "title": "Enterprise Network Discovery & SMB/RPC Protocol Interrogation",
+      "summary": "Interrogate enterprise network services: active host discovery, SMB share permissions, anonymous RPC binding (SAMR, LSARPC), and safe Active Directory domain enumeration without service disruption.",
+      "difficulty": "intermediate",
+      "durationMinutes": 100,
+      "prerequisites": [],
+      "outcomes": [
+        "Enumerate active enterprise hosts and internal subnets using controlled Layer 2/3 discovery techniques.",
+        "Audit SMB share permissions, null sessions, and message signing configurations across Windows servers.",
+        "Interrogate MSRPC endpoints (SAMR, LSARPC, SRVSVC) to enumerate domain users, groups, and security identifiers."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-assessment"],
+      "domains": ["network", "windows"],
+      "attackTactics": ["discovery"],
+      "keywords": ["smb", "rpc", "samr", "lsarpc", "null-session", "network-discovery"],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Enterprise network discovery is a protocol-level dialogue: querying built-in management endpoints (SMB shares, RPC interfaces) reveals domain topology, user directories, and trust relationships using native administrative mechanisms.",
+      "visual": {
+        "title": "SMB & MSRPC Protocol Interrogation Flow",
+        "caption": "How unauthenticated and authenticated RPC/SMB probes enumerate enterprise domain entities.",
+        "steps": [
+          {
+            "label": "Network Layer Discovery",
+            "detail": "Discover live hosts via ARP/ICMP sweeps and identify open SMB (TCP 445) and RPC Endpoint Mapper (TCP 135).",
+            "tone": "allow"
+          },
+          {
+            "label": "SMB Share & Null Session Probe",
+            "detail": "Test IPC$ and anonymous share access; verify SMB message signing requirements on domain members vs Domain Controllers.",
+            "tone": "caution"
+          },
+          {
+            "label": "MSRPC Interface Binding",
+            "detail": "Bind to SAMR and LSARPC interfaces to enumerate domain accounts, SIDs, and password policy metadata.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Enterprise Network Topology and Layer 2/3 Asset Mapping",
+          "paragraphs": [
+            "Inside enterprise networks, identifying active systems requires understanding broadcast domains and routing boundaries. On local subnets, ARP scanning provides instantaneous host discovery without relying on firewalled ICMP echo responses. Across routed VLANs, SYN sweeps targeting common management ports (TCP 445, 135, 3389, 22, 80, 443) map internal infrastructure.",
+            "Operators must configure scan parallelism carefully: probing thousands of internal IP addresses simultaneously can saturate core switch state tables, trigger 802.1X port security locks, or trip Network Access Control (NAC) sensors."
+          ]
+        },
+        {
+          "title": "SMB Protocol Architecture, Shares, and Signing Configurations",
+          "paragraphs": [
+            "Server Message Block (SMB over TCP 445) is the primary file and printer sharing protocol in Windows environments. Legacy misconfigurations frequently allow 'Null Sessions' (unauthenticated connections using empty username and password `''`) or guest access to network shares containing sensitive backups, deployment scripts, and configuration files.",
+            "Furthermore, assessors must evaluate 'SMB Signing'. While Domain Controllers enforce required SMB signing by default, standard workstations and member servers often leave SMB signing enabled but not required. When SMB signing is not required, attackers can execute SMB Relay attacks (relaying NTLM authentication to execute code on remote member hosts)."
+          ]
+        },
+        {
+          "title": "MSRPC Interface Interrogation: SAMR, LSARPC, and SRVSVC",
+          "paragraphs": [
+            "Microsoft Remote Procedure Call (MSRPC over TCP 135 or named pipes like `\\pipe\\samr`) exposes rich administrative interfaces. By querying the Security Account Manager (SAMR) interface, assessors extract complete domain user lists, group memberships, and account descriptions (which often contain cleartext passwords placed by administrators).",
+            "Querying the Local Security Authority (LSARPC) interface enumerates domain SIDs (Security Identifiers) and domain trust hierarchies. The Server Service (`srvsvc`) interface lists all active file shares, network sessions, and connected remote user accounts."
+          ]
+        },
+        {
+          "title": "Responsible AD Interrogation: Protocol Throttling and Audit Logging",
+          "paragraphs": [
+            "Active Directory domain controllers log extensive telemetry for RPC and SMB connections (Windows Event ID 4624 for successful logon, Event ID 4625 for failed logon, Event ID 5140 for network share access).",
+            "Aggressive unthrottled querying can lock domain accounts or generate thousands of SIEM alerts. Responsible operators batch RPC lookups, reuse existing authenticated connections, and verify domain lockout policies before executing directory queries."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "SMB/RPC Protocol Discovery & Access Control Audit",
+        "objective": "Enumerate internal network hosts, identify unauthenticated SMB share misconfigurations, audit SMB signing requirements, and interrogate MSRPC SAMR endpoints.",
+        "scenario": "You have connected an assessment laptop to an internal corporate network segment. You must discover domain member servers, audit SMB access controls, and extract domain account metadata.",
+        "constraints": [
+          "Must identify SMB signing configuration across discovered Windows hosts.",
+          "Must enumerate shared folders for unauthenticated read permissions.",
+          "Must query SAMR interface without causing domain controller performance degradation."
+        ],
+        "cases": [
+          {
+            "id": "case-01-smb-signing-audit",
+            "title": "Auditing SMB Signing Posture Across Member Hosts",
+            "context": "An Nmap SMB security scan against a subnet of 50 Windows member servers shows 'Message signing enabled but not required' on 48 servers, while the 2 Domain Controllers report 'Message signing enabled and required'.",
+            "prompt": "What security risk does this SMB signing configuration present, and what is the remediation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Hosts with SMB signing 'not required' are vulnerable to NTLM Relay attacks: an attacker capturing NTLM authentication can relay credentials to execute remote commands; the remediation is enforcing 'Digitally sign communications (always)' via Group Policy across all member servers.",
+                "correct": true,
+                "rationale": "Without mandatory SMB signing, an attacker in a position to intercept network traffic (via ARP spoofing or LLMNR/NBT-NS poisoning) can relay authentication tokens to un-signed target servers and gain administrative access."
+              },
+              {
+                "id": "opt-2",
+                "label": "All 48 member servers will crash if an SMB packet is sent to them.",
+                "correct": false,
+                "rationale": "Missing signing requirement creates relay vulnerabilities, not instant remote crashes."
+              },
+              {
+                "id": "opt-3",
+                "label": "SMB signing is an obsolete feature that should be disabled on Domain Controllers.",
+                "correct": false,
+                "rationale": "Disabling SMB signing on Domain Controllers exposes the entire domain infrastructure to relay compromise."
+              },
+              {
+                "id": "opt-4",
+                "label": "There is zero risk because Domain Controllers have signing enabled.",
+                "correct": false,
+                "rationale": "Protecting Domain Controllers does not protect the 48 member servers from being compromised via relayed authentication."
+              }
+            ]
+          },
+          {
+            "id": "case-02-anonymous-share-discovery",
+            "title": "Identifying Sensitive Unauthenticated SMB Shares",
+            "context": "An operator enumerates shares on an internal file server ('10.10.20.15') and discovers a share named `\\\\10.10.20.15\\Backups` readable with anonymous credentials. Inside is a file named `unattend.xml`.",
+            "prompt": "What critical credential risk is associated with `unattend.xml` in an accessible network share?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Windows Deployment Services `unattend.xml` files frequently contain base64-encoded or plaintext local Administrator passwords in `<AdministratorPassword>` tags, allowing immediate local privilege escalation across provisioned machines.",
+                "correct": true,
+                "rationale": "Automated deployment answer files (unattend.xml / sysprep.inf) often store local admin credentials, granting attackers full administrative access to all systems deployed from that image."
+              },
+              {
+                "id": "opt-2",
+                "label": "The file contains a virus that will format the operator's computer upon opening.",
+                "correct": false,
+                "rationale": "unattend.xml is an XML configuration file, not an executable virus."
+              },
+              {
+                "id": "opt-3",
+                "label": "The file only contains printer driver configuration settings.",
+                "correct": false,
+                "rationale": "unattend.xml is an OS setup answer file that typically contains initial local admin account credentials."
+              },
+              {
+                "id": "opt-4",
+                "label": "The share should be deleted immediately without logging the finding.",
+                "correct": false,
+                "rationale": "Assessors must document the finding and notify the client, not delete client infrastructure files."
+              }
+            ]
+          },
+          {
+            "id": "case-03-msrpc-samr-enumeration",
+            "title": "Interrogating SAMR for Domain User Enumeration",
+            "context": "Using low-privilege domain credentials, an assessor connects to the Domain Controller via `rpcclient -U 'domain/user%pass' dc01.corp.local` and executes `enumdomusers`.",
+            "prompt": "What intelligence does SAMR enumeration provide, and how is it safely leveraged in the assessment?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "SAMR returns all domain user accounts and RIDs (Relative Identifiers); inspecting user description fields (`queryuser <rid>`) often uncovers cleartext passwords, service descriptions, and employee roles without triggering account lockouts.",
+                "correct": true,
+                "rationale": "Querying user metadata via SAMR is a read-only directory operation that generates zero failed logon events, providing valuable reconnaissance on account names and potential sensitive descriptions."
+              },
+              {
+                "id": "opt-2",
+                "label": "Executing enumdomusers forces all domain users to reset their passwords immediately.",
+                "correct": false,
+                "rationale": "Read-only RPC queries do not modify user password state."
+              },
+              {
+                "id": "opt-3",
+                "label": "SAMR is only accessible to Domain Admins and will fail for normal users.",
+                "correct": false,
+                "rationale": "By default in Active Directory, any authenticated domain user can enumerate other domain users via SAMR/RPC."
+              },
+              {
+                "id": "opt-4",
+                "label": "SAMR enumeration modifies the Domain Controller registry directly.",
+                "correct": false,
+                "rationale": "Directory queries do not write to the domain controller registry."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Audit SMB signing requirements across discovered internal hosts.",
+          "Identify and document accessible network shares containing sensitive deployment artifacts.",
+          "Enumerate Active Directory accounts and RIDs via MSRPC SAMR interfaces."
+        ],
+        "evidenceTemplate": [
+          "Nmap SMB security check output detailing signing enforcement across subnet hosts.",
+          "Directory listing of accessible SMB share highlighting unattend.xml credential exposure.",
+          "rpcclient SAMR user enumeration transcript documenting domain accounts and RIDs."
+        ],
+        "reset": "Reset SMB file share permissions and mock Windows domain fixtures to baseline.",
+        "cleanup": "Remove temporary local share mount points and clear rpcclient query logs."
+      },
+      "governance": {
+        "prevent": [
+          "Enforce SMB Message Signing Required via Group Policy across all domain workstations and servers.",
+          "Disable Anonymous (Null Session) share access and restrict IPC$ named pipe permissions.",
+          "Block storage of plaintext deployment credentials in accessible network shares."
+        ],
+        "observe": [
+          "Monitor Windows Event ID 5140 and 5145 for abnormal network share access patterns.",
+          "Track MSRPC SAMR connection spikes and mass directory enumeration queries.",
+          "Log SMB relay attack attempts using network intrusion detection (Snort/Zeek)."
+        ],
+        "respond": [
+          "Immediately rotate any local administrator password exposed in accessible unattend.xml files.",
+          "Isolate member servers actively communicating with unauthenticated RPC clients.",
+          "Enforce SMB3 encryption and SMB signing domain-wide."
+        ],
+        "residualRisk": [
+          "Legacy embedded operating systems (e.g. Windows XP/Embedded) may not support mandatory SMB signing.",
+          "Disabling anonymous RPC queries may impact older third-party directory integration utilities."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "SMB signing and SMB encryption are the exact same thing.",
+          "correction": "SMB signing guarantees message integrity and authentication (preventing tampering and relay attacks). SMB encryption provides full payload confidentiality (preventing network sniffing)."
+        },
+        {
+          "claim": "Only Domain Administrators can list domain users in an Active Directory environment.",
+          "correction": "In standard Active Directory configurations, any authenticated domain user—or even anonymous null sessions if misconfigured—can query all domain user objects via SAMR/LDAP."
+        },
+        {
+          "claim": "Scanning port 445 on a Windows server will immediately crash the operating system.",
+          "correction": "Modern Windows SMB implementations handle standard TCP port scans reliably. However, unconstrained high-rate scanning can exhaust ephemeral connection pools."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is the primary risk of an enterprise server having SMB signing configured as 'Enabled but not required'?",
+          "options": [
+            {
+              "id": "A",
+              "label": "The server cannot connect to the internet."
+            },
+            {
+              "id": "B",
+              "label": "An attacker capturing network traffic can execute an NTLM Relay attack, relaying authenticated sessions to the server to execute unauthorized commands."
+            },
+            {
+              "id": "C",
+              "label": "The server will automatically reboot every 10 minutes."
+            },
+            {
+              "id": "D",
+              "label": "All files on the server are automatically converted to PDF."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "When SMB signing is not strictly required, an attacker can intercept and relay NTLM authentication challenge-responses to the un-signed host to execute commands without knowing the plaintext password."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "What sensitive information is frequently exposed inside unauthenticated `unattend.xml` or `sysprep.inf` files discovered on network shares?",
+          "options": [
+            {
+              "id": "A",
+              "label": "The physical weight of the server chassis."
+            },
+            {
+              "id": "B",
+              "label": "Plaintext or base64-encoded local Administrator account passwords used during automated OS imaging."
+            },
+            {
+              "id": "C",
+              "label": "The personal phone numbers of Microsoft engineers."
+            },
+            {
+              "id": "D",
+              "label": "The exact GPS coordinates of the datacenter."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Automated deployment answer files (unattend.xml) frequently store local administrator credentials created during automated installation images."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "Why does enumerating Active Directory users via MSRPC SAMR (`enumdomusers`) carry zero risk of triggering account lockouts?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because SAMR queries only run on Sundays."
+            },
+            {
+              "id": "B",
+              "label": "Because SAMR enumeration is a read-only directory query over an existing authenticated connection, generating zero failed logon attempts (Event ID 4625)."
+            },
+            {
+              "id": "C",
+              "label": "Because SAMR bypasses all Windows security subsystems."
+            },
+            {
+              "id": "D",
+              "label": "Because Active Directory disables account lockouts for RPC traffic."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "SAMR directory queries inspect user object metadata without attempting authentication passwords, producing zero failed logon events."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are connected to an internal corporate network (10.10.50.0/24). You must conduct a safe SMB and MSRPC security audit across all 30 hosts in the subnet: determine SMB signing requirements, locate any unauthenticated network shares containing sensitive setup files, and extract the domain user list via rpcclient without causing service disruption.",
+        "tasks": [
+          "Execute an Nmap script scan (`--script smb-security-mode,smb-enum-shares`) to audit signing and shares.",
+          "Connect to accessible shares and identify any exposed deployment artifacts or configuration files.",
+          "Use `rpcclient` to enumerate domain users and export the user list to a structured JSON file."
+        ],
+        "requiredEvidence": [
+          "Nmap SMB audit report detailing signing posture per host.",
+          "Evidence transcript of identified unauthenticated network shares.",
+          "Exported domain user inventory JSON artifact extracted via SAMR."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn: Overview of Server Message Block Signing",
+          "url": "https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/overview-server-message-block-signing",
+          "publisher": "Microsoft Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "SMB signing security mechanics and NTLM relay mitigation",
+            "Group Policy configuration for SMB client and server signing",
+            "SMB1, SMB2, and SMB3 signing architecture differences"
+          ]
+        },
+        {
+          "title": "MS-SAMR: Security Account Manager Remote Protocol Specification",
+          "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-samr/",
+          "publisher": "Microsoft Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "MSRPC SAMR interface architecture and method specifications",
+            "Domain user, group, and alias enumeration protocols"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os06-l44-common-infrastructure-services-and-misconfigurations",
+      "slug": "common-infrastructure-services-and-misconfigurations",
+      "title": "Common Infrastructure Services & Misconfiguration Auditing",
+      "summary": "Audit critical enterprise infrastructure services: SNMP community strings (v1/v2c vs v3), NFS export permissions (no_root_squash), database listeners (MSSQL, MySQL, PostgreSQL, Oracle), and SMTP open relays.",
+      "difficulty": "intermediate",
+      "durationMinutes": 100,
+      "prerequisites": ["os06-l43-enterprise-network-discovery-and-smb-rpc-enumeration"],
+      "outcomes": [
+        "Identify and enumerate SNMP management services using default community strings (public/private).",
+        "Audit NFS exports for insecure root squash settings (`no_root_squash`) and permissive network access.",
+        "Assess unauthenticated or weakly authenticated database listener services (MSSQL, MySQL, PostgreSQL, Oracle TNS)."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-assessment"],
+      "domains": ["network", "linux", "windows"],
+      "attackTactics": ["discovery", "initial-access"],
+      "keywords": [
+        "snmp",
+        "nfs",
+        "no_root_squash",
+        "database-security",
+        "mssql",
+        "smtp-relay"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Enterprise infrastructure services run with administrative privileges: unhardened default configurations (public SNMP, NFS no_root_squash, default SA/root database passwords) provide direct privilege escalation paths.",
+      "visual": {
+        "title": "Infrastructure Daemon Misconfiguration Risk Vectors",
+        "caption": "How misconfigurations in SNMP, NFS, and database services expose internal network assets.",
+        "steps": [
+          {
+            "label": "SNMP v1/v2c Probing",
+            "detail": "Query UDP 161 with default community strings ('public') to dump routing tables, installed software, and interfaces.",
+            "tone": "caution"
+          },
+          {
+            "label": "NFS Export Audit",
+            "detail": "Inspect /etc/exports via showmount -e; identify shares configured with 'no_root_squash' accessible to arbitrary subnets.",
+            "tone": "caution"
+          },
+          {
+            "label": "Database Listener Assessment",
+            "detail": "Probe default database ports (TCP 1433, 3306, 5432, 1521) for blank passwords, default accounts, and remote access.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "SNMP Architecture and Community String Vulnerabilities",
+          "paragraphs": [
+            "The Simple Network Management Protocol (SNMP over UDP 161) is widely deployed across routers, switches, printers, and servers for telemetry monitoring. SNMP versions 1 and 2c lack cryptographic authentication and encryption, relying entirely on plaintext 'community strings' (typically default values like `public` for read-only and `private` for read-write).",
+            "Interrogating SNMP using Management Information Bases (MIBs) like `HOST-RESOURCES-MIB` and `IP-MIB` uncovers running system processes, user accounts, network routing tables, and internal IP allocations. Read-write community strings (`private`) often permit modifying network device startup configs via TFTP, leading to complete device takeover."
+          ]
+        },
+        {
+          "title": "Network File System (NFS) Permissions and Root Squash Bypass",
+          "paragraphs": [
+            "Network File System (NFS over TCP/UDP 2049) enables Unix/Linux systems to mount remote directories over the network. Insecure `/etc/exports` configurations frequently expose file systems to broad IP subnets (`*(rw,sync,no_root_squash)`).",
+            "The `no_root_squash` option disables UID remapping. When a client root user (UID 0) connects to an NFS share with `no_root_squash`, files created on the share retain UID 0. An attacker mounting the share locally can place a SUID root binary or modify `/etc/shadow` on the target server, gaining instant root privileges upon server execution."
+          ]
+        },
+        {
+          "title": "Enterprise Database Listeners: MSSQL, MySQL, PostgreSQL, and Oracle TNS",
+          "paragraphs": [
+            "Enterprise database servers exposed directly to internal subnets are frequent targets for lateral movement. Assessors audit default ports: Microsoft SQL Server (TCP 1433 / UDP 1434 SQL Browser), MySQL (TCP 3306), PostgreSQL (TCP 5432), and Oracle TNS Listener (TCP 1521).",
+            "Common misconfigurations include blank or default administrative passwords (`sa` with empty password on MSSQL, `postgres` with `postgres` on PostgreSQL, `SYS` with `CHANGE_ON_INSTALL` on Oracle), unauthenticated TCP binding without TLS encryption, and dangerous extended stored procedures enabled (e.g. `xp_cmdshell` on MSSQL, which executes shell commands under the SQL Server service account)."
+          ]
+        },
+        {
+          "title": "SMTP Open Relays and Mail Infrastructure Spoofing",
+          "paragraphs": [
+            "Simple Mail Transfer Protocol (SMTP over TCP 25) daemons configured as 'Open Relays' accept and forward email messages from arbitrary IP addresses destined for external recipients without authentication. Open relays enable malicious actors to launch phishing campaigns that originate from the client's legitimate IP infrastructure.",
+            "Assessors test mail servers for relay authorization by sending test envelope commands (`MAIL FROM: <external@domain.com>`, `RCPT TO: <external@target.com>`) while validating that no test emails are actually delivered to external third parties."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Infrastructure Service Misconfiguration & Access Audit",
+        "objective": "Audit internal SNMP services for default community strings, evaluate an NFS share for `no_root_squash` privilege escalation risks, and assess an unhardened MSSQL database listener.",
+        "scenario": "You are auditing infrastructure services on an enterprise Linux and Windows staging network. You have identified hosts running SNMP, NFS, and MSSQL.",
+        "constraints": [
+          "Must extract system process and interface telemetry via SNMP v2c.",
+          "Must demonstrate the privilege escalation risk of NFS no_root_squash.",
+          "Must assess MSSQL service configuration and xp_cmdshell state safely."
+        ],
+        "cases": [
+          {
+            "id": "case-01-snmp-enumeration",
+            "title": "Harvesting System Intelligence via Default SNMP Communities",
+            "context": "A core router and several internal Linux servers respond to SNMP v2c queries with the community string 'public'.",
+            "prompt": "What security information can an assessor extract via SNMP 'public' community strings, and what is the remediation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "SNMP allows extracting running process lists, installed software versions, network routing tables, and interface IPs via MIB walks; the remediation is migrating to SNMPv3 with SHA authentication and AES encryption (USM) while disabling SNMPv1/v2c.",
+                "correct": true,
+                "rationale": "SNMPv1/v2c transmits unencrypted community strings and exposes deep host telemetry. Migrating to SNMPv3 provides strong user authentication and payload encryption."
+              },
+              {
+                "id": "opt-2",
+                "label": "SNMP 'public' community string is read-only and therefore carries zero security risk.",
+                "correct": false,
+                "rationale": "Read-only SNMP leaks detailed system telemetry, internal routing tables, and process arguments, aiding attacker reconnaissance."
+              },
+              {
+                "id": "opt-3",
+                "label": "SNMP community strings should be changed to 'admin123' while remaining on SNMPv1.",
+                "correct": false,
+                "rationale": "SNMPv1 transmits community strings in plaintext across the network, regardless of password complexity."
+              },
+              {
+                "id": "opt-4",
+                "label": "SNMP only monitors printer ink levels and has no networking capabilities.",
+                "correct": false,
+                "rationale": "SNMP is a comprehensive management protocol exposing core system, process, and network telemetry."
+              }
+            ]
+          },
+          {
+            "id": "case-02-nfs-no-root-squash",
+            "title": "Evaluating NFS `no_root_squash` Privilege Escalation Risks",
+            "context": "An NFS export on a production Linux server ('10.10.30.50') is configured in `/etc/exports` as `/var/nfs/shared *(rw,sync,no_root_squash)`.",
+            "prompt": "What is the critical security flaw with `no_root_squash`, and what is the remediation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "With `no_root_squash`, files created by a remote root client retain root ownership on the server; an attacker mounting the share can create a SUID root binary, leading to instant local root privilege escalation. The fix is enabling `root_squash` (remapping root to nobody:nogroup) and restricting export access to explicit IP addresses.",
+                "correct": true,
+                "rationale": "`no_root_squash` disables root remapping, allowing any attacker with root access on their own laptop to write root-owned SUID executables to the remote file system."
+              },
+              {
+                "id": "opt-2",
+                "label": "The share cannot be mounted on Linux systems.",
+                "correct": false,
+                "rationale": "NFS is natively supported on Linux systems."
+              },
+              {
+                "id": "opt-3",
+                "label": "The risk is that NFS will consume 100% of the server's hard drive within 1 hour.",
+                "correct": false,
+                "rationale": "The primary risk is privilege escalation via SUID binary placement, not disk exhaustion."
+              },
+              {
+                "id": "opt-4",
+                "label": "Setting `no_root_squash` is the official security recommendation from NIST.",
+                "correct": false,
+                "rationale": "NIST SP 800-123 explicitly recommends enabling root_squash to prevent unauthorized root privilege inheritance."
+              }
+            ]
+          },
+          {
+            "id": "case-03-mssql-xp-cmdshell-audit",
+            "title": "Auditing MSSQL `xp_cmdshell` Extended Stored Procedures",
+            "context": "An assessor authenticates to an internal MSSQL instance using valid database credentials and checks if the extended stored procedure `xp_cmdshell` is enabled.",
+            "prompt": "What risk does `xp_cmdshell` present, and what is the defensive best practice?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "`xp_cmdshell` allows database users with sufficient permissions to execute operating system shell commands under the SQL Server service account; it should be disabled via `sp_configure 'xp_cmdshell', 0` unless strictly required, and the SQL service account should run under least privilege.",
+                "correct": true,
+                "rationale": "`xp_cmdshell` bridges SQL execution into OS command execution. If enabled, any SQL injection or credential compromise immediately results in host operating system command execution."
+              },
+              {
+                "id": "opt-2",
+                "label": "`xp_cmdshell` only executes harmless DOS games and cannot run Windows commands.",
+                "correct": false,
+                "rationale": "`xp_cmdshell` invokes the Windows command interpreter (`cmd.exe`) with full service account permissions."
+              },
+              {
+                "id": "opt-3",
+                "label": "`xp_cmdshell` should always be granted to the `guest` database role.",
+                "correct": false,
+                "rationale": "Granting command execution to unprivileged guest roles allows arbitrary host takeover."
+              },
+              {
+                "id": "opt-4",
+                "label": "Disabling `xp_cmdshell` corrupts all SQL database tables.",
+                "correct": false,
+                "rationale": "Disabling xp_cmdshell is standard hardening and does not affect table storage or SQL querying."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate SNMP v1/v2c MIB walking and extract system process lists.",
+          "Identify and articulate NFS `no_root_squash` privilege escalation mechanics.",
+          "Audit MSSQL service configuration and evaluate `xp_cmdshell` security posture."
+        ],
+        "evidenceTemplate": [
+          "SNMPwalk output showing enumerated running processes and network interfaces.",
+          "NFS `/etc/exports` configuration audit report detailing root_squash remediation.",
+          "MSSQL configuration query trace documenting `xp_cmdshell` status."
+        ],
+        "reset": "Reset SNMP daemon configuration, NFS exports, and MSSQL sp_configure settings.",
+        "cleanup": "Unmount temporary NFS mounts and remove temporary database audit logs."
+      },
+      "governance": {
+        "prevent": [
+          "Prohibit deployment of SNMPv1/v2c with default community strings (`public`/`private`) on production devices.",
+          "Mandate `root_squash` and specific IP CIDR whitelisting in all NFS `/etc/exports` configurations.",
+          "Ensure database service accounts (MSSQL, MySQL, PostgreSQL) run with unprivileged OS accounts and disable shell extensions."
+        ],
+        "observe": [
+          "Alert on UDP 161 SNMP polling from unauthorized management subnets.",
+          "Monitor NFS mount request logs for unauthorized client IP addresses.",
+          "Audit database error logs for execution of dangerous stored procedures (`xp_cmdshell`)."
+        ],
+        "respond": [
+          "Immediately disable unauthenticated SNMP access on network switches and routers.",
+          "Reconfigure and re-export NFS file systems with `root_squash` enabled.",
+          "Disable `xp_cmdshell` and rotate compromised database administrative passwords."
+        ],
+        "residualRisk": [
+          "Legacy network appliances may not support SNMPv3, requiring compensating firewall access lists.",
+          "Custom applications relying on `xp_cmdshell` for automated reporting may require code refactoring."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "SNMP only runs on routers and switches, never on servers.",
+          "correction": "SNMP is commonly installed on Linux (`snmpd`) and Windows servers for enterprise monitoring suites (Zabbix, Nagios, Datadog)."
+        },
+        {
+          "claim": "NFS shares are secure if they are hidden and not advertised in DNS.",
+          "correction": "NFS shares can be discovered across network subnets via `showmount -e` or port scanning TCP 2049 regardless of DNS records."
+        },
+        {
+          "claim": "Running database servers on non-standard ports (e.g. MSSQL on 14333 instead of 1433) provides complete security.",
+          "correction": "Security through obscurity fails against basic port scanning and service fingerprinting (`nmap -sV`), which instantly identifies database protocol banners."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is the primary security enhancement of SNMPv3 compared to SNMPv1 and SNMPv2c?",
+          "options": [
+            {
+              "id": "A",
+              "label": "SNMPv3 only works over Bluetooth."
+            },
+            {
+              "id": "B",
+              "label": "SNMPv3 introduces User-based Security Model (USM) supporting cryptographic authentication (SHA) and payload encryption (AES), replacing plaintext community strings."
+            },
+            {
+              "id": "C",
+              "label": "SNMPv3 deletes all router passwords automatically."
+            },
+            {
+              "id": "D",
+              "label": "SNMPv3 increases network bandwidth to 10 Gbps."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "SNMPv3 replaces cleartext community strings with robust user authentication and message encryption, protecting management traffic from eavesdropping and tampering."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "In a Linux NFS export configuration, what is the consequence of specifying `no_root_squash`?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It compresses all files using gzip."
+            },
+            {
+              "id": "B",
+              "label": "It allows a remote client connecting as UID 0 (root) to access and create files with full root privileges on the server, enabling SUID binary privilege escalation."
+            },
+            {
+              "id": "C",
+              "label": "It makes the NFS share read-only."
+            },
+            {
+              "id": "D",
+              "label": "It requires two-factor authentication."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "By default, `root_squash` remaps UID 0 to an unprivileged user (nobody). `no_root_squash` preserves UID 0 ownership, allowing an attacker to place root-owned SUID executables."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "On Microsoft SQL Server, what command disables the dangerous `xp_cmdshell` operating system execution feature?",
+          "options": [
+            {
+              "id": "A",
+              "label": "EXEC sp_configure 'show advanced options', 1; RECONFIGURE; EXEC sp_configure 'xp_cmdshell', 0; RECONFIGURE;"
+            },
+            {
+              "id": "B",
+              "label": "DROP DATABASE master;"
+            },
+            {
+              "id": "C",
+              "label": "DELETE FROM sys.servers;"
+            },
+            {
+              "id": "D",
+              "label": "FORMAT C: /FS:NTFS"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Using `sp_configure` to set `xp_cmdshell` to 0 followed by `RECONFIGURE` disables the extended stored procedure in MSSQL."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are auditing a newly acquired business unit's datacenter subnet (10.20.30.0/24). You must discover all SNMP, NFS, and database services, identify any SNMP v1/v2c community string leaks, test NFS exports for `no_root_squash` misconfigurations, and document database listener hardening recommendations.",
+        "tasks": [
+          "Execute targeted port discovery across UDP 161, TCP 2049, TCP 1433, TCP 3306, and TCP 5432.",
+          "Perform SNMP MIB walks on responsive hosts and extract system inventory data.",
+          "Audit NFS export rules and write a formal hardening guide for database listeners and file shares."
+        ],
+        "requiredEvidence": [
+          "Network service discovery scan transcript for infrastructure daemons.",
+          "Extracted SNMP system telemetry report.",
+          "Infrastructure hardening matrix detailing NFS, SNMP, and MSSQL remediations."
+        ]
+      },
+      "sources": [
+        {
+          "title": "IETF RFC 3414: User-based Security Model (USM) for SNMPv3",
+          "url": "https://www.rfc-editor.org/rfc/rfc3414.html",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "SNMPv3 authentication and encryption specifications",
+            "User-based Security Model architecture",
+            "Mitigation of plaintext SNMPv1/v2c community string vulnerabilities"
+          ]
+        },
+        {
+          "title": "NIST SP 800-123: Guide to General Server Security",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-123/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "NFS export security and root squash enforcement",
+            "Database listener hardening and privilege restriction",
+            "Infrastructure service auditing standards"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os06-l45-authentication-weaknesses-and-credential-auditing",
+      "slug": "authentication-weaknesses-and-credential-auditing",
+      "title": "Authentication Weaknesses & Credential Spraying Safety",
+      "summary": "Execute safe, rate-controlled enterprise credential auditing: password spraying vs brute forcing, Active Directory lockout threshold policy calculation, Kerberos pre-authentication errors, and default credential hygiene.",
+      "difficulty": "intermediate",
+      "durationMinutes": 100,
+      "prerequisites": ["os06-l44-common-infrastructure-services-and-misconfigurations"],
+      "outcomes": [
+        "Differentiate horizontal password spraying dynamics from vertical brute forcing.",
+        "Calculate safe password spray timing intervals based on domain Account Lockout Thresholds and Observation Windows.",
+        "Audit Active Directory authentication endpoints (SMB, Kerberos, LDAPS) while avoiding user account lockouts."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-assessment"],
+      "domains": ["network", "windows", "linux"],
+      "attackTactics": ["credential-access", "initial-access"],
+      "keywords": [
+        "password-spraying",
+        "account-lockout",
+        "kerberos",
+        "brute-force",
+        "credential-auditing"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Password spraying is horizontal credential validation: testing 1 common password across 10,000 accounts with strict sleep intervals between cycles ensures valid credentials are found while staying far below account lockout thresholds.",
+      "visual": {
+        "title": "Password Spraying vs Brute Forcing Protocol Dynamics",
+        "caption": "How horizontal password spraying tests single passwords across many accounts safely below lockout thresholds.",
+        "steps": [
+          {
+            "label": "Domain Lockout Policy Discovery",
+            "detail": "Query Active Directory lockout threshold (e.g. 5 attempts) and reset duration (e.g. 30 minutes) via LDAP/SAMR.",
+            "tone": "allow"
+          },
+          {
+            "label": "Single Password Spray Cycle",
+            "detail": "Test 1 common password (e.g. 'SeasonYear!') across all user accounts; exactly 1 attempt per account.",
+            "tone": "caution"
+          },
+          {
+            "label": "Observation Window Sleep Delay",
+            "detail": "Sleep for the full lockout reset duration (e.g. 35 minutes) before testing a second password, preventing account lockout.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Horizontal Password Spraying vs Vertical Brute Forcing",
+          "paragraphs": [
+            "Traditional 'Vertical Brute Forcing' targets a single account with thousands of candidate passwords in rapid succession. In enterprise environments with Active Directory lockout policies (e.g. 5 failed attempts locks the account), vertical brute forcing instantly locks the target account, causing severe operational disruption and generating immediate SOC alerts.",
+            "In contrast, 'Horizontal Password Spraying' inverts the approach: testing a single, highly probable password (e.g. `Autumn2026!`, `Company123!`) across thousands of domain accounts. Because each individual account receives only 1 failed attempt per cycle, lockout counters are never exceeded."
+          ]
+        },
+        {
+          "title": "Active Directory Lockout Policy Modeling and Sleep Intervals",
+          "paragraphs": [
+            "Before launching any password spray, assessors must determine the domain's Fine-Grained Password Policy (FGPP) or Default Domain Password Policy using read-only LDAP or SAMR queries. Key parameters are: `LockoutThreshold` (number of failed attempts before lockout), `LockoutDuration` (minutes an account remains locked), and `LockoutObservationWindow` / `ResetLockoutCounterAfter` (minutes before failed attempt counters reset to 0).",
+            "If `LockoutThreshold` is 5 and `ResetLockoutCounterAfter` is 30 minutes, the safe spraying model tests 1 password across the user list, then enforces a sleep interval of at least 35 minutes before testing a second password. Spraying without verifying these parameters violates Rules of Engagement."
+          ]
+        },
+        {
+          "title": "Authentication Protocol Endpoints: SMB, Kerberos, and LDAPS",
+          "paragraphs": [
+            "Assessors evaluate multiple enterprise authentication interfaces. Kerberos Pre-Authentication (TCP/UDP 88 AS-REQ) is the most efficient and stealthy interface: requesting an AS-REP ticket without pre-auth returns `KDC_ERR_PREAUTH_REQUIRED` if the account exists, and validating passwords via AS-REQ returns `KDC_ERR_PREAUTH_FAILED` (Event ID 4771) on failure.",
+            "Alternatively, spraying can be performed over SMB (TCP 445 NTLMSSP), LDAPS (TCP 636), or web single-sign-on portals (ADFS, Azure AD / Entra ID, Okta). Operators must account for Smart Lockout features in hybrid cloud environments."
+          ]
+        },
+        {
+          "title": "Default Vendor Credentials and Service Account Hygiene",
+          "paragraphs": [
+            "Beyond domain user accounts, enterprise networks are saturated with network appliances, hypervisors, and storage arrays configured with factory default credentials (e.g. `admin:admin`, `cisco:cisco`, `root:calvin`).",
+            "Assessors audit service accounts (accounts configured with non-expiring passwords and high privileges). Service accounts frequently use predictable passwords or are vulnerable to Kerberoasting (requesting TGS tickets for Service Principal Names to crack offline without network lockout risks)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Password Spraying & Lockout Threshold Safety Audit",
+        "objective": "Query Active Directory lockout policies, calculate safe spray timing intervals, execute a controlled horizontal password spray against a simulated domain, and capture valid credentials without causing account lockouts.",
+        "scenario": "You are auditing authentication security for a corporate domain with 500 user accounts. You must discover the domain lockout policy, configure a safe password spray, and identify weak credentials.",
+        "constraints": [
+          "Must extract LockoutThreshold and ResetLockoutCounterAfter before spraying.",
+          "Must enforce a spray interval that guarantees zero user account lockouts.",
+          "Must capture telemetry showing successful authentication events (Event ID 4624/4768)."
+        ],
+        "cases": [
+          {
+            "id": "case-01-lockout-policy-math",
+            "title": "Calculating Safe Password Spraying Sleep Intervals",
+            "context": "An LDAP query against the Domain Controller reveals: `LockoutThreshold: 3`, `LockoutDuration: 30 minutes`, and `ResetLockoutCounterAfter: 30 minutes`.",
+            "prompt": "What is the maximum number of passwords that can be tested per account per cycle, and what sleep interval is required between cycles?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Test exactly 1 password per account per cycle, and enforce a sleep delay of at least 35 minutes (greater than the 30-minute ResetLockoutCounterAfter window) before initiating the next spray cycle.",
+                "correct": true,
+                "rationale": "Testing 1 password leaves 2 attempts margin of safety below the threshold of 3, and waiting 35 minutes ensures the domain counter resets to 0 before the next attempt, completely preventing account lockouts."
+              },
+              {
+                "id": "opt-2",
+                "label": "Test 10 passwords simultaneously with zero sleep time.",
+                "correct": false,
+                "rationale": "Testing 10 passwords will immediately lock out every user account in the domain on the 3rd attempt."
+              },
+              {
+                "id": "opt-3",
+                "label": "Spray continuously at 1,000 requests per second to finish before the lockout takes effect.",
+                "correct": false,
+                "rationale": "Active Directory locks accounts instantaneously upon reaching the threshold, regardless of request speed."
+              },
+              {
+                "id": "opt-4",
+                "label": "No sleep is needed because LockoutThreshold only applies to administrators.",
+                "correct": false,
+                "rationale": "Domain lockout policies apply to all standard domain accounts unless explicit Fine-Grained policies override them."
+              }
+            ]
+          },
+          {
+            "id": "case-02-kerberos-preauth-spraying",
+            "title": "Executing Safe Kerberos AS-REQ Password Spraying",
+            "context": "You are executing a spray using Kerberos AS-REQ packets (`kerbrute`) against 500 domain accounts for the single candidate password 'Spring2026!'.",
+            "prompt": "What response indicates a valid password, and what indicates a bad password?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "A valid password returns an AS-REP response containing a TGT ticket (or `KDC_ERR_KEY_EXPIRED`); an invalid password returns `KDC_ERR_PREAUTH_FAILED` (error code 24); a non-existent account returns `KDC_ERR_C_PRINCIPAL_UNKNOWN` (error code 6).",
+                "correct": true,
+                "rationale": "Kerberos protocol error codes distinguish valid accounts, bad passwords, and successful authentications with minimal packet footprint."
+              },
+              {
+                "id": "opt-2",
+                "label": "A valid password causes the Domain Controller to power off.",
+                "correct": false,
+                "rationale": "Successful Kerberos authentication returns a Ticket Granting Ticket (TGT), not a server shutdown."
+              },
+              {
+                "id": "opt-3",
+                "label": "All Kerberos errors mean the password is correct.",
+                "correct": false,
+                "rationale": "Kerberos returns specific standard error codes for non-existent users, bad passwords, and clock skew."
+              },
+              {
+                "id": "opt-4",
+                "label": "Kerberos cannot be used for password validation.",
+                "correct": false,
+                "rationale": "Kerberos is the primary authentication mechanism in Active Directory and the standard interface for credential validation."
+              }
+            ]
+          },
+          {
+            "id": "case-03-smart-lockout-evasion",
+            "title": "Auditing Cloud Hybrid Identity Authentication Endpoints",
+            "context": "A client uses Microsoft Entra ID (Azure AD) with Password Hash Synchronization. The on-premise lockout threshold is 5, but cloud accounts use Microsoft Smart Lockout.",
+            "prompt": "What must assessors consider when spraying hybrid cloud authentication endpoints?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Microsoft Smart Lockout tracks IP reputation and locks authentication on the cloud side without locking out the user on-premise; spraying must use distributed low-rate testing and avoid triggering tenant-wide risk-based conditional access blocks.",
+                "correct": true,
+                "rationale": "Smart Lockout protects users from denial of service by isolating attacker IP lockouts from legitimate user on-premise logons, but high spray volumes trigger risk-based IP bans."
+              },
+              {
+                "id": "opt-2",
+                "label": "Cloud endpoints do not record any failed logon events.",
+                "correct": false,
+                "rationale": "Azure AD / Entra ID logs comprehensive sign-in logs and user risk telemetry."
+              },
+              {
+                "id": "opt-3",
+                "label": "Spraying cloud endpoints will delete all Office 365 mailboxes.",
+                "correct": false,
+                "rationale": "Password validation does not delete user data."
+              },
+              {
+                "id": "opt-4",
+                "label": "Hybrid cloud environments do not support passwords.",
+                "correct": false,
+                "rationale": "Hybrid cloud environments routinely support synchronized password authentication."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate domain password policy discovery and calculation of safe sleep intervals.",
+          "Execute rate-controlled password spray with zero account lockouts.",
+          "Capture and analyze Kerberos AS-REQ authentication response telemetry."
+        ],
+        "evidenceTemplate": [
+          "Domain password policy extraction log showing LockoutThreshold and duration.",
+          "Password spray execution log demonstrating 1-attempt-per-account bounding.",
+          "Domain Controller Security Event log verifying zero Event ID 4740 (Account Locked Out) events."
+        ],
+        "reset": "Reset test domain user account passwords and clear failed logon counters.",
+        "cleanup": "Remove temporary user wordlists and clear spray execution logs."
+      },
+      "governance": {
+        "prevent": [
+          "Strictly forbid vertical brute forcing on enterprise production user accounts.",
+          "Mandate pre-spray discovery and verification of Account Lockout Thresholds in all testing plans.",
+          "Enforce multi-factor authentication (MFA) across all external and internal authentication portals."
+        ],
+        "observe": [
+          "Monitor Windows Event ID 4740 (Account Locked Out) and 4771 (Kerberos Pre-Auth Failed).",
+          "Track failed logon velocity per source IP across internal authentication servers.",
+          "Alert on single-password horizontal spikes across diverse user accounts."
+        ],
+        "respond": [
+          "Immediately halt password spraying if any account lockout alert is received.",
+          "Assist client administrators in unlocking any accidentally locked test accounts.",
+          "Mandate password reset and MFA enrollment for any user identified with weak/compromised passwords."
+        ],
+        "residualRisk": [
+          "Simultaneous legitimate user typos during a spray window could combine to trigger an accidental lockout.",
+          "Third-party cloud SSO gateways may implement unannounced proprietary rate-limiting algorithms."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Password spraying and brute forcing are identical terms.",
+          "correction": "Brute forcing tests many passwords against one account (high lockout risk). Password spraying tests one password against many accounts (low lockout risk)."
+        },
+        {
+          "claim": "Setting an Account Lockout Threshold of 3 prevents all password guessing attacks.",
+          "correction": "Lockout thresholds defend against brute forcing, but attackers bypass them by spraying one password every 35 minutes across all 10,000 accounts in an enterprise."
+        },
+        {
+          "claim": "Complex password complexity policies (requiring special characters) eliminate password spraying risk.",
+          "correction": "Users create predictable patterns meeting complexity rules (e.g. `Winter2026!`, `Welcome123#`). True protection requires Multi-Factor Authentication (MFA) and banned password lists."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is the key operational characteristic of Horizontal Password Spraying?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Testing 10,000 passwords against 1 administrator account in 5 seconds."
+            },
+            {
+              "id": "B",
+              "label": "Testing a single common candidate password across thousands of user accounts, ensuring no individual account exceeds lockout thresholds."
+            },
+            {
+              "id": "C",
+              "label": "Formatting the Domain Controller hard drive."
+            },
+            {
+              "id": "D",
+              "label": "Sending phishing emails to all employees."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Horizontal password spraying tests 1 password across many accounts to find users with common passwords while staying far below account lockout limits."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "If a domain's `LockoutThreshold` is 5 and `ResetLockoutCounterAfter` is 30 minutes, what is the safe password spraying interval between testing candidate passwords?",
+          "options": [
+            {
+              "id": "A",
+              "label": "0 seconds."
+            },
+            {
+              "id": "B",
+              "label": "At least 35 minutes (allowing the 30-minute counter reset window to elapse before the next attempt)."
+            },
+            {
+              "id": "C",
+              "label": "10 milliseconds."
+            },
+            {
+              "id": "D",
+              "label": "24 hours per user."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Enforcing a sleep interval slightly longer than the lockout observation reset window (35m > 30m) ensures failed attempt counters reset to 0 before the next attempt."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "In Kerberos pre-authentication auditing, what Kerberos error code is returned when a tested username exists but the supplied password is incorrect?",
+          "options": [
+            {
+              "id": "A",
+              "label": "KDC_ERR_PREAUTH_FAILED (Error Code 24)"
+            },
+            {
+              "id": "B",
+              "label": "HTTP 404 Not Found"
+            },
+            {
+              "id": "C",
+              "label": "KDC_ERR_C_PRINCIPAL_UNKNOWN (Error Code 6)"
+            },
+            {
+              "id": "D",
+              "label": "SQL_ERROR_INVALID_PASSWORD"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "`KDC_ERR_PREAUTH_FAILED` (error 24) confirms the account exists but the password failed decryption, corresponding to Windows Security Event ID 4771."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are assessing an enterprise Active Directory domain with 2,500 user accounts. You must query the domain password policy via LDAP, calculate the exact safe spraying parameters, perform a controlled 1-password spray using Kerberos AS-REQ against candidate seasonal passwords, and verify via Domain Controller event logs that zero account lockouts occurred.",
+        "tasks": [
+          "Query and document the domain `LockoutThreshold`, `LockoutDuration`, and `ResetLockoutCounterAfter`.",
+          "Configure and execute a rate-bounded password spray for the candidate password `Autumn2026!`.",
+          "Analyze domain security logs to verify successful logons (Event ID 4768) and confirm zero lockout events (Event ID 4740)."
+        ],
+        "requiredEvidence": [
+          "Domain password policy extraction transcript.",
+          "Rate-bounded password spray execution log with timestamp intervals.",
+          "Event log audit report verifying zero account lockouts during the test window."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn: Account Lockout Policy Settings",
+          "url": "https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/account-lockout-policy",
+          "publisher": "Microsoft Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Account Lockout Threshold and observation window mechanics",
+            "Fine-Grained Password Policy (FGPP) specifications",
+            "Security Event ID 4740 and 4771 telemetry logging"
+          ]
+        },
+        {
+          "title": "NIST SP 800-63B: Digital Identity Guidelines — Authentication and Lifecycle Management",
+          "url": "https://pages.nist.gov/800-63-3/sp800-63b.html",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Password complexity vs rate-limiting and spraying defense guidelines",
+            "Multi-Factor Authentication requirements and credential hygiene",
+            "Banned password list implementation standards"
+          ]
+        }
+      ]
+    }
+  ]
+}

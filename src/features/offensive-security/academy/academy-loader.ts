@@ -17,6 +17,9 @@ import safeEvidenceAutomationData from '../data/academy/os04-operator-scripting/
 import engagementReconEnumerationData from '../data/academy/os05-pentest-methodology/engagement-recon-enumeration.json';
 import verificationImpactEvidenceData from '../data/academy/os05-pentest-methodology/verification-impact-evidence.json';
 import reportRemediationRetestData from '../data/academy/os05-pentest-methodology/report-remediation-retest.json';
+import discoveryServicesAuthenticationData from '../data/academy/os06-network-infrastructure/discovery-services-authentication.json';
+import hostBoundariesAndMovementData from '../data/academy/os06-network-infrastructure/host-boundaries-and-movement.json';
+import blindEnterpriseNetworkData from '../data/academy/os06-network-infrastructure/blind-enterprise-network.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -135,6 +138,15 @@ export const VERIFICATION_IMPACT_EVIDENCE_MODULE = parseAcademyModule(
 export const REPORT_REMEDIATION_RETEST_MODULE = parseAcademyModule(
   reportRemediationRetestData
 );
+export const DISCOVERY_SERVICES_AUTHENTICATION_MODULE = parseAcademyModule(
+  discoveryServicesAuthenticationData
+);
+export const HOST_BOUNDARIES_AND_MOVEMENT_MODULE = parseAcademyModule(
+  hostBoundariesAndMovementData
+);
+export const BLIND_ENTERPRISE_NETWORK_MODULE = parseAcademyModule(
+  blindEnterpriseNetworkData
+);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
@@ -156,6 +168,9 @@ export const ACADEMY_MODULES: AcademyModule[] = [
   ENGAGEMENT_RECON_ENUMERATION_MODULE,
   VERIFICATION_IMPACT_EVIDENCE_MODULE,
   REPORT_REMEDIATION_RETEST_MODULE,
+  DISCOVERY_SERVICES_AUTHENTICATION_MODULE,
+  HOST_BOUNDARIES_AND_MOVEMENT_MODULE,
+  BLIND_ENTERPRISE_NETWORK_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {
