@@ -1,0 +1,1063 @@
+{
+  "id": "os07-m01-browser-http-auth-session",
+  "slug": "browser-http-auth-session",
+  "trackId": "os07-web-api-bug-bounty",
+  "title": "Browser trust, HTTP, authentication and sessions",
+  "summary": "Master fundamental web application security: analyze browser origin isolation (SOP), evaluate HTTP/2/3 request semantics, audit cryptographic password hashing and MFA, and harden cookie-based session lifecycles.",
+  "difficulty": "beginner",
+  "estimatedMinutes": 300,
+  "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+  "domains": ["web", "api"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os07-l52-browser-security-model-and-http-semantics",
+      "slug": "browser-security-model-and-http-semantics",
+      "title": "Browser Security Model, Same-Origin Policy & HTTP Semantics",
+      "summary": "Examine browser isolation boundaries: Same-Origin Policy (SOP) rules (protocol, host, port), DOM document access restrictions, HTTP request/response semantics, and core defensive headers (CSP, HSTS, X-Content-Type-Options).",
+      "difficulty": "beginner",
+      "durationMinutes": 100,
+      "prerequisites": [],
+      "outcomes": [
+        "Analyze the browser Same-Origin Policy (SOP) across protocol, hostname, and port tuples.",
+        "Differentiate cross-origin embedding, reading, and execution privileges in modern user agents.",
+        "Audit essential HTTP security headers: Content-Security-Policy (CSP), Strict-Transport-Security (HSTS), and X-Frame-Options."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web"],
+      "attackTactics": ["initial-access", "discovery"],
+      "keywords": [
+        "same-origin-policy",
+        "sop",
+        "http-semantics",
+        "csp",
+        "hsts",
+        "security-headers"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "The browser is an untrusted client executing multi-tenant code: the Same-Origin Policy strictly isolates site A from site B, permitting cross-origin rendering while blocking cross-origin DOM reads unless explicitly allowed by HTTP response headers.",
+      "visual": {
+        "title": "Same-Origin Policy (SOP) Boundary Evaluation",
+        "caption": "How browsers determine origin matching and enforce DOM read/write isolation.",
+        "steps": [
+          {
+            "label": "Origin Tuple Check",
+            "detail": "Browser compares (Protocol, Host, Port) between origin https://app.example.com:443 and target resource.",
+            "tone": "allow"
+          },
+          {
+            "label": "Cross-Origin Read Attempt",
+            "detail": "Script on https://evil.com attempts to read response body of fetch('https://app.example.com/api/user').",
+            "tone": "caution"
+          },
+          {
+            "label": "Browser SOP Enforcement",
+            "detail": "Browser blocks JavaScript DOM access to response body unless Access-Control-Allow-Origin explicitly grants permission.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "The Same-Origin Policy (SOP) Foundation",
+          "paragraphs": [
+            "The Same-Origin Policy (SOP) is the cornerstone of client-side web application security. Two URLs share the same origin if and only if their Protocol/Scheme (e.g. `https`), Hostname (e.g. `bank.example.com`), and Port (e.g. `443`) are strictly identical.",
+            "Under SOP, a script executing on `https://attacker.com` is prohibited from reading DOM contents, extracting cookies, or parsing JSON responses from `https://bank.example.com`. Without SOP, opening any malicious tab would allow instant extraction of authenticated data from all other open browser tabs."
+          ]
+        },
+        {
+          "title": "Cross-Origin Interactions: Embedding vs Reading",
+          "paragraphs": [
+            "A critical nuance of the browser security model is the asymmetry between cross-origin embedding and cross-origin reading. Browsers permit cross-origin embedding: a page can load external images (`<img>`), stylesheets (`<link>`), scripts (`<script>`), and iframes (`<iframe>`).",
+            "However, the browser strictly prevents the embedding page from reading the underlying raw bytes, DOM trees, or response bodies of those embedded resources via JavaScript unless specific cross-origin opt-ins (such as CORS or `postMessage`) are configured by the resource owner."
+          ]
+        },
+        {
+          "title": "HTTP Protocol Semantics: Request Methods, Status Codes, and Framing",
+          "paragraphs": [
+            "Web applications interact over HTTP (Hypertext Transfer Protocol). Assessors must understand protocol semantics across HTTP/1.1 (plain text, chunked transfer encoding, pipelining) and binary multiplexed HTTP/2 and HTTP/3 (HPACK/QPACK header compression, binary frames, stream multiplexing).",
+            "Discrepancies in how front-end reverse proxies and back-end application servers parse Content-Length and Transfer-Encoding headers lead to HTTP Request Smuggling, enabling cache poisoning, credential hijacking, and request interception."
+          ]
+        },
+        {
+          "title": "HTTP Security Headers: CSP, HSTS, and Frame Controls",
+          "paragraphs": [
+            "Web servers declare defensive browser constraints through HTTP response headers. `Strict-Transport-Security` (HSTS) enforces HTTPS and blocks SSL stripping attacks. `X-Content-Type-Options: nosniff` prevents MIME-type sniffing by user agents.",
+            "`Content-Security-Policy` (CSP) restricts the domains from which scripts, styles, fonts, and media can be loaded and executed, mitigating Cross-Site Scripting (XSS). `X-Frame-Options` (or CSP `frame-ancestors`) prevents Clickjacking by prohibiting embedding inside malicious iframes."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Browser Origin Isolation & Security Header Evaluation",
+        "objective": "Evaluate browser Same-Origin Policy boundaries across diverse URL tuples, audit missing HTTP security headers on a target web application, and construct a hardened CSP policy.",
+        "scenario": "You are auditing a newly deployed banking customer portal. You must analyze cross-origin interaction boundaries and configure defensive HTTP security headers to protect against XSS and Clickjacking.",
+        "constraints": [
+          "Must identify matching vs non-matching origin tuples accurately.",
+          "Must audit HTTP response headers for missing HSTS, CSP, and X-Frame-Options.",
+          "Must formulate a robust Content-Security-Policy blocking inline scripts."
+        ],
+        "cases": [
+          {
+            "id": "case-01-origin-tuple-matching",
+            "title": "Evaluating Same-Origin Policy Tuple Matching",
+            "context": "A web application runs at `https://portal.bank.com:443`. An embedded script makes fetch requests to 4 different URLs.",
+            "prompt": "Which of the following target URLs is considered Same-Origin with `https://portal.bank.com:443`?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "`https://portal.bank.com:443/api/v2/balance` (exact same protocol 'https', host 'portal.bank.com', and port '443').",
+                "correct": true,
+                "rationale": "An origin is defined exclusively by the (protocol, host, port) tuple. Changing path or query strings does not change the origin."
+              },
+              {
+                "id": "opt-2",
+                "label": "`http://portal.bank.com:80/api/v2/balance`",
+                "correct": false,
+                "rationale": "Different protocol ('http' vs 'https') and different port (80 vs 443) make this cross-origin."
+              },
+              {
+                "id": "opt-3",
+                "label": "`https://api.portal.bank.com:443/balance`",
+                "correct": false,
+                "rationale": "A different subdomain ('api.portal.bank.com' vs 'portal.bank.com') constitutes a completely different origin."
+              },
+              {
+                "id": "opt-4",
+                "label": "`https://portal.bank.com:8443/api/v2/balance`",
+                "correct": false,
+                "rationale": "A different port (8443 vs 443) constitutes a different origin."
+              }
+            ]
+          },
+          {
+            "id": "case-02-clickjacking-header-audit",
+            "title": "Mitigating Clickjacking via Frame Ancestors",
+            "context": "The banking portal allows user profile settings to be rendered inside an `<iframe>` on any external website because it lacks `X-Frame-Options` or CSP `frame-ancestors` headers.",
+            "prompt": "What attack does this enable, and what is the definitive HTTP header remediation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Clickjacking (UI Redressing): an attacker frames the portal under a transparent overlay to trick authenticated users into clicking buttons; remediation is setting `Content-Security-Policy: frame-ancestors 'self'` (or `X-Frame-Options: DENY`).",
+                "correct": true,
+                "rationale": "Without frame restrictions, attackers embed victim pages under invisible overlays. `frame-ancestors 'self'` prevents unauthorized cross-origin framing."
+              },
+              {
+                "id": "opt-2",
+                "label": "The risk is that the server will run out of hard drive space.",
+                "correct": false,
+                "rationale": "Framing issues are client-side UI redressing attacks, not server storage defects."
+              },
+              {
+                "id": "opt-3",
+                "label": "Set `X-Frame-Options: ALLOWALL` to fix the issue.",
+                "correct": false,
+                "rationale": "ALLOWALL is not a valid security directive and explicitly permits unauthorized framing."
+              },
+              {
+                "id": "opt-4",
+                "label": "Clickjacking is only possible on mobile devices without screens.",
+                "correct": false,
+                "rationale": "Clickjacking affects all standard desktop and mobile browsers."
+              }
+            ]
+          },
+          {
+            "id": "case-03-csp-strict-hardening",
+            "title": "Constructing a Secure Content Security Policy (CSP)",
+            "context": "A developer wants to secure their web app against XSS and proposes: `Content-Security-Policy: default-src * 'unsafe-inline' 'unsafe-eval'`. ",
+            "prompt": "Why is this CSP ineffective, and what is a hardened policy?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Using `*`, `'unsafe-inline'`, and `'unsafe-eval'` disables XSS protection entirely; a hardened policy is `Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-rAnd0m123'; object-src 'none'; base-uri 'self';`.",
+                "correct": true,
+                "rationale": "'unsafe-inline' allows execution of injected script tags. A robust CSP uses cryptographic nonces or strict hashes while disallowing object plugins and wildcard domains."
+              },
+              {
+                "id": "opt-2",
+                "label": "The developer's policy is completely secure because it has the word 'Security' in the header name.",
+                "correct": false,
+                "rationale": "Header names do not provide security if the directive arguments permit all unsafe scripts."
+              },
+              {
+                "id": "opt-3",
+                "label": "CSP should be disabled because it breaks all internet traffic.",
+                "correct": false,
+                "rationale": "CSP is an industry standard defense-in-depth control protecting millions of production web applications."
+              },
+              {
+                "id": "opt-4",
+                "label": "Change `default-src *` to `default-src google.com` to allow all hacker scripts.",
+                "correct": false,
+                "rationale": "Whitelisting entire public domains without script restrictions allows JSONP and hosting bypasses."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate precise identification of Same-Origin Policy boundary tuples.",
+          "Audit HTTP response headers for missing HSTS, CSP, and framing defenses.",
+          "Formulate robust Content-Security-Policy directives eliminating unsafe inline execution."
+        ],
+        "evidenceTemplate": [
+          "SOP origin comparison matrix evaluating protocol, host, and port tuples.",
+          "HTTP response header security audit report highlighting missing defense headers.",
+          "Hardened Content-Security-Policy specification and validation transcript."
+        ],
+        "reset": "Reset target web application HTTP response headers to unhardened baseline.",
+        "cleanup": "Remove temporary iframe framing test pages and clear browser cache."
+      },
+      "governance": {
+        "prevent": [
+          "Mandate deployment of `Strict-Transport-Security` (HSTS with `max-age=31536000; includeSubDomains; preload`) on all production domains.",
+          "Enforce strict Content-Security-Policy blocking `'unsafe-inline'` and `'unsafe-eval'`.",
+          "Prohibit rendering authenticated application portals in unapproved third-party iframes."
+        ],
+        "observe": [
+          "Monitor CSP violation reports via `report-uri` / `report-to` telemetry endpoints.",
+          "Track HTTP-to-HTTPS redirect traffic volume on edge reverse proxies.",
+          "Audit security header presence across all API gateway routes during automated CI/CD builds."
+        ],
+        "respond": [
+          "Immediately investigate any spike in CSP violation reports indicating active XSS probing.",
+          "Update CSP nonces dynamically per HTTP response to prevent replay attacks.",
+          "Deploy `X-Frame-Options: DENY` immediately if Clickjacking vulnerabilities are reported."
+        ],
+        "residualRisk": [
+          "Legacy third-party analytics scripts may require `'unsafe-inline'` until refactored with cryptographic nonces.",
+          "Strict HSTS preloading cannot be easily reverted if an enterprise needs to migrate to an unencrypted testing domain."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "The Same-Origin Policy prevents an attacker's website from sending HTTP requests to another origin.",
+          "correction": "SOP does not block sending requests (e.g. form POSTs, image loads, fetch requests); SOP strictly blocks JavaScript on the attacker's page from reading the response data."
+        },
+        {
+          "claim": "Subdomains automatically share the same origin as their parent domain.",
+          "correction": "`app.example.com` and `example.com` have different hostnames and are strictly different origins under SOP."
+        },
+        {
+          "claim": "HTTP security headers make application source code vulnerabilities impossible to exploit.",
+          "correction": "Security headers provide client-side defense-in-depth and containment; they do not fix underlying server-side bugs like SQL injection or BOLA."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "Which three components define an Origin in the browser Same-Origin Policy (SOP)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Username, Password, and Email"
+            },
+            {
+              "id": "B",
+              "label": "Protocol (Scheme), Hostname, and Port"
+            },
+            {
+              "id": "C",
+              "label": "Operating System, Browser Version, and Screen Resolution"
+            },
+            {
+              "id": "D",
+              "label": "IP Address, MAC Address, and GPS Location"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "An origin is defined exclusively by the scheme (protocol), host, and port tuple."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "What is the primary function of the `Strict-Transport-Security` (HSTS) HTTP response header?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It encrypts all database files on the server."
+            },
+            {
+              "id": "B",
+              "label": "It instructs the browser to communicate with the domain exclusively over HTTPS, preventing SSL stripping and unencrypted HTTP downgrade attacks."
+            },
+            {
+              "id": "C",
+              "label": "It forces users to change their password every 10 days."
+            },
+            {
+              "id": "D",
+              "label": "It blocks all search engines from indexing the website."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "HSTS ensures browsers automatically convert all `http://` links to `https://` before sending requests, eliminating Man-in-the-Middle SSL stripping attacks."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "Why is the CSP directive `'unsafe-inline'` dangerous when included in a `script-src` policy?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because it doubles the CSS file size."
+            },
+            {
+              "id": "B",
+              "label": "Because it permits the execution of inline `<script>` tags, inline event handlers (`onload=`), and `javascript:` URLs, neutralizing CSP's primary defense against Cross-Site Scripting (XSS)."
+            },
+            {
+              "id": "C",
+              "label": "Because it requires JavaScript to be written in binary."
+            },
+            {
+              "id": "D",
+              "label": "Because it deletes all session cookies."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "'unsafe-inline' allows any inline JavaScript in the HTML DOM to execute, allowing injected XSS payloads to bypass the policy."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are auditing the security headers of an e-commerce checkout application (`https://shop.example.com`). The application currently returns no security headers, allowing unauthorized framing and inline script execution. You must analyze the application's origin boundaries, audit the missing headers, and design a complete, production-ready security header configuration including strict HSTS, CSP with nonces, and framing controls.",
+        "tasks": [
+          "Evaluate origin boundaries across `shop.example.com`, `api.example.com`, and `example.com`.",
+          "Audit the HTTP response headers using curl or browser devtools.",
+          "Draft a production Nginx/Apache configuration snippet deploying HSTS, CSP (with nonce support), X-Content-Type-Options, and X-Frame-Options."
+        ],
+        "requiredEvidence": [
+          "SOP boundary analysis document.",
+          "Raw HTTP response header audit transcript.",
+          "Nginx/Apache security header deployment configuration file."
+        ]
+      },
+      "sources": [
+        {
+          "title": "MDN Web Docs: Same-Origin Policy",
+          "url": "https://developer.mozilla.org/en-US/docs/Web/Security/Same-origin_policy",
+          "publisher": "Mozilla Developer Network",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Same-Origin Policy definition and tuple matching rules",
+            "Cross-origin network access and embedding specifications",
+            "DOM document and script isolation mechanics"
+          ]
+        },
+        {
+          "title": "OWASP Secure Headers Project",
+          "url": "https://owasp.org/www-project-secure-headers/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Content-Security-Policy (CSP) deployment guidelines",
+            "HTTP Strict Transport Security (HSTS) configuration",
+            "Clickjacking mitigation via X-Frame-Options and frame-ancestors"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os07-l53-authentication-mechanisms-and-password-storage",
+      "slug": "authentication-mechanisms-and-password-storage",
+      "title": "Cryptographic Password Storage & Multi-Factor Authentication",
+      "summary": "Audit server-side authentication security: cryptographic password hashing functions (Argon2id, bcrypt, scrypt vs vulnerable MD5/SHA256), per-user salts, work factor tuning, Multi-Factor Authentication (TOTP, WebAuthn/FIDO2), and brute-force defenses.",
+      "difficulty": "beginner",
+      "durationMinutes": 100,
+      "prerequisites": ["os07-l52-browser-security-model-and-http-semantics"],
+      "outcomes": [
+        "Audit password hashing algorithms and evaluate resistance to GPU-accelerated dictionary cracking.",
+        "Assess Multi-Factor Authentication (MFA) implementations: TOTP RFC 6238 timing windows vs phishing-resistant WebAuthn / FIDO2.",
+        "Implement rate-limiting and account lockout mechanisms to neutralize automated credential attacks."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web", "api"],
+      "attackTactics": ["credential-access", "initial-access"],
+      "keywords": [
+        "password-hashing",
+        "argon2id",
+        "bcrypt",
+        "mfa",
+        "totp",
+        "webauthn",
+        "fido2"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Authentication is proof of identity: storing passwords requires slow, memory-hard cryptographic hashing (Argon2id/bcrypt) with unique salts; multi-factor authentication requires cryptographic proof (WebAuthn/FIDO2) to resist adversary-in-the-middle phishing.",
+      "visual": {
+        "title": "Cryptographic Password Storage & MFA Verification",
+        "caption": "How modern backends hash passwords and verify time-based / FIDO2 MFA tokens.",
+        "steps": [
+          {
+            "label": "Salted Password Hashing",
+            "detail": "Password + 16-byte cryptographically secure random salt processed via Argon2id (memory-hard, resistant to GPU/ASIC cracking).",
+            "tone": "allow"
+          },
+          {
+            "label": "Primary Credential Verification",
+            "detail": "Constant-time string comparison validates hash without leaking timing metadata.",
+            "tone": "allow"
+          },
+          {
+            "label": "MFA Step-Up Challenge",
+            "detail": "Require RFC 6238 TOTP (30s window) or WebAuthn public-key signature before issuing session token.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "The Cryptographic Password Hashing Hierarchy",
+          "paragraphs": [
+            "General-purpose cryptographic hash functions (MD5, SHA-1, SHA-256, SHA-512) are designed to be extremely fast for data integrity verification. When used for password storage, their speed is fatal: modern GPU clusters compute billions of SHA-256 hashes per second, allowing attackers to crack dumped password databases in minutes.",
+            "Secure password storage requires 'Adaptive, Memory-Hard Hash Functions' (OWASP Password Storage Cheat Sheet). Argon2id (winner of the Password Hashing Competition) is the gold standard, providing tunable memory cost ($m$), time cost ($t$), and parallelism ($p$) to defeat ASIC/GPU attacks. `bcrypt` (Blowfish-based) and `scrypt` are proven enterprise alternatives."
+          ]
+        },
+        {
+          "title": "Salts, Peppering, and Constant-Time Verification",
+          "paragraphs": [
+            "A 'Salt' is a cryptographically secure random byte sequence (at least 16 bytes) generated per user and stored alongside the hash. Salts guarantee that two users with the exact same password produce completely different hash outputs, defeating pre-computed Rainbow Tables.",
+            "When verifying a password during login, applications must use 'Constant-Time Comparison' functions (`crypto.timingSafeEqual` in Node.js, `hmac.compare_digest` in Python). Standard string equality checks (`hash1 == hash2`) return early on the first mismatched byte, leaking timing side-channel data that attackers exploit to reconstruct hashes."
+          ]
+        },
+        {
+          "title": "Multi-Factor Authentication (MFA): TOTP vs WebAuthn / FIDO2",
+          "paragraphs": [
+            "Multi-Factor Authentication adds a secondary verification factor. Time-Based One-Time Passwords (TOTP per IETF RFC 6238) derive 6-digit codes from a shared secret and current timestamp within a 30-second window. While effective against static credential theft, TOTP is vulnerable to real-time Adversary-in-the-Middle (AiTM) phishing proxies (e.g. Evilginx).",
+            "WebAuthn / FIDO2 provides 'Phishing-Resistant MFA'. Operating on public-key cryptography and hardware authenticators (YubiKeys, TouchID), the browser cryptographically signs a challenge incorporating the exact origin (`https://bank.com`). If an attacker tricks a user onto `https://bank-login.com`, the FIDO2 signature fails origin verification, neutralizing AiTM phishing."
+          ]
+        },
+        {
+          "title": "Account Protection: Rate Limiting and Credential Stuffing Defenses",
+          "paragraphs": [
+            "Authentication endpoints must implement robust defense against automated credential stuffing and dictionary attacks. Standard controls include: IP-based sliding window rate-limiting, CAPTCHA step-up on failed attempts, and integration with leaked credential databases (HaveIBeenPwned API).",
+            "Account lockout mechanisms must be carefully calibrated to prevent Denial of Service (DoS): locking accounts after 5 failed attempts allows an attacker to lock out all employees simultaneously. Modern systems employ 'Smart Lockouts' and progressive delays rather than permanent lockouts."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Cryptographic Password Hashing & MFA Implementation Audit",
+        "objective": "Audit a backend authentication service, replace vulnerable MD5/SHA256 password hashing with Argon2id, fix timing side channels, and audit an RFC 6238 TOTP validation routine.",
+        "scenario": "You are reviewing a legacy Node.js authentication service that stores passwords using `crypto.createHash('md5').update(pass).digest('hex')` and verifies TOTP codes without clock skew protection.",
+        "constraints": [
+          "Must refactor password storage to use Argon2id with recommended parameters.",
+          "Must implement constant-time string comparison for secret validation.",
+          "Must enforce TOTP replay protection and clock skew bounding."
+        ],
+        "cases": [
+          {
+            "id": "case-01-hash-algorithm-refactor",
+            "title": "Refactoring Fast Hashes to Memory-Hard Argon2id",
+            "context": "A legacy authentication database stores passwords as `MD5(password)`. A developer proposes upgrading to `SHA256(password + 'static_salt')`.",
+            "prompt": "Why is the developer's proposal insecure, and what is the proper industry-standard implementation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "SHA256 with a static salt is vulnerable to GPU cracking and rainbow attacks across users; the proper implementation is Argon2id (or bcrypt) using a unique 16-byte random salt per user and high memory cost parameters.",
+                "correct": true,
+                "rationale": "SHA256 is designed for fast cryptographic hashing, allowing GPU clusters to test billions of guesses per second. Argon2id forces memory consumption, preventing mass hardware parallelization."
+              },
+              {
+                "id": "opt-2",
+                "label": "MD5 is completely secure if passwords are at least 4 characters long.",
+                "correct": false,
+                "rationale": "MD5 is cryptographically broken and trivial to crack on commodity hardware regardless of length."
+              },
+              {
+                "id": "opt-3",
+                "label": "Passwords should be stored in cleartext to save CPU cycles.",
+                "correct": false,
+                "rationale": "Storing plaintext passwords violates all security standards and data protection laws."
+              },
+              {
+                "id": "opt-4",
+                "label": "Argon2id was invented for Bitcoin mining and cannot hash text.",
+                "correct": false,
+                "rationale": "Argon2id is the winner of the Password Hashing Competition, specifically engineered for password storage."
+              }
+            ]
+          },
+          {
+            "id": "case-02-timing-side-channel-fix",
+            "title": "Eliminating Timing Side-Channel Leaks in Token Comparison",
+            "context": "A password reset token verification function uses `if (suppliedToken === storedToken)`.",
+            "prompt": "What vulnerability does standard string comparison introduce, and how is it remediated?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Standard `===` comparisons return early upon encountering the first mismatched character, leaking execution timing that allows attackers to determine token characters byte-by-byte; remediation is using constant-time comparison `crypto.timingSafeEqual()`.",
+                "correct": true,
+                "rationale": "Constant-time comparisons always compare the entirety of both buffers regardless of where differences occur, preventing timing attack measurements."
+              },
+              {
+                "id": "opt-2",
+                "label": "Standard comparison makes the web server run out of memory.",
+                "correct": false,
+                "rationale": "String comparison does not cause memory exhaustion; the issue is timing side-channel leakage."
+              },
+              {
+                "id": "opt-3",
+                "label": "Replace `===` with `==` to fix the timing leak.",
+                "correct": false,
+                "rationale": "Loose equality (`==`) is also non-constant-time and introduces type coercion vulnerabilities."
+              },
+              {
+                "id": "opt-4",
+                "label": "Timing attacks are impossible over internet connections.",
+                "correct": false,
+                "rationale": "Statistical analysis of thousands of network requests allows measuring microsecond timing variations over the internet."
+              }
+            ]
+          },
+          {
+            "id": "case-03-totp-replay-protection",
+            "title": "Enforcing One-Time Use on TOTP Verification Tokens",
+            "context": "A user enters a 6-digit TOTP code `123456`. The server validates that `123456` matches the current 30-second time window, but does not record that the code was used. An attacker intercepts the code over unencrypted Wi-Fi.",
+            "prompt": "What vulnerability exists, and what is the remediation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "TOTP Replay Attack: the intercepted 6-digit code can be reused by an attacker for the remainder of the 30-second time window; remediation is caching used OTP codes in Redis/database and rejecting any duplicate code within the active time window.",
+                "correct": true,
+                "rationale": "TOTP codes must be strictly 'One-Time'. Recording used tokens ensures that a code cannot be replayed even if submitted within the same 30-second window."
+              },
+              {
+                "id": "opt-2",
+                "label": "The user's phone will automatically delete the authenticator app.",
+                "correct": false,
+                "rationale": "Server verification flaws do not affect the mobile device app installation."
+              },
+              {
+                "id": "opt-3",
+                "label": "Extend the TOTP window to 24 hours to reduce user typing errors.",
+                "correct": false,
+                "rationale": "Extending the window dramatically increases the replay attack opportunity."
+              },
+              {
+                "id": "opt-4",
+                "label": "TOTP codes can only be replayed on leap years.",
+                "correct": false,
+                "rationale": "TOTP replay works within the current active time step regardless of calendar dates."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate refactoring of vulnerable password hashing to Argon2id with memory-hard parameters.",
+          "Implement constant-time string comparison for all cryptographic tokens and secrets.",
+          "Enforce one-time validation and replay rejection for TOTP MFA workflows."
+        ],
+        "evidenceTemplate": [
+          "Argon2id password hashing implementation code snippet with parameter tuning.",
+          "`crypto.timingSafeEqual` constant-time verification refactoring diff.",
+          "TOTP replay protection validation test log."
+        ],
+        "reset": "Reset authentication service source code to legacy MD5 implementation.",
+        "cleanup": "Remove temporary test user database files and clear Redis replay cache."
+      },
+      "governance": {
+        "prevent": [
+          "Prohibit storage of passwords using fast hash algorithms (MD5, SHA1, SHA256, SHA512).",
+          "Mandate Argon2id (or bcrypt work factor >= 12) with per-user cryptographic salts for all credentials.",
+          "Enforce constant-time comparison on all API tokens, session IDs, and reset secrets."
+        ],
+        "observe": [
+          "Monitor authentication failure spikes per account and per source IP in application logs.",
+          "Track password hash algorithm distribution across user databases during migration phases.",
+          "Alert on anomalous TOTP verification attempts exceeding rate limits."
+        ],
+        "respond": [
+          "Force password reset and re-hashing upon user login for accounts stored in legacy hash formats.",
+          "Immediately revoke session tokens if credential stuffing attacks compromise user accounts.",
+          "Deploy WebAuthn / FIDO2 security keys for administrative account protection."
+        ],
+        "residualRisk": [
+          "Argon2id high memory parameters ($m=64MB$) can increase server RAM usage under high concurrency.",
+          "Users losing MFA devices requires a secure, out-of-band identity verification recovery process."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Adding a secret 'Pepper' to SHA-256 makes it just as secure as bcrypt or Argon2id.",
+          "correction": "A pepper adds secrecy, but if the database and server are compromised, SHA-256 remains billions of times faster to crack on GPUs than memory-hard functions like Argon2id."
+        },
+        {
+          "claim": "SMS 2-Factor Authentication is just as secure as WebAuthn / FIDO2 security keys.",
+          "correction": "SMS OTP is vulnerable to SIM-swapping, SS7 telecom interception, and real-time AiTM phishing proxies. WebAuthn is cryptographically bound to the origin and phishing-resistant."
+        },
+        {
+          "claim": "Bcrypt hashes do not need a salt because the salt is built-in.",
+          "correction": "Bcrypt automatically generates and embeds a 128-bit salt inside the resulting hash string ($2b$12$...); the salt is still essential and present."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "Which algorithm is recognized by the OWASP Password Storage guidelines as the modern gold standard for password hashing?",
+          "options": [
+            {
+              "id": "A",
+              "label": "MD5"
+            },
+            {
+              "id": "B",
+              "label": "Argon2id"
+            },
+            {
+              "id": "C",
+              "label": "Base64"
+            },
+            {
+              "id": "D",
+              "label": "DES"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Argon2id combines memory hardness and time cost, providing superior defense against both GPU and side-channel cracking attacks."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "Why is WebAuthn / FIDO2 considered 'Phishing-Resistant' compared to Time-Based One-Time Passwords (TOTP)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because WebAuthn passwords are 500 characters long."
+            },
+            {
+              "id": "B",
+              "label": "Because the browser cryptographically binds the public-key signature to the exact website origin (FQDN), causing authentication to fail automatically if the user is on a phishing domain."
+            },
+            {
+              "id": "C",
+              "label": "Because WebAuthn requires users to take a selfie."
+            },
+            {
+              "id": "D",
+              "label": "Because WebAuthn does not work over the internet."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "FIDO2/WebAuthn authenticators sign a cryptographic challenge that includes the origin. An AiTM phishing proxy operating on a spoofed domain cannot forge a signature for the legitimate origin."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "In Node.js or Python, what is the danger of using standard equality operators (`===` or `==`) to verify secret reset tokens?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It causes the CPU clock to run backwards."
+            },
+            {
+              "id": "B",
+              "label": "Early exit upon the first mismatched byte creates timing differences that attackers can measure over multiple network requests to extract the secret byte-by-byte."
+            },
+            {
+              "id": "C",
+              "label": "It automatically converts the token to uppercase."
+            },
+            {
+              "id": "D",
+              "label": "It corrupts the SSL certificate."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Non-constant-time comparisons leak timing information proportional to the number of correct matching initial bytes, enabling timing side-channel attacks."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are auditing an enterprise authentication microservice written in Python/FastAPI. Passwords are currently hashed with `hashlib.sha256(password.encode()).hexdigest()`, session tokens are compared with standard `==`, and TOTP verification allows code reuse. You must refactor the microservice to use Argon2id via `argon2-cffi`, implement `hmac.compare_digest`, and enforce Redis-backed TOTP replay prevention.",
+        "tasks": [
+          "Refactor user registration and login endpoints to use Argon2id with recommended parameters.",
+          "Replace all secret and token comparison logic with `hmac.compare_digest`.",
+          "Implement a Redis cache middleware to record and reject replayed TOTP codes within the 30-second window."
+        ],
+        "requiredEvidence": [
+          "Refactored Python authentication router code file.",
+          "Argon2id hashing benchmark and verification transcript.",
+          "Unit test verifying rejection of replayed TOTP tokens."
+        ]
+      },
+      "sources": [
+        {
+          "title": "OWASP Cheat Sheet Series: Password Storage Cheat Sheet",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Argon2id, bcrypt, and scrypt parameter tuning recommendations",
+            "Salting and work factor adjustment standards",
+            "Mitigation of GPU/ASIC dictionary attack vectors"
+          ]
+        },
+        {
+          "title": "W3C Web Authentication: An API for accessing Public Key Credentials (WebAuthn Level 3)",
+          "url": "https://www.w3.org/TR/webauthn-3/",
+          "publisher": "World Wide Web Consortium (W3C)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "WebAuthn / FIDO2 public-key credential architecture",
+            "Origin binding and phishing resistance specifications",
+            "Hardware authenticator interaction protocols"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os07-l54-session-management-cookies-and-token-lifecycles",
+      "slug": "session-management-cookies-and-token-lifecycles",
+      "title": "Session Security, Cookie Attributes & Token Lifecycles",
+      "summary": "Audit stateful session management and stateless tokens: cookie security flags (HttpOnly, Secure, SameSite=Lax/Strict), session fixation, session hijacking, entropy requirements, and absolute vs idle expiration lifecycles.",
+      "difficulty": "beginner",
+      "durationMinutes": 100,
+      "prerequisites": ["os07-l53-authentication-mechanisms-and-password-storage"],
+      "outcomes": [
+        "Audit HTTP cookie security attributes: `HttpOnly`, `Secure`, and `SameSite` (Lax, Strict, None).",
+        "Identify and remediate session fixation, session hijacking, and insufficient entropy vulnerabilities.",
+        "Design robust session termination lifecycles enforcing absolute timeouts, idle timeouts, and server-side invalidation."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web", "api"],
+      "attackTactics": ["credential-access", "defense-evasion"],
+      "keywords": [
+        "session-management",
+        "cookies",
+        "httponly",
+        "samesite",
+        "session-fixation",
+        "session-hijacking"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "A session token is the bearer key to the user's identity: cookies must be locked down with HttpOnly, Secure, and SameSite attributes, regenerated upon every privilege change, and terminated on both client and server.",
+      "visual": {
+        "title": "Hardened HTTP Cookie Security Attributes",
+        "caption": "How cookie security flags protect session identifiers from client-side theft and CSRF.",
+        "steps": [
+          {
+            "label": "Secure Flag Enforcement",
+            "detail": "Cookie is transmitted exclusively over encrypted HTTPS connections; dropped over unencrypted HTTP.",
+            "tone": "allow"
+          },
+          {
+            "label": "HttpOnly Flag Protection",
+            "detail": "Blocks JavaScript document.cookie access, preventing token theft via Cross-Site Scripting (XSS).",
+            "tone": "allow"
+          },
+          {
+            "label": "SameSite=Lax/Strict Flag",
+            "detail": "Restricts cookie inclusion on cross-site requests, mitigating Cross-Site Request Forgery (CSRF).",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Session Token Entropy and Cryptographic Generation",
+          "paragraphs": [
+            "A session identifier (Session ID) represents an authenticated user state. Session tokens must be generated using a Cryptographically Secure Pseudo-Random Number Generator (CSPRNG, such as `crypto.randomBytes(32)` or `secrets.token_hex(32)`).",
+            "Session tokens must possess at least 128 bits of entropy (64 hexadecimal characters or 43 base64 characters). Using predictable generation algorithms (e.g. sequential integers, timestamps, or MD5 of username) allows attackers to calculate valid session IDs and hijack user accounts without credentials."
+          ]
+        },
+        {
+          "title": "Cookie Security Attributes: HttpOnly, Secure, and SameSite",
+          "paragraphs": [
+            "Cookies remain the most secure vehicle for storing session IDs in web browsers when configured with proper security flags: `Set-Cookie: session_id=abc...; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=3600`.",
+            "`Secure` ensures the cookie is transmitted only over encrypted TLS (HTTPS). `HttpOnly` completely blocks client-side JavaScript from accessing `document.cookie`, preventing token exfiltration even if XSS occurs. `SameSite=Lax` or `Strict` prevents the browser from attaching the cookie on cross-site state-changing requests, providing native CSRF defense."
+          ]
+        },
+        {
+          "title": "Session Fixation and Privilege-State Transitions",
+          "paragraphs": [
+            "In a 'Session Fixation' attack, an attacker obtains a valid unauthenticated session ID (e.g. `session_id=1234`), sends a link to a victim, and waits for the victim to log in. If the web server maintains the same session ID after successful authentication, the attacker can use their copy of `1234` to access the victim's authenticated account.",
+            "To eliminate session fixation, web frameworks must execute 'Session Regeneration': destroying the pre-login session ID and issuing a brand-new cryptographic token immediately upon every authentication and privilege elevation event."
+          ]
+        },
+        {
+          "title": "Session Lifecycle Management: Idle Timeouts, Absolute Timeouts, and Invalidation",
+          "paragraphs": [
+            "A secure session lifecycle enforces three distinct boundaries: 1) Idle Timeout (terminating sessions after 15–30 minutes of inactivity), 2) Absolute Timeout (forcing re-authentication after 8–12 hours regardless of activity), and 3) Server-Side Logout Invalidation.",
+            "Simply deleting the cookie on the client side (`document.cookie = ''`) is insufficient: the server-side session store (Redis, database) must explicitly delete the session record so that intercepted tokens cannot be reused."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Cookie Attribute Hardening & Session Lifecycle Audit",
+        "objective": "Audit an application's session management implementation, identify missing cookie flags, demonstrate session fixation exploitability, and refactor session regeneration and timeout logic.",
+        "scenario": "You are auditing an e-commerce checkout session backend. Cookies are issued without `HttpOnly` and `SameSite`, and the session ID does not change when an anonymous guest logs into an authenticated account.",
+        "constraints": [
+          "Must configure `Set-Cookie` headers with `HttpOnly`, `Secure`, and `SameSite=Lax`.",
+          "Must implement session ID regeneration upon user login.",
+          "Must enforce server-side session invalidation upon logout."
+        ],
+        "cases": [
+          {
+            "id": "case-01-cookie-attribute-hardening",
+            "title": "Hardening `Set-Cookie` Directives",
+            "context": "The server response header is: `Set-Cookie: session_id=f83a...; Path=/`.",
+            "prompt": "What critical security flags are missing, and what is the hardened header?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Missing `HttpOnly` (allows XSS cookie theft), `Secure` (allows plaintext transmission over HTTP), and `SameSite=Lax` (exposes session to CSRF); the hardened header is: `Set-Cookie: session_id=f83a...; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=1800`.",
+                "correct": true,
+                "rationale": "Every session cookie must include Secure (HTTPS only), HttpOnly (blocks JavaScript DOM reads), and SameSite (CSRF mitigation) to protect bearer tokens."
+              },
+              {
+                "id": "opt-2",
+                "label": "Add `SameSite=None` without `Secure` to make cookies compatible with all devices.",
+                "correct": false,
+                "rationale": "SameSite=None without Secure is rejected by modern browsers and eliminates CSRF defenses."
+              },
+              {
+                "id": "opt-3",
+                "label": "Remove all cookies and pass session IDs in the URL query string `?session_id=f83a`.",
+                "correct": false,
+                "rationale": "Passing session IDs in URL query parameters leaks tokens via browser history, proxy logs, and Referer headers."
+              },
+              {
+                "id": "opt-4",
+                "label": "The header is already 100% secure as long as the user uses Chrome.",
+                "correct": false,
+                "rationale": "Without security attributes, session cookies are vulnerable to XSS theft and network sniffing across all browsers."
+              }
+            ]
+          },
+          {
+            "id": "case-02-session-fixation-remediation",
+            "title": "Remediating Session Fixation Flaws",
+            "context": "An attacker tricks a user into logging in using a pre-set session cookie. The backend validates the password and marks the existing session ID as authenticated in the database.",
+            "prompt": "What programming pattern eliminates session fixation during authentication?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Call `session.regenerate()` immediately upon successful credential validation: generate a completely new cryptographic session ID, migrate user state, delete the old ID from the session store, and issue the new cookie to the client.",
+                "correct": true,
+                "rationale": "Regenerating the session ID upon login ensures that any pre-login token known to an attacker becomes invalid, neutralizing session fixation."
+              },
+              {
+                "id": "opt-2",
+                "label": "Ask the user to close their browser window after logging in.",
+                "correct": false,
+                "rationale": "User behavior cannot compensate for flawed server-side session management logic."
+              },
+              {
+                "id": "opt-3",
+                "label": "Keep the same session ID forever to avoid annoying users.",
+                "correct": false,
+                "rationale": "Perpetual session IDs guarantee account compromise if a token is ever intercepted."
+              },
+              {
+                "id": "opt-4",
+                "label": "Encrypt the session ID using ROT13.",
+                "correct": false,
+                "rationale": "ROT13 is a trivial character shift, offering zero cryptographic security."
+              }
+            ]
+          },
+          {
+            "id": "case-03-server-side-logout-invalidation",
+            "title": "Auditing Server-Side Session Invalidation",
+            "context": "When a user clicks 'Log Out', the client-side JavaScript deletes the local cookie via `document.cookie = 'session_id=; Max-Age=0'`. However, submitting the original session cookie directly via curl still returns authenticated account data.",
+            "prompt": "What is the security flaw in this logout implementation, and what is the remediation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Client-only logout leaves the session token active in the server database/Redis store; an attacker with an intercepted token retains permanent access. Remediation requires an authenticated POST `/api/logout` endpoint that explicitly deletes the session record from the server-side store.",
+                "correct": true,
+                "rationale": "Logout must be enforced server-side by deleting or revoking the session record, ensuring intercepted tokens cannot be reused."
+              },
+              {
+                "id": "opt-2",
+                "label": "There is no flaw because the user cannot see the cookie anymore.",
+                "correct": false,
+                "rationale": "Attackers using CLI tools (curl, Postman) do not rely on browser cookie stores."
+              },
+              {
+                "id": "opt-3",
+                "label": "The user should change their email address upon logout.",
+                "correct": false,
+                "rationale": "Changing email addresses is irrelevant to session token lifecycle management."
+              },
+              {
+                "id": "opt-4",
+                "label": "Server-side invalidation is forbidden by HTTP RFC specifications.",
+                "correct": false,
+                "rationale": "Server-side session management is the fundamental recommendation of OWASP and NIST standards."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate configuration of hardened `Set-Cookie` attributes (`HttpOnly`, `Secure`, `SameSite`).",
+          "Implement session ID regeneration upon authentication to prevent session fixation.",
+          "Enforce server-side session store invalidation and idle timeout lifecycles."
+        ],
+        "evidenceTemplate": [
+          "Hardened `Set-Cookie` HTTP response header capture.",
+          "Session ID regeneration test transcript showing pre-login vs post-login token changes.",
+          "Server-side session deletion validation log verifying token rejection post-logout."
+        ],
+        "reset": "Reset web framework session configuration to default unhardened settings.",
+        "cleanup": "Flush test session records from Redis/database and clear browser cookies."
+      },
+      "governance": {
+        "prevent": [
+          "Mandate `HttpOnly`, `Secure`, and `SameSite=Lax` on all session and authorization cookies.",
+          "Enforce automatic session ID regeneration upon login, privilege change, or password reset.",
+          "Implement strict idle timeouts (<= 30 minutes) and absolute timeouts (<= 12 hours) on session lifecycles."
+        ],
+        "observe": [
+          "Monitor concurrent session counts per user account in application telemetry.",
+          "Track session token generation rates and flag sequential or low-entropy patterns.",
+          "Alert on requests using expired or revoked session tokens."
+        ],
+        "respond": [
+          "Immediately revoke all active sessions for a user upon password change or reported credential compromise.",
+          "Flush all active session keys in Redis if a session store compromise is detected.",
+          "Force re-authentication when suspicious changes in user IP or User-Agent are detected."
+        ],
+        "residualRisk": [
+          "`SameSite=Lax` permits top-level GET navigation requests, requiring POST/PUT for all state-changing operations.",
+          "Multi-datacenter distributed session replication can introduce brief revocation sync latency."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Storing session tokens in HTML5 `localStorage` is more secure than HTTP cookies.",
+          "correction": "`localStorage` is accessible to all JavaScript on the page and has no `HttpOnly` protection; any XSS flaw allows instant token theft. Hardened `HttpOnly` cookies are far more secure."
+        },
+        {
+          "claim": "Deleting the cookie in JavaScript logs the user out securely.",
+          "correction": "Client-side cookie deletion only removes the local copy. If the server does not invalidate the session ID in its database, the token remains valid indefinitely."
+        },
+        {
+          "claim": "Session fixation only affects desktop browsers, not mobile APIs.",
+          "correction": "Any API that accepts a pre-existing session token or token ID without regenerating it upon authentication is vulnerable to session fixation."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What protection does the `HttpOnly` attribute provide when set on a session cookie?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It makes the website run faster."
+            },
+            {
+              "id": "B",
+              "label": "It prevents client-side scripts (such as JavaScript `document.cookie`) from accessing the cookie, protecting session tokens from theft via Cross-Site Scripting (XSS)."
+            },
+            {
+              "id": "C",
+              "label": "It allows the cookie to be sent over unencrypted radio frequencies."
+            },
+            {
+              "id": "D",
+              "label": "It deletes the user's browser history."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "The `HttpOnly` flag ensures cookies are handled exclusively by the browser's HTTP networking stack and remain hidden from JavaScript DOM access."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "Why must a web application regenerate the Session ID immediately after a user successfully logs in?",
+          "options": [
+            {
+              "id": "A",
+              "label": "To prevent Session Fixation attacks, ensuring an attacker who provided a pre-login session token cannot access the authenticated session."
+            },
+            {
+              "id": "B",
+              "label": "Because session tokens can only be used once."
+            },
+            {
+              "id": "C",
+              "label": "To change the user's password automatically."
+            },
+            {
+              "id": "D",
+              "label": "To clear the server's cache."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Session ID regeneration invalidates the anonymous session identifier, issuing a fresh token that an attacker could not have pre-set."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "What is the minimum recommended entropy for cryptographic session identifiers according to OWASP guidelines?",
+          "options": [
+            {
+              "id": "A",
+              "label": "4 bits (1 character)"
+            },
+            {
+              "id": "B",
+              "label": "At least 128 bits of entropy (e.g. 16 raw random bytes / 32 hexadecimal characters generated by a CSPRNG)"
+            },
+            {
+              "id": "C",
+              "label": "The user's first name spelled backwards"
+            },
+            {
+              "id": "D",
+              "label": "1,000,000 bits"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "128 bits of CSPRNG entropy provides 2^128 possible values, making brute-force guessing of session IDs mathematically infeasible."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are auditing a healthcare web portal. The session implementation uses sequential integer session IDs (`Set-Cookie: sid=10045; Path=/`), does not regenerate session IDs on login, and lacks `HttpOnly`/`Secure` flags. You must demonstrate how sequential IDs enable account enumeration, author a refactored session manager using Python/Flask or Node.js/Express with CSPRNG tokens, and configure complete cookie security attributes.",
+        "tasks": [
+          "Demonstrate session enumeration risks of sequential IDs.",
+          "Write a session middleware refactoring generating 256-bit CSPRNG tokens with session regeneration on login.",
+          "Configure `Set-Cookie` response headers with `Secure; HttpOnly; SameSite=Lax; Max-Age=1800`."
+        ],
+        "requiredEvidence": [
+          "Session token entropy analysis report.",
+          "Refactored session manager source code with CSPRNG generation.",
+          "HTTP response header capture verifying all required cookie security attributes."
+        ]
+      },
+      "sources": [
+        {
+          "title": "OWASP Cheat Sheet Series: Session Management Cheat Sheet",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Session identifier entropy and CSPRNG generation standards",
+            "Cookie security attributes (HttpOnly, Secure, SameSite)",
+            "Session fixation defense via session regeneration",
+            "Idle and absolute timeout lifecycle rules"
+          ]
+        },
+        {
+          "title": "IETF RFC 6265bis: Cookies: HTTP State Management Mechanism",
+          "url": "https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-rfc6265bis",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Cookie attribute semantics and browser parsing rules",
+            "SameSite attribute (Strict, Lax, None) specification",
+            "Prefix-based cookie isolation (__Secure-, __Host-)"
+          ]
+        }
+      ]
+    }
+  ]
+}

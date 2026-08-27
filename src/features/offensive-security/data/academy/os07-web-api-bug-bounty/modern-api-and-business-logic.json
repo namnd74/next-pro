@@ -1,0 +1,1062 @@
+{
+  "id": "os07-m04-modern-api-and-business-logic",
+  "slug": "modern-api-and-business-logic",
+  "trackId": "os07-web-api-bug-bounty",
+  "title": "OAuth, JWT, GraphQL, WebSocket, races and business logic",
+  "summary": "Master modern API security and business logic: exploit and remediate OAuth 2.0 / OIDC and JWT signature flaws, audit GraphQL introspection and Cross-Site WebSocket Hijacking, and conquer concurrency race conditions with atomic locking.",
+  "difficulty": "advanced",
+  "estimatedMinutes": 480,
+  "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+  "domains": ["web", "api"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os07-l61-oauth2-flows-and-jwt-security-mechanics",
+      "slug": "oauth2-flows-and-jwt-security-mechanics",
+      "title": "OAuth 2.0 / OIDC Vulnerabilities & JSON Web Token (JWT) Exploitation",
+      "summary": "Audit modern federated authentication and stateless tokens: OAuth 2.0 authorization flows (Authorization Code + PKCE, Implicit deprecation), redirect_uri validation bypasses, state/CSRF hijacking, and JWT signature attacks (alg: none, HMAC vs RSA key confusion, JWK injection, expiration bypasses).",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [],
+      "outcomes": [
+        "Audit OAuth 2.0 / OpenID Connect authorization flows for redirect URI poisoning and state parameter CSRF flaws.",
+        "Identify and exploit JWT implementation vulnerabilities including `alg: none`, HMAC/RSA key confusion, and missing signature verification.",
+        "Architect secure OAuth/OIDC client and resource server integrations enforcing strict URI whitelists and asymmetric key signing."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web", "api"],
+      "attackTactics": ["initial-access", "credential-access"],
+      "keywords": [
+        "oauth2",
+        "oidc",
+        "jwt",
+        "pkce",
+        "alg-none",
+        "key-confusion",
+        "redirect-uri"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "OAuth and JWT are cryptographic trust chains: OAuth delegates identity via authorization codes that must be bound to strict redirect URIs and PKCE verifiers; JWTs assert claims whose authenticity rests entirely on strict asymmetric signature verification.",
+      "visual": {
+        "title": "OAuth 2.0 Code Flow & JWT Signature Validation Pipeline",
+        "caption": "How OAuth authorization codes exchange for cryptographically verified JWT access tokens.",
+        "steps": [
+          {
+            "label": "Authorization Request",
+            "detail": "Client redirects user to Identity Provider with client_id, redirect_uri, scope, state, and code_challenge (PKCE).",
+            "tone": "allow"
+          },
+          {
+            "label": "Redirect URI Validation",
+            "detail": "IdP validates redirect_uri against exact registered URI string, preventing token theft to attacker domains.",
+            "tone": "allow"
+          },
+          {
+            "label": "JWT Signature Verification",
+            "detail": "Resource Server verifies JWT using IdP public key (RS256); rejects alg: none, unapproved algorithms, and expired tokens.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "OAuth 2.0 & OIDC Architecture: Grants, Tokens, and Scopes",
+          "paragraphs": [
+            "OAuth 2.0 (IETF RFC 6749) is the industry standard for delegated authorization, while OpenID Connect (OIDC) adds an identity layer on top of OAuth. Modern web applications utilize the 'Authorization Code Grant with PKCE' (Proof Key for Code Exchange per RFC 7636). Legacy Implicit grants (returning tokens in URL hashes) are deprecated due to token leakage in browser history.",
+            "The client sends an authorization request containing `client_id`, `redirect_uri`, `scope`, `state` (anti-CSRF), and `code_challenge`. The user authenticates at the Identity Provider (IdP), which returns an authorization code to the `redirect_uri`. The client backend exchanges the code and `code_verifier` for an Access Token and ID Token."
+          ]
+        },
+        {
+          "title": "OAuth Vulnerabilities: Redirect URI Poisoning and Account Linking Hijacking",
+          "paragraphs": [
+            "A critical OAuth vulnerability is 'Redirect URI Poisoning'. If the authorization server uses loose regex matching on `redirect_uri` (e.g. allowing `https://client.com.attacker.com` or `https://client.com/callback/../../attacker`), an attacker crafts an authorization link that forwards the victim's authorization code directly to the attacker's server, enabling total account takeover.",
+            "Additionally, omitting or failing to validate the `state` parameter enables OAuth CSRF: tricking a victim into linking the attacker's social identity to the victim's account, allowing the attacker to log into the victim's account via social login."
+          ]
+        },
+        {
+          "title": "JSON Web Token (JWT) Structure and Cryptographic Signatures",
+          "paragraphs": [
+            "JSON Web Tokens (IETF RFC 7519) are compact, URL-safe tokens consisting of three base64url-encoded parts separated by dots: `Header.Payload.Signature`. The Header specifies the algorithm (`{\"alg\": \"RS256\", \"typ\": \"JWT\"}`); the Payload contains claims (`{\"sub\": \"user123\", \"role\": \"admin\", \"exp\": 1700000000}`); and the Signature is computed over `Header.Payload` using a private key or shared secret.",
+            "JWTs are encoded, not encrypted. Anyone can read the payload. Security relies entirely on the server cryptographically verifying the signature before trusting the payload claims."
+          ]
+        },
+        {
+          "title": "JWT Vulnerability Hierarchy: `alg: none`, Key Confusion, and JWK Injection",
+          "paragraphs": [
+            "Common JWT implementation flaws include: 1) `alg: none` Vulnerability: if the server accepts tokens with `{\"alg\": \"none\"}` and an empty signature, an attacker can modify any payload claim (e.g. changing `user_id` to admin) without generating a signature.",
+            "2) Algorithm Confusion (RS256 to HS256): when a server expects an asymmetric RSA signature (RS256) verified with a public key, an attacker changes `alg` to symmetric HMAC (HS256) and signs the token using the server's public RSA key as the HMAC secret key. If the server library blindly uses its RSA public key string as the HMAC secret, the forged signature verifies as valid."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "OAuth 2.0 Redirect URI Validation & JWT Algorithm Confusion Audit",
+        "objective": "Audit an OAuth 2.0 authorization server for redirect URI path traversal flaws, exploit a JWT `alg: none` signature bypass, and remediate an RS256 to HS256 algorithm confusion vulnerability.",
+        "scenario": "You are auditing a cloud identity provider. The OAuth server permits path traversal in `redirect_uri`, and the microservice API gateway accepts unsigned JWT tokens.",
+        "constraints": [
+          "Must demonstrate authorization code leakage via loose redirect_uri matching.",
+          "Must construct a forged administrative JWT using `alg: none`.",
+          "Must refactor JWT verification to enforce strict algorithm whitelisting and asymmetric public key verification."
+        ],
+        "cases": [
+          {
+            "id": "case-01-oauth-redirect-uri-traversal",
+            "title": "Exploiting Loose OAuth Redirect URI Validation",
+            "context": "An OAuth IdP validates redirect URIs using `url.startswith('https://app.client.com')`. An attacker submits `redirect_uri=https://app.client.com@attacker.com/oauth/callback` or `https://app.client.com/login/../../oauth.attacker.com`.",
+            "prompt": "Why is prefix-only redirect URI validation insecure, and what is the remediation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Prefix matching permits domain and path traversal, leaking authorization codes to attacker-controlled servers; remediation is enforcing exact string matching against pre-registered client redirect URIs (e.g. `redirect_uri === registered_uri`).",
+                "correct": true,
+                "rationale": "Exact string matching guarantees that authorization codes are delivered strictly to the client's pre-approved endpoint, preventing code theft."
+              },
+              {
+                "id": "opt-2",
+                "label": "Prefix matching is standard and secure if the domain ends with .com.",
+                "correct": false,
+                "rationale": "Prefix matching allows domain confusion and subpath traversal regardless of TLD."
+              },
+              {
+                "id": "opt-3",
+                "label": "Remove all redirect URIs and send codes via SMS.",
+                "correct": false,
+                "rationale": "OAuth 2.0 web flows require HTTP redirect URIs."
+              },
+              {
+                "id": "opt-4",
+                "label": "Allow any URL on the internet to receive authorization codes.",
+                "correct": false,
+                "rationale": "Allowing arbitrary redirect URIs creates instant open redirection and account takeover."
+              }
+            ]
+          },
+          {
+            "id": "case-02-jwt-alg-none-bypass",
+            "title": "Remediating JWT `alg: none` Signature Stripping",
+            "context": "A microservice parses JWTs using a library that supports the `none` algorithm. An attacker sends a token with header `{\"alg\": \"none\", \"typ\": \"JWT\"}`, payload `{\"sub\": \"admin\", \"role\": \"admin\"}`, and trailing dot `.` with no signature.",
+            "prompt": "What security flaw allows this token to be accepted, and how is it remediated?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "The verification library defaults to accepting `none` algorithm tokens without cryptographic validation; remediation is explicitly specifying the expected algorithm array (`algorithms: ['RS256']`) and rejecting any token with `alg: none` or unexpected algorithms.",
+                "correct": true,
+                "rationale": "Enforcing explicit algorithm whitelists in the JWT verification call (`jwt.verify(token, publicKey, { algorithms: ['RS256'] })`) causes the parser to reject `alg: none` tokens immediately."
+              },
+              {
+                "id": "opt-2",
+                "label": "`alg: none` is required for testing and should be enabled in production.",
+                "correct": false,
+                "rationale": "Enabling `alg: none` in production allows any user to forge arbitrary identity claims."
+              },
+              {
+                "id": "opt-3",
+                "label": "JWT signatures are optional according to RFC 7519.",
+                "correct": false,
+                "rationale": "Authentication tokens must always be cryptographically signed."
+              },
+              {
+                "id": "opt-4",
+                "label": "Encrypt the JWT with ROT13 to prevent none attacks.",
+                "correct": false,
+                "rationale": "ROT13 provides zero security."
+              }
+            ]
+          },
+          {
+            "id": "case-03-jwt-key-confusion-fix",
+            "title": "Preventing RS256 to HS256 Algorithm Confusion",
+            "context": "A backend service verifies RS256 tokens using an RSA public key. An attacker converts the header to `{\"alg\": \"HS256\"}` and signs the payload with HMAC-SHA256 using the server's public RSA key (available at `/.well-known/jwks.json`) as the HMAC secret.",
+            "prompt": "How is Algorithm Confusion prevented in resource server token verification?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Strictly enforce asymmetric algorithm validation (`algorithms: ['RS256']` or `['ES256']`), ensuring the verification function refuses to verify symmetric HMAC algorithms with an asymmetric RSA public key object.",
+                "correct": true,
+                "rationale": "Restricting the verification library to asymmetric algorithms prevents the parser from treating the public key string as a symmetric HMAC secret key."
+              },
+              {
+                "id": "opt-2",
+                "label": "Hide the `/.well-known/jwks.json` endpoint behind a password.",
+                "correct": false,
+                "rationale": "JWKS endpoints must be publicly accessible for OpenID Connect client verification."
+              },
+              {
+                "id": "opt-3",
+                "label": "Switch all authentication back to unencrypted Basic Auth.",
+                "correct": false,
+                "rationale": "Basic Auth transmits plaintext credentials and lacks modern token delegation capabilities."
+              },
+              {
+                "id": "opt-4",
+                "label": "Allow the client to choose any algorithm in the header.",
+                "correct": false,
+                "rationale": "Allowing clients to choose algorithms creates the algorithm confusion vulnerability."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate OAuth redirect URI validation bypass and code theft mechanics.",
+          "Identify and forge administrative JWT tokens exploiting `alg: none`.",
+          "Implement strict algorithm whitelisting and asymmetric public key verification in JWT middleware."
+        ],
+        "evidenceTemplate": [
+          "OAuth redirect URI validation vulnerability audit report.",
+          "Forged `alg: none` JWT token and authorization bypass test log.",
+          "Refactored Node.js/Python JWT verification middleware source code."
+        ],
+        "reset": "Reset OAuth configuration and JWT verification options to permissive baseline.",
+        "cleanup": "Remove temporary forged tokens and clear test authentication sessions."
+      },
+      "governance": {
+        "prevent": [
+          "Enforce exact string matching on all OAuth 2.0 `redirect_uri` parameters.",
+          "Mandate PKCE (RFC 7636) across all authorization code flows, deprecating implicit grants.",
+          "Strictly enforce explicit algorithm whitelisting (`algorithms: ['RS256']`) in all JWT verification libraries."
+        ],
+        "observe": [
+          "Monitor OAuth authorization failures and redirect URI rejection events in identity logs.",
+          "Track JWT verification failures (invalid signature, algorithm mismatch, expired token) in SIEM.",
+          "Alert on requests attempting to use `alg: none` or symmetric algorithms against asymmetric keys."
+        ],
+        "respond": [
+          "Immediately revoke compromised OAuth client secrets and rotate signing keys in JWKS.",
+          "Blacklist compromised JWT tokens in distributed cache (Redis) before token expiration.",
+          "Enforce user session termination across all active resource servers."
+        ],
+        "residualRisk": [
+          "Stateless JWTs cannot be revoked instantly without maintaining a distributed revocation blacklist.",
+          "OpenID Connect discovery endpoints (JWKS) can introduce SSRF if `jku` header parameters are parsed without domain whitelists."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "JWTs are encrypted and secure against inspection by users.",
+          "correction": "Standard JWTs (JWS) are signed and base64-encoded, not encrypted. Anyone can decode and view the payload claims in plaintext at jwt.io."
+        },
+        {
+          "claim": "The `state` parameter in OAuth 2.0 is optional and only used for analytics.",
+          "correction": "The `state` parameter is a mandatory anti-CSRF token that binds the authorization request to the user's browser session, preventing OAuth account hijacking."
+        },
+        {
+          "claim": "A JWT with an expired `exp` claim is automatically rejected by all servers.",
+          "correction": "The server's verification library must explicitly check the `exp` claim. Flawed implementations that only decode the payload without verification process expired tokens."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What are the three components of a standard JSON Web Token (JWT)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Username, Password, and Domain"
+            },
+            {
+              "id": "B",
+              "label": "Header, Payload, and Signature"
+            },
+            {
+              "id": "C",
+              "label": "HTML, CSS, and JavaScript"
+            },
+            {
+              "id": "D",
+              "label": "IP Address, Port, and Protocol"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "A JWT consists of three base64url-encoded segments separated by dots: Header, Payload, and Signature."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "Why is the PKCE (Proof Key for Code Exchange - RFC 7636) extension essential in OAuth 2.0 Authorization Code flows?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It makes OAuth tokens expire after 1 second."
+            },
+            {
+              "id": "B",
+              "label": "It prevents authorization code interception attacks by requiring the client to prove ownership of a dynamic secret (`code_verifier`) when exchanging the code for tokens, protecting public clients that cannot store client secrets securely."
+            },
+            {
+              "id": "C",
+              "label": "It forces all users to change their password."
+            },
+            {
+              "id": "D",
+              "label": "It encrypts all internet traffic with AES-512."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "PKCE dynamically binds the authorization code request to the token exchange request using a code verifier challenge, preventing intercepted codes from being redeemed by attackers."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "In a JWT Algorithm Confusion (RS256 to HS256) attack, what does the attacker use as the symmetric HMAC signing key to forge a valid signature?",
+          "options": [
+            {
+              "id": "A",
+              "label": "A blank password."
+            },
+            {
+              "id": "B",
+              "label": "The server's public RSA key (which is publicly available), exploiting the server library's flawed behavior of treating the public key string as a symmetric HMAC secret key."
+            },
+            {
+              "id": "C",
+              "label": "The server administrator's private home address."
+            },
+            {
+              "id": "D",
+              "label": "A random number generated by Math.random()."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "If the server verification routine allows HS256 while supplying its RSA public key to the verify function, the HMAC algorithm uses the public key string as its shared secret."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are auditing a financial API gateway using JWT access tokens. The gateway uses `jsonwebtoken.verify(token, key)` without specifying the `algorithms` array, allowing `alg: none` and RS256/HS256 algorithm confusion. Furthermore, the OAuth 2.0 authorization server allows wildcard subdomains in `redirect_uri`. You must author a complete security advisory detailing both attack vectors and provide refactored Python/Node.js verification code enforcing exact URI matching and strict algorithm validation.",
+        "tasks": [
+          "Demonstrate the `alg: none` token forgery and algorithm confusion attack payloads.",
+          "Demonstrate the OAuth wildcard redirect URI account takeover scenario.",
+          "Author refactored verification middleware in Node.js (or Python) that enforces strict algorithm whitelisting and exact redirect URI matching."
+        ],
+        "requiredEvidence": [
+          "JWT forgery exploit script transcript.",
+          "OAuth redirect URI vulnerability proof of concept.",
+          "Refactored security middleware source code file."
+        ]
+      },
+      "sources": [
+        {
+          "title": "IETF RFC 6749: The OAuth 2.0 Authorization Framework",
+          "url": "https://www.rfc-editor.org/rfc/rfc6749.html",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "OAuth 2.0 authorization code flow specification",
+            "Redirect URI validation and security considerations",
+            "State parameter CSRF protection mechanics"
+          ]
+        },
+        {
+          "title": "OWASP Cheat Sheet Series: JSON Web Token for Java Cheat Sheet",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "JWT signature validation and algorithm whitelisting",
+            "alg: none and key confusion mitigation standards",
+            "Claim verification (exp, nbf, iss, aud) requirements"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os07-l62-graphql-introspection-and-websocket-security",
+      "slug": "graphql-introspection-and-websocket-security",
+      "title": "GraphQL API Security & Cross-Site WebSocket Hijacking (CSWSH)",
+      "summary": "Audit modern interactive API protocols: GraphQL schema introspection, query depth and complexity attacks, field-level authorization bypasses, and WebSocket security (Cross-Site WebSocket Hijacking CSWSH, message-level authorization, and socket rate-limiting).",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": ["os07-l61-oauth2-flows-and-jwt-security-mechanics"],
+      "outcomes": [
+        "Interrogate and analyze GraphQL APIs via schema introspection, query batching, and nested depth exhaustion.",
+        "Audit field-level authorization in GraphQL resolvers to detect hidden object leaks.",
+        "Identify and remediate Cross-Site WebSocket Hijacking (CSWSH) and unauthenticated socket message processing."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web", "api"],
+      "attackTactics": ["initial-access", "discovery", "defense-evasion"],
+      "keywords": [
+        "graphql",
+        "introspection",
+        "query-depth",
+        "websocket",
+        "cswsh",
+        "batching"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Modern interactive APIs expose granular graph nodes and bi-directional sockets: GraphQL requires query depth/cost limits and resolver-level authorization; WebSockets require handshake Origin validation to prevent cross-site socket hijacking.",
+      "visual": {
+        "title": "GraphQL Query Complexity vs WebSocket Handshake Validation",
+        "caption": "How GraphQL complexity limits prevent DoS and how WebSocket origin checks block CSWSH.",
+        "steps": [
+          {
+            "label": "GraphQL Query Depth Limit",
+            "detail": "Middleware analyzes incoming AST; rejects nested circular queries (user -> friends -> user -> friends) exceeding max depth (e.g. 5).",
+            "tone": "allow"
+          },
+          {
+            "label": "WebSocket Handshake Check",
+            "detail": "Server inspects Origin header during HTTP 101 Switching Protocols; drops connection if origin is untrusted.",
+            "tone": "allow"
+          },
+          {
+            "label": "Message-Level Authorization",
+            "detail": "Every socket frame message validates session permissions before executing backend business actions.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "GraphQL Architecture: Single Endpoint, Schema, and Resolvers",
+          "paragraphs": [
+            "Unlike traditional REST APIs that expose multiple resource endpoints, GraphQL exposes a single endpoint (`/graphql` or `/api/graphql`) accepting POST requests with structured query strings. The server uses a strongly typed Schema defining Types, Queries, Mutations, and Subscriptions.",
+            "Each field in a GraphQL query is resolved by an independent 'Resolver Function'. If a resolver fetches data from a database without validating the caller's authorization, unauthorized users can traverse relationships to access sensitive fields (e.g. `user { id, email, ssn, role }`)."
+          ]
+        },
+        {
+          "title": "GraphQL Attack Vectors: Introspection Leaks, Batching, and Circular Depth DoS",
+          "paragraphs": [
+            "By default in development mode, GraphQL enables 'Schema Introspection' (`__schema`, `__type`), allowing anyone to download the complete schema, internal types, mutations, and hidden administrative queries. Introspection should be disabled in production.",
+            "Furthermore, because GraphQL allows circular relational queries (`author { books { author { books { ... } } } }`), attackers can craft deeply nested queries that exhaust server CPU and database connections. Attackers also abuse 'Query Batching' (sending 1,000 queries in a single HTTP request) to bypass rate limiters and brute-force passwords."
+          ]
+        },
+        {
+          "title": "Field-Level Access Control and Resolver Authorization",
+          "paragraphs": [
+            "In REST, access control is enforced at the route level. In GraphQL, authorization must be enforced at the 'Field/Resolver Level' (using middleware libraries like GraphQL-Shield or custom directives like `@auth`).",
+            "For example, while public users may query `User.username`, the `User.email` and `User.phoneNumber` resolvers must verify that the requesting user owns the profile or possesses administrative privileges before returning the data, returning null or authorization errors for restricted fields."
+          ]
+        },
+        {
+          "title": "WebSocket Security: Handshake Origin Validation and CSWSH Prevention",
+          "paragraphs": [
+            "The WebSocket protocol (IETF RFC 6455) enables full-duplex, persistent communication over a single TCP connection. WebSockets begin with an HTTP handshake (`GET /ws`, `Upgrade: websocket`, `Connection: Upgrade`).",
+            "Browsers do not apply the Same-Origin Policy to WebSockets: any malicious website (`https://attacker.com`) can initiate a WebSocket connection to `wss://bank.com/ws` with the victim's ambient session cookies. If the server does not validate the `Origin` header during the HTTP upgrade handshake, an attacker executes 'Cross-Site WebSocket Hijacking' (CSWSH), intercepting private live feeds and sending unauthorized socket messages."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "GraphQL Introspection Hardening & WebSocket Authorization Audit",
+        "objective": "Interrogate a GraphQL API to dump the hidden schema via introspection, test circular query depth limits, and audit a WebSocket endpoint for Cross-Site WebSocket Hijacking (CSWSH) vulnerabilities.",
+        "scenario": "You are auditing a financial trading application. The GraphQL endpoint exposes an internal administrative mutation in its introspection schema, and the real-time trade execution WebSocket does not validate the Origin header.",
+        "constraints": [
+          "Must extract schema metadata via GraphQL introspection query.",
+          "Must implement query depth limiting (max depth = 5) and disable production introspection.",
+          "Must demonstrate CSWSH exploitability and implement Origin header validation during the WebSocket upgrade."
+        ],
+        "cases": [
+          {
+            "id": "case-01-graphql-introspection-hardening",
+            "title": "Hardening GraphQL Schema Introspection in Production",
+            "context": "A public GraphQL endpoint at `/graphql` responds to `query { __schema { types { name } } }` by dumping all internal types and administrative mutations (`deleteTenant`, `grantAdminRole`).",
+            "prompt": "What configuration changes harden this GraphQL API in production?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Disable introspection in production (e.g. `introspection: process.env.NODE_ENV !== 'production'`), disable GraphQL Playground/GraphiQL in production, and implement field-level authorization on all administrative mutations.",
+                "correct": true,
+                "rationale": "Disabling introspection in production prevents unauthenticated attackers from mapping the internal API surface, while field-level authorization prevents unauthorized mutation execution."
+              },
+              {
+                "id": "opt-2",
+                "label": "Rename `__schema` to `__secret_schema`.",
+                "correct": false,
+                "rationale": "`__schema` is a built-in GraphQL specification keyword and cannot be renamed."
+              },
+              {
+                "id": "opt-3",
+                "label": "Introspection carries zero risk because GraphQL is encrypted.",
+                "correct": false,
+                "rationale": "Introspection leaks the complete internal data model, hidden endpoints, and unreleased feature schemas."
+              },
+              {
+                "id": "opt-4",
+                "label": "Only allow GET requests on the GraphQL endpoint.",
+                "correct": false,
+                "rationale": "GraphQL queries can be executed over GET as query string parameters; method restriction does not disable introspection."
+              }
+            ]
+          },
+          {
+            "id": "case-02-graphql-dos-depth-limiting",
+            "title": "Mitigating Nested Query Denial of Service",
+            "context": "An attacker sends a deeply nested query with 50 levels of recursion: `query { thread { comments { thread { comments { ... } } } } }`, causing the database CPU to hit 100%.",
+            "prompt": "What validation control prevents GraphQL nested recursion DoS attacks?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Implement query depth limiting (e.g. `graphql-depth-limit` max depth: 5) and query complexity analysis (cost analysis) to calculate and reject expensive query ASTs before execution.",
+                "correct": true,
+                "rationale": "Depth limiting and query cost analysis inspect the Abstract Syntax Tree (AST) before execution, rejecting queries that exceed depth or complexity thresholds."
+              },
+              {
+                "id": "opt-2",
+                "label": "Buy a CPU with 500 cores.",
+                "correct": false,
+                "rationale": "Exponential nested queries will exhaust any hardware capacity."
+              },
+              {
+                "id": "opt-3",
+                "label": "Remove the comments feature from the application.",
+                "correct": false,
+                "rationale": "Depth limiting protects all recursive relationships without removing application features."
+              },
+              {
+                "id": "opt-4",
+                "label": "Limit the HTTP request payload to 5 bytes.",
+                "correct": false,
+                "rationale": "A 5-byte payload limit breaks all valid GraphQL queries."
+              }
+            ]
+          },
+          {
+            "id": "case-03-cswsh-origin-validation",
+            "title": "Preventing Cross-Site WebSocket Hijacking (CSWSH)",
+            "context": "A real-time trading WebSocket server (`wss://trade.bank.com/stream`) accepts upgrade handshakes using ambient session cookies without checking the `Origin` header. An attacker on `https://evil.com` executes `new WebSocket('wss://trade.bank.com/stream')`.",
+            "prompt": "Why does this allow account hijacking, and what is the remediation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Cross-Site WebSocket Hijacking: the victim's browser includes session cookies during the upgrade handshake; without Origin validation, the attacker's script receives private trade data and can send trades on behalf of the victim. Remediation is validating the `Origin` header against a strict domain whitelist during the HTTP upgrade handshake and requiring one-time ticket tokens.",
+                "correct": true,
+                "rationale": "WebSockets are not restricted by SOP. Validating the `Origin` header during the initial HTTP upgrade handshake is mandatory to reject cross-site connections."
+              },
+              {
+                "id": "opt-2",
+                "label": "WebSockets are automatically protected by CORS headers.",
+                "correct": false,
+                "rationale": "CORS headers do not apply to WebSocket handshakes; the server must manually inspect the `Origin` header."
+              },
+              {
+                "id": "opt-3",
+                "label": "There is no risk because WebSockets use binary packets.",
+                "correct": false,
+                "rationale": "CSWSH works on both text and binary WebSocket streams."
+              },
+              {
+                "id": "opt-4",
+                "label": "Only allow WebSockets on Internet Explorer.",
+                "correct": false,
+                "rationale": "Security relies on server-side origin validation, not client browser restrictions."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate GraphQL schema extraction via introspection queries and apply production hardening.",
+          "Implement query depth limiting to prevent circular recursion DoS.",
+          "Demonstrate Cross-Site WebSocket Hijacking (CSWSH) and implement HTTP upgrade Origin validation."
+        ],
+        "evidenceTemplate": [
+          "GraphQL introspection dump analysis report.",
+          "Query depth limiting middleware configuration and validation test log.",
+          "WebSocket HTTP upgrade Origin verification code snippet."
+        ],
+        "reset": "Reset GraphQL server options and WebSocket server upgrade handler to unhardened baseline.",
+        "cleanup": "Remove temporary introspection query scripts and close test WebSocket connections."
+      },
+      "governance": {
+        "prevent": [
+          "Disable GraphQL schema introspection and GraphQL Playground in all production environments.",
+          "Mandate query depth limiting (max depth <= 6) and query complexity analyzers on GraphQL gateways.",
+          "Enforce strict `Origin` header validation and one-time authentication tickets on all WebSocket upgrade handlers."
+        ],
+        "observe": [
+          "Monitor GraphQL query execution times, depth rejections, and batching anomalies in APM tools.",
+          "Track WebSocket connection handshake rejections due to unauthorized Origin headers.",
+          "Alert on resolver-level authorization failures in GraphQL logs."
+        ],
+        "respond": [
+          "Immediately disable introspection flags if discovered exposed on production endpoints.",
+          "Terminate active WebSocket sessions if anomalous cross-origin traffic patterns are detected.",
+          "Deploy WAF rate-limiting rules against high-volume GraphQL batch requests."
+        ],
+        "residualRisk": [
+          "Complex GraphQL schemas with wide relationships may require high depth limits for legitimate nested dashboards.",
+          "Reverse proxy configurations that strip or rewrite the `Origin` header can disrupt WebSocket origin validation."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "The Same-Origin Policy prevents a malicious website from connecting to another site's WebSocket server.",
+          "correction": "The Same-Origin Policy does NOT apply to WebSockets. Browsers permit cross-origin WebSocket connections by design. The server must explicitly validate the `Origin` header."
+        },
+        {
+          "claim": "Disabling GraphQL introspection makes it impossible for attackers to find vulnerabilities.",
+          "correction": "Disabling introspection stops automated schema dumping, but attackers can still fuzz queries, analyze client JavaScript bundles for query strings, and exploit resolver-level authorization bugs."
+        },
+        {
+          "claim": "WebSockets are inherently more secure than REST APIs because they maintain persistent connections.",
+          "correction": "WebSockets bypass standard HTTP security controls (like CORS and CSRF tokens) unless custom message authentication and origin validation are implemented."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "Why should GraphQL Schema Introspection be disabled in production environments?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because introspection deletes the database."
+            },
+            {
+              "id": "B",
+              "label": "Because introspection allows unauthenticated users to download the entire API schema, revealing internal object types, hidden administrative queries, and unreleased fields."
+            },
+            {
+              "id": "C",
+              "label": "Because introspection only works on Windows."
+            },
+            {
+              "id": "D",
+              "label": "Because introspection makes CSS stylesheets fail to load."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Introspection acts as an interactive blueprint of the API, allowing attackers to map all internal types, relations, and sensitive mutations."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "What is the primary security risk of Cross-Site WebSocket Hijacking (CSWSH)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "The user's monitor brightness is set to 100%."
+            },
+            {
+              "id": "B",
+              "label": "Because browsers do not enforce SOP on WebSockets, a malicious site visited by an authenticated victim can establish a WebSocket connection with ambient cookies, eavesdropping on live private data and sending forged actions."
+            },
+            {
+              "id": "C",
+              "label": "It disconnects the user's Wi-Fi router."
+            },
+            {
+              "id": "D",
+              "label": "It formats all USB flash drives."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "CSWSH is CSRF on WebSockets: cross-origin scripts initiate authenticated socket connections to steal data or issue commands."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "How does Query Depth Limiting protect a GraphQL server from Denial of Service (DoS)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It encrypts the query payload with AES-GCM."
+            },
+            {
+              "id": "B",
+              "label": "It analyzes the query Abstract Syntax Tree (AST) before execution and aborts queries where relational nesting exceeds a configured maximum threshold (e.g. depth > 5), preventing circular recursive database load."
+            },
+            {
+              "id": "C",
+              "label": "It limits the query string length to 10 characters."
+            },
+            {
+              "id": "D",
+              "label": "It requires all GraphQL queries to be written in SQL."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Depth limiting inspects the AST hierarchy prior to execution, rejecting deeply nested circular queries that would trigger exponential database queries."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are auditing a fintech trading platform that exposes a GraphQL endpoint (`/graphql`) and a real-time order execution WebSocket (`wss://trade.platform.com/ws`). Introspection is enabled in production, recursive queries crash the server, and the WebSocket upgrade does not check the `Origin` header. You must author a Node.js/Apollo Server configuration that disables production introspection, applies `graphql-depth-limit`, and validates `Origin` headers on WebSocket upgrade handshakes.",
+        "tasks": [
+          "Demonstrate GraphQL schema extraction and circular recursion DoS exploitation.",
+          "Configure Apollo Server to disable introspection and enforce query depth limits.",
+          "Implement a WebSocket server `verifyClient` / `upgrade` listener that rejects unapproved cross-origin requests."
+        ],
+        "requiredEvidence": [
+          "GraphQL introspection query dump and recursion test log.",
+          "Hardened Apollo Server configuration file.",
+          "WebSocket HTTP upgrade Origin verification source code file."
+        ]
+      },
+      "sources": [
+        {
+          "title": "GraphQL Foundation: Security Best Practices",
+          "url": "https://graphql.org/learn/best-practices/#security",
+          "publisher": "GraphQL Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Query depth limiting and complexity analysis standards",
+            "Schema introspection management guidelines",
+            "Field-level resolver authorization architecture"
+          ]
+        },
+        {
+          "title": "IETF RFC 6455: The WebSocket Protocol — Section 10: Security Considerations",
+          "url": "https://www.rfc-editor.org/rfc/rfc6455.html#section-10",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "WebSocket handshake security and Origin header semantics",
+            "Cross-Site WebSocket Hijacking (CSWSH) threat vectors",
+            "Authentication and message-level encryption standards"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os07-l63-race-conditions-and-business-logic-flaws",
+      "slug": "race-conditions-and-business-logic-flaws",
+      "title": "Concurrency Race Conditions & Flawed Business Logic Exploitation",
+      "summary": "Exploit and remediate complex application business logic: concurrency race conditions (Limit-overrun, Time-of-Check to Time-of-Use TOCTOU), e-commerce cart/price tampering, coupon code reuse, multi-step workflow state skipping, and atomic database transactions.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": ["os07-l62-graphql-introspection-and-websocket-security"],
+      "outcomes": [
+        "Identify concurrency race condition windows enabling limit-overrun and balance manipulation.",
+        "Audit multi-step business workflows for state skipping and client-side parameter tampering.",
+        "Implement atomic database transactions, pessimistic/optimistic locking, and distributed mutexes (Redis Redlock)."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web", "api"],
+      "attackTactics": ["initial-access", "defense-evasion"],
+      "keywords": [
+        "race-condition",
+        "toctou",
+        "business-logic",
+        "concurrency",
+        "atomic-transactions",
+        "pessimistic-locking"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Business logic flaws exploit invalid developer assumptions: race conditions exploit the sub-millisecond gap between checking a balance and deducting it; defense requires atomic database transactions and strict server-side state machines.",
+      "visual": {
+        "title": "Concurrency Race Condition (Limit Overrun) vs Atomic Transaction",
+        "caption": "How simultaneous parallel requests bypass non-atomic balance checks.",
+        "steps": [
+          {
+            "label": "Non-Atomic Check (Vulnerable)",
+            "detail": "Request 1 & Request 2 simultaneously read balance = $100; both pass check (balance >= $100); both deduct $100, withdrawing $200 total.",
+            "tone": "stop"
+          },
+          {
+            "label": "Atomic Row Locking (SELECT FOR UPDATE)",
+            "detail": "Request 1 locks row; reads balance = $100; deducts $100; balance = $0; releases lock.",
+            "tone": "allow"
+          },
+          {
+            "label": "Subsequent Request Evaluation",
+            "detail": "Request 2 acquires lock; reads updated balance = $0; check fails; transaction aborts.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "The Nature of Business Logic Flaws: Exploiting Implicit Assumptions",
+          "paragraphs": [
+            "Unlike technical vulnerabilities (like SQLi or XSS) that stem from parser confusion, Business Logic Flaws occur when an application's legitimate features behave in unexpected ways when manipulated by an adversary.",
+            "Developers routinely make implicit assumptions: assuming users will follow steps 1 -> 2 -> 3 in order, assuming prices sent in client requests cannot be negative (`quantity: -5`), or assuming discounts cannot be redeemed more than once. Automated scanners cannot detect logic flaws because the application produces valid HTTP 200 responses."
+          ]
+        },
+        {
+          "title": "Concurrency Race Conditions: The Time-of-Check to Time-of-Use (TOCTOU) Window",
+          "paragraphs": [
+            "A 'Race Condition' (specifically Time-of-Check to Time-of-Use - TOCTOU) occurs when multi-threaded web application servers process simultaneous requests that access shared state. In a 'Limit-Overrun' vulnerability, a user with a one-time $50 gift card sends 20 identical redemption requests at the exact same millisecond using HTTP/2 single-packet multiplexing (Turbo Intruder).",
+            "Because thread 1 through thread 10 all execute the balance check (`if card.is_valid:`) before any thread marks the card as used in the database, all 10 requests succeed, redeeming $500 from a $50 card."
+          ]
+        },
+        {
+          "title": "E-Commerce and Financial Logic: Price Tampering and Workflow State Skipping",
+          "paragraphs": [
+            "Common e-commerce logic vulnerabilities include: 1) Parameter Tampering: changing price parameters in checkout JSON (`{\"item_id\": 42, \"price\": 0.01}`), which occurs when the server trusts client-supplied pricing rather than looking up prices in the database.",
+            "2) Negative Quantities: submitting negative item quantities to reduce the total cart value to $0.01 while adding positive items. 3) Multi-Step State Skipping: navigating directly to `/checkout/step3_confirm` without completing `/checkout/step2_payment`, resulting in order fulfillment without payment capture."
+          ]
+        },
+        {
+          "title": "Defensive Concurrency Architecture: Atomic Transactions, Row Locks, and Idempotency",
+          "paragraphs": [
+            "Remediating concurrency race conditions requires atomic operations at the data layer: 1) Pessimistic Locking: using SQL `SELECT ... FOR UPDATE` within an explicit database transaction (`BEGIN TRANSACTION ... COMMIT`), which locks the target row until the transaction completes, forcing concurrent requests to queue sequentially.",
+            "2) Atomic Updates: executing updates in a single SQL operation (`UPDATE accounts SET balance = balance - 100 WHERE id = 1 AND balance >= 100`). 3) Idempotency Keys: requiring unique cryptographic client-supplied transaction IDs stored in Redis with atomic SETNX locks."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Concurrency Race Condition Exploitability & Business Logic Hardening",
+        "objective": "Demonstrate a limit-overrun race condition on a one-time coupon redemption endpoint, exploit multi-step checkout state skipping, and refactor the backend using atomic SQL transactions and row locking.",
+        "scenario": "You are auditing a retail platform. A one-time discount coupon ($100 off) can be redeemed multiple times by sending concurrent requests, and the payment verification step can be bypassed by directly invoking the order completion API.",
+        "constraints": [
+          "Must demonstrate simultaneous multi-request coupon redemption.",
+          "Must identify multi-step workflow authorization state skipping.",
+          "Must refactor coupon redemption with `SELECT ... FOR UPDATE` atomic transactions."
+        ],
+        "cases": [
+          {
+            "id": "case-01-coupon-race-condition",
+            "title": "Exploiting Concurrency Race Conditions on Single-Use Coupons",
+            "context": "The vulnerable coupon redemption handler executes: `coupon = db.get(code); if not coupon.used: apply_discount(); coupon.used = True; db.save(coupon)`.",
+            "prompt": "How does sending 10 simultaneous HTTP requests exploit this logic, and what is the remediation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "All 10 requests read `coupon.used == False` during the concurrency window before any single thread updates the database to `True`, applying the coupon 10 times. Remediation is wrapping the check and update inside an atomic database transaction with pessimistic row locking (`SELECT * FROM coupons WHERE code = ? FOR UPDATE`) or an atomic update (`UPDATE coupons SET used = 1 WHERE code = ? AND used = 0`).",
+                "correct": true,
+                "rationale": "Atomic row locking ensures only one thread can inspect and modify the coupon row at a time, forcing concurrent requests to wait until the coupon is marked used."
+              },
+              {
+                "id": "opt-2",
+                "label": "Add a `time.sleep(1)` statement in the Python code.",
+                "correct": false,
+                "rationale": "Adding sleep statements actually widens the race condition window, making exploitation easier."
+              },
+              {
+                "id": "opt-3",
+                "label": "Rate-limit the user's IP to 1 request per hour.",
+                "correct": false,
+                "rationale": "IP rate-limiting can be bypassed using proxy pools and does not fix the underlying data concurrency flaw."
+              },
+              {
+                "id": "opt-4",
+                "label": "Race conditions only exist on quantum computers.",
+                "correct": false,
+                "rationale": "Race conditions occur routinely on standard multi-core servers and web application frameworks."
+              }
+            ]
+          },
+          {
+            "id": "case-02-state-skipping-workflow",
+            "title": "Remediating Multi-Step Workflow State Skipping",
+            "context": "A checkout workflow has 3 steps: Step 1 (Cart), Step 2 (Payment Gateway), Step 3 (Order Confirmation). An attacker directly sends a POST to `/api/order/complete` without completing Step 2.",
+            "prompt": "How should multi-step business workflows enforce state integrity?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Enforce a server-side State Machine: the server tracks the order status in the database (`PENDING_PAYMENT` -> `PAID` -> `COMPLETED`); `/api/order/complete` must verify that the order state is strictly `PAID` via server-to-server webhook verification from the payment processor before marking the order as fulfilled.",
+                "correct": true,
+                "rationale": "Server-side state machines ensure orders cannot transition to completed without verified upstream payment confirmation."
+              },
+              {
+                "id": "opt-2",
+                "label": "Disable the 'Back' button in the user's web browser.",
+                "correct": false,
+                "rationale": "Disabling browser buttons does not stop direct API requests sent via curl or proxy."
+              },
+              {
+                "id": "opt-3",
+                "label": "Check if the HTTP Referer header is `/checkout/step2`.",
+                "correct": false,
+                "rationale": "Referer headers are trivially forged in HTTP requests."
+              },
+              {
+                "id": "opt-4",
+                "label": "Charge the user's credit card twice to make sure.",
+                "correct": false,
+                "rationale": "Double charging users causes billing disputes and does not fix workflow state validation."
+              }
+            ]
+          },
+          {
+            "id": "case-03-price-parameter-tampering",
+            "title": "Eliminating Client-Side Price Parameter Tampering",
+            "context": "An e-commerce mobile app sends `{\"item_id\": 101, \"quantity\": 2, \"price\": 0.05}` during order submission. The server charges the user $0.10 and ships the $500 item.",
+            "prompt": "What design flaw causes this vulnerability, and what is the fix?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "The server trusts client-supplied pricing; remediation is ignoring the client `price` attribute, querying the authoritative item price directly from the server database (`price = db.get_item(item_id).price`), and calculating the total strictly on the server.",
+                "correct": true,
+                "rationale": "Financial calculations and prices must always be derived from server-side database records, never from untrusted client input."
+              },
+              {
+                "id": "opt-2",
+                "label": "Encrypt the price using base64 in the mobile app.",
+                "correct": false,
+                "rationale": "Base64 is trivial to decode and tamper with."
+              },
+              {
+                "id": "opt-3",
+                "label": "Trust prices from iPhone users but reject prices from Android users.",
+                "correct": false,
+                "rationale": "All client applications (iOS, Android, Web) are untrusted."
+              },
+              {
+                "id": "opt-4",
+                "label": "Set the price to $0 for all items in the store.",
+                "correct": false,
+                "rationale": "Giving away all merchandise for free destroys business viability."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate limit-overrun race condition exploitation using concurrent multi-request testing.",
+          "Identify and secure multi-step business workflows against state skipping.",
+          "Implement atomic database transactions and row-level locking (`SELECT FOR UPDATE`)."
+        ],
+        "evidenceTemplate": [
+          "Concurrency race condition test transcript showing multiple coupon redemptions.",
+          "Workflow state machine validation audit report.",
+          "Atomic transaction remediation code snippet using SQL row locking."
+        ],
+        "reset": "Reset coupon database records and checkout workflow endpoints to unhardened baseline.",
+        "cleanup": "Remove temporary order records and reset coupon redemption counters."
+      },
+      "governance": {
+        "prevent": [
+          "Mandate atomic database transactions (`SELECT ... FOR UPDATE` or atomic decrement) on all financial and balance operations.",
+          "Prohibit trusting client-supplied pricing, discount amounts, or workflow state parameters.",
+          "Enforce server-side finite state machines on all multi-step order and registration workflows."
+        ],
+        "observe": [
+          "Monitor concurrency request spikes on financial and redemption API endpoints.",
+          "Track order completion events lacking corresponding payment gateway confirmation IDs.",
+          "Alert on anomalous database deadlock errors indicating concurrent lock contention."
+        ],
+        "respond": [
+          "Immediately suspend coupon codes or accounts exhibiting multi-redemption race condition abuse.",
+          "Cancel orders flagged for price tampering or payment state skipping.",
+          "Deploy Redis distributed mutexes (Redlock) on high-traffic balance deduction routes."
+        ],
+        "residualRisk": [
+          "Row-level locking can introduce performance bottlenecks under high-volume flash sale traffic, requiring optimistic locking patterns.",
+          "Third-party payment gateway webhook delivery delays can create temporary state synchronization lag."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Checking a balance with `if (balance >= amount)` in application code is completely safe.",
+          "correction": "In-memory checks are vulnerable to race conditions if multiple threads execute the check simultaneously before the database is updated. Concurrency control must be enforced at the database layer."
+        },
+        {
+          "claim": "Rate limiting completely eliminates race condition vulnerabilities.",
+          "correction": "Rate limiters often operate on a 1-second window. Attackers can send 20 requests within 2 milliseconds via HTTP/2 multiplexing, triggering the race condition before rate limiters engage."
+        },
+        {
+          "claim": "Automated DAST vulnerability scanners will find all business logic flaws.",
+          "correction": "Scanners cannot understand business context, multi-step state dependencies, or domain-specific pricing rules. Logic flaw discovery requires manual expert testing."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is a Time-of-Check to Time-of-Use (TOCTOU) Race Condition?",
+          "options": [
+            {
+              "id": "A",
+              "label": "A flaw where the server clock runs 1 hour fast."
+            },
+            {
+              "id": "B",
+              "label": "A concurrency flaw where the state of a resource changes between the moment it is checked and the moment it is used, allowing parallel requests to bypass validation."
+            },
+            {
+              "id": "C",
+              "label": "A video game racing competition."
+            },
+            {
+              "id": "D",
+              "label": "A hardware defect in the server power supply."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "TOCTOU race conditions exploit the sub-millisecond gap between checking a condition (e.g. balance check) and executing the state change (e.g. balance deduction)."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "In SQL databases, what does the clause `SELECT ... FOR UPDATE` accomplish inside a transaction?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It deletes all records in the table."
+            },
+            {
+              "id": "B",
+              "label": "It places an exclusive row-level lock on the selected records, preventing concurrent transactions from reading or modifying those rows until the current transaction commits."
+            },
+            {
+              "id": "C",
+              "label": "It changes the database schema."
+            },
+            {
+              "id": "D",
+              "label": "It restarts the MySQL server."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "`SELECT ... FOR UPDATE` provides pessimistic locking, serializing access to the locked rows to prevent concurrent race condition tampering."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "Why is relying on client-supplied `price` or `discount` fields in checkout API payloads a critical vulnerability?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because clients may have slow internet connections."
+            },
+            {
+              "id": "B",
+              "label": "Because attackers intercept and modify HTTP payloads using proxy tools, altering prices to $0.01 or negative values, allowing theft of goods unless prices are strictly derived from the server database."
+            },
+            {
+              "id": "C",
+              "label": "Because prices must be written in Roman numerals."
+            },
+            {
+              "id": "D",
+              "label": "Because JSON does not support decimal numbers."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Client-supplied parameters are completely untrusted. Financial values must always be calculated server-side from authoritative database models."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are auditing a gift card redemption microservice in Python/SQLAlchemy. The endpoint checks `if card.balance >= amount:` in Python, then updates the database after deducting funds. An attacker sends 15 concurrent requests to redeem a $20 balance, successfully withdrawing $300. You must demonstrate the race condition using a concurrent script (e.g. Python `asyncio` / `ThreadPoolExecutor`) and refactor the backend using atomic SQL row locking (`with_for_update()`) and idempotency keys.",
+        "tasks": [
+          "Write a Python script demonstrating concurrent race condition exploitation.",
+          "Refactor the SQLAlchemy endpoint to use `db.session.query(GiftCard).filter_by(code=code).with_for_update().first()` within an atomic transaction.",
+          "Verify that concurrent requests are serialized and overdrafts are rejected."
+        ],
+        "requiredEvidence": [
+          "Concurrent race condition exploit demonstration log.",
+          "Refactored Python/SQLAlchemy source code snippet with row locking.",
+          "Verification test log proving zero overdrafts under 50 concurrent requests."
+        ]
+      },
+      "sources": [
+        {
+          "title": "PortSwigger Web Security Academy: Race Conditions",
+          "url": "https://portswigger.net/web-security/race-conditions",
+          "publisher": "PortSwigger Ltd",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Limit-overrun and multi-endpoint race condition mechanics",
+            "Single-packet attack methodology over HTTP/2",
+            "Atomic transaction and row-level locking remediations"
+          ]
+        },
+        {
+          "title": "OWASP Web Security Testing Guide: Testing for Business Logic (WSTG-BUSL)",
+          "url": "https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/10-Business_Logic_Testing/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Business logic flaw testing methodologies",
+            "State machine integrity and workflow skipping validation",
+            "Data integrity and price tampering verification"
+          ]
+        }
+      ]
+    }
+  ]
+}
