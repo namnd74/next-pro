@@ -11,6 +11,9 @@ import processesServicesShellData from '../data/academy/os02-linux-foundations/p
 import servicesPowershellRemoteData from '../data/academy/os03-windows-foundations/services-powershell-remote.json';
 import linuxBoundariesAndTelemetryData from '../data/academy/os02-linux-foundations/linux-boundaries-and-telemetry.json';
 import endpointControlsAndEventsData from '../data/academy/os03-windows-foundations/endpoint-controls-and-events.json';
+import bashPythonPowershellData from '../data/academy/os04-operator-scripting/bash-python-powershell.json';
+import structuredDataHttpGitData from '../data/academy/os04-operator-scripting/structured-data-http-git.json';
+import safeEvidenceAutomationData from '../data/academy/os04-operator-scripting/safe-evidence-automation.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -113,6 +116,13 @@ export const LINUX_BOUNDARIES_AND_TELEMETRY_MODULE = parseAcademyModule(
 export const ENDPOINT_CONTROLS_AND_EVENTS_MODULE = parseAcademyModule(
   endpointControlsAndEventsData
 );
+export const BASH_PYTHON_POWERSHELL_MODULE = parseAcademyModule(bashPythonPowershellData);
+export const STRUCTURED_DATA_HTTP_GIT_MODULE = parseAcademyModule(
+  structuredDataHttpGitData
+);
+export const SAFE_EVIDENCE_AUTOMATION_MODULE = parseAcademyModule(
+  safeEvidenceAutomationData
+);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
@@ -128,6 +138,9 @@ export const ACADEMY_MODULES: AcademyModule[] = [
   SERVICES_POWERSHELL_REMOTE_MODULE,
   LINUX_BOUNDARIES_AND_TELEMETRY_MODULE,
   ENDPOINT_CONTROLS_AND_EVENTS_MODULE,
+  BASH_PYTHON_POWERSHELL_MODULE,
+  STRUCTURED_DATA_HTTP_GIT_MODULE,
+  SAFE_EVIDENCE_AUTOMATION_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {

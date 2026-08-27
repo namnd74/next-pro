@@ -1,6 +1,6 @@
 # Offensive Security Curriculum Generation Status
 
-Updated: 2026-08-25
+Updated: 2026-08-27
 
 ## Current state
 
@@ -10,15 +10,16 @@ Updated: 2026-08-25
 - Machine-readable manifest: verified
 - Generation skill: active
 - Curriculum validator: verified
-- Full lesson migration/generation: in progress — **13 modules validated (39 lessons, 2,730 minutes);
+- Full lesson migration/generation: in progress — **16 modules validated (48 lessons, 3,570 minutes);
   tracks `os00-ethics-authorization` (3/3), `os01-network-foundations` (4/4),
-  `os02-linux-foundations` (3/3), and `os03-windows-foundations` (3/3) fully validated**
+  `os02-linux-foundations` (3/3), `os03-windows-foundations` (3/3), and
+  `os04-operator-scripting` (3/3) fully validated**
 - Existing Practice Range collections: preserved as auxiliary practice range
 - Publishing state: PR #4 (foundation), PR #5 (`os01-m02`), PR #6 (`os01-m03`), PR #7 (`os01-m04`),
-  PR #9 (paired cycle 1: `os02-m01` + `os03-m01`), PR #10 (paired cycle 2: `os02-m02` + `os03-m02` & tree restructure)
+  PR #9 (paired cycle 1: `os02-m01` + `os03-m01`), PR #10 (paired cycle 2: `os02-m02` + `os03-m02` & tree restructure),
+  PR #11 (paired cycle 3: `os02-m03` + `os03-m03`)
   open for review; each new batch stacks on the previous branch.
-- Batch policy: raised to 2 modules / 6 lessons per run by owner approval (2026-08-25) to pair
-  independent tracks; paired cycles 1, 2, and 3 are complete.
+- Batch policy: single module or paired modules per run by owner approval.
 
 The current `/offensive-security` content remains operational. It has not been declared equivalent to
 the new academy and must not be counted as completion of foundation, network, Linux,
@@ -26,40 +27,38 @@ Windows, Active Directory, cloud, research, or adversary-emulation tracks.
 
 ## Latest validated batch
 
-**Third paired cycle** — two independent modules generated in one run:
+**Track 04 Module 03** — `os04-m03-safe-evidence-automation` (Timeouts, retries, errors and evidence-collector capstone, 300 minutes total) — **Completes Track 04**:
 
-1. `os02-m03-linux-boundaries-and-telemetry` — Linux privilege boundaries, containers & telemetry (300 minutes total):
-   - `os02-l19-linux-capabilities-and-suid-privesc` (100 min) — POSIX capabilities decomposition vs SUID all-or-nothing root,
-     5 capability sets (Permitted, Effective, Inheritable, Bounding, Ambient), dangerous capabilities (CAP_SETUID, CAP_DAC_OVERRIDE,
-     CAP_SYS_ADMIN, CAP_SYS_PTRACE), prctl PR_SET_NO_NEW_PRIVS and systemd CapabilityBoundingSet hardening.
-   - `os02-l20-namespaces-cgroups-container-boundaries` (100 min) — 7 Linux Namespaces (PID, MNT, NET, IPC, UTS, USER, CGROUP) and
-     Cgroups v1/v2, chroot vs pivot_root boundary mechanics, container escape vectors (--privileged, docker.sock mount, cgroups release_agent),
-     defense-in-depth via User Namespaces mapping, Seccomp profiles, and rootless containers.
-   - `os02-l21-auditd-ebpf-and-host-telemetry` (100 min) — Linux Audit Subsystem architecture (kauditd, Netlink socket, auditd daemon),
-     immutable auid (Login UID) forensics tracing across sudo/su transitions, audit rule design (-w file watch, -a always,exit -S execve),
-     ausearch/aureport query analysis, and eBPF in-kernel telemetry vs auditd performance trade-offs.
+1. `os04-l31-concurrency-asyncio-and-worker-pools` (100 min) — Bounded concurrency, AsyncIO & worker pool engineering:
+   cooperative event loop mechanics vs Thread/Process pools, bounded concurrency via `asyncio.Semaphore(N)` and `asyncio.Queue` backpressure,
+   `asyncio.to_thread()` blocking I/O offloading, CPU hashing dispatch to `ProcessPoolExecutor`, and graceful signal shutdown (`SIGINT`/`SIGTERM`)
+   with `asyncio.CancelledError` flushing.
 
-2. `os03-m03-endpoint-controls-and-events` — Windows endpoint controls, firewall & event telemetry (300 minutes total):
-   - `os03-l22-defender-av-edr-and-amsi` (100 min) — Multi-layered Defender AV/EDR engine (WdFilter.sys mini-filter, emulation sandbox,
-     MAPS cloud protection), AMSI in-memory script buffer interception (AmsiScanBuffer) for obfuscated PowerShell/.NET, Attack Surface
-     Reduction (ASR) rules, and safe testing patterns under Safe Harbor.
-   - `os03-l23-windows-firewall-and-network-boundaries` (100 min) — Windows Filtering Platform (WFP) kernel architecture and Base Filtering
-     Engine (BFE), 3 Network Profiles (Domain, Private, Public), rule evaluation precedence (IPsec bypass > Block rules > Allow rules > Default action),
-     and Workstation-to-Workstation SMB/RPC lateral movement isolation policies.
-   - `os03-l24-security-event-log-and-sysmon-telemetry` (100 min) — Windows Event Log EVTX binary XML architecture, Advanced Audit Policy
-     golden events (Event 4688 with CommandLine, Event 4624 LogonTypes, Event 4672, Event 7045), Sysmon telemetry (Event ID 1 process create with
-     SHA256, Event ID 3 network, Event ID 10 LSASS process access), Windows Event Forwarding (WEF), and anti-tamper detection (Event 1102).
+2. `os04-l32-defensive-error-handling-and-telemetry-pipelines` (100 min) — Defensive error architecture & observable telemetry pipelines:
+   domain exception taxonomy (Transient vs Fatal errors), explicit exception chaining (`raise ... from err`),
+   Circuit Breaker state machine (Closed, Open, Half-Open) for target stability protection, Dead Letter Queue (DLQ) pattern for failed evidence preservation,
+   and OpenTelemetry-aligned structured JSON telemetry.
 
-All six labs are browser-only decision simulations with fixed datasets. They accept no external
+3. `os04-l33-evidence-collector-capstone-and-safe-packaging` (100 min) — Safe operator CLI packaging & evidence collector capstone:
+   declarative CLI design with Click/Typer subcommands and Path validation, cryptographic streaming SHA-256 evidence sealing,
+   NIST SP 800-86 compliant `manifest.json` chain-of-custody generation, multi-stage rootless containerization (`USER 10001`),
+   and end-to-end evidence collection and verification workflows.
+
+All three labs are browser-only decision simulations with fixed datasets. They accept no external
 target, credential, command or arbitrary payload. Completion requires all three lab cases and
 all three quiz questions to be correct per module.
 
 Quality rubric review (generation-agent self-assessment against `references/quality-rubric.md`):
-22/22 for each of the six lessons; automatic-rejection checklist clear. Independent re-review
+22/22 for each of the three lessons; automatic-rejection checklist clear. Independent re-review
 before `published` status remains pending, as for all batches.
 
 ## Previous validated batches
 
+- `os04-m02-structured-data-http-git` (240 min, 3 lessons): `os04-l28..l30`.
+- `os04-m01-bash-python-powershell` (300 min, 3 lessons): `os04-l25..l27`.
+
+- **Paired cycle 3** — `os02-m03-linux-boundaries-and-telemetry` (300 min) +
+  `os03-m03-endpoint-controls-and-events` (300 min): lessons `os02-l19..l21`, `os03-l22..l24`.
 - **Paired cycle 2** — `os02-m02-processes-services-shell` (240 min) +
   `os03-m02-services-powershell-remote` (270 min): lessons `os02-l16..l18`, `os03-l19..l21`.
 - **Paired cycle 1** — `os02-m01-files-identity-permissions` (180 min) +
@@ -95,8 +94,7 @@ before `published` status remains pending, as for all batches.
 
 ## Next eligible batch
 
-Track 04: `os04-m01-bash-python-powershell` (Operator Scripting & Data Handling, 300 min) — depends on
-both `os02-linux-foundations` and `os03-windows-foundations` which are now both fully validated.
+Track 05: `os05-m01-engagement-recon-enumeration` (Engagement planning, reconnaissance and enumeration, 240 min) — depends on `os04-operator-scripting` which is now fully validated.
 
 ## Tree restructure (owner-approved, pre-cycle 3)
 
@@ -143,23 +141,22 @@ Owner approved full restructuring before cycle 3:
 ## Evidence log
 
 - `npm run validate:offensive-security-curriculum`: passed — 19 tracks, 64 modules; next
-  eligible module is `os04-m01-bash-python-powershell`.
-- `npm run validate:offensive-security-content`: passed — validated all thirteen modules
-  `os00-m01`–`os00-m03`, `os01-m01`–`os01-m04`, `os02-m01`–`os02-m03`, `os03-m01`–`os03-m03`
-  (39 lessons, 2,730m).
-- Quality rubric review: 22/22 self-assessed for each of the six lessons in this batch;
+  eligible module is `os05-m01-engagement-recon-enumeration`.
+- `npm run validate:offensive-security-content`: passed — validated all sixteen modules
+  `os00-m01`–`os00-m03`, `os01-m01`–`os01-m04`, `os02-m01`–`os02-m03`, `os03-m01`–`os03-m03`,
+  and `os04-m01`–`os04-m03` (48 lessons, 3,570m).
+- Quality rubric review: 22/22 self-assessed for each of the three lessons in this batch;
   no dimension scored zero.
-- Authoritative sources: Linux man-pages (capabilities(7), prctl(2), namespaces(7), cgroups(7),
-  auditd(8), auditctl(8)), NIST SP 800-190, Docker security documentation, Cilium eBPF reference;
-  Microsoft Learn (Defender Antivirus, AMSI architecture, ASR rules, Windows Firewall / WFP,
-  Sysinternals Sysmon, Advanced Security Audit Policy, Windows Event Forwarding).
-- CJK-leakage grep across all thirteen data files: clean (0 matches).
+- Authoritative sources: Python 3 Standard Library (`asyncio`), Python PEP 3156,
+  Martin Fowler (Circuit Breaker pattern), Python PEP 3134 (Exception Chaining),
+  NIST SP 800-86 (Forensic Techniques in Incident Response), Click Documentation.
+- CJK-leakage grep across all sixteen data files: clean (0 matches).
 - `npm run lint`: passed.
 - `npm run typecheck` (`tsc --noEmit`): passed.
-- Production build: passed.
+- Production build: passed (203 static pages generated).
 - `git diff --check`: passed.
 
-Runtime integration: all 13 modules served from
-`/offensive-security/academy/<track-id>/<module-slug>` plus 39 statically generated lesson
+Runtime integration: all 16 modules served from
+`/offensive-security/academy/<track-id>/<module-slug>` plus 48 statically generated lesson
 routes beneath them; index page renders the track → module tree via
 `groupAcademyModulesByTrack`; routes derive automatically from `ACADEMY_MODULES`.
