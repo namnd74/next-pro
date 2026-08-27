@@ -1,616 +1,612 @@
 import type { TerminalExecutionResult, VfsDirectory, VfsNode, VfsState } from '../types';
 
-export function createDefaultVfs(): VfsDirectory {
-  return {
-    type: 'dir',
-    name: '',
-    mode: 0o755,
-    owner: 'root',
-    group: 'root',
-    children: {
-      bin: {
-        type: 'dir',
-        name: 'bin',
-        mode: 0o755,
-        owner: 'root',
-        group: 'root',
-        children: {
-          bash: {
-            type: 'file',
-            name: 'bash',
-            content: '#!/bin/bash binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 1234528,
-          },
-          sh: {
-            type: 'file',
-            name: 'sh',
-            content: '#!/bin/sh binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 124500,
-          },
-          cat: {
-            type: 'file',
-            name: 'cat',
-            content: '#!/bin/cat binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 43512,
-          },
-          chmod: {
-            type: 'file',
-            name: 'chmod',
-            content: '#!/bin/chmod binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 65400,
-          },
-          chown: {
-            type: 'file',
-            name: 'chown',
-            content: '#!/bin/chown binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 68120,
-          },
-          cp: {
-            type: 'file',
-            name: 'cp',
-            content: '#!/bin/cp binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 152000,
-          },
-          date: {
-            type: 'file',
-            name: 'date',
-            content: '#!/bin/date binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 89000,
-          },
-          echo: {
-            type: 'file',
-            name: 'echo',
-            content: '#!/bin/echo binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 34000,
-          },
-          grep: {
-            type: 'file',
-            name: 'grep',
-            content: '#!/bin/grep binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 154200,
-          },
-          head: {
-            type: 'file',
-            name: 'head',
-            content: '#!/bin/head binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 48000,
-          },
-          kill: {
-            type: 'file',
-            name: 'kill',
-            content: '#!/bin/kill binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 31000,
-          },
-          ls: {
-            type: 'file',
-            name: 'ls',
-            content: '#!/bin/ls binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 142800,
-          },
-          mkdir: {
-            type: 'file',
-            name: 'mkdir',
-            content: '#!/bin/mkdir binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 52000,
-          },
-          mv: {
-            type: 'file',
-            name: 'mv',
-            content: '#!/bin/mv binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 139000,
-          },
-          ps: {
-            type: 'file',
-            name: 'ps',
-            content: '#!/bin/ps binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 112400,
-          },
-          pwd: {
-            type: 'file',
-            name: 'pwd',
-            content: '#!/bin/pwd binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 38000,
-          },
-          rm: {
-            type: 'file',
-            name: 'rm',
-            content: '#!/bin/rm binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 71000,
-          },
-          sed: {
-            type: 'file',
-            name: 'sed',
-            content: '#!/bin/sed binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 180000,
-          },
-          su: {
-            type: 'file',
-            name: 'su',
-            content: '#!/bin/su binary',
-            mode: 0o4755,
-            owner: 'root',
-            group: 'root',
-            size: 78920,
-          }, // SUID
-          tail: {
-            type: 'file',
-            name: 'tail',
-            content: '#!/bin/tail binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 53000,
-          },
-          tar: {
-            type: 'file',
-            name: 'tar',
-            content: '#!/bin/tar binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 420000,
-          },
-          touch: {
-            type: 'file',
-            name: 'touch',
-            content: '#!/bin/touch binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 45000,
-          },
-          uname: {
-            type: 'file',
-            name: 'uname',
-            content: '#!/bin/uname binary',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            size: 35000,
-          },
+export const createDefaultVfs = (): VfsDirectory => ({
+  type: 'dir',
+  name: '',
+  mode: 0o755,
+  owner: 'root',
+  group: 'root',
+  children: {
+    bin: {
+      type: 'dir',
+      name: 'bin',
+      mode: 0o755,
+      owner: 'root',
+      group: 'root',
+      children: {
+        bash: {
+          type: 'file',
+          name: 'bash',
+          content: '#!/bin/bash',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 1234528,
+        },
+        sh: {
+          type: 'file',
+          name: 'sh',
+          content: '#!/bin/sh',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 124500,
+        },
+        cat: {
+          type: 'file',
+          name: 'cat',
+          content: '#!/bin/cat',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 43512,
+        },
+        chmod: {
+          type: 'file',
+          name: 'chmod',
+          content: '#!/bin/chmod',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 65400,
+        },
+        chown: {
+          type: 'file',
+          name: 'chown',
+          content: '#!/bin/chown',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 68120,
+        },
+        cp: {
+          type: 'file',
+          name: 'cp',
+          content: '#!/bin/cp',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 152000,
+        },
+        date: {
+          type: 'file',
+          name: 'date',
+          content: '#!/bin/date',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 89000,
+        },
+        echo: {
+          type: 'file',
+          name: 'echo',
+          content: '#!/bin/echo',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 34000,
+        },
+        grep: {
+          type: 'file',
+          name: 'grep',
+          content: '#!/bin/grep',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 154200,
+        },
+        head: {
+          type: 'file',
+          name: 'head',
+          content: '#!/bin/head',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 48000,
+        },
+        kill: {
+          type: 'file',
+          name: 'kill',
+          content: '#!/bin/kill',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 31000,
+        },
+        ls: {
+          type: 'file',
+          name: 'ls',
+          content: '#!/bin/ls',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 142800,
+        },
+        mkdir: {
+          type: 'file',
+          name: 'mkdir',
+          content: '#!/bin/mkdir',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 52000,
+        },
+        mv: {
+          type: 'file',
+          name: 'mv',
+          content: '#!/bin/mv',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 139000,
+        },
+        ps: {
+          type: 'file',
+          name: 'ps',
+          content: '#!/bin/ps',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 112400,
+        },
+        pwd: {
+          type: 'file',
+          name: 'pwd',
+          content: '#!/bin/pwd',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 38000,
+        },
+        rm: {
+          type: 'file',
+          name: 'rm',
+          content: '#!/bin/rm',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 71000,
+        },
+        sed: {
+          type: 'file',
+          name: 'sed',
+          content: '#!/bin/sed',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 180000,
+        },
+        su: {
+          type: 'file',
+          name: 'su',
+          content: '#!/bin/su',
+          mode: 0o4755,
+          owner: 'root',
+          group: 'root',
+          size: 78920,
+        }, // SUID
+        tail: {
+          type: 'file',
+          name: 'tail',
+          content: '#!/bin/tail',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 53000,
+        },
+        tar: {
+          type: 'file',
+          name: 'tar',
+          content: '#!/bin/tar',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 420000,
+        },
+        touch: {
+          type: 'file',
+          name: 'touch',
+          content: '#!/bin/touch',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 45000,
+        },
+        uname: {
+          type: 'file',
+          name: 'uname',
+          content: '#!/bin/uname',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          size: 35000,
         },
       },
-      usr: {
-        type: 'dir',
-        name: 'usr',
-        mode: 0o755,
-        owner: 'root',
-        group: 'root',
-        children: {
-          bin: {
-            type: 'dir',
-            name: 'bin',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            children: {
-              awk: {
-                type: 'file',
-                name: 'awk',
-                content: '#!/usr/bin/awk binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 210000,
-              },
-              base64: {
-                type: 'file',
-                name: 'base64',
-                content: '#!/usr/bin/base64 binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 42000,
-              },
-              curl: {
-                type: 'file',
-                name: 'curl',
-                content: '#!/usr/bin/curl binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 320000,
-              },
-              cut: {
-                type: 'file',
-                name: 'cut',
-                content: '#!/usr/bin/cut binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 46000,
-              },
-              dig: {
-                type: 'file',
-                name: 'dig',
-                content: '#!/usr/bin/dig binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 178000,
-              },
-              find: {
-                type: 'file',
-                name: 'find',
-                content: '#!/usr/bin/find binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 245000,
-              },
-              hexdump: {
-                type: 'file',
-                name: 'hexdump',
-                content: '#!/usr/bin/hexdump binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 68000,
-              },
-              id: {
-                type: 'file',
-                name: 'id',
-                content: '#!/usr/bin/id binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 42000,
-              },
-              md5sum: {
-                type: 'file',
-                name: 'md5sum',
-                content: '#!/usr/bin/md5sum binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 49000,
-              },
-              nc: {
-                type: 'file',
-                name: 'nc',
-                content: '#!/usr/bin/nc binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 54000,
-              },
-              nmap: {
-                type: 'file',
-                name: 'nmap',
-                content: '#!/usr/bin/nmap binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 2800000,
-              },
-              sha256sum: {
-                type: 'file',
-                name: 'sha256sum',
-                content: '#!/usr/bin/sha256sum binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 51000,
-              },
-              sort: {
-                type: 'file',
-                name: 'sort',
-                content: '#!/usr/bin/sort binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 120000,
-              },
-              strings: {
-                type: 'file',
-                name: 'strings',
-                content: '#!/usr/bin/strings binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 76000,
-              },
-              sudo: {
-                type: 'file',
-                name: 'sudo',
-                content: '#!/usr/bin/sudo binary',
-                mode: 0o4755,
-                owner: 'root',
-                group: 'root',
-                size: 180000,
-              },
-              uniq: {
-                type: 'file',
-                name: 'uniq',
-                content: '#!/usr/bin/uniq binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 48000,
-              },
-              wc: {
-                type: 'file',
-                name: 'wc',
-                content: '#!/usr/bin/wc binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 46000,
-              },
-              whoami: {
-                type: 'file',
-                name: 'whoami',
-                content: '#!/usr/bin/whoami binary',
-                mode: 0o755,
-                owner: 'root',
-                group: 'root',
-                size: 36000,
-              },
+    },
+    usr: {
+      type: 'dir',
+      name: 'usr',
+      mode: 0o755,
+      owner: 'root',
+      group: 'root',
+      children: {
+        bin: {
+          type: 'dir',
+          name: 'bin',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          children: {
+            awk: {
+              type: 'file',
+              name: 'awk',
+              content: '#!/usr/bin/awk',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 210000,
+            },
+            base64: {
+              type: 'file',
+              name: 'base64',
+              content: '#!/usr/bin/base64',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 42000,
+            },
+            curl: {
+              type: 'file',
+              name: 'curl',
+              content: '#!/usr/bin/curl',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 320000,
+            },
+            cut: {
+              type: 'file',
+              name: 'cut',
+              content: '#!/usr/bin/cut',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 46000,
+            },
+            dig: {
+              type: 'file',
+              name: 'dig',
+              content: '#!/usr/bin/dig',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 178000,
+            },
+            find: {
+              type: 'file',
+              name: 'find',
+              content: '#!/usr/bin/find',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 245000,
+            },
+            hexdump: {
+              type: 'file',
+              name: 'hexdump',
+              content: '#!/usr/bin/hexdump',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 68000,
+            },
+            id: {
+              type: 'file',
+              name: 'id',
+              content: '#!/usr/bin/id',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 42000,
+            },
+            md5sum: {
+              type: 'file',
+              name: 'md5sum',
+              content: '#!/usr/bin/md5sum',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 49000,
+            },
+            nc: {
+              type: 'file',
+              name: 'nc',
+              content: '#!/usr/bin/nc',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 54000,
+            },
+            nmap: {
+              type: 'file',
+              name: 'nmap',
+              content: '#!/usr/bin/nmap',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 2800000,
+            },
+            sha256sum: {
+              type: 'file',
+              name: 'sha256sum',
+              content: '#!/usr/bin/sha256sum',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 51000,
+            },
+            sort: {
+              type: 'file',
+              name: 'sort',
+              content: '#!/usr/bin/sort',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 120000,
+            },
+            strings: {
+              type: 'file',
+              name: 'strings',
+              content: '#!/usr/bin/strings',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 76000,
+            },
+            sudo: {
+              type: 'file',
+              name: 'sudo',
+              content: '#!/usr/bin/sudo',
+              mode: 0o4755,
+              owner: 'root',
+              group: 'root',
+              size: 180000,
+            },
+            uniq: {
+              type: 'file',
+              name: 'uniq',
+              content: '#!/usr/bin/uniq',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 48000,
+            },
+            wc: {
+              type: 'file',
+              name: 'wc',
+              content: '#!/usr/bin/wc',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 46000,
+            },
+            whoami: {
+              type: 'file',
+              name: 'whoami',
+              content: '#!/usr/bin/whoami',
+              mode: 0o755,
+              owner: 'root',
+              group: 'root',
+              size: 36000,
             },
           },
         },
       },
-      etc: {
-        type: 'dir',
-        name: 'etc',
-        mode: 0o755,
-        owner: 'root',
-        group: 'root',
-        children: {
-          hostname: {
-            type: 'file',
-            name: 'hostname',
-            content: 'sec-target-prod01\n',
-            mode: 0o644,
-            owner: 'root',
-            group: 'root',
-          },
-          hosts: {
-            type: 'file',
-            name: 'hosts',
-            content:
-              '127.0.0.1\tlocalhost\n127.0.1.1\tsec-target-prod01\n10.0.4.1\tgateway.corp.internal\n10.0.4.5\tdb.corp.internal\n',
-            mode: 0o644,
-            owner: 'root',
-            group: 'root',
-          },
-          os_release: {
-            type: 'file',
-            name: 'os-release',
-            content:
-              'NAME="Ubuntu"\nVERSION="24.04 LTS (Noble Numbat)"\nID=ubuntu\nVERSION_ID="24.04"\nPRETTY_NAME="Ubuntu 24.04 LTS"\n',
-            mode: 0o644,
-            owner: 'root',
-            group: 'root',
-          },
-          passwd: {
-            type: 'file',
-            name: 'passwd',
-            content:
-              'root:x:0:0:root:/root:/bin/bash\n' +
-              'daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n' +
-              'www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin\n' +
-              'operator:x:1000:1000:Operator User,,,:/home/operator:/bin/bash\n' +
-              'auditor:x:1001:1001:Security Auditor:/home/auditor:/bin/bash\n',
-            mode: 0o644,
-            owner: 'root',
-            group: 'root',
-          },
-          shadow: {
-            type: 'file',
-            name: 'shadow',
-            content:
-              'root:$6$aK92jL$zXp94/8vM4L2389.kLmPqz01980vF1:19820:0:99999:7:::\n' +
-              'operator:$6$bJ21kQ$98LmnO1029384756lkjhgfdsap:19820:0:99999:7:::\n' +
-              'auditor:$6$cL31mR$0192837465alskdjfhgzmxncbv12:19820:0:99999:7:::\n',
-            mode: 0o640,
-            owner: 'root',
-            group: 'shadow',
-          },
-          sudoers: {
-            type: 'file',
-            name: 'sudoers',
-            content:
-              '# /etc/sudoers\nDefaults env_reset\nroot ALL=(ALL:ALL) ALL\n%sudo ALL=(ALL:ALL) ALL\noperator ALL=(ALL) NOPASSWD: /usr/bin/apt, /bin/systemctl status *\n',
-            mode: 0o440,
-            owner: 'root',
-            group: 'root',
-          },
+    },
+    etc: {
+      type: 'dir',
+      name: 'etc',
+      mode: 0o755,
+      owner: 'root',
+      group: 'root',
+      children: {
+        hostname: {
+          type: 'file',
+          name: 'hostname',
+          content: 'sec-target-prod01\n',
+          mode: 0o644,
+          owner: 'root',
+          group: 'root',
+        },
+        hosts: {
+          type: 'file',
+          name: 'hosts',
+          content:
+            '127.0.0.1\tlocalhost\n127.0.1.1\tsec-target-prod01\n10.0.4.1\tgateway.corp.internal\n10.0.4.5\tdb.corp.internal\n',
+          mode: 0o644,
+          owner: 'root',
+          group: 'root',
+        },
+        os_release: {
+          type: 'file',
+          name: 'os-release',
+          content:
+            'NAME="Ubuntu"\nVERSION="24.04 LTS (Noble Numbat)"\nID=ubuntu\nVERSION_ID="24.04"\nPRETTY_NAME="Ubuntu 24.04 LTS"\n',
+          mode: 0o644,
+          owner: 'root',
+          group: 'root',
+        },
+        passwd: {
+          type: 'file',
+          name: 'passwd',
+          content:
+            'root:x:0:0:root:/root:/bin/bash\n' +
+            'daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n' +
+            'www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin\n' +
+            'operator:x:1000:1000:Operator User,,,:/home/operator:/bin/bash\n' +
+            'auditor:x:1001:1001:Security Auditor:/home/auditor:/bin/bash\n',
+          mode: 0o644,
+          owner: 'root',
+          group: 'root',
+        },
+        shadow: {
+          type: 'file',
+          name: 'shadow',
+          content:
+            'root:$6$aK92jL$zXp94/8vM4L2389.kLmPqz01980vF1:19820:0:99999:7:::\n' +
+            'operator:$6$bJ21kQ$98LmnO1029384756lkjhgfdsap:19820:0:99999:7:::\n' +
+            'auditor:$6$cL31mR$0192837465alskdjfhgzmxncbv12:19820:0:99999:7:::\n',
+          mode: 0o640,
+          owner: 'root',
+          group: 'shadow',
+        },
+        sudoers: {
+          type: 'file',
+          name: 'sudoers',
+          content:
+            '# /etc/sudoers\nDefaults env_reset\nroot ALL=(ALL:ALL) ALL\n%sudo ALL=(ALL:ALL) ALL\noperator ALL=(ALL) NOPASSWD: /usr/bin/apt, /bin/systemctl status *\n',
+          mode: 0o440,
+          owner: 'root',
+          group: 'root',
         },
       },
-      home: {
-        type: 'dir',
-        name: 'home',
-        mode: 0o755,
-        owner: 'root',
-        group: 'root',
-        children: {
-          operator: {
-            type: 'dir',
-            name: 'operator',
-            mode: 0o700,
-            owner: 'operator',
-            group: 'operator',
-            children: {
-              '.bashrc': {
-                type: 'file',
-                name: '.bashrc',
-                content: 'export PS1="\\u@\\h:\\w\\$ "\nalias ll="ls -la"\n',
-                mode: 0o644,
-                owner: 'operator',
-                group: 'operator',
-              },
-              'notes.txt': {
-                type: 'file',
-                name: 'notes.txt',
-                content:
-                  '=== Operator Field Checklist ===\n' +
-                  '1. Check /etc/shadow permissions.\n' +
-                  '2. Investigate unauthorized SSH logins in /var/log/auth.log.\n' +
-                  '3. Extract suspicious IPs from /var/log/access.log.\n' +
-                  '4. Verify network topology via ifconfig and ping.\n',
-                mode: 0o644,
-                owner: 'operator',
-                group: 'operator',
-              },
-              scripts: {
-                type: 'dir',
-                name: 'scripts',
-                mode: 0o755,
-                owner: 'operator',
-                group: 'operator',
-                children: {
-                  'recon.sh': {
-                    type: 'file',
-                    name: 'recon.sh',
-                    content:
-                      '#!/bin/bash\necho "[*] Running host reconnaissance..."\nuname -a\nid\ncat /etc/passwd | cut -d: -f1\n',
-                    mode: 0o755,
-                    owner: 'operator',
-                    group: 'operator',
-                  },
+    },
+    home: {
+      type: 'dir',
+      name: 'home',
+      mode: 0o755,
+      owner: 'root',
+      group: 'root',
+      children: {
+        operator: {
+          type: 'dir',
+          name: 'operator',
+          mode: 0o700,
+          owner: 'operator',
+          group: 'operator',
+          children: {
+            '.bashrc': {
+              type: 'file',
+              name: '.bashrc',
+              content: 'export PS1="\\u@\\h:\\w\\$ "\nalias ll="ls -la"\n',
+              mode: 0o644,
+              owner: 'operator',
+              group: 'operator',
+            },
+            'notes.txt': {
+              type: 'file',
+              name: 'notes.txt',
+              content:
+                '=== Operator Field Checklist ===\n' +
+                '1. Check /etc/shadow permissions & SUID binaries.\n' +
+                '2. Investigate unauthorized SSH logins in /var/log/auth.log.\n' +
+                '3. Extract suspicious IPs from /var/log/access.log.\n' +
+                '4. Verify network topology via ifconfig and ping.\n',
+              mode: 0o644,
+              owner: 'operator',
+              group: 'operator',
+            },
+            scripts: {
+              type: 'dir',
+              name: 'scripts',
+              mode: 0o755,
+              owner: 'operator',
+              group: 'operator',
+              children: {
+                'recon.sh': {
+                  type: 'file',
+                  name: 'recon.sh',
+                  content:
+                    '#!/bin/bash\necho "[*] Running host reconnaissance..."\nuname -a\nid\ncat /etc/passwd | cut -d: -f1\n',
+                  mode: 0o755,
+                  owner: 'operator',
+                  group: 'operator',
                 },
               },
             },
           },
         },
       },
-      var: {
-        type: 'dir',
-        name: 'var',
-        mode: 0o755,
-        owner: 'root',
-        group: 'root',
-        children: {
-          log: {
-            type: 'dir',
-            name: 'log',
-            mode: 0o755,
-            owner: 'root',
-            group: 'root',
-            children: {
-              'auth.log': {
-                type: 'file',
-                name: 'auth.log',
-                content:
-                  'Aug 27 06:12:01 sec-target-prod01 sshd[1421]: Accepted publickey for operator from 10.0.4.15 port 52312 ssh2\n' +
-                  'Aug 27 06:14:22 sec-target-prod01 sshd[1456]: Failed password for invalid user admin from 192.168.1.105 port 41202 ssh2\n' +
-                  'Aug 27 06:14:25 sec-target-prod01 sshd[1458]: Failed password for invalid user root from 192.168.1.105 port 41208 ssh2\n' +
-                  'Aug 27 06:14:30 sec-target-prod01 sshd[1460]: Failed password for invalid user test from 192.168.1.105 port 41214 ssh2\n' +
-                  'Aug 27 06:15:02 sec-target-prod01 sudo: operator : TTY=pts/0 ; PWD=/home/operator ; USER=root ; COMMAND=/bin/systemctl status nginx\n',
-                mode: 0o640,
-                owner: 'root',
-                group: 'adm',
-              },
-              'access.log': {
-                type: 'file',
-                name: 'access.log',
-                content:
-                  '192.168.1.105 - - [27/Aug/2026:06:10:12 +0000] "GET /api/v1/health HTTP/1.1" 200 45 "-" "curl/7.88.1"\n' +
-                  '192.168.1.105 - - [27/Aug/2026:06:10:15 +0000] "POST /api/v1/login HTTP/1.1" 401 128 "-" "Python-urllib/3.11"\n' +
-                  '192.168.1.105 - - [27/Aug/2026:06:10:18 +0000] "GET /admin/debug.php HTTP/1.1" 404 153 "-" "Mozilla/5.0"\n' +
-                  '192.168.1.200 - - [27/Aug/2026:06:10:25 +0000] "POST /api/v1/login HTTP/1.1" 401 128 "-" "Hydra/9.5"\n' +
-                  '192.168.1.200 - - [27/Aug/2026:06:10:30 +0000] "POST /api/v1/login HTTP/1.1" 401 128 "-" "Hydra/9.5"\n' +
-                  '10.0.4.15 - - [27/Aug/2026:06:11:00 +0000] "GET /dashboard HTTP/1.1" 200 4521 "https://corp.local" "Mozilla/5.0"\n' +
-                  '10.0.4.15 - - [27/Aug/2026:06:12:05 +0000] "GET /api/user/profile HTTP/1.1" 200 892 "https://corp.local" "Mozilla/5.0"\n',
-                mode: 0o644,
-                owner: 'www-data',
-                group: 'adm',
-              },
+    },
+    var: {
+      type: 'dir',
+      name: 'var',
+      mode: 0o755,
+      owner: 'root',
+      group: 'root',
+      children: {
+        log: {
+          type: 'dir',
+          name: 'log',
+          mode: 0o755,
+          owner: 'root',
+          group: 'root',
+          children: {
+            'auth.log': {
+              type: 'file',
+              name: 'auth.log',
+              content:
+                'Aug 27 06:12:01 sec-target-prod01 sshd[1421]: Accepted publickey for operator from 10.0.4.15 port 52312 ssh2\n' +
+                'Aug 27 06:14:22 sec-target-prod01 sshd[1456]: Failed password for invalid user admin from 192.168.1.105 port 41202 ssh2\n' +
+                'Aug 27 06:14:25 sec-target-prod01 sshd[1458]: Failed password for invalid user root from 192.168.1.105 port 41208 ssh2\n' +
+                'Aug 27 06:14:30 sec-target-prod01 sshd[1460]: Failed password for invalid user test from 192.168.1.105 port 41214 ssh2\n' +
+                'Aug 27 06:15:02 sec-target-prod01 sudo: operator : TTY=pts/0 ; PWD=/home/operator ; USER=root ; COMMAND=/bin/systemctl status nginx\n',
+              mode: 0o640,
+              owner: 'root',
+              group: 'adm',
+            },
+            'access.log': {
+              type: 'file',
+              name: 'access.log',
+              content:
+                '192.168.1.105 - - [27/Aug/2026:06:10:12 +0000] "GET /api/v1/health HTTP/1.1" 200 45 "-" "curl/7.88.1"\n' +
+                '192.168.1.105 - - [27/Aug/2026:06:10:15 +0000] "POST /api/v1/login HTTP/1.1" 401 128 "-" "Python-urllib/3.11"\n' +
+                '192.168.1.105 - - [27/Aug/2026:06:10:18 +0000] "GET /admin/debug.php HTTP/1.1" 404 153 "-" "Mozilla/5.0"\n' +
+                '192.168.1.200 - - [27/Aug/2026:06:10:25 +0000] "POST /api/v1/login HTTP/1.1" 401 128 "-" "Hydra/9.5"\n' +
+                '192.168.1.200 - - [27/Aug/2026:06:10:30 +0000] "POST /api/v1/login HTTP/1.1" 401 128 "-" "Hydra/9.5"\n' +
+                '10.0.4.15 - - [27/Aug/2026:06:11:00 +0000] "GET /dashboard HTTP/1.1" 200 4521 "https://corp.local" "Mozilla/5.0"\n' +
+                '10.0.4.15 - - [27/Aug/2026:06:12:05 +0000] "GET /api/user/profile HTTP/1.1" 200 892 "https://corp.local" "Mozilla/5.0"\n',
+              mode: 0o644,
+              owner: 'www-data',
+              group: 'adm',
             },
           },
         },
       },
-      tmp: {
-        type: 'dir',
-        name: 'tmp',
-        mode: 0o1777,
-        owner: 'root',
-        group: 'root',
-        children: {},
-      },
     },
-  };
-}
+    tmp: {
+      type: 'dir',
+      name: 'tmp',
+      mode: 0o1777,
+      owner: 'root',
+      group: 'root',
+      children: {},
+    },
+  },
+});
 
-export function createInitialVfsState(customRoot?: VfsDirectory): VfsState {
-  return {
-    root: customRoot || createDefaultVfs(),
-    cwd: '/home/operator',
-    user: {
-      uid: 1000,
-      gid: 1000,
-      username: 'operator',
-      groups: ['operator', 'sudo', 'adm'],
-    },
-    env: {
-      USER: 'operator',
-      HOME: '/home/operator',
-      PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      SHELL: '/bin/bash',
-      HOSTNAME: 'sec-target-prod01',
-      TERM: 'xterm-256color',
-      LANG: 'en_US.UTF-8',
-    },
-    history: [],
-  };
-}
+export const createInitialVfsState = (customRoot?: VfsDirectory): VfsState => ({
+  root: customRoot || createDefaultVfs(),
+  cwd: '/home/operator',
+  user: {
+    uid: 1000,
+    gid: 1000,
+    username: 'operator',
+    groups: ['operator', 'sudo', 'adm'],
+  },
+  env: {
+    USER: 'operator',
+    HOME: '/home/operator',
+    PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+    SHELL: '/bin/bash',
+    HOSTNAME: 'sec-target-prod01',
+    TERM: 'xterm-256color',
+    LANG: 'en_US.UTF-8',
+  },
+  history: [],
+});
 
-function resolvePath(cwd: string, targetPath: string): string[] {
+const resolvePath = (cwd: string, targetPath: string): string[] => {
   const parts = targetPath.startsWith('/')
     ? targetPath.split('/').filter(Boolean)
     : [...cwd.split('/').filter(Boolean), ...targetPath.split('/').filter(Boolean)];
@@ -625,9 +621,9 @@ function resolvePath(cwd: string, targetPath: string): string[] {
     }
   }
   return resolved;
-}
+};
 
-function getNode(root: VfsDirectory, pathParts: string[]): VfsNode | null {
+const getNode = (root: VfsDirectory, pathParts: string[]): VfsNode | null => {
   let current: VfsNode = root;
   for (const part of pathParts) {
     if (current.type !== 'dir') return null;
@@ -636,9 +632,9 @@ function getNode(root: VfsDirectory, pathParts: string[]): VfsNode | null {
     current = nextNode;
   }
   return current;
-}
+};
 
-function formatMode(mode: number, isDir: boolean): string {
+const formatMode = (mode: number, isDir: boolean): string => {
   const fileType = isDir ? 'd' : '-';
   const hasSuid = (mode & 0o4000) !== 0;
   const hasSgid = (mode & 0o2000) !== 0;
@@ -660,25 +656,76 @@ function formatMode(mode: number, isDir: boolean): string {
   if (hasSticky) oX = oX === 'x' ? 't' : 'T';
 
   return `${fileType}${uR}${uW}${uX}${gR}${gW}${gX}${oR}${oW}${oX}`;
-}
+};
 
-function substituteEnvVars(input: string, env: Record<string, string>): string {
+const substituteEnvVars = (input: string, env: Record<string, string>): string => {
   return input.replace(/\$([a-zA-Z0-9_]+)|\$\{([a-zA-Z0-9_]+)\}/g, (_, g1, g2) => {
     const varName = g1 || g2;
     return env[varName] !== undefined ? env[varName] : '';
   });
-}
+};
 
-export function executeBashCommand(
+/**
+ * Quote-aware argument tokenizer handling single quotes, double quotes, and escapes
+ */
+const tokenizeCommandLine = (cmdLine: string): string[] => {
+  const tokens: string[] = [];
+  let current = '';
+  let inSingleQuote = false;
+  let inDoubleQuote = false;
+  let isEscaped = false;
+
+  for (let i = 0; i < cmdLine.length; i++) {
+    const char = cmdLine[i];
+
+    if (isEscaped) {
+      current += char;
+      isEscaped = false;
+      continue;
+    }
+
+    if (char === '\\' && !inSingleQuote) {
+      isEscaped = true;
+      continue;
+    }
+
+    if (char === "'" && !inDoubleQuote) {
+      inSingleQuote = !inSingleQuote;
+      continue;
+    }
+
+    if (char === '"' && !inSingleQuote) {
+      inDoubleQuote = !inDoubleQuote;
+      continue;
+    }
+
+    if (/\s/.test(char) && !inSingleQuote && !inDoubleQuote) {
+      if (current.length > 0) {
+        tokens.push(current);
+        current = '';
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (current.length > 0) {
+    tokens.push(current);
+  }
+
+  return tokens;
+};
+
+export const executeBashCommand = (
   inputLine: string,
   state: VfsState
-): TerminalExecutionResult {
+): TerminalExecutionResult => {
   const rawTrimmed = inputLine.trim();
   if (!rawTrimmed) {
     return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
   }
 
-  // Clone state
   let nextState: VfsState = {
     ...state,
     root: JSON.parse(JSON.stringify(state.root)),
@@ -710,7 +757,7 @@ export function executeBashCommand(
     };
   }
 
-  // Handle command chaining: cmd1 && cmd2
+  // Handle AND chaining: cmd1 && cmd2
   if (rawTrimmed.includes(' && ')) {
     const parts = rawTrimmed.split(' && ');
     let currentOut = '';
@@ -769,11 +816,12 @@ export function executeBashCommand(
   const redirectOverwriteMatch = cleanLine.match(/^(.*?)\s*>\s*(.*?)$/);
 
   if (redirectAppendMatch || redirectOverwriteMatch) {
-    const isAppend = !!redirectAppendMatch;
-    const rawCmd = isAppend ? redirectAppendMatch![1] : redirectOverwriteMatch![1];
-    const targetFile = (
-      isAppend ? redirectAppendMatch![2] : redirectOverwriteMatch![2]
-    ).trim();
+    const isAppend = Boolean(redirectAppendMatch);
+    const activeMatch = redirectAppendMatch ?? redirectOverwriteMatch;
+    if (!activeMatch) return executeSingleCommand(cleanLine, nextState, '');
+
+    const rawCmd = activeMatch[1] ?? '';
+    const targetFile = (activeMatch[2] ?? '').trim();
 
     const cmdRes = executeBashCommand(rawCmd, nextState);
     if (cmdRes.exitCode !== 0) return cmdRes;
@@ -827,22 +875,22 @@ export function executeBashCommand(
   }
 
   return executeSingleCommand(cleanLine, nextState, '');
-}
+};
 
-function executeSingleCommand(
+const executeSingleCommand = (
   rawCmd: string,
   state: VfsState,
   stdinData: string
-): TerminalExecutionResult {
+): TerminalExecutionResult => {
   const substituted = substituteEnvVars(rawCmd, state.env);
-  const args = substituted.split(/\s+/).filter(Boolean);
+  const args = tokenizeCommandLine(substituted);
   const cmd = args[0] || '';
 
-  // Variable assignment check: VAR=val or export VAR=val
+  // Variable assignment check: VAR=val
   if (cmd.includes('=') && !cmd.startsWith('==')) {
     const eqIdx = cmd.indexOf('=');
     const key = cmd.substring(0, eqIdx);
-    const val = cmd.substring(eqIdx + 1).replace(/^['"](.*)['"]$/, '$1');
+    const val = cmd.substring(eqIdx + 1);
     state.env[key] = val;
     return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
   }
@@ -947,7 +995,7 @@ function executeSingleCommand(
       const rest = args.slice(1).join(' ');
       const [key, ...vParts] = rest.split('=');
       if (key) {
-        state.env[key.trim()] = vParts.join('=').replace(/^['"](.*)['"]$/, '$1');
+        state.env[key.trim()] = vParts.join('=');
       }
       return { stdout: '', stderr: '', exitCode: 0, updatedState: state };
     }
@@ -961,7 +1009,7 @@ function executeSingleCommand(
     }
 
     case 'cd': {
-      const target = args[1] || '/home/' + state.user.username;
+      const target = args[1] || `/home/${state.user.username}`;
       const resolved = resolvePath(state.cwd, target);
       const node = getNode(state.root, resolved);
       if (!node) {
@@ -980,7 +1028,7 @@ function executeSingleCommand(
           updatedState: state,
         };
       }
-      const newCwd = '/' + resolved.join('/');
+      const newCwd = `/${resolved.join('/')}`;
       state.env.PWD = newCwd;
       return {
         stdout: '',
@@ -1183,7 +1231,15 @@ function executeSingleCommand(
           updatedState: state,
         };
       const resolved = resolvePath(state.cwd, target);
-      const fileName = resolved.pop()!;
+      const fileName = resolved.pop();
+      if (!fileName)
+        return {
+          stdout: '',
+          stderr: 'touch: invalid file path\n',
+          exitCode: 1,
+          updatedState: state,
+        };
+
       const parent = getNode(state.root, resolved);
       if (!parent || parent.type !== 'dir') {
         return {
@@ -1209,7 +1265,7 @@ function executeSingleCommand(
     }
 
     case 'mkdir': {
-      const target = args.find((a) => !a.startsWith('-'));
+      const target = args.find((a) => !a.startsWith('-') && a !== 'mkdir');
       if (!target)
         return {
           stdout: '',
@@ -1218,7 +1274,15 @@ function executeSingleCommand(
           updatedState: state,
         };
       const resolved = resolvePath(state.cwd, target);
-      const dirName = resolved.pop()!;
+      const dirName = resolved.pop();
+      if (!dirName)
+        return {
+          stdout: '',
+          stderr: 'mkdir: invalid directory path\n',
+          exitCode: 1,
+          updatedState: state,
+        };
+
       const parent = getNode(state.root, resolved);
       if (!parent || parent.type !== 'dir') {
         return {
@@ -1240,7 +1304,7 @@ function executeSingleCommand(
     }
 
     case 'rm': {
-      const target = args.find((a) => !a.startsWith('-'));
+      const target = args.find((a) => !a.startsWith('-') && a !== 'rm');
       if (!target)
         return {
           stdout: '',
@@ -1249,7 +1313,15 @@ function executeSingleCommand(
           updatedState: state,
         };
       const resolved = resolvePath(state.cwd, target);
-      const name = resolved.pop()!;
+      const name = resolved.pop();
+      if (!name)
+        return {
+          stdout: '',
+          stderr: 'rm: invalid file path\n',
+          exitCode: 1,
+          updatedState: state,
+        };
+
       const parent = getNode(state.root, resolved);
       if (!parent || parent.type !== 'dir' || !parent.children[name]) {
         return {
@@ -1356,7 +1428,7 @@ function executeSingleCommand(
           if (a.includes('n')) showLineNum = true;
           if (a.includes('c')) countOnly = true;
         } else if (!pattern) {
-          pattern = a.replace(/^['"](.*)['"]$/, '$1');
+          pattern = a;
         } else {
           fileArg = a;
         }
@@ -1426,7 +1498,7 @@ function executeSingleCommand(
         } else if (args[i].startsWith('-F')) {
           delimiter = new RegExp(args[i].slice(2));
         } else if (!program) {
-          program = args[i].replace(/^['"](.*)['"]$/, '$1');
+          program = args[i];
         }
       }
 
@@ -1452,8 +1524,7 @@ function executeSingleCommand(
     }
 
     case 'sed': {
-      // Basic sed support: sed 's/foo/bar/g'
-      const expr = args[1]?.replace(/^['"](.*)['"]$/, '$1') || '';
+      const expr = args[1] || '';
       const sedMatch = expr.match(/^s\/([^/]+)\/([^/]*)\/(g?)/);
       if (!sedMatch) {
         return { stdout: stdinData, stderr: '', exitCode: 0, updatedState: state };
@@ -1574,7 +1645,7 @@ function executeSingleCommand(
       }
 
       const results: string[] = [];
-      function walk(n: VfsNode, currentPath: string) {
+      const walk = (n: VfsNode, currentPath: string): void => {
         let matches = true;
         if (permCheck !== null && (n.mode & permCheck) !== permCheck) matches = false;
         if (nameCheck !== null && !nameCheck.test(n.name)) matches = false;
@@ -1584,7 +1655,7 @@ function executeSingleCommand(
             walk(n.children[k], `${currentPath}/${k}`.replace(/\/+/g, '/'));
           }
         }
-      }
+      };
 
       const basePath = pathArg.startsWith('/')
         ? pathArg
@@ -1611,7 +1682,7 @@ function executeSingleCommand(
     }
 
     case 'kill': {
-      const pid = args.find((a) => !a.startsWith('-'));
+      const pid = args.find((a) => !a.startsWith('-') && a !== 'kill');
       if (!pid)
         return {
           stdout: '',
@@ -1676,7 +1747,7 @@ function executeSingleCommand(
         const text = stdinData || args.slice(2).join(' ');
         try {
           const decoded = atob(text.trim());
-          return { stdout: decoded + '\n', stderr: '', exitCode: 0, updatedState: state };
+          return { stdout: `${decoded}\n`, stderr: '', exitCode: 0, updatedState: state };
         } catch {
           return {
             stdout: '',
@@ -1688,7 +1759,7 @@ function executeSingleCommand(
       }
       const text = stdinData || args.slice(1).join(' ');
       const encoded = btoa(text);
-      return { stdout: encoded + '\n', stderr: '', exitCode: 0, updatedState: state };
+      return { stdout: `${encoded}\n`, stderr: '', exitCode: 0, updatedState: state };
     }
 
     case 'hexdump': {
@@ -1706,10 +1777,7 @@ function executeSingleCommand(
     }
 
     case 'echo': {
-      const msg = args
-        .slice(1)
-        .join(' ')
-        .replace(/^['"](.*)['"]$/, '$1');
+      const msg = args.slice(1).join(' ');
       return { stdout: `${msg}\n`, stderr: '', exitCode: 0, updatedState: state };
     }
 
@@ -1741,11 +1809,11 @@ function executeSingleCommand(
 
     case 'help': {
       const helpMsg =
-        '=== Web POSIX / BusyBox Command Suite (40+ Utilities) ===\n' +
-        '  File System:  ls, cd, pwd, cat, head, tail, touch, mkdir, rm, cp, mv, chmod, chown\n' +
-        '  Search & Text: grep, awk, sed, cut, sort, uniq, wc, find, strings, hexdump\n' +
-        '  System Info:   whoami, id, uname, hostname, env, export, unset, uptime, date, ps, kill\n' +
-        '  Network Recon: nmap, ifconfig, ip, ping, curl, dig, nc\n' +
+        '=== Professional Security POSIX Workbench (45+ Utilities) ===\n' +
+        '  File System:   ls, cd, pwd, cat, head, tail, touch, mkdir, rm, cp, mv, chmod, chown\n' +
+        '  Search & Text:  grep, awk, sed, cut, sort, uniq, wc, find, strings, hexdump\n' +
+        '  System Info:    whoami, id, uname, hostname, env, export, unset, uptime, date, ps, kill\n' +
+        '  Network Recon:  nmap, ifconfig, ip, ping, curl, dig, nc\n' +
         '  Pipelines (|), Chaining (&&, ||, ;), and Redirections (>, >>) are fully active.\n';
       return { stdout: helpMsg, stderr: '', exitCode: 0, updatedState: state };
     }
@@ -1753,10 +1821,10 @@ function executeSingleCommand(
     default: {
       return {
         stdout: '',
-        stderr: `bash: ${cmd}: command not found. Type 'help' to see all 40+ supported commands.\n`,
+        stderr: `bash: ${cmd}: command not found. Type 'help' to see all 45+ supported commands.\n`,
         exitCode: 127,
         updatedState: state,
       };
     }
   }
-}
+};

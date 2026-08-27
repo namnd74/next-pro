@@ -1,258 +1,300 @@
 'use client';
 
 import * as React from 'react';
-import { Globe, Layers, Network, Send, Sparkles } from 'lucide-react';
-import type {
-  HttpRequestState,
-  HttpResponseState,
-  PacketHeaderInfo,
-  WorkbenchConfig,
-} from '../types';
+import {
+  CornerDownLeft,
+  Globe,
+  Layers,
+  Play,
+  RotateCcw,
+  Send,
+  Sparkles,
+} from 'lucide-react';
+import type { HttpRequestState, HttpResponseState, WorkbenchConfig } from '../types';
 import {
   createDefaultHttpRequest,
-  decodePacketHeaders,
+  decodePacketLayers,
   executeHttpRequest,
+  parseRawHeaders,
 } from '../engines/http-packet-engine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 
 interface HttpRepeaterViewProps {
   config: WorkbenchConfig;
-  onExecution?: (res: HttpResponseState, req: HttpRequestState) => void;
+  onExecution?: (result: HttpResponseState, req: HttpRequestState) => void;
 }
 
-export function HttpRepeaterView({ config, onExecution }: HttpRepeaterViewProps) {
+export const HttpRepeaterView: React.FC<HttpRepeaterViewProps> = ({
+  config,
+  onExecution,
+}) => {
   const [request, setRequest] = React.useState<HttpRequestState>(
     () => config.initialHttpRequest || createDefaultHttpRequest()
   );
   const [response, setResponse] = React.useState<HttpResponseState | null>(null);
-  const [packetHeaders, setPacketHeaders] = React.useState<PacketHeaderInfo[]>([]);
-  const [activeTab, setActiveTab] = React.useState<'http' | 'packet'>('http');
+  const [activeTab, setActiveTab] = React.useState<'response' | 'packet'>('response');
 
-  const handleSend = (targetReq: HttpRequestState = request) => {
-    const res = executeHttpRequest(targetReq);
+  const handleSend = (): void => {
+    const parsedHeaders = parseRawHeaders(request.rawHeaders);
+    const updatedReq: HttpRequestState = {
+      ...request,
+      headers: parsedHeaders,
+    };
+    const res = executeHttpRequest(updatedReq);
     setResponse(res);
-    const decoded = decodePacketHeaders(targetReq);
-    setPacketHeaders(decoded);
-    onExecution?.(res, targetReq);
+    onExecution?.(res, updatedReq);
   };
 
-  React.useEffect(() => {
-    handleSend(request);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const handleReset = (): void => {
+    const fresh = config.initialHttpRequest || createDefaultHttpRequest();
+    setRequest(fresh);
+    setResponse(null);
+  };
+
+  const packetLayers = React.useMemo(() => decodePacketLayers(request), [request]);
 
   return (
     <div className="space-y-4">
-      {/* Sample Header/Payload shortcuts */}
+      {/* Sample Header Payloads */}
       {config.samplePayloads && config.samplePayloads.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground flex items-center gap-1 text-xs font-semibold">
             <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-            Headers / Payloads mẫu:
+            Header mẫu:
           </span>
-          {config.samplePayloads.map((sample) => (
+          {config.samplePayloads.map((payload) => (
             <button
-              key={sample}
+              key={payload}
               type="button"
               onClick={() => {
-                setRequest((prev) => ({
-                  ...prev,
-                  rawHeaders: `${prev.rawHeaders.trim()}\n${sample}`,
-                }));
+                if (
+                  payload.startsWith('X-Forwarded-For') ||
+                  payload.startsWith('X-Real-IP') ||
+                  payload.startsWith('Authorization')
+                ) {
+                  setRequest((prev) => ({
+                    ...prev,
+                    rawHeaders: `${prev.rawHeaders}\n${payload}`,
+                  }));
+                } else {
+                  setRequest((prev) => ({
+                    ...prev,
+                    url: payload.startsWith('/') ? payload : prev.url,
+                  }));
+                }
               }}
               className="border-border/60 bg-secondary/40 hover:bg-secondary/80 hover:border-primary/40 group text-foreground inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors"
             >
-              <span>+ {sample}</span>
+              <span>{payload}</span>
+              <CornerDownLeft className="text-muted-foreground group-hover:text-primary h-3 w-3 opacity-60" />
             </button>
           ))}
         </div>
       )}
 
-      {/* Main Mode Toggle: HTTP Repeater vs Packet Layer Inspector */}
-      <div className="border-border/60 flex items-center justify-between border-b pb-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab('http')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-              activeTab === 'http'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-secondary/60'
-            }`}
-          >
-            <Globe className="h-3.5 w-3.5" />
-            HTTP Request Repeater
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('packet')}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-              activeTab === 'packet'
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:bg-secondary/60'
-            }`}
-          >
-            <Network className="h-3.5 w-3.5" />
-            Mổ xẻ TCP/IP Packet Layers
-          </button>
-        </div>
-        {response && (
-          <div className="flex items-center gap-2 font-mono text-xs">
-            <Badge
-              variant={response.statusCode < 400 ? 'success' : 'destructive'}
-              className="text-[10px] font-bold"
-            >
-              {response.statusCode} {response.statusText}
-            </Badge>
-            <span className="text-muted-foreground text-[11px]">
-              {response.durationMs.toFixed(2)} ms
-            </span>
-          </div>
-        )}
-      </div>
-
-      {activeTab === 'http' && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Request Editor */}
-          <Card className="glass-card space-y-3 p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-foreground text-xs font-extrabold uppercase">
-                Raw HTTP Request
-              </span>
+      {/* HTTP Repeater Panel */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Request Builder Box */}
+        <div className="flex flex-col justify-between rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs shadow-2xl ring-1 ring-slate-800">
+          <div>
+            <div className="mb-3 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-emerald-400" />
+                <span className="font-semibold text-slate-200">
+                  HTTP Repeater & Request Forge
+                </span>
+              </div>
               <Button
-                type="button"
-                onClick={() => handleSend()}
+                variant="ghost"
                 size="sm"
-                className="h-7 gap-1 text-xs font-bold"
+                onClick={handleReset}
+                className="h-6 gap-1 px-2 text-[10px] text-slate-400 hover:text-white"
               >
-                <Send className="h-3 w-3" />
-                Send Request
+                <RotateCcw className="h-3 w-3" />
+                Reset Req
               </Button>
             </div>
 
-            {/* Request Line Controls */}
-            <div className="flex gap-2 font-mono text-xs">
+            {/* Method & URL Input Bar */}
+            <div className="mb-3 flex items-center gap-2">
               <select
                 value={request.method}
                 onChange={(e) =>
-                  setRequest((prev) => ({
-                    ...prev,
+                  setRequest({
+                    ...request,
                     method: e.target.value as HttpRequestState['method'],
-                  }))
+                  })
                 }
-                className="border-border/80 bg-background text-primary rounded-lg border px-2.5 py-1.5 font-bold outline-none"
+                className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1.5 text-xs font-bold text-amber-400 outline-none"
               >
                 <option value="GET">GET</option>
                 <option value="POST">POST</option>
                 <option value="PUT">PUT</option>
                 <option value="DELETE">DELETE</option>
-                <option value="OPTIONS">OPTIONS</option>
+                <option value="PATCH">PATCH</option>
               </select>
               <input
                 type="text"
                 value={request.url}
-                onChange={(e) => setRequest((prev) => ({ ...prev, url: e.target.value }))}
-                className="border-border/80 bg-background text-foreground ring-primary/20 flex-1 rounded-lg border px-3 py-1.5 font-mono text-xs outline-none focus:ring-2"
+                onChange={(e) => setRequest({ ...request, url: e.target.value })}
+                placeholder="/api/v1/resource"
+                className="flex-1 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs text-slate-200 outline-none focus:ring-1 focus:ring-emerald-500/40"
               />
             </div>
 
-            {/* Raw Headers Textarea */}
-            <div className="space-y-1">
-              <label className="text-muted-foreground text-[11px] font-semibold">
-                Headers (key: value):
-              </label>
+            {/* Raw Headers Editor */}
+            <div className="space-y-1.5">
+              <div className="font-sans text-[11px] text-slate-400">
+                Raw HTTP Headers (Key: Value)
+              </div>
               <textarea
                 value={request.rawHeaders}
-                onChange={(e) =>
-                  setRequest((prev) => ({ ...prev, rawHeaders: e.target.value }))
-                }
-                rows={7}
-                className="ring-primary/20 w-full rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-slate-200 outline-none focus:ring-1"
+                onChange={(e) => setRequest({ ...request, rawHeaders: e.target.value })}
+                rows={5}
+                className="w-full resize-none rounded-xl border border-slate-800 bg-slate-900/90 p-2.5 font-mono text-[11.5px] text-slate-300 outline-none focus:ring-1 focus:ring-emerald-500/40"
                 spellCheck="false"
               />
             </div>
-          </Card>
 
-          {/* Response Viewer */}
-          <Card className="glass-card space-y-3 p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-foreground text-xs font-extrabold uppercase">
-                Raw HTTP Response
-              </span>
-              {response && (
-                <span className="text-muted-foreground font-mono text-[10px]">
-                  Content-Type: {response.contentType}
-                </span>
-              )}
+            {/* Request Body Editor (if not GET) */}
+            {request.method !== 'GET' && (
+              <div className="mt-2 space-y-1.5">
+                <div className="font-sans text-[11px] text-slate-400">
+                  Request Body (JSON / Payload)
+                </div>
+                <textarea
+                  value={request.body}
+                  onChange={(e) => setRequest({ ...request, body: e.target.value })}
+                  rows={3}
+                  className="w-full resize-none rounded-xl border border-slate-800 bg-slate-900/90 p-2.5 font-mono text-[11.5px] text-slate-300 outline-none"
+                  placeholder='{"username": "admin", "password": "..."}'
+                  spellCheck="false"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3 flex justify-end border-t border-slate-800/80 pt-3">
+            <Button
+              onClick={handleSend}
+              className="h-8 gap-1.5 bg-emerald-600 px-4 text-xs font-medium text-white hover:bg-emerald-500"
+            >
+              <Send className="h-3.5 w-3.5" />
+              Send Request
+            </Button>
+          </div>
+        </div>
+
+        {/* Response & Packet Decoder Box */}
+        <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs shadow-2xl ring-1 ring-slate-800">
+          <div className="mb-3 flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('response')}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors ${
+                  activeTab === 'response'
+                    ? 'bg-emerald-500/20 font-semibold text-emerald-300'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Play className="h-3.5 w-3.5" />
+                Response Data
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('packet')}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors ${
+                  activeTab === 'packet'
+                    ? 'bg-emerald-500/20 font-semibold text-emerald-300'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Packet Decoder (L2-L7)
+              </button>
             </div>
 
-            {/* Status Line */}
-            {response ? (
-              <div className="space-y-3">
-                <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs">
-                  <div className="mb-2 border-b border-slate-800 pb-1.5 font-bold text-emerald-400">
-                    HTTP/1.1 {response.statusCode} {response.statusText}
-                  </div>
-                  {/* Response Headers */}
-                  <div className="mb-2 space-y-0.5 border-b border-slate-800/80 pb-2 text-[11px] text-slate-400">
+            {response && (
+              <Badge
+                className={
+                  response.statusCode === 200
+                    ? 'border-emerald-500/40 bg-emerald-950/60 text-emerald-300'
+                    : response.statusCode === 403
+                      ? 'border-rose-500/40 bg-rose-950/60 text-rose-300'
+                      : 'border-amber-500/40 bg-amber-950/60 text-amber-300'
+                }
+              >
+                HTTP {response.statusCode} {response.statusText} · {response.durationMs}ms
+              </Badge>
+            )}
+          </div>
+
+          {/* Response Tab */}
+          {activeTab === 'response' && (
+            <div>
+              {response ? (
+                <div className="space-y-3">
+                  <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2.5">
+                    <div className="mb-1 text-[10px] text-slate-500">
+                      Response Headers
+                    </div>
                     {Object.entries(response.headers).map(([k, v]) => (
-                      <div key={k}>
+                      <div key={k} className="text-[11px] text-slate-400">
                         <span className="text-slate-500">{k}:</span> {v}
                       </div>
                     ))}
                   </div>
-                  {/* Response Body */}
-                  <pre className="max-h-[220px] overflow-y-auto text-[11.5px] leading-relaxed whitespace-pre-wrap text-slate-100">
-                    {response.body}
-                  </pre>
-                </div>
-              </div>
-            ) : (
-              <div className="text-muted-foreground p-8 text-center text-xs">
-                Chưa có phản hồi. Bấm &quot;Send Request&quot; để gửi gói tin.
-              </div>
-            )}
-          </Card>
-        </div>
-      )}
 
-      {/* Packet Decoder View */}
-      {activeTab === 'packet' && (
-        <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {packetHeaders.map((packetLayer) => (
-              <Card key={packetLayer.layer} className="glass-card space-y-3 p-4">
-                <div className="border-border/50 flex items-center justify-between border-b pb-2">
-                  <h4 className="text-primary flex items-center gap-1.5 text-xs font-extrabold">
-                    <Layers className="h-3.5 w-3.5" />
-                    {packetLayer.title}
-                  </h4>
-                  <Badge variant="outline" className="text-[9px]">
-                    {packetLayer.layer}
-                  </Badge>
+                  <div className="max-h-[220px] overflow-y-auto rounded-lg border border-slate-800 bg-slate-900 p-3">
+                    <pre className="font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap text-emerald-300">
+                      {response.body}
+                    </pre>
+                  </div>
                 </div>
-                <div className="space-y-2 font-mono text-[11px]">
-                  {packetLayer.fields.map((f) => (
-                    <div key={f.name} className="flex items-start justify-between gap-2">
-                      <div className="space-y-0.5">
-                        <span className="text-foreground font-bold">{f.name}:</span>
-                        <p className="text-muted-foreground text-[10px]">
-                          {f.description}
-                        </p>
+              ) : (
+                <div className="flex h-48 items-center justify-center font-sans text-xs text-slate-500">
+                  Nhấn Send Request để gửi yêu cầu và kiểm tra phản hồi từ backend.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Packet Decoder Tab */}
+          {activeTab === 'packet' && (
+            <div className="max-h-[300px] space-y-3 overflow-y-auto pr-1">
+              {packetLayers.map((layer) => (
+                <div
+                  key={layer.layer}
+                  className="rounded-lg border border-slate-800 bg-slate-900/80 p-2.5"
+                >
+                  <div className="mb-1.5 flex items-center justify-between text-[11.5px] font-semibold text-slate-200">
+                    <span>{layer.title}</span>
+                    <Badge
+                      variant="outline"
+                      className="border-slate-700 text-[9px] text-slate-400"
+                    >
+                      {layer.layer}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    {layer.fields.map((f) => (
+                      <div
+                        key={f.name}
+                        className="flex items-center justify-between text-[11px]"
+                      >
+                        <span className="text-slate-400">{f.name}:</span>
+                        <span className="font-mono text-emerald-300">{f.value}</span>
                       </div>
-                      <span className="text-right font-semibold text-emerald-500 dark:text-emerald-400">
-                        {f.value}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
-}
+};

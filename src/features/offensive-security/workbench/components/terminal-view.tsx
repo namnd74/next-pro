@@ -31,7 +31,7 @@ interface TerminalHistoryItem {
   exitCode: number;
 }
 
-export function TerminalView({ config, onExecution }: TerminalViewProps) {
+export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution }) => {
   const [vfsState, setVfsState] = React.useState<VfsState>(() =>
     createInitialVfsState(config.initialVfs)
   );
@@ -42,7 +42,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
       cwd: '/home/operator',
       stdout:
         'Linux sec-target-prod01 6.8.0-45-generic #45-Ubuntu SMP PREEMPT_DYNAMIC x86_64\n' +
-        'Type "help" for 40+ available Linux utilities (ls, grep, awk, sed, nmap, curl, etc.).\n',
+        'Type "help" for 45+ available Linux utilities (ls, grep, awk, sed, nmap, curl, etc.).\n',
       stderr: '',
       exitCode: 0,
     },
@@ -58,7 +58,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [historyItems]);
 
-  const handleRunCommand = (cmdToRun: string) => {
+  const handleRunCommand = (cmdToRun: string): void => {
     const trimmed = cmdToRun.trim();
     if (!trimmed) return;
 
@@ -88,11 +88,14 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
     onExecution?.(result, trimmed);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleRunCommand(currentInput);
-    } else if (e.key === 'ArrowUp') {
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
       e.preventDefault();
       const userCmds = vfsState.history;
       if (userCmds.length === 0) return;
@@ -100,7 +103,10 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
         historyIndex === null ? userCmds.length - 1 : Math.max(0, historyIndex - 1);
       setHistoryIndex(nextIdx);
       setCurrentInput(userCmds[nextIdx] || '');
-    } else if (e.key === 'ArrowDown') {
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
       const userCmds = vfsState.history;
       if (historyIndex === null) return;
@@ -112,7 +118,10 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
         setHistoryIndex(nextIdx);
         setCurrentInput(userCmds[nextIdx] || '');
       }
-    } else if (e.key === 'Tab') {
+      return;
+    }
+
+    if (e.key === 'Tab') {
       e.preventDefault();
       const parts = currentInput.split(' ');
       const lastWord = parts[parts.length - 1];
@@ -152,7 +161,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = (): void => {
     const fresh = createInitialVfsState(config.initialVfs);
     setVfsState(fresh);
     setHistoryItems([
@@ -169,7 +178,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
     setHistoryIndex(null);
   };
 
-  const handleCopy = (text: string) => {
+  const handleCopy = (text: string): void => {
     navigator.clipboard.writeText(text);
     setCopiedCmd(text);
     setTimeout(() => setCopiedCmd(null), 2000);
@@ -224,7 +233,7 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
               variant="outline"
               className="border-emerald-500/40 bg-emerald-950/40 text-[9px] text-emerald-400"
             >
-              POSIX RUNTIME · 40+ CMDS
+              POSIX RUNTIME · 45+ CMDS
             </Badge>
             <Button
               variant="ghost"
@@ -304,4 +313,4 @@ export function TerminalView({ config, onExecution }: TerminalViewProps) {
       </div>
     </div>
   );
-}
+};
