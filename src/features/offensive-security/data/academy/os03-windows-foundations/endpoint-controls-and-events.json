@@ -1,0 +1,1101 @@
+{
+  "id": "os03-m03-endpoint-controls-and-events",
+  "slug": "endpoint-controls-and-events",
+  "trackId": "os03-windows-foundations",
+  "title": "Defender, Firewall, Event Logs & Host Privilege Boundaries",
+  "summary": "Kiến trúc phòng thủ endpoint Windows: Microsoft Defender AV/EDR, ASR rules và giao diện AMSI; Windows Advanced Firewall và mô hình lọc WFP; kiến trúc Windows Event Logs và Sysmon telemetry — kèm kịch bản điều tra xâm nhập qua Event ID và thiết kế baseline giám sát.",
+  "difficulty": "intermediate",
+  "estimatedMinutes": 300,
+  "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+  "domains": ["windows"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os03-l22-defender-av-edr-and-amsi",
+      "slug": "defender-av-edr-and-amsi",
+      "title": "Microsoft Defender, ASR & AMSI Architecture",
+      "summary": "Cơ chế hoạt động đa lớp của Microsoft Defender (chữ ký, heuristic động, Cloud-delivered Protection/MAPS); các quy tắc Giảm Bề mặt Tấn công (Attack Surface Reduction - ASR); kiến trúc Giao diện Quét Mã Độc (AMSI) trong bộ nhớ; phân biệt ranh giới bảo mật (Security Boundary) với cơ chế phòng ngừa (Defense-in-depth), và phương pháp kiểm thử an toàn.",
+      "difficulty": "intermediate",
+      "durationMinutes": 100,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân biệt các tầng quét của Microsoft Defender: On-demand/Real-time scanner, Emulation Engine (máy ảo giả lập trong sandbox), và Cloud Protection (MAPS).",
+        "Giải thích cơ chế hoạt động của AMSI: DLL amsi.dll được load vào process userland (PowerShell, WScript, .NET CLR) và chuyển tiếp buffer giải mã tới engine diệt virus qua RPC.",
+        "Phân tích các quy tắc Attack Surface Reduction (ASR) cốt lõi (chặn Office tạo con process, chặn credential stealing từ LSASS, chặn obfuscated scripts).",
+        "Thiết kế phương pháp kiểm thử và đo lường hiệu lực của Defender/AMSI tuân thủ Safe Harbor mà không sử dụng malware thật."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["windows"],
+      "attackTactics": ["TA0005"],
+      "keywords": [
+        "microsoft-defender",
+        "amsi-architecture",
+        "asr-rules",
+        "real-time-protection",
+        "cloud-protection",
+        "defense-in-depth"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Microsoft Defender không chỉ là một công cụ so khớp mã hash virus cổ điển mà là một hệ thống phòng thủ phối hợp đa tầng. Khi một tệp tin chạm đĩa hoặc tiến trình khởi động, Defender kích hoạt Sandbox Emulation để chạy thử bytecode vài mili-giây tìm hành vi độc. Với các ngôn ngữ thông dịch hoặc script mã hóa nhiều lớp (obfuscation) như PowerShell, VBScript, JScript hay .NET, tầng AMSI (Antimalware Scan Interface) được nhúng ngay vào tiến trình thông dịch. Trước khi thực thi lệnh thật sự (sau khi script đã tự giải mã trong RAM), AMSI gọi hàm AmsiScanBuffer() gửi nội dung thô cho Defender chấm điểm. Bên cạnh đó, ASR (Attack Surface Reduction) đặt ra các rào chắn cứng (như cấm Office spawn PowerShell hay cấm app lạ đọc bộ nhớ LSASS). Hiểu rõ kiến trúc này giúp chuyên gia bảo mật phân biệt cơ chế phòng thủ thực thụ với các ranh giới danh tính.",
+      "visual": {
+        "title": "Kiến trúc Đa tầng: Defender, AMSI & ASR Engine",
+        "caption": "Từ giải mã script trong memory qua AMSI RPC tới thẩm định heuristic và chặn bằng ASR.",
+        "steps": [
+          {
+            "label": "Process & Script Invocation",
+            "detail": "PowerShell.exe / wscript.exe khởi động; nạp amsi.dll vào không gian địa chỉ ảo của tiến trình userland.",
+            "tone": "neutral"
+          },
+          {
+            "label": "In-Memory De-obfuscation & Buffer Inspection",
+            "detail": "Sau khi script tự giải nén/mã hóa nhiều lớp, chuỗi lệnh thô được chuyển vào AmsiScanBuffer() trước khi engine thực thi.",
+            "tone": "allow"
+          },
+          {
+            "label": "AMSI to Defender RPC Call",
+            "detail": "amsi.dll chuyển nội dung buffer qua ALPC/RPC tới Windows Defender Service (MsMpEng.exe); đối chiếu signatures và heuristic.",
+            "tone": "allow"
+          },
+          {
+            "label": "Attack Surface Reduction (ASR)",
+            "detail": "Các quy tắc kernel/userland chặn đứng hành vi nguy hiểm: cấm Word/Excel spawn cmd/powershell, cấm đọc LSASS.",
+            "tone": "caution"
+          },
+          {
+            "label": "Defender Cloud Protection (MAPS)",
+            "detail": "Nếu mẫu file/script chưa rõ ràng, Defender gửi metadata/hash lên Cloud ML Engine để nhận verdict trong vài mili-giây.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến trúc Đa tầng của Microsoft Defender AV/EDR",
+          "paragraphs": [
+            "Microsoft Defender Antivirus (chạy dưới tiến trình dịch vụ trung tâm `MsMpEng.exe` trong Session 0) được tích hợp sâu vào Windows Kernel thông qua file system mini-filter driver (`WdFilter.sys`). Khi bất kỳ tiến trình nào thực hiện thao tác mở, tạo hoặc thực thi file, mini-filter driver chặn lại (intercept) và chuyển yêu cầu tới engine quét trước khi cho phép IO tiếp tục.",
+            "Defender áp dụng 4 tầng phân tích nối tiếp: (1) Static Signatures & Hash Matching: Kiểm tra nhanh chữ ký và mã băm SHA256 đã biết; (2) Sandbox Lightweight Emulation: Bộ giải lập nội bộ giải mã các packer/crypter phổ biến trong môi trường giả lập micro-virtual machine để quan sát hành vi mã máy; (3) Dynamic Heuristics & Behavioral Monitoring: Giám sát chuỗi hành vi bất thường tại runtime; (4) Cloud-Delivered Protection (Microsoft Advanced Protection Service - MAPS): Nếu kết quả cục bộ không chắc chắn, hash và telemetry được gửi lên đám mây Azure AI để phân tích theo thời gian thực và trả về phán quyết chặn tức thì (Block at First Sight)."
+          ],
+          "points": [
+            "WdFilter.sys: mini-filter driver tầng kernel chặn mọi thao tác file I/O theo thời gian thực.",
+            "MsMpEng.exe: tiến trình dịch vụ AV chính, chạy với quyền SYSTEM và được bảo vệ bởi cờ Protected Process Light (PPL).",
+            "Block at First Sight: công nghệ cloud protection phản hồi phán quyết trong < 100ms dựa trên mô hình học máy toàn cầu."
+          ]
+        },
+        {
+          "title": "AMSI trong Bộ nhớ: Cửa ngõ Soi chiếu Script và Payload",
+          "paragraphs": [
+            "Trước khi Antimalware Scan Interface (AMSI) ra đời, các cuộc tấn công không dùng file (Fileless Attacks) hoặc script sử dụng kỹ thuật che giấu nhiều lớp (multi-stage obfuscation, XOR, Base64, environment variable concatenation) có thể dễ dàng né tránh AV truyền thống vì AV chỉ quét file tĩnh trên đĩa cứng. AMSI thay đổi hoàn toàn cuộc chơi bằng cách tích hợp trực tiếp vào các môi trường thực thi runtime (PowerShell, VBScript/JScript, .NET CLR 4.8+, Office VBA, MSBuild).",
+            "Khi một script được thực thi, runtime sẽ nạp thư viện `amsi.dll` vào bộ nhớ tiến trình của mình. Quá trình hoạt động diễn ra như sau: (1) Script trải qua các bước giải mã, gộp chuỗi và chuẩn bị được đưa vào bộ phân tích cú pháp (parser/interpreter); (2) Ngay trước khi thực thi, runtime gọi hàm `AmsiOpenSession()` và `AmsiScanBuffer()`; (3) Hàm này chuyển tiếp buffer bộ nhớ sạch (plain text buffer đã giải mã) qua giao tiếp RPC/ALPC sang dịch vụ `MsMpEng.exe`; (4) Defender trả về điểm rủi ro `AMSI_RESULT_DETECTED` (nếu có mã độc) hoặc `AMSI_RESULT_NOT_DETECTED`. Nếu bị phát hiện, runtime lập tức hủy lệnh và báo lỗi `This script contains malicious content and has been blocked by your antivirus software`."
+          ],
+          "points": [
+            "AmsiScanBuffer(): hàm API trọng tâm gửi buffer bộ nhớ đã giải mã tới AV engine.",
+            "AMSI là Defense-in-depth, không phải Security Boundary: vì amsi.dll chạy trong user-space của tiến trình người dùng.",
+            "PowerShell 5.1+ và .NET Framework 4.8+ mặc định tích hợp AMSI cho mọi lệnh thực thi."
+          ]
+        },
+        {
+          "title": "Attack Surface Reduction (ASR): Rào chắn Hành vi Ứng dụng",
+          "paragraphs": [
+            "Attack Surface Reduction (ASR) là tập hợp các quy tắc chủ động nhằm cắt đứt các chuỗi khai thác phổ biến nhất trước khi mã độc kịp thực thi. Thay vì cố gắng phát hiện payload cụ thể, ASR chặn thẳng hành vi (behavior-based boundary): cấm một ứng dụng đáng tin cậy thực hiện các thao tác mà bình thường nó không nên làm.",
+            "Các quy tắc ASR then chốt trong môi trường doanh nghiệp bao gồm: (1) `Block all Office applications from creating child processes` (GUID: d4f940ab-401b-4efc-aadc-ad5f3c50688a) — chặn đứng 99% macro độc hại cố tình spawn `powershell.exe`, `cmd.exe` hoặc `wscript.exe`; (2) `Block credential stealing from the Windows local security authority subsystem (lsass.exe)` (GUID: 9e6c4e1f-7d60-472f-ba1a-a39ef669e4b2) — ngăn chặn các ứng dụng lạ mở handle đọc bộ nhớ LSASS để trích xuất mật khẩu; (3) `Block executable content from email client and webmail`; (4) `Block persistence through WMI event subscription`.",
+            "Mỗi quy tắc ASR có thể được cấu hình ở 3 chế độ: Disabled (tắt), AuditMode (chỉ ghi log Event ID 1121/1122 trong Defender Operational Log mà không chặn, giúp đánh giá ảnh hưởng nghiệp vụ), và Block (cưỡng chế chặn thực thi và ghi log Event ID 1121)."
+          ],
+          "points": [
+            "ASR Rules được kích hoạt qua Group Policy, Microsoft Intune hoặc PowerShell cmdlet Set-MpPreference.",
+            "Audit Mode (Mode 2): ghi nhận telemetry trong Event Viewer mà không gây gián đoạn công việc của người dùng.",
+            "Block Mode (Mode 1): chặn tức thì hành vi và ghi sự kiện cảnh báo vào Microsoft-Windows-Windows Defender/Operational."
+          ]
+        },
+        {
+          "title": "Telemetry vs Enforcement: Kiểm thử và Vận hành An toàn",
+          "paragraphs": [
+            "Trong quá trình đánh giá an ninh chuyên nghiệp (Penetration Testing / Red Teaming), việc kiểm thử hiệu lực của Defender, AMSI và ASR phải luôn tuân thủ nguyên tắc Safe Harbor: không bao giờ sử dụng mã độc thực tế hoặc các công cụ không rõ nguồn gốc. Thay vào đó, chuyên gia sử dụng các chuỗi mẫu thử nghiệm tiêu chuẩn đã được định nghĩa:",
+            "(1) Kiểm thử Defender AV: Sử dụng chuỗi ký tự EICAR Standard Anti-Virus Test File — một chuỗi ký tự ASCII vô hại (68 bytes) được toàn bộ các hãng AV công nhận là mẫu test chuẩn; (2) Kiểm thử AMSI: Sử dụng chuỗi thử nghiệm chuẩn `amsiutils` (ví dụ `[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils')`) — Defender sẽ kích hoạt cảnh báo AMSI Test mà không gây bất kỳ thiệt hại nào; (3) Kiểm thử ASR: Sử dụng Microsoft Defender Testground và các file mẫu do Microsoft cung cấp để xác thực quy tắc chặn macro.",
+            "Đội ngũ phòng thủ (Blue Team) cần giám sát thường xuyên các sự kiện trong kênh nhật ký `Applications and Services Logs -> Microsoft -> Windows -> Windows Defender -> Operational`: Event 1116 (Malware detection), Event 1117 (Action taken), Event 1121 (ASR block), Event 5001 (Real-time protection disabled) để phát hiện sớm các dấu hiệu can thiệp trái phép."
+          ],
+          "points": [
+            "Event 1116 / 1117: ghi nhận phát hiện và hành động cách ly/xóa mã độc của Defender.",
+            "Event 1121: ghi nhận hành vi bị chặn bởi Attack Surface Reduction rule.",
+            "Event 5001: cảnh báo nguy hiểm — Real-time Protection vừa bị tắt trên máy trạm."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Defender & AMSI Telemetry Audit Desk",
+        "objective": "Phân tích nhật ký Defender và sự kiện AMSI/ASR mô phỏng, phân biệt hành vi bị chặn và đề xuất cấu hình phòng thủ tối ưu cho doanh nghiệp.",
+        "scenario": "Bạn được cung cấp bảng trích xuất sự kiện từ nhật ký Windows Defender Operational Log, cấu hình Get-MpPreference và kết quả kiểm thử macro Office mô phỏng. Toàn bộ diễn ra tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận dựa trên log và dữ liệu cấu hình được cung cấp; không sử dụng malware thật.",
+          "Mọi phân tích phải chỉ rõ Event ID, quy tắc ASR liên quan hoặc cơ chế AMSI tương ứng.",
+          "Đề xuất cấu hình phải đảm bảo cân bằng giữa an ninh và hoạt động nghiệp vụ."
+        ],
+        "evidenceTemplate": [
+          "Event ID và mức độ nghiêm trọng từ Defender Log",
+          "Hành vi vi phạm và quy tắc ASR/AMSI kích hoạt",
+          "Phân tích nguyên nhân (Tại sao bị chặn hoặc lọt qua)",
+          "Lệnh PowerShell cấu hình hardening đề xuất"
+        ],
+        "successCriteria": [
+          "Nhận diện đúng Event ID 1121 của ASR rule chặn Office spawn PowerShell.",
+          "Giải thích chính xác cơ chế hoạt động của AMSI trong việc soi chiếu script bộ nhớ.",
+          "Viết đúng lệnh Set-MpPreference để kích hoạt ASR rule ở chế độ Block."
+        ],
+        "reset": "Khôi phục lại dữ liệu trích xuất nhật ký Defender ban đầu.",
+        "cleanup": "Lưu báo cáo phân tích hiệu lực bảo vệ endpoint.",
+        "cases": [
+          {
+            "id": "def-case-01",
+            "title": "Điều tra sự kiện ASR chặn Macro độc hại",
+            "context": "Nhật ký Windows Defender Operational ghi nhận bản ghi:\nEvent ID: 1121\nLevel: Warning\nPath: C:\\Program Files\\Microsoft Office\\root\\Office16\\WINWORD.EXE\nTarget Path: C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe\nRule ID: d4f940ab-401b-4efc-aadc-ad5f3c50688a\nRule Name: Block all Office applications from creating child processes",
+            "prompt": "Nhận định nào sau đây diễn giải chính xác nhất về sự kiện này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Microsoft Word bị lỗi bộ nhớ và tự động gọi PowerShell để sửa chữa tệp tài liệu.",
+                "correct": false,
+                "rationale": "Word không tự sửa lỗi bằng cách gọi PowerShell; đây là dấu hiệu đặc trưng của tài liệu chứa mã macro độc hại."
+              },
+              {
+                "id": "B",
+                "label": "Một tài liệu Word (có thể đính kèm email lừa đảo) đã cố gắng thực thi mã macro để khởi tạo tiến trình con PowerShell. Quy tắc ASR 'Block all Office applications from creating child processes' đã phát hiện và chặn đứng hành vi tạo tiến trình con này thành công.",
+                "correct": true,
+                "rationale": "Event ID 1121 cùng Rule ID d4f940ab... chứng minh hành vi Word spawn PowerShell đã bị quy tắc ASR chặn đứng trước khi payload kịp chạy."
+              },
+              {
+                "id": "C",
+                "label": "Người dùng đang gõ lệnh PowerShell thủ công bên trong giao diện Word.",
+                "correct": false,
+                "rationale": "Giao diện Word không phải là terminal dòng lệnh; sự kiện ghi nhận WINWORD.EXE là caller sinh ra tiến trình con powershell.exe."
+              },
+              {
+                "id": "D",
+                "label": "Defender đã xóa nhầm bộ cài đặt Microsoft Office của máy tính.",
+                "correct": false,
+                "rationale": "ASR chỉ chặn hành vi tạo tiến trình con, không xóa file nhị phân của Office."
+              }
+            ]
+          },
+          {
+            "id": "def-case-02",
+            "title": "Phân tích cơ chế AMSI trong phát hiện script",
+            "context": "Một quản trị viên kiểm thử một script PowerShell bị mã hóa Base64 nhiều lớp `powershell.exe -enc <base64_blob>`. Mặc dù file script trên đĩa không chứa từ khóa độc hại, ngay khi chạy lệnh, PowerShell lập tức báo lỗi 'Script contains malicious content...' và Defender ghi nhận Event ID 1116.",
+            "prompt": "Tại sao Defender phát hiện được mã độc dù script đã được mã hóa trên đĩa cứng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Defender tự động giải mã toàn bộ dữ liệu trên Internet trước khi tải về.",
+                "correct": false,
+                "rationale": "Defender không giải mã toàn bộ Internet mà kiểm tra trên endpoint."
+              },
+              {
+                "id": "B",
+                "label": "Khi PowerShell thực thi, engine runtime giải mã chuỗi Base64 thành các câu lệnh trong RAM. Trước khi thông dịch, thư viện amsi.dll trong tiến trình PowerShell đã gọi hàm AmsiScanBuffer() gửi nội dung thô đã giải mã trong bộ nhớ tới MsMpEng.exe để đối chiếu chữ ký và heuristic.",
+                "correct": true,
+                "rationale": "AMSI hoạt động ở tầng bộ nhớ trong runtime; nó soi chiếu buffer sau khi mã đã tự giải mã xong trước khi thực thi, vô hiệu hóa kỹ thuật làm rối tĩnh."
+              },
+              {
+                "id": "C",
+                "label": "Base64 là chuẩn mã hóa quân sự mà Defender có khóa giải mã riêng.",
+                "correct": false,
+                "rationale": "Base64 là bảng mã biểu diễn nhị phân thành ký tự ASCII, không phải thuật toán mã hóa bí mật."
+              },
+              {
+                "id": "D",
+                "label": "Do card mạng của máy tính tự động chặn các gói tin có chứa ký tự '='.",
+                "correct": false,
+                "rationale": "Card mạng không liên quan đến cơ chế phân tích nội dung script của AMSI."
+              }
+            ]
+          },
+          {
+            "id": "def-case-03",
+            "title": "Thiết lập chính sách ASR bảo vệ LSASS",
+            "context": "Doanh nghiệp muốn kích hoạt quy tắc ASR ngăn chặn các ứng dụng lạ đọc trộm bộ nhớ LSASS (Rule ID: 9e6c4e1f-7d60-472f-ba1a-a39ef669e4b2) ở chế độ Chặn (Block Mode = 1) trên toàn bộ máy trạm thông qua PowerShell.",
+            "prompt": "Lệnh PowerShell nào sau đây thực hiện cấu hình đúng chuẩn?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Set-MpPreference -AttackSurfaceReductionRules_Ids '9e6c4e1f-7d60-472f-ba1a-a39ef669e4b2' -AttackSurfaceReductionRules_Actions 1",
+                "correct": true,
+                "rationale": "Cmdlet Set-MpPreference với tham số -AttackSurfaceReductionRules_Ids chỉ định GUID của rule và -AttackSurfaceReductionRules_Actions 1 kích hoạt chế độ Block (0: Disabled, 1: Block, 2: Audit)."
+              },
+              {
+                "id": "B",
+                "label": "Stop-Service MsMpEng -Force",
+                "correct": false,
+                "rationale": "Dừng dịch vụ Defender làm mất hoàn toàn khả năng bảo vệ của endpoint."
+              },
+              {
+                "id": "C",
+                "label": "Remove-Item C:\\Windows\\System32\\lsass.exe",
+                "correct": false,
+                "rationale": "Xóa file lsass.exe sẽ làm hỏng hệ điều hành Windows và gây màn hình xanh sập hệ thống."
+              },
+              {
+                "id": "D",
+                "label": "Set-Service -Name wuauserv -StartupType Disabled",
+                "correct": false,
+                "rationale": "Tắt Windows Update không liên quan đến quy tắc ASR bảo vệ LSASS."
+              }
+            ]
+          }
+        ]
+      },
+      "governance": {
+        "prevent": [
+          "Bật toàn bộ các quy tắc Attack Surface Reduction (ASR) cốt lõi ở chế độ Block sau giai đoạn Audit 30 ngày.",
+          "Kích hoạt Defender Cloud-Delivered Protection và Block at First Sight để nhận diện kịp thời các biến thể mã độc mới.",
+          "Cấu hình chính sách Group Policy khóa tính năng tắt Real-time Protection của người dùng thường."
+        ],
+        "observe": [
+          "Tập trung hóa nhật ký Microsoft-Windows-Windows Defender/Operational về hệ thống SIEM/SOC.",
+          "Thiết lập cảnh báo độ ưu tiên cao (Severity 1) đối với Event ID 5001 (Real-time protection disabled) và Event 1116 lặp lại nhiều lần.",
+          "Theo dõi các sự kiện Event ID 1121 (ASR Block) để tinh chỉnh danh sách ngoại lệ (exclusions) hợp lệ."
+        ],
+        "respond": [
+          "Khi phát hiện Event 1116/1117, tự động cách ly máy trạm (Network Isolation) qua Defender for Endpoint EDR.",
+          "Thu thập memory dump của tiến trình vi phạm và phân tích chuỗi lệnh qua PowerShell Script Block Logging.",
+          "Rà soát tài khoản người dùng liên quan và thu hồi phiên đăng nhập để ngăn chặn lan rộng."
+        ],
+        "residualRisk": [
+          "Các kỹ thuật khai thác zero-day trong kernel drivers (BYOVD - Bring Your Own Vulnerable Driver) có thể vô hiệu hóa callback của WdFilter.sys nếu không bật Driver Blocklist.",
+          "Mã độc chạy thuần túy trong bộ nhớ với kỹ thuật API hooking cấp thấp có thể cố gắng can thiệp amsi.dll nếu tiến trình không được bảo vệ."
+        ]
+      },
+      "misconceptions": [
+        "Lầm tưởng 1: 'AMSI là một ranh giới bảo mật (Security Boundary) bất khả xâm phạm.' -> Sai. Microsoft xác định AMSI là cơ chế phòng vệ chiều sâu (Defense-in-depth). Vì amsi.dll nằm trong không gian bộ nhớ của tiến trình userland, mã độc có quyền quản trị tiến trình đó có thể tìm cách hook hoặc patch bộ nhớ cục bộ.",
+        "Lầm tưởng 2: 'Chỉ cần file script không lưu xuống đĩa cứng (Fileless) là Defender sẽ hoàn toàn không nhìn thấy.' -> Sai. AMSI bắt các buffer bộ nhớ tại thời điểm runtime thực thi, bất kể script đến từ file, command line hay download trực tiếp vào RAM.",
+        "Lầm tưởng 3: 'Bật ASR rules sẽ làm hỏng tất cả phần mềm nghiệp vụ của công ty.' -> Sai. ASR có chế độ Audit Mode (Mode 2) cho phép chạy thử nghiệm và ghi log telemetry trong 30 ngày để lập danh sách exclusion an toàn trước khi chuyển sang Block Mode."
+      ],
+      "quiz": [
+        {
+          "id": "os03-l22-q1",
+          "difficulty": "easy",
+          "question": "Event ID nào trong Windows Defender Operational Log ghi nhận sự kiện một hành vi vừa bị ngăn chặn bởi quy tắc Attack Surface Reduction (ASR)?",
+          "explanation": "Event ID 1121 ghi nhận hành vi bị chặn bởi ASR rule; Event 1122 ghi nhận hành vi trong chế độ Audit mode.",
+          "options": [
+            { "id": "A", "label": "Event ID 4624" },
+            { "id": "B", "label": "Event ID 1121" },
+            { "id": "C", "label": "Event ID 7045" },
+            { "id": "D", "label": "Event ID 1000" }
+          ],
+          "correctAnswer": "B"
+        },
+        {
+          "id": "os03-l22-q2",
+          "difficulty": "medium",
+          "question": "Hàm API cốt lõi nào của giao diện AMSI được các ứng dụng runtime (như PowerShell, .NET) gọi để gửi buffer bộ nhớ đã giải mã sang cho Antivirus chấm điểm?",
+          "explanation": "AmsiScanBuffer() là hàm API chuẩn nhận con trỏ tới vùng đệm bộ nhớ, kích thước buffer và tên nội dung để gửi tới antivirus engine thẩm định.",
+          "options": [
+            { "id": "A", "label": "VirtualAllocEx()" },
+            { "id": "B", "label": "AmsiScanBuffer()" },
+            { "id": "C", "label": "CreateProcessW()" },
+            { "id": "D", "label": "BitBlt()" }
+          ],
+          "correctAnswer": "B"
+        },
+        {
+          "id": "os03-l22-q3",
+          "difficulty": "hard",
+          "question": "Trong kịch bản đánh giá an ninh tuân thủ Safe Harbor, phương pháp nào sau đây là chuẩn mực nhất để kiểm tra xem tính năng AMSI trên máy chủ thử nghiệm có đang hoạt động tốt hay không mà không vi phạm chính sách an toàn?",
+          "explanation": "Sử dụng chuỗi kiểm thử chuẩn 'AmsiUtils' hoặc test pattern trong PowerShell được Microsoft công nhận để kiểm tra phản hồi của AMSI mà không cần tải hay chạy bất kỳ mã độc thật nào.",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tải một ransomware thật từ Internet về máy chủ nội bộ để chạy thử."
+            },
+            {
+              "id": "B",
+              "label": "Chạy chuỗi kiểm thử chuẩn được công nhận (như gõ lệnh kiểm tra chuỗi 'AmsiUtils' hoặc chuỗi test EICAR) để quan sát thông báo chặn của AMSI."
+            },
+            {
+              "id": "C",
+              "label": "Tắt toàn bộ firewall và xóa sạch file nhật ký Windows Event Log."
+            },
+            {
+              "id": "D",
+              "label": "Gửi email lừa đảo thật tới toàn bộ nhân viên trong công ty."
+            }
+          ],
+          "correctAnswer": "B"
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Doanh nghiệp tài chính muốn chuẩn hóa cấu hình Microsoft Defender trên 5,000 máy trạm Windows 11. Yêu cầu đặt ra: Bật chế độ Block at First Sight, kích hoạt 3 quy tắc ASR quan trọng nhất (chặn Office tạo process, chặn LSASS credential theft, chặn obfuscated scripts), và thiết lập quy trình giám sát Event ID tập trung.",
+        "tasks": [
+          "Viết script PowerShell quản trị sử dụng Set-MpPreference để áp dụng toàn bộ cấu hình trên.",
+          "Xây dựng tài liệu ma trận mapping giữa các GUID của quy tắc ASR với rủi ro tấn công tương ứng.",
+          "Định nghĩa bộ lọc truy vấn XPath trong Event Viewer để trích xuất toàn bộ cảnh báo Defender và ASR blocks."
+        ],
+        "requiredEvidence": [
+          "Đoạn script Set-MpPreference hoàn chỉnh với các tham số: -SubmitSamplesConsent 3, -MAPSReporting 2, -AttackSurfaceReductionRules_Ids, -AttackSurfaceReductionRules_Actions",
+          "Truy vấn XPath: *[System[(EventID=1116 or EventID=1117 or EventID=1121)]] trong kênh Microsoft-Windows-Windows Defender/Operational",
+          "Báo cáo kết quả thử nghiệm trên máy lab mẫu xác nhận ASR chặn thành công macro test."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Defender Antivirus overview and deployment",
+          "publisher": "Microsoft Learn",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Kiến trúc engine MsMpEng.exe và mini-filter driver WdFilter.sys",
+            "Cơ chế Cloud-delivered Protection và Block at First Sight"
+          ],
+          "url": "https://learn.microsoft.com/en-us/defender-endpoint/microsoft-defender-antivirus-windows"
+        },
+        {
+          "title": "Antimalware Scan Interface (AMSI) Reference",
+          "publisher": "Microsoft Learn",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Định nghĩa hàm AmsiScanBuffer và luồng dữ liệu RPC",
+            "Mô hình tích hợp AMSI trong PowerShell và .NET"
+          ],
+          "url": "https://learn.microsoft.com/en-us/windows/win32/amsi/antimalware-scan-interface-portal"
+        },
+        {
+          "title": "Attack Surface Reduction (ASR) rules reference",
+          "publisher": "Microsoft Learn",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Danh mục GUID và hành vi của các quy tắc ASR",
+            "Hướng dẫn cấu hình Audit Mode và Block Mode qua PowerShell"
+          ],
+          "url": "https://learn.microsoft.com/en-us/defender-endpoint/attack-surface-reduction-rules-reference"
+        }
+      ]
+    },
+    {
+      "id": "os03-l23-windows-firewall-and-network-boundaries",
+      "slug": "windows-firewall-and-network-boundaries",
+      "title": "Windows Firewall & Host Network Boundaries",
+      "summary": "Kiến trúc Windows Filtering Platform (WFP) và Windows Defender Firewall with Advanced Security; 3 loại Network Profile (Domain, Private, Public) và thứ tự ưu tiên rule; kiểm soát luồng Inbound/Outbound; cô lập dịch vụ qua RPC/SMB filtering; đánh giá và audit cấu hình tường lửa.",
+      "difficulty": "intermediate",
+      "durationMinutes": 100,
+      "prerequisites": ["os03-l22-defender-av-edr-and-amsi"],
+      "outcomes": [
+        "Trình bày kiến trúc Windows Filtering Platform (WFP) hoạt động ở tầng Kernel (Network Drivers) và sự phối hợp với Windows Firewall service (mpssvc).",
+        "Phân tích cơ chế áp dụng 3 Network Profiles (DomainAuthenticated, Private, Public) và nguyên lý mặc định chặn Inbound, cho phép Outbound.",
+        "Đánh giá thứ tự ưu tiên xử lý luật tường lửa (Bypass Authenticated > Block Rules > Allow Rules > Default Behavior) và các kịch bản Rule Misconfiguration.",
+        "Thực hiện kiểm tra, audit cấu hình tường lửa bằng PowerShell (Get-NetFirewallRule) và thiết kế chính sách giới hạn RPC/SMB lateral movement."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["windows", "network"],
+      "attackTactics": ["TA0005", "TA0008"],
+      "keywords": [
+        "windows-firewall",
+        "wfp-architecture",
+        "firewall-profiles",
+        "inbound-outbound-rules",
+        "smb-rpc-filtering",
+        "network-boundary"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Windows Defender Firewall không hoạt động độc lập mà là giao diện quản trị cấp cao của Windows Filtering Platform (WFP) — một hệ thống lọc gói tin nằm sâu trong Windows Kernel (Network Driver Interface Specification - NDIS). Mọi luồng mạng đều được phân loại dựa theo Network Profile của adapter (Domain: khi kết nối tới Domain Controller; Private: mạng nội bộ tin cậy; Public: mạng công cộng ngoài quán cà phê với mức phòng thủ cao nhất). Windows Firewall áp dụng quy tắc thứ tự vàng: Block Rule luôn có quyền lực tối thượng đè bẹp Allow Rule (trừ khi có ngoại lệ Bypass IPsec Authenticated). Nếu tường lửa mở toang cổng SMB (445) hoặc RPC Dynamic Ports (49152-65535) trên profile Public/Private, kẻ tấn công nội bộ có thể thực hiện lateral movement dễ dàng. Cấu hình đúng đòi hỏi phân đoạn chặt chẽ, chặn Inbound không cần thiết và audit thường xuyên.",
+      "visual": {
+        "title": "Kiến trúc Windows Filtering Platform & Firewall Rules",
+        "caption": "Phân loại Profile; thứ tự ưu tiên xử lý luật từ Block tới Default Inbound Action.",
+        "steps": [
+          {
+            "label": "Network Adapter & Profile Detection",
+            "detail": "Network Location Awareness (NLA) xác định kết nối: Domain (có DC), Private (mạng nhà/văn phòng), Public (mạng lạ, siết chặt nhất).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Kernel WFP Filtering Layers",
+            "detail": "Gói tin đi qua các tầng kiểm tra IP, Transport, Application, RPC trong kernel drivers (tcpip.sys, fwpkclnt.sys).",
+            "tone": "allow"
+          },
+          {
+            "label": "Thứ tự 1: Explicit Block Rules",
+            "detail": "Bất kỳ luật chặn tường minh nào (ví dụ Chặn Port 445 từ Subnet X) đều có quyền ưu tiên cao nhất, hủy gói tin tức thì.",
+            "tone": "stop"
+          },
+          {
+            "label": "Thứ tự 2: Explicit Allow Rules",
+            "detail": "Nếu không bị Block, kiểm tra luật cho phép (chỉ mở đúng Port, Protocol, Program và Authorized Remote Addresses).",
+            "tone": "allow"
+          },
+          {
+            "label": "Thứ tự 3: Default Profile Action",
+            "detail": "Mặc định Inbound: BlockAll (chặn mọi kết nối tới nếu không có Allow rule); Mặc định Outbound: Allow (cho phép ra ngoài).",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến trúc Windows Filtering Platform (WFP) và Firewall Engine",
+          "paragraphs": [
+            "Windows Filtering Platform (WFP) là bộ khung lọc mạng cấp hệ thống được giới thiệu từ Windows Vista/Server 2008 nhằm thay thế các giao diện lọc gói tin cũ (như TDI filters). WFP hoạt động tại nhiều tầng khác nhau của ngăn xếp mạng (Network Stack) từ tầng Network (IP Packet), Transport (TCP/UDP Stream), Application Layer Enforcement (ALE), cho tới lọc cấp cuộc gọi hàm RPC.",
+            "Windows Defender Firewall with Advanced Security thực chất là một nhà cung cấp chính sách (Policy Provider) giao tiếp với Base Filtering Engine (BFE service) trong user mode và WFP Kernel Mode Driver (`fwpkclnt.sys`). Khi một ứng dụng mở socket nghe hoặc gửi gói tin, tầng ALE kiểm tra chính sách và quyết định cho phép hoặc chặn trước khi gói tin chạm tới tầng ứng dụng, đảm bảo hiệu năng cao và độ trễ tối thiểu."
+          ],
+          "points": [
+            "BFE (Base Filtering Engine): dịch vụ user-mode quản lý các bộ lọc và chính sách WFP.",
+            "ALE (Application Layer Enforcement): tầng lọc theo dõi đường dẫn tệp thực thi (Program Path) và User SID của tiến trình mở socket.",
+            "WFP Callouts: cho phép các phần mềm diệt virus hoặc EDR bên thứ ba gắn thêm logic phân tích gói tin sâu vào kernel."
+          ]
+        },
+        {
+          "title": "Ba Network Profiles: Domain, Private và Public",
+          "paragraphs": [
+            "Hệ điều hành Windows tự động gán mỗi card mạng (Network Interface) vào một trong ba Network Profile thông qua dịch vụ Network Location Awareness (NLA): (1) Domain Profile: Tự động kích hoạt khi máy tính kết nối và xác thực thành công với Active Directory Domain Controller; (2) Private Profile: Người dùng hoặc quản trị viên đánh dấu thủ công cho mạng gia đình hoặc mạng nội bộ tin cậy, cho phép chia sẻ file và máy in; (3) Public Profile: Cấu hình mặc định cho mọi mạng mới hoặc mạng công cộng (Wi-Fi công cộng, khách sạn), áp dụng mức độ bảo mật nghiêm ngặt nhất.",
+            "Một máy tính có nhiều card mạng (hoặc kết nối VPN) có thể đồng thời áp dụng nhiều profile khác nhau (Multi-Profile Support). Ví dụ card Wi-Fi gán profile Public trong khi card VPN gán profile Domain. Mỗi profile duy trì một bộ quy tắc và hành vi mặc định (Default Inbound Action: Block; Default Outbound Action: Allow) hoàn toàn độc lập."
+          ],
+          "points": [
+            "Get-NetConnectionProfile: kiểm tra Network Profile đang áp dụng cho từng card mạng.",
+            "Set-NetConnectionProfile -InterfaceAlias 'Wi-Fi' -NetworkCategory Public: chuyển đổi profile card mạng sang Public.",
+            "Quy tắc mở cổng phải luôn chỉ định rõ tham số -Profile để tránh mở cổng không mong muốn trên mạng công cộng."
+          ]
+        },
+        {
+          "title": "Luật Tường lửa: Thứ tự Xử lý, Xung đột và Phân quyền",
+          "paragraphs": [
+            "Windows Advanced Firewall áp dụng thứ tự xử lý quy tắc có cấu trúc chặt chẽ để giải quyết xung đột khi một gói tin khớp với nhiều luật cùng lúc: (1) IPsec Authenticated Bypass: Quy tắc cho phép đặc biệt dành cho lưu lượng đã được xác thực mã hóa an toàn qua IPsec; (2) Explicit Block Rule: Quy tắc chặn tường minh luôn được ưu tiên xử lý trước mọi quy tắc cho phép thông thường; (3) Explicit Allow Rule: Quy tắc cho phép tường minh (khớp chính xác Protocol, Local/Remote Port, Program Path, Remote IP Address); (4) Default Inbound/Outbound Behavior: Nếu không khớp với bất kỳ quy tắc tường minh nào, hành vi mặc định của Profile tương ứng sẽ được áp dụng (thường là Block đối với Inbound).",
+            "Một lỗ hổng quản trị phổ biến là 'Rule Overscoping': khi mở cổng cho một ứng dụng (ví dụ một web server thử nghiệm), quản trị viên tạo luật Allow cho cổng 8080 nhưng lại áp dụng cho cả 3 Profile (Domain, Private, Public) và để Remote Address là `Any`. Khi laptop kết nối vào mạng Wi-Fi công cộng, cổng 8080 vẫn mở toang cho toàn bộ người dùng trong quán cà phê tấn công."
+          ],
+          "points": [
+            "Quy tắc vàng: Block Rule luôn đè bẹp Allow Rule trên cùng một điều kiện so khớp.",
+            "New-NetFirewallRule: cmdlet PowerShell tạo luật tường lửa mạnh mẽ với đầy đủ tham số.",
+            "Scope Binding: luôn giới hạn -RemoteAddress về dải IP quản trị nội bộ thay vì 'Any'."
+          ]
+        },
+        {
+          "title": "Hardening Ranh giới Host: Cô lập RPC, SMB và Outbound Control",
+          "paragraphs": [
+            "Trong các chiến dịch tấn công doanh nghiệp, kẻ tấn công sau khi chiếm được một máy trạm thường sử dụng các giao thức quản trị nội bộ như SMB (Port 445), WinRM (Port 5985/5986), RDP (Port 3389) hoặc RPC Dynamic Ports (49152-65535) để thực hiện di chuyển ngang (Lateral Movement) sang các máy trạm khác cùng subnet.",
+            "Chiến lược phòng thủ Workstation-to-Workstation Isolation sử dụng Windows Firewall để bẻ gãy hoàn toàn chuỗi di chuyển ngang này: (1) Chặn toàn bộ kết nối Inbound SMB (Port 445) giữa các máy trạm với nhau trên Profile Domain/Private (chỉ cho phép kết nối Inbound SMB tới Domain Controllers và File Servers); (2) Chặn RPC Endpoint Mapper (Port 135) và dải cổng động từ các IP máy trạm khác; (3) Kiểm soát Outbound Traffic: Đối với các máy chủ cơ sở dữ liệu hoặc hệ thống chứa dữ liệu tuyệt mật, chuyển cấu hình Default Outbound Action thành `Block` và chỉ whitelist các cổng ra Internet cần thiết để ngăn chặn mã độc kết nối về C2 Server."
+          ],
+          "points": [
+            "Workstation Isolation Rule: New-NetFirewallRule -DisplayName 'Block Workstation SMB' -Direction Inbound -LocalPort 445 -Protocol TCP -Action Block -RemoteAddress LocalSubnet.",
+            "Lọc RPC: WFP cho phép tạo quy tắc lọc RPC cấp sâu theo UUID của Interface (như MS-DRSR, MS-SAMR).",
+            "Bật Logging: Set-NetFirewallProfile -LogFileName %systemroot%\\system32\\LogFiles\\Firewall\\pfirewall.log -LogBlocked True."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Host Firewall Audit & Lateral Movement Boundary Desk",
+        "objective": "Kiểm toán cấu hình Windows Firewall qua PowerShell mô phỏng, nhận diện lỗ hổng phân đoạn mạng máy trạm và thiết kế quy tắc chặn di chuyển ngang.",
+        "scenario": "Bạn được cung cấp cấu hình tường lửa trích xuất từ lệnh `Get-NetFirewallRule` và `Get-NetFirewallProfile` trên một nhóm máy trạm doanh nghiệp. Toàn bộ diễn ra tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ phân tích dữ liệu cấu hình được cung cấp; không quét mạng thực tế.",
+          "Mọi giải pháp thiết kế rule phải chỉ rõ Direction, Protocol, LocalPort, Profile và Action.",
+          "Đảm bảo không làm gián đoạn việc đăng nhập Domain và đồng bộ Group Policy từ Domain Controller."
+        ],
+        "evidenceTemplate": [
+          "Tên quy tắc tường lửa cấu hình sai hoặc thiếu sót",
+          "Phân tích nguy cơ di chuyển ngang (Lateral Movement)",
+          "Thứ tự ưu tiên xử lý luật liên quan",
+          "Lệnh PowerShell khắc phục và thiết lập ranh giới cô lập"
+        ],
+        "successCriteria": [
+          "Chỉ ra chính xác lỗ hổng quy tắc mở cổng SMB/RDP cho Any Remote Address trên Public Profile.",
+          "Giải thích đúng thứ tự ưu tiên giữa Block rule và Allow rule trong xử lý xung đột.",
+          "Viết đúng lệnh PowerShell thiết lập chính sách Workstation-to-Workstation SMB Block."
+        ],
+        "reset": "Khôi phục lại dữ liệu trích xuất cấu hình tường lửa ban đầu.",
+        "cleanup": "Lưu báo cáo kiểm toán ranh giới mạng host.",
+        "cases": [
+          {
+            "id": "fw-case-01",
+            "title": "Phân tích lỗ hổng Rule Overscoping trên Public Profile",
+            "context": "Kiểm toán phát hiện quy tắc tường lửa sau trên laptop nhân viên:\nName: RemoteDesktop-UserMode-In-TCP\nDisplayName: Remote Desktop - User Mode (TCP-In)\nEnabled: True\nDirection: Inbound\nProfile: Any (Domain, Private, Public)\nLocalPort: 3389\nProtocol: TCP\nAction: Allow\nRemoteAddress: Any",
+            "prompt": "Rủi ro an ninh nghiêm trọng nhất của quy tắc này khi nhân viên mang máy ra làm việc tại quán cà phê là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Máy tính sẽ tự động bị mất kết nối Internet qua Wi-Fi.",
+                "correct": false,
+                "rationale": "Mở cổng 3389 không làm mất kết nối Internet của máy tính."
+              },
+              {
+                "id": "B",
+                "label": "Do quy tắc áp dụng cho cả Profile Public và RemoteAddress là Any, cổng RDP 3389 sẽ mở toang cho bất kỳ ai trên cùng mạng Wi-Fi công cộng. Kẻ tấn công trên mạng Wi-Fi đó có thể quét thấy cổng và thực hiện tấn công dò mật khẩu (Brute-force/Password Spraying) hoặc khai thác lỗ hổng RDP.",
+                "correct": true,
+                "rationale": "Cấu hình mở cổng 3389 trên Public profile với nguồn Any phá hủy hoàn toàn ranh giới bảo vệ của máy tính khi ra ngoài mạng tin cậy."
+              },
+              {
+                "id": "C",
+                "label": "Màn hình laptop sẽ tự động bị xoay ngược 180 độ.",
+                "correct": false,
+                "rationale": "Quy tắc tường lửa không liên quan đến hiển thị màn hình."
+              },
+              {
+                "id": "D",
+                "label": "Không có rủi ro nào vì Windows Firewall tự động mã hóa mọi cổng mạng.",
+                "correct": false,
+                "rationale": "Tường lửa chỉ cho phép hoặc chặn gói tin, không tự động mã hóa dữ liệu ứng dụng trừ khi cấu hình IPsec."
+              }
+            ]
+          },
+          {
+            "id": "fw-case-02",
+            "title": "Xung đột quy tắc Block vs Allow",
+            "context": "Hệ thống có 2 quy tắc Inbound cùng áp dụng cho dải IP 192.168.1.50:\nQuy tắc 1: Name: 'Allow-Custom-App', Protocol: TCP, LocalPort: 8080, Action: Allow, RemoteAddress: 192.168.1.50\nQuy tắc 2: Name: 'Block-Suspicious-Subnet', Protocol: TCP, LocalPort: 8080, Action: Block, RemoteAddress: 192.168.1.0/24\nBiết rằng không có cấu hình IPsec Authenticated Bypass.",
+            "prompt": "Gói tin TCP gửi từ IP 192.168.1.50 tới cổng 8080 sẽ được xử lý như thế nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Gói tin được Cho phép (Allow) vì quy tắc Allow-Custom-App chỉ định chính xác IP 192.168.1.50 hơn dải mạng /24.",
+                "correct": false,
+                "rationale": "Trong Windows Firewall, độ đặc hiệu của IP không đè bẹp được tính chất Block; Block rule luôn có quyền ưu tiên cao hơn Allow rule thông thường."
+              },
+              {
+                "id": "B",
+                "label": "Gói tin bị Chặn (Block) vì theo thứ tự ưu tiên chuẩn của Windows Firewall, một Explicit Block Rule luôn đè bẹp (takes precedence over) bất kỳ Explicit Allow Rule nào nếu cùng thỏa mãn điều kiện so khớp.",
+                "correct": true,
+                "rationale": "Quy tắc xử lý của Windows Firewall: Block Rule luôn chiến thắng Allow Rule (trừ trường hợp IPsec Authenticated Bypass)."
+              },
+              {
+                "id": "C",
+                "label": "Tường lửa sẽ chia đôi gói tin: cho phép 50% và chặn 50%.",
+                "correct": false,
+                "rationale": "Tường lửa xử lý nhị phân trên từng phiên/gói tin, không chia tỷ lệ phần trăm."
+              },
+              {
+                "id": "D",
+                "label": "Hệ điều hành sẽ hiện bảng thông báo hỏi người dùng xem có muốn cho phép hay không.",
+                "correct": false,
+                "rationale": "Tường lửa chạy ngầm ở tầng kernel ALE/WFP, không popup hỏi người dùng trong kịch bản này."
+              }
+            ]
+          },
+          {
+            "id": "fw-case-03",
+            "title": "Thiết kế chính sách chặn di chuyển ngang Workstation SMB",
+            "context": "Đội ngũ Security muốn ngăn chặn kỹ thuật di chuyển ngang qua SMB (Port 445) giữa các máy trạm trong cùng mạng nội bộ Domain (10.0.5.0/24), nhưng vẫn phải cho phép các máy trạm kết nối SMB tới máy chủ Domain Controller (10.0.1.10) và File Server (10.0.1.20).",
+            "prompt": "Cấu hình tường lửa Inbound nào trên các máy trạm là chuẩn xác nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tắt hoàn toàn Windows Firewall trên toàn bộ máy trạm.",
+                "correct": false,
+                "rationale": "Tắt tường lửa làm mất hoàn toàn ranh giới mạng của máy trạm."
+              },
+              {
+                "id": "B",
+                "label": "Tạo quy tắc Inbound Block trên cổng TCP 445 cho dải RemoteAddress là mạng máy trạm (10.0.5.0/24). Vì kết nối từ máy trạm lên File Server/DC là luồng Outbound (được Default Outbound Allow cho phép), việc chặn Inbound trên máy trạm sẽ triệt tiêu hoàn toàn khả năng máy trạm này tấn công SMB sang máy trạm khác mà không ảnh hưởng tới việc truy cập server.",
+                "correct": true,
+                "rationale": "Máy trạm chỉ đóng vai trò SMB Client gửi request Outbound tới Server. Chặn Inbound SMB trên máy trạm ngăn chúng trở thành SMB Server nhận kết nối từ các máy trạm bị chiếm quyền khác."
+              },
+              {
+                "id": "C",
+                "label": "Chặn toàn bộ cổng DNS 53 và DHCP 67.",
+                "correct": false,
+                "rationale": "Chặn DNS và DHCP sẽ làm máy trạm mất mạng và không thể phân giải tên miền."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cho phép kết nối từ địa chỉ 127.0.0.1.",
+                "correct": false,
+                "rationale": "Cấu hình này sẽ chặn luôn cả các kết nối quản trị hợp lệ từ máy chủ trung tâm."
+              }
+            ]
+          }
+        ]
+      },
+      "governance": {
+        "prevent": [
+          "Bật Windows Firewall trên toàn bộ 3 Network Profiles (Domain, Private, Public) thông qua Group Policy bất biến.",
+          "Triển khai chính sách Workstation-to-Workstation Isolation: chặn Inbound SMB (445), WinRM (5985) và RPC giữa các máy trạm.",
+          "Cấm tạo quy tắc Allow với RemoteAddress 'Any' trên Public Profile."
+        ],
+        "observe": [
+          "Bật tính năng ghi nhật ký các gói tin bị chặn (LogDroppedPackets) trong Windows Firewall Profile.",
+          "Chuyển tiếp nhật ký tường lửa (pfirewall.log) hoặc Windows Event Log ID 5156/5157 (WFP connection allowed/blocked) về SIEM.",
+          "Giám sát các nỗ lực quét cổng Inbound hàng loạt từ các địa chỉ IP nội bộ."
+        ],
+        "respond": [
+          "Khi phát hiện máy trạm bị nhiễm mã độc, áp dụng ngay lập tức cấu hình Firewall Isolation: Chặn toàn bộ Inbound và Outbound, chỉ giữ kết nối tới EDR/SOC.",
+          "Kiểm tra danh sách quy tắc tường lửa cục bộ xem có quy tắc độc hại nào do mã độc tự tạo (qua netsh/PowerShell) hay không.",
+          "Khôi phục cấu hình tường lửa về baseline chuẩn của Group Policy (gpupdate /force)."
+        ],
+        "residualRisk": [
+          "Các kỹ thuật vượt tường lửa qua kênh Outbound hợp lệ (như kết nối ra HTTPS cổng 443 hoặc DNS tunneling qua cổng 53) nếu không có Outbound Filtering và proxy kiểm tra SSL.",
+          "Kẻ tấn công có quyền Administrator cục bộ có thể tạm thời chỉnh sửa hoặc thêm quy tắc tường lửa bypass nếu không có cơ chế EDR giám sát thay đổi rule."
+        ]
+      },
+      "misconceptions": [
+        "Lầm tưởng 1: 'Chỉ cần máy trạm nằm sau tường lửa mạng phần cứng (Hardware Firewall) của công ty là không cần bật Windows Firewall.' -> Sai. Tường lửa phần cứng ở cổng ngõ không thể bảo vệ các máy trạm trước các cuộc tấn công di chuyển ngang (Lateral Movement) xuất phát từ bên trong cùng một VLAN/Subnet.",
+        "Lầm tưởng 2: 'Quy tắc Allow có địa chỉ IP cụ thể sẽ luôn được ưu tiên hơn quy tắc Block có dải IP /24.' -> Sai. Trong Windows Firewall, Block Rule luôn có quyền ưu tiên cao hơn Allow Rule thông thường bất kể độ chi tiết của địa chỉ IP.",
+        "Lầm tưởng 3: 'Chặn cổng SMB Inbound trên máy trạm sẽ làm nhân viên không thể truy cập vào thư mục chia sẻ trên File Server.' -> Sai. Truy cập File Server là luồng Outbound từ máy trạm tới Server; chặn Inbound chỉ ngăn các máy khác kết nối ngược vào máy trạm đó."
+      ],
+      "quiz": [
+        {
+          "id": "os03-l23-q1",
+          "difficulty": "easy",
+          "question": "Hợp phần nào trong kiến trúc Windows Kernel chịu trách nhiệm thực thi các bộ lọc gói tin và luồng mạng cấp thấp cho Windows Firewall?",
+          "explanation": "Windows Filtering Platform (WFP) là bộ khung lọc mạng cấp kernel quản lý các tầng lọc IP, Transport và ALE.",
+          "options": [
+            { "id": "A", "label": "DirectX Graphics Kernel" },
+            { "id": "B", "label": "Windows Filtering Platform (WFP)" },
+            { "id": "C", "label": "Task Scheduler Engine" },
+            { "id": "D", "label": "Spooler Subsystem" }
+          ],
+          "correctAnswer": "B"
+        },
+        {
+          "id": "os03-l23-q2",
+          "difficulty": "medium",
+          "question": "Trong trường hợp xảy ra xung đột giữa một quy tắc Chặn tường minh (Explicit Block Rule) và một quy tắc Cho phép tường minh (Explicit Allow Rule) cùng khớp một gói tin, Windows Firewall sẽ xử lý như thế nào?",
+          "explanation": "Quy tắc Chặn tường minh luôn được ưu tiên xử lý trước và đè bẹp quy tắc Cho phép thông thường.",
+          "options": [
+            {
+              "id": "A",
+              "label": "Quy tắc Cho phép luôn chiến thắng quy tắc Chặn."
+            },
+            {
+              "id": "B",
+              "label": "Quy tắc Chặn luôn được ưu tiên xử lý trước và đè bẹp quy tắc Cho phép."
+            },
+            {
+              "id": "C",
+              "label": "Hệ thống chọn ngẫu nhiên một trong hai quy tắc."
+            },
+            {
+              "id": "D",
+              "label": "Hệ điều hành tự động xóa cả hai quy tắc khỏi cơ sở dữ liệu."
+            }
+          ],
+          "correctAnswer": "B"
+        },
+        {
+          "id": "os03-l23-q3",
+          "difficulty": "hard",
+          "question": "Tại sao chính sách cô lập Workstation-to-Workstation (chặn Inbound SMB 445 giữa các máy trạm) là biện pháp hiệu quả nhất để ngăn chặn Ransomware tự động lây lan trong mạng LAN?",
+          "explanation": "Hầu hết các biến thể ransomware lây lan nội bộ dựa vào việc quét và khai thác các dịch vụ SMB lắng nghe trên máy trạm khác cùng subnet. Chặn Inbound SMB trên máy trạm cắt đứt hoàn toàn bề mặt tiếp nhận cuộc gọi độc hại này.",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì nó làm cho máy trạm không thể khởi động được hệ điều hành Windows."
+            },
+            {
+              "id": "B",
+              "label": "Vì nó cắt đứt bề mặt tiếp nhận kết nối SMB lắng nghe trên máy trạm, ngăn chặn mã độc từ một máy bị nhiễm quét và tấn công sang các máy trạm lân cận trong cùng subnet."
+            },
+            {
+              "id": "C",
+              "label": "Vì nó tự động gỡ bỏ toàn bộ tài khoản người dùng trên mạng."
+            },
+            {
+              "id": "D",
+              "label": "Vì SMB là giao thức duy nhất có thể truyền tải virus trên Internet."
+            }
+          ],
+          "correctAnswer": "B"
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một mạng chi nhánh ngân hàng có 50 máy trạm Windows 11 và 2 máy in mạng. Quản trị viên cần triển khai chính sách Zero-Trust Host Firewall thông qua PowerShell: Bật tường lửa trên cả 3 profiles, chặn toàn bộ Inbound SMB/WinRM giữa các máy trạm, nhưng cho phép máy trạm in ấn tới 2 máy in (192.168.10.200, 192.168.10.201) trên cổng TCP 9100.",
+        "tasks": [
+          "Xây dựng script PowerShell thiết lập chính sách tường lửa cho máy trạm theo yêu cầu trên.",
+          "Cấu hình bật tính năng ghi nhật ký các kết nối bị từ chối vào file pfirewall.log dung lượng tối đa 16MB.",
+          "Xác thực thứ tự ưu tiên và kiểm tra tính toàn vẹn của kết nối in ấn."
+        ],
+        "requiredEvidence": [
+          "Script PowerShell hoàn chỉnh chứa các lệnh: Set-NetFirewallProfile, New-NetFirewallRule (chặn Inbound 445/5985 từ Subnet, cho phép Outbound 9100 tới 2 IP máy in)",
+          "Bằng chứng cấu hình logging: Set-NetFirewallProfile -LogAllowed False -LogBlocked True -LogMaxSizeKilobytes 16384",
+          "Kết quả kiểm thử mô phỏng: kết nối SMB từ máy trạm khác bị drop, kết nối in ấn tới 192.168.10.200 thành công."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Windows Defender Firewall with Advanced Security Architecture",
+          "publisher": "Microsoft Learn",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Kiến trúc WFP và Base Filtering Engine",
+            "Thứ tự ưu tiên xử lý luật và cơ chế Network Profiles"
+          ],
+          "url": "https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/"
+        },
+        {
+          "title": "NetSecurity PowerShell Module Documentation",
+          "publisher": "Microsoft Learn",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Cmdlets Get-NetFirewallRule, New-NetFirewallRule, Set-NetFirewallProfile",
+            "Cú pháp lọc theo Profile, Direction, RemoteAddress"
+          ],
+          "url": "https://learn.microsoft.com/en-us/powershell/module/netsecurity/"
+        },
+        {
+          "title": "Best Practices for Securing Active Directory: Lateral Movement Protection",
+          "publisher": "Microsoft Learn",
+          "sourceType": "industry-guide",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Khuyến nghị chặn Workstation-to-Workstation SMB/RPC",
+            "Chiến lược phân đoạn mạng host trong môi trường enterprise"
+          ],
+          "url": "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/security-best-practices/reducing-the-active-directory-attack-surface"
+        }
+      ]
+    },
+    {
+      "id": "os03-l24-security-event-log-and-sysmon-telemetry",
+      "slug": "security-event-log-and-sysmon-telemetry",
+      "title": "Windows Event Logs, Sysmon & Telemetry Engineering",
+      "summary": "Kiến trúc ghi nhật ký Windows (định dạng EVTX, dịch vụ Windows Event Log); cấu hình chính sách kiểm toán nâng cao (Advanced Audit Policy: Process Creation 4688 kèm CommandLine, Logon Events 4624/4625, Special Privileges 4672); triển khai và tinh chỉnh Microsoft Sysmon; chuyển tiếp log tập trung (WEF) và quy trình điều tra phát hiện xâm nhập.",
+      "difficulty": "intermediate",
+      "durationMinutes": 100,
+      "prerequisites": ["os03-l23-windows-firewall-and-network-boundaries"],
+      "outcomes": [
+        "Giải thích kiến trúc Windows Event Log (định dạng nhị phân EVTX, kênh Security/System/Application/Operational) và cơ chế chống ghi đè/xóa trái phép.",
+        "Nhận diện và diễn giải các Event ID trọng yếu trong Security Log: Event 4688 (Process Creation + Command Line), 4624/4625 (Logon Types), 4672 (Admin Logon), 4720/4726 (User Creation/Deletion), 7045 (New Service Installed).",
+        "Phân tích cấu hình và các loại telemetry cao cấp do Microsoft Sysmon cung cấp: Event ID 1 (Process Create), Event ID 3 (Network Connect), Event ID 7 (Image Load), Event ID 10 (Process Access / LSASS Dump), Event ID 12/13/14 (Registry Events).",
+        "Xây dựng quy tắc tương quan sự kiện (Detection Rules) và mô hình chuyển tiếp log tập trung (WEF/WEC) phục vụ săn lùng mối đe dọa (Threat Hunting)."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["windows"],
+      "attackTactics": ["TA0005", "TA0007"],
+      "keywords": [
+        "windows-event-log",
+        "sysmon",
+        "event-4688",
+        "event-4624",
+        "event-id-10-lsass",
+        "wef-telemetry",
+        "threat-hunting"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Windows Event Log là 'hộp đen' tối quan trọng của hệ điều hành Windows. Khác với file text thô của Linux syslog, Windows lưu trữ dữ liệu dạng nhị phân có cấu trúc (EVTX) với Schema XML chuẩn hóa. Một hệ thống Windows mặc định thường chỉ ghi lại thông tin rất nghèo nàn (ví dụ Event 4688 không có CommandLine thì chỉ biết cmd.exe chạy chứ không biết nó chạy lệnh gì). Bằng cách bật Advanced Audit Policy (bật 'Include command line in process creation events') và cài đặt Microsoft Sysmon, hệ thống có được tầm nhìn toàn diện: ghi nhận băm SHA256 của binary (Sysmon ID 1), mọi kết nối mạng outbound gắn liền với PID (Sysmon ID 3), các DLL được nạp vào bộ nhớ (Sysmon ID 7), và đặc biệt là hành vi mở tay cầm (Handle) đọc bộ nhớ LSASS để trích xuất mật khẩu (Sysmon ID 10 với GrantedAccess 0x1010/0x1410). Telemetry chất lượng cao là nền tảng để biến một hệ thống mù thành pháo đài quan sát được.",
+      "visual": {
+        "title": "Hệ sinh thái Telemetry: Security Log, Sysmon & WEF",
+        "caption": "Từ Kernel Event Tracing (ETW) tới phân tích EVTX và chuyển tiếp về SIEM trung tâm.",
+        "steps": [
+          {
+            "label": "Kernel Event Tracing (ETW)",
+            "detail": "Hạ tầng Kernel cấp thấp ghi nhận sự kiện thực thi tiến trình, nạp driver, tạo kết nối mạng và can thiệp bộ nhớ.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Windows Security Log (EVTX)",
+            "detail": "Event 4688 (Process Creation + CommandLine), 4624 (Logon Type 2/3/10), 4672 (Admin Privs), 7045 (New Service Installed).",
+            "tone": "allow"
+          },
+          {
+            "label": "Sysmon Service & Driver (SysmonDrv)",
+            "detail": "Driver mini-filter thu thập dữ liệu sâu: Sysmon 1 (Hash SHA256/Parent), Sysmon 3 (Network IP:Port), Sysmon 10 (LSASS Handle Access).",
+            "tone": "allow"
+          },
+          {
+            "label": "Phát hiện Tấn công & Tương quan",
+            "detail": "Ghép nối chuỗi sự kiện: Phishing Mail -> Office spawn PowerShell (4688/Sysmon 1) -> Tải Payload (Sysmon 3) -> Đọc LSASS (Sysmon 10).",
+            "tone": "caution"
+          },
+          {
+            "label": "Windows Event Forwarding (WEF)",
+            "detail": "Chuyển tiếp log nén và mã hóa Kerberos qua WinRM (Port 5985) về Windows Event Collector (WEC) / SIEM trước khi kẻ tấn công kịp xóa log.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến trúc Windows Event Log và Cấu trúc EVTX",
+          "paragraphs": [
+            "Hệ thống Windows Event Log là dịch vụ trung tâm (`eventlog` service) quản lý toàn bộ việc ghi nhận nhật ký của hệ điều hành. Dữ liệu được lưu trữ trong các tệp nhị phân có đuôi `.evtx` tại đường dẫn `C:\\Windows\\System32\\winevt\\Logs\\`. Tệp EVTX được tổ chức thành các khối (chunks) 64KB có checksum kiểm tra tính toàn vẹn, chứa cấu trúc dữ liệu XML nhị phân (Binary XML) giúp tiết kiệm dung lượng đĩa và tối ưu tốc độ lập chỉ mục.",
+            "Có hai loại kênh log chính: (1) Windows Logs (kênh truyền thống): Gồm `Security.evtx` (chỉ dịch vụ LSA có quyền ghi), `System.evtx` (ghi lỗi phần cứng/driver), và `Application.evtx`; (2) Applications and Services Logs (kênh chuyên biệt): Chứa hàng trăm kênh operational của từng phân hệ (như PowerShell, TaskScheduler, Windows Defender, Sysmon). Mọi sự kiện đều được định danh bằng một số `Event ID` duy nhất và chứa các trường dữ liệu chuẩn (TimeCreated, EventRecordID, Execution ProcessID/ThreadID, Channel, Computer, EventData)."
+          ],
+          "points": [
+            "C:\\Windows\\System32\\winevt\\Logs: thư mục lưu trữ toàn bộ các tệp .evtx của hệ thống.",
+            "Binary XML (BinXml): định dạng nhị phân tối ưu hóa của EVTX giúp nén dữ liệu và bảo toàn schema.",
+            "Get-WinEvent: cmdlet PowerShell mạnh mẽ để truy vấn và phân tích log EVTX bằng FilterHashtable hoặc XPath."
+          ]
+        },
+        {
+          "title": "Advanced Audit Policy: Những Event ID 'Vàng' Cần Bật",
+          "paragraphs": [
+            "Cấu hình mặc định của Windows chỉ bật một số lượng nhỏ các sự kiện kiểm toán cơ bản, để lại các vùng mù nguy hiểm. Quản trị viên bảo mật bắt buộc phải cấu hình chính sách kiểm toán nâng cao (Advanced Security Audit Policy) qua Group Policy (`Computer Configuration -> Policies -> Windows Settings -> Security Settings -> Advanced Audit Policy Configuration`):",
+            "(1) `Audit Process Creation` (Event ID 4688): Bắt buộc bật thêm chính sách `Include command line in process creation events` (Registry key: `HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System\\Audit\\ProcessCreationIncludeCmdLine_Enabled=1`). Nếu không có CommandLine, chuyên gia điều tra chỉ biết `cmd.exe` được chạy mà không biết tham số phía sau là gì; (2) `Audit Logon` (Event ID 4624 - Thành công, Event ID 4625 - Thất bại): Cung cấp trường `LogonType` cực kỳ quan trọng (Type 2: Interactive tại console, Type 3: Network qua SMB, Type 10: RemoteInteractive qua RDP, Type 9: NewCredentials trong Runas); (3) `Audit Special Logon` (Event ID 4672): Ghi nhận khi tài khoản Administrator/SYSTEM đăng nhập mang theo các đặc quyền tối cao (SeDebugPrivilege, SeTcbPrivilege); (4) `Audit Other Object Access Events` (Event ID 7045 trong System log): Ghi nhận khi một dịch vụ Windows mới được cài đặt (dấu hiệu persistence phổ biến)."
+          ],
+          "points": [
+            "Event 4688 + CommandLine: 'chén thánh' để phát hiện PowerShell download cradle, mã hóa rác và thực thi lệnh.",
+            "Logon Type 3: dấu hiệu di chuyển ngang (SMB/RPC); Logon Type 10: đăng nhập qua giao diện RDP.",
+            "Event 4672: phân tích các đặc quyền đặc biệt được gán cho token khi đăng nhập."
+          ]
+        },
+        {
+          "title": "Sysmon Telemetry: Mắt thần Giám sát Hành vi Cấp sâu",
+          "paragraphs": [
+            "Microsoft System Monitor (Sysmon) thuộc bộ công cụ Sysinternals là giải pháp mở rộng telemetry tiêu chuẩn vàng cho hệ điều hành Windows. Sysmon được cài đặt dưới dạng một dịch vụ hệ thống và một kernel-mode driver (`SysmonDrv.sys`), ghi nhận nhật ký vào kênh `Microsoft-Windows-Sysmon/Operational`.",
+            "Sysmon giải quyết các điểm yếu lớn nhất của Windows Security Log bằng cách cung cấp các Event ID chuyên biệt: (1) Sysmon Event ID 1 (Process Create): Ghi nhận mã băm SHA256/MD5/IMPHASH của file thực thi, dòng lệnh đầy đủ (CommandLine), thư mục làm việc (CurrentDirectory), danh tính User thực tế, và thông tin chi tiết về Process cha (ParentImage, ParentCommandLine); (2) Sysmon Event ID 3 (Network Connect): Liên kết trực tiếp một kết nối mạng TCP/UDP (Source IP/Port, Destination IP/Port, Hostname) với chính xác Process ID và Image tạo ra nó; (3) Sysmon Event ID 7 (Image Loaded): Giám sát các DLL được nạp vào tiến trình (phát hiện DLL Hijacking và DLL Side-Loading); (4) Sysmon Event ID 10 (Process Access): Cảnh báo khi một tiến trình mở handle đọc bộ nhớ của tiến trình khác với quyền nguy hiểm (như `GrantedAccess=0x1010` hoặc `0x1410` đọc `lsass.exe` để trích xuất mật khẩu); (5) Sysmon Event ID 11/12/13/14 (File & Registry): Giám sát tạo file thực thi và thay đổi khóa Run/Services Registry."
+          ],
+          "points": [
+            "Sysmon Event ID 1: Process Creation với Hash băm toàn vẹn (SHA256) và Parent Process Context.",
+            "Sysmon Event ID 3: Network Connection gắn liền với PID và tên binary thực thi.",
+            "Sysmon Event ID 10: Process Access — chữ ký phát hiện công cụ Mimikatz hoặc Procdump tấn công LSASS."
+          ]
+        },
+        {
+          "title": "Log Forwarding (WEF), Detection Rules và Chống Giấu Vết",
+          "paragraphs": [
+            "Một kẻ tấn công khi chiếm được quyền Administrator trên máy chủ cục bộ sẽ cố gắng xóa dấu vết bằng cách chạy lệnh `wevtutil cl Security` hoặc `Clear-EventLog`. Để bảo vệ tính toàn vẹn của bằng chứng số, mô hình chuyển tiếp nhật ký tập trung Windows Event Forwarding (WEF) phải được triển khai.",
+            "WEF hoạt động theo mô hình Subscription: máy chủ thu thập nhật ký (Windows Event Collector - WEC) định nghĩa các bộ lọc sự kiện cần lấy; các máy trạm (Forwarders) sử dụng giao thức chuẩn WinRM (Web Services for Management - WS-Management) được mã hóa Kerberos để tự động đẩy (push) log về WEC theo thời gian thực ngay khi sự kiện vừa phát sinh. Khi đó, dù kẻ tấn công có xóa sạch log trên máy trạm cục bộ (hành vi này bản thân nó cũng sinh ra Event ID 1102 - The audit log was cleared), toàn bộ bằng chứng trước đó đã được lưu trữ an toàn trên WEC/SIEM.",
+            "Trên hệ thống SIEM, các kỹ sư Detection Engineering xây dựng các quy tắc tương quan (Correlation Rules): Cảnh báo khi phát hiện chuỗi: Event 4624 (Logon Type 3) -> Event 7045 (New Service) -> Event 4688 (cmd.exe /c powershell -enc) trong vòng 60 giây."
+          ],
+          "points": [
+            "Event ID 1102 trong Security Log: ghi nhận sự kiện xóa nhật ký kiểm toán (The audit log was cleared).",
+            "WEF (Windows Event Forwarding): giải pháp chuyển tiếp log bản địa không cần cài đặt agent bên thứ ba.",
+            "Detection Rule: tương quan đa sự kiện (Multi-event correlation) giữa Logon, Process Creation và Network Connection."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Windows Telemetry & Incident Forensics Desk",
+        "objective": "Phân tích trích xuất sự kiện Security Log (Event 4688, 4624) và Sysmon (Event ID 1, 10), tái hiện chuỗi tấn công và xác định chính xác kỹ thuật xâm nhập.",
+        "scenario": "Bạn là SOC Analyst đang điều tra một cảnh báo rò rỉ thông tin xác thực trên máy chủ Domain Member Server. Hệ thống cung cấp trích xuất XML từ `Security.evtx` và `Microsoft-Windows-Sysmon/Operational.evtx`. Toàn bộ diễn ra tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận dựa trên log XML và dữ liệu sự kiện được cấp sẵn.",
+          "Mọi nhận định phải dẫn chứng Event ID, Timestamp, Process Name, CommandLine và GrantedAccess cụ thể.",
+          "Xác định rõ ràng tài khoản bị xâm nhập và phạm vi ảnh hưởng."
+        ],
+        "evidenceTemplate": [
+          "Chuỗi thời gian sự kiện (Timeline)",
+          "Event ID và Kênh Log tương ứng",
+          "Dấu vết Process (Image, CommandLine, ParentProcess, Hash)",
+          "Phân tích hành vi trích xuất credential hoặc di chuyển ngang"
+        ],
+        "successCriteria": [
+          "Chỉ ra chính xác hành vi mở handle LSASS qua Sysmon Event ID 10 với GrantedAccess nguy hiểm.",
+          "Phân tích đúng Logon Type 3 từ Event 4624 chứng minh kết nối qua mạng.",
+          "Tái hiện đúng chuỗi hành vi từ lúc đăng nhập, spawn PowerShell đến lúc dump credential."
+        ],
+        "reset": "Khôi phục lại dữ liệu trích xuất nhật ký sự kiện ban đầu.",
+        "cleanup": "Lưu báo cáo phân tích sự cố số và quy tắc phát hiện tương ứng.",
+        "cases": [
+          {
+            "id": "evt-case-01",
+            "title": "Phân tích Sysmon Event ID 10 phát hiện tấn công LSASS",
+            "context": "Nhật ký Sysmon Operational ghi nhận sự kiện:\nEvent ID: 10\nSourceImage: C:\\Windows\\Temp\\helper.exe\nTargetImage: C:\\Windows\\System32\\lsass.exe\nGrantedAccess: 0x1010 (PROCESS_VM_READ | PROCESS_QUERY_INFORMATION)\nCallTrace: C:\\Windows\\SYSTEM32\\ntdll.dll+9fb24|C:\\Windows\\System32\\KERNELBASE.dll+2c84e|C:\\Windows\\Temp\\helper.exe+1420",
+            "prompt": "Hành vi nào đang diễn ra và mức độ nguy hiểm của sự kiện này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tiến trình helper.exe đang thực hiện cập nhật bản vá bảo mật cho Windows.",
+                "correct": false,
+                "rationale": "Windows Update không chạy file nhị phân lạ từ thư mục Temp và không mở handle đọc bộ nhớ LSASS với mã quyền này."
+              },
+              {
+                "id": "B",
+                "label": "Tiến trình lạ (helper.exe trong C:\\Windows\\Temp) đang mở handle can thiệp vào bộ nhớ tiến trình LSASS với quyền đọc bộ nhớ ảo (0x1010 = PROCESS_VM_READ). Đây là chữ ký điển hình của kỹ thuật trích xuất mật khẩu/vé Kerberos từ bộ nhớ (Credential Dumping / Mimikatz-style attack).",
+                "correct": true,
+                "rationale": "Sysmon ID 10 với TargetImage là lsass.exe và GrantedAccess chứa 0x10 (PROCESS_VM_READ) là chỉ số chắc chắn của hành vi dump bộ nhớ LSASS để đánh cắp thông tin xác thực."
+              },
+              {
+                "id": "C",
+                "label": "Máy tính đang thực hiện chống phân mảnh ổ đĩa cứng.",
+                "correct": false,
+                "rationale": "Chống phân mảnh ổ đĩa không can thiệp vào bộ nhớ của tiến trình xác thực LSASS."
+              },
+              {
+                "id": "D",
+                "label": "Sự kiện bình thường do người dùng mở trình duyệt Google Chrome.",
+                "correct": false,
+                "rationale": "Trình duyệt thông thường không mở handle đọc bộ nhớ của LSASS."
+              }
+            ]
+          },
+          {
+            "id": "evt-case-02",
+            "title": "Phân tích chuỗi Event 4624 & 4688",
+            "context": "Security Log ghi nhận 2 sự kiện liên tiếp:\n1. Event ID: 4624, TargetUserName: 'svc_backup', LogonType: 3, WorkstationName: 'DESKTOP-HACKER', IpAddress: '192.168.1.105'\n2. Event ID: 4688, SubjectUserName: 'svc_backup', NewProcessName: 'C:\\Windows\\System32\\cmd.exe', CommandLine: 'cmd.exe /c net user hacker_admin Pass123! /add && net localgroup administrators hacker_admin /add'",
+            "prompt": "Nhận định nào sau đây diễn giải chính xác nhất chuỗi sự kiện?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tài khoản svc_backup thực hiện sao lưu dữ liệu tự động định kỳ.",
+                "correct": false,
+                "rationale": "Lệnh thực thi là tạo user mới và thêm vào nhóm Administrators, không phải tác vụ sao lưu."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công từ máy '192.168.1.105' đã sử dụng tài khoản 'svc_backup' để xác thực qua mạng (LogonType 3), sau đó thực thi lệnh cmd.exe để tạo một tài khoản quản trị cục bộ mới tên 'hacker_admin' nhằm thiết lập sự duy trì quyền lực (Persistence).",
+                "correct": true,
+                "rationale": "LogonType 3 chứng minh kết nối qua mạng, và Event 4688 CommandLine vạch trần hành vi tạo backdoor account thêm vào nhóm Administrators."
+              },
+              {
+                "id": "C",
+                "label": "Người dùng đăng nhập trực tiếp tại bàn phím (Console) của máy chủ.",
+                "correct": false,
+                "rationale": "Đăng nhập tại bàn phím là LogonType 2, trong khi log ghi nhận rõ ràng LogonType 3 (Network)."
+              },
+              {
+                "id": "D",
+                "label": "Hệ điều hành tự động đồng bộ thời gian NTP qua mạng.",
+                "correct": false,
+                "rationale": "Đồng bộ thời gian không sinh ra tiến trình net user tạo tài khoản quản trị."
+              }
+            ]
+          },
+          {
+            "id": "evt-case-03",
+            "title": "Phát hiện kỹ thuật xóa dấu vết nhật ký",
+            "context": "SOC Dashboard cảnh báo sự kiện:\nLog Channel: Security\nEvent ID: 1102\nDescription: The audit log was cleared.\nSubjectUserName: svc_backup\nSubjectUserSid: S-1-5-21-12345678-1001",
+            "prompt": "Sự kiện này có ý nghĩa gì và quy trình xử lý ứng cứu sự cố ngay lập tức là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Hệ thống tự động dọn dẹp log vì ổ cứng bị đầy — không cần hành động gì.",
+                "correct": false,
+                "rationale": "Khi log đầy, Windows tự xoay vòng (overwrite); Event 1102 chỉ sinh ra khi có lệnh xóa log thủ công."
+              },
+              {
+                "id": "B",
+                "label": "Nhật ký bảo mật (Security Log) vừa bị xóa chủ đích bởi tài khoản 'svc_backup'. Đây là hành vi che giấu dấu vết xâm nhập (Defense Evasion). Cần cô lập máy chủ ngay lập tức, thu hồi quyền của 'svc_backup', và đối chiếu các bản ghi đã được chuyển tiếp trước đó trên máy chủ WEF/SIEM.",
+                "correct": true,
+                "rationale": "Event 1102 là chỉ số cảnh báo cao (High Severity Indicator) thể hiện hành vi xóa dấu vết; hệ thống WEF giúp bảo toàn bằng chứng đã gửi đi."
+              },
+              {
+                "id": "C",
+                "label": "Người dùng vừa đăng xuất khỏi hệ thống an toàn.",
+                "correct": false,
+                "rationale": "Đăng xuất là Event ID 4634 hoặc 4647, không phải Event 1102."
+              },
+              {
+                "id": "D",
+                "label": "Defender vừa diệt xong một virus máy tính.",
+                "correct": false,
+                "rationale": "Defender diệt virus là Event ID 1117 trong kênh Defender Operational, không phải Event 1102."
+              }
+            ]
+          }
+        ]
+      },
+      "governance": {
+        "prevent": [
+          "Bật Advanced Audit Policy và chính sách 'Include command line in process creation events' trên toàn bộ domain qua GPO.",
+          "Cài đặt và duy trì cấu hình Microsoft Sysmon tối ưu (sử dụng cấu hình chuẩn như SwiftOnSecurity Sysmon config).",
+          "Phân quyền hạn chế tuyệt đối quyền xóa Event Log (chỉ cấp cho Domain Admins chuyên trách)."
+        ],
+        "observe": [
+          "Chuyển tiếp toàn bộ sự kiện Security Log và Sysmon về hệ thống WEC/SIEM trung tâm qua Windows Event Forwarding (WEF).",
+          "Thiết lập cảnh báo tự động khi xuất hiện Event ID 1102 (Log cleared), Event 7045 (New Service), hoặc Sysmon Event 10 truy cập LSASS.",
+          "Theo dõi các sự kiện đăng nhập thất bại liên tiếp (Event 4625) để phát hiện hành vi tấn công brute-force."
+        ],
+        "respond": [
+          "Khi có cảnh báo Credential Dumping hoặc Event 1102, cách ly ngay lập tức máy chủ khỏi mạng nội bộ.",
+          "Trích xuất snapshot bộ nhớ (RAM dump) và bảo toàn các tệp `.evtx` còn lại phục vụ công tác giám định pháp y.",
+          "Thực hiện reset mật khẩu và thu hồi toàn bộ vé Kerberos (TGT) của các tài khoản quản trị bị nghi ngờ lộ lọt."
+        ],
+        "residualRisk": [
+          "Kẻ tấn công có quyền Kernel (qua lỗ hổng driver) có thể vô hiệu hóa callback của ETW (Event Tracing for Windows) làm gián đoạn việc sinh log của hệ thống.",
+          "Lưu lượng log quá lớn từ Sysmon Image Load (Event 7) có thể làm quá tải băng thông mạng nếu không được lọc kỹ tại client."
+        ]
+      },
+      "misconceptions": [
+        "Lầm tưởng 1: 'Windows mặc định đã ghi lại toàn bộ câu lệnh thực thi trong Event 4688.' -> Sai. Mặc định Windows chỉ ghi tên file thực thi; phải bật riêng chính sách 'Include command line in process creation events' thì trường CommandLine mới xuất hiện.",
+        "Lầm tưởng 2: 'Kẻ tấn công xóa sạch Security Log trên máy trạm thì coi như mất trắng mọi bằng chứng.' -> Sai. Nếu đã triển khai Windows Event Forwarding (WEF), các sự kiện đã được chuyển tiếp và lưu trữ bất biến trên máy chủ thu thập log trung tâm (WEC/SIEM) từ trước đó.",
+        "Lầm tưởng 3: 'Chỉ cần cài Sysmon là máy tính tự động được bảo vệ an toàn.' -> Sai. Sysmon thuần túy là công cụ tạo Telemetry (quan sát), không phải phần mềm diệt virus ngăn chặn (Enforcement); cần có SIEM/EDR và SOC phân tích telemetry đó."
+      ],
+      "quiz": [
+        {
+          "id": "os03-l24-q1",
+          "difficulty": "easy",
+          "question": "LogonType nào trong Event ID 4624 đại diện cho phiên đăng nhập xác thực qua mạng (ví dụ kết nối tới thư mục chia sẻ SMB hoặc gọi hàm RPC)?",
+          "explanation": "LogonType 3 đại diện cho đăng nhập qua mạng (Network Logon), thường thấy trong truy cập SMB, RPC và xác thực NTLM/Kerberos từ xa.",
+          "options": [
+            { "id": "A", "label": "LogonType 2 (Interactive)" },
+            { "id": "B", "label": "LogonType 3 (Network)" },
+            { "id": "C", "label": "LogonType 5 (Service)" },
+            { "id": "D", "label": "LogonType 10 (RemoteInteractive)" }
+          ],
+          "correctAnswer": "B"
+        },
+        {
+          "id": "os03-l24-q2",
+          "difficulty": "medium",
+          "question": "Event ID nào trong Microsoft Sysmon ghi nhận chi tiết hành vi một tiến trình mở handle can thiệp vào bộ nhớ của tiến trình khác (chữ ký phát hiện dump LSASS)?",
+          "explanation": "Sysmon Event ID 10 (ProcessAccess) ghi nhận sự kiện mở handle vào tiến trình đích kèm theo các cờ quyền truy cập (GrantedAccess) và CallTrace.",
+          "options": [
+            { "id": "A", "label": "Sysmon Event ID 1" },
+            { "id": "B", "label": "Sysmon Event ID 3" },
+            { "id": "C", "label": "Sysmon Event ID 10" },
+            { "id": "D", "label": "Sysmon Event ID 15" }
+          ],
+          "correctAnswer": "C"
+        },
+        {
+          "id": "os03-l24-q3",
+          "difficulty": "hard",
+          "question": "Trong kiến trúc giám sát doanh nghiệp, giải pháp Windows Event Forwarding (WEF) bảo vệ hệ thống trước hành vi xóa log (Event 1102) của kẻ tấn công như thế nào?",
+          "explanation": "WEF tự động chuyển tiếp các sự kiện theo thời gian thực về máy chủ WEC trung tâm qua WinRM mã hóa ngay khi sự kiện phát sinh. Khi kẻ tấn công xóa log trên máy cục bộ, toàn bộ dữ liệu trước đó đã được lưu an toàn tại WEC.",
+          "options": [
+            {
+              "id": "A",
+              "label": "WEF tự động khóa bàn phím và chuột của kẻ tấn công khi họ gõ lệnh xóa log."
+            },
+            {
+              "id": "B",
+              "label": "WEF chuyển tiếp sự kiện theo thời gian thực về máy chủ WEC/SIEM trung tâm ngay khi phát sinh, bảo toàn toàn bộ bằng chứng số dù máy trạm cục bộ bị xóa sạch log sau đó."
+            },
+            {
+              "id": "C",
+              "label": "WEF tự động khởi động lại máy tính về trạng thái xuất xưởng."
+            },
+            {
+              "id": "D",
+              "label": "WEF chuyển toàn bộ dữ liệu lưu trữ sang các máy in văn phòng."
+            }
+          ],
+          "correctAnswer": "B"
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được giao nhiệm vụ thiết kế kiến trúc Telemetry & Detection Engineering cho một hệ thống 100 máy chủ Windows Server: Triển khai cấu hình Sysmon chuẩn bắt các kỹ thuật MITRE ATT&CK (T1003 OS Credential Dumping, T1059 Command and Scripting Interpreter), thiết lập GPO Advanced Audit Policy, và cấu hình WEF Subscription thu thập các sự kiện trọng yếu.",
+        "tasks": [
+          "Xác định danh sách các Event ID bắt buộc phải thu thập trong Security Log và Sysmon.",
+          "Viết bộ lọc XML Subscription mẫu cho Windows Event Collector (WEC) để gom các sự kiện: 4688 (kèm CommandLine), 4624/4625, 4672, 7045, 1102 và Sysmon 1, 3, 10.",
+          "Định nghĩa 3 quy tắc cảnh báo tương quan (Detection Rules) phát hiện hành vi leo thang đặc quyền và dump mật khẩu."
+        ],
+        "requiredEvidence": [
+          "File XML QueryFilter cho WEC Subscription chứa đầy đủ các Channel và EventID yêu cầu.",
+          "Tài liệu đặc tả 3 Detection Rules kèm giả thuyết săn đe dọa (Threat Hunting Hypothesis) và trường dữ liệu tương quan.",
+          "Bằng chứng kiểm thử: mô phỏng lệnh net user và mở handle an toàn kích hoạt đầy đủ chuỗi log trên WEC."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Sysmon - Sysinternals Documentation",
+          "publisher": "Microsoft Learn",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Danh mục Sysmon Event IDs (Event 1 Process Create, Event 3 Network, Event 10 Process Access)",
+            "Cấu trúc schema cấu hình XML của Sysmon"
+          ],
+          "url": "https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon"
+        },
+        {
+          "title": "Advanced Security Audit Policy Settings",
+          "publisher": "Microsoft Learn",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Chính sách Audit Process Creation và ProcessCreationIncludeCmdLine_Enabled",
+            "Mã giải nghĩa LogonType trong Event 4624 và Event 4672"
+          ],
+          "url": "https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/advanced-security-auditing"
+        },
+        {
+          "title": "Windows Event Forwarding (WEF) Guidance",
+          "publisher": "Microsoft Learn / Palantir WEF Project",
+          "sourceType": "industry-guide",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Kiến trúc WEC/WEF Subscription qua giao thức WinRM",
+            "Thiết kế bộ lọc sự kiện tập trung và đối phó với Event 1102"
+          ],
+          "url": "https://learn.microsoft.com/en-us/windows/security/threat-protection/use-windows-event-forwarding-to-assist-in-intrusion-detection"
+        }
+      ]
+    }
+  ]
+}

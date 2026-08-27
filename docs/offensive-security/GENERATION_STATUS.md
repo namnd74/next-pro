@@ -10,15 +10,15 @@ Updated: 2026-08-25
 - Machine-readable manifest: verified
 - Generation skill: active
 - Curriculum validator: verified
-- Full lesson migration/generation: in progress — **11 modules validated (33 lessons, 2,130 minutes);
-  tracks `os01-network-foundations` fully validated (4/4); `os02-linux-foundations` and
-  `os03-windows-foundations` at 2/3 modules each**
+- Full lesson migration/generation: in progress — **13 modules validated (39 lessons, 2,730 minutes);
+  tracks `os00-ethics-authorization` (3/3), `os01-network-foundations` (4/4),
+  `os02-linux-foundations` (3/3), and `os03-windows-foundations` (3/3) fully validated**
 - Existing Practice Range collections: preserved as auxiliary practice range
 - Publishing state: PR #4 (foundation), PR #5 (`os01-m02`), PR #6 (`os01-m03`), PR #7 (`os01-m04`),
-  PR #9 (paired cycle 1: `os02-m01` + `os03-m01`) open for review; each new batch stacks on the
-  previous branch.
+  PR #9 (paired cycle 1: `os02-m01` + `os03-m01`), PR #10 (paired cycle 2: `os02-m02` + `os03-m02` & tree restructure)
+  open for review; each new batch stacks on the previous branch.
 - Batch policy: raised to 2 modules / 6 lessons per run by owner approval (2026-08-25) to pair
-  independent tracks; paired cycles 1 and 2 are complete.
+  independent tracks; paired cycles 1, 2, and 3 are complete.
 
 The current `/offensive-security` content remains operational. It has not been declared equivalent to
 the new academy and must not be counted as completion of foundation, network, Linux,
@@ -26,29 +26,29 @@ Windows, Active Directory, cloud, research, or adversary-emulation tracks.
 
 ## Latest validated batch
 
-**Second paired cycle** — two independent modules generated in one run:
+**Third paired cycle** — two independent modules generated in one run:
 
-1. `os02-m02-processes-services-shell` — Linux runtime foundations (240 minutes total):
-   - `os02-l16-processes-signals-and-procfs` (80 min) — process tree reasoning via PID/PPID,
-     fork/exec env-inheritance risks, TERM/KILL/HUP evidence trade-offs, /proc forensics
-     (cmdline, environ, exe-deleted masquerading, fd).
-   - `os02-l17-systemd-units-and-journal` (80 min) — unit-file anatomy with drop-in overrides,
-     sandbox directives (NoNewPrivileges, ProtectSystem, CapabilityBoundingSet, PrivateTmp),
-     privileged-unit + writable-content privesc chain, journalctl multi-unit incident timeline.
-   - `os02-l18-packages-cron-and-shell-env` (80 min) — dpkg -V verification decoding,
-     wildcard-cron privesc triple (privileged job + wildcard + writable dir), PATH resolution
-     across contexts (interactive vs cron), auth-log triage basics.
+1. `os02-m03-linux-boundaries-and-telemetry` — Linux privilege boundaries, containers & telemetry (300 minutes total):
+   - `os02-l19-linux-capabilities-and-suid-privesc` (100 min) — POSIX capabilities decomposition vs SUID all-or-nothing root,
+     5 capability sets (Permitted, Effective, Inheritable, Bounding, Ambient), dangerous capabilities (CAP_SETUID, CAP_DAC_OVERRIDE,
+     CAP_SYS_ADMIN, CAP_SYS_PTRACE), prctl PR_SET_NO_NEW_PRIVS and systemd CapabilityBoundingSet hardening.
+   - `os02-l20-namespaces-cgroups-container-boundaries` (100 min) — 7 Linux Namespaces (PID, MNT, NET, IPC, UTS, USER, CGROUP) and
+     Cgroups v1/v2, chroot vs pivot_root boundary mechanics, container escape vectors (--privileged, docker.sock mount, cgroups release_agent),
+     defense-in-depth via User Namespaces mapping, Seccomp profiles, and rootless containers.
+   - `os02-l21-auditd-ebpf-and-host-telemetry` (100 min) — Linux Audit Subsystem architecture (kauditd, Netlink socket, auditd daemon),
+     immutable auid (Login UID) forensics tracing across sudo/su transitions, audit rule design (-w file watch, -a always,exit -S execve),
+     ausearch/aureport query analysis, and eBPF in-kernel telemetry vs auditd performance trade-offs.
 
-2. `os03-m02-services-powershell-remote` — Windows services & administration (270 minutes total):
-   - `os03-l19-services-scm-and-path-security` (90 min) — SCM registry profiles (ImagePath/
-     ObjectName/Start), unquoted-path interception mechanics, service SDDL decode with
-     SERVICE_CHANGE_CONFIG privesc, recovery-option abuse patterns.
-   - `os03-l20-scheduled-tasks-and-autoruns` (90 min) — task XML anatomy (trigger/action/principal
-     incl. S4U), Run-key hive matrix + startup folders, edit-in-place persistence (event 4702),
-     baseline-diff inventory methodology and detection mapping.
-   - `os03-l21-powershell-logging-and-remote-admin` (90 min) — three logging layers (module/
-     script-block 4104/transcription), execution-policy guard-vs-boundary framework, WinRM
-     listener hardening, JEA role-capability design for least-privilege remote admin.
+2. `os03-m03-endpoint-controls-and-events` — Windows endpoint controls, firewall & event telemetry (300 minutes total):
+   - `os03-l22-defender-av-edr-and-amsi` (100 min) — Multi-layered Defender AV/EDR engine (WdFilter.sys mini-filter, emulation sandbox,
+     MAPS cloud protection), AMSI in-memory script buffer interception (AmsiScanBuffer) for obfuscated PowerShell/.NET, Attack Surface
+     Reduction (ASR) rules, and safe testing patterns under Safe Harbor.
+   - `os03-l23-windows-firewall-and-network-boundaries` (100 min) — Windows Filtering Platform (WFP) kernel architecture and Base Filtering
+     Engine (BFE), 3 Network Profiles (Domain, Private, Public), rule evaluation precedence (IPsec bypass > Block rules > Allow rules > Default action),
+     and Workstation-to-Workstation SMB/RPC lateral movement isolation policies.
+   - `os03-l24-security-event-log-and-sysmon-telemetry` (100 min) — Windows Event Log EVTX binary XML architecture, Advanced Audit Policy
+     golden events (Event 4688 with CommandLine, Event 4624 LogonTypes, Event 4672, Event 7045), Sysmon telemetry (Event ID 1 process create with
+     SHA256, Event ID 3 network, Event ID 10 LSASS process access), Windows Event Forwarding (WEF), and anti-tamper detection (Event 1102).
 
 All six labs are browser-only decision simulations with fixed datasets. They accept no external
 target, credential, command or arbitrary payload. Completion requires all three lab cases and
@@ -60,13 +60,14 @@ before `published` status remains pending, as for all batches.
 
 ## Previous validated batches
 
+- **Paired cycle 2** — `os02-m02-processes-services-shell` (240 min) +
+  `os03-m02-services-powershell-remote` (270 min): lessons `os02-l16..l18`, `os03-l19..l21`.
 - **Paired cycle 1** — `os02-m01-files-identity-permissions` (180 min) +
   `os03-m01-architecture-identities-acls` (240 min): lessons `os02-l13..l15`, `os03-l16..l18`.
 - `os01-m04-enterprise-protocols-and-packets` (240 min, 3 lessons):
   - `os01-l10-smb-ldap-enterprise-protocols`
   - `os01-l11-packet-capture-methodology`
   - `os01-l12-topology-reasoning-from-evidence`
-
 - `os01-m03-dns-transport-and-tls` (240 min, 3 lessons):
   - `os01-l07-dns-resolution-and-dhcp-boundaries`
   - `os01-l08-tcp-udp-transport-state`
@@ -94,9 +95,8 @@ before `published` status remains pending, as for all batches.
 
 ## Next eligible batch
 
-Third paired cycle: `os02-m03-linux-boundaries-and-telemetry` (Linux, 300 min) + `os03-m03-
-endpoint-controls-and-events` (Windows, 300 min) — both eligible; completing either track's
-foundation tier. Lesson numbering continues `os02-l22..l24`, `os03-l22..l24`.
+Track 04: `os04-m01-bash-python-powershell` (Operator Scripting & Data Handling, 300 min) — depends on
+both `os02-linux-foundations` and `os03-windows-foundations` which are now both fully validated.
 
 ## Tree restructure (owner-approved, pre-cycle 3)
 
@@ -143,25 +143,23 @@ Owner approved full restructuring before cycle 3:
 ## Evidence log
 
 - `npm run validate:offensive-security-curriculum`: passed — 19 tracks, 64 modules; next
-  eligible module is `os02-m03-linux-boundaries-and-telemetry`.
-- `npm run validate:offensive-security-content`: passed — validated all eleven modules
-  `os00-m01`–`os00-m03`, `os01-m01`–`os01-m04`, `os02-m01`, `os02-m02`, `os03-m01`, `os03-m02`
-  (33 lessons, 2,130m).
+  eligible module is `os04-m01-bash-python-powershell`.
+- `npm run validate:offensive-security-content`: passed — validated all thirteen modules
+  `os00-m01`–`os00-m03`, `os01-m01`–`os01-m04`, `os02-m01`–`os02-m03`, `os03-m01`–`os03-m03`
+  (39 lessons, 2,730m).
 - Quality rubric review: 22/22 self-assessed for each of the six lessons in this batch;
   no dimension scored zero.
-- Authoritative sources: Linux man-pages (proc/signal/systemd.exec/journalctl/crontab/dpkg),
-  freedesktop.org systemd docs, GNU bash manual; Microsoft Learn services registry/SDDL,
-  task-scheduler schema, audit events 4698/4702, Sysinternals Autoruns, PowerShell
-  about_Logging_Windows/about_Execution_Policies, JEA overview.
-- CJK-leakage grep across all eleven data files: clean after fixing one leak (`签名`) and one
-  invalid escape sequence in `os03-m02`; stray-field regression (`reasonale`) caught pre-commit.
+- Authoritative sources: Linux man-pages (capabilities(7), prctl(2), namespaces(7), cgroups(7),
+  auditd(8), auditctl(8)), NIST SP 800-190, Docker security documentation, Cilium eBPF reference;
+  Microsoft Learn (Defender Antivirus, AMSI architecture, ASR rules, Windows Firewall / WFP,
+  Sysinternals Sysmon, Advanced Security Audit Policy, Windows Event Forwarding).
+- CJK-leakage grep across all thirteen data files: clean (0 matches).
 - `npm run lint`: passed.
 - `npm run typecheck` (`tsc --noEmit`): passed.
-- Production build: **passed** after tree restructure — 183 static pages; academy routes now
-  nested under `[trackSlug]/[moduleSlug]/[lessonSlug]` (11 module + 33 lesson routes verified).
+- Production build: passed.
 - `git diff --check`: passed.
 
-Runtime integration: all 11 modules served from
-`/offensive-security/academy/<track-id>/<module-slug>` plus 33 statically generated lesson
+Runtime integration: all 13 modules served from
+`/offensive-security/academy/<track-id>/<module-slug>` plus 39 statically generated lesson
 routes beneath them; index page renders the track → module tree via
 `groupAcademyModulesByTrack`; routes derive automatically from `ACADEMY_MODULES`.
