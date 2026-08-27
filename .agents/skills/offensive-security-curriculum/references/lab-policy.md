@@ -19,6 +19,11 @@
 Use for mental models and bounded UI/application behavior that does not require a
 real OS, network boundary, or backend. A demo must be labeled as simulation.
 
+### `wasm-sandbox`
+
+Use for WebAssembly-native real execution (BusyBox WASM, POSIX VFS, In-Memory AST SQL,
+and HTTP/Packet Inspector) running client-side with deterministic auto-grading state assertions.
+
 ### `local-container`
 
 Use for HTTP/API, multiple services, packet paths, queues, caches, and bounded

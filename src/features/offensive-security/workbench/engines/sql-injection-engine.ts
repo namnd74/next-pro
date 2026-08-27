@@ -1,278 +1,352 @@
-import type { SqlDatabase, SqlExecutionResult } from '../types';
+import type { SqlDatabase, SqlExecutionResult, SqlInjectedToken } from '../types';
 
-export function createDefaultSqlDatabase(): SqlDatabase {
-  return {
-    tables: {
-      users: {
-        name: 'users',
-        columns: [
-          { name: 'id', type: 'number' },
-          { name: 'username', type: 'string' },
-          { name: 'password_hash', type: 'string' },
-          { name: 'role', type: 'string' },
-          { name: 'email', type: 'string' },
-        ],
-        rows: [
-          {
-            id: 1,
-            username: 'admin',
-            password_hash: '$2b$12$K1r.mZ8s7q8w3e9r0t1y2u3i4o5p6a7s8d9f0g',
-            role: 'administrator',
-            email: 'admin@corp.internal',
-          },
-          {
-            id: 2,
-            username: 'operator',
-            password_hash: '$2b$12$L2s.nA9t8r9x4f0s1u2v3w4x5y6z7b8c9d0e1f',
-            role: 'operator',
-            email: 'operator@corp.internal',
-          },
-          {
-            id: 3,
-            username: 'auditor',
-            password_hash: '$2b$12$M3t.oB0u9s0y5g1t2v3w4x5y6z7a8b9c0d1e2f',
-            role: 'auditor',
-            email: 'auditor@corp.internal',
-          },
-          {
-            id: 4,
-            username: 'guest',
-            password_hash: '$2b$12$N4u.pC1v0t1z6h2u3w4x5y6z7a8b9c0d1e2f3g',
-            role: 'viewer',
-            email: 'guest@public.net',
-          },
-        ],
-      },
-      secrets: {
-        name: 'secrets',
-        columns: [
-          { name: 'id', type: 'number' },
-          { name: 'secret_key', type: 'string' },
-          { name: 'secret_value', type: 'string' },
-          { name: 'environment', type: 'string' },
-        ],
-        rows: [
-          {
-            id: 101,
-            secret_key: 'JWT_SIGNING_PRIVATE_KEY',
-            secret_value: 'MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC7...',
-            environment: 'production',
-          },
-          {
-            id: 102,
-            secret_key: 'AWS_ACCESS_KEY_ID',
-            secret_value: 'AKIAIOSFODNN7EXAMPLE',
-            environment: 'production',
-          },
-          {
-            id: 103,
-            secret_key: 'STRIPE_WEBHOOK_SECRET',
-            secret_value: 'whsec_98a7sd6f5g4h3j2k1l0z9x8c7v6b5n4m',
-            environment: 'production',
-          },
-        ],
-      },
-      products: {
-        name: 'products',
-        columns: [
-          { name: 'id', type: 'number' },
-          { name: 'title', type: 'string' },
-          { name: 'category', type: 'string' },
-          { name: 'price', type: 'number' },
-          { name: 'is_published', type: 'boolean' },
-        ],
-        rows: [
-          {
-            id: 1,
-            title: 'Enterprise Network Sensor Agent',
-            category: 'Hardware',
-            price: 1499,
-            is_published: true,
-          },
-          {
-            id: 2,
-            title: 'Red Team Operator Field Manual',
-            category: 'Books',
-            price: 49,
-            is_published: true,
-          },
-          {
-            id: 3,
-            title: 'Zero-Day Advisory Subscription',
-            category: 'Intelligence',
-            price: 9999,
-            is_published: false,
-          },
-          {
-            id: 4,
-            title: 'Hardware Security Key (FIDO2/WebAuthn)',
-            category: 'Hardware',
-            price: 55,
-            is_published: true,
-          },
-        ],
-      },
+export const createDefaultSqlDatabase = (): SqlDatabase => ({
+  tables: {
+    users: {
+      name: 'users',
+      columns: [
+        { name: 'id', type: 'number' },
+        { name: 'username', type: 'string' },
+        { name: 'password_hash', type: 'string' },
+        { name: 'role', type: 'string' },
+        { name: 'email', type: 'string' },
+        { name: 'is_active', type: 'boolean' },
+      ],
+      rows: [
+        {
+          id: 1,
+          username: 'admin',
+          password_hash: '$2y$12$e8xL47r9mKq0...',
+          role: 'administrator',
+          email: 'admin@corp.internal',
+          is_active: true,
+        },
+        {
+          id: 2,
+          username: 'security_auditor',
+          password_hash: '$2y$12$kL93mN82jVw1...',
+          role: 'auditor',
+          email: 'auditor@corp.internal',
+          is_active: true,
+        },
+        {
+          id: 3,
+          username: 'operator',
+          password_hash: '$2y$12$pQ82vR91kLx4...',
+          role: 'operator',
+          email: 'operator@corp.internal',
+          is_active: true,
+        },
+        {
+          id: 4,
+          username: 'guest_user',
+          password_hash: '$2y$12$zX10aB29cVm8...',
+          role: 'guest',
+          email: 'guest@public.io',
+          is_active: true,
+        },
+      ],
     },
-  };
-}
+    secrets: {
+      name: 'secrets',
+      columns: [
+        { name: 'id', type: 'number' },
+        { name: 'secret_key', type: 'string' },
+        { name: 'secret_value', type: 'string' },
+        { name: 'owner_id', type: 'number' },
+        { name: 'classification', type: 'string' },
+      ],
+      rows: [
+        {
+          id: 101,
+          secret_key: 'AWS_PROD_ACCESS_KEY',
+          secret_value: 'AKIAIOSFODNN7EXAMPLE',
+          owner_id: 1,
+          classification: 'CONFIDENTIAL',
+        },
+        {
+          id: 102,
+          secret_key: 'JWT_SIGNING_SECRET',
+          secret_value: 'super_secret_signing_key_2026',
+          owner_id: 1,
+          classification: 'TOP_SECRET',
+        },
+        {
+          id: 103,
+          secret_key: 'DB_REPLICATION_TOKEN',
+          secret_value: 'repl_token_098234710293847',
+          owner_id: 2,
+          classification: 'RESTRICTED',
+        },
+      ],
+    },
+    products: {
+      name: 'products',
+      columns: [
+        { name: 'id', type: 'number' },
+        { name: 'name', type: 'string' },
+        { name: 'price', type: 'number' },
+        { name: 'category', type: 'string' },
+        { name: 'is_published', type: 'boolean' },
+      ],
+      rows: [
+        {
+          id: 1,
+          name: 'Security Baseline Hardening Guide',
+          price: 99.0,
+          category: 'books',
+          is_published: true,
+        },
+        {
+          id: 2,
+          name: 'Hardware Security Key (FIDO2)',
+          price: 45.0,
+          category: 'hardware',
+          is_published: true,
+        },
+        {
+          id: 3,
+          name: 'Unreleased Internal Zero-Day Advisory',
+          price: 9999.0,
+          category: 'confidential',
+          is_published: false,
+        },
+      ],
+    },
+    audit_logs: {
+      name: 'audit_logs',
+      columns: [
+        { name: 'id', type: 'number' },
+        { name: 'action', type: 'string' },
+        { name: 'actor', type: 'string' },
+        { name: 'ip_address', type: 'string' },
+        { name: 'timestamp', type: 'string' },
+      ],
+      rows: [
+        {
+          id: 1,
+          action: 'AUTH_SUCCESS',
+          actor: 'admin',
+          ip_address: '10.0.4.15',
+          timestamp: '2026-08-27T06:00:00Z',
+        },
+        {
+          id: 2,
+          action: 'AUTH_FAILURE',
+          actor: 'attacker',
+          ip_address: '192.168.1.105',
+          timestamp: '2026-08-27T06:14:00Z',
+        },
+      ],
+    },
+  },
+});
 
-export function executeSqlInjection(
-  userInput: string,
-  templateQuery: string = "SELECT * FROM products WHERE is_published = 1 AND title LIKE '%{{USER_INPUT}}%'",
-  db: SqlDatabase = createDefaultSqlDatabase()
-): SqlExecutionResult {
-  const startTime = performance.now();
-  const rawQuery = templateQuery.replace('{{USER_INPUT}}', userInput);
+export const parseSqlTokens = (rawQuery: string): SqlInjectedToken[] => {
+  const tokens: SqlInjectedToken[] = [];
+  const parts = rawQuery
+    .split(/(\s+|--.*|\/\*[\s\S]*?\*\/|#.*|[',;=()])/)
+    .filter(Boolean);
 
-  // Analyze injected tokens
-  const injectedTokens: Array<{
-    token: string;
-    type: 'base' | 'injected' | 'comment' | 'operator';
-  }> = [];
-  const parts = templateQuery.split('{{USER_INPUT}}');
-  injectedTokens.push({ token: parts[0], type: 'base' });
-  injectedTokens.push({ token: userInput, type: 'injected' });
-  if (parts[1]) injectedTokens.push({ token: parts[1], type: 'base' });
+  let inComment = false;
+  for (const part of parts) {
+    if (part.startsWith('--') || part.startsWith('#') || part.startsWith('/*')) {
+      inComment = true;
+      tokens.push({ token: part, type: 'comment' });
+      continue;
+    }
 
-  // Check for comment truncations: --, #, /* */
-  let activeSql = rawQuery;
-  let commentIndex = -1;
-  const commentPatterns = ['--', '#', '/*'];
-  for (const pat of commentPatterns) {
-    const idx = activeSql.indexOf(pat);
-    if (idx !== -1 && (commentIndex === -1 || idx < commentIndex)) {
-      commentIndex = idx;
+    if (inComment) {
+      tokens.push({ token: part, type: 'comment' });
+      continue;
+    }
+
+    const upper = part.trim().toUpperCase();
+    if (
+      [
+        'SELECT',
+        'FROM',
+        'WHERE',
+        'AND',
+        'OR',
+        'UNION',
+        'LIMIT',
+        'ORDER',
+        'BY',
+        'INSERT',
+        'UPDATE',
+        'DELETE',
+      ].includes(upper)
+    ) {
+      tokens.push({ token: part, type: 'operator' });
+    } else if (['1=1', "'1'='1'", "'a'='a'", "' OR '1'='1"].includes(part)) {
+      tokens.push({ token: part, type: 'injected' });
+    } else {
+      tokens.push({ token: part, type: 'base' });
     }
   }
 
-  if (commentIndex !== -1) {
-    activeSql = activeSql.substring(0, commentIndex).trim();
+  return tokens;
+};
+
+export const executeSqlQuery = (
+  rawInput: string,
+  db: SqlDatabase
+): SqlExecutionResult => {
+  const startTime = Date.now();
+  const trimmed = rawInput.trim();
+
+  if (!trimmed) {
+    return {
+      success: false,
+      queryExecuted: '',
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      executionTimeMs: 0,
+      error: 'Empty SQL query.',
+    };
   }
 
-  // Detect UNION SELECT injection
-  const unionMatch = activeSql.match(
-    /\bUNION\s+(?:ALL\s+)?SELECT\s+(.*?)\s+FROM\s+([a-zA-Z0-9_]+)/i
-  );
-  if (unionMatch) {
-    const unionCols = unionMatch[1]
-      .split(',')
-      .map((c) => c.trim().replace(/^['"](.*)['"]$/, '$1'));
-    const targetTable = unionMatch[2].toLowerCase();
+  const tokens = parseSqlTokens(trimmed);
 
-    if (!db.tables[targetTable]) {
+  // Check Tautology SQL Injection: ' OR 1=1 -- or ' OR 'a'='a
+  const hasTautology =
+    /'\s*OR\s*1\s*=\s*1/i.test(trimmed) ||
+    /'\s*OR\s*'1'\s*=\s*'1'/i.test(trimmed) ||
+    /'\s*OR\s*'a'\s*=\s*'a'/i.test(trimmed) ||
+    /OR\s+true/i.test(trimmed);
+
+  // Check UNION-based Exfiltration: ' UNION SELECT ...
+  const unionMatch = trimmed.match(
+    /UNION\s+SELECT\s+(.*?)(?:FROM\s+([a-zA-Z0-9_]+))?(?:--|\/\*|#|$)/i
+  );
+
+  // Check Auth Bypass detection
+  const isAuthBypass =
+    hasTautology &&
+    (trimmed.toLowerCase().includes('login') || trimmed.toLowerCase().includes('users'));
+
+  // Handle UNION SELECT against database tables
+  if (unionMatch) {
+    const rawCols = unionMatch[1].trim();
+    const targetTable = (unionMatch[2] || 'users').toLowerCase();
+    const table = db.tables[targetTable];
+
+    if (!table) {
       return {
         success: false,
-        queryExecuted: rawQuery,
+        queryExecuted: trimmed,
         columns: [],
         rows: [],
         rowCount: 0,
-        executionTimeMs: performance.now() - startTime,
-        error: `SQL Error (1146): Table '${targetTable}' doesn't exist`,
-        injectedTokens,
-        vulnerabilityTriggered: 'UNION-Based SQL Injection Attempt',
+        executionTimeMs: Date.now() - startTime,
+        error: `SQL syntax error: relation "${targetTable}" does not exist.`,
+        injectedTokens: tokens,
+        vulnerabilityTriggered: 'UNION_BASED_SQLI_INVALID_TABLE',
       };
     }
 
-    const table = db.tables[targetTable];
-    const extractedRows: Array<Record<string, unknown>> = table.rows.map((row) => {
-      const outputRow: Record<string, unknown> = {};
-      unionCols.forEach((colName, idx) => {
-        const key = colName === '*' ? 'all' : colName;
-        outputRow[`col_${idx + 1}_(${key})`] =
-          row[colName] !== undefined ? row[colName] : colName;
+    const requestedCols =
+      rawCols === '*'
+        ? table.columns.map((c) => c.name)
+        : rawCols.split(',').map((c) => c.trim().split(/\s+/).pop() || c.trim());
+
+    const resultRows = table.rows.map((row) => {
+      const rowItem: Record<string, unknown> = {};
+      requestedCols.forEach((col) => {
+        rowItem[col] = row[col] !== undefined ? row[col] : 'NULL';
       });
-      return outputRow;
+      return rowItem;
     });
 
     return {
       success: true,
-      queryExecuted: rawQuery,
-      columns: Object.keys(extractedRows[0] || {}),
-      rows: extractedRows,
-      rowCount: extractedRows.length,
-      executionTimeMs: performance.now() - startTime,
-      injectedTokens,
-      vulnerabilityTriggered: `UNION SQL Injection: Successfully exfiltrated table '${targetTable}'`,
+      queryExecuted: trimmed,
+      columns: requestedCols,
+      rows: resultRows,
+      rowCount: resultRows.length,
+      executionTimeMs: Date.now() - startTime,
+      injectedTokens: tokens,
+      vulnerabilityTriggered: 'UNION_BASED_EXFILTRATION',
     };
   }
 
-  // Detect boolean OR injection: ' OR '1'='1 or ' OR 1=1
-  const isTautology =
-    /\bOR\s+['"]?1['"]?\s*=\s*['"]?1/i.test(activeSql) ||
-    /\bOR\s+['"]?a['"]?\s*=\s*['"]?a/i.test(activeSql) ||
-    /\bOR\s+true\b/i.test(activeSql) ||
-    /['"]\s*OR\s*['"][^'"]*['"]\s*=\s*['"][^'"]*/i.test(activeSql);
-
-  // If query is targeting products table
-  if (templateQuery.includes('products')) {
-    const productsTable = db.tables.products;
-    if (isTautology) {
-      // Returns all products, including unpublished / confidential ones!
-      return {
-        success: true,
-        queryExecuted: rawQuery,
-        columns: productsTable.columns.map((c) => c.name),
-        rows: productsTable.rows,
-        rowCount: productsTable.rows.length,
-        executionTimeMs: performance.now() - startTime,
-        injectedTokens,
-        vulnerabilityTriggered:
-          'Tautology Bypass: Bypassed is_published constraint to dump hidden products',
-      };
-    }
-
-    // Normal safe filtering
-    const cleanTerm = userInput.toLowerCase();
-    const filtered = productsTable.rows.filter(
-      (p) => p.is_published && String(p.title).toLowerCase().includes(cleanTerm)
-    );
-
-    return {
-      success: true,
-      queryExecuted: rawQuery,
-      columns: productsTable.columns.map((c) => c.name),
-      rows: filtered,
-      rowCount: filtered.length,
-      executionTimeMs: performance.now() - startTime,
-      injectedTokens,
-    };
-  }
-
-  // If query is targeting users table (e.g. Login form: SELECT * FROM users WHERE username = 'admin' ...)
-  if (templateQuery.includes('users')) {
+  // Handle Tautology Auth Bypass
+  if (hasTautology) {
     const usersTable = db.tables.users;
-    if (isTautology || /admin['"]?\s*--/i.test(userInput)) {
+    return {
+      success: true,
+      queryExecuted: trimmed,
+      columns: usersTable.columns.map((c) => c.name),
+      rows: usersTable.rows, // Dumps all users due to 1=1 tautology
+      rowCount: usersTable.rows.length,
+      executionTimeMs: Date.now() - startTime,
+      injectedTokens: tokens,
+      vulnerabilityTriggered: isAuthBypass
+        ? 'AUTH_BYPASS_TAUTOLOGY'
+        : 'TAUTOLOGY_DUMP_ALL',
+    };
+  }
+
+  // Standard SELECT query handler
+  const selectMatch = trimmed.match(
+    /SELECT\s+(.*?)\s+FROM\s+([a-zA-Z0-9_]+)(?:\s+WHERE\s+(.*?))?(?:--|\/\*|#|$)/i
+  );
+  if (selectMatch) {
+    const rawCols = selectMatch[1].trim();
+    const tableName = selectMatch[2].toLowerCase();
+    const whereClause = selectMatch[3]?.trim();
+    const table = db.tables[tableName];
+
+    if (!table) {
       return {
-        success: true,
-        queryExecuted: rawQuery,
-        columns: usersTable.columns.map((c) => c.name),
-        rows: [usersTable.rows[0]], // Returns admin user!
-        rowCount: 1,
-        executionTimeMs: performance.now() - startTime,
-        injectedTokens,
-        vulnerabilityTriggered:
-          'Authentication Bypass: Admin login authenticated without password',
+        success: false,
+        queryExecuted: trimmed,
+        columns: [],
+        rows: [],
+        rowCount: 0,
+        executionTimeMs: Date.now() - startTime,
+        error: `SQL error: table "${tableName}" not found in schema.`,
+        injectedTokens: tokens,
       };
+    }
+
+    const requestedCols =
+      rawCols === '*'
+        ? table.columns.map((c) => c.name)
+        : rawCols.split(',').map((c) => c.trim());
+
+    let filteredRows = [...table.rows];
+    if (whereClause) {
+      const eqMatch = whereClause.match(/([a-zA-Z0-9_]+)\s*=\s*['"]?([^'"]+)['"]?/);
+      if (eqMatch) {
+        const field = eqMatch[1];
+        const val = eqMatch[2];
+        filteredRows = filteredRows.filter((r) => String(r[field]) === val);
+      }
     }
 
     return {
       success: true,
-      queryExecuted: rawQuery,
-      columns: usersTable.columns.map((c) => c.name),
-      rows: [],
-      rowCount: 0,
-      executionTimeMs: performance.now() - startTime,
-      injectedTokens,
+      queryExecuted: trimmed,
+      columns: requestedCols,
+      rows: filteredRows,
+      rowCount: filteredRows.length,
+      executionTimeMs: Date.now() - startTime,
+      injectedTokens: tokens,
     };
   }
 
+  // Fallback unrecognized query
   return {
-    success: true,
-    queryExecuted: rawQuery,
-    columns: ['result'],
-    rows: [{ result: 'Executed successfully with 0 rows returned' }],
+    success: false,
+    queryExecuted: trimmed,
+    columns: [],
+    rows: [],
     rowCount: 0,
-    executionTimeMs: performance.now() - startTime,
-    injectedTokens,
+    executionTimeMs: Date.now() - startTime,
+    error: 'Syntax error or unsupported SQL statement for educational simulator.',
+    injectedTokens: tokens,
   };
-}
+};

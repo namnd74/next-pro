@@ -1,10 +1,11 @@
 export type WorkbenchMode = 'terminal' | 'sql' | 'http' | 'packet';
 
+// POSIX Virtual Filesystem (VFS) Types
 export interface VfsFile {
   type: 'file';
   name: string;
   content: string;
-  mode: number; // e.g. 0o644, 0o755, 0o4755 (SUID)
+  mode: number; // Octal permissions e.g. 0o644, 0o755, 0o4755 (SUID)
   owner: string;
   group: string;
   size?: number;
@@ -14,7 +15,7 @@ export interface VfsFile {
 export interface VfsDirectory {
   type: 'dir';
   name: string;
-  mode: number; // e.g. 0o755
+  mode: number; // Octal permissions e.g. 0o755, 0o700
   owner: string;
   group: string;
   children: Record<string, VfsNode>;
@@ -23,15 +24,17 @@ export interface VfsDirectory {
 
 export type VfsNode = VfsFile | VfsDirectory;
 
+export interface VfsUserContext {
+  uid: number;
+  gid: number;
+  username: string;
+  groups: string[];
+}
+
 export interface VfsState {
   root: VfsDirectory;
   cwd: string;
-  user: {
-    uid: number;
-    gid: number;
-    username: string;
-    groups: string[];
-  };
+  user: VfsUserContext;
   env: Record<string, string>;
   history: string[];
 }
@@ -43,6 +46,7 @@ export interface TerminalExecutionResult {
   updatedState: VfsState;
 }
 
+// SQL Engine & AST Types
 export interface SqlColumn {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'json';
@@ -58,6 +62,11 @@ export interface SqlDatabase {
   tables: Record<string, SqlTable>;
 }
 
+export interface SqlInjectedToken {
+  token: string;
+  type: 'base' | 'injected' | 'comment' | 'operator';
+}
+
 export interface SqlExecutionResult {
   success: boolean;
   queryExecuted: string;
@@ -66,20 +75,20 @@ export interface SqlExecutionResult {
   rowCount: number;
   executionTimeMs: number;
   error?: string;
-  injectedTokens?: Array<{
-    token: string;
-    type: 'base' | 'injected' | 'comment' | 'operator';
-  }>;
+  injectedTokens?: SqlInjectedToken[];
   vulnerabilityTriggered?: string;
 }
 
+// HTTP Repeater & Packet Decoder Types
 export interface HttpHeader {
   key: string;
   value: string;
 }
 
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
+
 export interface HttpRequestState {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS' | 'HEAD';
+  method: HttpMethod;
   url: string;
   headers: HttpHeader[];
   rawHeaders: string;
@@ -95,10 +104,28 @@ export interface HttpResponseState {
   durationMs: number;
 }
 
+export interface PacketHeaderField {
+  name: string;
+  value: string;
+  description: string;
+  hex?: string;
+}
+
 export interface PacketHeaderInfo {
   layer: 'Ethernet' | 'IPv4' | 'TCP' | 'Application';
   title: string;
-  fields: Array<{ name: string; value: string; description: string; hex?: string }>;
+  fields: PacketHeaderField[];
+}
+
+// Workbench Objectives & Config
+export interface ObjectiveVerificationContext {
+  vfs?: VfsState;
+  lastCommand?: string;
+  lastResult?: TerminalExecutionResult;
+  sqlDb?: SqlDatabase;
+  lastSqlResult?: SqlExecutionResult;
+  lastHttpRes?: HttpResponseState;
+  lastHttpReq?: HttpRequestState;
 }
 
 export interface WorkbenchObjective {
@@ -106,15 +133,7 @@ export interface WorkbenchObjective {
   title: string;
   description: string;
   hint?: string;
-  isComplete: (context: {
-    vfs?: VfsState;
-    lastCommand?: string;
-    lastResult?: TerminalExecutionResult;
-    sqlDb?: SqlDatabase;
-    lastSqlResult?: SqlExecutionResult;
-    lastHttpRes?: HttpResponseState;
-    lastHttpReq?: HttpRequestState;
-  }) => boolean;
+  isComplete: (context: ObjectiveVerificationContext) => boolean;
 }
 
 export interface WorkbenchConfig {

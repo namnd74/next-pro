@@ -20,7 +20,7 @@ import {
 import { AcademyAssessment } from './academy-assessment';
 import { academyLessonHref, academyModuleHref } from './academy-tracks';
 import type { AcademyLesson, AcademyModule, AcademyVisualStep } from './types';
-import { getWorkbenchPresetForLesson } from '../workbench/workbench-presets';
+import { getWorkbenchConfigForLesson } from '../workbench/workbench-presets';
 import { AcademyLiveWorkbench } from '../workbench/components/academy-live-workbench';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -65,7 +65,7 @@ const VISUAL_TONE_CONFIG: Record<
   },
 };
 
-function getGridColsClass(stepCount: number): string {
+const getGridColsClass = (stepCount: number): string => {
   switch (stepCount) {
     case 1:
       return 'grid-cols-1 max-w-xl mx-auto';
@@ -82,16 +82,18 @@ function getGridColsClass(stepCount: number): string {
     default:
       return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
   }
-}
+};
 
-export function AcademyLessonViewer({ module, lesson }: AcademyLessonViewerProps) {
+export const AcademyLessonViewer: React.FC<AcademyLessonViewerProps> = ({
+  module,
+  lesson,
+}) => {
   const [practiceMode, setPracticeMode] = React.useState<'workbench' | 'assessment'>(
     'workbench'
   );
   const workbenchConfig = React.useMemo(
-    () =>
-      getWorkbenchPresetForLesson(lesson.slug) || getWorkbenchPresetForLesson(lesson.id),
-    [lesson.id, lesson.slug]
+    () => getWorkbenchConfigForLesson(lesson),
+    [lesson]
   );
 
   const currentIndex = module.lessons.findIndex((item) => item.id === lesson.id);
@@ -416,7 +418,7 @@ export function AcademyLessonViewer({ module, lesson }: AcademyLessonViewerProps
       </div>
     </article>
   );
-}
+};
 
 function GovernanceCard({
   title,
