@@ -9,6 +9,8 @@ import filesIdentityPermissionsData from '../data/academy/os02-linux-foundations
 import windowsArchitectureIdentitiesAclsData from '../data/academy/os03-windows-foundations/windows-architecture-identities-acls.json';
 import processesServicesShellData from '../data/academy/os02-linux-foundations/processes-services-shell.json';
 import servicesPowershellRemoteData from '../data/academy/os03-windows-foundations/services-powershell-remote.json';
+import linuxBoundariesAndTelemetryData from '../data/academy/os02-linux-foundations/linux-boundaries-and-telemetry.json';
+import endpointControlsAndEventsData from '../data/academy/os03-windows-foundations/endpoint-controls-and-events.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -105,6 +107,12 @@ export const PROCESSES_SERVICES_SHELL_MODULE = parseAcademyModule(
 export const SERVICES_POWERSHELL_REMOTE_MODULE = parseAcademyModule(
   servicesPowershellRemoteData
 );
+export const LINUX_BOUNDARIES_AND_TELEMETRY_MODULE = parseAcademyModule(
+  linuxBoundariesAndTelemetryData
+);
+export const ENDPOINT_CONTROLS_AND_EVENTS_MODULE = parseAcademyModule(
+  endpointControlsAndEventsData
+);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
@@ -118,6 +126,8 @@ export const ACADEMY_MODULES: AcademyModule[] = [
   WINDOWS_ARCHITECTURE_IDENTITIES_ACLS_MODULE,
   PROCESSES_SERVICES_SHELL_MODULE,
   SERVICES_POWERSHELL_REMOTE_MODULE,
+  LINUX_BOUNDARIES_AND_TELEMETRY_MODULE,
+  ENDPOINT_CONTROLS_AND_EVENTS_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {
