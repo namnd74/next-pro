@@ -36,13 +36,19 @@ Use [`references/quality-rubric.md`](references/quality-rubric.md) for final rev
 Each practical lesson should move through:
 
 ```text
-mental model -> mechanism -> safe demonstration -> guided lab -> blind variant
+mental model -> mechanism -> safe demonstration -> guided lab (WASM sandbox) -> blind variant
 -> evidence -> mitigation -> detection -> transfer challenge
 ```
 
 Adapt the presentation to the domain. Packet flows need network diagrams, Active
 Directory needs identity/relationship graphs, vulnerability research needs a
 crash-to-root-cause flow, and availability lessons need load and recovery metrics.
+
+## WebAssembly Live Workbench Standards
+
+- Every generated lesson automatically derives a tailored in-browser WASM workbench config via `generateWorkbenchConfigFromLesson()`.
+- Interactive labs support 4 execution modes: `terminal` (BusyBox WASM/POSIX VFS), `sql` (Relational AST Injection), `http` (RFC Repeater), and `packet` (TCP/IP Layers).
+- State inspection (`FS.stat`, mode bits `0600/0640`, file creation, query result rows, status codes) provides instant automated competency verification.
 
 ## Non-negotiable distinctions
 

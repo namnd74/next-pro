@@ -1,7 +1,7 @@
+import type { AcademyLesson } from '../academy/types';
 import type { WorkbenchConfig } from './types';
 import { createDefaultVfs } from './engines/virtual-posix-engine';
-import { createDefaultSqlDatabase } from './engines/sql-injection-engine';
-import { createDefaultHttpRequest } from './engines/http-packet-engine';
+import { generateWorkbenchConfigFromLesson } from './dynamic-lab-generator';
 
 export const WORKBENCH_PRESETS: Record<string, WorkbenchConfig> = {
   // Preset 1: Linux Permissions & SUID Hardening (Track 02 - Lesson 14)
@@ -21,181 +21,177 @@ export const WORKBENCH_PRESETS: Record<string, WorkbenchConfig> = {
     ],
     initialVfs: (() => {
       const vfs = createDefaultVfs();
-      // Introduce an insecure shadow file permission for the challenge
-      if (
-        vfs.children.etc &&
-        vfs.children.etc.type === 'dir' &&
-        vfs.children.etc.children.shadow
-      ) {
-        vfs.children.etc.children.shadow.mode = 0o666; // Insecure: world writable!
+      if (vfs.children.etc?.type === 'dir' && vfs.children.etc.children.shadow) {
+        vfs.children.etc.children.shadow.mode = 0o666; // Intentionally misconfigured for lab
       }
       return vfs;
     })(),
     sampleCommands: [
-      'ls -la /etc/shadow',
+      'ls -l /etc/shadow',
       'chmod 600 /etc/shadow',
-      'find /bin -perm -4000',
+      'chmod 640 /etc/shadow',
+      'find / -perm -4000 2>/dev/null',
       'cat /home/operator/notes.txt',
-      'id',
     ],
     objectives: [
       {
-        id: 'obj-inspect-shadow',
-        title: 'Kiểm tra quyền /etc/shadow',
-        description: 'Chạy lệnh ls -l /etc/shadow để xem mode bits.',
-        hint: 'Gõ `ls -l /etc/shadow`',
+        id: 'obj-check-shadow',
+        title: 'Kiểm tra quyền truy cập của /etc/shadow',
+        description:
+          'Chạy lệnh kiểm tra file /etc/shadow để phát hiện lỗ hổng phân quyền.',
+        hint: 'Gõ `ls -l /etc/shadow` trong terminal.',
         isComplete: ({ lastCommand }) =>
-          !!lastCommand && /ls\s+.*\/etc\/shadow/i.test(lastCommand),
+          !!lastCommand &&
+          lastCommand.includes('ls') &&
+          lastCommand.includes('/etc/shadow'),
       },
       {
         id: 'obj-harden-shadow',
-        title: 'Hardening /etc/shadow về quyền an toàn (0600 hoặc 0640)',
-        description: 'Thu hồi quyền đọc/ghi của other trên file mật khẩu nhạy cảm.',
-        hint: 'Gõ `chmod 600 /etc/shadow` hoặc `chmod 640 /etc/shadow`',
+        title: 'Hardening phân quyền /etc/shadow (Mode 0600 hoặc 0640)',
+        description: 'Thu hồi quyền đọc/ghi của thế giới ngoài bằng lệnh chmod.',
+        hint: 'Gõ `chmod 600 /etc/shadow` hoặc `chmod 640 /etc/shadow`.',
         isComplete: ({ vfs }) => {
           if (!vfs) return false;
           const etc = vfs.root.children.etc;
-          if (etc && etc.type === 'dir' && etc.children.shadow) {
-            const mode = etc.children.shadow.mode;
-            return (mode & 0o007) === 0 && (mode & 0o070) <= 0o040; // No permissions for other, max read for group
-          }
-          return false;
-        },
-      },
-      {
-        id: 'obj-suid-audit',
-        title: 'Tìm kiếm binary có cờ SUID',
-        description: 'Sử dụng lệnh find để liệt kê các binary có quyền SUID.',
-        hint: 'Gõ `find /bin -perm -4000` hoặc `find / -perm -4000`',
-        isComplete: ({ lastCommand }) =>
-          !!lastCommand && /find\s+.*-perm\s+-?4000/i.test(lastCommand),
-      },
-    ],
-  },
-
-  // Preset 2: Bash One-Liners & Log Analysis (Track 04 - Lesson 25)
-  'os04-l25-bash-one-liners-pipelines-awk-sed': {
-    id: 'os04-l25-live-lab',
-    lessonId: 'os04-l25-bash-one-liners-pipelines-awk-sed',
-    title: 'Phòng thực hành Terminal: Xử lý Dòng lệnh & Phân tích Log Pipeline',
-    summary:
-      'Sử dụng các công cụ dòng lệnh bash, grep, awk, và pipeline để phân tích file log máy chủ web và trích xuất IP khả nghi.',
-    mode: 'terminal',
-    availableModes: ['terminal'],
-    instructions: [
-      '1. Xem nội dung file log truy cập web tại `/var/log/access.log`.',
-      '2. Dùng pipeline `cat /var/log/access.log | grep 401` để lọc ra các request xác thực thất bại.',
-      "3. Dùng `cat /var/log/access.log | awk '{print $1}'` để trích xuất danh sách địa chỉ IP nguồn.",
-      '4. Ghi danh sách IP khả nghi ra file `/tmp/suspects.txt` bằng redirect `>` hoặc `>>`.',
-    ],
-    sampleCommands: [
-      'cat /var/log/access.log',
-      'grep 401 /var/log/access.log',
-      "cat /var/log/access.log | awk '{print $1}'",
-      "grep 401 /var/log/access.log | awk '{print $1}' > /tmp/suspects.txt",
-    ],
-    objectives: [
-      {
-        id: 'obj-read-log',
-        title: 'Đọc và kiểm tra access.log',
-        description: 'Đọc file log hệ thống trong /var/log/access.log.',
-        hint: 'Gõ `cat /var/log/access.log`',
-        isComplete: ({ lastCommand }) =>
-          !!lastCommand && /cat\s+.*access\.log/i.test(lastCommand),
-      },
-      {
-        id: 'obj-grep-pipe',
-        title: 'Lọc request mã lỗi 401/404 qua pipeline grep',
-        description: 'Sử dụng grep kết hợp pipeline hoặc tham số file.',
-        hint: 'Gõ `grep 401 /var/log/access.log` hoặc `cat /var/log/access.log | grep 401`',
-        isComplete: ({ lastCommand }) =>
-          !!lastCommand && /grep\s+(?:401|404)/i.test(lastCommand),
-      },
-      {
-        id: 'obj-extract-suspects',
-        title: 'Trích xuất IP và xuất ra /tmp/suspects.txt',
-        description: 'Chuyển hướng output (redirect >) vào file /tmp/suspects.txt.',
-        hint: "Gõ `cat /var/log/access.log | awk '{print $1}' > /tmp/suspects.txt`",
-        isComplete: ({ vfs }) => {
-          if (!vfs) return false;
-          const tmp = vfs.root.children.tmp;
-          if (tmp && tmp.type === 'dir') {
-            const file = tmp.children['suspects.txt'];
-            if (file && file.type === 'file') {
-              return file.content.length > 0;
+          if (etc && etc.type === 'dir') {
+            const shadow = etc.children.shadow;
+            if (shadow && shadow.type === 'file') {
+              const modeBits = shadow.mode & 0o777;
+              return modeBits === 0o600 || modeBits === 0o640;
             }
           }
           return false;
         },
       },
+      {
+        id: 'obj-audit-suid',
+        title: 'Audit danh sách nhị phân SUID trên toàn hệ thống',
+        description:
+          'Sử dụng lệnh find để liệt kê các file thực thi có cờ SUID (-perm -4000).',
+        hint: 'Gõ `find / -perm -4000` trong terminal.',
+        isComplete: ({ lastCommand }) =>
+          !!lastCommand && lastCommand.includes('find') && lastCommand.includes('-perm'),
+      },
     ],
   },
 
-  // Preset 3: SQL Injection & Authentication Bypass (Track 07 - Lesson 19/20)
-  'os07-l19-broken-object-level-authorization-idor': {
-    id: 'os07-l19-live-lab',
-    lessonId: 'os07-l19-broken-object-level-authorization-idor',
-    title: 'Phòng thực nghiệm SQL Injection & IDOR Web-Native',
+  // Preset 2: Operator Scripting & Log Analysis Pipeline (Track 04 - Lesson 25)
+  'os04-l25-bash-one-liners-pipelines-awk-sed': {
+    id: 'os04-l25-live-pipeline',
+    lessonId: 'os04-l25-bash-one-liners-pipelines-awk-sed',
+    title: 'Phòng thực hành Pipeline: Phân tích Log Tấn công bằng Bash, Grep & Awk',
     summary:
-      'Tương tác trực tiếp với Database SQL trong bộ nhớ và HTTP Inspector để khai thác các lỗ hổng Injection & IDOR.',
-    mode: 'sql',
-    availableModes: ['sql', 'http'],
+      'Xây dựng các đường ống (Pipeline) đa tầng bằng grep, awk, sort, uniq để trích xuất IP brute-force và các nỗ lực xâm nhập.',
+    mode: 'terminal',
+    availableModes: ['terminal'],
     instructions: [
-      '1. Thử nhập từ khóa tìm kiếm bình thường như `Sensor` hoặc `Manual`.',
-      "2. Sử dụng kỹ thuật Tautology: Nhập payload `' OR 1=1 --` để bypass bộ lọc `is_published = 1` và trích xuất cả sản phẩm ẩn Zero-Day.",
-      "3. Sử dụng kỹ thuật UNION-Based SQLi: Nhập `' UNION SELECT id, username, password_hash, role, email FROM users --` để dump toàn bộ cơ sở dữ liệu người dùng!",
-      '4. Chuyển sang tab HTTP Inspector để kiểm tra lỗ hổng IDOR trên API `/api/v1/user/profile?id=1`.',
+      '1. Khảo sát file log web bằng lệnh `cat /var/log/access.log | head -n 5`.',
+      '2. Lọc các request bị từ chối xác thực (HTTP 401) bằng `grep 401 /var/log/access.log`.',
+      "3. Kết hợp pipeline: `cat /var/log/access.log | grep 401 | awk '{print $1}' | sort | uniq -c` để đếm số lần tấn công theo IP.",
+      "4. Ghi danh sách IP khả nghi ra file: `cat /var/log/access.log | grep 401 | awk '{print $1}' | sort -u > /tmp/suspects.txt`.",
     ],
-    initialSqlDb: createDefaultSqlDatabase(),
-    initialHttpRequest: createDefaultHttpRequest(),
-    samplePayloads: [
-      "' OR 1=1 --",
-      "' OR 'a'='a",
-      "' UNION SELECT id, username, password_hash, role, email FROM users --",
-      "' UNION SELECT id, secret_key, secret_value, environment, 'confidential' FROM secrets --",
+    sampleCommands: [
+      'cat /var/log/access.log | head -n 5',
+      'grep 401 /var/log/access.log',
+      "cat /var/log/access.log | grep 401 | awk '{print $1}' | sort | uniq -c",
+      "cat /var/log/access.log | grep 401 | awk '{print $1}' | sort -u > /tmp/suspects.txt",
+      'cat /tmp/suspects.txt',
     ],
     objectives: [
       {
-        id: 'obj-tautology-sqli',
-        title: 'Khai thác Tautology bypass điều kiện lọc',
-        description:
-          "Nhập payload ' OR 1=1 -- để hiển thị các sản phẩm chưa được công bố.",
-        hint: "Nhập `' OR 1=1 --` vào ô tìm kiếm và bấm Thực thi SQL.",
-        isComplete: ({ lastSqlResult }) =>
-          !!lastSqlResult &&
-          lastSqlResult.success &&
-          lastSqlResult.rows.some((r) => r.title === 'Zero-Day Advisory Subscription'),
+        id: 'obj-inspect-log',
+        title: 'Khảo sát file log web /var/log/access.log',
+        description: 'Đọc file log để nắm bắt cấu trúc bản ghi truy cập.',
+        hint: 'Dùng `cat /var/log/access.log` hoặc `head /var/log/access.log`.',
+        isComplete: ({ lastCommand }) =>
+          !!lastCommand && lastCommand.includes('access.log'),
       },
       {
-        id: 'obj-union-sqli',
-        title: 'Dump bảng nhạy cảm users hoặc secrets qua UNION SELECT',
-        description:
-          'Trích xuất bảng dữ liệu tài khoản quản trị bằng UNION SQL Injection.',
-        hint: "Nhập `' UNION SELECT id, username, password_hash, role, email FROM users --`",
-        isComplete: ({ lastSqlResult }) =>
-          !!lastSqlResult &&
-          lastSqlResult.success &&
-          !!lastSqlResult.vulnerabilityTriggered &&
-          lastSqlResult.vulnerabilityTriggered.includes('UNION SQL Injection'),
+        id: 'obj-pipeline-extract',
+        title: 'Chạy Pipeline trích xuất IP tấn công (Grep + Awk)',
+        description: 'Thực thi pipeline kết hợp grep lọc mã 401 và awk in cột IP ($1).',
+        hint: "Dùng pipeline `grep 401 /var/log/access.log | awk '{print $1}'`.",
+        isComplete: ({ lastCommand }) =>
+          !!lastCommand &&
+          lastCommand.includes('|') &&
+          lastCommand.includes('grep') &&
+          lastCommand.includes('awk'),
       },
       {
-        id: 'obj-idor-admin',
-        title: 'Khai thác IDOR trích xuất thông tin Admin qua HTTP Inspector',
-        description:
-          'Sửa URL tham số id=1 trong tab HTTP Inspector để lấy token quản trị.',
-        hint: 'Chuyển sang tab HTTP Inspector, đổi URL thành `/api/v1/user/profile?id=1` và gửi request.',
-        isComplete: ({ lastHttpRes, lastHttpReq }) =>
-          !!lastHttpRes &&
-          !!lastHttpReq &&
-          lastHttpReq.url.includes('id=1') &&
-          lastHttpRes.body.includes('administrator'),
+        id: 'obj-export-suspects',
+        title: 'Lưu kết quả phân tích vào /tmp/suspects.txt',
+        description: 'Chuyển hướng đầu ra pipeline sang file /tmp/suspects.txt.',
+        hint: 'Gõ lệnh có chứa `> /tmp/suspects.txt`.',
+        isComplete: ({ vfs }) => {
+          if (!vfs) return false;
+          const tmp = vfs.root.children.tmp;
+          if (tmp && tmp.type === 'dir') {
+            const f = tmp.children['suspects.txt'];
+            return !!f && f.type === 'file' && f.content.length > 0;
+          }
+          return false;
+        },
       },
     ],
   },
 
-  // Preset 4: Network Protocols & Packet Decoding (Track 01 - Lesson 08)
+  // Preset 3: Web Security SQL Injection & IDOR Lab (Track 07 - Lesson 19)
+  'os07-l19-broken-object-level-authorization-idor': {
+    id: 'os07-l19-live-sqli-idor',
+    lessonId: 'os07-l19-broken-object-level-authorization-idor',
+    title: 'Phòng thực nghiệm Tấn công SQL Injection (AST) & IDOR BOLA',
+    summary:
+      'Thử nghiệm trực tiếp các payload SQLi (Tautology, UNION Exfiltration) và khai thác IDOR trên mock backend API.',
+    mode: 'sql',
+    availableModes: ['sql', 'http', 'terminal'],
+    instructions: [
+      "1. Trong tab SQL Lab: Nhập payload tautology `' OR 1=1 --` để quan sát cách mệnh đề WHERE bị phá vỡ và làm rò rỉ toàn bộ bảng users.",
+      '2. Quan sát các Token AST (Base, Injected, Comment, Operator) được highlight theo thời gian thực.',
+      "3. Thử nghiệm UNION Exfiltration: `' UNION SELECT id, secret_key, secret_value, owner_id, classification FROM secrets --` để đọc bảng dữ liệu mật.",
+      '4. Chuyển sang tab HTTP Repeater: Đổi tham số URL `id=1` (Admin) thay vì `id=3` để khai thác lỗi IDOR Broken Object-Level Authorization.',
+    ],
+    samplePayloads: [
+      "' OR 1=1 --",
+      "' OR '1'='1' --",
+      "' UNION SELECT id, username, password_hash, role, email, is_active FROM users --",
+      "' UNION SELECT id, secret_key, secret_value, owner_id, classification, NULL FROM secrets --",
+    ],
+    objectives: [
+      {
+        id: 'obj-sqli-tautology',
+        title: 'Khai thác SQL Injection dạng Tautology (Auth Bypass)',
+        description: "Gửi payload phá vỡ điều kiện WHERE bằng tautology `' OR 1=1 --`.",
+        hint: "Nhập `' OR 1=1 --` vào ô truy vấn SQL và bấm Execute.",
+        isComplete: ({ lastSqlResult }) =>
+          !!lastSqlResult &&
+          (lastSqlResult.vulnerabilityTriggered === 'AUTH_BYPASS_TAUTOLOGY' ||
+            lastSqlResult.vulnerabilityTriggered === 'TAUTOLOGY_DUMP_ALL'),
+      },
+      {
+        id: 'obj-sqli-union',
+        title: 'Khai thác UNION-based SQLi trích xuất bảng bí mật',
+        description: 'Sử dụng UNION SELECT để trích xuất dữ liệu từ bảng `secrets`.',
+        hint: "Nhập `' UNION SELECT id, secret_key, secret_value, owner_id, classification, NULL FROM secrets --`.",
+        isComplete: ({ lastSqlResult }) =>
+          !!lastSqlResult &&
+          lastSqlResult.vulnerabilityTriggered === 'UNION_BASED_EXFILTRATION',
+      },
+      {
+        id: 'obj-idor-admin',
+        title: 'Khai thác IDOR trích xuất thông tin Admin ID = 1',
+        description: 'Chuyển sang tab HTTP Repeater và gửi request với `id=1`.',
+        hint: 'Đổi URL thành `/api/v1/user/profile?id=1` và bấm Send Request.',
+        isComplete: ({ lastHttpRes }) =>
+          !!lastHttpRes &&
+          lastHttpRes.statusCode === 200 &&
+          lastHttpRes.body.includes('"role": "administrator"'),
+      },
+    ],
+  },
+
+  // Preset 4: Network Protocols & Packet Header Decoder (Track 01 - Lesson 08)
   'os01-l08-tcp-udp-transport-state': {
-    id: 'os01-l08-live-lab',
+    id: 'os01-l08-live-packet-decoder',
     lessonId: 'os01-l08-tcp-udp-transport-state',
     title: 'Phòng mổ xẻ Gói tin Mạng & HTTP Protocol Inspector',
     summary:
@@ -229,7 +225,7 @@ export const WORKBENCH_PRESETS: Record<string, WorkbenchConfig> = {
         description:
           'Xem các trường TTL, Protocol 6 (TCP), Cờ [PSH, ACK] và Window Size.',
         hint: 'Kiểm tra bảng phân tích Packet Header trong tab Packet Decoder.',
-        isComplete: () => true, // Auto complete on view
+        isComplete: () => true,
       },
       {
         id: 'obj-header-spoof',
@@ -246,62 +242,24 @@ export const WORKBENCH_PRESETS: Record<string, WorkbenchConfig> = {
   },
 };
 
-export function getWorkbenchPresetForLesson(lessonId: string): WorkbenchConfig | null {
-  // Direct match
-  if (WORKBENCH_PRESETS[lessonId]) {
-    return WORKBENCH_PRESETS[lessonId];
+export const getWorkbenchConfigForLesson = (lesson: AcademyLesson): WorkbenchConfig => {
+  // 1. Direct hand-crafted preset match
+  if (WORKBENCH_PRESETS[lesson.slug]) {
+    return WORKBENCH_PRESETS[lesson.slug];
+  }
+  if (WORKBENCH_PRESETS[lesson.id]) {
+    return WORKBENCH_PRESETS[lesson.id];
   }
 
-  // Fallback defaults based on track type
-  if (lessonId.startsWith('os02-') || lessonId.startsWith('os03-')) {
-    // Linux/Windows foundations fallback
-    return {
-      ...WORKBENCH_PRESETS['os02-l14-posix-permissions-mode-bits-umask'],
-      id: `${lessonId}-live-terminal`,
-      lessonId,
-      title: 'Phòng thực hành Terminal: Thao tác & Kiểm tra Hệ thống',
-    };
-  }
+  // 2. Synthesize bespoke interactive lab tailored to this specific lesson
+  return generateWorkbenchConfigFromLesson(lesson);
+};
 
-  if (lessonId.startsWith('os04-')) {
-    // Operator scripting fallback
-    return {
-      ...WORKBENCH_PRESETS['os04-l25-bash-one-liners-pipelines-awk-sed'],
-      id: `${lessonId}-live-scripting`,
-      lessonId,
-      title: 'Phòng thực hành Bash & Scripting Automation',
-    };
+export const getWorkbenchPresetForLesson = (
+  lessonIdOrSlug: string
+): WorkbenchConfig | null => {
+  if (WORKBENCH_PRESETS[lessonIdOrSlug]) {
+    return WORKBENCH_PRESETS[lessonIdOrSlug];
   }
-
-  if (lessonId.startsWith('os01-')) {
-    // Network foundations fallback
-    return {
-      ...WORKBENCH_PRESETS['os01-l08-tcp-udp-transport-state'],
-      id: `${lessonId}-live-packet`,
-      lessonId,
-      title: 'Phòng phân tích Giao thức Mạng & Packet Inspector',
-    };
-  }
-
-  if (
-    lessonId.startsWith('os07-') ||
-    lessonId.startsWith('os06-') ||
-    lessonId.startsWith('os05-')
-  ) {
-    // Web / Pentest fallback
-    return {
-      ...WORKBENCH_PRESETS['os07-l19-broken-object-level-authorization-idor'],
-      id: `${lessonId}-live-sqli`,
-      lessonId,
-      title: 'Phòng thực nghiệm SQLi & HTTP Web Security',
-    };
-  }
-
-  // Generic terminal default
-  return {
-    ...WORKBENCH_PRESETS['os02-l14-posix-permissions-mode-bits-umask'],
-    id: `${lessonId}-generic-terminal`,
-    lessonId,
-    title: 'Phòng thực hành Tương tác Web-Native',
-  };
-}
+  return null;
+};

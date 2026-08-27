@@ -1,5 +1,6 @@
 export * from './types';
 export * from './workbench-presets';
+export * from './dynamic-lab-generator';
 export * from './components/academy-live-workbench';
 export * from './components/terminal-view';
 export * from './components/sql-lab-view';
