@@ -1,0 +1,1050 @@
+{
+  "id": "os04-m01-bash-python-powershell",
+  "slug": "bash-python-powershell",
+  "trackId": "os04-operator-scripting",
+  "title": "Bash, Python and PowerShell foundations",
+  "summary": "Master operator-grade scripting across UNIX and Windows environments: safe pipeline engineering, subprocess isolation, structured object streaming, and defensive error handling.",
+  "difficulty": "beginner",
+  "estimatedMinutes": 300,
+  "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+  "domains": ["linux", "windows", "network"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os04-l25-bash-scripting-and-pipeline-safety",
+      "slug": "bash-scripting-and-pipeline-safety",
+      "title": "Safe Bash Scripting & UNIX Pipeline Engineering",
+      "summary": "Engineer robust shell automation for security workflows: set -euo pipefail, parameter expansion, IFS isolation, atomic temporary files, signal trapping, and bounded stream processing.",
+      "difficulty": "beginner",
+      "durationMinutes": 100,
+      "prerequisites": [],
+      "outcomes": [
+        "Construct robust Bash automation enforcing set -euo pipefail and signal traps for graceful termination and atomic state cleanup.",
+        "Apply POSIX parameter expansion, quoting rules, and strict IFS control to eliminate word-splitting and command injection vulnerabilities.",
+        "Implement bounded pipeline stream processing with awk, sed, and xargs -0 to process host telemetry safely without memory exhaustion."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["linux", "network"],
+      "attackTactics": ["execution"],
+      "keywords": [
+        "bash",
+        "pipefail",
+        "parameter-expansion",
+        "traps",
+        "stream-processing"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "A defensive UNIX pipeline is an explicit state machine over untrusted data streams: every command must validate its exit status, quote every variable expansion, guard file descriptors, and trap termination signals to guarantee atomic cleanup.",
+      "visual": {
+        "title": "UNIX Pipeline Execution & Subshell Error Propagation",
+        "caption": "How strict bash options and subshell boundaries prevent silent failures and data corruption during automation execution.",
+        "steps": [
+          {
+            "label": "Shell Initialization",
+            "detail": "set -euo pipefail locks uninitialized variables, pipeline exit codes, and non-zero command termination.",
+            "tone": "allow"
+          },
+          {
+            "label": "Pipeline Streaming",
+            "detail": "Data flows through anonymous pipes; subshell isolation prevents state pollution but requires pipefail to catch upstream errors.",
+            "tone": "caution"
+          },
+          {
+            "label": "Trap & Atomic Cleanup",
+            "detail": "EXIT, INT, and TERM traps intercept aborts and remove mktemp working buffers deterministically.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Deterministic Shell Execution: The set -euo pipefail Contract",
+          "paragraphs": [
+            "Default Bash execution behavior is permissive and hazardous for security operators: unbound variables evaluate silently to empty strings, intermediate command failures within a pipeline are masked by the rightmost command's exit code, and failed simple commands allow script execution to continue into subsequent destructive operations.",
+            "Enforcing 'set -euo pipefail' creates a fail-fast execution contract. The '-e' flag causes the shell to exit immediately if any command returns a non-zero status outside of conditional evaluations. The '-u' flag treats unset variables as fatal errors, preventing accidental operations on root directories like 'rm -rf /${UNSET_VAR}/tmp'. The '-o pipefail' setting ensures that the exit status of a pipeline reflects the rightmost non-zero exit code, catching early filter crashes."
+          ]
+        },
+        {
+          "title": "Word Splitting, Globbing, and Parameter Expansion Defense",
+          "paragraphs": [
+            "When the shell expands unquoted variables, it applies field splitting based on the Internal Field Separator (IFS, defaulting to space, tab, newline) and pathname expansion (globbing). An unquoted variable containing whitespace or asterisks expands into multiple distinct arguments or arbitrary file paths on the local filesystem.",
+            "Defensive shell scripting mandates quoting all variable expansions: '\"$var\"' and '\"$@\"'. Furthermore, POSIX parameter expansions provide deterministic defaults and error assertions without spawning external subshells: '${VAR:-default}' provides fallback values, '${VAR:?error message}' aborts if missing or null, and pattern stripping like '${FILE%.txt}' performs safe string manipulation entirely in memory."
+          ]
+        },
+        {
+          "title": "Atomic Temp Files, File Descriptors, and Signal Trapping",
+          "paragraphs": [
+            "Hardcoded temporary paths in '/tmp/script_output.txt' create symlink race conditions (TOCTOU) and multi-user collisions. Operators must generate unguessable temporary workspaces using 'mktemp -d' or 'mktemp' with restricted permissions (0600 / 0700).",
+            "To guarantee that temporary workspaces, background backgrounded subprocesses, and open file descriptors are released upon completion or unexpected interruption (such as Ctrl+C or kill signals), scripts must register a trap handler: 'trap cleanup EXIT INT TERM'. The cleanup routine executes deterministically on both successful termination and catastrophic crashes."
+          ]
+        },
+        {
+          "title": "Bounded Pipeline Stream Processing and Subshell Scope",
+          "paragraphs": [
+            "Piping commands ('cat file | while read line; do ...; done') executes the loop body inside a child subshell in standard Bash. Any variable modifications or aggregations performed within the loop are discarded when the subshell terminates.",
+            "To preserve variable state and process streams safely, operators should utilize process substitution ('while read -r line; do ...; done < <(command)') or 'lastpipe' when supported. When processing arbitrary file lists or raw logs containing spaces, newlines, or binary sequences, null-byte delimited pipelines ('find -print0', 'xargs -0', 'read -r -d $'\\0'') guarantee safe parsing without argument injection."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Defensive Host Telemetry Collector Script",
+        "objective": "Audit and harden a Bash telemetry collection script to eliminate silent failure masking, word-splitting bugs, and insecure temporary file handling.",
+        "scenario": "You are reviewing an automated evidence collection script intended to gather network socket states, user authentication logs, and process snapshots across target Linux test hosts under Rules of Engagement.",
+        "constraints": [
+          "Must enforce zero unquoted variable expansions for arbitrary data.",
+          "Must catch intermediate failures in multi-stage evidence filtering pipelines.",
+          "Must clean up all temporary evidence buffers regardless of exit signal."
+        ],
+        "cases": [
+          {
+            "id": "case-01-shell-options",
+            "title": "Configuring Strict Shell Execution Options",
+            "context": "An operator script performs: 'netstat -tuln | grep LISTEN | awk '{print $4}' | sort -u > /tmp/ports.txt'. If grep fails to find any listeners or awk crashes due to malformed input, netstat and sort succeed, exiting with status 0 and creating an empty file.",
+            "prompt": "Which configuration header guarantees that intermediate filter crashes abort execution immediately and report an error?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Add 'set -euo pipefail' and 'IFS=$'\\n\\t'' at the very top of the script.",
+                "correct": true,
+                "rationale": "Enforcing set -euo pipefail ensures pipeline failures are propagated and unset variables cause an immediate abort, while restricting IFS prevents word splitting on spaces."
+              },
+              {
+                "id": "opt-2",
+                "label": "Add 'set -x' to print every command trace to standard error.",
+                "correct": false,
+                "rationale": "The -x option enables execution tracing for debugging but does not alter error handling or pipeline exit code behavior."
+              },
+              {
+                "id": "opt-3",
+                "label": "Append '|| true' to each individual pipe stage.",
+                "correct": false,
+                "rationale": "Appending '|| true' explicitly suppresses all errors, compounding silent failure masking."
+              },
+              {
+                "id": "opt-4",
+                "label": "Wrap the pipeline in an 'eval' statement with background execution '&'.",
+                "correct": false,
+                "rationale": "Using eval introduces command injection hazards and running in the background detaches error reporting entirely."
+              }
+            ]
+          },
+          {
+            "id": "case-02-temp-file-cleanup",
+            "title": "Secure Temporary Workspace & Signal Trap",
+            "context": "A script writes sensitive host configuration snapshots to '/tmp/evidence_log.txt'. If interrupted by SIGINT (Ctrl+C), the unredacted evidence remains exposed in world-readable /tmp.",
+            "prompt": "What is the correct pattern to create a secure, isolated workspace and guarantee its deletion upon any termination signal?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Create 'TMPDIR=$(mktemp -d)' and register 'trap 'rm -rf \"$TMPDIR\"' EXIT INT TERM'.",
+                "correct": true,
+                "rationale": "mktemp -d creates a uniquely named directory with 0700 permissions, and trapping EXIT, INT, and TERM guarantees deterministic deletion on normal completion or signal aborts."
+              },
+              {
+                "id": "opt-2",
+                "label": "Write directly to '/tmp/run.$$' and place 'rm /tmp/run.$$' at the very bottom of the script.",
+                "correct": false,
+                "rationale": "Using PID $$ is predictable and vulnerable to symlink race conditions, and putting rm at the bottom fails to run if the script crashes or is killed early."
+              },
+              {
+                "id": "opt-3",
+                "label": "Use 'touch /tmp/evidence.lock' and ignore all incoming operating system signals with 'trap \"\" INT'.",
+                "correct": false,
+                "rationale": "Ignoring signals makes the script unkillable via standard operator controls and does not provide atomic cleanup."
+              },
+              {
+                "id": "opt-4",
+                "label": "Rely on the host operating system's systemd-tmpfiles cron to purge /tmp every 30 days.",
+                "correct": false,
+                "rationale": "Leaving sensitive assessment artifacts on target hosts for 30 days violates data handling and Rules of Engagement requirements."
+              }
+            ]
+          },
+          {
+            "id": "case-03-safe-stream-parsing",
+            "title": "Handling Filenames with Whitespace & Special Characters",
+            "context": "An evidence gathering routine parses a directory of configuration files using: 'for file in $(ls /etc/*.conf); do cat $file; done'. A configuration file named '/etc/network settings.conf' causes the loop to fail with 'No such file or directory: /etc/network' and 'settings.conf'.",
+            "prompt": "How should this stream parsing loop be rewritten to safely handle arbitrary paths with spaces and special characters?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Use 'find /etc -maxdepth 1 -name \"*.conf\" -print0 | while IFS= read -r -d $'\\0' file; do cat \"$file\"; done'.",
+                "correct": true,
+                "rationale": "Null-byte delimiters (-print0 and read -d $'\\0') combined with IFS= and quoted \"$file\" completely prevent word splitting, globbing, and whitespace parsing corruption."
+              },
+              {
+                "id": "opt-2",
+                "label": "Change the loop to 'for file in `ls /etc/*.conf`; do cat \"$file\"; done'.",
+                "correct": false,
+                "rationale": "Backtick command substitution suffers from identical word-splitting issues as $() when the output contains whitespace."
+              },
+              {
+                "id": "opt-3",
+                "label": "Set 'IFS=\" \"' before running the 'for file in $(ls /etc/*.conf)' loop.",
+                "correct": false,
+                "rationale": "Setting IFS to space explicitly forces word splitting on space characters, guaranteeing failure on paths with spaces."
+              },
+              {
+                "id": "opt-4",
+                "label": "Pass the filenames through 'sed \"s/ /_/g\"' before passing them to cat.",
+                "correct": false,
+                "rationale": "Replacing spaces with underscores alters the file name string so cat will fail to locate the original file on disk."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Eliminate word-splitting and command injection vectors in all shell parameter expansions.",
+          "Implement atomic temporary directory creation and multi-signal trap handlers.",
+          "Ensure pipeline exit codes are strictly enforced using set -euo pipefail."
+        ],
+        "evidenceTemplate": [
+          "ShellCheck lint report showing zero SC2086 (unquoted variable) warnings.",
+          "Signal interruption test demonstrating atomic removal of $TMPDIR on SIGINT.",
+          "Pipeline test validating non-zero exit status propagation on upstream filter crash."
+        ],
+        "reset": "Reset shell script templates to baseline state in the local sandbox workspace.",
+        "cleanup": "Remove all scratch files and unset experimental shell environment variables."
+      },
+      "governance": {
+        "prevent": [
+          "Run ShellCheck (or equivalent static AST analysis) in continuous integration pipelines for all operator scripts.",
+          "Prohibit the use of 'eval' and unquoted parameter expansions in production assessment automation.",
+          "Mandate 'set -euo pipefail' and 'trap ... EXIT INT TERM' as standard boilerplate across all operator utilities."
+        ],
+        "observe": [
+          "Monitor Linux audit logs (kauditd) for unexpected shell spawning from assessment tooling.",
+          "Inspect process exit statuses in CI/CD runner logs to detect silent script terminations.",
+          "Log full argument arrays and execution durations for assessment automation jobs."
+        ],
+        "respond": [
+          "Abort automated collection runs immediately upon detecting unhandled non-zero exit codes.",
+          "Execute emergency cleanup routines to scrub lingering temporary files if a runner crashes.",
+          "Quarantine scripts that fail ShellCheck syntax and safety audits."
+        ],
+        "residualRisk": [
+          "Subshells spawned inside command substitutions or pipes cannot modify parent shell state.",
+          "Third-party binaries called by Bash may not adhere to standard POSIX exit status conventions."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Adding 'set -e' makes a Bash script completely immune to unhandled errors.",
+          "correction": "The '-e' flag does not catch failures in commands executed on the left side of a pipeline (without '-o pipefail'), nor does it trigger inside if-condition checks, while loops, or arithmetic expansions."
+        },
+        {
+          "claim": "Using '\"$*\"' is identical to using '\"$@\"' when passing arguments to sub-commands.",
+          "correction": "'\"$*\"' concatenates all arguments into a single continuous string separated by the first character of IFS, whereas '\"$@\"' expands each positional parameter into an independent, quoted argument."
+        },
+        {
+          "claim": "Creating temporary files in '/tmp/my_script_output.txt' is safe if the script deletes the file upon exit.",
+          "correction": "Predictable static paths in '/tmp' are vulnerable to symlink pre-creation attacks (TOCTOU) and collision by other local users before the script ever exits."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is the primary effect of enabling '-o pipefail' in a Bash script?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It causes the entire script to exit immediately if any simple command fails."
+            },
+            {
+              "id": "B",
+              "label": "It ensures the exit code of a pipeline reflects the rightmost command with a non-zero exit status, rather than always returning the last command's status."
+            },
+            {
+              "id": "C",
+              "label": "It automatically quotes all variables passed into pipes."
+            },
+            {
+              "id": "D",
+              "label": "It buffers pipeline data entirely in memory to accelerate execution."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "By default, a pipeline returns the exit status of the very last command. Enabling '-o pipefail' forces the pipeline to return the exit code of the last failing command, preventing earlier crashes from being masked."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "In POSIX parameter expansion, what does the expression '${CONFIG_PATH:?Missing config path}' do if CONFIG_PATH is unset or null?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It assigns the literal string 'Missing config path' to CONFIG_PATH and continues execution."
+            },
+            {
+              "id": "B",
+              "label": "It prints 'Missing config path' to standard error and immediately terminates the script with a non-zero exit code."
+            },
+            {
+              "id": "C",
+              "label": "It prompts the interactive user to enter a value for CONFIG_PATH."
+            },
+            {
+              "id": "D",
+              "label": "It skips the current line and proceeds to the next command."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "The '${var:?message}' expansion checks if the variable is unset or null; if so, it writes the message to stderr and terminates the non-interactive shell with an exit code of 1."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "Consider a script with 'count=0' followed by 'cat /etc/passwd | while read -r line; do ((count++)); done; echo $count'. Why does echo $count output 0 in standard Bash?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because ((count++)) is not valid arithmetic syntax in Bash."
+            },
+            {
+              "id": "B",
+              "label": "Because the while loop on the right side of the pipe executes inside a subshell, so modifications to $count do not persist in the parent shell."
+            },
+            {
+              "id": "C",
+              "label": "Because cat clears all previously declared shell variables upon invocation."
+            },
+            {
+              "id": "D",
+              "label": "Because $count is treated as an immutable constant unless declared with 'export'."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "In standard Bash, each element of a pipeline executes in a separate subshell environment. Variable changes made within the subshell are destroyed when the subshell terminates upon pipe completion."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You must build a high-performance, safe log-ingestion Bash utility that reads 500 MB of multi-line sudo audit events, filters authorized operator entries, extracts IP addresses and command hashes, and outputs a timestamped TSV evidence file.",
+        "tasks": [
+          "Implement the script header with strict options, custom signal traps, and a secure mktemp workspace.",
+          "Use null-byte stream processing and process substitution to prevent subshell variable loss and handle arbitrary whitespace.",
+          "Verify the entire script against ShellCheck with zero errors and prove atomic cleanup under simulated SIGTERM."
+        ],
+        "requiredEvidence": [
+          "Complete script source code demonstrating set -euo pipefail, trap handlers, and parameter expansion.",
+          "ShellCheck CLI execution log verifying clean pass.",
+          "Audit trace confirming complete cleanup of temporary files upon signal abort."
+        ]
+      },
+      "sources": [
+        {
+          "title": "IEEE Std 1003.1 (POSIX.1-2017) Shell Command Language",
+          "url": "https://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html",
+          "publisher": "The Open Group / IEEE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "POSIX parameter expansion rules and special parameter behavior",
+            "Field splitting and pathname expansion algorithms",
+            "Trap signal handling specifications"
+          ]
+        },
+        {
+          "title": "GNU Bash Reference Manual: Defensive Shell Scripting",
+          "url": "https://www.gnu.org/software/bash/manual/bash.html",
+          "publisher": "Free Software Foundation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "set -euo pipefail semantics",
+            "Subshell execution environments and pipe behavior",
+            "Process substitution architecture"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os04-l26-python-operator-tooling-and-subprocesses",
+      "slug": "python-operator-tooling-and-subprocesses",
+      "title": "Python Operator Tooling & Safe Subprocess Architecture",
+      "summary": "Build resilient, secure Python automation for security workflows using subprocess.run with argument vectors, strict timeout enforcement, structured logging, exception hierarchies, and isolated virtual environments.",
+      "difficulty": "beginner",
+      "durationMinutes": 100,
+      "prerequisites": ["os04-l25-bash-scripting-and-pipeline-safety"],
+      "outcomes": [
+        "Execute external operating system commands securely using Python subprocess.run with explicit argument sequences and strict timeout boundaries.",
+        "Structure operator automation with standard library logging, JSON schema outputs, and typed exception hierarchies.",
+        "Isolate runtime dependencies and avoid command injection vectors through shlex sanitization and environment variable fencing."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["linux", "windows", "network"],
+      "attackTactics": ["execution"],
+      "keywords": ["python", "subprocess", "timeout", "logging", "virtualenv"],
+      "safetyLevel": "safe",
+      "mentalModel": "External operating system commands executed by Python are untrusted foreign binaries: they must be invoked via direct execve argument arrays without shell interpolation, governed by explicit timeouts, and structured into strongly typed telemetry.",
+      "visual": {
+        "title": "Python Subprocess Execution & Process Isolation Model",
+        "caption": "Direct execve invocation vs unsafe shell interpolation in Python automation.",
+        "steps": [
+          {
+            "label": "Argument Array Construction",
+            "detail": "Commands are structured as list vectors ['/usr/bin/tool', '--flag', target] bypassing shell string parsing.",
+            "tone": "allow"
+          },
+          {
+            "label": "Subprocess Invocation & Timeout",
+            "detail": "subprocess.run(..., shell=False, timeout=30, capture_output=True) prevents hang deadlocks and command injection.",
+            "tone": "allow"
+          },
+          {
+            "label": "Structured Telemetry Parsing",
+            "detail": "Captured stdout/stderr is validated against JSON schemas and emitted via standard logging handlers.",
+            "tone": "neutral"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "The Subprocess Security Boundary: Array Vectors vs Shell Execution",
+          "paragraphs": [
+            "Invoking external operating system tools (such as nmap, dig, or openssl) from Python scripts is a common requirement in security operations. However, using legacy interfaces like 'os.system()', 'os.popen()', or 'subprocess.run(..., shell=True)' passes the entire command string to the system shell (/bin/sh or cmd.exe), enabling trivial command injection if any argument contains untrusted input.",
+            "The secure paradigm mandates 'shell=False' (the default in subprocess.run) and passing command arguments as a list of strings: 'subprocess.run([\"/usr/bin/nmap\", \"-sT\", \"-p\", port, target], check=True, capture_output=True, text=True)'. In this model, the operating system kernel executes 'execve()' directly, passing arguments directly into the target process's argv vector without ever invoking a shell interpreter."
+          ]
+        },
+        {
+          "title": "Process Lifecycles, Deadlock Avoidance, and Timeout Enforcement",
+          "paragraphs": [
+            "Unbounded subprocess execution is a primary cause of automation hangs and resource exhaustion. Network tools querying unresponsive hosts or hanging on stdin prompts can block operator scripts indefinitely.",
+            "Every subprocess invocation must define an explicit 'timeout' parameter (e.g. 'timeout=15'). When a timeout expires, Python raises 'subprocess.TimeoutExpired', allowing the script to catch the exception, terminate or kill the underlying process, and record a structured failure artifact. Furthermore, using 'subprocess.run()' or 'process.communicate()' avoids OS pipe buffer deadlocks that occur when interacting manually with raw stdin/stdout file descriptors."
+          ]
+        },
+        {
+          "title": "Structured Operator Telemetry: Logging and Output Schemas",
+          "paragraphs": [
+            "Printing raw strings with 'print()' pollutes standard output, mixes operational telemetry with diagnostic errors, and makes programmatic parsing impossible for downstream consumers. Operator tooling should strictly utilize the standard library 'logging' module.",
+            "Configuring structured logging with standard handlers (StreamHandler for stderr, FileHandler for operational audit trails) and JSON formatters guarantees that every logged event contains an ISO 8601 timestamp, log level, module name, and structured context dictionary. This provides verifiable evidence for assessment reporting."
+          ]
+        },
+        {
+          "title": "Dependency Isolation, Environment Variables, and Defensive Coding",
+          "paragraphs": [
+            "Operator scripts must not pollute or depend on the global system Python environment. Tools should be deployed within virtual environments ('python3 -m venv .venv') with deterministic dependency pinning in 'requirements.txt' (including exact package hashes where possible).",
+            "When invoking sub-commands that consume sensitive configuration (such as API tokens or temporary lab credentials), avoid passing secrets via command-line arguments, as command lines are visible to all users in 'ps' output. Instead, inject secrets via isolated environment dictionaries passed to 'subprocess.run(..., env=custom_env)'."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Subprocess Wrapper for Network Discovery Telemetry",
+        "objective": "Audit and refactor an insecure Python network discovery helper to eliminate command injection, prevent pipeline deadlocks, and implement structured JSON logging.",
+        "scenario": "You are auditing a Python helper script used during authorized lab network discovery. The existing script takes a user-supplied target IP and port range, executes ping and nmap, and writes summary files to disk.",
+        "constraints": [
+          "Must use subprocess.run with explicit argument sequences (no shell=True).",
+          "Must enforce a strict 15-second timeout on all network probing commands.",
+          "Must emit structured JSON audit telemetry to stderr without raw print statements."
+        ],
+        "cases": [
+          {
+            "id": "case-01-subprocess-security",
+            "title": "Eliminating Shell Injection in Command Execution",
+            "context": "The original script runs: 'os.system(\"ping -c 1 \" + target_ip)'. A target value of '192.168.1.1; cat /etc/shadow' executes the ping followed by reading shadow hashes.",
+            "prompt": "How should this invocation be refactored to make command injection impossible regardless of the target_ip value?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Use 'subprocess.run([\"ping\", \"-c\", \"1\", target_ip], capture_output=True, text=True, check=True, timeout=10)'.",
+                "correct": true,
+                "rationale": "Passing the command as an argument list with shell=False calls execve directly; the target_ip string is passed purely as an argument to ping without shell syntax interpretation."
+              },
+              {
+                "id": "opt-2",
+                "label": "Use 'subprocess.run(f\"ping -c 1 {shlex.quote(target_ip)}\", shell=True)'.",
+                "correct": false,
+                "rationale": "While shlex.quote escapes characters, retaining shell=True still unnecessarily exposes the script to shell quirks, subshell overhead, and platform differences."
+              },
+              {
+                "id": "opt-3",
+                "label": "Filter out semicolons from target_ip with 'target_ip.replace(\";\", \"\")' before calling os.system.",
+                "correct": false,
+                "rationale": "Blacklisting individual characters fails against alternative injection characters like '&', '|', backticks, and newlines."
+              },
+              {
+                "id": "opt-4",
+                "label": "Execute the command through 'eval(\"ping -c 1 \" + target_ip)'.",
+                "correct": false,
+                "rationale": "Python's eval() executes arbitrary Python code and does not execute operating system binaries safely."
+              }
+            ]
+          },
+          {
+            "id": "case-02-timeout-and-exception-handling",
+            "title": "Handling Network Hangs and Deadlocks",
+            "context": "An external tool hangs indefinitely when scanning a firewalled IP that silently drops TCP SYN packets without returning RSTs, stalling the entire assessment pipeline.",
+            "prompt": "What is the defensive Python pattern to handle slow or unresponsive external subprocesses gracefully?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Wrap the subprocess call in a try/except block catching 'subprocess.TimeoutExpired' with an explicit timeout argument.",
+                "correct": true,
+                "rationale": "Setting timeout=15 raises subprocess.TimeoutExpired if the child process runs too long, allowing clean error logging and pipeline progression."
+              },
+              {
+                "id": "opt-2",
+                "label": "Spawn a background thread with 'time.sleep(15)' and terminate the entire Python script if the thread finishes first.",
+                "correct": false,
+                "rationale": "Killing the entire parent Python process halts all other pending tasks and leaves child processes orphaned."
+              },
+              {
+                "id": "opt-3",
+                "label": "Increase the default operating system TCP socket timeout by modifying '/proc/sys/net/ipv4/tcp_fin_timeout'.",
+                "correct": false,
+                "rationale": "Modifying host kernel parameters requires root privileges and alters system-wide networking rather than managing tool subprocess lifecycles."
+              },
+              {
+                "id": "opt-4",
+                "label": "Ignore timeouts and let the operating system send SIGKILL automatically after 60 minutes.",
+                "correct": false,
+                "rationale": "The operating system does not automatically send SIGKILL to hanging processes unless out-of-memory killer conditions are triggered."
+              }
+            ]
+          },
+          {
+            "id": "case-03-structured-telemetry",
+            "title": "Configuring Telemetry & Structured Logging",
+            "context": "An assessment utility outputs debug messages and findings using unstructured 'print()' calls. Downstream ingestion tools fail to differentiate informational status messages from critical security findings.",
+            "prompt": "What is the standard architecture for emitting structured, machine-parsable logs from Python operator utilities?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Configure Python's 'logging' module with a JSON formatter writing structured event records to stderr or an audit file.",
+                "correct": true,
+                "rationale": "The standard logging module separates log levels (DEBUG, INFO, WARNING, ERROR), supports structured contextual data, and routes telemetry cleanly away from stdout data pipelines."
+              },
+              {
+                "id": "opt-2",
+                "label": "Prefix all print statements with strings like '[INFO]' or '[ERROR]'.",
+                "correct": false,
+                "rationale": "Ad-hoc string prefixes lack standardized schemas, timestamps, and log-level filtering capabilities."
+              },
+              {
+                "id": "opt-3",
+                "label": "Write all diagnostic messages directly to '/var/log/syslog' using raw socket writes.",
+                "correct": false,
+                "rationale": "Writing directly to system syslog requires unnecessary privileges and pollutes host system logs with ephemeral operator telemetry."
+              },
+              {
+                "id": "opt-4",
+                "label": "Store all log messages in a global Python list and dump it as text upon script exit.",
+                "correct": false,
+                "rationale": "Buffering all logs in memory risks high memory consumption and complete telemetry loss if the script is abruptly terminated."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Eliminate all shell=True and string-concatenated subprocess calls.",
+          "Implement explicit timeout bounds and TimeoutExpired exception handlers.",
+          "Configure standard library logging with structured JSON formatting."
+        ],
+        "evidenceTemplate": [
+          "Bandit security linter report showing zero B602 (subprocess_popen_with_shell_equals_true) warnings.",
+          "Subprocess test showing successful timeout interception on artificial 30s sleep binary.",
+          "Structured JSON log sample captured from stderr containing timestamp, level, and context."
+        ],
+        "reset": "Reset Python helper scripts to initial template state in the test directory.",
+        "cleanup": "Remove temporary virtual environment directories and test output logs."
+      },
+      "governance": {
+        "prevent": [
+          "Run Bandit and flake8/ruff in CI/CD to block unsafe subprocess patterns and hardcoded secrets.",
+          "Enforce type annotations and strict exception handling across all operator tool repositories.",
+          "Mandate execution inside isolated Python virtual environments with locked dependency hashes."
+        ],
+        "observe": [
+          "Capture subprocess exit codes, execution durations, and standard error streams in central logs.",
+          "Monitor process tree hierarchies to detect unauthorized sub-tool execution.",
+          "Track API client response times and retry rates during automated testing."
+        ],
+        "respond": [
+          "Gracefully terminate child process trees upon receiving SIGINT or TimeoutExpired exceptions.",
+          "Emit alerts when subprocess error rates exceed configured thresholds in automated workflows.",
+          "Quarantine unpinned or untrusted third-party Python packages from operator environments."
+        ],
+        "residualRisk": [
+          "Subprocesses executing third-party C extensions may crash without raising clean Python exceptions.",
+          "Command-line arguments may still be visible in host process listings on shared multi-user systems."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Using 'shlex.quote()' makes 'shell=True' completely safe in all operating systems.",
+          "correction": "'shlex.quote()' is designed for POSIX shells and fails to sanitize arguments properly on Windows cmd.exe or PowerShell. Using 'shell=False' with argument lists is the only cross-platform secure method."
+        },
+        {
+          "claim": "'subprocess.run(..., check=True)' automatically terminates processes that hang indefinitely.",
+          "correction": "The 'check=True' flag only checks the return code after the process terminates; it does nothing to prevent hangs. A 'timeout' parameter must be explicitly specified."
+        },
+        {
+          "claim": "Python's 'print()' is adequate for CLI operator tools if output redirection is used.",
+          "correction": "'print()' writes to stdout by default, corrupting data streams when tools are chained together in UNIX pipes. Operational logs must be routed to stderr or dedicated log handlers."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "Why is 'subprocess.run([\"ping\", \"-c\", \"1\", target], shell=False)' safer than 'subprocess.run(f\"ping -c 1 {target}\", shell=True)'?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It runs the ping command with root privileges automatically."
+            },
+            {
+              "id": "B",
+              "label": "It bypasses the system shell interpreter entirely, passing arguments directly to the OS kernel via execve and preventing command injection."
+            },
+            {
+              "id": "C",
+              "label": "It forces the network interface to encrypt all outgoing ICMP packets."
+            },
+            {
+              "id": "D",
+              "label": "It executes ping in a multi-threaded Python worker pool."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "With shell=False and a list of arguments, Python invokes the binary directly via the OS execve system call. Characters like ';', '|', or '&' are treated as literal arguments rather than shell control operators."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "What happens when a subprocess execution exceeds the duration specified by 'timeout=10' in 'subprocess.run()'?",
+          "options": [
+            {
+              "id": "A",
+              "label": "The subprocess continues running in the background and returns an exit code of 0."
+            },
+            {
+              "id": "B",
+              "label": "Python terminates the child process and raises a 'subprocess.TimeoutExpired' exception."
+            },
+            {
+              "id": "C",
+              "label": "Python automatically doubles the timeout and retries the command."
+            },
+            {
+              "id": "D",
+              "label": "The entire operating system reboots to clear frozen process tables."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "When the timeout expires, subprocess.run attempts to kill the child process and immediately raises a TimeoutExpired exception containing whatever partial output was captured."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "Why should sensitive credentials (such as API keys or lab passwords) be passed to subprocesses via environment variables rather than command-line arguments?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because environment variables are automatically encrypted with AES-256 by the Linux kernel."
+            },
+            {
+              "id": "B",
+              "label": "Because command-line arguments are visible to all users on the host via 'ps aux' or /proc/<pid>/cmdline, whereas environment variables are restricted to the process owner."
+            },
+            {
+              "id": "C",
+              "label": "Because Python subprocess does not support string arguments longer than 16 characters."
+            },
+            {
+              "id": "D",
+              "label": "Because passing arguments via command line causes immediate memory leaks in the Python garbage collector."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Command-line arguments are world-readable across the local system through process table listings (e.g. /proc/pid/cmdline). Environment variables in /proc/pid/environ are protected by OS access controls and readable only by the process owner or root."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You need to develop a multi-target diagnostic utility that accepts a list of 100 IP addresses, executes a custom port check binary against each host concurrently with a 5-second per-host timeout, collects structured results, and outputs a single sanitized JSON evidence report.",
+        "tasks": [
+          "Use concurrent.futures.ThreadPoolExecutor or asyncio to orchestrate subprocess execution with bounded concurrency.",
+          "Ensure every subprocess is invoked via argument arrays with explicit timeouts and structured exception handling.",
+          "Emit comprehensive JSON logs to stderr and write a schema-validated output report."
+        ],
+        "requiredEvidence": [
+          "Python source file containing typed function signatures and robust subprocess invocation.",
+          "Test run log demonstrating graceful timeout handling when simulated targets hang.",
+          "Validated JSON output artifact adhering to the assessment schema."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Python 3 Standard Library: subprocess — Subprocess management",
+          "url": "https://docs.python.org/3/library/subprocess.html",
+          "publisher": "Python Software Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "subprocess.run security recommendations and shell=False model",
+            "TimeoutExpired exception mechanics and communicate deadlock avoidance",
+            "Environment dictionary isolation for child processes"
+          ]
+        },
+        {
+          "title": "OWASP Command Injection Prevention Cheat Sheet",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Command_Injection_Defense_Cheat_Sheet.html",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Direct API and argument vector usage over shell command strings",
+            "Input validation and parameterization patterns"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os04-l27-powershell-advanced-functions-and-objects",
+      "slug": "powershell-advanced-functions-and-objects",
+      "title": "PowerShell Advanced Functions & Object Pipeline Architecture",
+      "summary": "Engineer production-grade PowerShell automation using Advanced Functions [CmdletBinding()], the Begin/Process/End pipeline lifecycle, PSCustomObject transformation, strict typing, and structured error control.",
+      "difficulty": "beginner",
+      "durationMinutes": 100,
+      "prerequisites": ["os04-l26-python-operator-tooling-and-subprocesses"],
+      "outcomes": [
+        "Design Advanced Functions utilizing [CmdletBinding()] and parameter validation attributes for defensive operator tooling.",
+        "Stream heterogeneous pipeline objects efficiently across Begin, Process, and End blocks without holding excessive memory.",
+        "Enforce robust error handling with $ErrorActionPreference = 'Stop', terminating exceptions, and strongly typed PSCustomObject pipelines."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "vulnerability-research"],
+      "domains": ["windows", "network"],
+      "attackTactics": ["execution"],
+      "keywords": [
+        "powershell",
+        "cmdletbinding",
+        "pipeline",
+        "pscustomobject",
+        "erroraction"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "PowerShell is an object-oriented pipeline engine: automation tools consume, manipulate, and emit strongly typed objects across standardized lifecycle blocks rather than parsing fragile plain-text strings.",
+      "visual": {
+        "title": "PowerShell Pipeline Lifecycle & Object Streaming Flow",
+        "caption": "How Advanced Functions stream typed objects through Begin, Process, and End lifecycle blocks.",
+        "steps": [
+          {
+            "label": "Begin Block (Initialization)",
+            "detail": "Executes once before pipeline input arrives; sets up connections, buffers, and state.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Process Block (Streaming)",
+            "detail": "Executes once for every incoming object in the pipeline ($_); performs streaming transformations.",
+            "tone": "allow"
+          },
+          {
+            "label": "End Block (Finalization)",
+            "detail": "Executes once after all objects are processed; flushes buffers, closes handles, and outputs aggregations.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Object Pipelines vs Text Streams: The PowerShell Paradigm",
+          "paragraphs": [
+            "Unlike traditional UNIX shells that transmit untyped byte streams between processes, PowerShell passes rich .NET objects through the pipeline. When a command emits data, downstream commands receive structured objects containing typed properties and methods rather than raw text requiring regular expression scraping.",
+            "Relying on string manipulation (such as formatting output with 'Out-String' or parsing text with 'Select-String') discards type metadata and creates fragile automation. Operators must preserve and emit objects using '[PSCustomObject]' to maintain property-based filtering, sorting, and JSON export capabilities across the entire toolchain."
+          ]
+        },
+        {
+          "title": "Advanced Functions and the CmdletBinding Contract",
+          "paragraphs": [
+            "Adding the '[CmdletBinding()]' attribute to a PowerShell function transforms a basic script function into an Advanced Function that behaves identically to compiled C# cmdlets. It automatically provides common parameters including '-Verbose', '-Debug', '-ErrorAction', '-WarningAction', and supports impact testing via 'SupportsShouldProcess' ('-WhatIf' and '-Confirm').",
+            "Inside the 'param()' block, operators enforce strict type contracts and input constraints using validation attributes: '[Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]', '[ValidateNotNullOrEmpty()]', '[ValidateSet(\"TCP\", \"UDP\")]', and '[ValidatePattern()]'. These attributes validate inputs at the pipeline boundary before function body execution begins."
+          ]
+        },
+        {
+          "title": "Pipeline Streaming Mechanics: Begin, Process, and End Lifecycle",
+          "paragraphs": [
+            "An Advanced Function processing pipeline input must organize its logic into three discrete blocks: 'begin', 'process', and 'end'. The 'begin' block runs once per invocation to initialize state, allocate data structures, or open network connections.",
+            "The 'process' block executes iteratively for every object sent through the pipeline. Inside 'process', the special variable '$_' (or '$PSItem') represents the current pipeline item. The 'end' block executes once after the last object has been processed, performing teardown and resource release. Omitting the 'process' block causes the function to execute only on the last object in the pipeline stream."
+          ]
+        },
+        {
+          "title": "Defensive Error Management, Strict Mode, and Telemetry Objects",
+          "paragraphs": [
+            "PowerShell distinguishes between non-terminating errors (which write to the error stream but allow execution to continue) and terminating errors (which halt execution or trigger try/catch blocks). In default settings ('$ErrorActionPreference = \"Continue\"'), commands that fail silently continue executing subsequent code.",
+            "Operator scripts must set '$ErrorActionPreference = \"Stop\"' or pass '-ErrorAction Stop' to convert all errors into terminating exceptions that can be caught by 'try { ... } catch { ... }' blocks. Additionally, enabling 'Set-StrictMode -Version Latest' prevents referencing uninitialized variables or non-existent object properties."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Active Directory Host Diagnostic Cmdlet Architecture",
+        "objective": "Design and validate a production-grade PowerShell Advanced Function that accepts host identities from the pipeline, queries endpoint state safely, and outputs structured PSCustomObjects.",
+        "scenario": "You are developing an administrative diagnostic cmdlet for a Windows enterprise environment under authorized assessment scoping. The cmdlet must accept computer names from the pipeline, verify remote WinRM reachability, query operating system details, and emit strongly typed telemetry.",
+        "constraints": [
+          "Must use [CmdletBinding()] with parameter validation attributes.",
+          "Must implement proper Begin/Process/End blocks to support pipeline streaming.",
+          "Must emit [PSCustomObject] outputs and handle connection failures with try/catch."
+        ],
+        "cases": [
+          {
+            "id": "case-01-advanced-function-structure",
+            "title": "Building the Cmdlet Parameter Contract",
+            "context": "A script receives computer names: 'Get-Content hosts.txt | Test-HostEndpoint'. The function must accept strings from the pipeline by value and ensure no empty computer names are processed.",
+            "prompt": "What is the correct parameter declaration for this Advanced Function?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "[CmdletBinding()] param([Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)][ValidateNotNullOrEmpty()][string[]]$ComputerName)",
+                "correct": true,
+                "rationale": "This declaration enables cmdlet features, accepts string arrays both from arguments and pipeline streaming, and enforces non-empty validation."
+              },
+              {
+                "id": "opt-2",
+                "label": "param($ComputerName = $args[0])",
+                "correct": false,
+                "rationale": "Using $args bypasses PowerShell parameter binding, lacks type validation, and does not support pipeline streaming."
+              },
+              {
+                "id": "opt-3",
+                "label": "function Test-HostEndpoint($ComputerName) { $ComputerName = Read-Host }",
+                "correct": false,
+                "rationale": "Prompting interactively with Read-Host breaks unattended automation and pipeline interoperability."
+              },
+              {
+                "id": "opt-4",
+                "label": "[CmdletBinding()] param([switch]$ComputerName)",
+                "correct": false,
+                "rationale": "A [switch] parameter is a boolean flag (present/absent) and cannot receive host name strings from pipeline objects."
+              }
+            ]
+          },
+          {
+            "id": "case-02-pipeline-streaming-lifecycle",
+            "title": "Implementing Begin, Process, and End Blocks",
+            "context": "An operator writes a function with logic placed directly inside the function body without block definitions. When piped 50 host names ('Get-ADComputer | Test-HostEndpoint'), only the 50th host is analyzed.",
+            "prompt": "Why did the function only analyze the last host, and how is it corrected?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Without an explicit 'process' block, pipeline code executes only in the 'end' phase on the final object; the logic must be wrapped inside a 'process { ... }' block.",
+                "correct": true,
+                "rationale": "In PowerShell functions without explicit block markers, the entire body defaults to the 'end' block, which only sees the last item in the pipeline. Wrapping item logic in 'process' ensures per-item execution."
+              },
+              {
+                "id": "opt-2",
+                "label": "The pipeline buffer was exceeded; increasing the pipeline buffer with 'Out-Buffer 500' fixes the issue.",
+                "correct": false,
+                "rationale": "Pipeline execution is governed by function lifecycle blocks, not Out-Buffer capacity."
+              },
+              {
+                "id": "opt-3",
+                "label": "The function must declare 'Set-Item WSMan:\\localhost\\Client\\MaxEnvelopeSizekb 8192'.",
+                "correct": false,
+                "rationale": "WinRM envelope size is irrelevant to basic PowerShell pipeline lifecycle block routing."
+              },
+              {
+                "id": "opt-4",
+                "label": "The function must use a 'for ($i=0; $i -lt 50; $i++)' loop inside the begin block.",
+                "correct": false,
+                "rationale": "Hardcoding loop iterations in the begin block violates dynamic pipeline streaming principles."
+              }
+            ]
+          },
+          {
+            "id": "case-03-structured-object-emission",
+            "title": "Emitting PSCustomObjects vs Plain Text Strings",
+            "context": "A cmdlet outputs status messages using 'Write-Host \"Host $ComputerName is Online with OS $OSVersion\"'. A downstream command 'Test-HostEndpoint | Export-Csv -Path report.csv' produces an empty CSV file.",
+            "prompt": "How must the cmdlet output its findings so that downstream cmdlets like Export-Csv, Where-Object, and ConvertTo-Json work seamlessly?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Construct and emit a '[PSCustomObject]@{\n  ComputerName = $ComputerName\n  Status = \"Online\"\n  OSVersion = $OSVersion\n  Timestamp = (Get-Date)\n}' object.",
+                "correct": true,
+                "rationale": "Emitting a [PSCustomObject] onto the pipeline preserves named properties with typed data, enabling native sorting, filtering, and Export-Csv transformation."
+              },
+              {
+                "id": "opt-2",
+                "label": "Replace 'Write-Host' with 'Write-Output' formatted as a comma-separated string '\"$ComputerName,Online,$OSVersion\"'.",
+                "correct": false,
+                "rationale": "Emitting a raw comma-separated string outputs an untyped string object that requires fragile text parsing downstream."
+              },
+              {
+                "id": "opt-3",
+                "label": "Write the results directly to a SQL database inside the process block using raw ADO.NET connections.",
+                "correct": false,
+                "rationale": "Hardcoding database writes couples the diagnostic function to specific external storage rather than emitting pipeline objects."
+              },
+              {
+                "id": "opt-4",
+                "label": "Use 'Out-String' to format a table and send it directly to standard error.",
+                "correct": false,
+                "rationale": "Out-String destroys object structure and routes formatted text to stderr, bypassing the output pipeline."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Enforce [CmdletBinding()] and parameter validation attributes across all functions.",
+          "Implement Begin, Process, and End blocks to support full pipeline streaming.",
+          "Emit typed [PSCustomObject] outputs and handle errors with $ErrorActionPreference = 'Stop'."
+        ],
+        "evidenceTemplate": [
+          "PSScriptAnalyzer report showing zero Error/Warning rule violations.",
+          "Pipeline test demonstrating streaming object execution with Measure-Command.",
+          "Export-Csv and ConvertTo-Json validation of emitted PSCustomObjects."
+        ],
+        "reset": "Reset PowerShell script modules to template state in the test environment.",
+        "cleanup": "Remove temporary test PSD1/PSM1 files and clear test PowerShell sessions."
+      },
+      "governance": {
+        "prevent": [
+          "Run PSScriptAnalyzer with community best-practice rules in CI/CD pipelines.",
+          "Prohibit 'Write-Host' in utility functions; mandate '[PSCustomObject]' pipeline emission.",
+          "Enforce 'Set-StrictMode -Version Latest' and explicit parameter typing in all production modules."
+        ],
+        "observe": [
+          "Enable PowerShell Script Block Logging (Event ID 4104) and Transcription for operator environments.",
+          "Monitor Module Logging (Event ID 4103) for administrative cmdlet invocations.",
+          "Capture pipeline execution errors and exceptions in centralized telemetry."
+        ],
+        "respond": [
+          "Catch terminating exceptions in catch blocks and emit structured error objects with ErrorRecord metadata.",
+          "Implement '-WhatIf' and '-Confirm' support for state-modifying cmdlets to enable pre-flight verification.",
+          "Audit scripts that attempt to disable Constrained Language Mode or bypass execution policy."
+        ],
+        "residualRisk": [
+          "Non-terminating errors from legacy COM objects or native win32 binaries may not trigger catch blocks unless explicitly trapped.",
+          "Large object pipelines retained in memory variables rather than streamed can cause high memory usage on operator workstations."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "'Write-Host' is the standard way to return data from a PowerShell function.",
+          "correction": "'Write-Host' writes directly to the console host buffer (Information stream in modern PowerShell) and does not output objects to the success pipeline. Downstream commands cannot capture or process Write-Host data."
+        },
+        {
+          "claim": "A function that works with 'Test-Command -ComputerName \"DC01\"' will automatically work when piped input like '\"DC01\" | Test-Command'.",
+          "correction": "A parameter must be explicitly configured with '[Parameter(ValueFromPipeline)]' and the function must implement a 'process { ... }' block to consume pipeline input dynamically."
+        },
+        {
+          "claim": "'try { ... } catch { ... }' catches all errors in PowerShell by default.",
+          "correction": "PowerShell try/catch only catches terminating errors. Non-terminating errors (the default for most cmdlets) continue execution unless '$ErrorActionPreference = \"Stop\"' or '-ErrorAction Stop' is set."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "Which attribute converts a standard PowerShell script function into an Advanced Function with common parameters like -Verbose and -ErrorAction?",
+          "options": [
+            {
+              "id": "A",
+              "label": "[CmdletBinding()]"
+            },
+            {
+              "id": "B",
+              "label": "[System.Serializable()]"
+            },
+            {
+              "id": "C",
+              "label": "[OutputType([string])]"
+            },
+            {
+              "id": "D",
+              "label": "[SecurityProtocol(Tls12)]"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Placing [CmdletBinding()] above the param() block enables compiled cmdlet behaviors, including automatic support for common parameters (-Verbose, -Debug, -ErrorAction, -WhatIf, etc.)."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "What is the primary operational difference between the 'begin' block and the 'process' block in an Advanced Function?",
+          "options": [
+            {
+              "id": "A",
+              "label": "The 'begin' block executes with elevated Administrator privileges, while 'process' executes as standard user."
+            },
+            {
+              "id": "B",
+              "label": "The 'begin' block executes once before any pipeline objects arrive, while the 'process' block executes once for every individual object streamed through the pipeline."
+            },
+            {
+              "id": "C",
+              "label": "The 'begin' block is only used for compiled C# code, while 'process' is for PowerShell scripts."
+            },
+            {
+              "id": "D",
+              "label": "The 'begin' block catches errors, while 'process' runs the cleanup code."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "The 'begin' block performs one-time initialization, while 'process' runs iteratively for each pipeline object, enabling low-memory streaming transformations."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "How can an operator ensure that non-terminating errors generated by built-in cmdlets (such as 'Get-ChildItem') are caught by an enclosing 'try { ... } catch { ... }' block?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Pass '-ErrorAction Stop' to the cmdlet or set '$ErrorActionPreference = \"Stop\"' in the script scope."
+            },
+            {
+              "id": "B",
+              "label": "Set '$VerbosePreference = \"Continue\"' in the global profile."
+            },
+            {
+              "id": "C",
+              "label": "Wrap the cmdlet call in double quotes '\"$(Get-ChildItem)\"''."
+            },
+            {
+              "id": "D",
+              "label": "Enable Constrained Language Mode with '$ExecutionContext.SessionState.LanguageMode'."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "PowerShell try/catch blocks only intercept terminating errors. Setting ErrorAction to Stop converts non-terminating errors into terminating exceptions, triggering the catch block."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You must build an enterprise endpoint triage module 'Get-EndpointSecurityState' that accepts Active Directory computer names from the pipeline, queries endpoint firewall state, Antivirus signature freshness, and pending reboots, and emits strongly typed [PSCustomObject] records compatible with Export-Csv and ConvertTo-Json.",
+        "tasks": [
+          "Implement [CmdletBinding()] with parameter validation, pipeline binding, and -WhatIf support.",
+          "Structure the cmdlet using Begin, Process, and End lifecycle blocks with robust error handling (-ErrorAction Stop).",
+          "Validate the cmdlet with PSScriptAnalyzer and generate sample CSV and JSON reports."
+        ],
+        "requiredEvidence": [
+          "Complete PowerShell advanced function source code in PSM1 format.",
+          "PSScriptAnalyzer output confirming zero rule violations.",
+          "Sample CSV report generated from piped multi-host diagnostic execution."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn: about_Functions_Advanced & about_Pipelines",
+          "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced",
+          "publisher": "Microsoft",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "CmdletBinding attribute specifications and parameter validation rules",
+            "Pipeline lifecycle execution mechanics (Begin, Process, End)",
+            "Strongly typed object streaming versus text output"
+          ]
+        },
+        {
+          "title": "Microsoft Learn: about_Try_Catch_Finally and Error Handling",
+          "url": "https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_try_catch_finally",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Terminating versus non-terminating error behavior in PowerShell",
+            "ErrorActionPreference configuration and exception interception"
+          ]
+        }
+      ]
+    }
+  ]
+}
