@@ -20,6 +20,11 @@ import reportRemediationRetestData from '../data/academy/os05-pentest-methodolog
 import discoveryServicesAuthenticationData from '../data/academy/os06-network-infrastructure/discovery-services-authentication.json';
 import hostBoundariesAndMovementData from '../data/academy/os06-network-infrastructure/host-boundaries-and-movement.json';
 import blindEnterpriseNetworkData from '../data/academy/os06-network-infrastructure/blind-enterprise-network.json';
+import browserHttpAuthSessionData from '../data/academy/os07-web-api-bug-bounty/browser-http-auth-session.json';
+import accessControlAndInjectionData from '../data/academy/os07-web-api-bug-bounty/access-control-and-injection.json';
+import browserCrossOriginAndFilesData from '../data/academy/os07-web-api-bug-bounty/browser-cross-origin-and-files.json';
+import modernApiAndBusinessLogicData from '../data/academy/os07-web-api-bug-bounty/modern-api-and-business-logic.json';
+import bountyReconReportDisclosureData from '../data/academy/os07-web-api-bug-bounty/bounty-recon-report-disclosure.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -147,6 +152,21 @@ export const HOST_BOUNDARIES_AND_MOVEMENT_MODULE = parseAcademyModule(
 export const BLIND_ENTERPRISE_NETWORK_MODULE = parseAcademyModule(
   blindEnterpriseNetworkData
 );
+export const BROWSER_HTTP_AUTH_SESSION_MODULE = parseAcademyModule(
+  browserHttpAuthSessionData
+);
+export const ACCESS_CONTROL_AND_INJECTION_MODULE = parseAcademyModule(
+  accessControlAndInjectionData
+);
+export const BROWSER_CROSS_ORIGIN_AND_FILES_MODULE = parseAcademyModule(
+  browserCrossOriginAndFilesData
+);
+export const MODERN_API_AND_BUSINESS_LOGIC_MODULE = parseAcademyModule(
+  modernApiAndBusinessLogicData
+);
+export const BOUNTY_RECON_REPORT_DISCLOSURE_MODULE = parseAcademyModule(
+  bountyReconReportDisclosureData
+);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
@@ -171,6 +191,11 @@ export const ACADEMY_MODULES: AcademyModule[] = [
   DISCOVERY_SERVICES_AUTHENTICATION_MODULE,
   HOST_BOUNDARIES_AND_MOVEMENT_MODULE,
   BLIND_ENTERPRISE_NETWORK_MODULE,
+  BROWSER_HTTP_AUTH_SESSION_MODULE,
+  ACCESS_CONTROL_AND_INJECTION_MODULE,
+  BROWSER_CROSS_ORIGIN_AND_FILES_MODULE,
+  MODERN_API_AND_BUSINESS_LOGIC_MODULE,
+  BOUNTY_RECON_REPORT_DISCLOSURE_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {

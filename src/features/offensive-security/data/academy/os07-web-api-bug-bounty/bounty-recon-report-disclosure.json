@@ -1,0 +1,1059 @@
+{
+  "id": "os07-m05-bounty-recon-report-disclosure",
+  "slug": "bounty-recon-report-disclosure",
+  "trackId": "os07-web-api-bug-bounty",
+  "title": "Bug bounty recon, triage, reporting and disclosure",
+  "summary": "Master professional bug bounty methodologies: execute horizontal/vertical attack surface reconnaissance, calculate precise CVSS v3.1/v4.0 impact scores, navigate triage pipelines, and adhere to Coordinated Vulnerability Disclosure (CVD) and Safe Harbor standards.",
+  "difficulty": "advanced",
+  "estimatedMinutes": 360,
+  "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+  "domains": ["web", "api"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os07-l64-bug-bounty-reconnaissance-and-asset-mapping",
+      "slug": "bug-bounty-reconnaissance-and-asset-mapping",
+      "title": "External Attack Surface Management & Bug Bounty Reconnaissance",
+      "summary": "Execute broad external reconnaissance for bug bounty programs: horizontal asset discovery via Autonomous System Numbers (ASN) and WHOIS/Reverse IP, vertical subdomain enumeration via Certificate Transparency (CT logs) and DNS bruteforcing, JavaScript bundle analysis for hidden API routes, and strict out-of-scope boundary respect.",
+      "difficulty": "advanced",
+      "durationMinutes": 120,
+      "prerequisites": [],
+      "outcomes": [
+        "Map organization-wide external attack surfaces using ASN lookup, WHOIS, and reverse DNS mapping.",
+        "Execute vertical subdomain enumeration combining Certificate Transparency logs, passive DNS, and permutation fuzzing.",
+        "Deconstruct frontend JavaScript bundles to extract hidden API endpoints, hardcoded credentials, and debug flags."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web"],
+      "attackTactics": ["reconnaissance", "discovery"],
+      "keywords": [
+        "bug-bounty",
+        "attack-surface",
+        "subdomain-enumeration",
+        "certificate-transparency",
+        "sourcemaps",
+        "asn-mapping"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Reconnaissance is discovery before engagement: mapping an enterprise attack surface uncovers forgotten staging servers, un-routed development environments, and leaked internal API routes before competitors or threat actors find them.",
+      "visual": {
+        "title": "External Attack Surface Mapping & Asset Discovery Funnel",
+        "caption": "How broad horizontal discovery narrows down into high-value target endpoints.",
+        "steps": [
+          {
+            "label": "Horizontal Asset Discovery",
+            "detail": "Query BGP Autonomous System Numbers (ASNs) and corporate acquisitions to map owned IP CIDR blocks.",
+            "tone": "allow"
+          },
+          {
+            "label": "Vertical Subdomain Enumeration",
+            "detail": "Parse Certificate Transparency logs (crt.sh) and passive DNS databases for live *.target.com subdomains.",
+            "tone": "allow"
+          },
+          {
+            "label": "Endpoint & JS Archaeology",
+            "detail": "Extract hidden API routes, development feature flags, and staging parameters from unpacked client JavaScript sourcemaps.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bug Bounty Reconnaissance Philosophy: Breadth vs Depth",
+          "paragraphs": [
+            "In commercial bug bounty programs (HackerOne, Bugcrowd, Intigriti), hundreds of researchers compete on the same primary targets (`www.example.com`). While deep manual application testing on core assets is vital, finding high-severity vulnerabilities often begins with 'Broad Attack Surface Reconnaissance'.",
+            "Organizations frequently deploy development, staging, testing, and legacy acquisition servers that receive fewer security reviews. Discovering unannounced assets (e.g. `jira-staging.dev.example.com` or `api-v1-deprecated.example.com`) provides fertile ground for unpatched vulnerabilities."
+          ]
+        },
+        {
+          "title": "Horizontal Domain Discovery: ASN Mapping, CIDR Ranges, and Acquisitions",
+          "paragraphs": [
+            "Horizontal asset discovery identifies the full organizational boundaries: 1) Autonomous System Number (ASN) Lookups (e.g. via BGP routing databases) identify all IP prefixes registered to the parent corporation.",
+            "2) WHOIS Reverse IP and Organization mapping finds subsidiary domain names and newly acquired corporate entities. 3) Reverse PTR DNS sweeping across discovered CIDR ranges maps all hostnames tied to corporate IP allocations. Researchers must verify program Policy scopes to ensure newly discovered domains are explicitly 'In-Scope'."
+          ]
+        },
+        {
+          "title": "Vertical Subdomain Enumeration: Certificate Transparency and DNS Mutation",
+          "paragraphs": [
+            "Once root domains are established, researchers execute vertical subdomain enumeration combining passive and active techniques: 1) Certificate Transparency (CT) Logs: because CA/Browser Forum rules require all TLS certificates to be publicly logged, querying CT monitors (`crt.sh`, Censys) reveals newly provisioned subdomains within seconds of certificate issuance.",
+            "2) Passive DNS Aggregation (SecurityTrails, AlienVault OTX, VirusTotal) uncovers historical DNS records. 3) DNS Permutation and Alteration Fuzzing (altdns, dnsgen) generates wordlists based on discovered patterns (`dev-api`, `qa-api`, `stage-api`)."
+          ]
+        },
+        {
+          "title": "Client-Side Code Archaeology: Source Map Unpacking and Endpoint Harvesting",
+          "paragraphs": [
+            "Modern web frontends are built with Webpack, Vite, or Next.js, bundling hundreds of internal TypeScript/JavaScript components into minified production chunks (`main.abc123.js`).",
+            "If developers inadvertently publish JavaScript Source Maps (`.js.map` files), researchers can unpack the original, un-minified source code repository (using tools like `sourcemapper` or browser devtools). Unpacking reveals internal backend API routes, unreleased feature flags, internal staging URLs, and hardcoded API tokens that are invisible on the rendered UI."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "External Asset Surface Mapping & Scope Boundary Verification",
+        "objective": "Map an enterprise attack surface using Certificate Transparency logs, identify live subdomains, extract hidden API routes from unpacked JavaScript sourcemaps, and verify program scope boundaries.",
+        "scenario": "You are participating in a public bug bounty program for an enterprise fintech organization. The scope covers `*.fintech.com`. You must discover unannounced subdomains and extract unreleased API routes.",
+        "constraints": [
+          "Must extract subdomains from Certificate Transparency query output.",
+          "Must verify that discovered assets fall within the authorized in-scope policy.",
+          "Must analyze unpacked JavaScript source code to harvest hidden API endpoints."
+        ],
+        "cases": [
+          {
+            "id": "case-01-ct-log-subdomain-parsing",
+            "title": "Harvesting Subdomains via Certificate Transparency",
+            "context": "Querying Certificate Transparency logs for `fintech.com` returns certificates for `api-internal-qa.fintech.com`, `admin-legacy.fintech.com`, and `thirdparty-partner.com`.",
+            "prompt": "Which discovered domains are in-scope under a `*.fintech.com` policy, and what is the next step?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "`api-internal-qa.fintech.com` and `admin-legacy.fintech.com` are in-scope; `thirdparty-partner.com` is out-of-scope; the next step is probing the live DNS resolution and HTTP status of the in-scope subdomains.",
+                "correct": true,
+                "rationale": "Only subdomains ending with the exact in-scope apex domain (`*.fintech.com`) are authorized for testing. Testing out-of-scope partner domains violates program policies and legal Safe Harbor."
+              },
+              {
+                "id": "opt-2",
+                "label": "Test `thirdparty-partner.com` immediately because it appeared in the certificate search.",
+                "correct": false,
+                "rationale": "Certificate relationships do not confer authorization. Testing out-of-scope domains violates Safe Harbor."
+              },
+              {
+                "id": "opt-3",
+                "label": "Certificate Transparency logs only contain fake domains created by Google.",
+                "correct": false,
+                "rationale": "CT logs are cryptographic public ledgers recording all real-world TLS certificates issued by Certificate Authorities."
+              },
+              {
+                "id": "opt-4",
+                "label": "Delete the certificates from the internet.",
+                "correct": false,
+                "rationale": "CT logs are append-only cryptographic records that cannot be modified or deleted."
+              }
+            ]
+          },
+          {
+            "id": "case-02-sourcemap-route-harvesting",
+            "title": "Extracting Hidden API Routes from JavaScript Source Maps",
+            "context": "On `https://app.fintech.com/static/js/bundle.js`, you discover `https://app.fintech.com/static/js/bundle.js.map` is publicly accessible. Unpacking the sourcemap reveals an unreleased module `src/api/adminPortal.ts` containing the route `/api/v2/internal/debug/users`.",
+            "prompt": "How should this discovered route be evaluated in a bug bounty context?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Test the discovered `/api/v2/internal/debug/users` endpoint for authentication and authorization controls; if unauthenticated or vulnerable to BOLA, document the reproduction steps proving access to sensitive user data.",
+                "correct": true,
+                "rationale": "Source map analysis uncovers internal debug endpoints that developers may have neglected to protect with production authentication middleware."
+              },
+              {
+                "id": "opt-2",
+                "label": "Source map files are viruses that should never be opened.",
+                "correct": false,
+                "rationale": "Source maps are standard JSON debugging maps mapping compiled JavaScript back to TypeScript/React source code."
+              },
+              {
+                "id": "opt-3",
+                "label": "Submit a bug report claiming 'Source map is accessible' without testing any endpoints.",
+                "correct": false,
+                "rationale": "Exposing source maps alone is typically an informational/P5 finding. Real impact requires demonstrating an exploitable vulnerability in the discovered endpoints."
+              },
+              {
+                "id": "opt-4",
+                "label": "Delete the client's GitHub repository.",
+                "correct": false,
+                "rationale": "Researchers have no authorization or ability to delete client source code repositories."
+              }
+            ]
+          },
+          {
+            "id": "case-03-scope-boundary-hygiene",
+            "title": "Verifying Policy Scoping and Third-Party Dependencies",
+            "context": "During reconnaissance on `fintech.com`, you discover an open redirect on `https://login.fintech.com/auth` that redirects to a third-party Zendesk helpdesk portal `https://fintech.zendesk.com`. The bug bounty policy explicitly lists `*.zendesk.com` as Out-of-Scope.",
+            "prompt": "What is the proper testing boundary in this situation?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Test and report the Open Redirect flaw on `login.fintech.com` (which is in-scope), but strictly refrain from testing vulnerabilities inside `fintech.zendesk.com` (which is out-of-scope).",
+                "correct": true,
+                "rationale": "Testing must stop at the exact boundary of authorized assets. Reporting the redirect on the in-scope domain is valid, but testing out-of-scope SaaS services violates program terms."
+              },
+              {
+                "id": "opt-2",
+                "label": "Execute full denial of service attacks against Zendesk.",
+                "correct": false,
+                "rationale": "Attacking out-of-scope SaaS providers violates terms of service and leads to platform banning."
+              },
+              {
+                "id": "opt-3",
+                "label": "Ignore the bug bounty policy because all fintech domains are fair game.",
+                "correct": false,
+                "rationale": "Testing out-of-scope assets forfeits legal Safe Harbor and invites criminal liability."
+              },
+              {
+                "id": "opt-4",
+                "label": "Report the issue directly to Zendesk's competitors.",
+                "correct": false,
+                "rationale": "Unprofessional disclosure breaches ethical standards."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate extraction and triage of subdomains from Certificate Transparency data.",
+          "Analyze JavaScript source maps to extract hidden API routes and parameters.",
+          "Demonstrate strict adherence to bug bounty program scope boundaries and policies."
+        ],
+        "evidenceTemplate": [
+          "Certificate Transparency subdomain enumeration transcript.",
+          "Source map endpoint extraction report listing identified internal routes.",
+          "Scope boundary verification checklist for discovered target assets."
+        ],
+        "reset": "Reset reconnaissance wordlists and clear local source map artifacts.",
+        "cleanup": "Remove temporary downloaded JavaScript chunk files and clear DNS cache."
+      },
+      "governance": {
+        "prevent": [
+          "Strictly prohibit testing assets outside the explicitly documented In-Scope program policy.",
+          "Disable generation and public hosting of JavaScript source maps in production CI/CD build scripts.",
+          "Enforce automated attack surface monitoring to decommission orphaned staging subdomains."
+        ],
+        "observe": [
+          "Monitor Certificate Transparency logs for unauthorized or unexpected certificate issuance events.",
+          "Track DNS query volume spikes and subdomain enumeration scanning against authoritative DNS.",
+          "Log access to production `.map` files in web server access logs."
+        ],
+        "respond": [
+          "Immediately remove production `.js.map` files from public web server directories.",
+          "Decommission or place authentication gateways in front of discovered staging and development subdomains.",
+          "Clarify program policy scope descriptions on the bug bounty platform to eliminate ambiguity."
+        ],
+        "residualRisk": [
+          "Fast-moving engineering teams may deploy microservices under unmonitored subdomains before security reviews.",
+          "Third-party SaaS providers managing branded subdomains (e.g. `support.company.com`) may introduce uncoordinated changes."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "All subdomains of an organization are automatically in-scope for bug bounty testing.",
+          "correction": "Program policies explicitly define scope (e.g. `*.target.com` vs specific target lists). Third-party hosted subdomains or sensitive production tiers are frequently out-of-scope."
+        },
+        {
+          "claim": "Public source maps are a Critical vulnerability on their own.",
+          "correction": "Exposing source maps is information disclosure. While it assists researchers in finding bugs, a high-severity report requires demonstrating an exploitable vulnerability in the code."
+        },
+        {
+          "claim": "Subdomain takeover is possible on any subdomain that returns HTTP 404.",
+          "correction": "Subdomain takeover requires a DNS CNAME record pointing to an unclaimed third-party service (e.g. GitHub Pages, S3, Azure) that an attacker can claim. An internal 404 server is not vulnerable."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is Certificate Transparency (CT) and why is it valuable for bug bounty reconnaissance?",
+          "options": [
+            {
+              "id": "A",
+              "label": "A tool that deletes SSL certificates."
+            },
+            {
+              "id": "B",
+              "label": "A publicly audited, append-only cryptographic ledger of all issued TLS certificates, allowing researchers to discover newly created subdomains and testing environments."
+            },
+            {
+              "id": "C",
+              "label": "A transparent computer monitor."
+            },
+            {
+              "id": "D",
+              "label": "A protocol used only by Bitcoin."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Certificate Transparency logs record every issued TLS certificate, providing a comprehensive public record of an organization's subdomains."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "What valuable intelligence can a security researcher extract by unpacking a JavaScript `.js.map` file?",
+          "options": [
+            {
+              "id": "A",
+              "label": "The original, un-minified TypeScript/React source code, including internal API endpoint paths, hidden debug flags, component logic, and developer comments."
+            },
+            {
+              "id": "B",
+              "label": "The root password of the database server."
+            },
+            {
+              "id": "C",
+              "label": "The user's credit card number."
+            },
+            {
+              "id": "D",
+              "label": "The physical address of the datacenter."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Source maps map minified bundles back to the original source code repository, exposing hidden routes, debug endpoints, and developer notes."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "What is the legal consequence of testing a target that is explicitly listed as 'Out-of-Scope' in a bug bounty program policy?",
+          "options": [
+            {
+              "id": "A",
+              "label": "The researcher receives a larger bounty."
+            },
+            {
+              "id": "B",
+              "label": "The testing falls outside the program's Safe Harbor legal protection, potentially constituting unauthorized computer access under laws like the CFAA and leading to platform account bans."
+            },
+            {
+              "id": "C",
+              "label": "The researcher's internet connection speed is doubled."
+            },
+            {
+              "id": "D",
+              "label": "Nothing happens."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Safe Harbor and authorization are strictly conditioned on adhering to program scope. Testing out-of-scope systems forfeits legal protections and breaches platform terms."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are beginning a bug bounty assessment on an enterprise technology company with the scope `*.techcorp.io`. You must execute a passive Certificate Transparency search to discover subdomains, identify an accessible staging environment (`qa-portal.techcorp.io`), locate an exposed JavaScript sourcemap on the staging site, extract all hidden API endpoints from the unpacked code, and compile a structured attack surface report.",
+        "tasks": [
+          "Query Certificate Transparency logs for `techcorp.io` and compile a list of active subdomains.",
+          "Identify an exposed `.js.map` file and extract the underlying TypeScript component tree.",
+          "Harvest all unauthenticated `/api/v1/internal/*` endpoints and verify their scope compliance."
+        ],
+        "requiredEvidence": [
+          "CT log subdomain discovery transcript.",
+          "Extracted TypeScript API route inventory artifact.",
+          "Scope compliance verification checklist."
+        ]
+      },
+      "sources": [
+        {
+          "title": "IETF RFC 6962: Certificate Transparency",
+          "url": "https://www.rfc-editor.org/rfc/rfc6962.html",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Certificate Transparency log architecture and auditability",
+            "Public TLS certificate submission and discovery mechanics"
+          ]
+        },
+        {
+          "title": "OWASP Amass Project Documentation: Attack Surface Mapping",
+          "url": "https://owasp.org/www-project-amass/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "DNS enumeration and ASN mapping methodologies",
+            "Passive reconnaissance intelligence gathering standards",
+            "External attack surface management"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os07-l65-vulnerability-triage-and-cvss-v4-impact",
+      "slug": "vulnerability-triage-and-cvss-v4-impact",
+      "title": "Vulnerability Triage, CVSS v4.0 Calculation & Impact Demonstration",
+      "summary": "Master bug bounty report triage: differentiate theoretical findings from demonstrable business impact, calculate accurate CVSS v3.1 and CVSS v4.0 vector strings, provide deterministic sanitized Proof of Concepts (PoCs), and avoid common dispute traps.",
+      "difficulty": "advanced",
+      "durationMinutes": 120,
+      "prerequisites": ["os07-l64-bug-bounty-reconnaissance-and-asset-mapping"],
+      "outcomes": [
+        "Triage vulnerability findings to distinguish impactful security flaws from non-actionable informational noise.",
+        "Calculate CVSS v3.1 and CVSS v4.0 base, threat, and environmental metric scores with objective justification.",
+        "Draft high-impact bug bounty report submissions with deterministic reproduction steps and clear threat modeling."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web", "api"],
+      "attackTactics": ["initial-access", "defense-evasion"],
+      "keywords": [
+        "triage",
+        "cvss-v4",
+        "cvss-v3",
+        "vulnerability-rating",
+        "bug-bounty-report",
+        "proof-of-concept"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Bounties are paid on demonstrated business impact: a report must establish deterministic reproduction steps, accurate CVSS v4.0 metrics, and an undeniable threat narrative showing how technical flaws compromise confidentiality, integrity, or availability.",
+      "visual": {
+        "title": "Bug Bounty Report Triage & Severity Evaluation Matrix",
+        "caption": "How triagers evaluate reproduction quality, impact proof, and CVSS severity metrics.",
+        "steps": [
+          {
+            "label": "Report Submission Intake",
+            "detail": "Researcher submits report with deterministic curl commands, clear precondition statements, and CVSS vector.",
+            "tone": "allow"
+          },
+          {
+            "label": "Technical Triage Validation",
+            "detail": "Triager reproduces vulnerability in staging/production environment without ambiguity.",
+            "tone": "allow"
+          },
+          {
+            "label": "Severity & Bounty Assignment",
+            "detail": "CVSS v4.0 / VRT severity assigned based on proven business impact (P1 Critical -> P4 Low); bounty rewarded.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "The Triage Perspective: What Makes a Valid Bug Bounty Report",
+          "paragraphs": [
+            "Bug bounty triage teams (at HackerOne, Bugcrowd, or in-house security teams) review thousands of incoming reports weekly. Over 60% of submissions are closed as Informational (P5), Not Applicable (N/A), or Duplicate due to poor report quality or lack of security impact.",
+            "A high-quality report must answer three core questions within 30 seconds: 1) What is the exact vulnerability and affected asset? 2) How does the triager deterministically reproduce it step-by-step? 3) What is the realistic business impact and threat scenario?"
+          ]
+        },
+        {
+          "title": "CVSS v3.1 vs CVSS v4.0: Understanding Metric Advancements and Threat Nuances",
+          "paragraphs": [
+            "Common Vulnerability Scoring System (CVSS) provides standardized numerical severity ratings. While CVSS v3.1 focused on Base metrics (Attack Vector, Attack Complexity, Privileges Required, User Interaction, Scope, Confidentiality, Integrity, Availability), CVSS v4.0 introduces major refinements.",
+            "CVSS v4.0 introduces the 'CVSS-BTE' nomenclature (Base, Threat, Environmental), replaces the controversial Scope ($S$) metric with explicit Subsequent System impact metrics ($SC/SI/SA$), adds Attack Requirements ($AT$), and refines User Interaction ($UI:N$, $UI:P$, $UI:A$). Accurate scoring requires understanding both versions."
+          ]
+        },
+        {
+          "title": "Demonstrating Real-World Impact: The Difference Between P4 and P1",
+          "paragraphs": [
+            "A common beginner mistake is submitting theoretical vulnerabilities without proving impact: reporting 'Missing Rate Limiting' on an endpoint with no sensitive data is rated P4/P5. In contrast, proving that missing rate limiting enables 10,000 parallel requests to bypass a $1,000 gift card redemption limit elevates the finding to P1 Critical.",
+            "Researchers must construct complete exploit chains: combining self-XSS with CSRF to achieve Account Takeover, or combining unauthenticated SSRF with cloud metadata to extract production IAM credentials."
+          ]
+        },
+        {
+          "title": "Avoiding Triage Pitfalls: Duplicate Prevention and Clear PoC Construction",
+          "paragraphs": [
+            "To avoid frustrating duplicate closures, researchers should submit reports promptly upon discovery, avoid mass-reporting 50 identical instances of the same root-cause bug across different parameters (which will be merged as 1 duplicate), and write deterministic reproduction scripts.",
+            "Proof of Concept (PoC) scripts must be sanitized: using placeholder tokens, masking sensitive PII/PCI data, and avoiding destructive payloads (e.g. running `whoami` instead of `rm -rf`)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Bug Bounty Report Triaging & CVSS Vector Score Defense",
+        "objective": "Audit a draft bug bounty submission, calculate accurate CVSS v3.1 and CVSS v4.0 vector strings, and refactor a rejected theoretical report into a validated high-impact finding.",
+        "scenario": "You are preparing a report for an SSRF vulnerability that allows accessing AWS instance metadata on a production banking API. You must calculate the exact CVSS score and formulate a compelling threat impact narrative.",
+        "constraints": [
+          "Must calculate CVSS v3.1 vector string with accurate base metrics.",
+          "Must calculate CVSS v4.0 vector string including Subsequent System impact.",
+          "Must draft deterministic, sanitized curl reproduction steps."
+        ],
+        "cases": [
+          {
+            "id": "case-01-cvss-vector-calculation",
+            "title": "Calculating CVSS v3.1 and v4.0 Scores for Cloud Metadata SSRF",
+            "context": "An unauthenticated remote attacker can send a GET request to `/api/proxy?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/admin-role` and retrieve AWS access keys with full EC2/S3 read/write permissions.",
+            "prompt": "What are the accurate CVSS v3.1 and CVSS v4.0 vector metrics for this vulnerability?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "CVSS v3.1: 9.8 (AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H) or 10.0 (S:C); CVSS v4.0: 9.3 (CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H) — unauthenticated network vector, low complexity, no privileges, no user interaction, critical impact across vulnerable and subsequent cloud systems.",
+                "correct": true,
+                "rationale": "Unauthenticated cloud metadata SSRF that yields full administrative cloud credentials results in complete compromise of confidentiality, integrity, and availability across the host and subsequent cloud infrastructure."
+              },
+              {
+                "id": "opt-2",
+                "label": "CVSS v3.1: 2.1 (Low severity) because the endpoint is only an image proxy.",
+                "correct": false,
+                "rationale": "CVSS evaluates the proven impact of the vulnerability (IAM account takeover), not the intended feature name."
+              },
+              {
+                "id": "opt-3",
+                "label": "CVSS v4.0 requires Attack Vector to be Physical (AV:P) for all web bugs.",
+                "correct": false,
+                "rationale": "Web application vulnerabilities are exploited over the network (AV:N)."
+              },
+              {
+                "id": "opt-4",
+                "label": "CVSS scores are randomly assigned by a computer algorithm and cannot be calculated.",
+                "correct": false,
+                "rationale": "CVSS is a standardized mathematical formula based on objective technical metrics."
+              }
+            ]
+          },
+          {
+            "id": "case-02-theoretical-vs-impactful",
+            "title": "Refactoring Theoretical Reports into Actionable High-Impact Findings",
+            "context": "A researcher submits: 'Title: Missing DMARC record on email.target.com - Severity: Critical'. The report is immediately closed as N/A by triage.",
+            "prompt": "Why was the report closed, and what defines a reportable email spoofing vulnerability?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Missing DMARC on non-sending subdomains without proof of email delivery to major inboxes is considered informational/P5 on bug bounty platforms; a valid report requires demonstrating that spoofed emails from the primary apex domain (`target.com`) bypass SPF/DKIM and land directly in Gmail/Outlook inboxes without spam flags.",
+                "correct": true,
+                "rationale": "Bug bounty platforms require proof of tangible business risk. Missing DNS records without proven delivery impact are universally rejected as non-actionable informational noise."
+              },
+              {
+                "id": "opt-2",
+                "label": "The report was closed because the triager hates the researcher.",
+                "correct": false,
+                "rationale": "Triage decisions are governed by standardized Vulnerability Rating Taxonomies (VRT), not personal feelings."
+              },
+              {
+                "id": "opt-3",
+                "label": "DMARC records are illegal under international law.",
+                "correct": false,
+                "rationale": "DMARC is a standard email authentication specification (RFC 7489)."
+              },
+              {
+                "id": "opt-4",
+                "label": "All missing DNS records are automatically Critical vulnerabilities.",
+                "correct": false,
+                "rationale": "Missing security records are defense-in-depth gaps that rarely warrant high severity without proven exploitability."
+              }
+            ]
+          },
+          {
+            "id": "case-03-deterministic-poc-formatting",
+            "title": "Formatting Deterministic, Copy-Pasteable Reproduction Steps",
+            "context": "A researcher submits a report for an IDOR vulnerability containing only a blurry screenshot and the text 'look at the user endpoint it is broken'.",
+            "prompt": "How should the reproduction section be rewritten to ensure immediate validation by the triager?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Provide numbered step-by-step instructions: 1) Register Account A (`user_a@test.com`) and Account B (`user_b@test.com`); 2) Log in as User A and note Document ID `105`; 3) Log in as User B and execute the provided sanitized curl command `curl -H 'Authorization: Bearer <USER_B_TOKEN>' https://api.target.com/v1/docs/105`; 4) Observe that User B successfully retrieves User A's private tax document.",
+                "correct": true,
+                "rationale": "Two-account reproduction steps with exact, sanitized curl commands allow triagers to verify BOLA/IDOR within 60 seconds, preventing delays and disputes."
+              },
+              {
+                "id": "opt-2",
+                "label": "Include the live production session cookie of the CEO.",
+                "correct": false,
+                "rationale": "Including live production CEO credentials violates data protection rules and credentials hygiene."
+              },
+              {
+                "id": "opt-3",
+                "label": "Refuse to provide reproduction steps and demand the bounty first.",
+                "correct": false,
+                "rationale": "Reports without reproduction steps are rejected immediately as un-reproducible."
+              },
+              {
+                "id": "opt-4",
+                "label": "Send a 4-hour video recording of the researcher typing.",
+                "correct": false,
+                "rationale": "Lengthy un-timestamped videos slow triage; concise text steps with curl commands are preferred."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Calculate accurate CVSS v3.1 and CVSS v4.0 vector strings with justified metric assignments.",
+          "Demonstrate clear differentiation between theoretical configuration gaps and high-impact vulnerabilities.",
+          "Author professional, two-account deterministic reproduction steps with sanitized curl commands."
+        ],
+        "evidenceTemplate": [
+          "CVSS v3.1 / CVSS v4.0 calculation breakdown and vector string.",
+          "Threat modeling narrative demonstrating tangible business impact.",
+          "Two-account deterministic reproduction steps with sanitized curl commands."
+        ],
+        "reset": "Reset draft report templates and CVSS calculator inputs to baseline.",
+        "cleanup": "Remove temporary draft markdown files and archive triage evaluation logs."
+      },
+      "governance": {
+        "prevent": [
+          "Prohibit submitting automated scanner outputs or theoretical configuration gaps without proof of impact.",
+          "Mandate inclusion of CVSS v3.1 and CVSS v4.0 vector strings in all structured vulnerability reports.",
+          "Enforce strict data sanitization (masking live credentials, PII, and financial records) in all report attachments."
+        ],
+        "observe": [
+          "Track report acceptance rates (Valid vs Duplicate vs N/A) on bug bounty researcher profiles.",
+          "Monitor average Time-to-Triage and Time-to-Bounty metrics across platform engagements.",
+          "Log CVSS score dispute frequencies and mediation resolutions."
+        ],
+        "respond": [
+          "Provide constructive technical clarifications if a triager requests additional impact details.",
+          "Accept duplicate closures gracefully if the client proves an earlier timestamped submission exists.",
+          "Escalate to platform mediation only when objective technical facts are misconstrued."
+        ],
+        "residualRisk": [
+          "Differing organizational risk appetites can lead to lower severity ratings on specific vulnerability classes.",
+          "Simultaneous independent discovery by multiple researchers during flash crowds often leads to duplicate disputes."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "The faster you submit a one-sentence report, the higher your chance of getting the bounty.",
+          "correction": "Vague one-sentence reports are rejected as 'Needs More Info' or closed. Well-structured reports with reproduction steps secure the earliest timestamp and are triaged first."
+        },
+        {
+          "claim": "CVSS v4.0 and CVSS v3.1 always produce the exact same score.",
+          "correction": "CVSS v4.0 refines metrics (adding Attack Requirements $AT$, splitting impact into Vulnerable vs Subsequent Systems), often resulting in different, more precise scores."
+        },
+        {
+          "claim": "Submitting a missing HTTP header is an easy way to earn thousands of dollars in bounties.",
+          "correction": "Missing headers (CSP, HSTS, X-Content-Type-Options) are almost universally rated P5 Informational / Out of Scope unless chained into an active, demonstrable exploit."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is the most effective way to ensure a bug bounty report is triaged quickly and validated without dispute?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Threaten to post the bug on Twitter if not paid within 1 hour."
+            },
+            {
+              "id": "B",
+              "label": "Provide clear, numbered step-by-step reproduction instructions, sanitized copy-pasteable curl commands, a two-account demonstration for authorization bugs, and an objective impact narrative."
+            },
+            {
+              "id": "C",
+              "label": "Send 50 emails to the company CEO."
+            },
+            {
+              "id": "D",
+              "label": "Submit a 500-page automated Nessus scan export."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Clear, reproducible instructions and deterministic commands enable triagers to verify the vulnerability instantly, minimizing friction and delays."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "In CVSS v4.0 scoring, what do the metrics $SC$, $SI$, and $SA$ represent?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Secret Credentials, Secret Identity, and Secret Access"
+            },
+            {
+              "id": "B",
+              "label": "Subsequent System Confidentiality, Subsequent System Integrity, and Subsequent System Availability impact"
+            },
+            {
+              "id": "C",
+              "label": "Software Code, Software Interface, and Software Architecture"
+            },
+            {
+              "id": "D",
+              "label": "Server CPU, Server Internet, and Server Application"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "CVSS v4.0 explicitly separates impact on the vulnerable system ($VC/VI/VA$) from impact on subsequent downstream systems ($SC/SI/SA$), replacing the v3 Scope metric."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "Why are reports for 'Self-XSS' (executing XSS on one's own account) typically closed as N/A or P5 unless chained with another vulnerability?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because Self-XSS only affects the attacker themselves, presenting zero security risk to other users unless chained with a vector like CSRF or OAuth account takeover to force execution in victim sessions."
+            },
+            {
+              "id": "B",
+              "label": "Because JavaScript is forbidden on bug bounty platforms."
+            },
+            {
+              "id": "C",
+              "label": "Because Self-XSS is encrypted by the browser."
+            },
+            {
+              "id": "D",
+              "label": "Because Self-XSS only works on Internet Explorer."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Self-XSS requires an attacker to attack themselves. Without a delivery mechanism (e.g. CSRF) to deliver the payload into another user's session, there is no real-world business impact."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You have verified a Critical unauthenticated SQL Injection vulnerability in a password reset API endpoint (`POST /api/v1/auth/reset-request` with JSON parameter `email`). An attacker can extract user password hashes using boolean-based blind SQLi. You must author a complete, professional bug bounty submission: compute the exact CVSS v3.1 and CVSS v4.0 vector strings, provide deterministic two-step curl reproduction commands with sanitized mock data, explain the business impact under GDPR/data protection regulations, and recommend parameterized query remediation.",
+        "tasks": [
+          "Calculate and document the full CVSS v3.1 and CVSS v4.0 vector strings.",
+          "Write a structured bug report adhering to Bugcrowd/HackerOne enterprise standards.",
+          "Provide copy-pasteable sanitized curl reproduction commands and remediation guidance."
+        ],
+        "requiredEvidence": [
+          "Complete professional bug bounty report markdown artifact.",
+          "CVSS v3.1 and CVSS v4.0 vector string calculation breakdown.",
+          "Sanitized reproduction curl snippet and proof of concept transcript."
+        ]
+      },
+      "sources": [
+        {
+          "title": "FIRST: Common Vulnerability Scoring System v4.0 Specification",
+          "url": "https://www.first.org/cvss/v4.0/specification-document",
+          "publisher": "Forum of Incident Response and Security Teams (FIRST)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "CVSS v4.0 metric definitions (Base, Threat, Environmental)",
+            "Subsequent System impact (SC/SI/SA) scoring mechanics",
+            "Attack Requirements (AT) and User Interaction (UI) specifications"
+          ]
+        },
+        {
+          "title": "Bugcrowd Vulnerability Rating Taxonomy (VRT)",
+          "url": "https://bugcrowd.com/vulnerability-rating-taxonomy",
+          "publisher": "Bugcrowd Inc.",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Vulnerability priority tiers (P1 Critical through P5 Informational)",
+            "Triage standards for web and API vulnerability classifications",
+            "Accepted vs non-actionable bug definitions"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os07-l66-responsible-disclosure-and-platform-etiquette",
+      "slug": "responsible-disclosure-and-platform-etiquette",
+      "title": "Coordinated Vulnerability Disclosure (CVD), Safe Harbor & Ethics",
+      "summary": "Navigate the legal and professional ecosystem of vulnerability disclosure: Coordinated Vulnerability Disclosure (ISO/IEC 29147 & ISO/IEC 30111), Gold Standard Safe Harbor compliance, Bugcrowd/HackerOne mediation, resolving severity disputes constructively, and public disclosure ethics.",
+      "difficulty": "advanced",
+      "durationMinutes": 120,
+      "prerequisites": ["os07-l65-vulnerability-triage-and-cvss-v4-impact"],
+      "outcomes": [
+        "Adhere to ISO/IEC 29147 and ISO/IEC 30111 Coordinated Vulnerability Disclosure standards.",
+        "Evaluate Safe Harbor protections to ensure testing remains within legal authorization boundaries.",
+        "Handle mediation, severity disputes, and public disclosure coordination professionally."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web", "api"],
+      "attackTactics": ["initial-access", "defense-evasion"],
+      "keywords": [
+        "responsible-disclosure",
+        "cvd",
+        "safe-harbor",
+        "iso-29147",
+        "mediation",
+        "ethics"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Vulnerability disclosure is a professional legal partnership: Coordinated Vulnerability Disclosure (CVD) grants Safe Harbor legal immunity in exchange for strict scope adherence, non-destructive testing, confidential reporting, and coordinated patch timelines.",
+      "visual": {
+        "title": "Coordinated Vulnerability Disclosure & Mediation Lifecycle",
+        "caption": "The structured lifecycle of discovering, reporting, remediating, and responsibly disclosing vulnerabilities.",
+        "steps": [
+          {
+            "label": "Authorized Discovery",
+            "detail": "Researcher tests strictly in-scope assets adhering to Safe Harbor terms; halts upon proving concept.",
+            "tone": "allow"
+          },
+          {
+            "label": "Confidential Submission & Triage",
+            "detail": "Submit structured report through official CVD/bounty platform; maintain 90-day confidential remediation window.",
+            "tone": "allow"
+          },
+          {
+            "label": "Patch Verification & Coordinated Release",
+            "detail": "Client deploys and verifies patch; mutual agreement on coordinated public disclosure / writeup release.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Coordinated Vulnerability Disclosure (CVD): The International Standard",
+          "paragraphs": [
+            "Coordinated Vulnerability Disclosure (CVD, codified in ISO/IEC 29147 for disclosure and ISO/IEC 30111 for vulnerability handling) is the global standard for managing security vulnerabilities between researchers and organizations.",
+            "Under CVD, the researcher agrees to report the vulnerability privately and give the vendor a reasonable window (standard 90 days per Google Project Zero / CERT/CC guidelines) to develop, test, and deploy a patch before any public disclosure occurs, ensuring users are protected before details become public."
+          ]
+        },
+        {
+          "title": "Legal Safe Harbor: Gold Standard Terms, Authorization, and Anti-Extortion Rules",
+          "paragraphs": [
+            "Computer crime laws (such as the US Computer Fraud and Abuse Act - CFAA and UK Computer Misuse Act) criminalize unauthorized access to computers. Vulnerability Disclosure Policies (VDP) that incorporate 'Gold Standard Safe Harbor' (promoted by Disclose.io) provide legal authorization and pledge that the organization will not initiate legal action against researchers.",
+            "Safe Harbor is strictly conditional: researchers must adhere to all program rules, test only in-scope assets, avoid accessing or storing customer PII, refrain from destructive testing (DoS, data corruption), and never demand financial payment as a condition for withholding vulnerability details (which constitutes criminal extortion)."
+          ]
+        },
+        {
+          "title": "Platform Mediation: Handling Duplicates, Out-of-Scope Flags, and Severity Disputes",
+          "paragraphs": [
+            "Disputes over severity ratings, duplicate closures, and scope eligibility occasionally arise during bug bounty engagements. Professional researchers maintain constructive, objective communication grounded in technical facts and standardized taxonomies (Bugcrowd VRT, HackerOne Directory).",
+            "If a triager closes a report as a duplicate, the researcher can politely request the original report ID or confirmation that the root-cause endpoint matches. If an impasse occurs, researchers utilize formal platform mediation rather than engaging in unprofessional hostility."
+          ]
+        },
+        {
+          "title": "Public Disclosure Ethics: Embargoes, Patch Verification, and Post-Mortems",
+          "paragraphs": [
+            "Publishing technical blog posts, CVE writeups, or social media disclosures is a valuable contribution to the cybersecurity community. However, public disclosure must always be coordinated: 1) Verify that the vendor has deployed and tested the patch in production.",
+            "2) Ensure all sensitive client tokens, IP addresses, and private customer information are permanently redacted from screenshots and transcripts. 3) Honor mutual disclosure embargo agreements until the agreed-upon public disclosure date."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Responsible Vulnerability Disclosure & Attestation Packaging",
+        "objective": "Evaluate a Safe Harbor policy boundary, navigate a duplicate finding dispute constructively using technical evidence, and draft a Coordinated Vulnerability Disclosure (CVD) attestation package.",
+        "scenario": "You have discovered a high-severity authentication bypass in an enterprise SaaS application. You must prepare a CVD submission package, verify Safe Harbor compliance, and handle disclosure coordination.",
+        "constraints": [
+          "Must evaluate Safe Harbor terms and ensure zero customer PII exfiltration.",
+          "Must draft professional, factual mediation communications for a severity dispute.",
+          "Must format a coordinated public disclosure writeup with full data redaction."
+        ],
+        "cases": [
+          {
+            "id": "case-01-safe-harbor-boundary-check",
+            "title": "Evaluating Safe Harbor Compliance and Data Handling",
+            "context": "While exploiting an IDOR vulnerability, an assessor notices they can download customer database backups containing 500,000 plaintext credit card numbers.",
+            "prompt": "What is the mandatory action required to remain compliant with Safe Harbor legal protections?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Immediately stop extraction: download exactly 1 test record (or demonstrative non-sensitive metadata) to prove concept, do not access or store the remaining records, and report the vulnerability immediately through the official disclosure channel.",
+                "correct": true,
+                "rationale": "Safe Harbor requires minimal necessary data access to prove concept. Downloading mass customer databases exceeds authorization, violates data privacy laws (GDPR/HIPAA), and forfeits legal protections."
+              },
+              {
+                "id": "opt-2",
+                "label": "Download all 500,000 records and post them on Telegram to prove the vulnerability is real.",
+                "correct": false,
+                "rationale": "Mass downloading and publicly dumping customer records is a serious data breach and criminal act."
+              },
+              {
+                "id": "opt-3",
+                "label": "Demand $50,000 from the company or threaten to sell the database.",
+                "correct": false,
+                "rationale": "Demanding money to withhold data is criminal extortion."
+              },
+              {
+                "id": "opt-4",
+                "label": "Delete the customer records from the client's database.",
+                "correct": false,
+                "rationale": "Destructive actions violate all program rules and legal authorizations."
+              }
+            ]
+          },
+          {
+            "id": "case-02-constructive-mediation",
+            "title": "Handling Severity Disputes with Objective Evidence",
+            "context": "A triager downgrades an Account Takeover vulnerability via OAuth CSRF from P1 Critical to P4 Low, claiming 'CSRF is always low severity'.",
+            "prompt": "How should the researcher professionally communicate and resolve this severity dispute?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Politely reply with objective technical references: cite the Bugcrowd VRT / HackerOne classification for 'Account Takeover via OAuth CSRF (P1)', provide a concise impact summary demonstrating one-click account takeover, and request platform mediation if the triager remains unaligned.",
+                "correct": true,
+                "rationale": "Grounding disputes in industry standard taxonomies (VRT) and factual impact demonstrations resolves severity disagreements professionally without emotional escalation."
+              },
+              {
+                "id": "opt-2",
+                "label": "Send insulting messages to the triager in all capital letters.",
+                "correct": false,
+                "rationale": "Hostility leads to researcher account suspension and accomplishes nothing."
+              },
+              {
+                "id": "opt-3",
+                "label": "Post the zero-day exploit on Twitter immediately.",
+                "correct": false,
+                "rationale": "Dropping zero-days breaches CVD agreements and harms innocent users."
+              },
+              {
+                "id": "opt-4",
+                "label": "Give up and close the report.",
+                "correct": false,
+                "rationale": "Professional mediation exists specifically to resolve valid technical disagreements."
+              }
+            ]
+          },
+          {
+            "id": "case-03-public-disclosure-redaction",
+            "title": "Preparing Coordinated Public Disclosure Writeups",
+            "context": "The client successfully patches a critical vulnerability and authorizes a public blog post writeup under mutual disclosure terms.",
+            "prompt": "What redaction requirements must be completed before publishing the technical writeup?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Verify the patch is fully deployed in production, permanently redact all sensitive client domains/IPs (if requested by policy), mask all real user email addresses, tokens, and PII, and coordinate the publication date with the client security team.",
+                "correct": true,
+                "rationale": "Responsible writeups educate the security community while rigorously protecting client confidentiality and preventing residual data leaks."
+              },
+              {
+                "id": "opt-2",
+                "label": "Include unmasked client passwords in the blog post title.",
+                "correct": false,
+                "rationale": "Leaking client passwords in public blogs violates basic confidentiality and ethics."
+              },
+              {
+                "id": "opt-3",
+                "label": "Publish the blog post before the client finishes writing the patch.",
+                "correct": false,
+                "rationale": "Publishing unpatched vulnerabilities exposes active users to malicious exploitation."
+              },
+              {
+                "id": "opt-4",
+                "label": "Public blog posts are forbidden by international cybersecurity treaties.",
+                "correct": false,
+                "rationale": "Public writeups after coordinated patching are a standard and respected part of the cybersecurity ecosystem."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate understanding of Safe Harbor scope boundaries and minimal data access rules.",
+          "Formulate constructive, taxonomy-grounded mediation communications for severity disputes.",
+          "Format a fully redacted, coordinated vulnerability disclosure post-mortem artifact."
+        ],
+        "evidenceTemplate": [
+          "Safe Harbor compliance and data minimization checklist.",
+          "Professional severity dispute mediation communication transcript.",
+          "Coordinated Public Disclosure post-mortem writeup template with redaction markings."
+        ],
+        "reset": "Reset mediation communication templates and disclosure draft documents.",
+        "cleanup": "Remove temporary draft writeups and archive disclosure coordination logs."
+      },
+      "governance": {
+        "prevent": [
+          "Strictly prohibit data exfiltration beyond the minimum necessary proof of concept.",
+          "Prohibit threatening or extortionate communication regarding vulnerability disclosures.",
+          "Enforce adherence to the standard 90-day Coordinated Vulnerability Disclosure embargo timeline."
+        ],
+        "observe": [
+          "Track disclosure report resolution times (Mean Time to Remediate - MTTR) on bounty platforms.",
+          "Monitor researcher communication tone and adherence to platform code of conduct.",
+          "Log public disclosure coordination agreements and agreed-upon publication dates."
+        ],
+        "respond": [
+          "Engage platform mediation specialists if technical severity disputes cannot be resolved amicably.",
+          "Issue public CVE advisories and coordinated security bulletins upon patch deployment.",
+          "Recognize and reward researchers adhering to CVD principles in security halls of fame."
+        ],
+        "residualRisk": [
+          "Complex enterprise patching cycles spanning third-party vendors may require extending 90-day disclosure embargoes.",
+          "Independent discovery by malicious actors during the patching window remains a background threat."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Having a bug bounty program means researchers can perform any action on any server without limits.",
+          "correction": "Bug bounty programs operate under strict legal rules. Destructive attacks, data destruction, social engineering, and testing out-of-scope targets remain illegal."
+        },
+        {
+          "claim": "Asking for money before explaining the full vulnerability is standard bug bounty practice.",
+          "correction": "Withholding vulnerability details or demanding payment to disclose is criminal extortion. Legitimate bounties are awarded voluntarily based on full, transparent reports."
+        },
+        {
+          "claim": "Once a bug is reported, researchers can immediately post it on social media.",
+          "correction": "Under Coordinated Vulnerability Disclosure, public disclosure must wait until the vendor has patched the vulnerability and agreed to disclosure."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is the core principle of Coordinated Vulnerability Disclosure (CVD)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Selling vulnerabilities to the highest bidder on the dark web."
+            },
+            {
+              "id": "B",
+              "label": "Privately reporting security vulnerabilities to the affected organization and giving them a reasonable time window (e.g. 90 days) to deploy a fix before publicly releasing technical details."
+            },
+            {
+              "id": "C",
+              "label": "Never fixing any security vulnerabilities."
+            },
+            {
+              "id": "D",
+              "label": "Publishing zero-day exploits on social media immediately upon discovery."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "CVD ensures that vulnerabilities are reported privately and resolved before public disclosure, safeguarding end-users from cyber attacks."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "Under Disclose.io Gold Standard Safe Harbor guidelines, what must a researcher do when they discover an access control flaw exposing customer records?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Download the entire database to prove the full count of records."
+            },
+            {
+              "id": "B",
+              "label": "Access only the minimum necessary data required to demonstrate proof of concept (e.g. 1 test record), avoid storing or exfiltrating mass data, and report the flaw immediately."
+            },
+            {
+              "id": "C",
+              "label": "Modify customer records to say 'Hacked'."
+            },
+            {
+              "id": "D",
+              "label": "Email all customers informing them they are vulnerable."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Safe Harbor protections require strict data minimization. Accessing or exfiltrating mass customer data exceeds authorization and forfeits legal protections."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "What international standards define the formal processes for vulnerability disclosure and vulnerability handling?",
+          "options": [
+            {
+              "id": "A",
+              "label": "ISO/IEC 29147 (Vulnerability disclosure) and ISO/IEC 30111 (Vulnerability handling processes)"
+            },
+            {
+              "id": "B",
+              "label": "IEEE 802.11 Wi-Fi Standards"
+            },
+            {
+              "id": "C",
+              "label": "HTML5 Living Standard"
+            },
+            {
+              "id": "D",
+              "label": "Unicode Consortium Character Maps"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "ISO/IEC 29147 and ISO/IEC 30111 are the international standards governing receipt, investigation, coordination, and remediation of security vulnerabilities."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You have discovered a high-severity authentication bypass in a healthcare platform operating a Coordinated Vulnerability Disclosure (CVD) program. The platform triager mistakenly closed your submission as a duplicate of an unrelated rate-limiting report. You must draft a professional, evidence-backed mediation appeal referencing the Bugcrowd VRT taxonomy, formulate a 90-day coordinated disclosure timeline, and prepare a sanitized public disclosure writeup template.",
+        "tasks": [
+          "Write a factual, professional mediation response explaining why the authentication bypass is distinct from rate-limiting.",
+          "Formulate a 90-day Coordinated Vulnerability Disclosure timeline adhering to ISO/IEC 29147.",
+          "Author a sanitized, redacted public disclosure post-mortem artifact."
+        ],
+        "requiredEvidence": [
+          "Mediation appeal communication transcript.",
+          "CVD 90-day timeline and milestone schedule.",
+          "Sanitized public disclosure case study document."
+        ]
+      },
+      "sources": [
+        {
+          "title": "ISO/IEC 29147:2018 Information technology — Security techniques — Vulnerability disclosure",
+          "url": "https://www.iso.org/standard/72311.html",
+          "publisher": "International Organization for Standardization (ISO)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Coordinated Vulnerability Disclosure guidelines and interface requirements",
+            "Vulnerability receipt, acknowledgment, and communication protocols",
+            "Public release coordination standards"
+          ]
+        },
+        {
+          "title": "Disclose.io: Gold Standard Safe Harbor Terms for Vulnerability Disclosure Policies",
+          "url": "https://disclose.io/programs/safe-harbor/",
+          "publisher": "Disclose.io Project",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Legal authorization and Safe Harbor definitions (CFAA / anti-circumvention)",
+            "Good faith security research guidelines and data minimization principles"
+          ]
+        }
+      ]
+    }
+  ]
+}

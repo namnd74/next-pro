@@ -1,0 +1,1062 @@
+{
+  "id": "os07-m02-access-control-and-injection",
+  "slug": "access-control-and-injection",
+  "trackId": "os07-web-api-bug-bounty",
+  "title": "Access control, XSS and injection families",
+  "summary": "Master core web vulnerability classes: exploit and remediate Broken Object Level Authorization (BOLA/IDOR) and BFLA, conquer Cross-Site Scripting (XSS) via contextual encoding and CSP, and eliminate SQL, NoSQL, Command, and Template Injection.",
+  "difficulty": "intermediate",
+  "estimatedMinutes": 420,
+  "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+  "domains": ["web", "api"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os07-l55-broken-object-level-and-function-authorization",
+      "slug": "broken-object-level-and-function-authorization",
+      "title": "Broken Object & Function Level Authorization (BOLA/IDOR & BFLA)",
+      "summary": "Audit modern API access controls: Broken Object Level Authorization (OWASP API1:2023 BOLA / IDOR), Broken Object Property Level Authorization (BOPLA), Broken Function Level Authorization (BFLA), and enforcing database-level tenant ownership checks.",
+      "difficulty": "intermediate",
+      "durationMinutes": 140,
+      "prerequisites": [],
+      "outcomes": [
+        "Identify and exploit BOLA/IDOR vulnerabilities by manipulating object identifiers in REST/GraphQL API endpoints.",
+        "Audit Broken Function Level Authorization (BFLA) where administrative endpoints lack role-based access checks.",
+        "Architect secure tenant-scoped database query patterns that enforce object ownership server-side."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web", "api"],
+      "attackTactics": ["initial-access", "privilege-escalation"],
+      "keywords": [
+        "idor",
+        "bola",
+        "bfla",
+        "authorization",
+        "access-control",
+        "mass-assignment"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Authorization is server-side ownership validation: never trust client-supplied resource IDs; every database query must enforce `WHERE id = :requested_id AND tenant_id = :session_user_tenant_id` at the data access layer.",
+      "visual": {
+        "title": "API Object & Function Level Authorization Verification",
+        "caption": "How server-side authorization middleware verifies tenant ownership before database retrieval.",
+        "steps": [
+          {
+            "label": "Client API Request",
+            "detail": "Authenticated User A requests GET /api/v1/invoices/9999 (where invoice 9999 belongs to User B).",
+            "tone": "caution"
+          },
+          {
+            "label": "Tenant Ownership Check",
+            "detail": "Middleware extracts user_id from session/JWT and checks if user_id == invoice.owner_id.",
+            "tone": "allow"
+          },
+          {
+            "label": "Access Enforcement",
+            "detail": "If tenant mismatch detected, server immediately returns HTTP 403 Forbidden / 404 Not Found without leaking data.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "The Anatomy of BOLA/IDOR: Client-Supplied vs Server-Verified Identity",
+          "paragraphs": [
+            "Broken Object Level Authorization (BOLA, historically known as Insecure Direct Object References - IDOR) ranks as the #1 vulnerability in the OWASP API Security Top 10. BOLA occurs when an API endpoint exposes an internal database key or object reference (e.g. `/api/v1/users/{userId}/documents/{docId}`) and fails to validate that the currently authenticated user owns the requested record.",
+            "An attacker logged in as User 101 simply alters the URL parameter to User 102 (`/api/v1/users/102/documents/5541`). If the server fetches and returns document 5541 without verifying ownership, the entire multi-tenant database is exposed to unauthorized enumeration."
+          ]
+        },
+        {
+          "title": "Broken Object Property Level Authorization (BOPLA / Mass Assignment)",
+          "paragraphs": [
+            "Broken Object Property Level Authorization (BOPLA, combining Mass Assignment and Excessive Data Exposure) occurs when APIs expose sensitive object properties in responses or accept unvalidated JSON properties in request payloads.",
+            "For example, a user updating their profile submits `{\"name\": \"Alice\", \"role\": \"admin\", \"is_verified\": true}`. If the back-end ORM automatically binds all incoming JSON properties directly to the User database model without a strict property whitelist (DTO), the unprivileged user successfully escalates their own privileges to Administrator."
+          ]
+        },
+        {
+          "title": "Broken Function Level Authorization (BFLA) and Administrative Route Bypass",
+          "paragraphs": [
+            "Broken Function Level Authorization (BFLA) occurs when access control checks are implemented on the client UI (e.g. hiding the 'Admin Panel' button in the React dashboard) but omitted on the server-side API endpoints (`POST /api/v1/admin/delete_user`).",
+            "Attackers discover administrative endpoints via JavaScript bundle analysis or API documentation and issue direct HTTP requests using standard unprivileged user credentials. If the endpoint does not verify administrative roles at the controller/middleware layer, the unauthorized administrative action executes."
+          ]
+        },
+        {
+          "title": "Architectural Defense: Tenant-Scoped Context and Authorization Middleware",
+          "paragraphs": [
+            "Replacing sequential integer IDs with UUIDs (e.g. `/api/v1/invoices/d3b07384...`) provides obscurity but does not fix authorization: if a UUID is leaked, shared, or indexed, it remains fully exploitable.",
+            "Durable remediation requires 'Tenant-Scoped Data Access'. All database queries must incorporate the authenticated user's tenant identity extracted from the verified session context: `SELECT * FROM invoices WHERE id = ? AND company_id = ?`. Modern frameworks enforce this via Policy-Based Authorization (e.g. CASL, Spring Security `@PreAuthorize`, or ASP.NET Core Policies)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "API BOLA / IDOR Authorization Bypass & Contextual Remediation",
+        "objective": "Identify a BOLA vulnerability on a document retrieval endpoint, exploit a mass-assignment BOPLA flaw to escalate user roles, and refactor the backend API controller to enforce tenant ownership checks.",
+        "scenario": "You are auditing a cloud billing API. An unprivileged user can read another customer's tax documents by changing the document ID in the URL, and can set `\"is_admin\": true` in their account update payload.",
+        "constraints": [
+          "Must demonstrate BOLA document access using authorization parameter manipulation.",
+          "Must identify mass-assignment property binding on profile update requests.",
+          "Must refactor controller code to enforce session-derived tenant ID matching in SQL/ORM queries."
+        ],
+        "cases": [
+          {
+            "id": "case-01-bola-idor-remediation",
+            "title": "Remediating BOLA on Document Retrieval Endpoints",
+            "context": "The vulnerable endpoint handler is: `def get_document(doc_id): return db.query(Document).filter_by(id=doc_id).first()`.",
+            "prompt": "How should this endpoint be refactored to prevent unauthorized cross-tenant data access?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Extract the authenticated user's organization/tenant ID from the session context and enforce it in the query: `doc = db.query(Document).filter_by(id=doc_id, org_id=current_user.org_id).first(); if not doc: raise HTTPException(404)`.",
+                "correct": true,
+                "rationale": "Enforcing both `id` and `org_id` in the database query guarantees that users can only retrieve documents belonging to their own organization, completely preventing BOLA/IDOR."
+              },
+              {
+                "id": "opt-2",
+                "label": "Encrypt the document ID with base64 so users cannot guess it.",
+                "correct": false,
+                "rationale": "Base64 is an unencrypted encoding that users can decode and tamper with in milliseconds."
+              },
+              {
+                "id": "opt-3",
+                "label": "Hide the document URL in the mobile application UI.",
+                "correct": false,
+                "rationale": "Client-side UI hiding does not protect API endpoints against direct HTTP proxy inspection."
+              },
+              {
+                "id": "opt-4",
+                "label": "Return all documents in the entire database and filter them in JavaScript on the browser.",
+                "correct": false,
+                "rationale": "Returning all documents sends all confidential customer data over the network to untrusted clients."
+              }
+            ]
+          },
+          {
+            "id": "case-02-mass-assignment-bopla",
+            "title": "Preventing Privilege Escalation via Mass Assignment",
+            "context": "A profile update endpoint binds incoming request JSON directly to the user model: `user.update(**request.json)`. An attacker sends `{\"bio\": \"Hello\", \"role\": \"superadmin\"}`.",
+            "prompt": "What design pattern prevents unauthorized model attribute tampering?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Use strict Data Transfer Objects (DTOs) / Pydantic schemas that whitelist only editable fields (e.g. `bio`, `display_name`) and ignore or reject protected fields like `role` or `is_verified`.",
+                "correct": true,
+                "rationale": "DTO schemas define strict whitelists of permitted update fields, preventing attackers from injecting administrative attributes into database update routines."
+              },
+              {
+                "id": "opt-2",
+                "label": "Check if the word 'superadmin' is in the request and convert it to lowercase.",
+                "correct": false,
+                "rationale": "String conversion does not prevent unauthorized assignment of administrative roles."
+              },
+              {
+                "id": "opt-3",
+                "label": "Allow mass assignment because developers write less code that way.",
+                "correct": false,
+                "rationale": "Unchecked mass assignment is a primary cause of account takeover and privilege escalation."
+              },
+              {
+                "id": "opt-4",
+                "label": "Delete the user table whenever an update request is received.",
+                "correct": false,
+                "rationale": "Deleting database tables destroys system functionality."
+              }
+            ]
+          },
+          {
+            "id": "case-03-bfla-rbac-enforcement",
+            "title": "Enforcing Role-Based Access on Administrative Functions",
+            "context": "An endpoint `/api/v1/tenants/{tenantId}/purge` has no role checks. Any authenticated employee from the tenant can send a POST request and purge all company records.",
+            "prompt": "How must authorization be implemented on this administrative function?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Enforce declarative role/policy authorization middleware: `@require_permission('tenant:admin')` and verify that `current_user.has_role('ADMIN', tenant_id)` before executing the purge routine.",
+                "correct": true,
+                "rationale": "Administrative functions must verify both role permissions (BFLA defense) and tenant boundary ownership (BOLA defense) before executing sensitive actions."
+              },
+              {
+                "id": "opt-2",
+                "label": "Change the HTTP method from POST to PUT.",
+                "correct": false,
+                "rationale": "Changing HTTP methods provides zero access control authorization."
+              },
+              {
+                "id": "opt-3",
+                "label": "Rename the endpoint to `/api/v1/secret_purge_nobody_knows`.",
+                "correct": false,
+                "rationale": "Security through obscurity fails against basic API fuzzing and traffic inspection."
+              },
+              {
+                "id": "opt-4",
+                "label": "Add a popup window in JavaScript asking 'Are you sure?'.",
+                "correct": false,
+                "rationale": "Client JavaScript popups are completely bypassed when requests are sent directly via curl or proxy."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate exploitation of BOLA/IDOR by querying cross-tenant object identifiers.",
+          "Identify and remediate Mass Assignment BOPLA vulnerabilities using strict DTO schemas.",
+          "Implement server-side role and tenant ownership authorization middleware across API routes."
+        ],
+        "evidenceTemplate": [
+          "BOLA exploit HTTP request/response transcript showing unauthorized cross-tenant data leak.",
+          "Refactored API controller source code enforcing tenant-scoped SQL queries.",
+          "Pydantic / DTO whitelist schema definition blocking mass-assignment tampering."
+        ],
+        "reset": "Reset API routes and database models to unhardened mass-assignment baseline.",
+        "cleanup": "Remove temporary test user accounts and restore database state."
+      },
+      "governance": {
+        "prevent": [
+          "Mandate server-side tenant ownership validation (`tenant_id = session.tenant_id`) on all database query methods.",
+          "Prohibit direct binding of request JSON payloads to database ORM models without strict DTO whitelisting.",
+          "Enforce centralized Role-Based Access Control (RBAC) middleware across all administrative API routes."
+        ],
+        "observe": [
+          "Monitor HTTP 403 Forbidden and 404 Not Found rates per user for authorization probing patterns.",
+          "Track API requests containing un-whitelisted model attributes in request logs.",
+          "Audit database query telemetry for queries lacking tenant filter predicates."
+        ],
+        "respond": [
+          "Immediately revoke active session tokens for accounts attempting automated IDOR parameter fuzzing.",
+          "Patch BOLA endpoints immediately and deploy virtual WAF rule filters if required.",
+          "Audit database access logs to determine if unauthorized records were exported prior to remediation."
+        ],
+        "residualRisk": [
+          "Complex hierarchical multi-tenant permission models (e.g. parent/subsidiary access) require careful rule auditing.",
+          "GraphQL nested object resolvers can introduce indirect authorization bypasses if sub-queries lack owner checks."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Using UUIDs instead of integer IDs eliminates BOLA/IDOR vulnerabilities.",
+          "correction": "UUIDs prevent sequential guessing, but if a UUID is leaked, shared in an email, or found in logs, an unauthorized user can still access the object because the server lacks ownership checks."
+        },
+        {
+          "claim": "Hiding buttons in the frontend UI is sufficient authorization for administrative features.",
+          "correction": "Attackers interact directly with HTTP API endpoints using proxy tools; authorization must be enforced on the server-side controller for every request."
+        },
+        {
+          "claim": "BOLA only occurs on GET requests, never on PUT or DELETE requests.",
+          "correction": "BOLA affects all HTTP methods. BOLA on PUT/DELETE allows attackers to modify or delete other users' records."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is the root cause of a Broken Object Level Authorization (BOLA / IDOR) vulnerability?",
+          "options": [
+            {
+              "id": "A",
+              "label": "The web server has an expired SSL certificate."
+            },
+            {
+              "id": "B",
+              "label": "The server retrieves or modifies a database object based on a client-supplied ID without verifying that the currently authenticated user owns or is authorized to access that object."
+            },
+            {
+              "id": "C",
+              "label": "The user entered their password in lowercase."
+            },
+            {
+              "id": "D",
+              "label": "The API uses JSON instead of XML."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "BOLA occurs when the server blindly trusts the ID provided in the request without validating tenant/user ownership against the authenticated session."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "How does a Mass Assignment (BOPLA) vulnerability allow an unprivileged user to become an Administrator?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It formats the user's hard drive."
+            },
+            {
+              "id": "B",
+              "label": "The server automatically binds all incoming JSON properties directly to the internal User database model, allowing an attacker to submit `\"role\": \"admin\"` in their profile update payload."
+            },
+            {
+              "id": "C",
+              "label": "It guesses the database root password."
+            },
+            {
+              "id": "D",
+              "label": "It sends a phishing email to all employees."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Without DTO input whitelisting, mass assignment binds arbitrary request attributes directly to the database record, including sensitive privilege flags."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "Why is replacing sequential IDs (`/invoices/100`) with UUIDs (`/invoices/9b1deb4d...`) an incomplete remediation for BOLA?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because UUIDs are only supported on Linux."
+            },
+            {
+              "id": "B",
+              "label": "Because UUIDs provide security through obscurity; if an attacker obtains a valid UUID through shared links, API responses, or logs, the server will still serve the unauthorized data because it lacks server-side ownership verification."
+            },
+            {
+              "id": "C",
+              "label": "Because UUIDs make database lookups 1,000 times slower."
+            },
+            {
+              "id": "D",
+              "label": "Because UUIDs expire after 5 minutes."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "True access control requires server-side authorization checks (`owner_id == session.user_id`). Obscuring the ID format does not prevent exploitation if the ID is known."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are auditing a healthcare REST API (`/api/v1/patients/{patient_id}/records/{record_id}`). An attacker logged in as Patient A can access Patient B's medical history by altering `patient_id` in the URL, and can update their own role to 'DOCTOR' via a JSON mass assignment flaw on `/api/v1/patients/me`. You must author a complete security patch refactoring the API controllers with Pydantic DTOs and database tenant-scoping.",
+        "tasks": [
+          "Demonstrate the BOLA data leak and Mass Assignment privilege escalation vectors.",
+          "Define a Pydantic `PatientUpdateDTO` schema whitelisting only safe profile fields.",
+          "Refactor the record retrieval controller to enforce tenant ownership verification in the database query."
+        ],
+        "requiredEvidence": [
+          "BOLA and Mass Assignment exploitation transcripts.",
+          "Refactored Pydantic DTO schema file.",
+          "Secure Python/FastAPI controller code snippet with ownership verification."
+        ]
+      },
+      "sources": [
+        {
+          "title": "OWASP API Security Top 10 2023: API1:2023 Broken Object Level Authorization",
+          "url": "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "BOLA / IDOR vulnerability mechanics and threat vectors",
+            "Authorization validation standards at data access layers",
+            "OWASP API security assessment guidelines"
+          ]
+        },
+        {
+          "title": "NIST SP 800-162: Guide to Attribute Based Access Control (ABAC) Definition and Considerations",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-162/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Attribute-based access control architecture",
+            "Policy enforcement points and decision points",
+            "Tenant and resource ownership validation models"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os07-l56-cross-site-scripting-and-context-encoding",
+      "slug": "cross-site-scripting-and-context-encoding",
+      "title": "Cross-Site Scripting (XSS), Contextual Encoding & Content Security Policy",
+      "summary": "Examine the complete Cross-Site Scripting hierarchy: Reflected XSS, Stored XSS, and DOM-based XSS; trace sources and sinks; implement context-aware output encoding (HTML body, attributes, JavaScript string contexts); and deploy strict CSP Level 3.",
+      "difficulty": "intermediate",
+      "durationMinutes": 140,
+      "prerequisites": ["os07-l55-broken-object-level-and-function-authorization"],
+      "outcomes": [
+        "Differentiate Reflected, Stored, and DOM-based XSS execution pathways and data flow.",
+        "Apply precise context-aware output encoding tailored to HTML, Attribute, JavaScript, and CSS sinks.",
+        "Deploy Content Security Policy (CSP Level 3) with cryptographic nonces and trusted types to eliminate XSS."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web"],
+      "attackTactics": ["initial-access", "execution"],
+      "keywords": [
+        "xss",
+        "stored-xss",
+        "dom-xss",
+        "context-encoding",
+        "csp",
+        "trusted-types",
+        "dompurify"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "XSS is interpreter confusion in the browser: user input breaks out of a data context and is executed as JavaScript instructions; defense requires context-specific encoding (HTML, attribute, JS), safe sinks, and strict CSP nonces.",
+      "visual": {
+        "title": "XSS Source-to-Sink Data Flow & Context-Aware Encoding",
+        "caption": "How untrusted user input flows into execution sinks and how context-aware encoders neutralize payloads.",
+        "steps": [
+          {
+            "label": "Untrusted Input Source",
+            "detail": "Attacker payload enters via URL query string, form POST, or database record (e.g. '><script>alert(1)</script>).",
+            "tone": "caution"
+          },
+          {
+            "label": "Context-Aware Encoder",
+            "detail": "Input processed based on sink: HTML Entity Encoder (&lt;script&gt;) or JavaScript String Hex Encoder (\\x3cscript\\x3e).",
+            "tone": "allow"
+          },
+          {
+            "label": "Safe Browser DOM Rendering",
+            "detail": "Browser renders encoded data strictly as text literals without executing script instructions.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "XSS Taxonomy: Reflected, Stored, and DOM-Based Sinks",
+          "paragraphs": [
+            "Cross-Site Scripting (XSS) occurs when untrusted user data is included in dynamic web pages without adequate sanitization or output encoding, allowing malicious JavaScript to execute in victim browsers. 'Reflected XSS' occurs when the payload is delivered via HTTP requests (e.g. search query parameters) and immediately reflected in the server's HTML response.",
+            "'Stored (Persistent) XSS' occurs when the payload is saved permanently in a database, forum post, or comment field, executing automatically whenever other users view the compromised page. 'DOM-Based XSS' occurs entirely within the client-side browser: client JavaScript reads data from a 'Source' (`location.search`, `location.hash`, `document.referrer`) and passes it into an unsafe execution 'Sink' (`innerHTML`, `document.write`, `eval`)."
+          ]
+        },
+        {
+          "title": "Context-Aware Output Encoding: HTML vs Attribute vs JavaScript Contexts",
+          "paragraphs": [
+            "A single encoding method cannot protect against XSS in all locations. Output encoding must match the exact execution context: 1) HTML Body Context (`<div>USER_INPUT</div>`) requires HTML Entity encoding (`&lt;`, `&gt;`, `&amp;`, `&quot;`, `&#x27;`).",
+            "2) HTML Attribute Context (`<input value=\"USER_INPUT\">`) requires aggressive attribute encoding to prevent quote breakout. 3) JavaScript Variable Context (`<script>let name = 'USER_INPUT';</script>`) requires Unicode/Hex encoding (`\\x27`, `\\x5c`) because HTML entity encoding inside a script block is parsed directly as JavaScript syntax by the engine."
+          ]
+        },
+        {
+          "title": "DOM XSS Analysis: Dangerous Sinks vs Safe DOM APIs",
+          "paragraphs": [
+            "Modern Single Page Applications (React, Angular, Vue) heavily manipulate the browser Document Object Model. Using dangerous sinks like `element.innerHTML = userInput` or React's `dangerouslySetInnerHTML` bypasses framework protections and introduces DOM XSS.",
+            "Developers must adopt safe DOM manipulation APIs: `element.textContent = userInput`, `document.createTextNode()`, and `element.setAttribute()`. When HTML rendering is strictly required (e.g. rich text Markdown editors), input must be sanitized using audited libraries like DOMPurify."
+          ]
+        },
+        {
+          "title": "Modern Defense: CSP Nonces, Trusted Types, and DOMPurify Sanitization",
+          "paragraphs": [
+            "Modern web defense combines multi-layer containment. Content Security Policy Level 3 enforces strict cryptographic nonces (`script-src 'nonce-random123' 'strict-dynamic'`): any injected `<script>` tag lacking the matching per-response nonce is blocked by the browser engine.",
+            "'Trusted Types' (`require-trusted-types-for 'script'`) locks down dangerous browser sinks at the browser API level: user agents reject plain strings passed into `innerHTML` or `eval()`, requiring explicit validation through a cryptographic Trusted Types policy."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Multi-Context XSS Remediation & CSP Policy Construction",
+        "objective": "Audit a vulnerable web application containing Reflected XSS in attribute contexts and DOM XSS in client-side routing, apply context-aware encoding, and deploy a strict nonce-based CSP.",
+        "scenario": "You are auditing a customer feedback portal. An attacker can execute JavaScript via a reflected parameter in an `<input value=\"...\">` attribute and via `location.hash` passed into `document.getElementById('content').innerHTML`.",
+        "constraints": [
+          "Must apply context-specific encoding to neutralize attribute breakout.",
+          "Must refactor DOM sink from `innerHTML` to `textContent` (or DOMPurify).",
+          "Must configure a strict CSP header with cryptographic nonces."
+        ],
+        "cases": [
+          {
+            "id": "case-01-attribute-context-encoding",
+            "title": "Remediating XSS in HTML Attribute Contexts",
+            "context": "A search form renders: `<input type=\"text\" name=\"q\" value=\"\" onfocus=\"alert(1)\" autofocus=\"\">` when the user inputs `\" onfocus=\"alert(1)\" autofocus=\"`.",
+            "prompt": "How should user input be encoded when placed inside an HTML attribute value?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Wrap attribute values in double quotes and apply strict HTML attribute encoding: convert double quotes (`&quot;`), single quotes (`&#x27;`), and ampersands (`&amp;`) to entities, preventing quote breakout.",
+                "correct": true,
+                "rationale": "Encoding quotation marks and special characters ensures the browser treats the input strictly as literal string attribute data, making attribute breakout impossible."
+              },
+              {
+                "id": "opt-2",
+                "label": "Filter out the word 'alert' from the user input.",
+                "correct": false,
+                "rationale": "Blacklist keyword filtering is easily bypassed using alternative functions (`prompt`, `fetch`, `eval`)."
+              },
+              {
+                "id": "opt-3",
+                "label": "Remove all input tags from the website.",
+                "correct": false,
+                "rationale": "Removing input forms destroys search functionality."
+              },
+              {
+                "id": "opt-4",
+                "label": "Attribute XSS only works on Friday nights.",
+                "correct": false,
+                "rationale": "XSS executes deterministically whenever a payload is rendered in a browser."
+              }
+            ]
+          },
+          {
+            "id": "case-02-dom-sink-refactoring",
+            "title": "Refactoring Dangerous DOM Sinks to Safe APIs",
+            "context": "Client JavaScript reads the URL hash and renders it: `document.getElementById('greeting').innerHTML = decodeURIComponent(location.hash.slice(1))`.",
+            "prompt": "How should this DOM manipulation be refactored to eliminate DOM XSS?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Replace `innerHTML` with `textContent`: `document.getElementById('greeting').textContent = decodeURIComponent(location.hash.slice(1))`.",
+                "correct": true,
+                "rationale": "`textContent` treats all incoming data strictly as plain text, instructing the browser DOM engine not to parse or execute HTML/script tags."
+              },
+              {
+                "id": "opt-2",
+                "label": "Use `eval(location.hash)` instead of `innerHTML`.",
+                "correct": false,
+                "rationale": "`eval()` directly executes arbitrary JavaScript, worsening the vulnerability."
+              },
+              {
+                "id": "opt-3",
+                "label": "Encode the hash using base64 and decode it with `document.write()`.",
+                "correct": false,
+                "rationale": "`document.write()` is another dangerous execution sink vulnerable to DOM XSS."
+              },
+              {
+                "id": "opt-4",
+                "label": "DOM XSS is impossible in modern browsers like Google Chrome.",
+                "correct": false,
+                "rationale": "DOM XSS is a flaw in application JavaScript logic that executes on all web browsers."
+              }
+            ]
+          },
+          {
+            "id": "case-03-csp-nonce-deployment",
+            "title": "Deploying Strict Nonce-Based Content Security Policy",
+            "context": "To provide robust defense-in-depth against XSS, a security architect designs a modern CSP Level 3 policy.",
+            "prompt": "What CSP header configuration provides strict script execution defense with nonce enforcement?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "`Content-Security-Policy: script-src 'nonce-{RANDOM_BASE64}' 'strict-dynamic'; object-src 'none'; base-uri 'none';` (with a cryptographically random nonce regenerated per HTTP response).",
+                "correct": true,
+                "rationale": "A strict nonce-based CSP blocks all inline scripts and untrusted external scripts lacking the per-response cryptographic nonce, neutralizing injected XSS payloads."
+              },
+              {
+                "id": "opt-2",
+                "label": "`Content-Security-Policy: script-src * 'unsafe-inline'`",
+                "correct": false,
+                "rationale": "Wildcards and `'unsafe-inline'` disable script protection completely."
+              },
+              {
+                "id": "opt-3",
+                "label": "Use a static nonce `nonce-12345` that never changes.",
+                "correct": false,
+                "rationale": "Static nonces allow attackers to hardcode the known nonce into their XSS payloads, bypassing CSP."
+              },
+              {
+                "id": "opt-4",
+                "label": "CSP only works on CSS stylesheets.",
+                "correct": false,
+                "rationale": "CSP provides granular control across scripts, objects, connections, and framing."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate context-aware encoding in HTML body, attribute, and JavaScript contexts.",
+          "Refactor dangerous DOM sinks (`innerHTML`, `eval`) to safe APIs (`textContent`, DOMPurify).",
+          "Formulate and validate strict CSP Level 3 directives with per-response nonces."
+        ],
+        "evidenceTemplate": [
+          "Context-aware encoding comparison table for diverse HTML/JS sinks.",
+          "DOM XSS remediation source code diff replacing `innerHTML` with `textContent`.",
+          "Strict CSP Level 3 HTTP response header validation transcript."
+        ],
+        "reset": "Reset target application templates to unencoded `innerHTML` baseline.",
+        "cleanup": "Remove temporary XSS testing payloads and clear browser storage."
+      },
+      "governance": {
+        "prevent": [
+          "Mandate automatic context-aware output encoding in all server-side rendering template engines.",
+          "Prohibit use of dangerous client-side DOM sinks (`innerHTML`, `document.write`, `eval`) without DOMPurify sanitization.",
+          "Enforce strict Content Security Policy with nonces and Trusted Types across all production web properties."
+        ],
+        "observe": [
+          "Monitor CSP violation reports for blocked script execution events via reporting APIs.",
+          "Track static code analysis (SAST) alerts flagging un-sanitized sink assignments.",
+          "Alert on anomalous script tag injections in web application firewall (WAF) logs."
+        ],
+        "respond": [
+          "Immediately deploy hotfix context encoding upon identification of any reflected/stored XSS flaw.",
+          "Purge malicious stored XSS payloads from application databases and CDN caches.",
+          "Rotate session tokens for any users whose session cookies may have lacked `HttpOnly` during an XSS incident."
+        ],
+        "residualRisk": [
+          "Complex client-side template libraries (e.g. AngularJS legacy) may suffer from Client-Side Template Injection.",
+          "Third-party advertising or analytics scripts may inject un-vetted dependencies."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "HTML Entity encoding (`&lt;script&gt;`) prevents XSS in all contexts, including inside `<script>` blocks.",
+          "correction": "Inside `<script>` blocks or event handlers (`onclick=\"...\"`), the JavaScript engine parses HTML entities directly as code. Script contexts require JavaScript Hex/Unicode encoding (`\\x27`, `\\u0027`), not HTML entities."
+        },
+        {
+          "claim": "Modern frameworks like React make XSS 100% impossible.",
+          "correction": "React auto-escapes JSX children, but XSS still occurs via `dangerouslySetInnerHTML`, `href=\"javascript:...\"` links, and unvalidated third-party component props."
+        },
+        {
+          "claim": "WAFs eliminate the need for output encoding in source code.",
+          "correction": "WAFs use signature pattern matching that attackers routinely bypass via polyglots, encoding mutations, and DOM XSS (which WAFs cannot see). Source code encoding is mandatory."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is the primary difference between Stored (Persistent) XSS and Reflected XSS?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Stored XSS only works on mobile phones."
+            },
+            {
+              "id": "B",
+              "label": "Stored XSS is permanently saved in a database or server storage and executes whenever any user views the page; Reflected XSS is delivered in a single request and reflected immediately in the response."
+            },
+            {
+              "id": "C",
+              "label": "Reflected XSS requires physical access to the server."
+            },
+            {
+              "id": "D",
+              "label": "There is zero difference."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Stored XSS persists in backend storage to target multiple victims over time, while Reflected XSS requires tricking a victim into clicking a crafted link."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "Why is `element.textContent = userInput` safe from DOM XSS while `element.innerHTML = userInput` is vulnerable?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because `textContent` tells the browser DOM engine to parse the input strictly as literal string characters, whereas `innerHTML` invokes the HTML parser which executes `<script>` or `<img>` event handlers."
+            },
+            {
+              "id": "B",
+              "label": "Because `textContent` deletes the user's internet connection."
+            },
+            {
+              "id": "C",
+              "label": "Because `innerHTML` is only supported on Internet Explorer 6."
+            },
+            {
+              "id": "D",
+              "label": "Because `textContent` encrypts the text with AES-256."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "`textContent` treats data strictly as raw text nodes without invoking the HTML parser, preventing script execution."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "In a strict Content Security Policy (CSP), why must the `nonce` value be cryptographically random and regenerated per HTTP response?",
+          "options": [
+            {
+              "id": "A",
+              "label": "To make the web page load 10 times faster."
+            },
+            {
+              "id": "B",
+              "label": "If the nonce is static or predictable, an attacker can extract or guess the nonce and append `nonce=\"static_value\"` to their injected XSS payload, completely bypassing CSP script execution blocks."
+            },
+            {
+              "id": "C",
+              "label": "Because static nonces are rejected by DNS servers."
+            },
+            {
+              "id": "D",
+              "label": "To prevent users from bookmarking the page."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "A CSP nonce is a secret proof of authorization. If predictable, attackers include the known nonce in their exploit payload, defeating the policy."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are assessing a single-page customer support portal. The application is vulnerable to DOM XSS via `window.location.search` parsed directly into an `innerHTML` element, and contains an unencoded reflected parameter in a `<script>` variable block: `var userDepartment = '<?php echo $_GET[\"dept\"]; ?>';`. You must author a comprehensive remediation guide demonstrating safe JavaScript Unicode encoding, safe DOM API usage, and a strict CSP Level 3 header.",
+        "tasks": [
+          "Demonstrate exploitation payloads for both the attribute/JS variable breakout and the DOM XSS sink.",
+          "Refactor the PHP template to use `json_encode()` / JavaScript hex encoding for the script block.",
+          "Refactor client-side DOM manipulation to use `textContent` and configure a strict nonce-based CSP header."
+        ],
+        "requiredEvidence": [
+          "XSS exploit demonstration transcript for both contexts.",
+          "Refactored PHP server-side template and JavaScript client code snippet.",
+          "Validated CSP Level 3 policy header specification."
+        ]
+      },
+      "sources": [
+        {
+          "title": "OWASP Cheat Sheet Series: Cross Site Scripting Prevention Cheat Sheet",
+          "url": "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Context-aware encoding rules for HTML, Attribute, and JavaScript contexts",
+            "Safe DOM APIs and DOMPurify sanitization recommendations",
+            "XSS mitigation hierarchy and defense-in-depth"
+          ]
+        },
+        {
+          "title": "W3C Content Security Policy Level 3 Specification",
+          "url": "https://www.w3.org/TR/CSP3/",
+          "publisher": "World Wide Web Consortium (W3C)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "Nonce and hash-based script execution controls",
+            "strict-dynamic directive semantics",
+            "Violation reporting and Trusted Types integration"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os07-l57-sql-nosql-command-and-template-injection",
+      "slug": "sql-nosql-command-and-template-injection",
+      "title": "SQL, NoSQL, OS Command & Server-Side Template Injection (SSTI)",
+      "summary": "Master interpreter injection vulnerabilities: in-band, blind boolean, and time-based SQL injection, MongoDB NoSQL operator injection ($ne, $gt), OS Command Injection shell meta-characters, and Jinja2/Twig Server-Side Template Injection (SSTI).",
+      "difficulty": "intermediate",
+      "durationMinutes": 140,
+      "prerequisites": ["os07-l56-cross-site-scripting-and-context-encoding"],
+      "outcomes": [
+        "Identify and verify SQL injection vulnerabilities across in-band, error-based, and blind time-based techniques.",
+        "Audit NoSQL databases for operator injection flaws bypassing JSON authentication filters.",
+        "Detect and remediate OS Command Injection and Server-Side Template Injection (SSTI) using safe APIs and sandboxes."
+      ],
+      "careerPaths": ["bug-bounty", "penetration-test", "vulnerability-research"],
+      "domains": ["web", "api"],
+      "attackTactics": ["initial-access", "execution"],
+      "keywords": [
+        "sqli",
+        "nosql-injection",
+        "command-injection",
+        "ssti",
+        "parameterization",
+        "jinja2"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Injection occurs when untrusted data is concatenated into an interpreter parser (SQL, shell, template engine): defense requires parameterization and structured APIs that separate data values from executable command grammar.",
+      "visual": {
+        "title": "Interpreter Injection Taxonomy & Safe Parameterization Architecture",
+        "caption": "How vulnerable string concatenation leads to command execution and how parameterization prevents it.",
+        "steps": [
+          {
+            "label": "Vulnerable String Concatenation",
+            "detail": "Input `' OR 1=1 --` concatenated directly into SQL/Shell string; interpreter parses input as control logic.",
+            "tone": "stop"
+          },
+          {
+            "label": "Interpreter Parsing Phase",
+            "detail": "Database/Shell parser modifies execution tree, executing unauthorized queries or system binaries.",
+            "tone": "caution"
+          },
+          {
+            "label": "Parameterized Protocol Separation",
+            "detail": "PreparedStatements transmit SQL query grammar first, then transmit user data as literal values in separate protocol packets.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "The Root Cause of Injection: Code vs Data Confusion",
+          "paragraphs": [
+            "Injection vulnerabilities (OWASP Top 10 A03:2021) occur whenever an application sends untrusted user data to an interpreter (SQL engine, system shell, NoSQL parser, template engine) as part of a command or query without separating data values from code syntax.",
+            "The interpreter cannot distinguish where the developer's original command ends and the attacker's injected input begins, executing the attacker's payload as native code with the full privileges of the application process."
+          ]
+        },
+        {
+          "title": "SQL Injection Vectors: Union-Based, Error-Based, and Blind Time-Based",
+          "paragraphs": [
+            "SQL Injection (SQLi) manifests in three major forms: 1) In-Band (Union-Based / Error-Based): results or database error messages are returned directly in the application's HTTP response, allowing rapid extraction of schemas and tables.",
+            "2) Blind Boolean-Based: the application returns different response content (e.g. 'User Found' vs 'User Not Found') depending on whether injected SQL boolean conditions (`AND (SELECT 1)=1`) evaluate to true or false. 3) Blind Time-Based: the attacker injects sleep functions (`pg_sleep(5)`, `WAITFOR DELAY '0:0:5'`) and measures server response latency to extract data character-by-character."
+          ]
+        },
+        {
+          "title": "NoSQL Operator Injections and Object Deserialization",
+          "paragraphs": [
+            "NoSQL databases (such as MongoDB) use JSON/BSON object queries rather than traditional SQL strings. However, if an API parses JSON request bodies without schema validation, attackers can inject MongoDB query operators (`$ne`, `$gt`, `$regex`, `$where`).",
+            "For example, submitting `{\"username\": \"admin\", \"password\": {\"$ne\": null}}` modifies the query to find any user where password is NOT null, bypassing password authentication completely without knowing the user's password."
+          ]
+        },
+        {
+          "title": "OS Command Injection and Server-Side Template Injection (SSTI)",
+          "paragraphs": [
+            "OS Command Injection occurs when user input is passed directly to system shells (`os.system()`, `exec()`, `Runtime.getRuntime().exec()`). Shell metacharacters (`;`, `&`, `|`, `` ` ``, `$()`) allow executing arbitrary system binaries. Remediation requires using parameterized process APIs (e.g. `subprocess.run(['ping', '-c', '4', host])` with shell=False).",
+            "Server-Side Template Injection (SSTI) occurs when template engines (Jinja2, Twig, Freemarker) dynamically concatenate user input into template strings. Attackers inject template syntax (e.g. `{{7*7}}` or `{{request.application.__globals__.__builtins__.__import__('os').popen('id').read()}}`), breaking out of the template sandbox to achieve Remote Code Execution."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Multi-Vector Interpreter Injection Triaging & Safe Parameterization",
+        "objective": "Triage and remediate three distinct interpreter injection flaws: a blind time-based SQL injection in Python/SQL, a NoSQL JSON operator authentication bypass in Node.js/MongoDB, and an SSTI code execution flaw in Jinja2.",
+        "scenario": "You are reviewing a multi-tier microservices platform. You must identify injection vulnerabilities in database querying, authentication parsing, and dynamic email template rendering.",
+        "constraints": [
+          "Must parameterize SQL queries using PreparedStatements / ORMs.",
+          "Must enforce strict string type validation to prevent NoSQL operator injection.",
+          "Must refactor template rendering from dynamic string formatting to parameterized template contexts."
+        ],
+        "cases": [
+          {
+            "id": "case-01-blind-time-sqli",
+            "title": "Remediating Blind Time-Based SQL Injection",
+            "context": "A reporting endpoint executes: `cursor.execute(f\"SELECT * FROM sales WHERE region = '{region_param}'\")`. An attacker passes `region=US' AND (SELECT pg_sleep(5))--`.",
+            "prompt": "What is the proper root-cause remediation for this SQL injection flaw?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Use parameterized queries with placeholder bindings: `cursor.execute(\"SELECT * FROM sales WHERE region = %s\", (region_param,))`.",
+                "correct": true,
+                "rationale": "Parameterized queries separate the SQL command structure from user data at the database protocol level, rendering injection mathematically impossible."
+              },
+              {
+                "id": "opt-2",
+                "label": "Filter out the word 'pg_sleep' using a regular expression.",
+                "correct": false,
+                "rationale": "Blacklisting sleep keywords is easily bypassed using alternative database timing functions or CPU-intensive queries."
+              },
+              {
+                "id": "opt-3",
+                "label": "Convert the SQL database into an Excel spreadsheet.",
+                "correct": false,
+                "rationale": "Changing database storage formats does not solve code-level parameter concatenation flaws."
+              },
+              {
+                "id": "opt-4",
+                "label": "Double all single quotes manually in Python.",
+                "correct": false,
+                "rationale": "Manual string replacement is error-prone, fails on numeric/binary inputs, and does not provide protocol-level parameter separation."
+              }
+            ]
+          },
+          {
+            "id": "case-02-nosql-operator-bypass",
+            "title": "Preventing NoSQL Operator Injection in JSON APIs",
+            "context": "An Express.js login handler uses Mongoose: `User.findOne({ username: req.body.username, password: req.body.password })`. An attacker sends JSON `{\"username\": \"admin\", \"password\": {\"$ne\": \"\"}}`.",
+            "prompt": "Why does this allow authentication bypass, and how is it remediated?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "Mongoose parses the object `{\"$ne\": \"\"}` as a MongoDB query operator ('not equal to empty'), matching the admin user without checking passwords. Remediation is enforcing strict string type validation (e.g. using Zod: `z.string()`) or using `mongo-sanitize` to strip `$` keys.",
+                "correct": true,
+                "rationale": "Schema validation guarantees that `req.body.password` is strictly a primitive string rather than a JSON query object containing MongoDB operators."
+              },
+              {
+                "id": "opt-2",
+                "label": "MongoDB automatically disables all operator injections by default.",
+                "correct": false,
+                "rationale": "MongoDB faithfully executes all valid query objects passed to its driver."
+              },
+              {
+                "id": "opt-3",
+                "label": "Change the password to an empty string.",
+                "correct": false,
+                "rationale": "Setting an empty password allows anyone to log in with zero credentials."
+              },
+              {
+                "id": "opt-4",
+                "label": "NoSQL databases cannot be secured.",
+                "correct": false,
+                "rationale": "Proper input validation and typed schema parsing completely secure NoSQL databases."
+              }
+            ]
+          },
+          {
+            "id": "case-03-jinja2-ssti-remediation",
+            "title": "Remediating Server-Side Template Injection (SSTI)",
+            "context": "A Python Flask app renders dynamic emails: `template = Template(f\"Hello {user_name}, welcome to our store!\"); return template.render()`. An attacker provides `user_name={{7*7}}`.",
+            "prompt": "Why is dynamic template string concatenation vulnerable, and how is it remediated?",
+            "options": [
+              {
+                "id": "opt-1",
+                "label": "String formatting compiles user input directly into the template grammar, allowing arbitrary Python object traversal via `__globals__` to execute OS commands; remediation is using static template files and passing user data as variables to `render_template('welcome.html', name=user_name)`.",
+                "correct": true,
+                "rationale": "Passing variables into `render_template(..., name=user_name)` treats data as template context variables, preventing Jinja2 from compiling user input into executable template instructions."
+              },
+              {
+                "id": "opt-2",
+                "label": "Replace `{{7*7}}` with `49` manually.",
+                "correct": false,
+                "rationale": "Evaluating math does not fix the underlying arbitrary code execution vulnerability."
+              },
+              {
+                "id": "opt-3",
+                "label": "Jinja2 only works on HTML files and cannot execute Python code.",
+                "correct": false,
+                "rationale": "Jinja2 template syntax allows accessing Python object hierarchies, enabling Remote Code Execution."
+              },
+              {
+                "id": "opt-4",
+                "label": "Delete the email server.",
+                "correct": false,
+                "rationale": "Deleting server infrastructure disrupts legitimate email operations."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Demonstrate parameterization of SQL queries eliminating blind time-based injection.",
+          "Implement schema type validation to neutralize NoSQL JSON operator injection.",
+          "Refactor dynamic template rendering to use static template files with parameterized context."
+        ],
+        "evidenceTemplate": [
+          "SQL injection parameterization source code diff.",
+          "Zod / Pydantic schema validation preventing NoSQL operator injection.",
+          "Jinja2 static template refactoring verification transcript."
+        ],
+        "reset": "Reset database queries and template handlers to unparameterized string concatenation baseline.",
+        "cleanup": "Remove temporary injection test scripts and restore database records."
+      },
+      "governance": {
+        "prevent": [
+          "Prohibit dynamic string concatenation, formatting, or interpolation when constructing SQL, NoSQL, Shell, or Template queries.",
+          "Mandate parameterized interfaces (PreparedStatements, ORM query builders, subprocess with shell=False) across all data layers.",
+          "Enforce strict schema validation (Zod, Pydantic) on all JSON API request payloads."
+        ],
+        "observe": [
+          "Monitor database error logs for SQL syntax errors and anomalous query latency spikes.",
+          "Track NoSQL query parameters containing `$` operator keys in application telemetry.",
+          "Alert on process spawning events originating from web server worker processes."
+        ],
+        "respond": [
+          "Immediately deploy parameterized patches upon discovery of any injection vector.",
+          "Isolate compromised database or application worker instances following RCE exploitation.",
+          "Audit database query history to determine if sensitive tables were exfiltrated."
+        ],
+        "residualRisk": [
+          "Dynamic SQL queries building dynamic table or column names cannot use standard parameter markers and require strict whitelisting.",
+          "Complex ORM raw query extensions (`db.raw()`) can bypass ORM parameterization if misused."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Using an ORM (like Hibernate or SQLAlchemy) automatically makes SQL injection impossible.",
+          "correction": "ORMs prevent SQLi when used correctly, but raw query methods (`session.execute(text(f'...'))`) or vulnerable custom query builders remain fully vulnerable to SQL injection."
+        },
+        {
+          "claim": "NoSQL databases (like MongoDB) are inherently immune to injection attacks because they don't use SQL.",
+          "correction": "NoSQL databases are vulnerable to NoSQL Operator Injection (`$ne`, `$where`) and JSON injection, allowing authentication bypass and data exfiltration."
+        },
+        {
+          "claim": "Server-Side Template Injection (SSTI) is just another name for Cross-Site Scripting (XSS).",
+          "correction": "XSS executes client-side in victim browsers. SSTI executes server-side on the web server, directly leading to Remote Code Execution (RCE) and full server takeover."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "q1",
+          "difficulty": "easy",
+          "question": "What is the primary mechanism that makes Parameterized Queries (PreparedStatements) immune to SQL Injection?",
+          "options": [
+            {
+              "id": "A",
+              "label": "They encrypt the database on disk."
+            },
+            {
+              "id": "B",
+              "label": "They transmit the SQL command structure and user data values separately at the protocol level, ensuring the database parser treats user input strictly as literal data rather than executable syntax."
+            },
+            {
+              "id": "C",
+              "label": "They only work with numbers."
+            },
+            {
+              "id": "D",
+              "label": "They delete all single quote characters."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "PreparedStatements compile the SQL statement first, then bind user inputs as pure data parameters, completely preventing inputs from modifying SQL syntax logic."
+        },
+        {
+          "id": "q2",
+          "difficulty": "medium",
+          "question": "In a Node.js/MongoDB application, how does submitting `{\"password\": {\"$ne\": \"\"}}` bypass authentication?",
+          "options": [
+            {
+              "id": "A",
+              "label": "It causes MongoDB to crash."
+            },
+            {
+              "id": "B",
+              "label": "The `$ne` operator instructs MongoDB to match any user whose password is 'not equal' to an empty string, successfully authenticating as the user without providing their password."
+            },
+            {
+              "id": "C",
+              "label": "It downloads the database to the browser."
+            },
+            {
+              "id": "D",
+              "label": "It changes the user's password to 'admin'."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "NoSQL operator injection modifies query logic by injecting operator objects into unsanitized query parameters."
+        },
+        {
+          "id": "q3",
+          "difficulty": "hard",
+          "question": "Why does Server-Side Template Injection (SSTI) present a far more severe security risk than client-side Cross-Site Scripting (XSS)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Because SSTI executes on the web server host, allowing attackers to access server-side environment variables, traverse Python/Ruby object globals, and execute arbitrary operating system commands (RCE)."
+            },
+            {
+              "id": "B",
+              "label": "Because SSTI only works on Mac computers."
+            },
+            {
+              "id": "C",
+              "label": "Because SSTI deletes all client cookies."
+            },
+            {
+              "id": "D",
+              "label": "Because SSTI makes HTML files larger."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "SSTI executes within the server-side template engine context on the host backend, allowing sandbox breakouts and full Remote Code Execution."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "You are conducting a code review on a legacy Python/Flask microservice. You discover: 1) A search endpoint using dynamic string interpolation in SQLite (`f\"SELECT * FROM items WHERE name LIKE '%{q}%'\"`), 2) A PDF generation endpoint executing `os.system(f\"wkhtmltopdf {url} output.pdf\")`, and 3) A welcome banner rendering `render_template_string(f\"<h1>Welcome {user_input}</h1>\")`. You must author refactored code eliminating all three injection vulnerabilities.",
+        "tasks": [
+          "Refactor the SQLite query to use parameterized queries (`cursor.execute(..., ('%' + q + '%',))`.",
+          "Replace `os.system()` with `subprocess.run(['wkhtmltopdf', url, 'output.pdf'], shell=False)` with URL whitelisting.",
+          "Refactor template rendering to use static template files with variable context passing."
+        ],
+        "requiredEvidence": [
+          "Injection vulnerability audit analysis report.",
+          "Complete refactored Python microservice source code file.",
+          "Verification transcript proving parameterized execution across all three components."
+        ]
+      },
+      "sources": [
+        {
+          "title": "OWASP Top 10:2021 — A03: Injection",
+          "url": "https://owasp.org/Top10/A03_2021-Injection/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "SQL, Command, and interpreter injection mechanics",
+            "Parameterization and safe API adoption standards",
+            "Prevention and verification controls"
+          ]
+        },
+        {
+          "title": "PortSwigger Web Security Academy: Server-Side Template Injection (SSTI)",
+          "url": "https://portswigger.net/web-security/server-side-template-injection",
+          "publisher": "PortSwigger Ltd",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-25",
+          "supports": [
+            "SSTI detection and engine identification methodology",
+            "Template sandbox breakout and RCE mechanics",
+            "Safe template engine architecture"
+          ]
+        }
+      ]
+    }
+  ]
+}
