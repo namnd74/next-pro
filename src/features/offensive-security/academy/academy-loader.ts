@@ -14,6 +14,9 @@ import endpointControlsAndEventsData from '../data/academy/os03-windows-foundati
 import bashPythonPowershellData from '../data/academy/os04-operator-scripting/bash-python-powershell.json';
 import structuredDataHttpGitData from '../data/academy/os04-operator-scripting/structured-data-http-git.json';
 import safeEvidenceAutomationData from '../data/academy/os04-operator-scripting/safe-evidence-automation.json';
+import engagementReconEnumerationData from '../data/academy/os05-pentest-methodology/engagement-recon-enumeration.json';
+import verificationImpactEvidenceData from '../data/academy/os05-pentest-methodology/verification-impact-evidence.json';
+import reportRemediationRetestData from '../data/academy/os05-pentest-methodology/report-remediation-retest.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -123,6 +126,15 @@ export const STRUCTURED_DATA_HTTP_GIT_MODULE = parseAcademyModule(
 export const SAFE_EVIDENCE_AUTOMATION_MODULE = parseAcademyModule(
   safeEvidenceAutomationData
 );
+export const ENGAGEMENT_RECON_ENUMERATION_MODULE = parseAcademyModule(
+  engagementReconEnumerationData
+);
+export const VERIFICATION_IMPACT_EVIDENCE_MODULE = parseAcademyModule(
+  verificationImpactEvidenceData
+);
+export const REPORT_REMEDIATION_RETEST_MODULE = parseAcademyModule(
+  reportRemediationRetestData
+);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
@@ -141,6 +153,9 @@ export const ACADEMY_MODULES: AcademyModule[] = [
   BASH_PYTHON_POWERSHELL_MODULE,
   STRUCTURED_DATA_HTTP_GIT_MODULE,
   SAFE_EVIDENCE_AUTOMATION_MODULE,
+  ENGAGEMENT_RECON_ENUMERATION_MODULE,
+  VERIFICATION_IMPACT_EVIDENCE_MODULE,
+  REPORT_REMEDIATION_RETEST_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {
