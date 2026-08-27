@@ -1,0 +1,1125 @@
+{
+  "id": "os02-m03-linux-boundaries-and-telemetry",
+  "slug": "linux-boundaries-and-telemetry",
+  "trackId": "os02-linux-foundations",
+  "title": "Linux Privilege Boundaries, Containers & Host Telemetry",
+  "summary": "Linux capabilities và ma trận quyền hạn; ranh giới cô lập container (namespaces, cgroups, AppArmor/SELinux); kiến trúc giám sát host (auditd, eBPF, audit rules) — kèm kịch bản phân tích thoát container và thiết kế quy tắc telemetry.",
+  "difficulty": "intermediate",
+  "estimatedMinutes": 300,
+  "careerPaths": [
+    "penetration-test",
+    "red-team",
+    "detection-engineering",
+    "vulnerability-research"
+  ],
+  "domains": ["linux", "cloud"],
+  "safetyLevel": "safe",
+  "lessons": [
+    {
+      "id": "os02-l19-linux-capabilities-and-suid-privesc",
+      "slug": "linux-capabilities-and-suid-privesc",
+      "title": "Linux Capabilities, SUID & Privilege Boundaries",
+      "summary": "Phân rã quyền root toàn năng thành các capability độc lập; 5 tập capability (Permitted, Effective, Inheritable, Bounding, Ambient); file capabilities vs SUID binary; các capability nguy hiểm (CAP_SETUID, CAP_DAC_OVERRIDE, CAP_NET_RAW, CAP_SYS_ADMIN, CAP_SYS_PTRACE) và phương pháp hardening.",
+      "difficulty": "intermediate",
+      "durationMinutes": 100,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân biệt mô hình truyền thống (SUID all-or-nothing root) với mô hình Linux POSIX Capabilities phân rã quyền lực.",
+        "Đọc và phân tích 5 tập capability (Permitted, Effective, Inheritable, Bounding, Ambient) qua /proc/[pid]/status và capsh.",
+        "Nhận diện các file capability nguy hiểm (CAP_SETUID, CAP_DAC_OVERRIDE, CAP_SYS_ADMIN, CAP_NET_RAW, CAP_SYS_PTRACE) và cơ chế dẫn đến chuyển giao quyền root.",
+        "Áp dụng nguyên tắc đặc quyền tối thiểu (prctl PR_SET_NO_NEW_PRIVS, cap_drop) để cô lập binary và kiểm thử độ an toàn."
+      ],
+      "careerPaths": [
+        "penetration-test",
+        "red-team",
+        "detection-engineering",
+        "vulnerability-research"
+      ],
+      "domains": ["linux"],
+      "attackTactics": ["TA0004", "TA0005"],
+      "keywords": [
+        "linux-capabilities",
+        "suid-vs-cap",
+        "cap_setuid",
+        "cap_sys_admin",
+        "capsh",
+        "least-privilege"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Linux POSIX Capabilities chia nhỏ quyền lực all-or-nothing của root (UID 0) thành ~40 mảnh quyền hạn cụ thể. Trước đây, để mở raw socket mạng ping cần SUID root (toàn quyền format ổ cứng hay đọc /etc/shadow nếu bị lỗi tràn bộ nhớ). Với capabilities, file chỉ cần gán cap_net_raw+ep. Tuy nhiên, nếu gán nhầm cap_setuid (đổi UID tùy ý) hay cap_dac_override (bỏ qua mọi kiểm tra quyền đọc/ghi file), binary đó có sức mạnh tương đương root. Hệ điều hành quản lý capability qua 5 tập (Permitted, Effective, Inheritable, Bounding, Ambient) trên từng process và 3 tập trên file metadata (xattr security.capability). Hiểu rõ dòng chảy kế thừa và giọt quyền (drop capabilities) là chìa khóa để vừa tấn công nhận diện sai sót cấu hình vừa phòng thủ hardening hệ thống.",
+      "visual": {
+        "title": "Dòng chảy Linux Capabilities & Ranh giới Đặc quyền",
+        "caption": "Từ SUID all-or-nothing tới phân rã 40 capabilities; 5 tập bitmask kiểm soát kế thừa và thực thi.",
+        "steps": [
+          {
+            "label": "SUID Binary Cổ điển",
+            "detail": "Khi chạy binary có cờ SUID root, EUID chuyển thành 0 — process sở hữu TOÀN BỘ 40 capabilities; một lỗ hổng nhỏ dẫn tới mất trắng máy.",
+            "tone": "stop"
+          },
+          {
+            "label": "File Capabilities (getcap/setcap)",
+            "detail": "Lưu trong extended attributes (security.capability); gán chính xác quyền cần thiết (ví dụ cap_net_raw+ep cho ping, cap_net_bind_service+ep cho web server).",
+            "tone": "caution"
+          },
+          {
+            "label": "5 Tập Capability của Process",
+            "detail": "Permitted (trần quyền được dùng), Effective (quyền đang bật thực tế), Inheritable (quyền truyền qua execve), Bounding (giới hạn tối đa có thể nhận), Ambient (giữ quyền cho non-root qua execve).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Capability Nguy hiểm",
+            "detail": "CAP_SETUID (đổi UID thành 0), CAP_DAC_OVERRIDE (bỏ qua read/write/exec check), CAP_SYS_ADMIN (tương đương 80% root, mount/debug), CAP_SYS_PTRACE (đọc/ghi bộ nhớ process khác).",
+            "tone": "stop"
+          },
+          {
+            "label": "Hardening: NoNewPrivileges & Cap Drop",
+            "detail": "prctl(PR_SET_NO_NEW_PRIVS) ngăn chặn binary con giành thêm quyền qua SUID hoặc file capabilities; seccomp và bounding set siết chặt bề mặt tấn công.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Từ SUID All-or-Nothing đến POSIX Capabilities",
+          "paragraphs": [
+            "Trong mô hình bảo mật truyền thống của UNIX, quyền hạn mang tính nhị phân: tiến trình hoặc là unprivileged user (UID != 0) chịu sự ràng buộc nghiêm ngặt của file permissions, hoặc là superuser root (UID == 0) với toàn quyền tối cao trên toàn bộ kernel và hệ thống tệp. Cơ chế SUID (Set User ID) cho phép user thường thực thi một binary với danh tính của owner (thường là root). Nhưng nếu binary đó chứa lỗi buffer overflow, format string, command injection hay relative path load, kẻ tấn công lập tức đạt được toàn quyền kiểm soát hệ thống.",
+            "Linux POSIX Capabilities (bắt đầu từ Kernel 2.2 và hoàn thiện ở 2.6+) đã giải quyết bài toán này bằng cách phân rã quyền năng tối cao của root thành khoảng 40 quyền hạn độc lập (mã hóa dưới dạng bitmask). Một daemon mạng chỉ cần bind cổng 80/443 không cần phải chạy dưới user root hay mang cờ SUID root; nó chỉ cần capability CAP_NET_BIND_SERVICE. Tương tự, tiện ích ping chỉ cần CAP_NET_RAW để gửi gói tin ICMP thay vì cần full root privilege."
+          ],
+          "points": [
+            "getcap -r / 2>/dev/null: quét toàn bộ file capabilities trên hệ thống tệp.",
+            "setcap cap_net_raw+ep /usr/bin/custom_ping: gán capability vào file qua extended attribute (security.capability).",
+            "SUID binary luôn gán FULL capabilities khi thực thi; File Capabilities chỉ cấp phát đúng những bitmask được chỉ định."
+          ]
+        },
+        {
+          "title": "Năm Tập Capability và Vòng đời Kế thừa",
+          "paragraphs": [
+            "Kernel Linux duy trì 5 tập capability bitmap cho mỗi tiến trình trong cấu trúc task_struct: (1) Permitted (P): tập hợp tối đa các capability mà tiến trình có thể sử dụng hoặc chuyển vào Effective; (2) Effective (E): tập hợp các capability đang thực sự kích hoạt để Kernel kiểm tra quyền tại thời điểm syscall; (3) Inheritable (I): các capability được bảo tồn qua lệnh gọi hàm execve() nếu file thực thi cũng hỗ trợ; (4) Bounding Set (X): mặt nạ giới hạn trần trên — không tiến trình nào có thể nhận capability vượt ngoài bounding set kể cả khi gọi SUID root; (5) Ambient Set (A): giới thiệu từ Kernel 4.3, cho phép tiến trình non-root truyền capability được phép cho tiến trình con qua execve() mà không cần cấu hình file capabilities trên đĩa.",
+            "Khi một tiến trình gọi execve(), công thức chuyển đổi capability của Kernel xác định các tập mới: P'(permitted) = (X & I_file) | (P_file & X) | A. E'(effective) = P' (nếu file có cờ effective) hoặc A. Nếu tiến trình thiết lập cờ PR_SET_NO_NEW_PRIVS qua syscall prctl(), Kernel vô hiệu hóa hoàn toàn việc nhận thêm capability từ SUID hoặc file capabilities, bảo vệ hệ thống trước các kỹ thuật leo thang đặc quyền thứ cấp."
+          ],
+          "points": [
+            "cat /proc/$$/status | grep Cap: xem 5 dòng CapInh, CapPrm, CapEff, CapBnd, CapAmb dạng hex bitmap.",
+            "capsh --decode=0000000000003000: giải mã hex bitmap thành danh sách capability tên người đọc được.",
+            "capsh --drop=cap_sys_admin,cap_setuid --: khởi chạy shell với các capability bị loại bỏ vĩnh viễn khỏi bounding set."
+          ]
+        },
+        {
+          "title": "Ma trận Capability Nguy hiểm và Đường Leo Thang",
+          "paragraphs": [
+            "Không phải mọi capability đều an toàn như CAP_NET_BIND_SERVICE. Một số capability khi được gán cho file thực thi hoặc tiến trình unprivileged sẽ tạo ra đường dẫn trực tiếp dẫn tới full root compromise: (1) CAP_SETUID: cho phép tiến trình gọi setuid(0), setresuid(0,0,0) tùy ý — gán CAP_SETUID cho python, perl, php hay bash đồng nghĩa với việc cung cấp root shell tức thì; (2) CAP_DAC_OVERRIDE: bỏ qua kiểm tra quyền đọc, ghi, thực thi (rwx) trên mọi file — cho phép sửa /etc/passwd, /etc/shadow hoặc /etc/sudoers; (3) CAP_SYS_ADMIN: 'ông vua' của các capability với hơn 30% chức năng root (mount filesystem, debug, nạp bpf, cấu hình cgroups); (4) CAP_SYS_PTRACE: cho phép attach debugger và can thiệp bộ nhớ của các tiến trình khác cùng user namespace (bao gồm cả inject shellcode vào tiến trình root đang chạy); (5) CAP_CHOWN: cho phép đổi quyền sở hữu file nhạy cảm.",
+            "Trong quá trình kiểm thử đánh giá, việc kiểm tra các file capability bằng lệnh getcap là bắt buộc. Các nhà phát triển đôi khi cấu hình setcap cap_setuid+ep /usr/bin/python3 để script tự động hóa chạy nhanh, vô tình biến toàn bộ binary thông dịch thành một công cụ leo thang đặc quyền hoàn hảo cho bất kỳ user cục bộ nào."
+          ],
+          "points": [
+            "CAP_SETUID trên interpreter (python, perl, node) = root tức thì qua os.setuid(0) + os.system('/bin/sh').",
+            "CAP_DAC_OVERRIDE trên editor/utility = ghi đè trực tiếp hash password vào /etc/shadow hoặc thêm dòng nopasswd vào /etc/sudoers.",
+            "CAP_SYS_PTRACE = dùng gdb hoặc injector can thiệp bộ nhớ tiến trình root để kích hoạt system('/bin/sh')."
+          ]
+        },
+        {
+          "title": "Hardening: NoNewPrivileges, Dropping Caps và File Audit",
+          "paragraphs": [
+            "Phòng thủ hệ thống đòi hỏi áp dụng triệt để nguyên tắc Least Privilege ở tầng capability. Đối với các systemd service, cần chỉ định tường minh CapabilityBoundingSet= trong file cấu hình .service để loại bỏ mọi capability thừa thãi (ví dụ CapabilityBoundingSet=CAP_NET_BIND_SERVICE). Bổ sung chỉ thị NoNewPrivileges=true để kích hoạt PR_SET_NO_NEW_PRIVS, triệt tiêu khả năng tiến trình con khai thác SUID hay file capabilities.",
+            "Đối với các ứng dụng tự phát triển, lập trình viên an toàn cần chủ động gọi hàm cap_drop_bound() hoặc cap_set_proc() trong thư viện libcap để từ bỏ vĩnh viễn các capability ngay sau khi hoàn thành thao tác đặc quyền (ví dụ sau khi bind xong socket cổng 80 thì drop CAP_NET_BIND_SERVICE). Đồng thời, định kỳ kiểm toán toàn bộ file system để phát hiện các file capabilities bất thường bằng audit rules và script giám sát."
+          ],
+          "points": [
+            "systemd unit hardening: AmbientCapabilities=, CapabilityBoundingSet=, ProtectSystem=strict, NoNewPrivileges=yes.",
+            "libcap API: cap_init(), cap_set_flag(), cap_set_proc() — quản lý capability trong mã nguồn C/Go.",
+            "Audit rule: auditctl -w /usr/bin/setcap -p x -k capability_modification — phát hiện thay đổi capability trên đĩa."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Capability Audit & Boundary Analysis Desk",
+        "objective": "Phân tích trạng thái capability qua /proc và getcap mô phỏng, nhận diện binary nguy hiểm và đưa ra giải pháp hardening chuẩn mực.",
+        "scenario": "Bạn được cung cấp bảng trích xuất trạng thái hệ thống Linux mô phỏng bao gồm: danh sách getcap -r, trích xuất /proc/[pid]/status CapEff/CapPrm của một số tiến trình nền, và cấu hình systemd service. Toàn bộ diễn ra tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận dựa trên dữ liệu cấp sẵn; không có command injection hay payload thực tế.",
+          "Mỗi nhận định phải chỉ rõ tên capability, tập bitmask liên quan và cơ chế ảnh hưởng.",
+          "Giải pháp khắc phục phải tuân thủ nguyên tắc Least Privilege."
+        ],
+        "evidenceTemplate": [
+          "Tên binary/tiến trình mang capability bất thường",
+          "Capability cụ thể và mã hex bitmask (nếu có)",
+          "Đường dẫn leo thang tiềm tàng hoặc rủi ro an ninh",
+          "Cấu hình hardening khuyến nghị (chỉ thị systemd hoặc lệnh setcap/prctl)"
+        ],
+        "successCriteria": [
+          "Nhận diện chính xác binary mang capability có thể bị lợi dụng để đổi UID hoặc ghi đè file nhạy cảm.",
+          "Giải mã đúng hex bitmask của tiến trình từ /proc status.",
+          "Chọn đúng phương án khắc phục an toàn không làm gián đoạn nghiệp vụ."
+        ],
+        "reset": "Khôi phục lại dữ liệu trích xuất trạng thái capabilities ban đầu.",
+        "cleanup": "Lưu báo cáo đánh giá ranh giới đặc quyền Linux capabilities.",
+        "cases": [
+          {
+            "id": "cap-case-01",
+            "title": "Đánh giá kết quả getcap trên hệ thống",
+            "context": "Quét hệ thống trả về kết quả:\n/usr/bin/ping = cap_net_raw+ep\n/usr/local/bin/backup-helper = cap_dac_override,cap_setuid+ep\n/usr/sbin/nginx = cap_net_bind_service+ep\n/usr/bin/tar = cap_dac_read_search+ep",
+            "prompt": "Binary nào tạo ra nguy cơ leo thang đặc quyền tức thời cao nhất cho unprivileged user và tại sao?",
+            "options": [
+              {
+                "id": "A",
+                "label": "ping vì cap_net_raw cho phép bắt trọn gói tin của toàn bộ mạng LAN.",
+                "correct": false,
+                "rationale": "cap_net_raw chỉ cho phép mở raw socket (ICMP/raw IP), không trực tiếp cấp quyền root hay sửa đổi file hệ thống."
+              },
+              {
+                "id": "B",
+                "label": "backup-helper vì mang đồng thời cap_setuid (cho phép đổi EUID sang 0) và cap_dac_override (cho phép đọc/ghi đè mọi file trên hệ thống bất kể permission). Bất kỳ user nào thực thi binary này có thể lợi dụng để sửa /etc/shadow hoặc spawn root shell.",
+                "correct": true,
+                "rationale": "Sự kết hợp giữa cap_setuid và cap_dac_override mang sức mạnh tương đương full root access, cho phép đổi danh tính tùy ý và ghi đè tệp tin xác thực của hệ điều hành."
+              },
+              {
+                "id": "C",
+                "label": "nginx vì mang cap_net_bind_service cho phép chiếm đoạt cổng dịch vụ của hệ thống.",
+                "correct": false,
+                "rationale": "cap_net_bind_service là cấu hình tiêu chuẩn an toàn cho web server bind cổng < 1024 mà không cần chạy toàn bộ dưới user root."
+              },
+              {
+                "id": "D",
+                "label": "tar vì cap_dac_read_search cho phép đọc toàn bộ dữ liệu người dùng khác.",
+                "correct": false,
+                "rationale": "cap_dac_read_search chỉ cho phép đọc và tìm kiếm file, rủi ro thấp hơn nhiều so với việc có quyền ghi đè (cap_dac_override) và đổi UID (cap_setuid)."
+              }
+            ]
+          },
+          {
+            "id": "cap-case-02",
+            "title": "Giải mã /proc/PID/status Capability Bitmask",
+            "context": "Tiến trình custom-daemon (PID 1420) chạy dưới user unprivileged 'appuser' (UID 1001). Trích xuất /proc/1420/status hiển thị:\nCapInh: 0000000000000000\nCapPrm: 0000000000000080\nCapEff: 0000000000000080\nCapBnd: 0000000000000080\nCapAmb: 0000000000000000\nBiết rằng bit thứ 7 (0x80) tương ứng với CAP_SETUID (bit 7).",
+            "prompt": "Nhận định nào sau đây là chính xác về khả năng bảo mật và rủi ro của tiến trình này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tiến trình an toàn tuyệt đối vì CapAmb bằng 0 nên không thể truyền quyền cho tiến trình con.",
+                "correct": false,
+                "rationale": "Dù CapAmb bằng 0, tiến trình hiện tại đang có CAP_SETUID trong CapEff và CapPrm, nghĩa là bản thân nó có thể gọi setuid(0) bất cứ lúc nào trước khi spawn tiến trình con."
+              },
+              {
+                "id": "B",
+                "label": "Tiến trình đang nắm giữ CAP_SETUID trong Effective set. Nếu ứng dụng có lỗ hổng thực thi mã (RCE/Memory Corruption), kẻ tấn công có thể gọi syscall setresuid(0,0,0) để nâng toàn bộ quyền của tiến trình lên root.",
+                "correct": true,
+                "rationale": "CapEff và CapPrm chứa bit 0x80 (CAP_SETUID), cho phép mã đang chạy trong tiến trình chuyển đổi UID/EUID sang root mà không cần mật khẩu."
+              },
+              {
+                "id": "C",
+                "label": "Tiến trình không có quyền gì vì UID là 1001 (non-root).",
+                "correct": false,
+                "rationale": "Trong mô hình Linux Capabilities, một tiến trình non-root vẫn có thể sở hữu capabilities trong CapEff/CapPrm nếu được kế thừa hoặc gán qua file capabilities."
+              },
+              {
+                "id": "D",
+                "label": "Tiến trình chỉ có quyền bind cổng mạng vì bit 0x80 là mạng.",
+                "correct": false,
+                "rationale": "Bit 0x80 (thập phân 128 = 2^7) là CAP_SETUID (capability số 7), không phải CAP_NET_BIND_SERVICE (capability số 10 = bit 0x400)."
+              }
+            ]
+          },
+          {
+            "id": "cap-case-03",
+            "title": "Hardening systemd unit cho microservice",
+            "context": "Một microservice nội bộ tên payment-worker.service cần kết nối mạng outbound và quản lý worker thread, nhưng không cần mở cổng nghe < 1024, không cần đổi UID, không cần can thiệp file hệ thống. Quản trị viên muốn cấu hình file service để triệt tiêu mọi khả năng leo thang đặc quyền.",
+            "prompt": "Khối cấu hình [Service] nào sau đây tuân thủ chuẩn Least Privilege tốt nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "[Service]\nUser=root\nCapabilityBoundingSet=CAP_NET_ADMIN\nNoNewPrivileges=false",
+                "correct": false,
+                "rationale": "Chạy dưới User=root và cấp CAP_NET_ADMIN (cấu hình mạng cấp sâu) là dư thừa và nguy hiểm."
+              },
+              {
+                "id": "B",
+                "label": "[Service]\nUser=payment\nGroup=payment\nCapabilityBoundingSet=\nAmbientCapabilities=\nNoNewPrivileges=true\nProtectSystem=strict\nProtectHome=true\nPrivateTmp=true",
+                "correct": true,
+                "rationale": "Chạy dưới user riêng 'payment', xóa sạch BoundingSet và AmbientCapabilities (không cấp bất kỳ capability nào), bật NoNewPrivileges=true cùng các cơ chế bảo vệ file system (ProtectSystem/ProtectHome/PrivateTmp)."
+              },
+              {
+                "id": "C",
+                "label": "[Service]\nUser=payment\nCapabilityBoundingSet=CAP_SYS_ADMIN\nNoNewPrivileges=true",
+                "correct": false,
+                "rationale": "Cấp CAP_SYS_ADMIN cho service thanh toán là sai lầm nghiêm trọng vi phạm nguyên tắc đặc quyền tối thiểu."
+              },
+              {
+                "id": "D",
+                "label": "[Service]\nExecStart=/usr/bin/payment-worker\nPermissionsStartOnly=true",
+                "correct": false,
+                "rationale": "Không định nghĩa User (chạy mặc định root), không giới hạn capability hay cô lập môi trường."
+              }
+            ]
+          }
+        ]
+      },
+      "governance": {
+        "prevent": [
+          "Không bao giờ gán file capabilities CAP_SETUID, CAP_DAC_OVERRIDE hoặc CAP_SYS_ADMIN cho binary unprivileged hay interpreter.",
+          "Áp dụng NoNewPrivileges=true và CapabilityBoundingSet= tối thiểu trong mọi systemd service unit.",
+          "Sử dụng công cụ kiểm toán định kỳ quét các file có extended attributes bất thường (getcap -r /)."
+        ],
+        "observe": [
+          "Giám sát lệnh gọi setcap và chmod +s qua auditd rules.",
+          "Theo dõi các sự kiện thay đổi security.capability xattrs trên filesystem.",
+          "Ghi nhận các tiến trình non-root có CapEff bất thường qua /proc telemetry."
+        ],
+        "respond": [
+          "Xóa ngay lập tức file capability nguy hiểm bằng lệnh setcap -r <file_path>.",
+          "Khởi động lại service bị ảnh hưởng sau khi cấu hình CapabilityBoundingSet chặt chẽ.",
+          "Kiểm tra lịch sử bash/audit log để xác định ai đã thực hiện gán capability và phạm vi ảnh hưởng."
+        ],
+        "residualRisk": [
+          "Các lỗ hổng Kernel Privilege Escalation (zero-day/n-day trong kernel syscalls) có thể bỏ qua cơ chế capability nếu không được vá kernel thường xuyên.",
+          "Binary được cấp capability hợp lệ (như CAP_NET_RAW) vẫn có thể bị tấn công DoS hoặc network spoofing trong phạm vi hẹp của capability đó."
+        ]
+      },
+      "misconceptions": [
+        "Lầm tưởng 1: 'Chạy ứng dụng dưới user non-root (UID 1000) thì luôn an toàn, không thể chiếm root.' -> Sai. Nếu binary hoặc tiến trình được gán CAP_SETUID, CAP_DAC_OVERRIDE hoặc CAP_SYS_ADMIN, kẻ tấn công có thể đạt quyền root đầy đủ chỉ bằng một lệnh gọi API.",
+        "Lầm tưởng 2: 'File capability và SUID bit hoạt động giống hệt nhau.' -> Sai. SUID cấp toàn bộ 40 capabilities và đổi EUID=0, trong khi File Capabilities chỉ cấp phát chính xác những bit được định nghĩa trong xattr mà không nhất thiết phải đổi EUID.",
+        "Lầm tưởng 3: 'Chỉ cần xóa quyền write trên binary là không thể gán capability.' -> Sai. Quyền gán capability phụ thuộc vào CAP_SETFCAP của user thực thi lệnh setcap (thường là root), lưu trong extended attribute của filesystem."
+      ],
+      "quiz": [
+        {
+          "id": "os02-l19-q1",
+          "difficulty": "easy",
+          "question": "Capability nào cho phép một tiến trình unprivileged thay đổi User ID (UID) của mình thành root (UID 0)?",
+          "explanation": "CAP_SETUID cho phép tiến trình thực hiện các thao tác thay đổi UID/GID tùy ý thông qua các hàm setuid(), setresuid(), setreuid().",
+          "options": [
+            { "id": "A", "label": "CAP_NET_BIND_SERVICE" },
+            { "id": "B", "label": "CAP_SETUID" },
+            { "id": "C", "label": "CAP_SYS_CHROOT" },
+            { "id": "D", "label": "CAP_KILL" }
+          ],
+          "correctAnswer": "B"
+        },
+        {
+          "id": "os02-l19-q2",
+          "difficulty": "medium",
+          "question": "Chỉ thị prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) mang lại tác dụng bảo mật gì cho tiến trình và các tiến trình con sau này?",
+          "explanation": "PR_SET_NO_NEW_PRIVS đảm bảo rằng tiến trình và mọi tiến trình con được sinh ra qua execve() sẽ không thể giành thêm bất kỳ quyền hạn nào thông qua cờ SUID/SGID hoặc File Capabilities.",
+          "options": [
+            {
+              "id": "A",
+              "label": "Chuyển toàn bộ tiến trình con sang chạy dưới user root tự động."
+            },
+            {
+              "id": "B",
+              "label": "Vô hiệu hóa việc nhận thêm đặc quyền từ SUID binary hoặc File Capabilities khi gọi execve()."
+            },
+            {
+              "id": "C",
+              "label": "Tự động mã hóa toàn bộ dữ liệu trong bộ nhớ của tiến trình."
+            },
+            {
+              "id": "D",
+              "label": "Chặn hoàn toàn tiến trình không cho tạo socket kết nối mạng."
+            }
+          ],
+          "correctAnswer": "B"
+        },
+        {
+          "id": "os02-l19-q3",
+          "difficulty": "hard",
+          "question": "Trong quá trình audit hệ thống, bạn phát hiện binary /opt/tools/net-diag có xattr 'security.capability' chứa 'cap_dac_override,cap_net_admin+ep'. Hướng khai thác và khắc phục nào là chuẩn xác nhất?",
+          "explanation": "cap_dac_override cho phép bỏ qua kiểm tra quyền đọc/ghi tệp tin, cho phép ghi đè /etc/shadow hoặc /etc/sudoers. Giải pháp chuẩn là gỡ bỏ capability thừa bằng 'setcap -r' hoặc chỉ giữ lại capability mạng tối thiểu cần thiết.",
+          "options": [
+            {
+              "id": "A",
+              "label": "Khai thác: Dùng cap_dac_override ghi đè hash password vào /etc/shadow để đạt root. Khắc phục: Dùng setcap -r gỡ bỏ toàn bộ capability hoặc chỉ cấp cap_net_raw nếu thực sự cần."
+            },
+            {
+              "id": "B",
+              "label": "Khai thác: Dùng cap_net_admin để format ổ cứng mạng. Khắc phục: Đổi owner của binary sang user nobody."
+            },
+            {
+              "id": "C",
+              "label": "Khai thác: Không thể khai thác vì không có cap_setuid. Khắc phục: Không cần xử lý."
+            },
+            {
+              "id": "D",
+              "label": "Khai thác: cap_dac_override chỉ cho phép đọc dữ liệu. Khắc phục: Chạy chmod 777 cho binary."
+            }
+          ],
+          "correctAnswer": "A"
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một nhóm kỹ sư phát triển một binary Golang chuyên kiểm tra sức khỏe hệ thống tệp và giám sát mạng nội bộ. Họ muốn binary chạy dưới user unprivileged 'monitor' nhưng vẫn có thể ping máy chủ và đọc file log hệ thống trong /var/log/secure mà không cần dùng sudo.",
+        "tasks": [
+          "Xác định chính xác danh sách capability tối thiểu cần thiết để đáp ứng yêu cầu nghiệp vụ.",
+          "Viết lệnh setcap chuẩn xác để gán capability vào binary mà không cấp quyền ghi đè hay đổi UID.",
+          "Thiết lập cấu hình systemd unit với NoNewPrivileges và BoundingSet bảo vệ dịch vụ."
+        ],
+        "requiredEvidence": [
+          "Lệnh gán capability: setcap cap_net_raw,cap_dac_read_search+ep /opt/monitor/bin/healthcheck",
+          "File unit systemd mẫu chứa CapabilityBoundingSet=CAP_NET_RAW CAP_DAC_READ_SEARCH và NoNewPrivileges=true",
+          "Bằng chứng kiểm thử: binary ping và đọc được file log nhưng bị Kernel từ chối khi thử ghi đè /etc/shadow."
+        ]
+      },
+      "sources": [
+        {
+          "title": "capabilities(7) — Linux manual page",
+          "publisher": "Linux Man-pages Project / kernel.org",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Định nghĩa 5 tập capability (Permitted, Effective, Inheritable, Bounding, Ambient)",
+            "Danh mục mã lỗi và cơ chế chuyển đổi capability qua execve()"
+          ],
+          "url": "https://man7.org/linux/man-pages/man7/capabilities.7.html"
+        },
+        {
+          "title": "prctl(2) & PR_SET_NO_NEW_PRIVS — Linux manual page",
+          "publisher": "Linux Man-pages Project / kernel.org",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Cơ chế khóa đặc quyền no_new_privs",
+            "Mối quan hệ giữa capability inheritance và seccomp filters"
+          ],
+          "url": "https://man7.org/linux/man-pages/man2/prctl.2.html"
+        },
+        {
+          "title": "Guide to the Secure Configuration of Red Hat Enterprise Linux",
+          "publisher": "National Security Agency (NSA) / CISA",
+          "sourceType": "industry-guide",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Khuyến nghị rà soát file capabilities định kỳ",
+            "Nguyên tắc cấu hình systemd CapabilityBoundingSet"
+          ],
+          "url": "https://www.cisa.gov/resources-tools/services"
+        }
+      ]
+    },
+    {
+      "id": "os02-l20-namespaces-cgroups-container-boundaries",
+      "slug": "namespaces-cgroups-container-boundaries",
+      "title": "Namespaces, Cgroups & Container Boundary Escapes",
+      "summary": "Các khối xây dựng nên container trên Linux (7 Namespaces và Cgroups v1/v2); cơ chế cô lập pivot_root vs chroot; các vectơ vượt ranh giới container (privileged mode, docker.sock mount, release_agent abuse, thiếu User Namespace) và thiết kế phòng thủ nhiều lớp.",
+      "difficulty": "intermediate",
+      "durationMinutes": 100,
+      "prerequisites": ["os02-l19-linux-capabilities-and-suid-privesc"],
+      "outcomes": [
+        "Giải thích vai trò của 7 Linux Namespaces (cung cấp tầm nhìn ảo hóa) và Cgroups (kiểm soát và giới hạn định mức tài nguyên).",
+        "Phân tích sự khác biệt cơ bản giữa VM (ảo hóa phần cứng qua Hypervisor) và Container (ảo hóa mức OS chia sẻ chung Linux Kernel).",
+        "Nhận diện các điểm vỡ ranh giới container nguy hiểm: flag --privileged, mount /var/run/docker.sock, mount /proc hoặc /sys ghi được, thiếu User Namespaces.",
+        "Đánh giá và áp dụng phòng thủ chiều sâu cho container workload: User Namespaces mapping, Seccomp profiles, AppArmor/SELinux và rootless containers."
+      ],
+      "careerPaths": [
+        "penetration-test",
+        "red-team",
+        "detection-engineering",
+        "vulnerability-research"
+      ],
+      "domains": ["linux", "cloud"],
+      "attackTactics": ["TA0004", "TA0005"],
+      "keywords": [
+        "linux-namespaces",
+        "cgroups-v2",
+        "container-escape",
+        "docker-socket",
+        "seccomp",
+        "user-namespaces"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Container không phải là một máy ảo độc lập mà chỉ là các tiến trình Linux thông thường được Kernel khoác cho chiếc kính lọc tầm nhìn (Namespaces) và chiếc vòng khóa tài nguyên (Cgroups). Tất cả container trên cùng một máy đều chia sẻ CHUNG một Kernel Linux duy nhất. Ranh giới container vững chắc đến đâu phụ thuộc hoàn toàn vào cấu hình Kernel: nếu container chạy ở chế độ '--privileged' (bật mọi capability và tắt mask /sys, /dev), nó có thể nạp kernel module hoặc mount trực tiếp ổ cứng vật lý của host. Nếu mount '/var/run/docker.sock' vào container, tiến trình bên trong có thể gọi Docker daemon của host để spawn một root container khác với host mount '/'. Container an toàn thực sự phải dùng User Namespaces (UID 0 trong container map với UID 100000 trên host), Seccomp filter và read-only root filesystem.",
+      "visual": {
+        "title": "Kiến trúc Ranh giới Container & Điểm Gãy Bảo mật",
+        "caption": "Chia sẻ chung Kernel; 7 Namespaces tạo ảo giác cô lập; cấu hình sai phá hủy ranh giới.",
+        "steps": [
+          {
+            "label": "Host Linux Kernel",
+            "detail": "Gốc chung của mọi container; mọi syscall, device driver và memory management đều chia sẻ chung một nhân duy nhất.",
+            "tone": "neutral"
+          },
+          {
+            "label": "7 Linux Namespaces",
+            "detail": "PID (cây tiến trình ảo), MNT (cây thư mục riêng), NET (card mạng/ip riêng), IPC (shm/queue riêng), UTS (hostname), USER (ánh xạ UID), CGROUP (tầm nhìn nhóm cgroup).",
+            "tone": "allow"
+          },
+          {
+            "label": "Cgroups v1/v2",
+            "detail": "Giới hạn và tính toán định mức CPU, RAM, IO, PIDs — ngăn chặn một container gây cạn kiệt tài nguyên của toàn bộ host.",
+            "tone": "allow"
+          },
+          {
+            "label": "Vectơ Vượt Ranh giới: --privileged",
+            "detail": "Bật tất cả capabilities, vô hiệu hóa seccomp, mở toàn bộ /dev và /sys → cho phép mount thiết bị ổ đĩa host và đọc ghi trực tiếp.",
+            "tone": "stop"
+          },
+          {
+            "label": "Vectơ Vượt Ranh giới: docker.sock Mount",
+            "detail": "Mount socket quản trị /var/run/docker.sock vào container = bàn giao toàn quyền root của Docker daemon cho tiến trình bên trong.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Giải phẫu Container: 7 Namespaces và Cgroups",
+          "paragraphs": [
+            "Một container Linux trong thực tế không có phần cứng ảo hóa, không có BIOS và không có Kernel riêng. Một tiến trình chạy trong container chỉ đơn thuần là một tiến trình thông thường trên host được gắn vào các Namespaces và Cgroups riêng biệt thông qua các cờ CLONE_* khi gọi syscall clone() hoặc unshare(). Có 7 Namespaces chính: (1) PID Namespace: cung cấp cây PID riêng biệt, nơi tiến trình chính của container nhìn thấy mình là PID 1; (2) Mount (MNT) Namespace: cung cấp bảng gắn kết hệ thống tệp riêng biệt; (3) Network (NET) Namespace: cung cấp interface mạng, routing table và firewall iptables riêng; (4) IPC Namespace: cô lập System V IPC và POSIX message queues; (5) UTS Namespace: cô lập hostname và domain name; (6) User Namespace: ánh xạ UID/GID bên trong container với UID/GID bên ngoài host; (7) Cgroup Namespace: che giấu cấu trúc cgroup thực tế.",
+            "Song song với Namespaces, Control Groups (Cgroups) chịu trách nhiệm phân bổ và giới hạn tài nguyên phần cứng. Cgroups v2 hợp nhất cây phân cấp thành một mô hình thống nhất, quản lý tài nguyên chặt chẽ: memory.max (tránh OOM host), cpu.max (giới hạn CPU time slice), pids.max (ngăn chặn fork bomb làm tê liệt host). Thiếu cgroups limits, một container bị lỗi hoặc bị chiếm quyền có thể làm cạn kiệt toàn bộ tài nguyên của máy chủ."
+          ],
+          "points": [
+            "lsns -p <PID>: liệt kê toàn bộ namespaces mà một tiến trình đang thuộc về.",
+            "unshare --mount --uts --ipc --net --pid --fork bash: tạo một môi trường namespace cô lập thủ công.",
+            "/sys/fs/cgroup: thư mục cấu hình và giám sát các nhóm cgroups v2 trong Kernel."
+          ]
+        },
+        {
+          "title": "chroot vs pivot_root và File System Boundary",
+          "paragraphs": [
+            "Để tạo ra hệ thống tệp riêng cho container, các runtime cổ điển sử dụng lệnh gọi hàm chroot(). Tuy nhiên, chroot() chỉ thay đổi thư mục gốc ảo (/) cho tiến trình mà không làm thay đổi mount table. Một tiến trình root bên trong môi trường chroot() có thể dễ dàng thoát ra ngoài (chroot escape) bằng cách mở một file descriptor trỏ ra ngoài trước khi chroot, hoặc gọi mkdir('sub'); chroot('sub'); cd ../../../ nếu không bị chặn bởi các cơ chế khác.",
+            "Các container runtime hiện đại chuẩn OCI (như runc, crun) bắt buộc sử dụng syscall pivot_root(). pivot_root() thực sự tráo đổi mount point của root filesystem cũ sang một thư mục con và đưa root filesystem mới vào vị trí /, sau đó umount -l root cũ. Kết hợp với việc mount /proc, /sys, /dev dưới dạng masked paths và read-only paths (như /proc/sys, /proc/kcore), Kernel ngăn chặn tiến trình container truy cập cấu trúc file hệ thống thật của host."
+          ],
+          "points": [
+            "chroot chỉ đổi root path pointer của tiến trình; pivot_root thay đổi toàn bộ mount topology.",
+            "Masked paths: các đường dẫn /proc nhạy cảm được runtime che bằng mount /dev/null đè lên.",
+            "Read-only paths: /proc/bus, /proc/fs, /proc/sys được mount ro để chống chỉnh sửa tham số kernel."
+          ]
+        },
+        {
+          "title": "Giải mã các Vectơ Thoát Ranh giới (Container Escape)",
+          "paragraphs": [
+            "Mọi vụ việc thoát ranh giới container (container breakout) đều xuất phát từ việc cấu hình sai làm sụp đổ lớp cô lập của Kernel: (1) Cờ --privileged: Flag này gỡ bỏ toàn bộ ranh giới — cấp phát toàn bộ capabilities (bao gồm CAP_SYS_ADMIN), tắt seccomp filter, không mask /proc//sys, và tạo tất cả device nodes trong /dev. Kẻ tấn công trong privileged container chỉ cần dùng fdisk -l để tìm ổ đĩa cứng của host (ví dụ /dev/sda1) rồi gọi mount /dev/sda1 /mnt để đọc ghi trực tiếp toàn bộ dữ liệu của host; (2) Mount Docker Socket (/var/run/docker.sock): Một sai lầm phổ biến khi triển khai CI/CD hoặc monitoring tools là mount trực tiếp docker.sock vào container. Tiến trình bên trong có thể tương tác với Docker REST API của host để gửi lệnh docker run -v /:/host_root alpine chroot /host_root tạo một container mới chiếm quyền root host tức thì; (3) Lợi dụng cgroups v1 release_agent: Khi container có CAP_SYS_ADMIN và mount cgroup v1, kẻ tấn công có thể ghi payload vào release_agent của cgroup để Kernel của host tự động thực thi script với quyền root khi một tiến trình trong cgroup kết thúc.",
+            "(4) Chia sẻ Host Namespaces: Chạy container với --pid=host hoặc --net=host làm mất khả năng cô lập tiến trình hoặc mạng. Với --pid=host, container nhìn thấy toàn bộ tiến trình của host và có thể dùng ptrace can thiệp nếu có capability phù hợp."
+          ],
+          "points": [
+            "Privileged container escape: mount /dev/sda1 /mnt && chroot /mnt /bin/bash.",
+            "Docker socket escape: curl -XPOST --unix-socket /var/run/docker.sock -d '{\"Image\":\"alpine\",\"Binds\":[\"/:/host\"]}' http://localhost/containers/create.",
+            "User Namespace mapping thiếu: root (UID 0) trong container mặc định chính là root (UID 0) trên host nếu không bật Userns-remap."
+          ]
+        },
+        {
+          "title": "Phòng thủ Container Chuyên sâu: User NS, Seccomp và Rootless",
+          "paragraphs": [
+            "Để xây dựng ranh giới container bất khả xâm phạm, chiến lược phòng thủ chiều sâu (Defense-in-depth) phải được áp dụng đồng bộ: (1) Bật User Namespaces (userns-remap trong daemon.json hoặc Rootless Containers): UID 0 bên trong container được ánh xạ sang UID không có đặc quyền trên host (ví dụ UID 100000). Khi đó, dù kẻ tấn công có chiếm được root trong container và thoát ra ngoài filesystem, Kernel vẫn xem chúng là unprivileged user và từ chối mọi thao tác can thiệp hệ thống; (2) Seccomp (Secure Computing Mode): Sử dụng bộ lọc seccomp mặc định chặn hơn 40 syscalls nguy hiểm (như mount, reboot, kexec_load, ptrace); (3) AppArmor / SELinux: Cưỡng chế chính sách MAC (Mandatory Access Control) ngăn chặn ghi đè /proc và /sys; (4) Read-only Root Filesystem (--read-only): Chặn hoàn toàn việc ghi file nhị phân độc hại lên ổ đĩa của container.",
+            "Nguyên tắc cốt lõi: Tuyệt đối không bao giờ chạy container ở chế độ --privileged trên môi trường sản xuất; không bao giờ mount Docker socket trực tiếp mà nên thay thế bằng giải pháp Docker-outside-of-Docker an toàn hoặc rootless Kaniko/Buildah cho CI/CD."
+          ],
+          "points": [
+            "Rootless Docker / Podman: chạy toàn bộ daemon và container bên trong User Namespace unprivileged.",
+            "Seccomp profile: whitelist các syscall cần thiết; drop các syscall quản trị hệ thống.",
+            "Read-only rootfs: docker run --read-only --tmpfs /tmp:rw,noexec,nosuid my-app."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Container Boundary & Escape Analysis Desk",
+        "objective": "Phân tích cấu hình container runtime mô phỏng, nhận diện điểm vỡ ranh giới và xác thực biện pháp khắc phục chuẩn OCI.",
+        "scenario": "Bạn được cung cấp 3 kịch bản cấu hình triển khai container (Docker compose, lệnh khởi chạy, trích xuất /proc/mounts và capabilities). Nhiệm vụ của bạn là đánh giá ranh giới bảo mật tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ phân tích cấu hình được cung cấp; không chạy khai thác thực tế.",
+          "Mọi nhận định về nguy cơ breakout phải giải thích rõ cơ chế tương tác giữa Container và Host Kernel.",
+          "Giải pháp thay thế phải khả thi cho môi trường vận hành thực tế."
+        ],
+        "evidenceTemplate": [
+          "Cấu hình sai hoặc cờ khởi chạy vi phạm ranh giới",
+          "Cơ chế Kernel bị vô hiệu hóa (Capabilities, Namespaces, Mounts)",
+          "Hậu quả an ninh trên máy chủ Host",
+          "Cấu hình hardening thay thế an toàn"
+        ],
+        "successCriteria": [
+          "Chỉ ra chính xác lỗ hổng bảo mật trong cấu hình mount docker.sock và --privileged.",
+          "Giải thích đúng nguyên lý hoạt động của User Namespaces trong việc ngăn chặn escape.",
+          "Chọn phương án kiến trúc an toàn cho pipeline CI/CD."
+        ],
+        "reset": "Khôi phục lại dữ liệu cấu hình container ban đầu.",
+        "cleanup": "Lưu báo cáo kiểm toán ranh giới cô lập container.",
+        "cases": [
+          {
+            "id": "cnt-case-01",
+            "title": "Phân tích rủi ro mount socket quản trị",
+            "context": "Một container phục vụ tác vụ giám sát tài nguyên được khởi chạy bằng lệnh:\ndocker run -d --name host-monitor -v /var/run/docker.sock:/var/run/docker.sock -v /proc:/host_proc:ro monitor-image:v1.2",
+            "prompt": "Rủi ro bảo mật lớn nhất của cấu hình này là gì và cơ chế xảy ra như thế nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không có rủi ro vì /proc được mount ở chế độ read-only (:ro).",
+                "correct": false,
+                "rationale": "Dù /proc là read-only, việc mount /var/run/docker.sock tạo ra toàn quyền tương tác với Docker daemon của host."
+              },
+              {
+                "id": "B",
+                "label": "Việc mount /var/run/docker.sock tương đương với việc trao toàn bộ quyền root của Host cho container. Nếu container bị thỏa hiệp, kẻ tấn công có thể gửi yêu cầu HTTP tới Docker API để tạo một container mới với host root filesystem được mount vào và chiếm quyền kiểm soát toàn bộ máy chủ.",
+                "correct": true,
+                "rationale": "Docker daemon chạy dưới quyền root trên host; bất kỳ ai có quyền đọc/ghi vào docker.sock đều có thể ra lệnh cho daemon spawn container mới với đầy đủ quyền hạn tối cao trên host."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ có rủi ro container bị đầy bộ nhớ do docker.sock sinh ra nhiều log.",
+                "correct": false,
+                "rationale": "docker.sock là Unix domain socket giao tiếp IPC, không phải file log thông thường."
+              },
+              {
+                "id": "D",
+                "label": "Rủi ro mạng vì container tự động mở cổng 2375 ra ngoài Internet.",
+                "correct": false,
+                "rationale": "Lệnh trên chỉ mount Unix socket cục bộ, không mở TCP port 2375 ra ngoài."
+              }
+            ]
+          },
+          {
+            "id": "cnt-case-02",
+            "title": "Đánh giá cờ --privileged và thiết bị lưu trữ",
+            "context": "Một kỹ sư chạy container gỡ lỗi mạng bằng lệnh:\ndocker run --rm -it --privileged ubuntu:22.04 bash\nBên trong container, lệnh `ls -l /dev` hiển thị toàn bộ thiết bị ổ đĩa của host (/dev/sda, /dev/sda1, /dev/nvme0n1).",
+            "prompt": "Tại sao cờ --privileged dẫn tới việc phá vỡ hoàn toàn ranh giới cô lập của container?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Vì --privileged tự động xóa mật khẩu của toàn bộ tài khoản trên hệ thống.",
+                "correct": false,
+                "rationale": "--privileged không chỉnh sửa file mật khẩu mà tác động lên Kernel boundaries."
+              },
+              {
+                "id": "B",
+                "label": "Vì --privileged cấp toàn bộ capabilities, tắt seccomp filter và không mask các device nodes/proc paths. Tiến trình bên trong có thể mount trực tiếp phân vùng ổ đĩa host (/dev/sda1) vào một thư mục và chỉnh sửa file hệ thống của host mà không bị cản trở.",
+                "correct": true,
+                "rationale": "Chế độ --privileged vô hiệu hóa toàn bộ cơ chế bảo vệ của container runtime, biến tiến trình container thành một tiến trình gần như chạy thẳng trên host với đầy đủ device access."
+              },
+              {
+                "id": "C",
+                "label": "Vì cờ này làm tăng tốc độ xung nhịp CPU của máy chủ vượt mức cho phép.",
+                "correct": false,
+                "rationale": "--privileged không can thiệp vào tần số phần cứng CPU."
+              },
+              {
+                "id": "D",
+                "label": "Vì container tự động biến thành máy ảo VMware ESXi.",
+                "correct": false,
+                "rationale": "Container vẫn dùng Linux Kernel chung, không biến thành Hypervisor."
+              }
+            ]
+          },
+          {
+            "id": "cnt-case-03",
+            "title": "Thiết kế kiến trúc an toàn cho CI/CD Pipeline",
+            "context": "Hệ thống CI/CD cần xây dựng (build) các Docker images cho các dự án phần mềm của lập trình viên. Nhóm vận hành muốn ngăn chặn triệt để nguy cơ các build script độc hại có thể thoát ra máy chủ runner.",
+            "prompt": "Kiến trúc nào sau đây đáp ứng tốt nhất yêu cầu an toàn ranh giới?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chạy runner với cờ --privileged để build nhanh nhất có thể.",
+                "correct": false,
+                "rationale": "Đây là giải pháp nguy hiểm nhất, cho phép bất kỳ build script độc hại nào chiếm root máy chủ runner."
+              },
+              {
+                "id": "B",
+                "label": "Mount /var/run/docker.sock vào runner và chạy chmod 777 /var/run/docker.sock.",
+                "correct": false,
+                "rationale": "chmod 777 docker socket cho phép mọi tiến trình unprivileged tương tác với Docker daemon root."
+              },
+              {
+                "id": "C",
+                "label": "Sử dụng các công cụ build image không cần đặc quyền root daemon (Rootless Builder như Kaniko hoặc Buildah trong User Namespace) kết hợp với Seccomp và gỡ bỏ hoàn toàn việc mount docker.sock.",
+                "correct": true,
+                "rationale": "Kaniko/Buildah thực hiện build image hoàn toàn trong user space mà không cần giao tiếp với daemon root hay yêu cầu cờ --privileged, triệt tiêu hoàn toàn bề mặt tấn công breakout."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần đổi tên file docker.sock thành docker.socket là an toàn.",
+                "correct": false,
+                "rationale": "Đổi tên file không thay đổi bản chất quyền lực của Unix domain socket."
+              }
+            ]
+          }
+        ]
+      },
+      "governance": {
+        "prevent": [
+          "Cấm tuyệt đối sử dụng flag --privileged trong môi trường sản xuất; kích hoạt admission controller (như OPA/Gatekeeper hoặc Kyverno trên K8s) để chặn tự động.",
+          "Không bao giờ mount /var/run/docker.sock vào container ứng dụng; sử dụng rootless container builders cho CI/CD.",
+          "Bật User Namespaces (userns-remap) để cô lập UID 0 của container khỏi UID 0 của máy chủ host."
+        ],
+        "observe": [
+          "Giám sát các container khởi chạy với cờ đặc quyền (--privileged) hoặc host namespaces (--pid=host, --net=host).",
+          "Theo dõi các sự kiện mount thiết bị ổ đĩa khối (/dev/sd*, /dev/nvme*) từ bên trong container namespaces.",
+          "Ghi nhận các truy vấn bất thường tới Docker daemon API qua audit log của Unix socket."
+        ],
+        "respond": [
+          "Dừng và cô lập ngay lập tức container vi phạm chính sách bảo mật (docker stop && docker network disconnect).",
+          "Kiểm tra tính toàn vẹn của máy chủ host để xác định liệu đã xảy ra hành vi ghi đè file hay leo thang quyền root.",
+          "Cập nhật chính sách container security posture management (CSPM) để ngăn chặn tái diễn."
+        ],
+        "residualRisk": [
+          "Lỗ hổng zero-day trong Linux Kernel subsystem (như vDSO, eBPF, io_uring) có thể bị khai thác để vượt ranh giới ngay cả khi container không có quyền privileged nếu seccomp chưa kịp chặn syscall đó.",
+          "Rò rỉ dữ liệu qua các kênh phụ phần cứng (CPU Side-channel Attacks như Spectre/Meltdown) giữa các container chạy chung một lõi CPU."
+        ]
+      },
+      "misconceptions": [
+        "Lầm tưởng 1: 'Container là máy ảo siêu nhẹ có hệ điều hành riêng biệt hoàn toàn.' -> Sai. Container chia sẻ chung Linux Kernel với host; ranh giới chỉ được duy trì bằng các cấu trúc dữ liệu Namespaces và Cgroups trong Kernel.",
+        "Lầm tưởng 2: 'Chạy container với user root bên trong là an toàn vì nó đã bị nhốt trong container.' -> Sai. Mặc định nếu không bật User Namespaces, root trong container có cùng UID 0 với root trên host; nếu thoát được ranh giới filesystem, nó có toàn quyền kiểm soát máy chủ.",
+        "Lầm tưởng 3: 'Mount thư mục host ở chế độ :ro (read-only) là hoàn toàn an toàn.' -> Sai. Đọc được các file nhạy cảm của host (như /etc/shadow, SSH keys, configuration files chứa secret) đã là một vi phạm nghiêm trọng về tính bảo mật."
+      ],
+      "quiz": [
+        {
+          "id": "os02-l20-q1",
+          "difficulty": "easy",
+          "question": "Linux Namespace nào chịu trách nhiệm tạo ra một cây tiến trình (process tree) độc lập, giúp tiến trình chính của container nhìn thấy mình là PID 1?",
+          "explanation": "PID Namespace cô lập không gian số PID, cho phép các tiến trình trong container có PID bắt đầu từ 1 độc lập với cây PID trên máy chủ host.",
+          "options": [
+            { "id": "A", "label": "Mount (MNT) Namespace" },
+            { "id": "B", "label": "Network (NET) Namespace" },
+            { "id": "C", "label": "PID Namespace" },
+            { "id": "D", "label": "UTS Namespace" }
+          ],
+          "correctAnswer": "C"
+        },
+        {
+          "id": "os02-l20-q2",
+          "difficulty": "medium",
+          "question": "Cơ chế User Namespaces (userns-remap) bảo vệ hệ thống host trước nguy cơ container escape như thế nào?",
+          "explanation": "User Namespaces ánh xạ UID 0 (root) bên trong container thành một UID không có đặc quyền (ví dụ UID 100000) trên host. Nhờ đó, nếu tiến trình thoát ra ngoài filesystem của host, nó chỉ có quyền của user thường và không thể can thiệp hệ thống.",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tự động mã hóa toàn bộ dữ liệu truyền qua card mạng của container."
+            },
+            {
+              "id": "B",
+              "label": "Ánh xạ UID 0 trong container thành một UID unprivileged trên host, ngăn chặn quyền root trên máy chủ host."
+            },
+            {
+              "id": "C",
+              "label": "Chặn hoàn toàn việc container kết nối tới cơ sở dữ liệu bên ngoài."
+            },
+            {
+              "id": "D",
+              "label": "Tăng dung lượng bộ nhớ RAM tối đa cho container lên gấp đôi."
+            }
+          ],
+          "correctAnswer": "B"
+        },
+        {
+          "id": "os02-l20-q3",
+          "difficulty": "hard",
+          "question": "Một ứng dụng container chạy với cờ '--privileged' và có quyền truy cập /dev. Kẻ tấn công bên trong container thực hiện chuỗi lệnh nào sau đây để chiếm quyền truy cập toàn bộ hệ thống file của host?",
+          "explanation": "Trong privileged container, thiết bị ổ đĩa của host (/dev/sda1) xuất hiện trong /dev. Kẻ tấn công có thể tạo thư mục /mnt_host, gọi mount /dev/sda1 /mnt_host và chroot /mnt_host để truy cập và chỉnh sửa trực tiếp filesystem của máy chủ host.",
+          "options": [
+            {
+              "id": "A",
+              "label": "mkdir /mnt_host && mount /dev/sda1 /mnt_host && chroot /mnt_host /bin/bash"
+            },
+            {
+              "id": "B",
+              "label": "ping -c 4 127.0.0.1 && systemctl restart docker"
+            },
+            {
+              "id": "C",
+              "label": "iptables -F && ifconfig eth0 down"
+            },
+            {
+              "id": "D",
+              "label": "export PATH=/tmp:$PATH && echo 'hello' > /dev/null"
+            }
+          ],
+          "correctAnswer": "A"
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một công ty SaaS đa người dùng (multi-tenant) cho phép khách hàng tải lên và chạy các đoạn mã Python tự động hóa trong các container Docker. Đội ngũ an ninh yêu cầu thiết kế một mô hình cô lập sandbox chuẩn mực để đảm bảo mã của một khách hàng không thể can thiệp sang khách hàng khác hay chiếm quyền máy chủ host.",
+        "tasks": [
+          "Xác định các cấu hình runtime bắt buộc (Seccomp, Capabilities, User Namespaces, Read-only rootfs).",
+          "Thiết lập giới hạn tài nguyên Cgroups v2 (CPU, Memory, PIDs) chống tấn công từ chối dịch vụ (DoS/Fork bomb).",
+          "Đề xuất kiến trúc kiểm soát mạng ngăn chặn quét nội bộ (Network isolation giữa các container)."
+        ],
+        "requiredEvidence": [
+          "Mẫu lệnh chạy container an toàn với đầy đủ các cờ: --cap-drop=ALL, --security-opt=no-new-privileges, --read-only, --pids-limit=50, --memory=256m",
+          "Chính sách Network Policy hoặc docker network cô lập hoàn toàn bridge giữa các tenant",
+          "Tài liệu giải trình kiến trúc đáp ứng tiêu chuẩn NIST SP 800-190."
+        ]
+      },
+      "sources": [
+        {
+          "title": "namespaces(7) & cgroups(7) — Linux manual pages",
+          "publisher": "Linux Man-pages Project / kernel.org",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Định nghĩa 7 Linux Namespaces và cờ CLONE",
+            "Cấu trúc và cơ chế kiểm soát tài nguyên Cgroups v2"
+          ],
+          "url": "https://man7.org/linux/man-pages/man7/namespaces.7.html"
+        },
+        {
+          "title": "NIST SP 800-190: Application Container Security Guide",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Các rủi ro bảo mật chính của Container Architecture",
+            "Khuyến nghị cấu hình ranh giới cô lập và User Namespaces"
+          ],
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-190/final"
+        },
+        {
+          "title": "Docker Security & Seccomp Security Profiles",
+          "publisher": "Docker Documentation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Danh sách syscalls bị chặn bởi Seccomp default profile",
+            "Hướng dẫn cấu hình userns-remap và rootless daemon"
+          ],
+          "url": "https://docs.docker.com/engine/security/"
+        }
+      ]
+    },
+    {
+      "id": "os02-l21-auditd-ebpf-and-host-telemetry",
+      "slug": "auditd-ebpf-and-host-telemetry",
+      "title": "Auditd, eBPF & Linux Host Telemetry",
+      "summary": "Kiến trúc ghi vết hệ thống Linux (kauditd trong Kernel, daemon auditd ở userland); thiết kế bộ quy tắc giám sát syscall (/etc/audit/rules.d/); công cụ truy vấn ausearch/aureport; công nghệ eBPF (kprobes, tracepoints, LSM hooks) so với audit truyền thống; kỹ thuật phát hiện tấn công và bảo vệ tính toàn vẹn telemetry.",
+      "difficulty": "intermediate",
+      "durationMinutes": 100,
+      "prerequisites": ["os02-l20-namespaces-cgroups-container-boundaries"],
+      "outcomes": [
+        "Mô tả luồng dữ liệu telemetry của Linux Audit Framework từ kauditd (kernel) qua netlink socket tới daemon auditd (userland).",
+        "Thiết kế và kiểm tra các audit rule (-w file watch, -a always,exit -S execve) để giám sát thực thi tiến trình, leo thang đặc quyền và chỉnh sửa file nhạy cảm.",
+        "Sử dụng ausearch và aureport để trích xuất bằng chứng số, giải mã các trường quan trọng (auid, euid, exe, tty, comm, key).",
+        "So sánh kiến trúc eBPF với Linux Auditd cổ điển: ưu điểm hiệu năng, khả năng can thiệp LSM (Linux Security Modules), và giới hạn của từng công nghệ trong detection engineering."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "detection-engineering"],
+      "domains": ["linux"],
+      "attackTactics": ["TA0005", "TA0007"],
+      "keywords": [
+        "auditd",
+        "audit-rules",
+        "ausearch",
+        "ebpf",
+        "kauditd",
+        "host-telemetry",
+        "auid-vs-euid"
+      ],
+      "safetyLevel": "safe",
+      "mentalModel": "Nếu /proc là ảnh chụp trạng thái tức thời thì Audit Framework là máy quay băng ghi hình từng hành động cấp Kernel. Trong Linux Audit, trường 'auid' (Audit UID / Login UID) là 'chứng minh nhân dân bất biến': dù user nam (UID 1000) có sudo su thành root (UID 0), auid vẫn mãi là 1000 — kẻ tấn công không thể giấu danh tính gốc. Khi auditd ghi nhận qua syscall execve, mọi tham số lệnh đều được lưu vết. Tuy nhiên, auditd truyền thống tạo overhead lớn khi số lượng syscall tăng vọt. eBPF (Extended Berkeley Packet Filter) mở ra kỷ nguyên mới: cho phép chạy các chương trình bytecode an toàn, hiệu năng cao ngay trong Kernel tại các điểm tracepoint/kprobe/LSM mà không cần context switch ra userland. Hiểu telemetry giúp Red Team nhận thức được vết chân số để lại và Purple/Blue Team xây dựng các quy tắc giám sát bất khả xâm phạm.",
+      "visual": {
+        "title": "Kiến trúc Linux Host Telemetry: Auditd & eBPF",
+        "caption": "Từ syscall trong kernel space tới phân tích log user space; auid bất biến truy vết danh tính thật.",
+        "steps": [
+          {
+            "label": "Syscall Execution",
+            "detail": "Tiến trình gọi execve, openat, setuid, connect; Kernel kiểm tra rules trong bộ nhớ để quyết định sinh audit event.",
+            "tone": "neutral"
+          },
+          {
+            "label": "kauditd Subsystem",
+            "detail": "Hợp phần trong Kernel ghi nhận event vào ring buffer; gửi qua Netlink socket tới daemon auditd trong user space.",
+            "tone": "allow"
+          },
+          {
+            "label": "auid (Login UID) Magic",
+            "detail": "Lưu UID ban đầu lúc user đăng nhập qua sshd/login; không bị thay đổi khi dùng sudo/su; bằng chứng số truy nguyên danh tính.",
+            "tone": "allow"
+          },
+          {
+            "label": "Audit Rules & /var/log/audit/audit.log",
+            "detail": "Quy tắc giám sát file (-w) và syscall (-S); log ghi chi tiết comm, exe, args, cwd, res=success/failed.",
+            "tone": "caution"
+          },
+          {
+            "label": "eBPF Tracing & LSM Sensors",
+            "detail": "Bytecode chạy an toàn trong kernel tại tracepoints/kprobes; lọc dữ liệu tốc độ cao không nghẽn ring buffer; hỗ trợ Tetragon, Falco, Tracee.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến trúc Linux Audit Subsystem: kauditd, Netlink và auditd",
+          "paragraphs": [
+            "Linux Audit Subsystem là cơ chế ghi nhận sự kiện bảo mật cấp thấp được tích hợp trực tiếp vào nhân Linux. Kiến trúc gồm hai phần chính: (1) kauditd (Kernel space): Nhận các sự kiện từ các điểm kiểm tra trong syscall dispatcher, selinux, apparmor và đưa vào một hàng đợi ring buffer nội bộ của kernel; (2) auditd (User space daemon): Mở một kết nối Netlink socket (NETLINK_AUDIT) để đọc các gói tin sự kiện từ kauditd và ghi xuống tệp tin nhật ký /var/log/audit/audit.log.",
+            "Một đặc tính quan trọng bậc nhất của Linux Audit là khái niệm auid (Audit UID / Login UID). Khi một người dùng đăng nhập vào hệ thống qua SSH hoặc console, daemon xác thực (như sshd hoặc login) ghi nhận UID của người dùng vào trường loginuid của tiến trình thông qua /proc/self/loginuid. Sau khi được gán, auid trở thành giá trị bất biến (immutable) và được truyền qua mọi tiến trình con. Dù người dùng có chạy sudo -i, su - hay khai thác lỗ hổng để đạt EUID=0 (root), mọi bản ghi audit do tiến trình đó sinh ra vẫn mang auid nguyên bản, giúp chuyên gia điều tra truy nguyên chính xác tài khoản ban đầu."
+          ],
+          "points": [
+            "auid (Audit UID): danh tính gốc lúc đăng nhập; euid (Effective UID): quyền thực tế lúc chạy lệnh.",
+            "Netlink socket: kênh giao tiếp hai chiều tốc độ cao giữa Kernel space và daemon auditd.",
+            "auditctl -s: kiểm tra trạng thái hoạt động của audit subsystem (enabled, backlog limit, lost events)."
+          ]
+        },
+        {
+          "title": "Thiết kế Audit Rules: File Watch và Syscall Interception",
+          "paragraphs": [
+            "Bộ quy tắc audit được cấu hình trong thư mục /etc/audit/rules.d/ (thường là tệp audit.rules) và được nạp vào Kernel thông qua công cụ auditctl. Có hai loại quy tắc cơ bản: (1) File System Watches: Sử dụng cú pháp -w <path> -p <permissions> -k <key_name>. Ví dụ: -w /etc/shadow -p wa -k identity_modification sẽ ghi lại mọi hành vi ghi (w) hoặc thay đổi thuộc tính (a) trên file /etc/shadow kèm theo nhãn định danh key=identity_modification; (2) Syscall Rules: Sử dụng cú pháp -a always,exit -F arch=b64 -S <syscall> -k <key_name>. Ví dụ để giám sát mọi lệnh thực thi trong hệ thống: -a always,exit -F arch=b64 -S execve,execveat -k process_execution.",
+            "Để tránh làm tràn ngập log (log flooding) và gây suy giảm hiệu năng hệ thống, quy tắc audit cần được tinh chỉnh bằng các bộ lọc trường (-F). Có thể lọc theo UID (-F auid>=1000 -F auid!=unset), lọc bỏ các tiến trình định kỳ của hệ thống (như cron jobs), hoặc giới hạn theo kết quả thực thi (-F success=1 hoặc -F exit=-EACCES để bắt các hành vi vi phạm phân quyền)."
+          ],
+          "points": [
+            "Giám sát file nhạy cảm: -w /etc/sudoers -p wa -k sudoers_change; -w /etc/passwd -p wa -k user_change.",
+            "Giám sát leo thang quyền: -a always,exit -F arch=b64 -S setuid,setgid,setresuid -k priv_escalation.",
+            "Khóa quy tắc: -e 2 ở cuối file audit.rules ngăn chặn việc thay đổi hoặc vô hiệu hóa rule cho đến khi reboot hệ thống."
+          ]
+        },
+        {
+          "title": "Phân tích Bằng chứng với ausearch, aureport và auid Magic",
+          "paragraphs": [
+            "Tệp /var/log/audit/audit.log chứa các bản ghi dạng text có cấu trúc chuẩn nhưng nhiều trường mã hóa hex. Thay vì dùng grep thủ công, chuyên gia điều tra sử dụng bộ công cụ chuyên dụng: (1) ausearch: Tìm kiếm sự kiện theo tiêu chí cụ thể. Lệnh ausearch -k identity_modification -i tự động giải mã các giá trị hex (như đường dẫn, tham số lệnh) thành text đọc được; lệnh ausearch -ui 1000 --start today trích xuất toàn bộ hành động do user có auid 1000 thực hiện trong ngày; (2) aureport: Tạo báo cáo thống kê tổng quan (báo cáo đăng nhập aureport -l, báo cáo thực thi lệnh aureport -x, báo cáo sự kiện thất bại aureport --failed).",
+            "Mỗi sự kiện audit đầy đủ thường bao gồm nhiều bản ghi liên kết với nhau qua timestamp và serial number msg=audit(time:serial): bản ghi type=SYSCALL (chứa auid, euid, exe, tty), bản ghi type=EXECVE (chứa chi tiết các tham số dòng lệnh a0, a1, a2), và bản ghi type=CWD (thư mục làm việc hiện tại). Việc liên kết các bản ghi này cho phép tái hiện chính xác 100% ngữ cảnh của một cuộc tấn công."
+          ],
+          "points": [
+            "ausearch -k <key> -i: tìm kiếm theo nhãn và tự động decode hex-encoded strings.",
+            "ausearch -m EXECVE -ts recent: xem các lệnh vừa được thực thi gần nhất trên hệ thống.",
+            "aureport -x --summary: tổng kết các binary được thực thi nhiều nhất để phát hiện bất thường."
+          ]
+        },
+        {
+          "title": "Cách mạng eBPF Telemetry và Detection Engineering Hiện đại",
+          "paragraphs": [
+            "Mặc dù auditd rất mạnh mẽ cho mục đích tuân thủ (compliance), nó bộc lộ hạn chế lớn trong môi trường container và cloud-native quy mô lớn: overhead CPU cao khi xử lý hàng triệu syscall/giây, và nguy cơ nghẽn ring buffer làm mất log khi bị tấn công dồn dập. eBPF (Extended Berkeley Packet Filter) khắc phục triệt để các nhược điểm này bằng cách cho phép nạp các chương trình C bytecode an toàn, được JIT-compiled chạy trực tiếp trong kernel context.",
+            "Các giải pháp telemetry hiện đại như Tetragon (Cilium), Falco, Tracee và bpftrace gắn các probe vào kprobes, tracepoints hoặc LSM hooks (Linux Security Modules) để thu thập dữ liệu với độ trễ cực thấp. eBPF có khả năng trích xuất sâu cấu trúc dữ liệu kernel, tương quan PID host với Container ID/Pod Kubernetes ngay trong kernel space, và thậm chí kích hoạt cơ chế ngăn chặn tức thì (in-kernel enforcement/kill) trước khi syscall hoàn tất. Sự kết hợp giữa Auditd truyền thống (cho compliance) và eBPF sensors (cho runtime security & threat hunting) tạo nên thế trận phòng thủ Linux vững chắc."
+          ],
+          "points": [
+            "Tracepoints vs Kprobes: tracepoints ổn định theo API kernel; kprobes linh hoạt gắn vào bất kỳ hàm kernel nào.",
+            "Tetragon / Falco: phát hiện hành vi namespace escape, process injection, reverse shell theo thời gian thực.",
+            "eBPF In-Kernel Filtering: loại bỏ 99% dữ liệu rác ngay trong kernel, chỉ gửi alert thực sự có giá trị lên SIEM."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Telemetry Investigation & Audit Rule Design Desk",
+        "objective": "Phân tích trích xuất log auditd và sự kiện eBPF mô phỏng, truy nguyên danh tính kẻ tấn công qua auid và thiết kế rule giám sát chuẩn CIS Benchmark.",
+        "scenario": "Bạn là Detection Engineer đang điều tra một vụ việc nghi vấn leo thang đặc quyền trên máy chủ Linux. Hệ thống cung cấp: trích xuất /var/log/audit/audit.log với các bản ghi SYSCALL/EXECVE, bảng báo cáo aureport, và file cấu hình audit.rules. Toàn bộ diễn ra tĩnh trong trình duyệt.",
+        "constraints": [
+          "Chỉ suy luận dựa trên log và dữ liệu cấp sẵn; không gửi truy vấn ra ngoài.",
+          "Mọi kết luận về danh tính phải căn cứ vào auid, euid và chuỗi sự kiện có timestamp.",
+          "Quy tắc audit thiết kế phải đảm bảo hiệu năng và có nhãn key rõ ràng."
+        ],
+        "evidenceTemplate": [
+          "Timestamp và Serial ID của sự kiện vi phạm",
+          "Tài khoản thực hiện (auid ban đầu vs euid lúc leo thang)",
+          "Lệnh thực thi chính xác và file bị chỉnh sửa",
+          "Quy tắc audit rule khuyến nghị để phát hiện sớm hành vi tương tự"
+        ],
+        "successCriteria": [
+          "Chỉ ra chính xác tài khoản gốc thông qua trường auid bất kể việc đối tượng đã chuyển sang root.",
+          "Giải mã đúng lệnh thực thi từ bản ghi type=EXECVE.",
+          "Viết đúng cú pháp quy tắc auditctl để giám sát tệp nhạy cảm và lệnh leo thang quyền."
+        ],
+        "reset": "Khôi phục lại dữ liệu trích xuất nhật ký auditd ban đầu.",
+        "cleanup": "Lưu báo cáo điều tra số và bộ quy tắc audit hardening.",
+        "cases": [
+          {
+            "id": "tel-case-01",
+            "title": "Truy nguyên danh tính kẻ tấn công qua auid",
+            "context": "Trích xuất audit log ghi nhận:\ntype=SYSCALL msg=audit(1724700000.120:402): arch=c000003e syscall=59 success=yes exit=0 a0=55c010 a1=55c030 a2=55c050 items=2 ppid=1200 pid=1540 auid=1002 uid=0 gid=0 euid=0 tty=pts1 ses=4 comm=\"useradd\" exe=\"/usr/sbin/useradd\" key=\"user_modification\"\ntype=EXECVE msg=audit(1724700000.120:402): argc=3 a0=\"useradd\" a1=\"-m\" a2=\"backdoor_admin\"",
+            "prompt": "Ai là người thực sự thực hiện lệnh tạo tài khoản 'backdoor_admin' và bằng chứng nào chứng minh điều đó?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tài khoản root chính danh vì uid=0 và euid=0.",
+                "correct": false,
+                "rationale": "uid=0 và euid=0 chỉ phản ánh quyền hạn thực thi tại thời điểm chạy lệnh (sau khi đã sudo/su), không phản ánh tài khoản gốc đăng nhập."
+              },
+              {
+                "id": "B",
+                "label": "Người dùng có UID 1002 (ví dụ user 'dev_john') là người thực hiện, vì trường auid=1002 (Audit/Login UID) lưu vết bất biến danh tính ban đầu lúc đăng nhập phiên làm việc (ses=4, pts1) trước khi chuyển quyền sang root (euid=0).",
+                "correct": true,
+                "rationale": "auid lưu lại danh tính gốc khi mở phiên làm việc; dù có sudo/su thành root thì auid vẫn giữ nguyên là 1002, chứng minh chính user 1002 là người khởi tạo phiên lệnh này."
+              },
+              {
+                "id": "C",
+                "label": "Hệ thống tự động chạy qua cron job vì ppid=1200.",
+                "correct": false,
+                "rationale": "Log có tty=pts1 và ses=4 chứng minh đây là phiên tương tác của người dùng qua terminal, không phải cron job ngầm."
+              },
+              {
+                "id": "D",
+                "label": "Không thể xác định được vì log auditd không ghi tên người dùng.",
+                "correct": false,
+                "rationale": "Số UID 1002 đối chiếu với /etc/passwd sẽ chỉ ra chính xác username tương ứng."
+              }
+            ]
+          },
+          {
+            "id": "tel-case-02",
+            "title": "Thiết kế Audit Rule bắt hành vi thay đổi sudoers",
+            "context": "Đội ngũ Security muốn giám sát chặt chẽ mọi hành vi chỉnh sửa hoặc thay đổi quyền hạn đối với file `/etc/sudoers` và thư mục `/etc/sudoers.d/`. Quy tắc cần gắn nhãn key là `scope_sudo_tamper`.",
+            "prompt": "Cặp quy tắc audit nào sau đây trong /etc/audit/rules.d/sudo.rules là chuẩn xác và đầy đủ nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "-w /etc/sudoers -p r -k scope_sudo_tamper\n-w /etc/sudoers.d/ -p r -k scope_sudo_tamper",
+                "correct": false,
+                "rationale": "Cờ '-p r' chỉ giám sát hành vi ĐỌC (read), không bắt được hành vi GHI (write) hoặc đổi thuộc tính (attribute change)."
+              },
+              {
+                "id": "B",
+                "label": "-w /etc/sudoers -p wa -k scope_sudo_tamper\n-w /etc/sudoers.d/ -p wa -k scope_sudo_tamper",
+                "correct": true,
+                "rationale": "Cờ '-p wa' giám sát cả hành vi Ghi (write) và Thay đổi thuộc tính/metadata (attribute change như chmod/chown) trên cả file /etc/sudoers và thư mục /etc/sudoers.d/ kèm key định danh."
+              },
+              {
+                "id": "C",
+                "label": "-a always,exit -S reboot -k scope_sudo_tamper",
+                "correct": false,
+                "rationale": "Quy tắc này giám sát syscall reboot, không liên quan đến file sudoers."
+              },
+              {
+                "id": "D",
+                "label": "-w /etc/shadow -p x -k scope_sudo_tamper",
+                "correct": false,
+                "rationale": "Giám sát nhầm file /etc/shadow và cờ '-p x' là thực thi (execute), trong khi file cấu hình không bao giờ có cờ execute."
+              }
+            ]
+          },
+          {
+            "id": "tel-case-03",
+            "title": "So sánh hiệu năng & tính năng eBPF vs Auditd",
+            "context": "Hệ thống Kubernetes có lưu lượng 50,000 requests/giây. Đội ngũ kỹ thuật nhận thấy daemon `auditd` bị quá tải (backlog limit exceeded, rớt gói tin) khi bật audit rule giám sát `execve` và `connect` cho tất cả container.",
+            "prompt": "Giải pháp kiến trúc nào là phù hợp nhất để duy trì telemetry thời gian thực mà không làm nghẽn hệ thống?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tắt hoàn toàn việc ghi log để bảo vệ hiệu năng ứng dụng.",
+                "correct": false,
+                "rationale": "Tắt log tạo ra vùng mù an ninh hoàn toàn, vi phạm nghiêm trọng nguyên tắc an toàn thông tin."
+              },
+              {
+                "id": "B",
+                "label": "Tăng kích thước audit backlog lên vô cực trong memory.",
+                "correct": false,
+                "rationale": "Tăng backlog không giới hạn có thể dẫn tới tràn RAM (OOM) làm sập toàn bộ máy chủ."
+              },
+              {
+                "id": "C",
+                "label": "Chuyển đổi sang sử dụng giải pháp telemetry dựa trên eBPF (như Tetragon hoặc Falco eBPF probe). eBPF thực hiện lọc dữ liệu và lọc nhiễu trực tiếp trong Kernel space, chỉ đẩy các sự kiện bảo mật đáng ngờ qua per-CPU ring buffers về user space, giảm thiểu tối đa context switch và CPU overhead.",
+                "correct": true,
+                "rationale": "eBPF cho phép xử lý và lọc dữ liệu với hiệu năng cực cao trong kernel context, phù hợp hoàn hảo cho môi trường container/cloud-native có mật độ syscall dày đặc."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển sang ghi log bằng cách chạy script 'ps aux' lặp vô tận mỗi 1 giây.",
+                "correct": false,
+                "rationale": "Chạy ps lặp lại sẽ bỏ sót toàn bộ các tiến trình chạy trong khoảng thời gian < 1s và gây tốn tài nguyên hơn."
+              }
+            ]
+          }
+        ]
+      },
+      "governance": {
+        "prevent": [
+          "Khóa cấu hình audit rules bằng chỉ thị '-e 2' ở cuối file /etc/audit/rules.d/audit.rules để ngăn kẻ tấn công vô hiệu hóa giám sát.",
+          "Cấu hình luân chuyển log (logrotate) và phân vùng lưu trữ riêng biệt (/var/log/audit) tránh làm đầy ổ đĩa gốc.",
+          "Triển khai eBPF runtime security sensors có khả năng tự động chặn (in-kernel block) các hành vi vi phạm chính sách."
+        ],
+        "observe": [
+          "Chuyển tiếp log auditd và eBPF events về hệ thống SIEM tập trung theo thời gian thực (qua rsyslog, fluentbit hoặc Vector).",
+          "Tạo cảnh báo tức thời khi phát hiện sự kiện thay đổi auid, sửa đổi /etc/sudoers hoặc gọi syscall setuid.",
+          "Theo dõi chỉ số sức khỏe của audit subsystem (auditctl -s lost/backlog) để phát hiện tình trạng nghẽn log."
+        ],
+        "respond": [
+          "Sử dụng ausearch để khoanh vùng toàn bộ hoạt động của phiên làm việc (ses) và auid liên quan ngay khi có cảnh báo.",
+          "Cách ly ngay lập tức tiến trình và tài khoản đang thực hiện hành vi can thiệp trái phép.",
+          "Lưu giữ bản sao nguyên vẹn của audit.log phục vụ công tác giám định pháp y kỹ thuật số (Forensics Chain of Custody)."
+        ],
+        "residualRisk": [
+          "Kẻ tấn công có quyền Root/Kernel Exploit có thể nạp Kernel Module độc hại để hook vào kauditd hoặc vô hiệu hóa eBPF verifier.",
+          "Khối lượng log quá lớn nếu không được lọc tốt có thể làm phát sinh chi phí lưu trữ SIEM đáng kể."
+        ]
+      },
+      "misconceptions": [
+        "Lầm tưởng 1: 'Kẻ tấn công dùng sudo su thành root thì mọi log sẽ chỉ ghi nhận là root, không biết ai làm.' -> Sai. Trường auid (Login UID) giữ nguyên ID gốc của người đăng nhập bất kể họ có chuyển sang root hay user nào khác.",
+        "Lầm tưởng 2: 'auditd và syslog là một.' -> Sai. Syslog nhận log từ các ứng dụng tự nguyện gửi lên; Auditd nhận dữ liệu cưỡng chế trực tiếp từ Kernel cho mọi syscall được cấu hình.",
+        "Lầm tưởng 3: 'eBPF thay thế hoàn toàn nhu cầu về audit log tuân thủ.' -> Sai. eBPF tối ưu cho runtime detection và performance, nhưng nhiều tiêu chuẩn tuân thủ (PCI-DSS, NIST) vẫn yêu cầu rõ ràng việc lưu trữ auditd log truyền thống có ký số."
+      ],
+      "quiz": [
+        {
+          "id": "os02-l21-q1",
+          "difficulty": "easy",
+          "question": "Trường nào trong bản ghi Linux Audit Log phản ánh danh tính gốc ban đầu của người dùng khi đăng nhập vào hệ thống?",
+          "explanation": "Trường auid (Audit UID / Login UID) lưu lại UID ban đầu lúc xác thực đăng nhập và không bị thay đổi khi dùng sudo/su.",
+          "options": [
+            { "id": "A", "label": "euid" },
+            { "id": "B", "label": "fsuid" },
+            { "id": "C", "label": "auid" },
+            { "id": "D", "label": "gid" }
+          ],
+          "correctAnswer": "C"
+        },
+        {
+          "id": "os02-l21-q2",
+          "difficulty": "medium",
+          "question": "Cú pháp auditctl nào sau đây dùng để giám sát mọi hành vi Ghi (write) và Đổi thuộc tính (attribute) trên file /etc/shadow với key là 'shadow_watch'?",
+          "explanation": "Cú pháp đúng là '-w /etc/shadow -p wa -k shadow_watch', trong đó '-p wa' đại diện cho write và attribute change.",
+          "options": [
+            { "id": "A", "label": "-w /etc/shadow -p wa -k shadow_watch" },
+            { "id": "B", "label": "-S open -f /etc/shadow -k shadow_watch" },
+            { "id": "C", "label": "-w /etc/shadow -p x -k shadow_watch" },
+            { "id": "D", "label": "-a always -file /etc/shadow -k shadow_watch" }
+          ],
+          "correctAnswer": "A"
+        },
+        {
+          "id": "os02-l21-q3",
+          "difficulty": "hard",
+          "question": "Ưu điểm kỹ thuật cốt lõi của giải pháp giám sát an ninh dựa trên eBPF so với Auditd truyền thống là gì?",
+          "explanation": "eBPF cho phép chạy chương trình bytecode đã qua kiểm định an toàn trực tiếp trong Kernel space, cho phép lọc dữ liệu tốc độ cao, tương quan ngữ cảnh container và kích hoạt phản hồi tức thì với overhead CPU cực thấp.",
+          "options": [
+            {
+              "id": "A",
+              "label": "eBPF tự động sửa lỗi trong mã nguồn của ứng dụng mà không cần lập trình viên."
+            },
+            {
+              "id": "B",
+              "label": "eBPF chạy an toàn trong kernel context, cho phép lọc và xử lý telemetry với hiệu năng cao mà không gây nghẽn context switch ra user space."
+            },
+            {
+              "id": "C",
+              "label": "eBPF chỉ chạy được trên các máy ảo Windows Server."
+            },
+            {
+              "id": "D",
+              "label": "eBPF thay thế hoàn toàn card mạng vật lý của máy chủ."
+            }
+          ],
+          "correctAnswer": "B"
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một máy chủ Linux production chứa cơ sở dữ liệu nhạy cảm. Bạn được giao nhiệm vụ triển khai giải pháp giám sát an ninh toàn diện: cấu hình auditd rules tuân thủ CIS Linux Benchmark Level 2, thiết lập bộ lọc eBPF bắt các hành vi reverse shell qua bash/sh, và đảm bảo kẻ tấn công không thể tắt audit mà không bị phát hiện.",
+        "tasks": [
+          "Xây dựng tệp cấu hình /etc/audit/rules.d/cis-benchmark.rules giám sát: execve của non-root, thay đổi /etc/pam.d/, và syscall nạp kernel module (init_module, finit_module).",
+          "Thiết lập khóa bất biến '-e 2' ở cuối file rules.",
+          "Viết tài liệu hướng dẫn truy vấn bằng ausearch để trích xuất bằng chứng khi có sự cố nạp kernel module bất thường."
+        ],
+        "requiredEvidence": [
+          "Tệp cis-benchmark.rules hoàn chỉnh với đầy đủ các rule syscalls và file watches kèm nhãn key rõ ràng.",
+          "Lệnh trích xuất ausearch -k module_insertion -i và kết quả mẫu giải mã trường auid/exe.",
+          "Bằng chứng kiểm thử: khi chạy auditctl -D bị Kernel từ chối với lỗi Operation not permitted do cờ -e 2."
+        ]
+      },
+      "sources": [
+        {
+          "title": "auditd(8) & auditctl(8) — Linux manual pages",
+          "publisher": "Linux Man-pages Project / kernel.org",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Kiến trúc Linux Audit Subsystem và daemon auditd",
+            "Cú pháp file watch và syscall rules"
+          ],
+          "url": "https://man7.org/linux/man-pages/man8/auditd.8.html"
+        },
+        {
+          "title": "CIS Red Hat Enterprise Linux Benchmark",
+          "publisher": "Center for Internet Security (CIS)",
+          "sourceType": "industry-guide",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Khuyến nghị cấu hình audit rules chuẩn cho môi trường enterprise",
+            "Nguyên tắc khóa audit configuration (-e 2)"
+          ],
+          "url": "https://www.cisecurity.org/benchmark/red_hat_linux"
+        },
+        {
+          "title": "BPF and XDP Reference Guide",
+          "publisher": "Cilium Authors / Linux Kernel Documentation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Kiến trúc eBPF Virtual Machine và In-Kernel Verifier",
+            "Cơ chế Kernel Tracing qua Tracepoints và Kprobes"
+          ],
+          "url": "https://docs.cilium.io/en/stable/bpf/"
+        }
+      ]
+    }
+  ]
+}
