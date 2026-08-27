@@ -10,14 +10,14 @@ Updated: 2026-08-27
 - Machine-readable manifest: verified
 - Generation skill: active
 - Curriculum validator: verified
-- Full lesson migration/generation: in progress — **16 modules validated (48 lessons, 3,570 minutes);
+- Full lesson migration/generation: in progress — **19 modules validated (57 lessons, 4,320 minutes);
   tracks `os00-ethics-authorization` (3/3), `os01-network-foundations` (4/4),
-  `os02-linux-foundations` (3/3), `os03-windows-foundations` (3/3), and
-  `os04-operator-scripting` (3/3) fully validated**
+  `os02-linux-foundations` (3/3), `os03-windows-foundations` (3/3),
+  `os04-operator-scripting` (3/3), and `os05-pentest-methodology` (3/3) fully validated (6 full tracks complete)**
 - Existing Practice Range collections: preserved as auxiliary practice range
 - Publishing state: PR #4 (foundation), PR #5 (`os01-m02`), PR #6 (`os01-m03`), PR #7 (`os01-m04`),
   PR #9 (paired cycle 1: `os02-m01` + `os03-m01`), PR #10 (paired cycle 2: `os02-m02` + `os03-m02` & tree restructure),
-  PR #11 (paired cycle 3: `os02-m03` + `os03-m03`)
+  PR #11 (paired cycle 3: `os02-m03` + `os03-m03`), PR #12 (`os04-m01`..`m03`), PR #13 (`os05-m01`..`m03`)
   open for review; each new batch stacks on the previous branch.
 - Batch policy: single module or paired modules per run by owner approval.
 
@@ -27,22 +27,22 @@ Windows, Active Directory, cloud, research, or adversary-emulation tracks.
 
 ## Latest validated batch
 
-**Track 04 Module 03** — `os04-m03-safe-evidence-automation` (Timeouts, retries, errors and evidence-collector capstone, 300 minutes total) — **Completes Track 04**:
+**Track 05 Module 03** — `os05-m03-report-remediation-retest` (Technical reporting, remediation and retest, 240 minutes total) — **Completes Track 05**:
 
-1. `os04-l31-concurrency-asyncio-and-worker-pools` (100 min) — Bounded concurrency, AsyncIO & worker pool engineering:
-   cooperative event loop mechanics vs Thread/Process pools, bounded concurrency via `asyncio.Semaphore(N)` and `asyncio.Queue` backpressure,
-   `asyncio.to_thread()` blocking I/O offloading, CPU hashing dispatch to `ProcessPoolExecutor`, and graceful signal shutdown (`SIGINT`/`SIGTERM`)
-   with `asyncio.CancelledError` flushing.
+1. `os05-l40-technical-vulnerability-reporting-and-structure` (80 min) — Professional vulnerability reporting & finding structure:
+   actionable finding anatomy (Identifier, Title, Severity, CVSS 3.1/4.0 vector string, CWE ID, Affected Assets),
+   strategic executive summary drafting for board-level stakeholders, deterministic sanitized reproduction steps (curl/PoC),
+   and two-stage QA peer review gates.
 
-2. `os04-l32-defensive-error-handling-and-telemetry-pipelines` (100 min) — Defensive error architecture & observable telemetry pipelines:
-   domain exception taxonomy (Transient vs Fatal errors), explicit exception chaining (`raise ... from err`),
-   Circuit Breaker state machine (Closed, Open, Half-Open) for target stability protection, Dead Letter Queue (DLQ) pattern for failed evidence preservation,
-   and OpenTelemetry-aligned structured JSON telemetry.
+2. `os05-l41-root-cause-analysis-and-defense-in-depth-remediation` (80 min) — Root-cause remediation, defense-in-depth & strategic guidance:
+   differentiating superficial blacklist regexes from architectural root-cause fixes (parameterized queries / PreparedStatements),
+   application-level controls (output encoding, least privilege), infrastructure defense-in-depth (IMDSv2, egress filtering),
+   and practical compensating control design for unpatchable legacy systems.
 
-3. `os04-l33-evidence-collector-capstone-and-safe-packaging` (100 min) — Safe operator CLI packaging & evidence collector capstone:
-   declarative CLI design with Click/Typer subcommands and Path validation, cryptographic streaming SHA-256 evidence sealing,
-   NIST SP 800-86 compliant `manifest.json` chain-of-custody generation, multi-stage rootless containerization (`USER 10001`),
-   and end-to-end evidence collection and verification workflows.
+3. `os05-l42-remediation-verification-and-retesting-workflows` (80 min) — Remediation verification, retesting workflows & engagement closeout:
+   focused verification retesting methodology, probing for filter bypasses and encoding loopholes (double-encoding, alternate tags),
+   finding status matrix tracking (Remediated, Partially Remediated, Not Remediated, Risk Accepted),
+   and drafting formal executive Letters of Attestation on corporate letterhead.
 
 All three labs are browser-only decision simulations with fixed datasets. They accept no external
 target, credential, command or arbitrary payload. Completion requires all three lab cases and
@@ -54,6 +54,9 @@ before `published` status remains pending, as for all batches.
 
 ## Previous validated batches
 
+- `os05-m02-verification-impact-evidence` (270 min, 3 lessons): `os05-l37..l39`.
+- `os05-m01-engagement-recon-enumeration` (240 min, 3 lessons): `os05-l34..l36`.
+- `os04-m03-safe-evidence-automation` (300 min, 3 lessons): `os04-l31..l33`.
 - `os04-m02-structured-data-http-git` (240 min, 3 lessons): `os04-l28..l30`.
 - `os04-m01-bash-python-powershell` (300 min, 3 lessons): `os04-l25..l27`.
 
@@ -94,7 +97,7 @@ before `published` status remains pending, as for all batches.
 
 ## Next eligible batch
 
-Track 05: `os05-m01-engagement-recon-enumeration` (Engagement planning, reconnaissance and enumeration, 240 min) — depends on `os04-operator-scripting` which is now fully validated.
+Track 06: `os06-m01-discovery-services-authentication` (Discovery, common services and authentication weaknesses, 270 min) — depends on `os05-pentest-methodology` which is now fully validated.
 
 ## Tree restructure (owner-approved, pre-cycle 3)
 
@@ -141,22 +144,21 @@ Owner approved full restructuring before cycle 3:
 ## Evidence log
 
 - `npm run validate:offensive-security-curriculum`: passed — 19 tracks, 64 modules; next
-  eligible module is `os05-m01-engagement-recon-enumeration`.
-- `npm run validate:offensive-security-content`: passed — validated all sixteen modules
+  eligible module is `os06-m01-discovery-services-authentication`.
+- `npm run validate:offensive-security-content`: passed — validated all nineteen modules
   `os00-m01`–`os00-m03`, `os01-m01`–`os01-m04`, `os02-m01`–`os02-m03`, `os03-m01`–`os03-m03`,
-  and `os04-m01`–`os04-m03` (48 lessons, 3,570m).
+  `os04-m01`–`os04-m03`, and `os05-m01`–`os05-m03` (57 lessons, 4,320m).
 - Quality rubric review: 22/22 self-assessed for each of the three lessons in this batch;
   no dimension scored zero.
-- Authoritative sources: Python 3 Standard Library (`asyncio`), Python PEP 3156,
-  Martin Fowler (Circuit Breaker pattern), Python PEP 3134 (Exception Chaining),
-  NIST SP 800-86 (Forensic Techniques in Incident Response), Click Documentation.
-- CJK-leakage grep across all sixteen data files: clean (0 matches).
+- Authoritative sources: PTES Reporting Guidelines, OWASP Vulnerability Reporting Guidelines,
+  NIST SP 800-53 Rev. 5, OWASP Proactive Controls, NIST SP 800-115 Section 6.
+- CJK-leakage grep across all nineteen data files: clean (0 matches).
 - `npm run lint`: passed.
 - `npm run typecheck` (`tsc --noEmit`): passed.
-- Production build: passed (203 static pages generated).
+- Production build: passed (215 static pages generated).
 - `git diff --check`: passed.
 
-Runtime integration: all 16 modules served from
-`/offensive-security/academy/<track-id>/<module-slug>` plus 48 statically generated lesson
+Runtime integration: all 19 modules served from
+`/offensive-security/academy/<track-id>/<module-slug>` plus 57 statically generated lesson
 routes beneath them; index page renders the track → module tree via
 `groupAcademyModulesByTrack`; routes derive automatically from `ACADEMY_MODULES`.
