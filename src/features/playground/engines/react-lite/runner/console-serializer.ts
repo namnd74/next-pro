@@ -1,4 +1,4 @@
-import type { SerializedValue } from '../types';
+import type { SerializedValue } from '../../../types';
 
 export const SERIALIZER_LIMITS = {
   maxDepth: 5,

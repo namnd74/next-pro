@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Loader2, AlertTriangle, RefreshCcw } from 'lucide-react';
 import type { PlaygroundLayoutConfig, RunnerStatus } from '../types';
-import { generateIframeSrcDoc } from '../runner/runner-entry';
+import { generateIframeSrcDoc } from '../engines/react-lite';
 import { Button } from '@/components/ui/button';
 
 interface PreviewPanelProps {

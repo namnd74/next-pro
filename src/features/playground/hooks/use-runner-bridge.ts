@@ -4,7 +4,7 @@ import {
   PLAYGROUND_PROTOCOL,
   type HostToRunnerMessage,
   type RunnerToHostMessage,
-} from '../runner/protocol';
+} from '../engines/react-lite/runner/protocol';
 
 export interface UseRunnerBridgeOptions {
   onStatusChange?: (status: RunnerStatus) => void;

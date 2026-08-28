@@ -16,12 +16,14 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import type { PlaygroundFile } from '../types';
-import { cleanVirtualPath } from '../engine/module-resolver';
+import type { FileChangeStatus } from '@/lib/storage/platform-db';
+import { cleanVirtualPath } from '../engines/react-lite';
 
 interface FileExplorerProps {
   files: Record<string, PlaygroundFile>;
   activePath: string;
   entryPath: string;
+  fileStatusMap?: Record<string, FileChangeStatus>;
   onSelectFile: (path: string) => void;
   onAddFile: (path: string) => void;
   onRenameFile: (oldPath: string, newPath: string) => void;
@@ -84,6 +86,7 @@ export function FileExplorer({
   files,
   activePath,
   entryPath,
+  fileStatusMap = {},
   onSelectFile,
   onAddFile,
   onRenameFile,
@@ -325,6 +328,8 @@ export function FileExplorer({
       );
     }
 
+    const status = fileStatusMap[node.fullPath] || 'clean';
+
     return (
       <div
         key={node.fullPath}
@@ -332,13 +337,36 @@ export function FileExplorer({
         className={`group flex cursor-pointer items-center justify-between rounded px-1.5 py-1 text-[11px] transition-colors select-none ${
           isActive
             ? 'bg-primary/15 text-primary border-primary border-l-2 font-semibold'
-            : 'text-slate-300 hover:bg-slate-900/60 hover:text-white'
+            : status === 'modified'
+              ? 'text-amber-400 hover:bg-slate-900/60'
+              : status === 'added'
+                ? 'text-emerald-400 hover:bg-slate-900/60'
+                : 'text-slate-300 hover:bg-slate-900/60 hover:text-white'
         }`}
         style={{ paddingLeft: `${depth * 10 + 6}px` }}
       >
         <div className="flex items-center gap-1.5 overflow-hidden text-ellipsis">
           {getFileIcon(node.fullPath)}
           <span className="truncate">{node.name}</span>
+
+          {status === 'modified' && (
+            <span
+              className="rounded bg-amber-500/20 px-1 text-[8px] font-bold text-amber-400"
+              title="File đã chỉnh sửa"
+            >
+              M
+            </span>
+          )}
+
+          {status === 'added' && (
+            <span
+              className="rounded bg-emerald-500/20 px-1 text-[8px] font-bold text-emerald-400"
+              title="File tự tạo mới"
+            >
+              U
+            </span>
+          )}
+
           {isEntry && (
             <span className="bg-primary/20 py-0.2 text-primary shrink-0 rounded px-1 font-sans text-[8px] font-bold">
               main

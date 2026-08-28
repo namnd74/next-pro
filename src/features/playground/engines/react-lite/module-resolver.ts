@@ -1,9 +1,11 @@
-import type { PlaygroundFile } from '../types';
+import type { PlaygroundFile } from '../../types';
 
 export const ALLOWED_EXTERNAL_MODULES = new Set([
   'react',
   'react-dom',
   'react-dom/client',
+  'zustand',
+  'zustand/middleware',
   'lucide-react',
   '@playground/ui',
 ]);

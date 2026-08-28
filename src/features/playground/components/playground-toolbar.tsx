@@ -26,6 +26,7 @@ interface PlaygroundToolbarProps {
   status: RunnerStatus;
   layout: PlaygroundLayoutConfig;
   logCount: number;
+  saveStatus?: 'idle' | 'saving' | 'saved';
   onRun: () => void;
   onReset: () => void;
   onToggleConsole: () => void;
@@ -40,6 +41,7 @@ export function PlaygroundToolbar({
   status,
   layout,
   logCount,
+  saveStatus = 'idle',
   onRun,
   onReset,
   onToggleConsole,
@@ -141,6 +143,20 @@ export function PlaygroundToolbar({
         </Button>
 
         {getStatusBadge()}
+
+        {saveStatus === 'saving' && (
+          <span className="text-muted-foreground/80 flex items-center gap-1 font-mono text-[10px]">
+            <Loader2 className="h-2.5 w-2.5 animate-spin text-cyan-400" />
+            <span className="hidden md:inline">Đang lưu...</span>
+          </span>
+        )}
+
+        {saveStatus === 'saved' && (
+          <span className="flex items-center gap-1 font-mono text-[10px] text-emerald-400">
+            <CheckCircle2 className="h-2.5 w-2.5" />
+            <span className="hidden md:inline">Đã lưu IDB</span>
+          </span>
+        )}
       </div>
 
       {/* Right controls: Viewport, Orientation, Console, Fullscreen / Close */}
@@ -215,17 +231,21 @@ export function PlaygroundToolbar({
             variant={layout.isFullscreen ? 'secondary' : 'outline'}
             size="sm"
             onClick={onToggleFullscreen}
-            className="text-primary border-primary/30 h-7 gap-1 px-2 text-xs"
-            title={layout.isFullscreen ? 'Thu nhỏ (Esc)' : 'Toàn màn hình VS Code (F11)'}
+            className={`text-primary border-primary/30 h-7 text-xs ${
+              layout.isFullscreen ? 'w-7 p-0' : 'gap-1 px-2'
+            }`}
+            title={
+              layout.isFullscreen ? 'Thoát toàn màn hình (Esc)' : 'Toàn màn hình (F11)'
+            }
           >
             {layout.isFullscreen ? (
               <Minimize2 className="h-3.5 w-3.5" />
             ) : (
-              <Maximize2 className="h-3.5 w-3.5" />
+              <>
+                <Maximize2 className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Toàn màn hình</span>
+              </>
             )}
-            <span className="hidden sm:inline">
-              {layout.isFullscreen ? 'Thu nhỏ' : 'Toàn màn hình'}
-            </span>
           </Button>
         )}
 

@@ -1,4 +1,5 @@
 export * from './types';
+export * from './engines';
 export * from './components/react-playground';
 export * from './components/code-editor';
 export * from './components/file-tabs';
@@ -9,7 +10,3 @@ export * from './components/playground-toolbar';
 export * from './components/playground-error-boundary';
 export * from './hooks/use-playground';
 export * from './hooks/use-runner-bridge';
-export * from './engine/module-resolver';
-export * from './engine/compiler.worker';
-export * from './runner/protocol';
-export * from './runner/external-modules';
