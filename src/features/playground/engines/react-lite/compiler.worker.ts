@@ -1,5 +1,5 @@
 import { transform } from 'sucrase';
-import type { PlaygroundFile, CompilationResult } from '../types';
+import type { PlaygroundFile, CompilationResult } from '../../types';
 import { cleanVirtualPath } from './module-resolver';
 
 // File-level compile cache

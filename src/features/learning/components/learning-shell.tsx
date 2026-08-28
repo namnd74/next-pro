@@ -21,7 +21,7 @@ export function LearningShell({ children, tracks }: LearningShellProps) {
 
   return (
     <div className="relative flex gap-6">
-      <aside className="sticky top-24 hidden h-[calc(100vh-8rem)] w-[280px] shrink-0 lg:block">
+      <aside className="sticky top-24 hidden h-[calc(100vh-8rem)] w-[290px] shrink-0 lg:block xl:w-[310px]">
         <div className="glass border-border/60 h-full rounded-2xl border p-3">
           <LearningSidebar tracks={tracks} />
         </div>

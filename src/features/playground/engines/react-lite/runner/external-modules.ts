@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import * as ReactDOMClient from 'react-dom/client';
+import { create as createZustandStore } from 'zustand';
 import {
   Sparkles,
   Plus,
@@ -93,6 +94,7 @@ export const RUNNER_EXTERNAL_MODULES: Record<string, unknown> = {
   react: React,
   'react-dom': ReactDOMClient,
   'react-dom/client': ReactDOMClient,
+  zustand: { create: createZustandStore, default: { create: createZustandStore } },
   'lucide-react': WHITELISTED_LUCIDE_ICONS,
   '@playground/ui': PLAYGROUND_UI_COMPONENTS,
 };

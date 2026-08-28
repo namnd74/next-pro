@@ -3,12 +3,14 @@
 import * as React from 'react';
 import { Plus, X, FileCode2, Check } from 'lucide-react';
 import type { PlaygroundFile } from '../types';
-import { cleanVirtualPath } from '../engine/module-resolver';
+import type { FileChangeStatus } from '@/lib/storage/platform-db';
+import { cleanVirtualPath } from '../engines/react-lite';
 
 interface FileTabsProps {
   files: Record<string, PlaygroundFile>;
   activePath: string;
   entryPath: string;
+  fileStatusMap?: Record<string, FileChangeStatus>;
   onSelectFile: (path: string) => void;
   onAddFile: (path: string) => void;
   onDeleteFile: (path: string) => void;
@@ -18,6 +20,7 @@ export function FileTabs({
   files,
   activePath,
   entryPath,
+  fileStatusMap = {},
   onSelectFile,
   onAddFile,
   onDeleteFile,
@@ -69,6 +72,7 @@ export function FileTabs({
         const isActive = file.path === activePath;
         const isEntry = file.path === entryPath;
         const displayName = file.path.replace(/^\//, '');
+        const status = fileStatusMap[file.path] || 'clean';
 
         return (
           <div
@@ -81,9 +85,46 @@ export function FileTabs({
             }`}
           >
             <FileCode2
-              className={`h-3.5 w-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`}
+              className={`h-3.5 w-3.5 ${
+                status === 'modified'
+                  ? 'text-amber-400'
+                  : status === 'added'
+                    ? 'text-emerald-400'
+                    : isActive
+                      ? 'text-primary'
+                      : 'text-muted-foreground'
+              }`}
             />
-            <span>{displayName}</span>
+            <span
+              className={
+                status === 'modified'
+                  ? 'text-amber-400'
+                  : status === 'added'
+                    ? 'text-emerald-400'
+                    : ''
+              }
+            >
+              {displayName}
+            </span>
+
+            {/* Git-like status badges */}
+            {status === 'modified' && (
+              <span
+                className="text-[10px] font-bold text-amber-400"
+                title="File đã chỉnh sửa so với đề bài"
+              >
+                ●
+              </span>
+            )}
+
+            {status === 'added' && (
+              <span
+                className="rounded bg-emerald-500/20 px-1 text-[9px] font-bold text-emerald-400"
+                title="File do bạn tự tạo mới"
+              >
+                [U]
+              </span>
+            )}
 
             {isEntry && (
               <span className="bg-primary/10 py-0.2 text-primary rounded px-1 font-sans text-[9px] font-bold">

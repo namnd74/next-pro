@@ -1,4 +1,4 @@
-import type { ConsoleMessage } from '../types';
+import type { ConsoleMessage } from '../../../types';
 
 export const PLAYGROUND_PROTOCOL = 'nextpro-playground-v1' as const;
 

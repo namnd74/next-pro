@@ -31,6 +31,8 @@ export interface ReactPlaygroundProps {
   instructions?: string;
   className?: string;
   minHeight?: string;
+  platform?: string;
+  scopeId?: string;
 }
 
 export function ReactPlayground({
@@ -39,12 +41,16 @@ export function ReactPlayground({
   instructions,
   className = '',
   minHeight = '320px',
+  platform = 'react-lite',
+  scopeId,
 }: ReactPlaygroundProps) {
   const {
     project,
     activeFile,
     layout,
     compileErrors,
+    saveStatus,
+    fileStatusMap,
     bridge,
     updateFileContent,
     addFile,
@@ -59,7 +65,7 @@ export function ReactPlayground({
     setIsFullscreen,
     setOrientation,
     setViewport,
-  } = usePlayground({ initialFiles, entryPath });
+  } = usePlayground({ initialFiles, entryPath, platform, scopeId });
 
   const [inlineMode, setInlineMode] = React.useState(false);
   const [splitPercent, setSplitPercent] = React.useState<number>(50);
@@ -213,7 +219,7 @@ export function ReactPlayground({
                   className="shadow-primary/25 bg-primary hover:bg-primary/90 w-full gap-2 text-xs font-semibold shadow-md sm:w-auto"
                 >
                   <Maximize2 className="h-3.5 w-3.5" />
-                  <span>Khởi động VS Code Studio (Toàn màn hình)</span>
+                  <span>Mở Studio Toàn Màn Hình</span>
                 </Button>
               </div>
             </div>
@@ -239,6 +245,7 @@ export function ReactPlayground({
           status={bridge.runnerStatus}
           layout={layout}
           logCount={bridge.consoleLogs.length}
+          saveStatus={saveStatus}
           onRun={runProject}
           onReset={resetProject}
           onToggleConsole={toggleConsole}
@@ -302,6 +309,7 @@ export function ReactPlayground({
               files={project.files}
               activePath={project.activePath}
               entryPath={project.entryPath}
+              fileStatusMap={fileStatusMap}
               onSelectFile={setActivePath}
               onAddFile={addFile}
               onRenameFile={renameFile}
@@ -331,6 +339,7 @@ export function ReactPlayground({
                 files={project.files}
                 activePath={project.activePath}
                 entryPath={project.entryPath}
+                fileStatusMap={fileStatusMap}
                 onSelectFile={setActivePath}
                 onAddFile={addFile}
                 onDeleteFile={deleteFile}
@@ -468,7 +477,7 @@ export function ReactPlayground({
                 onClick={() => setIsFullscreen(false)}
                 className="text-slate-400 hover:text-slate-200"
               >
-                [Esc để thu nhỏ]
+                [Esc để thoát]
               </button>
             )}
           </div>
