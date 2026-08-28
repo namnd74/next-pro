@@ -27,6 +27,7 @@ import { getCollectionsByPhase } from '../data/collection-loader';
 import { getMissionsByCollectionSlug } from '../data/collection-loader';
 import { OFFENSIVE_SECURITY_PHASES_ORDERED } from '../data/roadmap';
 import { useOffensiveSecurityStore } from '../stores/use-offensive-security-store';
+import { Badge } from '@/components/ui/badge';
 
 function getTopicIcon(iconName: string) {
   const cls = 'h-4 w-4';
@@ -170,6 +171,31 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
           <span className="block font-mono text-[9px] tracking-wide">
             {mounted ? completedAcademyLessonIds.length : 0}/{totalAcademyLessons} bài
             hoàn thành
+          </span>
+        </span>
+      </Link>
+
+      <Link
+        href="/offensive-security/arena"
+        onClick={onNavigate}
+        className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2.5 transition-colors ${
+          pathname.startsWith('/offensive-security/arena')
+            ? 'border-rose-500/40 bg-rose-500/15 font-bold text-rose-400 shadow-md shadow-rose-900/20'
+            : 'border-border/60 text-muted-foreground hover:text-foreground bg-rose-500/5 hover:border-rose-500/30'
+        }`}
+      >
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-500/20 text-rose-400">
+          <Flame className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block flex items-center gap-1.5 text-xs font-bold text-white">
+            Cyber Arena{' '}
+            <Badge className="border-rose-500/30 bg-rose-500/20 px-1 py-0 text-[8px] text-rose-400 uppercase">
+              0-Day
+            </Badge>
+          </span>
+          <span className="block font-mono text-[9px] tracking-wide text-amber-400">
+            Bounty & Leaderboard
           </span>
         </span>
       </Link>
