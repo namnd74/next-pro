@@ -6,6 +6,7 @@ import {
   BookOpenCheck,
   Bug,
   Crosshair,
+  Flame,
   MousePointerClick,
   ShieldCheck,
   Skull,
@@ -86,6 +87,49 @@ export default function OffensiveSecurityHomePage() {
             {totalVectors} attack vectors
           </Badge>
         </div>
+      </section>
+
+      {/* ── BATTLE RANGE & 0-DAY ARENA CTA ── */}
+      <section className="space-y-4">
+        <Link href="/offensive-security/arena" className="group block">
+          <Card className="relative overflow-hidden rounded-3xl border-2 border-rose-500/50 bg-gradient-to-r from-rose-950/40 via-slate-900 to-black p-6 shadow-2xl transition-all hover:border-rose-500 hover:shadow-rose-950/40">
+            <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-rose-600/10 blur-3xl" />
+            <div className="flex flex-col items-start justify-between gap-5 md:flex-row md:items-center">
+              <div className="flex items-start gap-4">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-rose-500/40 bg-gradient-to-br from-rose-600 to-red-950 text-white shadow-lg shadow-rose-900/40">
+                  <Flame className="h-6 w-6 text-rose-400" />
+                </span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Badge className="border-rose-500/40 bg-rose-500/20 font-mono text-[10px] font-bold text-rose-400 uppercase">
+                      ⚔️ Battle Range & Leaderboard
+                    </Badge>
+                    <span className="font-mono text-xs font-bold text-amber-400">
+                      💰 $85,000+ Săn Tiền Thưởng
+                    </span>
+                  </div>
+                  <h2 className="text-lg font-black text-white transition-colors group-hover:text-rose-400">
+                    Đấu Trường Thực Chiến (Cyber Range Arena)
+                  </h2>
+                  <p className="max-w-2xl text-xs leading-relaxed text-slate-300">
+                    Tác chiến với bộ công cụ trực tiếp (HTTP Repeater, Patch Diff, Memory
+                    Hex Dump, Dual-Terminal) để bóc tách{' '}
+                    <strong>CVE-2023-4966 Citrix Bleed</strong>,{' '}
+                    <strong>Log4Shell</strong>, <strong>AWS SSRF</strong> và{' '}
+                    <strong>Active Directory Kerberos</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-end md:self-auto">
+                <span className="flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-rose-600/30 transition group-hover:bg-rose-500">
+                  VÀO ĐẤU TRƯỜNG{' '}
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </span>
+              </div>
+            </div>
+          </Card>
+        </Link>
       </section>
 
       {/* Core academy */}

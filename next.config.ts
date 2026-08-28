@@ -12,6 +12,7 @@ const basePath = configuredBasePath || githubPagesBasePath;
 
 const nextConfig: NextConfig = {
   output: 'export',
+  basePath: basePath || undefined,
   poweredByHeader: false,
   images: {
     unoptimized: true,
