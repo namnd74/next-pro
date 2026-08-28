@@ -180,7 +180,7 @@ export const ArenaTerminalStage: React.FC<ArenaTerminalStageProps> = ({
       {/* TERMINAL OUTPUT STREAM */}
       <div
         onClick={() => inputRef.current?.focus()}
-        className="h-[420px] overflow-y-auto p-4 text-xs leading-relaxed text-slate-300 select-text"
+        className="h-[500px] overflow-y-auto p-4 font-mono text-xs leading-relaxed text-slate-300 select-text"
       >
         {history.map((h, i) => (
           <div key={i} className="mb-2">

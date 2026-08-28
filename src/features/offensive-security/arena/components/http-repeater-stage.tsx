@@ -240,14 +240,14 @@ export const HttpRepeaterStage: React.FC<HttpRepeaterStageProps> = ({
             <textarea
               value={rawHeaders}
               onChange={(e) => setRawHeaders(e.target.value)}
-              className="h-[360px] w-full resize-none rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-emerald-400 focus:border-slate-700 focus:outline-none"
+              className="h-[460px] w-full resize-none rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-emerald-400 focus:border-slate-700 focus:outline-none"
               placeholder="Host: target&#10;Authorization: Bearer ..."
             />
           ) : (
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              className="h-[360px] w-full resize-none rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-amber-300 focus:border-slate-700 focus:outline-none"
+              className="h-[460px] w-full resize-none rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-amber-300 focus:border-slate-700 focus:outline-none"
               placeholder='{"username": "admin"}'
             />
           )}
@@ -272,7 +272,7 @@ export const HttpRepeaterStage: React.FC<HttpRepeaterStageProps> = ({
             )}
           </div>
 
-          <div className="relative h-[360px] overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-300">
+          <div className="relative h-[460px] overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-300">
             {response ? (
               <div className="space-y-3">
                 <div className="border-b border-slate-800 pb-2 text-[11px] text-slate-400">
