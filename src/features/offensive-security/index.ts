@@ -13,3 +13,4 @@ export * from './academy/academy-tracks';
 export * from './academy/academy-module-overview';
 export * from './academy/academy-lesson-viewer';
 export * from './workbench';
+export * from './arena';
