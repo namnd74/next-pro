@@ -1,9 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { CornerDownLeft, Sparkles } from 'lucide-react';
+import { CornerDownLeft, Terminal as TerminalIcon } from 'lucide-react';
 import type { ArenaChallenge } from '../types';
-import { Button } from '@/components/ui/button';
+import { useArenaStore } from '../store/use-arena-store';
 import { Card } from '@/components/ui/card';
 
 interface ArenaTerminalStageProps {
@@ -16,173 +16,220 @@ export const ArenaTerminalStage: React.FC<ArenaTerminalStageProps> = ({
   onProofExtracted,
 }) => {
   const terminalConfig = challenge.terminalConfig;
+  const { getOrCreateTargetSession, executeTerminalCommand } = useArenaStore();
+  const session = getOrCreateTargetSession(challenge.id);
 
   const [history, setHistory] = React.useState<
-    Array<{ command: string; output: string; isError?: boolean }>
+    Array<{
+      command: string;
+      output: string;
+      isError?: boolean;
+      user?: string;
+      cwd?: string;
+    }>
   >(() => [
     {
       command: '',
       output:
         (terminalConfig?.bannerText ??
           '[*] Kali GNU/Linux Rolling 2026.3 - Cyber Range Terminal Ready\n') +
-        `[*] Target: ${challenge.targetHost}:${challenge.targetPort}\n`,
+        `[*] Target Host: ${challenge.targetHost}:${challenge.targetPort} (${challenge.title})\n` +
+        `[*] Type 'help' to view all 45+ POSIX utilities, or run 'nmap' to begin reconnaissance.\n`,
+      user: session.activeUser,
+      cwd: session.vfsState.cwd,
     },
   ]);
   const [currentInput, setCurrentInput] = React.useState('');
+  const [commandHistoryIndex, setCommandHistoryIndex] = React.useState(-1);
   const terminalBottomRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     terminalBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history]);
 
-  const executeCommand = (cmdStr: string) => {
+  const isRoot = session.vfsState.user.uid === 0;
+  const isFoothold =
+    session.vfsState.user.username === 'www-data' || session.stage === 'foothold';
+
+  const promptUser = session.vfsState.user.username;
+  const promptHost = session.currentHost === '10.0.4.15' ? 'kali' : 'target';
+  const promptSymbol = isRoot ? '#' : '$';
+  const promptColor = isRoot
+    ? 'text-rose-400 font-black'
+    : isFoothold
+      ? 'text-amber-400 font-bold'
+      : 'text-emerald-400 font-bold';
+
+  const handleRunCommand = (cmdStr: string) => {
     const trimmed = cmdStr.trim();
     if (!trimmed) return;
 
-    let output = '';
-
-    // Specialized command simulations per challenge
-    if (trimmed.startsWith('nmap')) {
-      output =
-        `Starting Nmap 7.94 ( https://nmap.org )\n` +
-        `Nmap scan report for ${challenge.targetHost}\n` +
-        `Host is up (0.0012s latency).\n` +
-        `PORT     STATE SERVICE       VERSION\n` +
-        `${challenge.targetPort}/tcp OPEN  target-svc     Active Service (${challenge.title})\n\n` +
-        `Nmap done: 1 IP address (1 host up) scanned in 0.08 seconds`;
-    } else if (trimmed.startsWith('impacket-GetUserSPNs')) {
-      output =
-        `[*] Requesting TGS for SPN: MSSQLSvc/db01.corp.internal:1433\n` +
-        `[*] Hash extracted successfully:\n` +
-        `$krb5tgs$23$*svc_mssql$corp.internal*$MSSQLSvc/db01.corp.internal:1433*...hash_data...\n` +
-        `[+] Hash written to /home/operator/ad-tools/hashes.kerb`;
-    } else if (trimmed.startsWith('john') || trimmed.startsWith('hashcat')) {
-      output =
-        `Using default wordlist: /usr/share/wordlists/rockyou.txt\n` +
-        `Loaded 1 password hash (Kerberos 5 TGS-REP etype 23 [MD4 HMAC-MD5 RC4])\n` +
-        `Summer2026!      (svc_mssql)\n` +
-        `1g 0:00:00:02 DONE 3/3 (2026-08-28 09:27) 0.4444g/s 452.0p/s 452.0c/s 452.0C/s Summer2026!..password\n` +
-        `[+] CRACKED PASSWORD: Summer2026!\n` +
-        `[!] FLAG: ${challenge.expectedFlag}`;
-      if (onProofExtracted) {
-        onProofExtracted(challenge.expectedFlag);
-      }
-    } else if (trimmed.startsWith('curl')) {
-      output =
-        `HTTP/1.1 200 OK\n` +
-        `Server: Exploit-Target/1.0\n` +
-        `Content-Type: application/json\n\n` +
-        `{\n` +
-        `  "status": "EXPLOITED",\n` +
-        `  "proof": "${challenge.expectedFlag}"\n` +
-        `}`;
-      if (onProofExtracted) {
-        onProofExtracted(challenge.expectedFlag);
-      }
-    } else if (trimmed === 'clear') {
+    if (trimmed === 'clear') {
       setHistory([]);
       setCurrentInput('');
       return;
-    } else if (trimmed.startsWith('cat') || trimmed.startsWith('ls')) {
-      output =
-        `total 24\n` +
-        `-rwxr-xr-x 1 operator operator 1240 Aug 28 09:00 exploit.py\n` +
-        `-rw-r--r-- 1 operator operator  512 Aug 28 09:05 target_notes.txt\n` +
-        `-rw-r--r-- 1 operator operator   64 Aug 28 09:10 proof.txt`;
-    } else {
-      output = `zsh: command executed: ${trimmed}\n[!] Target responded with standard ACK. Try nmap or specific exploit script.`;
     }
 
-    setHistory((prev) => [...prev, { command: trimmed, output }]);
+    const res = executeTerminalCommand(challenge.id, trimmed);
+
+    // Check if output contains user or root flag
+    if (res.stdout.includes('OS_0DAY{') || res.stdout.includes('OS_ROOT{')) {
+      const match = res.stdout.match(/OS_[A-Z0-9_]+\{[^}]+\}/);
+      if (match && onProofExtracted) {
+        onProofExtracted(match[0]);
+      }
+    }
+
+    setHistory((prev) => [
+      ...prev,
+      {
+        command: trimmed,
+        output: res.stdout || res.stderr,
+        isError: res.exitCode !== 0,
+        user: session.activeUser,
+        cwd: session.vfsState.cwd,
+      },
+    ]);
     setCurrentInput('');
+    setCommandHistoryIndex(-1);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      executeCommand(currentInput);
+      handleRunCommand(currentInput);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const userCmds = history.map((h) => h.command).filter(Boolean);
+      if (userCmds.length === 0) return;
+      const nextIdx =
+        commandHistoryIndex === -1
+          ? userCmds.length - 1
+          : Math.max(0, commandHistoryIndex - 1);
+      setCommandHistoryIndex(nextIdx);
+      setCurrentInput(userCmds[nextIdx] ?? '');
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const userCmds = history.map((h) => h.command).filter(Boolean);
+      if (commandHistoryIndex === -1) return;
+      const nextIdx = commandHistoryIndex + 1;
+      if (nextIdx >= userCmds.length) {
+        setCommandHistoryIndex(-1);
+        setCurrentInput('');
+      } else {
+        setCommandHistoryIndex(nextIdx);
+        setCurrentInput(userCmds[nextIdx] ?? '');
+      }
     }
   };
 
   return (
-    <div className="space-y-3">
-      {/* Sample Quick Commands Bar */}
-      {terminalConfig?.sampleCommands && terminalConfig.sampleCommands.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-950 p-2.5">
-          <span className="flex items-center gap-1 font-mono text-[11px] font-bold text-slate-400">
-            <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
-            Lệnh gợi ý nhanh:
-          </span>
-          {terminalConfig.sampleCommands.map((cmd, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => executeCommand(cmd)}
-              className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 font-mono text-[10px] text-emerald-400 transition hover:border-emerald-500 hover:bg-slate-800"
-            >
-              $ {cmd}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Terminal Screen */}
-      <Card className="flex flex-col rounded-2xl border-slate-800 bg-black p-4 font-mono text-xs shadow-2xl">
-        <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2 text-slate-500">
-          <div className="flex items-center gap-2 font-bold text-emerald-400">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-            {terminalConfig?.user ?? 'operator'}@{terminalConfig?.hostname ?? 'kali-box'}{' '}
-            ({terminalConfig?.ip ?? '10.0.4.15'})
+    <Card className="flex flex-col overflow-hidden rounded-2xl border border-slate-800 bg-black font-mono shadow-2xl">
+      {/* TERMINAL TOP BAR */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-950 px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-full bg-rose-500/80" />
+            <span className="h-3 w-3 rounded-full bg-amber-500/80" />
+            <span className="h-3 w-3 rounded-full bg-emerald-500/80" />
           </div>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setHistory([])}
-            className="h-6 px-2 text-[10px] text-slate-400 hover:text-white"
+          <span className="ml-2 text-xs font-bold text-slate-300">
+            <TerminalIcon className="mr-1 inline h-3.5 w-3.5 text-emerald-400" />
+            {promptUser}@{promptHost}:{session.vfsState.cwd}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span
+            className={`rounded-md px-2 py-0.5 text-[10px] font-black tracking-wider uppercase ${
+              isRoot
+                ? 'animate-pulse border border-rose-500/50 bg-rose-500/20 text-rose-300'
+                : isFoothold
+                  ? 'border border-amber-500/50 bg-amber-500/20 text-amber-300'
+                  : 'border border-emerald-500/50 bg-emerald-500/20 text-emerald-300'
+            }`}
           >
-            Clear Screen
-          </Button>
+            {isRoot
+              ? '👑 ROOT (UID 0)'
+              : isFoothold
+                ? '⚡ FOOTHOLD (UID 1000)'
+                : '🌐 ATTACKER'}
+          </span>
+          <span className="text-[11px] text-slate-500">{session.currentHost}</span>
         </div>
+      </div>
 
-        {/* History Log */}
-        <div className="custom-scrollbar h-72 space-y-2 overflow-y-auto leading-relaxed text-slate-200">
-          {history.map((item, idx) => (
-            <div key={idx} className="space-y-1">
-              {item.command && (
-                <div className="flex items-center gap-2 font-bold text-emerald-400">
-                  <span className="text-slate-500">operator@kali:~$</span>
-                  <span>{item.command}</span>
-                </div>
-              )}
-              <div className="text-[11.5px] leading-relaxed whitespace-pre text-slate-300">
-                {item.output}
+      {/* QUICK COMMAND CHIPS */}
+      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-900 bg-slate-950/60 px-4 py-2">
+        <span className="text-[10px] font-bold tracking-wider text-slate-500 uppercase">
+          Gợi ý lệnh:
+        </span>
+        {terminalConfig?.sampleCommands.map((cmd, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => handleRunCommand(cmd)}
+            className="rounded-lg border border-slate-800 bg-slate-900/90 px-2 py-1 text-[11px] text-slate-300 transition hover:border-slate-700 hover:bg-slate-800 hover:text-white"
+          >
+            <code>{cmd}</code>
+          </button>
+        ))}
+      </div>
+
+      {/* TERMINAL OUTPUT STREAM */}
+      <div
+        onClick={() => inputRef.current?.focus()}
+        className="h-[420px] overflow-y-auto p-4 text-xs leading-relaxed text-slate-300 select-text"
+      >
+        {history.map((h, i) => (
+          <div key={i} className="mb-2">
+            {h.command && (
+              <div className="flex items-center gap-1 text-slate-400">
+                <span className={promptColor}>
+                  {h.user || promptUser}@{promptHost}:{h.cwd || '~'}
+                  {promptSymbol}
+                </span>
+                <span className="font-bold text-white">{h.command}</span>
               </div>
-            </div>
-          ))}
-          <div ref={terminalBottomRef} />
-        </div>
+            )}
+            <pre
+              className={`mt-1 font-mono whitespace-pre-wrap ${
+                h.isError ? 'text-rose-400' : 'text-slate-300'
+              }`}
+            >
+              {h.output}
+            </pre>
+          </div>
+        ))}
 
-        {/* Input Line */}
-        <div className="mt-3 flex items-center gap-2 border-t border-slate-800/80 pt-3">
-          <span className="font-bold text-emerald-400">operator@kali:~$</span>
+        {/* ACTIVE INPUT LINE */}
+        <div className="flex items-center gap-2 pt-1">
+          <span className={promptColor}>
+            {promptUser}@{promptHost}:{session.vfsState.cwd}
+            {promptSymbol}
+          </span>
           <input
+            ref={inputRef}
             type="text"
             value={currentInput}
             onChange={(e) => setCurrentInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Nhập lệnh bash (nmap, curl, john, impacket...)"
-            className="flex-1 bg-transparent font-mono text-xs text-white placeholder-slate-600 focus:outline-none"
+            className="flex-1 border-none bg-transparent font-mono text-xs text-white focus:outline-none"
+            placeholder="gõ lệnh (vd: ls -la, sudo -l, cat /root/root.txt)..."
             autoFocus
           />
-          <Button
-            size="sm"
-            onClick={() => executeCommand(currentInput)}
-            className="h-7 rounded-lg bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-500"
+          <button
+            type="button"
+            onClick={() => handleRunCommand(currentInput)}
+            className="flex h-6 w-6 items-center justify-center rounded bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white"
           >
-            <CornerDownLeft className="h-3.5 w-3.5" />
-          </Button>
+            <CornerDownLeft className="h-3 w-3" />
+          </button>
         </div>
-      </Card>
-    </div>
+
+        <div ref={terminalBottomRef} />
+      </div>
+    </Card>
   );
 };

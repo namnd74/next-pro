@@ -1,9 +1,13 @@
+import type { VfsState } from '../workbench/types';
+
 export type ArenaChallengeCategory =
   'cve-labs' | 'bug-bounty' | 'zero-day' | 'active-directory';
 
 export type ArenaSeverity = 'critical' | 'high' | 'medium';
 
 export type OperatorToolType = 'repeater' | 'terminal' | 'diff' | 'memory';
+
+export type TargetBoxStage = 'recon' | 'foothold' | 'privesc' | 'pwned';
 
 export interface CodeDiffFile {
   filename: string;
@@ -61,7 +65,6 @@ export interface ArenaTerminalPreset {
   initialDirectory: string;
   sampleCommands: string[];
   bannerText: string;
-  vfsTree?: Record<string, string>;
 }
 
 export interface ArenaWriteup {
@@ -72,6 +75,14 @@ export interface ArenaWriteup {
   weaponizedPoC: string;
   remediationSnippet: string;
   cvssVector: string;
+}
+
+export interface HintLadderItem {
+  level: 0 | 1 | 2 | 3;
+  name: string;
+  penaltyPercent: number; // 0%, 10%, 20%, 40%
+  hintText: string;
+  isUnlocked?: boolean;
 }
 
 export interface ArenaChallenge {
@@ -89,7 +100,10 @@ export interface ArenaChallenge {
   tagline: string;
   scenarioBriefing: string;
   keyObjectives: string[];
-  expectedFlag: string;
+  expectedFlag: string; // Defaults to root flag or main proof
+  userFlag?: string; // Low-priv user flag
+  rootFlag?: string; // Root takeover flag
+  hints?: HintLadderItem[];
   firstBloodHolder: {
     handle: string;
     timeRecord: string;
@@ -101,6 +115,24 @@ export interface ArenaChallenge {
   memoryConfig?: MemoryDumpConfig;
   terminalConfig?: ArenaTerminalPreset;
   writeup: ArenaWriteup;
+}
+
+export interface TargetBoxSession {
+  challengeId: string;
+  stage: TargetBoxStage;
+  currentHost: string;
+  vfsState: VfsState;
+  activeUser: string;
+  userFlagFound: boolean;
+  rootFlagFound: boolean;
+  userFlag: string;
+  rootFlag: string;
+  availableShellSession?: {
+    user: string;
+    host: string;
+    port: number;
+    cwd: string;
+  };
 }
 
 export interface ArenaRival {

