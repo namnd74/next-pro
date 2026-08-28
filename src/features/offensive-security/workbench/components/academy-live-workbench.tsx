@@ -97,13 +97,13 @@ export const AcademyLiveWorkbench: React.FC<AcademyLiveWorkbenchProps> = ({ conf
     totalObjectives > 0 ? Math.round((completedCount / totalObjectives) * 100) : 0;
   const isAllCompleted = totalObjectives > 0 && completedCount === totalObjectives;
 
-  // Available modes always allows switching to Dual Terminal and Cyber Range Map
-  const activeAvailableModes = config.availableModes || ['terminal'];
-  const hasDualTerminal = true;
+  // Render mode tabs strictly matching what this lesson requires
+  const availableModes = config.availableModes || [config.mode];
+  const hasMultipleModes = availableModes.length > 1;
 
   return (
     <div className="space-y-6">
-      {/* Workbench Header & Mode Selector */}
+      {/* Workbench Header & Dynamic Mode Selector */}
       <div className="border-border flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -115,101 +115,111 @@ export const AcademyLiveWorkbench: React.FC<AcademyLiveWorkbenchProps> = ({ conf
           <p className="text-muted-foreground mt-1 text-xs">{config.summary}</p>
         </div>
 
-        {/* Mode Selector Tabs */}
-        <div className="border-border/80 bg-secondary/30 flex flex-wrap items-center gap-1.5 rounded-xl border p-1">
-          <button
-            type="button"
-            onClick={() => setActiveMode('terminal')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-              activeMode === 'terminal'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Terminal className="h-3.5 w-3.5" />
-            Single Terminal
-          </button>
+        {/* Dynamic Mode Switcher (Rendered ONLY when lesson supports multiple modes) */}
+        {hasMultipleModes && (
+          <div className="border-border/80 bg-secondary/30 flex flex-wrap items-center gap-1.5 rounded-xl border p-1">
+            {availableModes.includes('terminal') && (
+              <button
+                type="button"
+                onClick={() => setActiveMode('terminal')}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                  activeMode === 'terminal'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Terminal className="h-3.5 w-3.5" />
+                Terminal
+              </button>
+            )}
 
-          {hasDualTerminal && (
-            <button
-              type="button"
-              onClick={() => setActiveMode('cyber-range')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                activeMode === 'cyber-range'
-                  ? 'bg-cyan-600 text-white shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Columns2 className="h-3.5 w-3.5" />
-              Dual Terminal (2 Hosts)
-            </button>
-          )}
+            {availableModes.includes('cyber-range') && (
+              <button
+                type="button"
+                onClick={() => setActiveMode('cyber-range')}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                  activeMode === 'cyber-range'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Columns2 className="h-3.5 w-3.5" />
+                Cyber Range (2 Hosts)
+              </button>
+            )}
 
-          {activeAvailableModes.includes('sql') && (
-            <button
-              type="button"
-              onClick={() => setActiveMode('sql')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                activeMode === 'sql'
-                  ? 'bg-cyan-600 text-white shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Database className="h-3.5 w-3.5" />
-              SQL Lab (AST)
-            </button>
-          )}
+            {availableModes.includes('sql') && (
+              <button
+                type="button"
+                onClick={() => setActiveMode('sql')}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                  activeMode === 'sql'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Database className="h-3.5 w-3.5" />
+                SQL Lab (AST)
+              </button>
+            )}
 
-          {activeAvailableModes.includes('http') && (
-            <button
-              type="button"
-              onClick={() => setActiveMode('http')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                activeMode === 'http'
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Globe className="h-3.5 w-3.5" />
-              HTTP Repeater
-            </button>
-          )}
+            {availableModes.includes('http') && (
+              <button
+                type="button"
+                onClick={() => setActiveMode('http')}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                  activeMode === 'http'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Globe className="h-3.5 w-3.5" />
+                HTTP Repeater
+              </button>
+            )}
 
-          {activeAvailableModes.includes('packet') && (
-            <button
-              type="button"
-              onClick={() => setActiveMode('packet')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                activeMode === 'packet'
-                  ? 'bg-violet-600 text-white shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Layers className="h-3.5 w-3.5" />
-              Packet Inspector
-            </button>
-          )}
-        </div>
+            {availableModes.includes('packet') && (
+              <button
+                type="button"
+                onClick={() => setActiveMode('packet')}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                  activeMode === 'packet'
+                    ? 'bg-violet-600 text-white shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                Packet Inspector
+              </button>
+            )}
+          </div>
+        )}
       </div>
-
-      {/* Cyber Range Topology Map (Always visible or toggleable in Range / Dual Mode) */}
-      <CyberRangeTopologyMap
-        onRunNmapScan={(_ip) => {
-          setActiveMode('cyber-range');
-        }}
-      />
 
       {/* Main Interactive Tool Screen */}
       <div className="space-y-4">
         {activeMode === 'terminal' && (
           <TerminalView config={config} onExecution={handleTerminalExecution} />
         )}
+
         {activeMode === 'cyber-range' && (
-          <DualTerminalWorkbench config={config} onExecution={handleTerminalExecution} />
+          <div className="space-y-4">
+            <CyberRangeTopologyMap
+              onRunNmapScan={() => {
+                setActiveMode('cyber-range');
+              }}
+            />
+            <DualTerminalWorkbench
+              config={config}
+              onExecution={handleTerminalExecution}
+            />
+          </div>
         )}
+
         {activeMode === 'sql' && (
           <SqlLabView config={config} onExecution={handleSqlExecution} />
         )}
+
         {(activeMode === 'http' || activeMode === 'packet') && (
           <HttpRepeaterView config={config} onExecution={handleHttpExecution} />
         )}

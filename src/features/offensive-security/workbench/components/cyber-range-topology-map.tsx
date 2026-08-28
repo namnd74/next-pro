@@ -39,28 +39,31 @@ export const CyberRangeTopologyMap: React.FC<CyberRangeTopologyMapProps> = ({
     switch (status) {
       case 'compromised':
         return (
-          <Badge className="animate-pulse gap-1 border-rose-500/40 bg-rose-950/80 text-[10px] text-rose-300">
-            <Skull className="h-3 w-3 text-rose-400" />
-            COMPROMISED (ROOT)
+          <Badge className="shrink-0 animate-pulse gap-1 border-rose-500/40 bg-rose-950/80 px-1.5 py-0.5 text-[9.5px] text-rose-300">
+            <Skull className="h-2.5 w-2.5 text-rose-400" />
+            ROOT
           </Badge>
         );
       case 'foothold':
         return (
-          <Badge className="gap-1 border-amber-500/40 bg-amber-950/80 text-[10px] text-amber-300">
-            <ShieldAlert className="h-3 w-3 text-amber-400" />
-            USER FOOTHOLD
+          <Badge className="shrink-0 gap-1 border-amber-500/40 bg-amber-950/80 px-1.5 py-0.5 text-[9.5px] text-amber-300">
+            <ShieldAlert className="h-2.5 w-2.5 text-amber-400" />
+            USER
           </Badge>
         );
       case 'scanned':
         return (
-          <Badge className="gap-1 border-cyan-500/40 bg-cyan-950/80 text-[10px] text-cyan-300">
-            <Radio className="h-3 w-3 text-cyan-400" />
-            ACTIVE SCANNED
+          <Badge className="shrink-0 gap-1 border-cyan-500/40 bg-cyan-950/80 px-1.5 py-0.5 text-[9.5px] text-cyan-300">
+            <Radio className="h-2.5 w-2.5 text-cyan-400" />
+            ACTIVE
           </Badge>
         );
       default:
         return (
-          <Badge variant="outline" className="text-[10px] text-slate-400">
+          <Badge
+            variant="outline"
+            className="shrink-0 px-1.5 py-0.5 text-[9.5px] text-slate-400"
+          >
             ONLINE
           </Badge>
         );
@@ -69,19 +72,19 @@ export const CyberRangeTopologyMap: React.FC<CyberRangeTopologyMapProps> = ({
 
   const getNodeIcon = (role: string) => {
     if (role.includes('Domain Controller') || role.includes('Active Directory')) {
-      return <Shield className="h-4 w-4 text-violet-400" />;
+      return <Shield className="h-3.5 w-3.5 shrink-0 text-violet-400" />;
     }
     if (role.includes('Database')) {
-      return <Database className="h-4 w-4 text-amber-400" />;
+      return <Database className="h-3.5 w-3.5 shrink-0 text-amber-400" />;
     }
     if (role.includes('Gateway')) {
-      return <Globe className="h-4 w-4 text-emerald-400" />;
+      return <Globe className="h-3.5 w-3.5 shrink-0 text-emerald-400" />;
     }
-    return <Server className="h-4 w-4 text-cyan-400" />;
+    return <Server className="h-3.5 w-3.5 shrink-0 text-cyan-400" />;
   };
 
   return (
-    <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-2xl ring-1 ring-slate-800">
+    <div className="space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-2xl ring-1 ring-slate-800">
       {/* Header Bar */}
       <div className="flex flex-col gap-2 border-b border-slate-800/80 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
@@ -110,7 +113,7 @@ export const CyberRangeTopologyMap: React.FC<CyberRangeTopologyMapProps> = ({
       </div>
 
       {/* Grid of Network Nodes */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 xl:grid-cols-3">
         {hostList.map((host) => {
           const isSelected = host.ip === selectedHostIp;
           const openPorts = host.services.filter((s) => s.state === 'open');
@@ -122,32 +125,37 @@ export const CyberRangeTopologyMap: React.FC<CyberRangeTopologyMapProps> = ({
                 setSelectedHostIp(host.ip);
                 onSelectHost?.(host as unknown as CyberRangeHost);
               }}
-              className={`group cursor-pointer rounded-xl border p-3 transition-all ${
+              className={`group cursor-pointer overflow-hidden rounded-xl border p-3.5 transition-all ${
                 isSelected
                   ? 'border-cyan-500/80 bg-cyan-950/30 shadow-lg ring-1 shadow-cyan-950/50 ring-cyan-500/40'
                   : 'border-slate-800/90 bg-slate-900/60 hover:border-slate-700 hover:bg-slate-900'
               }`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="rounded-lg border border-slate-700 bg-slate-800 p-1.5">
+              {/* Host Card Top Row: Icon + Title on Left, Status Badge on Right */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="shrink-0 rounded-lg border border-slate-700 bg-slate-800 p-1.5">
                     {getNodeIcon(host.role)}
                   </div>
-                  <div>
-                    <div className="font-mono text-xs font-bold text-slate-200 transition-colors group-hover:text-cyan-300">
+                  <div className="min-w-0 flex-1">
+                    <div
+                      className="truncate font-mono text-xs font-bold text-slate-200 transition-colors group-hover:text-cyan-300"
+                      title={host.hostname}
+                    >
                       {host.hostname}
                     </div>
                     <div className="font-mono text-[10px] text-slate-400">{host.ip}</div>
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-1">
-                  {getStatusBadge('scanned')}
-                </div>
+                {getStatusBadge('scanned')}
               </div>
 
-              {/* OS and Role description */}
-              <div className="mt-2 line-clamp-1 text-[10.5px] text-slate-400">
+              {/* Role description */}
+              <div
+                className="mt-2.5 truncate text-[11px] text-slate-400"
+                title={host.role}
+              >
                 {host.role}
               </div>
 
@@ -212,7 +220,7 @@ export const CyberRangeTopologyMap: React.FC<CyberRangeTopologyMapProps> = ({
               </div>
             </div>
 
-            {/* Service & Vulnerability details */}
+            {/* Service details */}
             <div className="space-y-1 text-[10.5px] text-slate-400">
               <div className="mb-1 text-[11px] font-bold text-slate-300">
                 Dịch vụ Phát hiện:
