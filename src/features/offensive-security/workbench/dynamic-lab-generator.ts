@@ -34,25 +34,40 @@ export const generateWorkbenchConfigFromLesson = (
     lesson.domains.includes('web-api') ||
     lesson.domains.includes('application-security');
 
-  // Determine optimal Workbench Mode
+  // Determine optimal Workbench Mode based on specific lesson content
   let mode: WorkbenchMode = 'terminal';
   let availableModes: WorkbenchMode[] = ['terminal'];
 
   if (isWeb) {
-    mode =
-      slug.includes('sql') || slug.includes('injection') || slug.includes('database')
-        ? 'sql'
-        : 'http';
-    availableModes = ['http', 'sql', 'terminal'];
+    if (slug.includes('sql') || slug.includes('injection') || slug.includes('database')) {
+      mode = 'sql';
+      availableModes = ['sql', 'terminal'];
+    } else {
+      mode = 'http';
+      availableModes = ['http', 'terminal'];
+    }
   } else if (isNetwork) {
-    mode =
+    if (
       slug.includes('packet') ||
       slug.includes('transport') ||
       slug.includes('dns') ||
       slug.includes('tls')
-        ? 'packet'
-        : 'terminal';
-    availableModes = ['packet', 'http', 'terminal'];
+    ) {
+      mode = 'packet';
+      availableModes = ['packet', 'terminal'];
+    } else if (
+      lessonId.startsWith('os06-') ||
+      slug.includes('discovery') ||
+      slug.includes('movement') ||
+      slug.includes('network') ||
+      slug.includes('scan')
+    ) {
+      mode = 'cyber-range';
+      availableModes = ['cyber-range', 'terminal'];
+    } else {
+      mode = 'terminal';
+      availableModes = ['terminal'];
+    }
   } else {
     mode = 'terminal';
     availableModes = ['terminal'];
