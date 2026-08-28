@@ -30,6 +30,13 @@ export interface CodeRecipe {
   takeaway: string;
 }
 
+export interface InteractiveLabConfig {
+  initialFiles: Record<string, string>;
+  entryFile?: string;
+  instructions?: string;
+  solutionFiles?: Record<string, string>;
+}
+
 export interface Lesson {
   id: string;
   slug: string;
@@ -42,6 +49,7 @@ export interface Lesson {
   keyPoints: string[];
   codeRecipes: CodeRecipe[];
   quizzes: QuizQuestion[];
+  interactiveLab?: InteractiveLabConfig;
 }
 
 export interface LearningTrack {

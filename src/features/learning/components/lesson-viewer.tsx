@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import Link from 'next/link';
 import {
@@ -18,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CodeBlock } from '@/components/ui/code-block';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ReactPlayground } from '@/features/playground';
 
 interface LessonViewerProps {
   track: LearningTrack;
@@ -111,6 +114,16 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
     <BlitzQuiz lessonId={lesson.id} quizzes={lesson.quizzes} />
   ) : null;
 
+  const interactiveLab = lesson.interactiveLab ? (
+    <section className="space-y-4">
+      <ReactPlayground
+        initialFiles={lesson.interactiveLab.initialFiles}
+        entryPath={lesson.interactiveLab.entryFile || '/App.tsx'}
+        instructions={lesson.interactiveLab.instructions}
+      />
+    </section>
+  ) : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -151,7 +164,9 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
         theory={theory}
         recipes={recipes}
         quiz={quiz}
+        interactiveLab={interactiveLab}
         hasQuiz={lesson.quizzes.length > 0}
+        hasInteractiveLab={Boolean(lesson.interactiveLab)}
       />
 
       <div className="border-border/40 flex flex-col items-stretch justify-between gap-3 border-t pt-5 sm:flex-row sm:items-center">
