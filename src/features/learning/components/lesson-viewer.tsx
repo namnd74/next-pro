@@ -114,15 +114,85 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
     <BlitzQuiz lessonId={lesson.id} quizzes={lesson.quizzes} />
   ) : null;
 
-  const interactiveLab = lesson.interactiveLab ? (
+  const labInitialFiles = React.useMemo(() => {
+    if (
+      lesson.interactiveLab?.initialFiles &&
+      Object.keys(lesson.interactiveLab.initialFiles).length > 0
+    ) {
+      return lesson.interactiveLab.initialFiles;
+    }
+
+    const primaryRecipe = lesson.codeRecipes[0]?.afterCode;
+    const isTsx =
+      lesson.codeRecipes[0]?.language === 'tsx' ||
+      lesson.codeRecipes[0]?.language === 'typescript';
+
+    if (
+      primaryRecipe &&
+      isTsx &&
+      (primaryRecipe.includes('export default') || primaryRecipe.includes('function '))
+    ) {
+      let cleanCode = primaryRecipe;
+      if (!cleanCode.includes('import React') && !cleanCode.includes("from 'react'")) {
+        cleanCode = `import React from 'react';\n\n${cleanCode}`;
+      }
+      if (!cleanCode.includes('export default')) {
+        const match = cleanCode.match(/function\s+([A-Za-z0-9_]+)/);
+        if (match && match[1]) {
+          cleanCode += `\n\nexport default ${match[1]};`;
+        }
+      }
+      return {
+        '/App.tsx': cleanCode,
+        '/styles.css': '/* Custom styles */\n',
+      };
+    }
+
+    return {
+      '/App.tsx': `import React, { useState } from 'react';
+
+export default function App() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-100 p-6 flex flex-col items-center justify-center space-y-4">
+      <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/30 p-6 max-w-md text-center space-y-3 shadow-lg">
+        <h1 className="text-xl font-bold text-cyan-400">
+          ${lesson.title}
+        </h1>
+        <p className="text-slate-400 text-xs leading-relaxed">
+          ${lesson.summary.replace(/"/g, "'")}
+        </p>
+        <button 
+          onClick={() => setCount((c) => c + 1)}
+          className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 rounded-lg text-white text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+        >
+          Lượt bấm: {count}
+        </button>
+      </div>
+    </div>
+  );
+}
+`,
+      '/styles.css': '/* Custom styles */\n',
+    };
+  }, [lesson]);
+
+  const labInstructions =
+    lesson.interactiveLab?.instructions ||
+    `Thực hành và thử nghiệm code cho bài: ${lesson.title}. Mọi chỉnh sửa được tự động lưu trong IndexedDB theo bài học này.`;
+
+  const interactiveLab = (
     <section className="space-y-4">
       <ReactPlayground
-        initialFiles={lesson.interactiveLab.initialFiles}
-        entryPath={lesson.interactiveLab.entryFile || '/App.tsx'}
-        instructions={lesson.interactiveLab.instructions}
+        initialFiles={labInitialFiles}
+        entryPath={lesson.interactiveLab?.entryFile || '/App.tsx'}
+        instructions={labInstructions}
+        platform="react-lite"
+        scopeId={lesson.id}
       />
     </section>
-  ) : null;
+  );
 
   return (
     <div className="space-y-6">
@@ -166,7 +236,7 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
         quiz={quiz}
         interactiveLab={interactiveLab}
         hasQuiz={lesson.quizzes.length > 0}
-        hasInteractiveLab={Boolean(lesson.interactiveLab)}
+        hasInteractiveLab={true}
       />
 
       <div className="border-border/40 flex flex-col items-stretch justify-between gap-3 border-t pt-5 sm:flex-row sm:items-center">

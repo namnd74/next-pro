@@ -11,9 +11,34 @@ export function generateIframeSrcDoc(sessionId: string): string {
   <!-- Tailwind CSS -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   
-  <!-- React & ReactDOM Standalone UMD Scripts with CDNs -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Single-Instance React 19 & Zustand Import Map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@19.0.0",
+      "react/": "https://esm.sh/react@19.0.0/",
+      "react-dom": "https://esm.sh/react-dom@19.0.0",
+      "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+      "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+      "zustand": "https://esm.sh/zustand@5.0.3",
+      "zustand/": "https://esm.sh/zustand@5.0.3/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as React from 'react';
+    import * as ReactDOMClient from 'react-dom/client';
+    import * as ReactDOM from 'react-dom';
+    import { create } from 'zustand';
+
+    window.React = React;
+    window.ReactDOM = Object.assign({}, ReactDOM, ReactDOMClient, {
+      createRoot: ReactDOMClient.createRoot || ReactDOM.createRoot
+    });
+    window.Zustand = { create, default: { create } };
+    window.__REACT_19_READY__ = true;
+  </script>
   
   <style>
     * { box-sizing: border-box; }
@@ -41,7 +66,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
   <div id="root">
     <div style="display:flex;align-items:center;justify-content:center;min-height:160px;font-family:monospace;font-size:12px;color:#94a3b8;gap:8px;">
       <div style="width:14px;height:14px;border:2px solid #38bdf8;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
-      <span>Đang khởi động React Runtime...</span>
+      <span>Đang khởi động React 19 Runtime...</span>
     </div>
     <style>
       @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -270,6 +295,9 @@ export function generateIframeSrcDoc(sessionId: string): string {
         if (specifier === 'react-dom' || specifier === 'react-dom/client') {
           return window.ReactDOM;
         }
+        if (specifier === 'zustand' || specifier.startsWith('zustand')) {
+          return window.Zustand || { create: function() { return function() { return {}; }; } };
+        }
         if (specifier.startsWith('lucide-react')) {
           return LucideProxy;
         }
@@ -344,9 +372,12 @@ export function generateIframeSrcDoc(sessionId: string): string {
         if (!rootEl) return;
 
         try {
-          const wrappedReact = Object.assign(window.React, {
-            default: window.React,
-            __esModule: true
+          const wrappedReact = new Proxy(window.React, {
+            get: function(target, prop) {
+              if (prop === '__esModule') return true;
+              if (prop === 'default') return wrappedReact;
+              return target[prop];
+            }
           });
 
           const loader = new RunnerLoader(modules, wrappedReact);
@@ -443,7 +474,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
       // 9. Asynchronous Polling for React & ReactDOM availability
       function bootstrapRuntime(attempts) {
         attempts = attempts || 0;
-        if (window.React && window.ReactDOM) {
+        if (window.React && window.ReactDOM && window.ReactDOM.createRoot) {
           isRuntimeReady = true;
 
           const rootEl = document.getElementById('root');
