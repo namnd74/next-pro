@@ -4,6 +4,7 @@ import * as React from 'react';
 import {
   CheckCircle2,
   Circle,
+  Columns2,
   Database,
   Globe,
   HelpCircle,
@@ -22,6 +23,8 @@ import type {
   WorkbenchMode,
 } from '../types';
 import { TerminalView } from './terminal-view';
+import { DualTerminalWorkbench } from './dual-terminal-workbench';
+import { CyberRangeTopologyMap } from './cyber-range-topology-map';
 import { SqlLabView } from './sql-lab-view';
 import { HttpRepeaterView } from './http-repeater-view';
 import { Badge } from '@/components/ui/badge';
@@ -94,6 +97,10 @@ export const AcademyLiveWorkbench: React.FC<AcademyLiveWorkbenchProps> = ({ conf
     totalObjectives > 0 ? Math.round((completedCount / totalObjectives) * 100) : 0;
   const isAllCompleted = totalObjectives > 0 && completedCount === totalObjectives;
 
+  // Available modes always allows switching to Dual Terminal and Cyber Range Map
+  const activeAvailableModes = config.availableModes || ['terminal'];
+  const hasDualTerminal = true;
+
   return (
     <div className="space-y-6">
       {/* Workbench Header & Mode Selector */}
@@ -109,72 +116,96 @@ export const AcademyLiveWorkbench: React.FC<AcademyLiveWorkbenchProps> = ({ conf
         </div>
 
         {/* Mode Selector Tabs */}
-        {config.availableModes && config.availableModes.length > 1 && (
-          <div className="border-border/80 bg-secondary/30 flex items-center gap-1.5 rounded-xl border p-1">
-            {config.availableModes.includes('terminal') && (
-              <button
-                type="button"
-                onClick={() => setActiveMode('terminal')}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                  activeMode === 'terminal'
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Terminal className="h-3.5 w-3.5" />
-                Terminal
-              </button>
-            )}
-            {config.availableModes.includes('sql') && (
-              <button
-                type="button"
-                onClick={() => setActiveMode('sql')}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                  activeMode === 'sql'
-                    ? 'bg-cyan-600 text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Database className="h-3.5 w-3.5" />
-                SQL Lab (AST)
-              </button>
-            )}
-            {config.availableModes.includes('http') && (
-              <button
-                type="button"
-                onClick={() => setActiveMode('http')}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                  activeMode === 'http'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Globe className="h-3.5 w-3.5" />
-                HTTP Repeater
-              </button>
-            )}
-            {config.availableModes.includes('packet') && (
-              <button
-                type="button"
-                onClick={() => setActiveMode('packet')}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                  activeMode === 'packet'
-                    ? 'bg-violet-600 text-white shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                Packet Inspector
-              </button>
-            )}
-          </div>
-        )}
+        <div className="border-border/80 bg-secondary/30 flex flex-wrap items-center gap-1.5 rounded-xl border p-1">
+          <button
+            type="button"
+            onClick={() => setActiveMode('terminal')}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+              activeMode === 'terminal'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            Single Terminal
+          </button>
+
+          {hasDualTerminal && (
+            <button
+              type="button"
+              onClick={() => setActiveMode('cyber-range')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                activeMode === 'cyber-range'
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Columns2 className="h-3.5 w-3.5" />
+              Dual Terminal (2 Hosts)
+            </button>
+          )}
+
+          {activeAvailableModes.includes('sql') && (
+            <button
+              type="button"
+              onClick={() => setActiveMode('sql')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                activeMode === 'sql'
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Database className="h-3.5 w-3.5" />
+              SQL Lab (AST)
+            </button>
+          )}
+
+          {activeAvailableModes.includes('http') && (
+            <button
+              type="button"
+              onClick={() => setActiveMode('http')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                activeMode === 'http'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Globe className="h-3.5 w-3.5" />
+              HTTP Repeater
+            </button>
+          )}
+
+          {activeAvailableModes.includes('packet') && (
+            <button
+              type="button"
+              onClick={() => setActiveMode('packet')}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                activeMode === 'packet'
+                  ? 'bg-violet-600 text-white shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              Packet Inspector
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Cyber Range Topology Map (Always visible or toggleable in Range / Dual Mode) */}
+      <CyberRangeTopologyMap
+        onRunNmapScan={(_ip) => {
+          setActiveMode('cyber-range');
+        }}
+      />
 
       {/* Main Interactive Tool Screen */}
       <div className="space-y-4">
         {activeMode === 'terminal' && (
           <TerminalView config={config} onExecution={handleTerminalExecution} />
+        )}
+        {activeMode === 'cyber-range' && (
+          <DualTerminalWorkbench config={config} onExecution={handleTerminalExecution} />
         )}
         {activeMode === 'sql' && (
           <SqlLabView config={config} onExecution={handleSqlExecution} />
@@ -256,7 +287,10 @@ export const AcademyLiveWorkbench: React.FC<AcademyLiveWorkbenchProps> = ({ conf
                     <button
                       type="button"
                       onClick={() =>
-                        setShowHint((prev) => ({ ...prev, [obj.id]: !prev[obj.id] }))
+                        setShowHint((prev) => ({
+                          ...prev,
+                          [obj.id]: !prev[obj.id],
+                        }))
                       }
                       className="text-muted-foreground hover:text-primary p-1 transition-colors"
                       title="Xem gợi ý"
@@ -268,7 +302,7 @@ export const AcademyLiveWorkbench: React.FC<AcademyLiveWorkbenchProps> = ({ conf
 
                 {/* Hint Drawer */}
                 {isHintOpen && obj.hint && (
-                  <div className="border-border/40 mt-2.5 rounded-lg border-t bg-amber-500/5 p-2 pt-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
+                  <div className="border-border/40 mt-2.5 rounded-lg border-t bg-amber-500/5 p-2 font-mono text-[11px] text-amber-600 dark:text-amber-400">
                     💡 Gợi ý: {obj.hint}
                   </div>
                 )}

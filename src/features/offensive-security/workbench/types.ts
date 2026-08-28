@@ -1,4 +1,4 @@
-export type WorkbenchMode = 'terminal' | 'sql' | 'http' | 'packet';
+export type WorkbenchMode = 'terminal' | 'sql' | 'http' | 'packet' | 'cyber-range';
 
 // POSIX Virtual Filesystem (VFS) Types
 export interface VfsFile {
@@ -117,6 +117,66 @@ export interface PacketHeaderInfo {
   fields: PacketHeaderField[];
 }
 
+// --- Cyber Range & Multi-Host Topology Types ---
+
+export type HostRole =
+  'attacker' | 'victim-web' | 'victim-db' | 'victim-dc' | 'gateway' | 'siem' | 'git';
+
+export type HostCompromiseStatus =
+  | 'unscanned' // Hidden in fog of war / Dimmed
+  | 'discovered' // Alive / ICMP ping response
+  | 'scanned' // Ports & services fingerprinted via Nmap
+  | 'foothold' // User shell obtained (e.g. www-data)
+  | 'compromised'; // Root / SYSTEM full takeover
+
+export interface CyberRangeService {
+  port: number;
+  protocol: 'tcp' | 'udp';
+  name: string;
+  version: string;
+  state: 'open' | 'closed' | 'filtered';
+  banner?: string;
+  vulns?: string[];
+}
+
+export interface CyberRangeHost {
+  id: string;
+  hostname: string;
+  ip: string;
+  mac: string;
+  subnet: string;
+  os: string;
+  role: HostRole;
+  status: HostCompromiseStatus;
+  services: CyberRangeService[];
+  vfsState: VfsState;
+  activeUser: string;
+  position: { x: number; y: number };
+}
+
+export interface TopologyLink {
+  id: string;
+  sourceHostId: string;
+  targetHostId: string;
+  trafficType?: 'scan' | 'http' | 'exploit' | 'idle';
+  isPulsing?: boolean;
+}
+
+export type DualTerminalLayoutMode = 'split-horizontal' | 'split-vertical' | 'tabs';
+
+export interface CyberTelemetryEvent {
+  id: string;
+  timestamp: string;
+  sourceHostId: string;
+  targetHostId?: string;
+  sourceIp: string;
+  targetIp?: string;
+  type: 'recon' | 'traffic' | 'auth-failure' | 'foothold' | 'privesc' | 'alert';
+  message: string;
+  rawPayload?: string;
+  severity: 'info' | 'warning' | 'danger' | 'success';
+}
+
 // Workbench Objectives & Config
 export interface ObjectiveVerificationContext {
   vfs?: VfsState;
@@ -126,6 +186,8 @@ export interface ObjectiveVerificationContext {
   lastSqlResult?: SqlExecutionResult;
   lastHttpRes?: HttpResponseState;
   lastHttpReq?: HttpRequestState;
+  rangeHosts?: Record<string, CyberRangeHost>;
+  activeHostId?: string;
 }
 
 export interface WorkbenchObjective {
@@ -147,6 +209,7 @@ export interface WorkbenchConfig {
   initialVfs?: VfsDirectory;
   initialSqlDb?: SqlDatabase;
   initialHttpRequest?: HttpRequestState;
+  initialHosts?: Record<string, CyberRangeHost>;
   sampleCommands?: string[];
   samplePayloads?: string[];
   objectives: WorkbenchObjective[];
