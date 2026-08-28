@@ -1,4 +1,10 @@
 import type { TerminalExecutionResult, VfsDirectory, VfsNode, VfsState } from '../types';
+import {
+  handleNmapScan,
+  handleNetworkCurl,
+  handleNetworkDig,
+  resolveHostByQuery,
+} from './virtual-network-engine';
 
 export const createDefaultVfs = (): VfsDirectory => ({
   type: 'dir',
@@ -1700,18 +1706,7 @@ const executeSingleCommand = (
     }
 
     case 'nmap': {
-      const target = args.find((a) => !a.startsWith('-') && a !== 'nmap') || '10.0.4.1';
-      const out =
-        `Starting Nmap 7.94 ( https://nmap.org ) at 2026-08-27 06:50 UTC\n` +
-        `Nmap scan report for ${target}\n` +
-        `Host is up (0.00042s latency).\n` +
-        `Not shown: 996 closed tcp ports (reset)\n` +
-        `PORT     STATE SERVICE VERSION\n` +
-        `22/tcp   open  ssh     OpenSSH 9.6p1 Ubuntu 3ubuntu13\n` +
-        `80/tcp   open  http    nginx 1.24.0 (Ubuntu)\n` +
-        `443/tcp  open  ssl/http nginx 1.24.0\n` +
-        `5432/tcp open  postgresql PostgreSQL DB 16.2\n\n` +
-        `Nmap done: 1 IP address (1 host up) scanned in 0.84 seconds\n`;
+      const out = handleNmapScan(args);
       return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
     }
 
@@ -1742,63 +1737,50 @@ const executeSingleCommand = (
       return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
     }
 
-    case 'base64': {
-      if (args.includes('-d') || args.includes('--decode')) {
-        const text = stdinData || args.slice(2).join(' ');
-        try {
-          const decoded = atob(text.trim());
-          return { stdout: `${decoded}\n`, stderr: '', exitCode: 0, updatedState: state };
-        } catch {
-          return {
-            stdout: '',
-            stderr: 'base64: invalid input\n',
-            exitCode: 1,
-            updatedState: state,
-          };
-        }
-      }
-      const text = stdinData || args.slice(1).join(' ');
-      const encoded = btoa(text);
-      return { stdout: `${encoded}\n`, stderr: '', exitCode: 0, updatedState: state };
-    }
-
-    case 'hexdump': {
-      const content = stdinData || 'Security Practice Payload Data';
-      let out = '';
-      for (let i = 0; i < content.length; i += 16) {
-        const chunk = content.slice(i, i + 16);
-        const hex = Array.from(chunk)
-          .map((c) => c.charCodeAt(0).toString(16).padStart(2, '0'))
-          .join(' ');
-        const offset = i.toString(16).padStart(8, '0');
-        out += `${offset}  ${hex.padEnd(48, ' ')}  |${chunk}|\n`;
-      }
+    case 'dig':
+    case 'nslookup': {
+      const domainArg =
+        args.find((a) => !a.startsWith('-') && a !== 'dig' && a !== 'nslookup') ||
+        'gateway.corp.internal';
+      const out = handleNetworkDig(domainArg);
       return { stdout: out, stderr: '', exitCode: 0, updatedState: state };
     }
 
-    case 'echo': {
-      const msg = args.slice(1).join(' ');
-      return { stdout: `${msg}\n`, stderr: '', exitCode: 0, updatedState: state };
+    case 'nc':
+    case 'netcat': {
+      const hostArg =
+        args.find(
+          (a) => !a.startsWith('-') && a !== 'nc' && a !== 'netcat' && isNaN(Number(a))
+        ) || '10.0.4.10';
+      const portArg = args.find((a) => !isNaN(Number(a))) || '80';
+      const portNum = parseInt(portArg, 10);
+      const target = resolveHostByQuery(hostArg);
+      const srv = target?.services.find((s) => s.port === portNum);
+      if (srv && srv.state === 'open') {
+        return {
+          stdout: `Connection to ${hostArg} ${portArg} port [tcp/${srv.name}] succeeded!\n`,
+          stderr: '',
+          exitCode: 0,
+          updatedState: state,
+        };
+      }
+      return {
+        stdout: '',
+        stderr: `(UNKNOWN) [${hostArg}] ${portArg} (?): Connection refused\n`,
+        exitCode: 1,
+        updatedState: state,
+      };
     }
 
     case 'curl': {
+      const urlArg =
+        args.find((a) => !a.startsWith('-') && a !== 'curl') || 'http://10.0.4.10';
       const isHead = args.includes('-I') || args.includes('--head');
-      if (isHead) {
-        const headerRes =
-          'HTTP/1.1 200 OK\r\n' +
-          'Server: nginx/1.24.0 (Ubuntu)\r\n' +
-          'Date: Thu, 27 Aug 2026 06:30:00 GMT\r\n' +
-          'Content-Type: application/json; charset=utf-8\r\n' +
-          'Content-Length: 48\r\n' +
-          'X-Powered-By: Express\r\n' +
-          'Access-Control-Allow-Origin: *\r\n' +
-          'Connection: keep-alive\r\n\r\n';
-        return { stdout: headerRes, stderr: '', exitCode: 0, updatedState: state };
-      }
+      const res = handleNetworkCurl(urlArg, isHead);
       return {
-        stdout: '{"status":"healthy","version":"1.4.2","environment":"production"}\n',
-        stderr: '',
-        exitCode: 0,
+        stdout: res.stdout,
+        stderr: res.stderr,
+        exitCode: res.exitCode,
         updatedState: state,
       };
     }
