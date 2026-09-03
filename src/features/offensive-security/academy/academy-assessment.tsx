@@ -77,7 +77,7 @@ export function AcademyAssessment({ lesson }: AcademyAssessmentProps) {
         {completed && (
           <Badge variant="success" className="gap-1.5">
             <ShieldCheck className="h-3.5 w-3.5" />
-            Competency verified
+            Practice Completed (Self-Paced)
           </Badge>
         )}
       </div>

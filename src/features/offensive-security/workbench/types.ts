@@ -1,4 +1,14 @@
-export type WorkbenchMode = 'terminal' | 'sql' | 'http' | 'packet' | 'cyber-range';
+export type WorkbenchMode =
+  | 'terminal'
+  | 'sql'
+  | 'http'
+  | 'packet'
+  | 'cyber-range'
+  | 'telemetry'
+  | 'telemetry-inspector'
+  | 'decision-lab'
+  | 'ad-graph'
+  | 'memory-exploit';
 
 // POSIX Virtual Filesystem (VFS) Types
 export interface VfsFile {
@@ -205,6 +215,7 @@ export interface WorkbenchConfig {
   summary: string;
   mode: WorkbenchMode;
   availableModes?: WorkbenchMode[];
+  targetHost?: string;
   instructions: string[];
   initialVfs?: VfsDirectory;
   initialSqlDb?: SqlDatabase;
