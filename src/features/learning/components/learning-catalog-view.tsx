@@ -5,16 +5,11 @@ import Link from 'next/link';
 import {
   Code2,
   Layers,
-  Sparkles,
   BookOpen,
   Terminal,
   Play,
-  ArrowRight,
   Clock,
   CheckCircle2,
-  Cpu,
-  Server,
-  Zap,
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { LearningTrack } from '../types';
@@ -22,7 +17,7 @@ import { TrackCard } from './track-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { getCuratedExercises, CuratedExercise } from '../data/curriculum';
+import { getCuratedExercises } from '../data/curriculum';
 import { useLearningStore } from '../stores/use-learning-store';
 
 interface LearningCatalogViewProps {
@@ -54,9 +49,6 @@ export function LearningCatalogView({
   const reactExercises = React.useMemo(() => getCuratedExercises('react'), []);
   const nextjsExercises = React.useMemo(() => getCuratedExercises('nextjs'), []);
 
-  const totalReactLessons = reactTracks.reduce((acc, t) => acc + t.lessons.length, 0);
-  const totalNextLessons = nextjsTracks.reduce((acc, t) => acc + t.lessons.length, 0);
-
   const completedReactCount = mounted
     ? reactExercises.filter((e) => completedLessonIds.includes(e.lessonId)).length
     : 0;
@@ -67,7 +59,6 @@ export function LearningCatalogView({
 
   const currentTracks = isReact ? reactTracks : nextjsTracks;
   const currentExercises = isReact ? reactExercises : nextjsExercises;
-  const currentTotal = isReact ? totalReactLessons : totalNextLessons;
   const currentCompleted = isReact ? completedReactCount : completedNextCount;
 
   return (

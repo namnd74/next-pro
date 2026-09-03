@@ -206,7 +206,7 @@ export function useRunnerBridge(options: UseRunnerBridgeOptions = {}) {
       clearInterval(pingInterval);
       clearWatchdog();
     };
-  }, [sessionId, clearWatchdog, updateStatus]);
+  }, [sessionId, clearWatchdog, updateStatus, watchdogTimeoutMs]);
 
   return {
     iframeRef,
