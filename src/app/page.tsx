@@ -75,16 +75,20 @@ export default function HomePage() {
             </Button>
           </Link>
 
-          <Link href="/offensive-security">
+          <div className="inline-flex items-center">
             <Button
               variant="outline"
               size="lg"
-              className="border-destructive/30 text-destructive hover:bg-destructive/10 gap-2 font-semibold"
+              disabled
+              className="border-destructive/30 text-destructive/60 cursor-not-allowed gap-2 font-semibold opacity-70"
             >
               <Crosshair className="h-4 w-4" />
-              <span>Offensive Security Academy</span>
+              <span>Offensive Security</span>
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500">
+                Coming Soon
+              </span>
             </Button>
-          </Link>
+          </div>
         </div>
       </section>
 
@@ -153,26 +157,30 @@ export default function HomePage() {
           </Card>
         </Link>
 
-        <Link href="/offensive-security" className="group">
-          <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500 via-orange-500 to-amber-500" />
+        <div className="group relative cursor-not-allowed">
+          <Card className="glass-card relative overflow-hidden border-dashed p-6 opacity-75">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500/40 via-orange-500/40 to-amber-500/40" />
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-2">
-                <div className="bg-destructive/10 text-destructive flex h-10 w-10 items-center justify-center rounded-xl">
-                  <Crosshair className="h-5 w-5" />
+                <div className="flex items-center gap-2">
+                  <div className="bg-destructive/10 text-destructive/70 flex h-10 w-10 items-center justify-center rounded-xl">
+                    <Crosshair className="h-5 w-5" />
+                  </div>
+                  <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500">
+                    Coming Soon
+                  </span>
                 </div>
-                <h3 className="text-foreground group-hover:text-destructive text-lg font-bold transition-colors">
+                <h3 className="text-foreground text-lg font-bold">
                   Offensive Security Academy
                 </h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  Học từ authority và nền tảng hệ thống, sau đó củng cố qua Practice Range
-                  tấn công–phòng thủ an toàn.
+                  Lộ trình bảo mật Web & Red Team Range đang được hoàn thiện nội dung và
+                  sẽ ra mắt trong bản cập nhật kế tiếp.
                 </p>
               </div>
-              <ArrowRight className="text-muted-foreground group-hover:text-destructive mt-2 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1" />
             </div>
           </Card>
-        </Link>
+        </div>
       </section>
 
       {/* Live Server State Metrics (TanStack Query + Axios) */}

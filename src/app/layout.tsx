@@ -42,8 +42,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') ?? '';
+
   return (
     <html lang="en" suppressHydrationWarning className={plusJakartaSans.variable}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: 'window.coepCredentialless = true;',
+          }}
+        />
+        <script src={`${basePath}/coi-serviceworker.min.js`} async />
+      </head>
       <body className="bg-background text-foreground selection:bg-primary/20 selection:text-primary relative flex min-h-screen flex-col font-sans antialiased">
         {/* Background gradient decorations */}
         <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">

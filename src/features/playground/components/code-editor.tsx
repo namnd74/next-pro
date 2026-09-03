@@ -4,6 +4,7 @@ import * as React from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorView } from '@codemirror/view';
+import { oneDark } from '@codemirror/theme-one-dark';
 import { useTheme } from 'next-themes';
 
 interface CodeEditorProps {
@@ -14,6 +15,85 @@ interface CodeEditorProps {
   className?: string;
 }
 
+// Custom High-Contrast Theme Overrides for Dark & Light modes
+const highContrastDarkTheme = EditorView.theme(
+  {
+    '&': {
+      backgroundColor: '#090d16 !important',
+      color: '#f8fafc !important',
+      fontSize: '13px',
+    },
+    '.cm-content': {
+      caretColor: '#38bdf8',
+      fontFamily:
+        'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    },
+    '.cm-cursor': {
+      borderLeftColor: '#38bdf8 !important',
+      borderLeftWidth: '2px !important',
+    },
+    '.cm-gutters': {
+      backgroundColor: '#070a12 !important',
+      color: '#64748b !important',
+      borderRight: '1px solid rgba(255, 255, 255, 0.08) !important',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: 'rgba(56, 189, 248, 0.15) !important',
+      color: '#38bdf8 !important',
+      fontWeight: 'bold',
+    },
+    '.cm-activeLine': {
+      backgroundColor: 'rgba(255, 255, 255, 0.04) !important',
+    },
+    '.cm-selectionMatch': {
+      backgroundColor: 'rgba(56, 189, 248, 0.25) !important',
+    },
+    '&.cm-focused .cm-selectionBackground, ::selection': {
+      backgroundColor: 'rgba(99, 102, 241, 0.35) !important',
+    },
+  },
+  { dark: true }
+);
+
+const highContrastLightTheme = EditorView.theme(
+  {
+    '&': {
+      backgroundColor: '#ffffff !important',
+      color: '#0f172a !important',
+      fontSize: '13px',
+    },
+    '.cm-content': {
+      caretColor: '#2563eb',
+      fontFamily:
+        'var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    },
+    '.cm-cursor': {
+      borderLeftColor: '#2563eb !important',
+      borderLeftWidth: '2px !important',
+    },
+    '.cm-gutters': {
+      backgroundColor: '#f8fafc !important',
+      color: '#94a3b8 !important',
+      borderRight: '1px solid rgba(0, 0, 0, 0.08) !important',
+    },
+    '.cm-activeLineGutter': {
+      backgroundColor: 'rgba(37, 99, 235, 0.1) !important',
+      color: '#2563eb !important',
+      fontWeight: 'bold',
+    },
+    '.cm-activeLine': {
+      backgroundColor: 'rgba(0, 0, 0, 0.03) !important',
+    },
+    '.cm-selectionMatch': {
+      backgroundColor: 'rgba(37, 99, 235, 0.15) !important',
+    },
+    '&.cm-focused .cm-selectionBackground, ::selection': {
+      backgroundColor: 'rgba(37, 99, 235, 0.25) !important',
+    },
+  },
+  { dark: false }
+);
+
 export function CodeEditor({
   code,
   onChange,
@@ -22,17 +102,29 @@ export function CodeEditor({
   className = '',
 }: CodeEditorProps) {
   const { theme, resolvedTheme } = useTheme();
-  const isDark = (resolvedTheme || theme) === 'dark';
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted ? (resolvedTheme || theme) === 'dark' : true;
 
   const extensions = React.useMemo(() => {
-    return [
+    const baseExtensions = [
       EditorView.lineWrapping,
       javascript({
         jsx: true,
         typescript: true,
       }),
     ];
-  }, []);
+
+    if (isDark) {
+      return [...baseExtensions, oneDark, highContrastDarkTheme];
+    }
+
+    return [...baseExtensions, highContrastLightTheme];
+  }, [isDark]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Flame, CheckCircle2, Trophy, BookOpen, RotateCcw } from 'lucide-react';
 import { useLearningStore } from '../stores/use-learning-store';
-import { MOCK_LEARNING_TRACKS } from '../data/mock-courses';
+import { CURRICULUM_TRACKS } from '../data/curriculum';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -18,7 +18,7 @@ export function LearningStats() {
   }, []);
 
   const totalLessons = React.useMemo(() => {
-    return MOCK_LEARNING_TRACKS.reduce((acc, t) => acc + t.lessons.length, 0);
+    return CURRICULUM_TRACKS.reduce((acc, t) => acc + t.lessons.length, 0);
   }, []);
 
   const completedCount = mounted ? completedLessonIds.length : 0;

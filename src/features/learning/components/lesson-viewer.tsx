@@ -20,7 +20,16 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CodeBlock } from '@/components/ui/code-block';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ReactPlayground } from '@/features/playground';
+import {
+  ReactPlayground,
+  NextPlayground,
+  type PlaygroundFile,
+} from '@/features/playground';
+import { NEXTJS_SERIES_TRACK_SLUGS } from '../data/curriculum';
+import {
+  generateDynamicLabFiles,
+  ensureStandardReactProjectFiles,
+} from '../data/lab-generator';
 
 interface LessonViewerProps {
   track: LearningTrack;
@@ -35,11 +44,11 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
 
   const theory = (
     <>
-      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-900 dark:text-amber-200">
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-950 dark:text-amber-100">
         <div className="flex items-start gap-3">
-          <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+          <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
           <div className="space-y-1">
-            <span className="text-xs font-bold tracking-wider text-amber-600 uppercase dark:text-amber-400">
+            <span className="text-xs font-extrabold tracking-wider text-amber-800 uppercase dark:text-amber-300">
               Core Mental Model
             </span>
             <p className="text-sm leading-relaxed font-medium">{lesson.mentalModel}</p>
@@ -53,7 +62,10 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
         </h2>
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {lesson.keyPoints.map((point, index) => (
-            <Card key={index} className="glass-card flex items-start gap-3 p-4">
+            <Card
+              key={index}
+              className="glass-card glass-card-hover hover:border-primary/40 flex items-start gap-3 p-4 transition-all"
+            >
               <CheckCircle2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />
               <span className="text-foreground text-xs leading-relaxed">{point}</span>
             </Card>
@@ -114,83 +126,67 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
     <BlitzQuiz lessonId={lesson.id} quizzes={lesson.quizzes} />
   ) : null;
 
+  const isNextJsTrack = NEXTJS_SERIES_TRACK_SLUGS.includes(track.slug);
+
+  const dynamicLab = React.useMemo(() => {
+    return generateDynamicLabFiles(lesson, track, isNextJsTrack);
+  }, [lesson, track, isNextJsTrack]);
+
   const labInitialFiles = React.useMemo(() => {
+    let raw: Record<string, string | PlaygroundFile>;
+
     if (
       lesson.interactiveLab?.initialFiles &&
       Object.keys(lesson.interactiveLab.initialFiles).length > 0
     ) {
-      return lesson.interactiveLab.initialFiles;
+      raw = lesson.interactiveLab.initialFiles;
+    } else {
+      raw = dynamicLab.initialFiles;
     }
 
-    const primaryRecipe = lesson.codeRecipes[0]?.afterCode;
-    const isTsx =
-      lesson.codeRecipes[0]?.language === 'tsx' ||
-      lesson.codeRecipes[0]?.language === 'typescript';
-
-    if (
-      primaryRecipe &&
-      isTsx &&
-      (primaryRecipe.includes('export default') || primaryRecipe.includes('function '))
-    ) {
-      let cleanCode = primaryRecipe;
-      if (!cleanCode.includes('import React') && !cleanCode.includes("from 'react'")) {
-        cleanCode = `import React from 'react';\n\n${cleanCode}`;
-      }
-      if (!cleanCode.includes('export default')) {
-        const match = cleanCode.match(/function\s+([A-Za-z0-9_]+)/);
-        if (match && match[1]) {
-          cleanCode += `\n\nexport default ${match[1]};`;
-        }
-      }
-      return {
-        '/App.tsx': cleanCode,
-        '/styles.css': '/* Custom styles */\n',
-      };
+    if (!isNextJsTrack) {
+      return ensureStandardReactProjectFiles(raw);
     }
 
-    return {
-      '/App.tsx': `import React, { useState } from 'react';
-
-export default function App() {
-  const [count, setCount] = useState(0);
-
-  return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-6 flex flex-col items-center justify-center space-y-4">
-      <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/30 p-6 max-w-md text-center space-y-3 shadow-lg">
-        <h1 className="text-xl font-bold text-cyan-400">
-          ${lesson.title}
-        </h1>
-        <p className="text-slate-400 text-xs leading-relaxed">
-          ${lesson.summary.replace(/"/g, "'")}
-        </p>
-        <button 
-          onClick={() => setCount((c) => c + 1)}
-          className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 rounded-lg text-white text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
-        >
-          Lượt bấm: {count}
-        </button>
-      </div>
-    </div>
-  );
-}
-`,
-      '/styles.css': '/* Custom styles */\n',
-    };
-  }, [lesson]);
+    return raw;
+  }, [lesson, dynamicLab, isNextJsTrack]);
 
   const labInstructions =
     lesson.interactiveLab?.instructions ||
+    dynamicLab.instructions ||
     `Thực hành và thử nghiệm code cho bài: ${lesson.title}. Mọi chỉnh sửa được tự động lưu trong IndexedDB theo bài học này.`;
+
+  const nextInitialFiles =
+    lesson.interactiveLab?.initialFiles &&
+    Object.keys(lesson.interactiveLab.initialFiles).length > 0
+      ? lesson.interactiveLab.initialFiles
+      : dynamicLab.initialFiles;
+
+  const resolvedReactEntry = labInitialFiles['/src/main.tsx']
+    ? '/src/main.tsx'
+    : labInitialFiles['/src/App.tsx']
+      ? '/src/App.tsx'
+      : '/App.tsx';
 
   const interactiveLab = (
     <section className="space-y-4">
-      <ReactPlayground
-        initialFiles={labInitialFiles}
-        entryPath={lesson.interactiveLab?.entryFile || '/App.tsx'}
-        instructions={labInstructions}
-        platform="react-lite"
-        scopeId={lesson.id}
-      />
+      {isNextJsTrack ? (
+        <NextPlayground
+          title={`Next.js 16 Curriculum Studio: ${lesson.title}`}
+          initialFiles={nextInitialFiles}
+          entryPath={lesson.interactiveLab?.entryFile || '/app/page.tsx'}
+          instructions={labInstructions}
+          scopeId={lesson.id}
+        />
+      ) : (
+        <ReactPlayground
+          initialFiles={labInitialFiles}
+          entryPath={resolvedReactEntry}
+          instructions={labInstructions}
+          platform="react-lite"
+          scopeId={lesson.id}
+        />
+      )}
     </section>
   );
 

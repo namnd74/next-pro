@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   BookOpen,
   CheckCircle2,
@@ -15,10 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { LearningNavigationTrack } from '../types';
-import {
-  REACT_SERIES_TRACK_SLUGS,
-  NEXTJS_SERIES_TRACK_SLUGS,
-} from '../data/mock-courses';
+import { REACT_SERIES_TRACK_SLUGS, NEXTJS_SERIES_TRACK_SLUGS } from '../data/curriculum';
 import { useLearningStore } from '../stores/use-learning-store';
 
 interface LearningSidebarProps {
@@ -26,35 +23,60 @@ interface LearningSidebarProps {
   onNavigate?: () => void;
 }
 
-type SeriesFilter = 'all' | 'react' | 'nextjs';
-
 export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [, , activeTrackSlug, activeLessonSlug] = pathname.split('/');
-  const { completedLessonIds, resetProgress } = useLearningStore();
+  const { completedLessonIds, resetProgress, activeDomain, setActiveDomain } =
+    useLearningStore();
   const [mounted, setMounted] = React.useState(false);
-  const [filter, setFilter] = React.useState<SeriesFilter>('all');
   const [manualExpanded, setManualExpanded] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     setMounted(true);
-  }, []);
+    if (typeof window !== 'undefined') {
+      const param = new URLSearchParams(window.location.search).get('domain');
+      if (param === 'nextjs' || param === 'react') {
+        setActiveDomain(param);
+      }
+    }
+  }, [setActiveDomain]);
 
-  // Auto-sync tab or auto-expand active track on load/route change
+  // Auto-expand active track and sync active domain on load/route change
   React.useEffect(() => {
     if (activeTrackSlug) {
+      if (NEXTJS_SERIES_TRACK_SLUGS.includes(activeTrackSlug)) {
+        setActiveDomain('nextjs');
+      } else if (REACT_SERIES_TRACK_SLUGS.includes(activeTrackSlug)) {
+        setActiveDomain('react');
+      }
       setManualExpanded((prev) =>
         prev.includes(activeTrackSlug) ? prev : [...prev, activeTrackSlug]
       );
     }
-  }, [activeTrackSlug]);
+  }, [activeTrackSlug, setActiveDomain]);
 
-  const reactTracks = tracks.filter((t) => REACT_SERIES_TRACK_SLUGS.includes(t.slug));
-  const nextjsTracks = tracks.filter((t) => NEXTJS_SERIES_TRACK_SLUGS.includes(t.slug));
+  const isNextjs = activeDomain === 'nextjs';
 
-  const allLessons = tracks.flatMap((track) => track.lessons);
+  const reactTracks = React.useMemo(
+    () => tracks.filter((t) => REACT_SERIES_TRACK_SLUGS.includes(t.slug)),
+    [tracks]
+  );
+  const nextjsTracks = React.useMemo(
+    () => tracks.filter((t) => NEXTJS_SERIES_TRACK_SLUGS.includes(t.slug)),
+    [tracks]
+  );
+
+  const activeTracks = isNextjs ? nextjsTracks : reactTracks;
+  const activeSeriesType: 'react' | 'nextjs' = isNextjs ? 'nextjs' : 'react';
+
+  const seriesLessons = React.useMemo(
+    () => activeTracks.flatMap((track) => track.lessons),
+    [activeTracks]
+  );
+
   const completedCount = mounted
-    ? allLessons.filter((lesson) => completedLessonIds.includes(lesson.id)).length
+    ? seriesLessons.filter((lesson) => completedLessonIds.includes(lesson.id)).length
     : 0;
 
   const toggleExpand = (trackSlug: string) => {
@@ -184,115 +206,118 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto pb-4">
-      {/* Header Card */}
-      <Link
-        href="/learn"
-        onClick={onNavigate}
-        className="border-primary/20 bg-primary/5 hover:bg-primary/10 flex shrink-0 items-center gap-2.5 rounded-xl border p-2.5 transition-colors"
-      >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-indigo-600 text-white shadow-md">
-          <BookOpen className="h-4 w-4" />
-        </span>
-        <div className="min-w-0 space-y-0.5">
-          <span className="text-foreground block truncate text-sm font-extrabold tracking-tight">
-            React & Next.js Pro
-          </span>
-          <span className="text-muted-foreground block font-mono text-[9px] tracking-widest uppercase">
-            Learn · Practice · Master
-          </span>
-        </div>
-      </Link>
-
-      {/* Series Filter Selector Tabs */}
-      <div className="bg-secondary/40 grid grid-cols-3 gap-1 rounded-lg p-1 text-[11px] font-semibold">
+      {/* 1. Dedicated Framework Switcher in Left Sidebar */}
+      <div className="border-border/70 bg-secondary/30 grid grid-cols-2 gap-1.5 rounded-xl border p-1">
         <button
           type="button"
-          onClick={() => setFilter('all')}
-          className={`flex items-center justify-center gap-1 rounded-md px-1.5 py-1 transition-all ${
-            filter === 'all'
-              ? 'bg-background text-foreground font-bold shadow-xs'
-              : 'text-muted-foreground hover:text-foreground'
+          onClick={() => {
+            setActiveDomain('react');
+            if (pathname !== '/learn') {
+              router.push('/learn?domain=react');
+            } else {
+              window.history.pushState(null, '', '/learn?domain=react');
+            }
+            onNavigate?.();
+          }}
+          className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-bold transition-all ${
+            !isNextjs
+              ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/25'
+              : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
           }`}
         >
-          <Sparkles className="h-3 w-3" />
-          <span>Tất cả</span>
+          <Code2 className="h-3.5 w-3.5" />
+          <span>React 19</span>
         </button>
 
         <button
           type="button"
-          onClick={() => setFilter('react')}
-          className={`flex items-center justify-center gap-1 rounded-md px-1.5 py-1 transition-all ${
-            filter === 'react'
-              ? 'bg-cyan-500/20 font-bold text-cyan-400 shadow-xs'
-              : 'text-muted-foreground hover:text-cyan-400'
+          onClick={() => {
+            setActiveDomain('nextjs');
+            if (pathname !== '/learn') {
+              router.push('/learn?domain=nextjs');
+            } else {
+              window.history.pushState(null, '', '/learn?domain=nextjs');
+            }
+            onNavigate?.();
+          }}
+          className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-bold transition-all ${
+            isNextjs
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+              : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
           }`}
         >
-          <Code2 className="h-3 w-3" />
-          <span>React ({reactTracks.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFilter('nextjs')}
-          className={`flex items-center justify-center gap-1 rounded-md px-1.5 py-1 transition-all ${
-            filter === 'nextjs'
-              ? 'bg-indigo-500/20 font-bold text-indigo-400 shadow-xs'
-              : 'text-muted-foreground hover:text-indigo-400'
-          }`}
-        >
-          <Layers className="h-3 w-3" />
-          <span>Next.js ({nextjsTracks.length})</span>
+          <Layers className="h-3.5 w-3.5" />
+          <span>Next.js 16</span>
         </button>
       </div>
 
-      {/* Navigation List */}
-      <nav className="space-y-4" aria-label="Lộ trình học React & Next.js">
-        {/* Section: React Series */}
-        {(filter === 'all' || filter === 'react') && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-wider text-cyan-400 uppercase">
-                <Code2 className="h-3 w-3" />
-                <span>Seri React Mastery</span>
-              </div>
-              <span className="text-muted-foreground/70 font-mono text-[9px]">
-                {reactTracks.length} tracks
-              </span>
-            </div>
-            <div className="space-y-1.5">{renderTrackList(reactTracks, 'react')}</div>
-          </div>
-        )}
+      {/* 2. Series Header Banner */}
+      <div
+        className={`flex shrink-0 items-center gap-2.5 rounded-xl border p-2.5 transition-colors ${
+          isNextjs
+            ? 'border-indigo-500/20 bg-indigo-500/5'
+            : 'border-cyan-500/20 bg-cyan-500/5'
+        }`}
+      >
+        <span
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white shadow-xs ${
+            isNextjs
+              ? 'bg-gradient-to-br from-indigo-500 to-purple-600'
+              : 'bg-gradient-to-br from-cyan-500 to-teal-600'
+          }`}
+        >
+          {isNextjs ? <Layers className="h-4 w-4" /> : <Code2 className="h-4 w-4" />}
+        </span>
+        <div className="min-w-0 space-y-0.5">
+          <span className="text-foreground block truncate text-xs font-extrabold tracking-tight">
+            {isNextjs ? 'Seri Next.js 16 Fullstack' : 'Seri React 19 Mastery'}
+          </span>
+          <span className="text-muted-foreground block font-mono text-[9px] tracking-widest uppercase">
+            {isNextjs ? '4 Lộ trình · WebContainer' : '8 Lộ trình · Sandbox'}
+          </span>
+        </div>
+      </div>
 
-        {/* Section: Next.js Series */}
-        {(filter === 'all' || filter === 'nextjs') && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-wider text-indigo-400 uppercase">
-                <Layers className="h-3 w-3" />
-                <span>Seri Next.js Fullstack</span>
-              </div>
-              <span className="text-muted-foreground/70 font-mono text-[9px]">
-                {nextjsTracks.length} tracks
-              </span>
-            </div>
-            <div className="space-y-1.5">{renderTrackList(nextjsTracks, 'nextjs')}</div>
+      {/* Navigation List - Only Active Series */}
+      <nav
+        className="space-y-3"
+        aria-label={isNextjs ? 'Lộ trình học Next.js 16' : 'Lộ trình học React 19'}
+      >
+        <div className="flex items-center justify-between px-1">
+          <div
+            className={`flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-wider uppercase ${
+              isNextjs ? 'text-indigo-400' : 'text-cyan-400'
+            }`}
+          >
+            {isNextjs ? <Layers className="h-3 w-3" /> : <Code2 className="h-3 w-3" />}
+            <span>{isNextjs ? 'Seri Next.js Fullstack' : 'Seri React Mastery'}</span>
           </div>
-        )}
+          <span className="text-muted-foreground/70 font-mono text-[9px]">
+            {activeTracks.length} tracks
+          </span>
+        </div>
+        <div className="space-y-1.5">
+          {renderTrackList(activeTracks, activeSeriesType)}
+        </div>
       </nav>
 
       {/* Progress Footer */}
       <div className="border-border/60 bg-secondary/30 mt-auto space-y-2 rounded-xl border p-3">
         <div className="text-muted-foreground flex items-center justify-between font-mono text-[10px]">
-          <span>Tiến độ tổng</span>
+          <span>Tiến độ {isNextjs ? 'Next.js' : 'React'}</span>
           <span className="text-primary font-bold">
-            {completedCount}/{allLessons.length} bài
+            {completedCount}/{seriesLessons.length} bài
           </span>
         </div>
         <div className="bg-secondary h-1.5 overflow-hidden rounded-full">
           <div
-            className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-indigo-500 transition-[width] duration-300"
+            className={`h-full rounded-full transition-[width] duration-300 ${
+              isNextjs
+                ? 'bg-gradient-to-r from-indigo-500 to-purple-600'
+                : 'bg-gradient-to-r from-cyan-500 to-teal-500'
+            }`}
             style={{
-              width: `${allLessons.length ? (completedCount / allLessons.length) * 100 : 0}%`,
+              width: `${seriesLessons.length ? (completedCount / seriesLessons.length) * 100 : 0}%`,
             }}
           />
         </div>
