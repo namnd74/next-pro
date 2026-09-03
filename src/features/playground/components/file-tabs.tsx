@@ -67,7 +67,11 @@ export function FileTabs({
   };
 
   return (
-    <div className="border-border/50 bg-muted/40 no-scrollbar flex items-center gap-1 overflow-x-auto border-b px-2 py-1.5 select-none">
+    <div
+      role="tablist"
+      aria-label="Open files"
+      className="border-border/50 bg-muted/40 no-scrollbar flex items-center gap-1 overflow-x-auto border-b px-2 py-1.5 select-none"
+    >
       {fileList.map((file) => {
         const isActive = file.path === activePath;
         const isEntry = file.path === entryPath;
@@ -77,60 +81,65 @@ export function FileTabs({
         return (
           <div
             key={file.path}
-            onClick={() => onSelectFile(file.path)}
-            className={`group flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors ${
+            className={`group flex items-center rounded-lg border font-mono text-xs transition-colors ${
               isActive
                 ? 'bg-background text-foreground border-border/80 font-semibold shadow-xs'
                 : 'text-muted-foreground hover:bg-background/50 hover:text-foreground border-transparent'
             }`}
           >
-            <FileCode2
-              className={`h-3.5 w-3.5 ${
-                status === 'modified'
-                  ? 'text-amber-400'
-                  : status === 'added'
-                    ? 'text-emerald-400'
-                    : isActive
-                      ? 'text-primary'
-                      : 'text-muted-foreground'
-              }`}
-            />
-            <span
-              className={
-                status === 'modified'
-                  ? 'text-amber-400'
-                  : status === 'added'
-                    ? 'text-emerald-400'
-                    : ''
-              }
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => onSelectFile(file.path)}
+              className="focus-visible:ring-primary flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 focus-visible:ring-2 focus-visible:outline-none"
             >
-              {displayName}
-            </span>
-
-            {/* Git-like status badges */}
-            {status === 'modified' && (
+              <FileCode2
+                aria-hidden="true"
+                className={`h-3.5 w-3.5 ${
+                  status === 'modified'
+                    ? 'text-amber-400'
+                    : status === 'added'
+                      ? 'text-emerald-400'
+                      : isActive
+                        ? 'text-primary'
+                        : 'text-muted-foreground'
+                }`}
+              />
               <span
-                className="text-[10px] font-bold text-amber-400"
-                title="File đã chỉnh sửa so với đề bài"
+                className={
+                  status === 'modified'
+                    ? 'text-amber-400'
+                    : status === 'added'
+                      ? 'text-emerald-400'
+                      : ''
+                }
               >
-                ●
+                {displayName}
               </span>
-            )}
 
-            {status === 'added' && (
-              <span
-                className="rounded bg-emerald-500/20 px-1 text-[9px] font-bold text-emerald-400"
-                title="File do bạn tự tạo mới"
-              >
-                [U]
-              </span>
-            )}
+              {/* Git-like status badges */}
+              {status === 'modified' && (
+                <span className="text-[10px] font-bold text-amber-400" title="Modified">
+                  ●
+                </span>
+              )}
 
-            {isEntry && (
-              <span className="bg-primary/10 py-0.2 text-primary rounded px-1 font-sans text-[9px] font-bold">
-                entry
-              </span>
-            )}
+              {status === 'added' && (
+                <span
+                  className="rounded bg-emerald-500/20 px-1 text-[9px] font-bold text-emerald-400"
+                  title="Untracked"
+                >
+                  [U]
+                </span>
+              )}
+
+              {isEntry && (
+                <span className="bg-primary/10 py-0.2 text-primary rounded px-1 font-sans text-[9px] font-bold">
+                  entry
+                </span>
+              )}
+            </button>
 
             {!isEntry && (
               <button
@@ -139,10 +148,11 @@ export function FileTabs({
                   e.stopPropagation();
                   onDeleteFile(file.path);
                 }}
-                className="hover:text-destructive rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
-                title="Xóa file"
+                className="hover:text-destructive focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 focus:opacity-100 focus-visible:ring-2 focus-visible:outline-none [@media(hover:none)]:opacity-100"
+                title="Close file"
+                aria-label={`Close file ${displayName}`}
               >
-                <X className="h-3 w-3" />
+                <X aria-hidden="true" className="h-3 w-3" />
               </button>
             )}
           </div>
@@ -155,6 +165,7 @@ export function FileTabs({
           <input
             ref={inputRef}
             type="text"
+            aria-label="New file name"
             placeholder="Filename.tsx"
             value={newFileName}
             onChange={(e) => setNewFileName(e.target.value)}
@@ -164,10 +175,11 @@ export function FileTabs({
           <button
             type="button"
             onClick={handleConfirmAdd}
-            className="p-0.5 text-emerald-500 hover:text-emerald-400"
-            title="Thêm file"
+            className="focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded text-emerald-500 hover:text-emerald-400 focus-visible:ring-2 focus-visible:outline-none"
+            title="Add file"
+            aria-label="Confirm add file"
           >
-            <Check className="h-3.5 w-3.5" />
+            <Check aria-hidden="true" className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
@@ -175,21 +187,22 @@ export function FileTabs({
               setIsAdding(false);
               setNewFileName('');
             }}
-            className="text-muted-foreground hover:text-destructive p-0.5"
-            title="Hủy"
+            className="text-muted-foreground hover:text-destructive focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded focus-visible:ring-2 focus-visible:outline-none"
+            title="Cancel"
+            aria-label="Cancel add file"
           >
-            <X className="h-3.5 w-3.5" />
+            <X aria-hidden="true" className="h-3.5 w-3.5" />
           </button>
         </div>
       ) : (
         <button
           type="button"
           onClick={() => setIsAdding(true)}
-          className="text-muted-foreground hover:bg-background/60 hover:text-foreground flex items-center gap-1 rounded-lg px-2 py-1 text-xs transition-colors"
-          title="Tạo file mới"
+          className="text-muted-foreground hover:bg-background/60 hover:text-foreground focus-visible:ring-primary flex min-h-11 items-center gap-1 rounded-lg px-2 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          title="New file"
         >
-          <Plus className="h-3.5 w-3.5" />
-          <span className="font-sans text-[11px]">Thêm file</span>
+          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+          <span className="font-sans text-[11px]">New file</span>
         </button>
       )}
     </div>

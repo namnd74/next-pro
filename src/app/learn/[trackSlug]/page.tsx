@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft, BookOpen, Clock, ArrowRight, Sparkles } from 'lucide-react';
-import { MOCK_LEARNING_TRACKS } from '@/features/learning/data/mock-courses';
+import { CURRICULUM_TRACKS } from '@/features/learning/data/curriculum';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,14 +15,14 @@ interface TrackPageProps {
 }
 
 export function generateStaticParams() {
-  return MOCK_LEARNING_TRACKS.map((track) => ({
+  return CURRICULUM_TRACKS.map((track) => ({
     trackSlug: track.slug,
   }));
 }
 
 export async function generateMetadata({ params }: TrackPageProps): Promise<Metadata> {
   const { trackSlug } = await params;
-  const track = MOCK_LEARNING_TRACKS.find((t) => t.slug === trackSlug);
+  const track = CURRICULUM_TRACKS.find((t) => t.slug === trackSlug);
   if (!track) return { title: 'Track Not Found | NextPro' };
 
   return {
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: TrackPageProps): Promise<Meta
 
 export default async function TrackDetailPage({ params }: TrackPageProps) {
   const { trackSlug } = await params;
-  const track = MOCK_LEARNING_TRACKS.find((t) => t.slug === trackSlug);
+  const track = CURRICULUM_TRACKS.find((t) => t.slug === trackSlug);
 
   if (!track) {
     notFound();

@@ -11,6 +11,7 @@ import {
   Play,
   CheckCircle2,
   Laptop,
+  Target,
 } from 'lucide-react';
 import type { PlaygroundFile } from '../types';
 import { usePlayground } from '../hooks/use-playground';
@@ -59,8 +60,11 @@ export function ReactPlayground({
     setActivePath,
     resetProject,
     runProject,
+    retryRunner,
     toggleConsole,
     toggleSidebar,
+    togglePreview,
+    setShowPreview,
     toggleFullscreen,
     setIsFullscreen,
     setOrientation,
@@ -70,20 +74,41 @@ export function ReactPlayground({
   const [inlineMode, setInlineMode] = React.useState(false);
   const [splitPercent, setSplitPercent] = React.useState<number>(50);
   const [isDraggingSplit, setIsDraggingSplit] = React.useState<boolean>(false);
+  const [sidebarWidth, setSidebarWidth] = React.useState<number>(220);
+  const [isDraggingSidebar, setIsDraggingSidebar] = React.useState<boolean>(false);
+  const [isNarrowViewport, setIsNarrowViewport] = React.useState(false);
+
   const workspaceContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const mainSplitBodyRef = React.useRef<HTMLDivElement | null>(null);
+  const hasInitializedMobileLayoutRef = React.useRef(false);
 
   const fileList = Object.values(project.files);
   const isHorizontal = layout.orientation === 'horizontal';
+  const effectiveHorizontal = isHorizontal && !isNarrowViewport;
 
-  // Handle Dragging Split Pane
+  React.useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const syncViewport = () => setIsNarrowViewport(mediaQuery.matches);
+    syncViewport();
+    mediaQuery.addEventListener('change', syncViewport);
+    return () => mediaQuery.removeEventListener('change', syncViewport);
+  }, []);
+
+  React.useEffect(() => {
+    if (!isNarrowViewport || hasInitializedMobileLayoutRef.current) return;
+    hasInitializedMobileLayoutRef.current = true;
+    if (layout.showSidebar) toggleSidebar();
+  }, [isNarrowViewport, layout.showSidebar, toggleSidebar]);
+
+  // Handle Dragging Split Pane between Editor and Preview
   React.useEffect(() => {
     if (!isDraggingSplit) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       if (!workspaceContainerRef.current) return;
       const rect = workspaceContainerRef.current.getBoundingClientRect();
 
-      if (isHorizontal) {
+      if (effectiveHorizontal) {
         const offset = e.clientX - rect.left;
         const newPercent = (offset / rect.width) * 100;
         setSplitPercent(Math.min(Math.max(newPercent, 15), 85));
@@ -94,66 +119,115 @@ export function ReactPlayground({
       }
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       setIsDraggingSplit(false);
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [isDraggingSplit, isHorizontal]);
+  }, [isDraggingSplit, effectiveHorizontal]);
 
-  // 1. Lab Launcher Card (When not in fullscreen and inlineMode is false)
-  if (!layout.isFullscreen && !inlineMode) {
+  // Handle Dragging Sidebar Width
+  React.useEffect(() => {
+    if (!isDraggingSidebar) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (!mainSplitBodyRef.current) return;
+      const rect = mainSplitBodyRef.current.getBoundingClientRect();
+      // 44px is the width of activity bar (w-11)
+      const offset = e.clientX - rect.left - 44;
+      setSidebarWidth(Math.min(Math.max(offset, 160), 450));
+    };
+
+    const handlePointerUp = () => {
+      setIsDraggingSidebar(false);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [isDraggingSidebar]);
+
+  const handleSeparatorKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = 5;
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      setSplitPercent((prev) => Math.max(15, prev - step));
+    } else if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      setSplitPercent((prev) => Math.min(85, prev + step));
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      setSplitPercent(50);
+    }
+  };
+
+  // 1. Compact Inline Preview Mode (before opening full editor)
+  if (!inlineMode && !layout.isFullscreen) {
     return (
       <PlaygroundErrorBoundary fallbackTitle="React Playground Error">
         <Card
           style={{ minHeight }}
-          className={`glass-card border-primary/30 from-card via-card/90 to-primary/5 relative overflow-hidden rounded-2xl border bg-gradient-to-br p-6 shadow-lg ${className}`}
+          className={`glass-card border-border/70 relative overflow-hidden transition-all duration-300 ${className}`}
         >
-          {/* Background Ambient Glow */}
-          <div className="bg-primary/10 pointer-events-none absolute -top-24 -right-24 h-56 w-56 rounded-full blur-3xl" />
+          <div className="border-border/60 bg-muted/30 flex items-center justify-between border-b px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                <Code2 className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-foreground text-xs font-bold sm:text-sm">
+                  React 19 Playground
+                </h3>
+                <span className="text-muted-foreground hidden font-mono text-[10px] sm:inline">
+                  Interactive Client Sandbox · Live Hot Reload
+                </span>
+              </div>
+            </div>
 
-          <div className="flex h-full flex-col justify-between space-y-6">
-            {/* Header section */}
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="bg-primary/15 text-primary flex h-9 w-9 items-center justify-center rounded-xl shadow-xs">
-                    <Code2 className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-foreground flex items-center gap-2 text-base font-bold">
-                      <span>React Multi-File Playground</span>
-                      <Badge
-                        variant="outline"
-                        className="text-primary border-primary/40 text-[10px]"
-                      >
-                        React 19 + TypeScript
-                      </Badge>
-                    </h3>
-                    <p className="text-muted-foreground text-xs">
-                      Môi trường thực thi code đa file trực tiếp trong trình duyệt
-                    </p>
-                  </div>
-                </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {fileList.length} files
+              </Badge>
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => setInlineMode(true)}
+                className="gap-1.5 text-xs font-semibold shadow-xs"
+              >
+                <Play className="h-3 w-3 fill-current" />
+                <span>Open Studio</span>
+              </Button>
+            </div>
+          </div>
 
+          <div className="space-y-4 p-5">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-foreground text-sm font-bold">
+                  {project.entryPath.replace(/^\//, '')}
+                </h4>
                 <Badge
-                  variant="secondary"
-                  className="gap-1.5 bg-slate-800/60 font-mono text-[11px] text-slate-200"
+                  variant="outline"
+                  className="border-cyan-500/30 text-[10px] text-cyan-600 dark:text-cyan-400"
                 >
-                  <Files className="text-primary h-3 w-3" />
-                  <span>{fileList.length} files trong project</span>
+                  Entry File
                 </Badge>
               </div>
 
               {instructions && (
                 <div className="border-primary/20 bg-primary/5 text-foreground rounded-xl border p-3.5 text-xs leading-relaxed">
-                  <span className="text-primary mr-1 font-bold">🎯 Yêu cầu:</span>
+                  <span className="text-primary mr-1 inline-flex items-center gap-1 font-bold">
+                    <Target className="h-3.5 w-3.5" />
+                    <span>Instructions:</span>
+                  </span>
                   {instructions}
                 </div>
               )}
@@ -162,7 +236,7 @@ export function ReactPlayground({
             {/* File Badges Overview */}
             <div className="space-y-2">
               <span className="text-muted-foreground text-[11px] font-bold tracking-wider uppercase">
-                Cấu trúc Files:
+                File Tree:
               </span>
               <div className="flex flex-wrap gap-2">
                 {fileList.map((file) => {
@@ -197,9 +271,7 @@ export function ReactPlayground({
             <div className="border-border/40 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
               <div className="text-muted-foreground flex items-center gap-2 text-xs">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span>
-                  Hỗ trợ React 19 Hooks, Lucide Icons, TypeScript và Live Hot-Reload.
-                </span>
+                <span>Supports React 19, Lucide Icons, TypeScript & Hot-Reload.</span>
               </div>
 
               <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -210,7 +282,7 @@ export function ReactPlayground({
                   className="w-full text-xs sm:w-auto"
                 >
                   <Laptop className="mr-1.5 h-3.5 w-3.5" />
-                  <span>Xem nhanh tại đây</span>
+                  <span>Inline Studio</span>
                 </Button>
 
                 <Button
@@ -219,7 +291,7 @@ export function ReactPlayground({
                   className="shadow-primary/25 bg-primary hover:bg-primary/90 w-full gap-2 text-xs font-semibold shadow-md sm:w-auto"
                 >
                   <Maximize2 className="h-3.5 w-3.5" />
-                  <span>Mở Studio Toàn Màn Hình</span>
+                  <span>Open Fullscreen Studio</span>
                 </Button>
               </div>
             </div>
@@ -229,7 +301,7 @@ export function ReactPlayground({
     );
   }
 
-  // 2. Fullscreen VS Code Studio Modal / Inline Mode
+  // 2. Fullscreen Studio Modal / Inline Mode
   const studioContainerClasses = layout.isFullscreen
     ? 'fixed inset-0 z-50 flex flex-col w-screen h-screen bg-slate-950 text-slate-100 overflow-hidden'
     : `flex flex-col rounded-2xl border border-border/70 bg-card shadow-md overflow-hidden glass-card ${className}`;
@@ -250,6 +322,7 @@ export function ReactPlayground({
           onReset={resetProject}
           onToggleConsole={toggleConsole}
           onToggleSidebar={toggleSidebar}
+          onTogglePreview={togglePreview}
           onToggleFullscreen={toggleFullscreen}
           onClose={() => {
             if (layout.isFullscreen) setIsFullscreen(false);
@@ -260,19 +333,21 @@ export function ReactPlayground({
         />
 
         {/* Main Split Body */}
-        <div className="flex flex-1 overflow-hidden">
+        <div ref={mainSplitBodyRef} className="relative flex flex-1 overflow-hidden">
           {/* Activity Bar (Thin Left Icon Strip) */}
           <div className="border-border/50 flex w-11 flex-col items-center justify-between border-r bg-slate-950 py-3 text-slate-400 select-none">
             <div className="flex flex-col items-center gap-3">
               <button
                 type="button"
                 onClick={toggleSidebar}
-                className={`rounded-lg p-2 transition-colors ${
+                aria-label="Toggle Explorer"
+                aria-pressed={layout.showSidebar}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
                   layout.showSidebar
                     ? 'bg-primary/20 text-primary border-primary border-l-2'
                     : 'hover:bg-slate-900 hover:text-slate-200'
                 }`}
-                title="Explorer (Cây thư mục file)"
+                title="Explorer"
               >
                 <Files className="h-4 w-4" />
               </button>
@@ -280,12 +355,14 @@ export function ReactPlayground({
               <button
                 type="button"
                 onClick={toggleConsole}
-                className={`rounded-lg p-2 transition-colors ${
+                aria-label="Toggle Console"
+                aria-pressed={layout.showConsole}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
                   layout.showConsole
                     ? 'bg-primary/20 text-primary'
                     : 'hover:bg-slate-900 hover:text-slate-200'
                 }`}
-                title="Bật/Tắt Console"
+                title="Toggle Console"
               >
                 <Terminal className="h-4 w-4" />
               </button>
@@ -295,44 +372,83 @@ export function ReactPlayground({
               <button
                 type="button"
                 onClick={runProject}
-                className="rounded-lg p-2 text-emerald-400 transition-colors hover:bg-emerald-950/40"
-                title="Chạy code (⌘↵)"
+                aria-label="Run React project (⌘↵)"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-emerald-400 transition-colors hover:bg-emerald-950/40"
+                title="Run code (⌘↵)"
               >
                 <Play className="h-4 w-4 fill-current" />
               </button>
             </div>
           </div>
 
-          {/* File Explorer Sidebar */}
+          {/* File Explorer Sidebar & Resizer Gutter */}
           {layout.showSidebar && (
-            <FileExplorer
-              files={project.files}
-              activePath={project.activePath}
-              entryPath={project.entryPath}
-              fileStatusMap={fileStatusMap}
-              onSelectFile={setActivePath}
-              onAddFile={addFile}
-              onRenameFile={renameFile}
-              onDeleteFile={deleteFile}
-            />
+            <>
+              <div
+                className={
+                  isNarrowViewport
+                    ? 'absolute inset-y-0 left-11 z-30 shadow-2xl'
+                    : 'flex shrink-0'
+                }
+              >
+                <FileExplorer
+                  files={project.files}
+                  activePath={project.activePath}
+                  entryPath={project.entryPath}
+                  fileStatusMap={fileStatusMap}
+                  width={isNarrowViewport ? undefined : sidebarWidth}
+                  onSelectFile={(path) => {
+                    setActivePath(path);
+                    if (isNarrowViewport) toggleSidebar();
+                  }}
+                  onAddFile={addFile}
+                  onRenameFile={renameFile}
+                  onDeleteFile={deleteFile}
+                />
+              </div>
+
+              {!isNarrowViewport && (
+                <div
+                  role="separator"
+                  tabIndex={0}
+                  aria-label="Resize Sidebar"
+                  aria-orientation="vertical"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    setIsDraggingSidebar(true);
+                  }}
+                  onDoubleClick={() => setSidebarWidth(220)}
+                  className={`group bg-border/40 hover:bg-primary/50 relative z-20 flex w-1.5 shrink-0 cursor-col-resize touch-none items-center justify-center transition-colors select-none focus-visible:ring-2 focus-visible:outline-none ${
+                    isDraggingSidebar ? 'bg-primary/70' : ''
+                  }`}
+                  title="Drag to resize sidebar (Double click to reset)"
+                />
+              )}
+            </>
           )}
 
           {/* Workspace Area: Resizable Editor & Live Preview */}
           <div
             ref={workspaceContainerRef}
             className={`relative flex flex-1 overflow-hidden ${
-              isHorizontal ? 'flex-col md:flex-row' : 'flex-col'
+              effectiveHorizontal ? 'flex-row' : 'flex-col'
             } ${isDraggingSplit ? 'select-none' : ''}`}
           >
             {/* Editor Section */}
             <div
               style={
-                isHorizontal
-                  ? { width: `${splitPercent}%` }
-                  : { height: `${splitPercent}%` }
+                layout.showPreview === false
+                  ? { width: '100%', height: '100%' }
+                  : effectiveHorizontal
+                    ? { width: `${splitPercent}%` }
+                    : { width: '100%', height: `${splitPercent}%` }
               }
-              className={`border-border/60 flex min-h-[140px] min-w-[160px] flex-col overflow-hidden ${
-                isHorizontal ? 'border-b md:border-b-0' : 'border-b'
+              className={`border-border/60 flex min-h-[140px] min-w-[160px] flex-1 flex-col overflow-hidden ${
+                layout.showPreview === false
+                  ? ''
+                  : effectiveHorizontal
+                    ? 'border-r'
+                    : 'border-b'
               }`}
             >
               <FileTabs
@@ -355,47 +471,66 @@ export function ReactPlayground({
                   />
                 ) : (
                   <div className="text-muted-foreground flex h-full items-center justify-center text-xs">
-                    Không có file nào được chọn.
+                    No file selected.
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Draggable Resizer Gutter */}
-            <div
-              role="separator"
-              tabIndex={0}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setIsDraggingSplit(true);
-              }}
-              onDoubleClick={() => setSplitPercent(50)}
-              className={`group relative z-20 flex shrink-0 items-center justify-center transition-colors select-none ${
-                isHorizontal
-                  ? 'hover:bg-primary/50 bg-border/40 w-2 cursor-col-resize'
-                  : 'hover:bg-primary/50 bg-border/40 h-2 cursor-row-resize'
-              } ${isDraggingSplit ? 'bg-primary/70' : ''}`}
-              title="Kéo để chia tỷ lệ Editor / Preview (Nhấp đúp để đặt lại 50/50)"
-            >
+            {/* Draggable Resizer Gutter between Editor & Preview */}
+            {layout.showPreview !== false && (
               <div
-                className={`group-hover:bg-primary rounded-full bg-slate-500/50 transition-colors ${
-                  isHorizontal ? 'h-8 w-1' : 'h-1 w-8'
-                } ${isDraggingSplit ? 'bg-primary' : ''}`}
-              />
-            </div>
+                role="separator"
+                tabIndex={0}
+                aria-label="Resize Editor and Preview"
+                aria-orientation={effectiveHorizontal ? 'vertical' : 'horizontal'}
+                aria-valuemin={15}
+                aria-valuemax={85}
+                aria-valuenow={Math.round(splitPercent)}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  setIsDraggingSplit(true);
+                }}
+                onKeyDown={handleSeparatorKeyDown}
+                onDoubleClick={() => setSplitPercent(50)}
+                className={`group focus-visible:ring-primary bg-border/40 hover:bg-primary/50 relative z-20 flex shrink-0 touch-none items-center justify-center transition-colors select-none focus-visible:ring-2 focus-visible:outline-none ${
+                  effectiveHorizontal
+                    ? 'w-2 cursor-col-resize before:absolute before:inset-y-0 before:-right-4 before:-left-4'
+                    : 'h-2 cursor-row-resize before:absolute before:inset-x-0 before:-top-4 before:-bottom-4'
+                } ${isDraggingSplit ? 'bg-primary/70' : ''}`}
+                title="Drag to resize Editor / Preview (Double-click to reset 50/50)"
+              >
+                <div
+                  className={`group-hover:bg-primary rounded-full bg-slate-500/50 transition-colors ${
+                    effectiveHorizontal ? 'h-8 w-1' : 'h-1 w-8'
+                  } ${isDraggingSplit ? 'bg-primary' : ''}`}
+                />
+              </div>
+            )}
 
             {/* Preview & Console Section */}
             <div
               style={
-                isHorizontal
-                  ? { width: `calc(${100 - splitPercent}% - 8px)` }
-                  : { height: `calc(${100 - splitPercent}% - 8px)` }
+                layout.showPreview === false
+                  ? { display: 'none' }
+                  : effectiveHorizontal
+                    ? { width: `calc(${100 - splitPercent}% - 8px)` }
+                    : {
+                        width: '100%',
+                        height: `calc(${100 - splitPercent}% - 8px)`,
+                      }
               }
-              className={`relative flex min-h-[140px] min-w-[160px] flex-col overflow-hidden`}
+              className={`relative min-h-[140px] min-w-[160px] flex-col overflow-hidden ${
+                layout.showPreview === false ? 'hidden' : 'flex'
+              }`}
             >
               {/* Overlay during drag to prevent iframe from trapping mouse events */}
               {isDraggingSplit && (
-                <div className="absolute inset-0 z-50 cursor-col-resize bg-transparent select-none" />
+                <div
+                  className={`absolute inset-0 z-50 bg-transparent select-none ${
+                    effectiveHorizontal ? 'cursor-col-resize' : 'cursor-row-resize'
+                  }`}
+                />
               )}
 
               {/* Live Preview Area */}
@@ -408,7 +543,8 @@ export function ReactPlayground({
                   runtimeError={bridge.runtimeError}
                   compileErrors={compileErrors}
                   layout={layout}
-                  onReboot={bridge.rebootIframe}
+                  onReboot={retryRunner}
+                  onClosePreview={() => setShowPreview(false)}
                 />
               </div>
 
@@ -424,7 +560,7 @@ export function ReactPlayground({
           </div>
         </div>
 
-        {/* VS Code Bottom Status Bar */}
+        {/* Bottom Status Bar */}
         <div className="border-border/50 flex items-center justify-between border-t bg-slate-950 px-3 py-1 font-mono text-[10px] text-slate-400 select-none">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1 text-slate-300">
@@ -439,47 +575,20 @@ export function ReactPlayground({
                   ? 'TypeScript'
                   : 'JavaScript'}
             </span>
-            <button
-              type="button"
-              onClick={() => setSplitPercent(50)}
-              className="hover:text-primary hidden cursor-pointer text-slate-400 transition-colors sm:inline"
-              title="Nhấp để đặt lại tỷ lệ 50:50"
-            >
-              Tỷ lệ: {Math.round(splitPercent)}% : {Math.round(100 - splitPercent)}%
-            </button>
-            <button
-              type="button"
-              onClick={toggleConsole}
-              className={`hover:text-primary flex cursor-pointer items-center gap-1 transition-colors ${
-                layout.showConsole ? 'text-primary font-semibold' : 'text-slate-400'
-              }`}
-              title="Bật/Tắt Console Drawer"
-            >
-              <Terminal className="h-3 w-3" />
-              <span>
-                Console
-                {bridge.consoleLogs.length > 0 ? ` (${bridge.consoleLogs.length})` : ''}
-              </span>
-            </button>
           </div>
 
           <div className="flex items-center gap-3">
-            {bridge.runnerStatus === 'ready' && (
+            {compileErrors.length > 0 ? (
+              <span className="text-destructive font-semibold">
+                {compileErrors.length} error{compileErrors.length > 1 ? 's' : ''}
+              </span>
+            ) : (
               <span className="flex items-center gap-1 text-emerald-400">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                <span>Sandbox Live</span>
+                <CheckCircle2 className="h-3 w-3" />
+                <span>0 errors</span>
               </span>
             )}
-            <span className="hidden text-slate-500 sm:inline">Phím tắt: ⌘↵ Chạy</span>
-            {layout.isFullscreen && (
-              <button
-                type="button"
-                onClick={() => setIsFullscreen(false)}
-                className="text-slate-400 hover:text-slate-200"
-              >
-                [Esc để thoát]
-              </button>
-            )}
+            <span className="text-slate-500">React 19</span>
           </div>
         </div>
       </div>

@@ -147,7 +147,7 @@ export function ConsolePanel({ logs, onClear, className = '' }: ConsolePanelProp
       <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-3 py-1.5 font-mono text-xs">
         <div className="flex items-center gap-1.5 text-slate-400">
           <Terminal className="text-primary h-3.5 w-3.5" />
-          <span className="font-semibold text-slate-300">Console Logs</span>
+          <span className="font-semibold text-slate-300">Console</span>
           <span className="text-[10px] text-slate-500">({logs.length})</span>
         </div>
 
@@ -156,10 +156,10 @@ export function ConsolePanel({ logs, onClear, className = '' }: ConsolePanelProp
             type="button"
             onClick={onClear}
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
-            title="Xóa logs"
+            title="Clear console"
           >
             <Trash2 className="h-3 w-3" />
-            <span>Xóa</span>
+            <span>Clear</span>
           </button>
         )}
       </div>
@@ -170,9 +170,9 @@ export function ConsolePanel({ logs, onClear, className = '' }: ConsolePanelProp
         className="max-h-48 flex-1 space-y-1 overflow-y-auto p-2 font-mono text-xs"
       >
         {logs.length === 0 ? (
-          <div className="p-4 text-center text-[11px] text-slate-600 italic">
-            Chưa có console log nào. Sử dụng `console.log(...)` trong mã để xem kết quả
-            tại đây.
+          <div className="p-4 text-center text-[11px] text-slate-500 italic">
+            No console output yet. Use <code>console.log(...)</code> in your code to see
+            output here.
           </div>
         ) : (
           logs.map((log) => {

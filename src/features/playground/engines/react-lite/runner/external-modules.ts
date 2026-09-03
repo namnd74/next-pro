@@ -39,6 +39,8 @@ import {
   RefreshCw,
   Sun,
   Moon,
+  Server,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -81,6 +83,8 @@ export const WHITELISTED_LUCIDE_ICONS = {
   RefreshCw,
   Sun,
   Moon,
+  Server,
+  Zap,
 };
 
 export const PLAYGROUND_UI_COMPONENTS = {

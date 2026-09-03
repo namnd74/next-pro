@@ -54,7 +54,8 @@ export type RunnerToHostMessage =
           | 'ModuleResolutionError'
           | 'ModuleExecutionError'
           | 'ReactRenderError'
-          | 'AsyncRuntimeError';
+          | 'AsyncRuntimeError'
+          | 'RuntimeBootstrapError';
         message: string;
         stack?: string;
         file?: string;

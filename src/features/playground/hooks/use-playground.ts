@@ -46,31 +46,108 @@ export function usePlayground({
       }
     }
 
-    const normEntry = cleanVirtualPath(entryPath);
-    if (!files[normEntry]) {
-      const firstKey = Object.keys(files)[0] || '/App.tsx';
-      return {
-        files,
-        entryPath: firstKey,
-        activePath: firstKey,
-      };
+    if (platform === 'react-lite') {
+      if (files['/App.tsx'] && !files['/src/App.tsx']) {
+        files['/src/App.tsx'] = { ...files['/App.tsx'], path: '/src/App.tsx' };
+        delete files['/App.tsx'];
+      }
+      if (files['/styles.css'] && !files['/src/index.css']) {
+        files['/src/index.css'] = { ...files['/styles.css'], path: '/src/index.css' };
+        delete files['/styles.css'];
+      }
+      for (const [p, f] of Object.entries(files)) {
+        if (
+          p.startsWith('/components/') ||
+          p.startsWith('/data/') ||
+          p.startsWith('/hooks/') ||
+          p.startsWith('/utils/')
+        ) {
+          const np = `/src${p}`;
+          files[np] = { ...f, path: np };
+          delete files[p];
+        }
+      }
+      if (!files['/index.html']) {
+        files['/index.html'] = {
+          path: '/index.html',
+          content: `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NextPro React Studio</title>
+  </head>
+  <body>
+    <!-- Container DOM duy nhất của ứng dụng Single Page (SPA) -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>`,
+        };
+      }
+      if (!files['/src/main.tsx']) {
+        files['/src/main.tsx'] = {
+          path: '/src/main.tsx',
+          content: `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+
+// Trái tim khởi động: Tìm phần tử #root và kích hoạt chu kỳ render
+const rootElement = document.getElementById('root');
+
+if (rootElement) {
+  const root = ReactDOM.createRoot(rootElement);
+  root.render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+}`,
+        };
+      }
+      if (!files['/src/index.css']) {
+        files['/src/index.css'] = {
+          path: '/src/index.css',
+          content: '/* Custom playground styles */\n',
+        };
+      }
     }
+
+    let normEntry = cleanVirtualPath(entryPath);
+    if (files['/src/main.tsx']) {
+      normEntry = '/src/main.tsx';
+    } else if (!files[normEntry]) {
+      const firstKey = Object.keys(files)[0] || '/App.tsx';
+      normEntry = firstKey;
+    }
+
+    const defaultActive = files['/src/App.tsx']
+      ? '/src/App.tsx'
+      : files['/App.tsx']
+        ? '/App.tsx'
+        : normEntry;
 
     return {
       files,
       entryPath: normEntry,
-      activePath: normEntry,
+      activePath: defaultActive,
     };
   }, [initialFiles, entryPath]);
 
   const [project, setProject] = React.useState<PlaygroundProject>(
     normalizedInitialProject
   );
+  const projectRef = React.useRef(project);
+  React.useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
   const [layout, setLayout] = React.useState<PlaygroundLayoutConfig>({
     orientation: 'horizontal',
     viewport: 'desktop',
     showConsole: false,
     showSidebar: true,
+    showPreview: true,
     isFullscreen: false,
   });
 
@@ -85,6 +162,7 @@ export function usePlayground({
 
   const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const saveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const lastExecutedFilesRef = React.useRef<PlaygroundProject['files'] | null>(null);
 
   // Compute Delta & Visual Change Statuses
   const {
@@ -104,6 +182,8 @@ export function usePlayground({
 
   // Runner Bridge
   const bridge = useRunnerBridge();
+  const executeProjectInRunner = bridge.execute;
+  const rebootRunnerIframe = bridge.rebootIframe;
 
   // 1. Hydrate saved project from IndexedDB on mount with Virtual Overlay merge
   React.useEffect(() => {
@@ -122,14 +202,15 @@ export function usePlayground({
             normalizedInitialProject.files,
             savedDelta
           );
-          setProject({
+          const hydratedProject = {
             files: mergedFiles,
             entryPath: normalizedInitialProject.entryPath,
             activePath:
               savedDelta.activePath && mergedFiles[savedDelta.activePath]
                 ? savedDelta.activePath
                 : normalizedInitialProject.activePath,
-          });
+          };
+          setProject(hydratedProject);
         }
         if (isMounted) {
           const history = await getPlatformHistory(platform, scopeId);
@@ -150,7 +231,14 @@ export function usePlayground({
 
   // Trigger Compilation and Execution
   const runProject = React.useCallback(() => {
-    const result = compileVirtualProject(project.files, project.entryPath);
+    // Automatically ensure preview is visible when running
+    setLayout((prev) =>
+      prev.showPreview === false ? { ...prev, showPreview: true } : prev
+    );
+
+    const currentProject = projectRef.current;
+    lastExecutedFilesRef.current = currentProject.files;
+    const result = compileVirtualProject(currentProject.files, currentProject.entryPath);
 
     if (!result.success) {
       setCompileErrors(result.errors);
@@ -158,10 +246,16 @@ export function usePlayground({
     }
 
     setCompileErrors([]);
-    bridge.execute(project.entryPath, result.modules);
-  }, [project.files, project.entryPath, bridge]);
+    executeProjectInRunner(currentProject.entryPath, result.modules);
+  }, [executeProjectInRunner]);
 
   const hasInitialRunRef = React.useRef(false);
+
+  const retryRunner = React.useCallback(() => {
+    hasInitialRunRef.current = false;
+    lastExecutedFilesRef.current = null;
+    rebootRunnerIframe();
+  }, [rebootRunnerIframe]);
 
   // Initial Auto-run when iframe is ready and project is hydrated
   React.useEffect(() => {
@@ -170,6 +264,15 @@ export function usePlayground({
       runProject();
     }
   }, [bridge.isIframeReady, isHydrated, runProject]);
+
+  // Re-run when preview is unhidden to ensure fresh rendering
+  const prevShowPreviewRef = React.useRef(layout.showPreview);
+  React.useEffect(() => {
+    if (prevShowPreviewRef.current === false && layout.showPreview !== false) {
+      runProject();
+    }
+    prevShowPreviewRef.current = layout.showPreview;
+  }, [layout.showPreview, runProject]);
 
   // Debounced auto-save Delta to IndexedDB (Zero bloat)
   const triggerAutoSave = React.useCallback(
@@ -203,15 +306,23 @@ export function usePlayground({
     [platform, scopeId, enableAutoSave, isHydrated, normalizedInitialProject.files]
   );
 
-  // Debounced auto-run on file changes
-  const scheduleAutoRun = React.useCallback(() => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-    }
-    debounceTimerRef.current = setTimeout(() => {
-      runProject();
-    }, autoRunDebounceMs);
-  }, [runProject, autoRunDebounceMs]);
+  // Debounced auto-run on every project file mutation. Reading from projectRef
+  // guarantees the timer compiles the committed project instead of the render
+  // snapshot that scheduled it.
+  React.useEffect(() => {
+    if (!bridge.isIframeReady || !isHydrated || !hasInitialRunRef.current) return;
+    if (lastExecutedFilesRef.current === project.files) return;
+
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(runProject, autoRunDebounceMs);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+  }, [project.files, bridge.isIframeReady, isHydrated, runProject, autoRunDebounceMs]);
 
   // File Mutators
   const updateFileContent = React.useCallback(
@@ -235,10 +346,8 @@ export function usePlayground({
         triggerAutoSave(updated);
         return updated;
       });
-
-      scheduleAutoRun();
     },
-    [scheduleAutoRun, triggerAutoSave]
+    [triggerAutoSave]
   );
 
   const addFile = React.useCallback(
@@ -340,10 +449,8 @@ export function usePlayground({
         triggerAutoSave(updated);
         return updated;
       });
-
-      scheduleAutoRun();
     },
-    [normalizedInitialProject.files, triggerAutoSave, scheduleAutoRun]
+    [normalizedInitialProject.files, triggerAutoSave]
   );
 
   // Manual & Auto Snapshots
@@ -381,17 +488,17 @@ export function usePlayground({
         return updated;
       });
       bridge.clearLogs();
-      scheduleAutoRun();
     },
-    [triggerAutoSave, bridge, scheduleAutoRun]
+    [triggerAutoSave, bridge]
   );
 
   // Reset to original starter template
   const resetProject = React.useCallback(async () => {
     hasInitialRunRef.current = false;
+    lastExecutedFilesRef.current = null;
     setProject(normalizedInitialProject);
     bridge.clearLogs();
-    bridge.rebootIframe();
+    retryRunner();
 
     if (scopeId) {
       try {
@@ -402,7 +509,7 @@ export function usePlayground({
         console.warn('[usePlayground] Error resetting IndexedDB state:', err);
       }
     }
-  }, [normalizedInitialProject, bridge, platform, scopeId]);
+  }, [normalizedInitialProject, bridge, platform, scopeId, retryRunner]);
 
   const toggleConsole = React.useCallback(() => {
     setLayout((prev) => ({ ...prev, showConsole: !prev.showConsole }));
@@ -418,6 +525,14 @@ export function usePlayground({
 
   const setIsFullscreen = React.useCallback((isFullscreen: boolean) => {
     setLayout((prev) => ({ ...prev, isFullscreen }));
+  }, []);
+
+  const togglePreview = React.useCallback(() => {
+    setLayout((prev) => ({ ...prev, showPreview: prev.showPreview === false }));
+  }, []);
+
+  const setShowPreview = React.useCallback((showPreview: boolean) => {
+    setLayout((prev) => ({ ...prev, showPreview }));
   }, []);
 
   const setOrientation = React.useCallback((orientation: 'horizontal' | 'vertical') => {
@@ -462,8 +577,11 @@ export function usePlayground({
       setProject((prev) => ({ ...prev, activePath: cleanVirtualPath(path) })),
     resetProject,
     runProject,
+    retryRunner,
     toggleConsole,
     toggleSidebar,
+    togglePreview,
+    setShowPreview,
     toggleFullscreen,
     setIsFullscreen,
     setOrientation,

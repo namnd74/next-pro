@@ -84,13 +84,13 @@ export function TrackCard({ track }: TrackCardProps) {
             {isFullyCompleted ? (
               <Badge
                 variant="outline"
-                className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-xs text-emerald-500"
+                className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-xs font-semibold text-emerald-700 dark:text-emerald-400"
               >
                 <CheckCircle2 className="h-3 w-3" />
                 Completed
               </Badge>
             ) : (
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs font-medium">
                 {totalLessons} Lessons
               </Badge>
             )}
@@ -99,8 +99,13 @@ export function TrackCard({ track }: TrackCardProps) {
 
         {/* Title & Description */}
         <div className="space-y-1.5">
-          <h3 className="text-foreground group-hover:text-primary text-lg font-bold tracking-tight transition-colors">
-            {track.title}
+          <h3 className="text-foreground text-lg font-bold tracking-tight">
+            <Link
+              href={`/learn/${track.slug}`}
+              className="group-hover:text-primary focus-visible:ring-primary cursor-pointer rounded-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {track.title}
+            </Link>
           </h3>
           <p className="text-muted-foreground line-clamp-2 text-xs leading-relaxed">
             {track.description}

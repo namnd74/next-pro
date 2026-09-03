@@ -37,6 +37,8 @@ export interface InteractiveLabConfig {
   solutionFiles?: Record<string, string>;
 }
 
+export type LearningLesson = Lesson;
+
 export interface Lesson {
   id: string;
   slug: string;
