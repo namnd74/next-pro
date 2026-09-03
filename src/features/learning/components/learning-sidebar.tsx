@@ -4,7 +4,6 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  BookOpen,
   CheckCircle2,
   ChevronDown,
   Circle,
@@ -12,7 +11,6 @@ import {
   Code2,
   Layers,
   RotateCcw,
-  Sparkles,
 } from 'lucide-react';
 import type { LearningNavigationTrack } from '../types';
 import { REACT_SERIES_TRACK_SLUGS, NEXTJS_SERIES_TRACK_SLUGS } from '../data/curriculum';
