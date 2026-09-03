@@ -133,7 +133,7 @@ if (rootElement) {
       entryPath: normEntry,
       activePath: defaultActive,
     };
-  }, [initialFiles, entryPath]);
+  }, [initialFiles, entryPath, platform]);
 
   const [project, setProject] = React.useState<PlaygroundProject>(
     normalizedInitialProject
