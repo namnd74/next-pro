@@ -6,6 +6,7 @@
 
 - `architecture.md`: Database schemas, API endpoints, and authentication flows.
 - `tech-stack.md`: Core frameworks, versions, and environment variables.
+- `../../docs/studio-darkmode-contrast-ergonomics.md`: UI/UX Dark Mode contrast, APCA standards & learning ergonomics for Studio/Workbench.
 
 ## 🟢 Post-Mortems & Issue Solutions
 

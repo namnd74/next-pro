@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { LearningShell } from '@/features/learning/components/learning-shell';
-import { MOCK_LEARNING_TRACKS } from '@/features/learning/data/mock-courses';
+import { CURRICULUM_TRACKS } from '@/features/learning/data/curriculum';
 import type { LearningNavigationTrack } from '@/features/learning/types';
 
-const navigationTracks: LearningNavigationTrack[] = MOCK_LEARNING_TRACKS.map((track) => ({
+const navigationTracks: LearningNavigationTrack[] = CURRICULUM_TRACKS.map((track) => ({
   id: track.id,
   slug: track.slug,
   title: track.title,

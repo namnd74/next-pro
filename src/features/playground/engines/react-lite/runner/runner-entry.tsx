@@ -11,33 +11,46 @@ export function generateIframeSrcDoc(sessionId: string): string {
   <!-- Tailwind CSS -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   
-  <!-- Single-Instance React 19 & Zustand Import Map -->
-  <script type="importmap">
-  {
-    "imports": {
-      "react": "https://esm.sh/react@19.0.0",
-      "react/": "https://esm.sh/react@19.0.0/",
-      "react-dom": "https://esm.sh/react-dom@19.0.0",
-      "react-dom/": "https://esm.sh/react-dom@19.0.0/",
-      "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-      "zustand": "https://esm.sh/zustand@5.0.3",
-      "zustand/": "https://esm.sh/zustand@5.0.3/"
-    }
-  }
-  </script>
-
+  <!-- Single-Instance Unified React 19.2.8 & ReactDOM 19.2.8 Loader -->
   <script type="module">
-    import * as React from 'react';
-    import * as ReactDOMClient from 'react-dom/client';
-    import * as ReactDOM from 'react-dom';
-    import { create } from 'zustand';
+    try {
+      const [React, ReactDOM, ReactDOMClient] = await Promise.all([
+        import('https://esm.sh/react@19.2.8'),
+        import('https://esm.sh/react-dom@19.2.8'),
+        import('https://esm.sh/react-dom@19.2.8/client')
+      ]);
 
-    window.React = React;
-    window.ReactDOM = Object.assign({}, ReactDOM, ReactDOMClient, {
-      createRoot: ReactDOMClient.createRoot || ReactDOM.createRoot
-    });
-    window.Zustand = { create, default: { create } };
-    window.__REACT_19_READY__ = true;
+      const reactDefault = React.default || React;
+      const reactDomDefault = ReactDOM.default || ReactDOM;
+
+      window.React = reactDefault;
+      const rawCreateRoot = (ReactDOMClient && ReactDOMClient.createRoot) || reactDomDefault.createRoot;
+      window.ReactDOM = Object.assign({}, reactDomDefault, ReactDOMClient, {
+        createRoot: function(container, options) {
+          if (window.__REACT_ACTIVE_ROOT__) {
+            try { window.__REACT_ACTIVE_ROOT__.unmount(); } catch(e) {}
+            window.__REACT_ACTIVE_ROOT__ = null;
+          }
+          const root = rawCreateRoot.call(this, container, options);
+          window.__REACT_ACTIVE_ROOT__ = root;
+          return root;
+        }
+      });
+
+      try {
+        const { create } = await import('https://esm.sh/zustand@5.0.3');
+        window.Zustand = { create, default: { create } };
+      } catch (e) {
+        window.Zustand = { create: () => () => ({}) };
+      }
+
+      window.__REACT_RUNTIME_READY__ = true;
+      window.dispatchEvent(new Event('react-runtime-ready'));
+    } catch (err) {
+      console.error('Failed to load React 19.2.8:', err);
+      window.__REACT_RUNTIME_ERROR__ = err instanceof Error ? err.message : String(err);
+      window.dispatchEvent(new Event('react-runtime-error'));
+    }
   </script>
   
   <style>
@@ -63,14 +76,16 @@ export function generateIframeSrcDoc(sessionId: string): string {
   </style>
 </head>
 <body>
-  <div id="root">
-    <div style="display:flex;align-items:center;justify-content:center;min-height:160px;font-family:monospace;font-size:12px;color:#94a3b8;gap:8px;">
-      <div style="width:14px;height:14px;border:2px solid #38bdf8;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
-      <span>Đang khởi động React 19 Runtime...</span>
+  <div id="__user_html_wrapper__">
+    <div id="root">
+      <div style="display:flex;align-items:center;justify-content:center;min-height:160px;font-family:monospace;font-size:12px;color:#94a3b8;gap:8px;">
+        <div style="width:14px;height:14px;border:2px solid #38bdf8;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
+        <span>Đang khởi động React 19.2.8 Runtime...</span>
+      </div>
+      <style>
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      </style>
     </div>
-    <style>
-      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-    </style>
   </div>
 
   <script>
@@ -189,8 +204,17 @@ export function generateIframeSrcDoc(sessionId: string): string {
       console.warn = function() { const args = Array.from(arguments); originalConsole.warn.apply(console, args); sendLog('warn', args); };
       console.error = function() { const args = Array.from(arguments); originalConsole.error.apply(console, args); sendLog('error', args); };
 
-      // 4. Global Error Handlers
+      // 4. Global Error Handlers (Suppress masked cross-origin noise)
       window.onerror = function(message, source, lineno, colno, error) {
+        const msgStr = String(message || '');
+        if (
+          msgStr === 'Script error.' ||
+          msgStr === 'Script error' ||
+          msgStr.includes('ResizeObserver')
+        ) {
+          return true;
+        }
+
         if (currentRunId) {
           window.parent.postMessage({
             protocol: PROTOCOL,
@@ -199,7 +223,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
             type: 'ERROR',
             payload: {
               category: 'AsyncRuntimeError',
-              message: String(message),
+              message: msgStr,
               stack: error && error.stack ? error.stack : undefined,
               line: lineno
             }
@@ -209,8 +233,17 @@ export function generateIframeSrcDoc(sessionId: string): string {
       };
 
       window.onunhandledrejection = function(event) {
+        const reason = event.reason;
+        const reasonStr = reason instanceof Error ? reason.message : String(reason || '');
+        if (
+          reasonStr === 'Script error.' ||
+          reasonStr === 'Script error' ||
+          reasonStr.includes('ResizeObserver')
+        ) {
+          return;
+        }
+
         if (currentRunId) {
-          const reason = event.reason;
           window.parent.postMessage({
             protocol: PROTOCOL,
             sessionId: SESSION_ID,
@@ -218,7 +251,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
             type: 'ERROR',
             payload: {
               category: 'AsyncRuntimeError',
-              message: reason instanceof Error ? reason.message : String(reason),
+              message: reasonStr,
               stack: reason instanceof Error ? reason.stack : undefined
             }
           }, '*');
@@ -280,6 +313,10 @@ export function generateIframeSrcDoc(sessionId: string): string {
       LucideProxy.__esModule = true;
       LucideProxy.default = LucideProxy;
 
+      function withoutLeadingSlash(value) {
+        return value && value.charAt(0) === '/' ? value.slice(1) : value;
+      }
+
       // 6. Virtual CommonJS Module Loader
       function RunnerLoader(compiledModules, wrappedReact) {
         this.modules = compiledModules;
@@ -302,12 +339,52 @@ export function generateIframeSrcDoc(sessionId: string): string {
           return LucideProxy;
         }
 
+        if (specifier === 'next/server') {
+          return {
+            NextResponse: {
+              json: function(data, init) {
+                return {
+                  status: (init && init.status) || 200,
+                  json: async function() { return data; },
+                  text: async function() { return JSON.stringify(data); }
+                };
+              }
+            }
+          };
+        }
+        if (specifier === 'next/navigation') {
+          return {
+            useRouter: function() { return { push: function() {}, replace: function() {}, back: function() {} }; },
+            usePathname: function() { return '/'; },
+            useSearchParams: function() { return new URLSearchParams(); }
+          };
+        }
+        if (specifier === 'next/link') {
+          return {
+            default: function(props) {
+              return window.React.createElement('a', Object.assign({}, props, { href: props.href || '#' }), props.children);
+            }
+          };
+        }
+        if (specifier === 'next/image') {
+          return {
+            default: function(props) {
+              return window.React.createElement('img', Object.assign({}, props, { src: props.src || '' }));
+            }
+          };
+        }
+        if (specifier.startsWith('next/font')) {
+          return {
+            default: function() { return { className: 'font-sans' }; }
+          };
+        }
+
         const resolved = this.resolve(specifier, currentPath);
         if (this.cache.has(resolved)) {
           return this.cache.get(resolved).exports;
         }
 
-        const code = this.modules[resolved] ?? this.modules[resolved.replace(/^\\//, '')];
+        const code = this.modules[resolved] ?? this.modules[withoutLeadingSlash(resolved)];
         if (!code) {
           throw new Error("Cannot find module '" + specifier + "' imported from '" + currentPath + "'");
         }
@@ -342,7 +419,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
         }
         const norm = '/' + stack.join('/');
         const self = this;
-        const has = function(p) { return Boolean(self.modules[p] || self.modules[p.replace(/^\\//, '')]); };
+        const has = function(p) { return Boolean(self.modules[p] || self.modules[withoutLeadingSlash(p)]); };
         if (has(norm)) return norm;
         const exts = ['.tsx', '.ts', '.jsx', '.js', '.css', '/index.tsx', '/index.ts', '/index.jsx', '/index.js'];
         for (let j = 0; j < exts.length; j++) {
@@ -351,12 +428,12 @@ export function generateIframeSrcDoc(sessionId: string): string {
         return norm;
       };
 
-      // 7. Execution Function
+      // 7. Execution Function (Strict React 19 Single Instance)
       function executeProject(runId, entryPath, modules) {
         currentRunId = runId;
         logCount = 0;
 
-        if (!isRuntimeReady || !window.React || !window.ReactDOM) {
+        if (!isRuntimeReady || !window.React || !window.ReactDOM || !window.ReactDOM.createRoot) {
           pendingExecution = { runId, entryPath, modules };
           return;
         }
@@ -382,7 +459,14 @@ export function generateIframeSrcDoc(sessionId: string): string {
 
           const loader = new RunnerLoader(modules, wrappedReact);
 
-          // 1. Auto-evaluate all CSS modules in the project so styles apply immediately
+          // 1. Reconcile virtual CSS. A fresh loader runs each revision, so
+          // removing previous tags prevents deleted or renamed styles leaking.
+          const previousVirtualStyles = document.querySelectorAll('style[data-virtual-css]');
+          for (let s = 0; s < previousVirtualStyles.length; s++) {
+            previousVirtualStyles[s].remove();
+          }
+
+          // Auto-evaluate all CSS modules in the project
           for (const modPath in modules) {
             if (modPath.endsWith('.css') && modPath.startsWith('/')) {
               try {
@@ -393,23 +477,170 @@ export function generateIframeSrcDoc(sessionId: string): string {
             }
           }
 
+          // 1b. Reconcile index.html into the iframe DOM
+          const htmlModulePath = modules['/index.html'] ? '/index.html' : (modules['index.html'] ? 'index.html' : null);
+          if (htmlModulePath) {
+            try {
+              const htmlExports = loader.require(htmlModulePath, '');
+              const rawHtml = typeof htmlExports === 'string' ? htmlExports : (htmlExports && htmlExports.default ? htmlExports.default : '');
+              if (rawHtml && rawHtml.trim()) {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(rawHtml, 'text/html');
+
+                // 1. Reconcile <title>
+                if (doc.title) {
+                  document.title = doc.title;
+                }
+
+                // 2. Reconcile custom inline styles in head from index.html
+                const previousHtmlStyles = document.querySelectorAll('style[data-index-html-style]');
+                for (let s = 0; s < previousHtmlStyles.length; s++) {
+                  previousHtmlStyles[s].remove();
+                }
+                const headStyles = doc.head ? doc.head.querySelectorAll('style') : [];
+                for (let hs = 0; hs < headStyles.length; hs++) {
+                  const st = headStyles[hs];
+                  const newStyle = document.createElement('style');
+                  newStyle.setAttribute('data-index-html-style', 'true');
+                  newStyle.textContent = st.textContent;
+                  document.head.appendChild(newStyle);
+                }
+
+                // 3. Reconcile body markup and #root container
+                const parsedRoot = doc.body ? doc.body.querySelector('#root') : null;
+                if (!parsedRoot) {
+                  throw new Error("File 'index.html' bị thiếu thẻ <div id=\\"root\\"></div>. React không thể tìm thấy phần tử DOM để render ứng dụng.");
+                }
+
+                // Reconcile attributes on actual #root (e.g. class, style)
+                if (rootEl) {
+                  const existingAttrNames = Array.from(rootEl.attributes).map(function(a) { return a.name; });
+                  for (let ea = 0; ea < existingAttrNames.length; ea++) {
+                    const aName = existingAttrNames[ea];
+                    if (aName !== 'id' && !parsedRoot.hasAttribute(aName)) {
+                      rootEl.removeAttribute(aName);
+                    }
+                  }
+                  for (let pa = 0; pa < parsedRoot.attributes.length; pa++) {
+                    const attr = parsedRoot.attributes[pa];
+                    rootEl.setAttribute(attr.name, attr.value);
+                  }
+                }
+
+                // Reconcile elements before and after #root in __user_html_wrapper__
+                let wrapper = document.getElementById('__user_html_wrapper__');
+                if (!wrapper) {
+                  wrapper = document.createElement('div');
+                  wrapper.id = '__user_html_wrapper__';
+                  if (rootEl.parentNode) {
+                    rootEl.parentNode.insertBefore(wrapper, rootEl);
+                    wrapper.appendChild(rootEl);
+                  }
+                }
+
+                if (wrapper) {
+                  // Remove non-root children
+                  const children = Array.from(wrapper.childNodes);
+                  for (let c = 0; c < children.length; c++) {
+                    if (children[c] !== rootEl) {
+                      children[c].remove();
+                    }
+                  }
+
+                  // Insert parsed elements in order (ignoring script tags so the browser doesn't try network fetches)
+                  let reachedRoot = false;
+                  const bodyNodes = Array.from(doc.body.childNodes);
+                  for (let bn = 0; bn < bodyNodes.length; bn++) {
+                    const node = bodyNodes[bn];
+                    if (node.nodeType === 1 && node.tagName && node.tagName.toLowerCase() === 'script') {
+                      continue;
+                    }
+                    if (node.nodeType === 1 && node.id === 'root') {
+                      reachedRoot = true;
+                    } else if (!reachedRoot) {
+                      wrapper.insertBefore(node.cloneNode(true), rootEl);
+                    } else {
+                      wrapper.appendChild(node.cloneNode(true));
+                    }
+                  }
+                }
+              }
+            } catch (htmlErr) {
+              console.warn('Error applying index.html:', htmlErr);
+              throw htmlErr;
+            }
+          }
+
           // 2. Load Entry Component
-          const entryExports = loader.require(entryPath, '');
-          const RootComponent = entryExports.default || entryExports.App || entryExports;
-
-          if (!RootComponent || (typeof RootComponent !== 'function' && typeof RootComponent !== 'object')) {
-            throw new Error("File '" + entryPath + "' không export một React Component hợp lệ dưới dạng export default.");
+          let targetPath = entryPath;
+          if (targetPath.endsWith('layout.tsx') || targetPath.endsWith('layout.ts')) {
+            targetPath = '/app/page.tsx';
           }
 
-          if (!rootInstance) {
-            rootEl.innerHTML = '';
-            rootInstance = window.ReactDOM.createRoot(rootEl);
+          // If /src/main.tsx exists, it is ALWAYS the primary application bootstrap entry!
+          if (modules['/src/main.tsx'] || modules['src/main.tsx']) {
+            targetPath = modules['/src/main.tsx'] ? '/src/main.tsx' : 'src/main.tsx';
+          } else if (targetPath.endsWith('.html') || (!modules[targetPath] && !modules[withoutLeadingSlash(targetPath)])) {
+            if (modules['/src/App.tsx'] || modules['src/App.tsx']) {
+              targetPath = modules['/src/App.tsx'] ? '/src/App.tsx' : 'src/App.tsx';
+            } else if (modules['/App.tsx'] || modules['App.tsx']) {
+              targetPath = modules['/App.tsx'] ? '/App.tsx' : 'App.tsx';
+            } else {
+              targetPath = entryPath;
+            }
           }
 
-          const element = window.React.createElement(RootComponent);
-          rootInstance.render(element);
+          const entryExports = loader.require(targetPath, '');
+          let RootComponent = entryExports.default || entryExports.Page || entryExports.App;
 
-          // Announce Render Success immediately
+          // If entry is main.tsx and rendered into DOM or exported App:
+          if (!RootComponent) {
+            if (modules['/src/App.tsx'] || modules['src/App.tsx']) {
+              try {
+                const appExp = loader.require(modules['/src/App.tsx'] ? '/src/App.tsx' : 'src/App.tsx', '');
+                RootComponent = appExp.default || appExp.App || appExp;
+              } catch(e) {}
+            } else if (modules['/App.tsx'] || modules['App.tsx']) {
+              try {
+                const appExp = loader.require(modules['/App.tsx'] ? '/App.tsx' : 'App.tsx', '');
+                RootComponent = appExp.default || appExp.App || appExp;
+              } catch(e) {}
+            }
+          }
+
+          if (!RootComponent && rootEl.childNodes.length === 0 && !window.__REACT_ACTIVE_ROOT__) {
+            RootComponent = entryExports;
+          }
+
+          if (!RootComponent && rootEl.childNodes.length === 0 && !window.__REACT_ACTIVE_ROOT__) {
+            throw new Error("File '" + targetPath + "' không export một React Component hợp lệ dưới dạng export default.");
+          }
+
+          // Check if Root Layout exists
+          let LayoutComponent = null;
+          try {
+            if (modules['/app/layout.tsx'] || modules['app/layout.tsx']) {
+              const layoutExports = loader.require('/app/layout.tsx', '');
+              LayoutComponent = layoutExports.default || layoutExports.RootLayout;
+            }
+          } catch(e) {}
+
+          // If main.tsx did not create a root via ReactDOM.createRoot, fallback to manual rendering
+          if (!window.__REACT_ACTIVE_ROOT__ && RootComponent && (typeof RootComponent === 'function' || typeof RootComponent === 'object')) {
+            if (!rootInstance) {
+              rootEl.innerHTML = '';
+              rootInstance = window.ReactDOM.createRoot(rootEl);
+            }
+
+            let element = window.React.createElement(RootComponent);
+            if (LayoutComponent && typeof LayoutComponent === 'function' && RootComponent !== LayoutComponent) {
+              element = window.React.createElement(LayoutComponent, null, element);
+            }
+
+            rootInstance.render(element);
+          }
+
+          // Announce Render Success
           window.parent.postMessage({
             protocol: PROTOCOL,
             sessionId: SESSION_ID,
@@ -439,7 +670,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
         }
       }
 
-      // 8. Attach PostMessage Listener IMMEDIATELY
+      // 8. Attach PostMessage Listener
       window.addEventListener('message', function(event) {
         const data = event.data;
         if (!data || data.protocol !== PROTOCOL || data.sessionId !== SESSION_ID) {
@@ -454,6 +685,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
           if (isRuntimeReady) {
             executeProject(data.runId, data.entryPath, data.modules);
           } else {
+            currentRunId = data.runId;
             pendingExecution = data;
           }
         } else if (data.type === 'RESET') {
@@ -471,10 +703,11 @@ export function generateIframeSrcDoc(sessionId: string): string {
         }
       });
 
-      // 9. Asynchronous Polling for React & ReactDOM availability
+      // 9. Asynchronous Polling for Unified React 19.2.8 availability
       function bootstrapRuntime(attempts) {
         attempts = attempts || 0;
-        if (window.React && window.ReactDOM && window.ReactDOM.createRoot) {
+        if (window.__REACT_RUNTIME_READY__ === true && window.React && window.ReactDOM && window.ReactDOM.createRoot) {
+          if (isRuntimeReady) return;
           isRuntimeReady = true;
 
           const rootEl = document.getElementById('root');
@@ -487,24 +720,60 @@ export function generateIframeSrcDoc(sessionId: string): string {
             type: 'READY'
           }, '*');
 
-          // Execute any pending execution request immediately
+          // Execute pending request
           if (pendingExecution) {
             executeProject(pendingExecution.runId, pendingExecution.entryPath, pendingExecution.modules);
             pendingExecution = null;
           }
-        } else if (attempts < 150) {
-          // Poll every 20ms for up to 3 seconds
-          setTimeout(function() { bootstrapRuntime(attempts + 1); }, 20);
-        } else {
+          return;
+        }
+
+        if (window.__REACT_RUNTIME_ERROR__) {
+          window.parent.postMessage({
+            protocol: PROTOCOL,
+            sessionId: SESSION_ID,
+            runId: currentRunId || 'bootstrap',
+            type: 'ERROR',
+            payload: {
+              category: 'RuntimeBootstrapError',
+              message: 'Không thể tải React 19.2.8 Runtime: ' + window.__REACT_RUNTIME_ERROR__
+            }
+          }, '*');
           const rootEl = document.getElementById('root');
           if (rootEl) {
             rootEl.innerHTML = '<div style="padding:16px;background:#450a0a;border:1px solid #dc2626;color:#fecaca;font-family:monospace;border-radius:8px;font-size:12px;">' +
-              '<b>⚠️ Không thể tải React Runtime:</b> Vui lòng kiểm tra kết nối mạng hoặc tắt các extension chặn script CDN (AdBlocker/uBlock).</div>';
+              '<b>⚠️ Không thể tải React 19.2.8 Runtime:</b> ' + window.__REACT_RUNTIME_ERROR__ + '<br/>Vui lòng kiểm tra kết nối mạng hoặc tắt extension chặn CDN.</div>';
+          }
+          return;
+        }
+
+        if (attempts < 1000) {
+          setTimeout(function() { bootstrapRuntime(attempts + 1); }, 20);
+        } else {
+          window.parent.postMessage({
+            protocol: PROTOCOL,
+            sessionId: SESSION_ID,
+            runId: currentRunId || 'bootstrap',
+            type: 'ERROR',
+            payload: {
+              category: 'RuntimeBootstrapError',
+              message: 'Quá thời gian tải React 19.2.8 Runtime.'
+            }
+          }, '*');
+          const rootEl = document.getElementById('root');
+          if (rootEl) {
+            rootEl.innerHTML = '<div style="padding:16px;background:#450a0a;border:1px solid #dc2626;color:#fecaca;font-family:monospace;border-radius:8px;font-size:12px;">' +
+              '<b>⚠️ Quá thời gian tải React 19.2.8 Runtime:</b> Vui lòng kiểm tra kết nối mạng hoặc thử tải lại.</div>';
           }
         }
       }
 
-      // Start bootstrap
+      // Module scripts can finish after a slow cold CDN request. Events allow
+      // the runner to recover even if the defensive polling window elapsed.
+      window.addEventListener('react-runtime-ready', function() { bootstrapRuntime(0); });
+      window.addEventListener('react-runtime-error', function() { bootstrapRuntime(0); });
+
+      // Start bootstrap with a 20-second cold-load window.
       bootstrapRuntime(0);
     })();
   </script>

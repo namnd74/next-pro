@@ -102,8 +102,14 @@ export function resolveEffectiveFiles(
     }
   }
 
-  // 2. Overlay modified files
-  for (const [path, modifiedContent] of Object.entries(delta.modifiedFiles)) {
+  // 2. Overlay modified files (with backward compatibility mapping)
+  for (const [rawPath, modifiedContent] of Object.entries(delta.modifiedFiles)) {
+    let path = rawPath;
+    if (path === '/App.tsx' && effective['/src/App.tsx']) {
+      path = '/src/App.tsx';
+    } else if (path === '/styles.css' && effective['/src/index.css']) {
+      path = '/src/index.css';
+    }
     if (effective[path]) {
       effective[path] = { ...effective[path], content: modifiedContent };
     } else {
@@ -112,8 +118,12 @@ export function resolveEffectiveFiles(
   }
 
   // 3. Add user-created files
-  for (const [path, newFile] of Object.entries(delta.addedFiles)) {
-    effective[path] = newFile;
+  for (const [rawPath, newFile] of Object.entries(delta.addedFiles)) {
+    let path = rawPath;
+    if (path === '/App.tsx' && effective['/src/App.tsx']) {
+      path = '/src/App.tsx';
+    }
+    effective[path] = { ...newFile, path };
   }
 
   return effective;

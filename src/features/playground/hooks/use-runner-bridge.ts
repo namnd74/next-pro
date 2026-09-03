@@ -25,6 +25,8 @@ export function useRunnerBridge(options: UseRunnerBridgeOptions = {}) {
   const [runtimeError, setRuntimeError] = React.useState<string | null>(null);
 
   const currentRunIdRef = React.useRef<string>('');
+  const iframeReadyRef = React.useRef<boolean>(false);
+  const iframeFailedRef = React.useRef<boolean>(false);
   const watchdogTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const onStatusChangeRef = React.useRef(options.onStatusChange);
   React.useEffect(() => {
@@ -49,14 +51,25 @@ export function useRunnerBridge(options: UseRunnerBridgeOptions = {}) {
 
   const rebootIframe = React.useCallback(() => {
     clearWatchdog();
+    currentRunIdRef.current = '';
+    iframeReadyRef.current = false;
+    iframeFailedRef.current = false;
     setIsIframeReady(false);
+    setRuntimeError(null);
     setIframeKey((k) => k + 1);
     updateStatus('idle');
   }, [clearWatchdog, updateStatus]);
 
+  const lastExecutionRef = React.useRef<{
+    entryPath: string;
+    modules: Record<string, string>;
+  } | null>(null);
+
   // Execute project inside iframe
   const execute = React.useCallback(
     (entryPath: string, modules: Record<string, string>) => {
+      lastExecutionRef.current = { entryPath, modules };
+
       if (!iframeRef.current?.contentWindow) {
         return;
       }
@@ -81,7 +94,7 @@ export function useRunnerBridge(options: UseRunnerBridgeOptions = {}) {
         if (currentRunIdRef.current === runId) {
           updateStatus('timeout');
           setRuntimeError(
-            'Runner health timeout: Execution did not complete within 5000ms.'
+            `Runner health timeout: Execution did not complete within ${watchdogTimeoutMs}ms.`
           );
         }
       }, watchdogTimeoutMs);
@@ -103,8 +116,40 @@ export function useRunnerBridge(options: UseRunnerBridgeOptions = {}) {
 
       switch (data.type) {
         case 'READY': {
+          iframeReadyRef.current = true;
+          iframeFailedRef.current = false;
           setIsIframeReady(true);
+          setRuntimeError(null);
           updateStatus('ready');
+
+          // Auto-execute pending/last payload on iframe ready
+          if (lastExecutionRef.current && iframeRef.current?.contentWindow) {
+            const { entryPath, modules } = lastExecutionRef.current;
+            const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            currentRunIdRef.current = runId;
+            updateStatus('starting');
+
+            const message: HostToRunnerMessage = {
+              protocol: PLAYGROUND_PROTOCOL,
+              sessionId,
+              runId,
+              type: 'EXECUTE',
+              entryPath,
+              modules,
+            };
+
+            clearWatchdog();
+            watchdogTimerRef.current = setTimeout(() => {
+              if (currentRunIdRef.current === runId) {
+                updateStatus('timeout');
+                setRuntimeError(
+                  `Runner health timeout: Execution did not complete within ${watchdogTimeoutMs}ms.`
+                );
+              }
+            }, watchdogTimeoutMs);
+
+            iframeRef.current.contentWindow.postMessage(message, '*');
+          }
           break;
         }
         case 'RUN_START': {
@@ -126,7 +171,9 @@ export function useRunnerBridge(options: UseRunnerBridgeOptions = {}) {
           break;
         }
         case 'ERROR': {
-          if (data.runId === currentRunIdRef.current) {
+          const isBootstrapError = data.payload.category === 'RuntimeBootstrapError';
+          if (data.runId === currentRunIdRef.current || isBootstrapError) {
+            if (isBootstrapError) iframeFailedRef.current = true;
             clearWatchdog();
             updateStatus('error');
             setRuntimeError(data.payload.message);
@@ -142,7 +189,11 @@ export function useRunnerBridge(options: UseRunnerBridgeOptions = {}) {
 
     // Active PING interval until iframe is acknowledged
     const pingInterval = setInterval(() => {
-      if (iframeRef.current?.contentWindow) {
+      if (
+        !iframeReadyRef.current &&
+        !iframeFailedRef.current &&
+        iframeRef.current?.contentWindow
+      ) {
         iframeRef.current.contentWindow.postMessage(
           { protocol: PLAYGROUND_PROTOCOL, sessionId, type: 'PING' },
           '*'

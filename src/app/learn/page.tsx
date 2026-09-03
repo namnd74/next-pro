@@ -12,7 +12,7 @@ import { LearningCatalogView } from '@/features/learning/components/learning-cat
 import {
   REACT_SERIES_TRACKS,
   NEXTJS_SERIES_TRACKS,
-} from '@/features/learning/data/mock-courses';
+} from '@/features/learning/data/curriculum';
 import { Card } from '@/components/ui/card';
 
 export const metadata: Metadata = {
@@ -54,8 +54,12 @@ export default function LearnPage() {
         </h1>
         <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed sm:text-base">
           Tập trung vào 20% kiến trúc và API cốt lõi được sử dụng trong 80% dự án thực tế.
-          Được chia thành 2 Seri chuyên biệt: <b>Seri React Mastery</b> và{' '}
-          <b>Seri Next.js 16 Fullstack</b>.
+          Được chia thành 2 Seri chuyên biệt:{' '}
+          <strong className="text-foreground font-semibold">Seri React Mastery</strong> và{' '}
+          <strong className="text-foreground font-semibold">
+            Seri Next.js 16 Fullstack
+          </strong>
+          .
         </p>
       </section>
 
@@ -66,10 +70,14 @@ export default function LearnPage() {
 
       {/* Categorized Tracks Catalog */}
       <section className="space-y-4">
-        <LearningCatalogView
-          reactTracks={REACT_SERIES_TRACKS}
-          nextjsTracks={NEXTJS_SERIES_TRACKS}
-        />
+        <React.Suspense
+          fallback={<div className="bg-muted/10 h-96 animate-pulse rounded-2xl" />}
+        >
+          <LearningCatalogView
+            reactTracks={REACT_SERIES_TRACKS}
+            nextjsTracks={NEXTJS_SERIES_TRACKS}
+          />
+        </React.Suspense>
       </section>
 
       {/* Learning Methodology */}
@@ -82,7 +90,10 @@ export default function LearnPage() {
           {LEARNING_STEPS.map((step, index) => {
             const Icon = step.icon;
             return (
-              <Card key={step.title} className="glass-card space-y-2 p-5">
+              <Card
+                key={step.title}
+                className="glass-card glass-card-hover hover:border-primary/40 space-y-2 p-5 transition-all"
+              >
                 <div className="flex items-center gap-2">
                   <span className="text-primary font-mono text-xs font-extrabold">
                     {String(index + 1).padStart(2, '0')}

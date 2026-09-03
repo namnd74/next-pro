@@ -1,4 +1,5 @@
 export * from './types';
+export * from './data/curriculum';
 export * from './data/mock-courses';
 export * from './stores/use-learning-store';
 export * from './components/track-card';

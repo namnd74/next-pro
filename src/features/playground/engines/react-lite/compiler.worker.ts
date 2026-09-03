@@ -41,6 +41,20 @@ module.exports = {};`;
     return { code: jsCode };
   }
 
+  // 1b. Handle HTML files (static viewable files)
+  if (normalizedPath.endsWith('.html')) {
+    const jsCode = `module.exports = ${JSON.stringify(source)};`;
+    compileCache.set(normalizedPath, { source, code: jsCode });
+    return { code: jsCode };
+  }
+
+  // 1c. Handle JSON files
+  if (normalizedPath.endsWith('.json')) {
+    const jsCode = `module.exports = JSON.parse(${JSON.stringify(source)});`;
+    compileCache.set(normalizedPath, { source, code: jsCode });
+    return { code: jsCode };
+  }
+
   // 2. Handle JS/TS/JSX/TSX with Sucrase
   try {
     const result = transform(source, {

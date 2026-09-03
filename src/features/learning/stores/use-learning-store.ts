@@ -8,11 +8,13 @@ interface LearningState {
   streakDays: number;
   lastActiveDate: string;
   activeTrackId: string | null;
+  activeDomain: 'react' | 'nextjs';
 
   // Actions
   markLessonCompleted: (lessonId: string) => void;
   saveQuizResult: (lessonId: string, result: QuizResultRecord) => void;
   setActiveTrack: (trackId: string | null) => void;
+  setActiveDomain: (domain: 'react' | 'nextjs') => void;
   recordDailyActivity: () => void;
   resetProgress: () => void;
 }
@@ -25,6 +27,7 @@ export const useLearningStore = create<LearningState>()(
       streakDays: 1,
       lastActiveDate: new Date().toISOString().split('T')[0],
       activeTrackId: 'track-react-19',
+      activeDomain: 'react',
 
       markLessonCompleted: (lessonId) =>
         set((state) => ({
@@ -48,6 +51,7 @@ export const useLearningStore = create<LearningState>()(
       },
 
       setActiveTrack: (trackId) => set({ activeTrackId: trackId }),
+      setActiveDomain: (domain) => set({ activeDomain: domain }),
 
       recordDailyActivity: () => {
         const today = new Date().toISOString().split('T')[0];

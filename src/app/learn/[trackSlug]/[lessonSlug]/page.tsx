@@ -2,7 +2,7 @@ import * as React from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { LessonViewer } from '@/features/learning/components/lesson-viewer';
-import { MOCK_LEARNING_TRACKS } from '@/features/learning/data/mock-courses';
+import { CURRICULUM_TRACKS } from '@/features/learning/data/curriculum';
 
 interface LessonPageProps {
   params: Promise<{
@@ -12,7 +12,7 @@ interface LessonPageProps {
 }
 
 export function generateStaticParams() {
-  return MOCK_LEARNING_TRACKS.flatMap((track) =>
+  return CURRICULUM_TRACKS.flatMap((track) =>
     track.lessons.map((lesson) => ({
       trackSlug: track.slug,
       lessonSlug: lesson.slug,
@@ -22,7 +22,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: LessonPageProps): Promise<Metadata> {
   const { trackSlug, lessonSlug } = await params;
-  const track = MOCK_LEARNING_TRACKS.find((t) => t.slug === trackSlug);
+  const track = CURRICULUM_TRACKS.find((t) => t.slug === trackSlug);
   const lesson = track?.lessons.find((l) => l.slug === lessonSlug);
 
   if (!track || !lesson) return { title: 'Lesson Not Found | NextPro' };
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: LessonPageProps): Promise<Met
 
 export default async function LessonDetailPage({ params }: LessonPageProps) {
   const { trackSlug, lessonSlug } = await params;
-  const track = MOCK_LEARNING_TRACKS.find((t) => t.slug === trackSlug);
+  const track = CURRICULUM_TRACKS.find((t) => t.slug === trackSlug);
   const lesson = track?.lessons.find((l) => l.slug === lessonSlug);
 
   if (!track || !lesson) {

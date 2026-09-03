@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Loader2, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { Loader2, AlertTriangle, RefreshCcw, X } from 'lucide-react';
 import type { PlaygroundLayoutConfig, RunnerStatus } from '../types';
 import { generateIframeSrcDoc } from '../engines/react-lite';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ interface PreviewPanelProps {
   compileErrors: { path: string; message: string }[];
   layout: PlaygroundLayoutConfig;
   onReboot: () => void;
+  onClosePreview?: () => void;
 }
 
 export function PreviewPanel({
@@ -26,6 +27,7 @@ export function PreviewPanel({
   compileErrors,
   layout,
   onReboot,
+  onClosePreview,
 }: PreviewPanelProps) {
   const srcDoc = React.useMemo(() => generateIframeSrcDoc(sessionId), [sessionId]);
 
@@ -42,12 +44,26 @@ export function PreviewPanel({
 
   return (
     <div className="bg-background/50 relative flex h-full w-full flex-col items-center justify-center overflow-hidden">
+      {/* Hide Preview Close Button */}
+      {onClosePreview && (
+        <button
+          type="button"
+          onClick={onClosePreview}
+          className="border-border/70 bg-background/90 text-muted-foreground hover:bg-muted hover:text-foreground absolute top-2.5 right-2.5 z-30 flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-semibold shadow-xs backdrop-blur-md transition-colors"
+          title="Hide Preview (Code-only mode)"
+          aria-label="Hide Preview"
+        >
+          <X className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Hide Preview</span>
+        </button>
+      )}
+
       {/* Compile Errors Overlay */}
       {compileErrors.length > 0 && (
         <div className="border-destructive/40 bg-destructive/15 text-destructive absolute inset-x-3 top-3 z-20 rounded-xl border p-4 text-xs backdrop-blur-md">
           <div className="mb-1 flex items-center gap-1.5 font-bold">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            <span>Lỗi cú pháp (Compile Error)</span>
+            <span>Compile Error</span>
           </div>
           <ul className="list-disc space-y-1 pl-5 font-mono text-[11px]">
             {compileErrors.map((err, idx) => (
@@ -76,7 +92,7 @@ export function PreviewPanel({
             className="h-7 shrink-0 gap-1 border-rose-500/30 text-[11px] hover:bg-rose-500/20"
           >
             <RefreshCcw className="h-3 w-3" />
-            <span>Khởi động lại</span>
+            <span>Restart Runner</span>
           </Button>
         </div>
       )}
@@ -85,7 +101,7 @@ export function PreviewPanel({
       {(runnerStatus === 'compiling' || runnerStatus === 'starting') && (
         <div className="bg-background/80 text-muted-foreground border-border/40 absolute right-3 bottom-3 z-10 flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs shadow-sm backdrop-blur-sm">
           <Loader2 className="text-primary h-3.5 w-3.5 animate-spin" />
-          <span className="text-[11px]">Đang nạp preview...</span>
+          <span className="text-[11px]">Loading preview...</span>
         </div>
       )}
 

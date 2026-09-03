@@ -52,5 +52,6 @@ export interface PlaygroundLayoutConfig {
   viewport: 'desktop' | 'tablet' | 'mobile';
   showConsole: boolean;
   showSidebar: boolean;
+  showPreview?: boolean;
   isFullscreen: boolean;
 }

@@ -28,6 +28,7 @@ interface FileExplorerProps {
   onAddFile: (path: string) => void;
   onRenameFile: (oldPath: string, newPath: string) => void;
   onDeleteFile: (path: string) => void;
+  width?: number | string;
   className?: string;
 }
 
@@ -91,6 +92,7 @@ export function FileExplorer({
   onAddFile,
   onRenameFile,
   onDeleteFile,
+  width,
   className = '',
 }: FileExplorerProps) {
   const [isCreatingInFolder, setIsCreatingInFolder] = React.useState<string | null>(null);
@@ -128,7 +130,7 @@ export function FileExplorer({
     }));
   };
 
-  const handleStartRename = (path: string, e: React.MouseEvent) => {
+  const handleStartRename = (path: string, e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     setRenamingPath(path);
     const basename = path.substring(path.lastIndexOf('/') + 1);
@@ -206,25 +208,42 @@ export function FileExplorer({
         <div key={node.fullPath} className="space-y-0.5">
           {/* Folder Header Row */}
           <div
-            onClick={() => toggleFolder(node.fullPath)}
-            className="group flex cursor-pointer items-center justify-between rounded px-1.5 py-1 text-[11px] font-bold text-slate-300 transition-colors select-none hover:bg-slate-900/70"
+            className="group flex items-center justify-between rounded text-[11px] font-bold text-slate-300 transition-colors select-none hover:bg-slate-900/70"
             style={{ paddingLeft: `${depth * 10 + 6}px` }}
           >
-            <div className="flex items-center gap-1 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleFolder(node.fullPath)}
+              aria-expanded={isExpanded}
+              aria-label={`${isExpanded ? 'Collapse' : 'Expand'} folder ${node.name}`}
+              className="focus-visible:ring-primary flex min-h-11 min-w-0 flex-1 items-center gap-1 overflow-hidden rounded text-left focus-visible:ring-2 focus-visible:outline-none"
+            >
               {isExpanded ? (
-                <ChevronDown className="h-3 w-3 shrink-0 text-slate-500" />
+                <ChevronDown
+                  aria-hidden="true"
+                  className="h-3 w-3 shrink-0 text-slate-500"
+                />
               ) : (
-                <ChevronRight className="h-3 w-3 shrink-0 text-slate-500" />
+                <ChevronRight
+                  aria-hidden="true"
+                  className="h-3 w-3 shrink-0 text-slate-500"
+                />
               )}
               {isExpanded ? (
-                <FolderOpen className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                <FolderOpen
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 shrink-0 text-amber-400"
+                />
               ) : (
-                <Folder className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                <Folder
+                  aria-hidden="true"
+                  className="h-3.5 w-3.5 shrink-0 text-amber-400"
+                />
               )}
               <span className="truncate text-[11px] tracking-wider uppercase">
                 {node.name}
               </span>
-            </div>
+            </button>
 
             {/* Quick add file into this folder */}
             <button
@@ -233,10 +252,11 @@ export function FileExplorer({
                 e.stopPropagation();
                 handleStartCreate(node.fullPath);
               }}
-              className="rounded p-0.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-800 hover:text-slate-100"
-              title={`Thêm file vào ${node.name}/`}
+              className="focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 hover:bg-slate-800 hover:text-slate-100 focus:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+              title={`Add file to ${node.name}/`}
+              aria-label={`Add file to folder ${node.name}`}
             >
-              <Plus className="h-3 w-3" />
+              <Plus aria-hidden="true" className="h-3 w-3" />
             </button>
           </div>
 
@@ -253,6 +273,7 @@ export function FileExplorer({
                   <input
                     ref={createInputRef}
                     type="text"
+                    aria-label={`New file name in ${node.name}`}
                     placeholder="Component.tsx"
                     value={newFileName}
                     onChange={(e) => setNewFileName(e.target.value)}
@@ -265,16 +286,18 @@ export function FileExplorer({
                   <button
                     type="button"
                     onClick={handleConfirmCreate}
-                    className="text-emerald-400 hover:text-emerald-300"
+                    className="focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded text-emerald-400 hover:text-emerald-300 focus-visible:ring-2 focus-visible:outline-none"
+                    aria-label="Confirm create file"
                   >
-                    <Check className="h-3 w-3" />
+                    <Check aria-hidden="true" className="h-3 w-3" />
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsCreatingInFolder(null)}
-                    className="text-slate-400 hover:text-rose-400"
+                    className="focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 hover:text-rose-400 focus-visible:ring-2 focus-visible:outline-none"
+                    aria-label="Cancel"
                   >
-                    <X className="h-3 w-3" />
+                    <X aria-hidden="true" className="h-3 w-3" />
                   </button>
                 </div>
               )}
@@ -302,6 +325,7 @@ export function FileExplorer({
           <input
             ref={renameInputRef}
             type="text"
+            aria-label={`New name for ${node.name}`}
             value={renamingValue}
             onChange={(e) => setRenamingValue(e.target.value)}
             onKeyDown={(e) => {
@@ -313,16 +337,18 @@ export function FileExplorer({
           <button
             type="button"
             onClick={handleConfirmRename}
-            className="text-emerald-400"
+            className="focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded text-emerald-400 focus-visible:ring-2 focus-visible:outline-none"
+            aria-label="Confirm rename"
           >
-            <Check className="h-3 w-3" />
+            <Check aria-hidden="true" className="h-3 w-3" />
           </button>
           <button
             type="button"
             onClick={() => setRenamingPath(null)}
-            className="text-slate-400"
+            className="focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 focus-visible:ring-2 focus-visible:outline-none"
+            aria-label="Cancel rename"
           >
-            <X className="h-3 w-3" />
+            <X aria-hidden="true" className="h-3 w-3" />
           </button>
         </div>
       );
@@ -333,8 +359,7 @@ export function FileExplorer({
     return (
       <div
         key={node.fullPath}
-        onClick={() => onSelectFile(node.fullPath)}
-        className={`group flex cursor-pointer items-center justify-between rounded px-1.5 py-1 text-[11px] transition-colors select-none ${
+        className={`group flex items-center justify-between rounded text-[11px] transition-colors select-none ${
           isActive
             ? 'bg-primary/15 text-primary border-primary border-l-2 font-semibold'
             : status === 'modified'
@@ -345,14 +370,19 @@ export function FileExplorer({
         }`}
         style={{ paddingLeft: `${depth * 10 + 6}px` }}
       >
-        <div className="flex items-center gap-1.5 overflow-hidden text-ellipsis">
+        <button
+          type="button"
+          onClick={() => onSelectFile(node.fullPath)}
+          aria-current={isActive ? 'true' : undefined}
+          className="focus-visible:ring-primary flex min-h-11 min-w-0 flex-1 items-center gap-1.5 overflow-hidden rounded text-left text-ellipsis focus-visible:ring-2 focus-visible:outline-none"
+        >
           {getFileIcon(node.fullPath)}
           <span className="truncate">{node.name}</span>
 
           {status === 'modified' && (
             <span
               className="rounded bg-amber-500/20 px-1 text-[8px] font-bold text-amber-400"
-              title="File đã chỉnh sửa"
+              title="Modified"
             >
               M
             </span>
@@ -361,7 +391,7 @@ export function FileExplorer({
           {status === 'added' && (
             <span
               className="rounded bg-emerald-500/20 px-1 text-[8px] font-bold text-emerald-400"
-              title="File tự tạo mới"
+              title="Untracked"
             >
               U
             </span>
@@ -372,17 +402,18 @@ export function FileExplorer({
               main
             </span>
           )}
-        </div>
+        </button>
 
         {/* Action icons on hover */}
-        <div className="flex shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100">
+        <div className="flex shrink-0 items-center opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
           <button
             type="button"
             onClick={(e) => handleStartRename(node.fullPath, e)}
-            className="rounded p-0.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200"
-            title="Đổi tên file"
+            className="focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-800 hover:text-slate-200 focus:opacity-100 focus-visible:ring-2 focus-visible:outline-none"
+            title="Rename file"
+            aria-label={`Rename file ${node.name}`}
           >
-            <Edit3 className="h-3 w-3" />
+            <Edit3 aria-hidden="true" className="h-3 w-3" />
           </button>
 
           {!isEntry && (
@@ -392,10 +423,11 @@ export function FileExplorer({
                 e.stopPropagation();
                 onDeleteFile(node.fullPath);
               }}
-              className="rounded p-0.5 text-slate-400 transition-colors hover:bg-rose-950 hover:text-rose-400"
-              title="Xóa file"
+              className="focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 transition-colors hover:bg-rose-950 hover:text-rose-400 focus-visible:ring-2 focus-visible:outline-none"
+              title="Delete file"
+              aria-label={`Delete file ${node.name}`}
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 aria-hidden="true" className="h-3 w-3" />
             </button>
           )}
         </div>
@@ -403,31 +435,41 @@ export function FileExplorer({
     );
   };
 
+  const explorerStyle = width ? { width, minWidth: width, maxWidth: width } : undefined;
+
   return (
-    <div
-      className={`border-border/60 flex h-full w-56 flex-col border-r bg-slate-950/90 font-mono text-xs select-none ${className}`}
+    <nav
+      aria-label="Playground File Explorer"
+      style={explorerStyle}
+      className={`border-border/60 flex h-full ${width ? '' : 'w-56'} flex-col border-r bg-slate-950/90 font-mono text-xs select-none ${className}`}
     >
       {/* Explorer Header */}
       <div className="border-border/40 flex items-center justify-between border-b px-3 py-2 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
         <span className="flex items-center gap-1.5">
-          <Folder className="text-primary h-3.5 w-3.5" />
+          <Folder aria-hidden="true" className="text-primary h-3.5 w-3.5" />
           <span>Explorer</span>
         </span>
 
         <button
           type="button"
           onClick={() => handleStartCreate('/')}
-          className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
-          title="Tạo file mới ở thư mục gốc (src/)"
+          className="focus-visible:ring-primary flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:ring-2 focus-visible:outline-none"
+          title="New file in root (src/)"
+          aria-label="New file in root"
         >
-          <Plus className="h-3.5 w-3.5" />
+          <Plus aria-hidden="true" className="h-3.5 w-3.5" />
         </button>
       </div>
 
       {/* Recursive Folder & File Tree */}
       <div className="flex-1 space-y-0.5 overflow-y-auto p-1.5">
-        {renderTree(tree, 0)}
+        {Object.entries(tree.children)
+          .sort(([, a], [, b]) => {
+            if (a.isFolder === b.isFolder) return a.name.localeCompare(b.name);
+            return a.isFolder ? -1 : 1;
+          })
+          .map(([, childNode]) => renderTree(childNode, 0))}
       </div>
-    </div>
+    </nav>
   );
 }
