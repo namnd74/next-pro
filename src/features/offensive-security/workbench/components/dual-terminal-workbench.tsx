@@ -21,14 +21,13 @@ import type {
 } from '../types';
 import {
   createInitialVfsState,
-  executeBashCommand,
-} from '../engines/virtual-posix-engine';
-import { ENTERPRISE_CYBER_RANGE_SUBNET } from '../engines/virtual-network-engine';
+  executeHonestShellCommand,
+} from '../../fixtures/default-vfs-fixture';
+import { ENTERPRISE_CYBER_RANGE_SUBNET } from '../../fixtures/network-topology-fixture';
 import {
   playAlertSiren,
   playFootholdChime,
   playKeyPressSound,
-  playRootCompromisedChime,
   playSonarPing,
 } from '../engines/cyber-audio-engine';
 import { Badge } from '@/components/ui/badge';
@@ -159,7 +158,7 @@ export const DualTerminalWorkbench: React.FC<DualTerminalWorkbenchProps> = ({
       return;
     }
 
-    const result = executeBashCommand(trimmed, term1.vfs);
+    const result = executeHonestShellCommand(trimmed, term1.vfs);
 
     // Cross-host telemetry side-effect: If Attacker runs nmap/curl against 10.0.4.10, log to Terminal 2!
     if (trimmed.includes('10.0.4.10') || trimmed.includes('web01')) {
@@ -222,12 +221,7 @@ export const DualTerminalWorkbench: React.FC<DualTerminalWorkbenchProps> = ({
       return;
     }
 
-    const result = executeBashCommand(trimmed, term2.vfs);
-
-    // Check privilege escalation victory condition
-    if (result.stdout.includes('uid=0(root)') || trimmed === 'su root') {
-      if (!isAudioMuted) playRootCompromisedChime();
-    }
+    const result = executeHonestShellCommand(trimmed, term2.vfs);
 
     setTerm2((prev) => ({
       ...prev,
@@ -475,6 +469,7 @@ export const DualTerminalWorkbench: React.FC<DualTerminalWorkbenchProps> = ({
                 </span>
                 <input
                   type="text"
+                  data-testid="terminal-input"
                   value={term1.currentInput}
                   onChange={(e) => setTerm1({ ...term1, currentInput: e.target.value })}
                   onKeyDown={(e) => {
@@ -562,6 +557,7 @@ export const DualTerminalWorkbench: React.FC<DualTerminalWorkbenchProps> = ({
                 </span>
                 <input
                   type="text"
+                  data-testid="dual-terminal-input-2"
                   value={term2.currentInput}
                   onChange={(e) => setTerm2({ ...term2, currentInput: e.target.value })}
                   onKeyDown={(e) => {

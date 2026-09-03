@@ -10,15 +10,128 @@ import {
   Send,
   Sparkles,
 } from 'lucide-react';
-import type { HttpRequestState, HttpResponseState, WorkbenchConfig } from '../types';
-import {
-  createDefaultHttpRequest,
-  decodePacketLayers,
-  executeHttpRequest,
-  parseRawHeaders,
-} from '../engines/http-packet-engine';
+import type {
+  HttpRequestState,
+  HttpResponseState,
+  PacketHeaderInfo,
+  WorkbenchConfig,
+} from '../types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+
+export const DEFAULT_HTTP_REQUEST: HttpRequestState = {
+  method: 'GET',
+  url: '/api/v1/user/profile?id=3',
+  headers: [
+    { key: 'Host', value: 'api.corp.internal' },
+    { key: 'User-Agent', value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+    { key: 'Accept', value: 'application/json' },
+    { key: 'Authorization', value: 'Bearer token_user_3_operator' },
+  ],
+  rawHeaders:
+    'Host: api.corp.internal\n' +
+    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)\n' +
+    'Accept: application/json\n' +
+    'Authorization: Bearer token_user_3_operator',
+  body: '',
+};
+
+function parseRawHeaders(raw: string): Array<{ key: string; value: string }> {
+  const lines = raw.split('\n').filter(Boolean);
+  const result: Array<{ key: string; value: string }> = [];
+  for (const line of lines) {
+    const colonIdx = line.indexOf(':');
+    if (colonIdx > 0) {
+      result.push({
+        key: line.substring(0, colonIdx).trim(),
+        value: line.substring(colonIdx + 1).trim(),
+      });
+    }
+  }
+  return result;
+}
+
+function decodePacketLayers(req: HttpRequestState): PacketHeaderInfo[] {
+  return [
+    {
+      layer: 'Ethernet',
+      title: 'Layer 2: Data Link (Ethernet II Frame)',
+      fields: [
+        {
+          name: 'Destination MAC',
+          value: '52:54:00:12:34:56',
+          description: 'Default Gateway Interface',
+        },
+        {
+          name: 'Source MAC',
+          value: '00:16:3e:aa:bb:cc',
+          description: 'Operator Workstation NIC',
+        },
+        {
+          name: 'EtherType',
+          value: '0x0800 (IPv4)',
+          description: 'Encapsulated Network Layer Protocol',
+        },
+      ],
+    },
+    {
+      layer: 'IPv4',
+      title: 'Layer 3: Network (Internet Protocol Version 4)',
+      fields: [
+        {
+          name: 'Source IP',
+          value: '10.0.4.15',
+          description: 'Client IP on Internal Subnet',
+        },
+        {
+          name: 'Destination IP',
+          value: '10.0.4.1',
+          description: 'Target Web API Server',
+        },
+        {
+          name: 'TTL (Time to Live)',
+          value: '64',
+          description: 'Hop limit counter before discard',
+        },
+        { name: 'Protocol', value: '6 (TCP)', description: 'Transport Layer Protocol' },
+      ],
+    },
+    {
+      layer: 'TCP',
+      title: 'Layer 4: Transport (Transmission Control Protocol)',
+      fields: [
+        {
+          name: 'Source Port',
+          value: '54128',
+          description: 'Ephemeral Dynamic Client Port',
+        },
+        {
+          name: 'Destination Port',
+          value: '80 (HTTP) / 443 (HTTPS)',
+          description: 'Standard Web Port',
+        },
+        {
+          name: 'Flags',
+          value: '[PSH, ACK]',
+          description: 'Push Data and Acknowledgment Active',
+        },
+      ],
+    },
+    {
+      layer: 'Application',
+      title: 'Layer 7: Application (HyperText Transfer Protocol)',
+      fields: [
+        { name: 'Request Method', value: req.method, description: 'REST Action Verb' },
+        { name: 'Request Path', value: req.url, description: 'Target Endpoint URI' },
+        {
+          name: 'Header Count',
+          value: `${req.headers.length} headers`,
+          description: 'HTTP Header Metadata',
+        },
+      ],
+    },
+  ];
+}
 
 interface HttpRepeaterViewProps {
   config: WorkbenchConfig;
@@ -30,7 +143,7 @@ export const HttpRepeaterView: React.FC<HttpRepeaterViewProps> = ({
   onExecution,
 }) => {
   const [request, setRequest] = React.useState<HttpRequestState>(
-    () => config.initialHttpRequest || createDefaultHttpRequest()
+    () => config.initialHttpRequest || DEFAULT_HTTP_REQUEST
   );
   const [response, setResponse] = React.useState<HttpResponseState | null>(null);
   const [activeTab, setActiveTab] = React.useState<'response' | 'packet'>('response');
@@ -41,13 +154,30 @@ export const HttpRepeaterView: React.FC<HttpRepeaterViewProps> = ({
       ...request,
       headers: parsedHeaders,
     };
-    const res = executeHttpRequest(updatedReq);
-    setResponse(res);
-    onExecution?.(res, updatedReq);
+    const isBypass = parsedHeaders.some(
+      (h) =>
+        h.key.toLowerCase() === 'x-forwarded-for' &&
+        (h.value === '127.0.0.1' || h.value === 'localhost')
+    );
+    const mockRes: HttpResponseState = {
+      statusCode: isBypass ? 200 : 403,
+      statusText: isBypass ? 'OK' : 'Forbidden',
+      headers: {
+        'Content-Type': 'application/json',
+        Server: 'mock-preview/1.0',
+      },
+      body: isBypass
+        ? JSON.stringify({ status: 'ACCESS_GRANTED', role: 'admin_preview' }, null, 2)
+        : JSON.stringify({ error: 'ACCESS_DENIED', reason: 'Untrusted origin' }, null, 2),
+      contentType: 'application/json',
+      durationMs: 12,
+    };
+    setResponse(mockRes);
+    onExecution?.(mockRes, updatedReq);
   };
 
   const handleReset = (): void => {
-    const fresh = config.initialHttpRequest || createDefaultHttpRequest();
+    const fresh = config.initialHttpRequest || DEFAULT_HTTP_REQUEST;
     setRequest(fresh);
     setResponse(null);
   };

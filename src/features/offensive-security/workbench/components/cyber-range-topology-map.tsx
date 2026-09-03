@@ -13,7 +13,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import type { CyberRangeHost, HostCompromiseStatus } from '../types';
-import { ENTERPRISE_CYBER_RANGE_SUBNET } from '../engines/virtual-network-engine';
+import { ENTERPRISE_CYBER_RANGE_SUBNET } from '../../fixtures/network-topology-fixture';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
