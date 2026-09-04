@@ -29,7 +29,7 @@ async function collectJsonFiles(dir) {
   return found;
 }
 
-function resolveRuntimeMode(trackId, lessonId) {
+function resolveRuntimeMode(trackId, _lessonId) {
   if (trackId.startsWith('os00-')) return 'decision-lab';
   if (trackId.startsWith('os01-')) return 'telemetry-inspector';
   if (trackId.startsWith('os02-')) return 'telemetry-inspector';

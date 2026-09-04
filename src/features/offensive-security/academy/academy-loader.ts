@@ -42,6 +42,14 @@ import otSafetyAndCapstoneData from '../data/academy/os11-iot-firmware-hardware/
 import aiThreatModelAndInjectionData from '../data/academy/os12-ai-agentic-security/ai-threat-model-and-injection.json';
 import toolsRagIdentityData from '../data/academy/os12-ai-agentic-security/tools-rag-identity.json';
 import aiSupplyChainAndCapstoneData from '../data/academy/os12-ai-agentic-security/ai-supply-chain-and-capstone.json';
+import researchSurfaceSourceAuditData from '../data/academy/os13-vulnerability-research/research-surface-source-audit.json';
+import fuzzingCrashTriageData from '../data/academy/os13-vulnerability-research/fuzzing-crash-triage.json';
+import rootCauseVariantsPatchesData from '../data/academy/os13-vulnerability-research/root-cause-variants-patches.json';
+import cveCweCvssDisclosureData from '../data/academy/os13-vulnerability-research/cve-cwe-cvss-disclosure.json';
+import memoryAssemblyExecutablesData from '../data/academy/os14-reverse-engineering/memory-assembly-executables.json';
+import staticDynamicDebuggingData from '../data/academy/os14-reverse-engineering/static-dynamic-debugging.json';
+import memoryFailuresAndMitigationsData from '../data/academy/os14-reverse-engineering/memory-failures-and-mitigations.json';
+import malwareBehaviorAnalysisData from '../data/academy/os15-malware-c2-emulation/malware-behavior-analysis.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -219,6 +227,28 @@ export const TOOLS_RAG_IDENTITY_MODULE = parseAcademyModule(toolsRagIdentityData
 export const AI_SUPPLY_CHAIN_AND_CAPSTONE_MODULE = parseAcademyModule(
   aiSupplyChainAndCapstoneData
 );
+export const RESEARCH_SURFACE_SOURCE_AUDIT_MODULE = parseAcademyModule(
+  researchSurfaceSourceAuditData
+);
+export const FUZZING_CRASH_TRIAGE_MODULE = parseAcademyModule(fuzzingCrashTriageData);
+export const ROOT_CAUSE_VARIANTS_PATCHES_MODULE = parseAcademyModule(
+  rootCauseVariantsPatchesData
+);
+export const CVE_CWE_CVSS_DISCLOSURE_MODULE = parseAcademyModule(
+  cveCweCvssDisclosureData
+);
+export const MEMORY_ASSEMBLY_EXECUTABLES_MODULE = parseAcademyModule(
+  memoryAssemblyExecutablesData
+);
+export const STATIC_DYNAMIC_DEBUGGING_MODULE = parseAcademyModule(
+  staticDynamicDebuggingData
+);
+export const MEMORY_FAILURES_AND_MITIGATIONS_MODULE = parseAcademyModule(
+  memoryFailuresAndMitigationsData
+);
+export const MALWARE_BEHAVIOR_ANALYSIS_MODULE = parseAcademyModule(
+  malwareBehaviorAnalysisData
+);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
@@ -265,6 +295,14 @@ export const ACADEMY_MODULES: AcademyModule[] = [
   AI_THREAT_MODEL_AND_INJECTION_MODULE,
   TOOLS_RAG_IDENTITY_MODULE,
   AI_SUPPLY_CHAIN_AND_CAPSTONE_MODULE,
+  RESEARCH_SURFACE_SOURCE_AUDIT_MODULE,
+  FUZZING_CRASH_TRIAGE_MODULE,
+  ROOT_CAUSE_VARIANTS_PATCHES_MODULE,
+  CVE_CWE_CVSS_DISCLOSURE_MODULE,
+  MEMORY_ASSEMBLY_EXECUTABLES_MODULE,
+  STATIC_DYNAMIC_DEBUGGING_MODULE,
+  MEMORY_FAILURES_AND_MITIGATIONS_MODULE,
+  MALWARE_BEHAVIOR_ANALYSIS_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {

@@ -16,6 +16,8 @@ Run every proposed change against this senior developer checklist before complet
 
 - [ ] Are existing function signatures and export contracts preserved?
 - [ ] Do all calling sites remain compatible with modified parameters?
+- [ ] **Anti-Tautology Audit**: Are verification harnesses executing live subprocesses/sockets rather than checking hardcoded in-memory fixture objects?
+- [ ] Are cryptographic receipts backed by dynamic execution hashes, not static declarations?
 
 ## 3. Performance & Memory Audit
 

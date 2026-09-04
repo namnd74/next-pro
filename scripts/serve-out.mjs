@@ -25,7 +25,14 @@ const server = http.createServer((req, res) => {
   let reqPath = req.url ? decodeURIComponent(req.url.split('?')[0]) : '/';
   if (reqPath === '/') reqPath = '/index.html';
 
-  const filePath = path.join(OUT_DIR, reqPath);
+  // Resolution 0: Vendor packages for in-browser probes
+  if (reqPath.startsWith('/vendor/@webcontainer/api/')) {
+    const subPath = reqPath.replace('/vendor/@webcontainer/api/', '');
+    const fullPath = path.resolve(__dirname, '../node_modules/@webcontainer/api/dist', subPath);
+    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+      return serveFile(fullPath, res);
+    }
+  }
 
   // Resolution 1: Direct file
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
@@ -57,7 +64,11 @@ const server = http.createServer((req, res) => {
 function serveFile(filePath, res) {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': contentType });
+  res.writeHead(200, {
+    'Content-Type': contentType,
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
+  });
   fs.createReadStream(filePath).pipe(res);
 }
 

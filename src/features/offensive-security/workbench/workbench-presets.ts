@@ -2,77 +2,88 @@ import type { AcademyLesson } from '../academy/types';
 import type { WorkbenchConfig } from './types';
 import { createDefaultVfs } from '../fixtures/default-vfs-fixture';
 
-export const WORKBENCH_PRESETS: Record<string, WorkbenchConfig> = {
-  // Preset 1: Linux Permissions & SUID Hardening (Track 02 - Lesson 14)
-  'os02-l14-posix-permissions-mode-bits-umask': {
-    id: 'os02-l14-live-lab',
-    lessonId: 'os02-l14-posix-permissions-mode-bits-umask',
-    title: 'Phòng thực hành Terminal: Hardening Phân Quyền POSIX & SUID',
-    summary:
-      'Thực hành thao tác lệnh thật trên cây thư mục Linux ảo: kiểm tra quyền /etc/shadow, thu hồi quyền ghi nguy hiểm và hardening file hệ thống.',
-    mode: 'terminal',
-    availableModes: ['terminal', 'telemetry'],
-    instructions: [
-      '1. Dùng lệnh `ls -l /etc/shadow` để kiểm tra phân quyền hiện tại.',
-      '2. File `/etc/shadow` hiện đang bị cấu hình lỏng lẻo. Hãy dùng lệnh `chmod 600 /etc/shadow` hoặc `chmod 640 /etc/shadow` để bảo vệ dữ liệu mật khẩu.',
-      '3. Dùng lệnh `find / -perm -4000` để tìm tất cả các file có gắn cờ SUID trên hệ thống.',
-      '4. Đọc nội dung ghi chú trong `/home/operator/notes.txt` bằng lệnh `cat`.',
-    ],
-    initialVfs: (() => {
-      const vfs = createDefaultVfs();
-      if (vfs.children.etc?.type === 'dir' && vfs.children.etc.children.shadow) {
-        vfs.children.etc.children.shadow.mode = 0o666; // Intentionally misconfigured for lab
-      }
-      return vfs;
-    })(),
-    sampleCommands: [
-      'ls -l /etc/shadow',
-      'chmod 600 /etc/shadow',
-      'chmod 640 /etc/shadow',
-      'find / -perm -4000 2>/dev/null',
-      'cat /home/operator/notes.txt',
-    ],
-    objectives: [
-      {
-        id: 'obj-check-shadow',
-        title: 'Kiểm tra quyền truy cập của /etc/shadow',
-        description:
-          'Chạy lệnh kiểm tra file /etc/shadow để phát hiện lỗ hổng phân quyền.',
-        hint: 'Gõ `ls -l /etc/shadow` trong terminal.',
-        isComplete: ({ lastCommand }) =>
-          !!lastCommand &&
-          lastCommand.includes('ls') &&
-          lastCommand.includes('/etc/shadow'),
-      },
-      {
-        id: 'obj-harden-shadow',
-        title: 'Hardening phân quyền /etc/shadow (Mode 0600 hoặc 0640)',
-        description: 'Thu hồi quyền đọc/ghi của thế giới ngoài bằng lệnh chmod.',
-        hint: 'Gõ `chmod 600 /etc/shadow` hoặc `chmod 640 /etc/shadow`.',
-        isComplete: ({ vfs }) => {
-          if (!vfs) return false;
-          const etc = vfs.root.children.etc;
-          if (etc && etc.type === 'dir') {
-            const shadow = etc.children.shadow;
-            if (shadow && shadow.type === 'file') {
-              const modeBits = shadow.mode & 0o777;
-              return modeBits === 0o600 || modeBits === 0o640;
-            }
+const linuxPermissionsPreset: WorkbenchConfig = {
+  id: 'os02-l15-live-lab',
+  lessonId: 'os02-l15-permission-bits-and-special-modes',
+  title:
+    'Phòng thực hành Terminal: Hardening Phân Quyền POSIX & SUID (Mô Phỏng / Telemetry Inspector)',
+  summary:
+    'Thực hành khảo sát phân quyền DAC, cờ SUID/SGID và hardening logic. Lưu ý: Phiên bản in-browser hoạt động như một công cụ khảo sát mô phỏng (xem ADR-001). Thực thi kernel Linux thực thụ yêu cầu môi trường container hoặc VM ngoài.',
+  mode: 'terminal',
+  availableModes: ['terminal', 'telemetry'],
+  instructions: [
+    '1. Dùng lệnh `ls -l /etc/shadow` để kiểm tra phân quyền hiện tại.',
+    '2. File `/etc/shadow` hiện đang bị cấu hình lỏng lẻo. Hãy dùng lệnh `chmod 600 /etc/shadow` hoặc `chmod 640 /etc/shadow` để bảo vệ dữ liệu mật khẩu.',
+    '3. Dùng lệnh `find / -perm -4000` để tìm tất cả các file có gắn cờ SUID trên hệ thống.',
+    '4. Đọc nội dung ghi chú trong `/home/operator/notes.txt` bằng lệnh `cat`.',
+  ],
+  initialVfs: (() => {
+    const vfs = createDefaultVfs();
+    if (vfs.children.etc?.type === 'dir' && vfs.children.etc.children.shadow) {
+      vfs.children.etc.children.shadow.mode = 0o666; // Intentionally misconfigured for lab
+    }
+    return vfs;
+  })(),
+  sampleCommands: [
+    'ls -l /etc/shadow',
+    'chmod 600 /etc/shadow',
+    'chmod 640 /etc/shadow',
+    'find / -perm -4000 2>/dev/null',
+    'cat /home/operator/notes.txt',
+  ],
+  objectives: [
+    {
+      id: 'obj-check-shadow',
+      title: 'Kiểm tra quyền truy cập của /etc/shadow',
+      description: 'Chạy lệnh kiểm tra file /etc/shadow để phát hiện lỗ hổng phân quyền.',
+      hint: 'Gõ `ls -l /etc/shadow` trong terminal.',
+      isComplete: ({ lastCommand }) =>
+        !!lastCommand &&
+        lastCommand.includes('ls') &&
+        lastCommand.includes('/etc/shadow'),
+    },
+    {
+      id: 'obj-harden-shadow',
+      title: 'Hardening phân quyền /etc/shadow (Mode 0600 hoặc 0640)',
+      description: 'Thu hồi quyền đọc/ghi của thế giới ngoài bằng lệnh chmod.',
+      hint: 'Gõ `chmod 600 /etc/shadow` hoặc `chmod 640 /etc/shadow`.',
+      isComplete: ({ vfs, lastCommand }) => {
+        if (
+          lastCommand &&
+          (lastCommand.includes('chmod 600 /etc/shadow') ||
+            lastCommand.includes('chmod 640 /etc/shadow'))
+        ) {
+          return true;
+        }
+        if (!vfs) return false;
+        const etc = vfs.root.children.etc;
+        if (etc && etc.type === 'dir') {
+          const shadow = etc.children.shadow;
+          if (shadow && shadow.type === 'file') {
+            const modeBits = shadow.mode & 0o777;
+            return modeBits === 0o600 || modeBits === 0o640;
           }
-          return false;
-        },
+        }
+        return false;
       },
-      {
-        id: 'obj-audit-suid',
-        title: 'Audit danh sách nhị phân SUID trên toàn hệ thống',
-        description:
-          'Sử dụng lệnh find để liệt kê các file thực thi có cờ SUID (-perm -4000).',
-        hint: 'Gõ `find / -perm -4000` trong terminal.',
-        isComplete: ({ lastCommand }) =>
-          !!lastCommand && lastCommand.includes('find') && lastCommand.includes('-perm'),
-      },
-    ],
-  },
+    },
+    {
+      id: 'obj-audit-suid',
+      title: 'Audit danh sách nhị phân SUID trên toàn hệ thống',
+      description:
+        'Sử dụng lệnh find để liệt kê các file thực thi có cờ SUID (-perm -4000).',
+      hint: 'Gõ `find / -perm -4000` trong terminal.',
+      isComplete: ({ lastCommand }) =>
+        !!lastCommand && lastCommand.includes('find') && lastCommand.includes('-perm'),
+    },
+  ],
+};
+
+export const WORKBENCH_PRESETS: Record<string, WorkbenchConfig> = {
+  // Preset 1: Linux Permissions & SUID Hardening (Track 02 - Lesson 15)
+  'os02-l15-permission-bits-and-special-modes': linuxPermissionsPreset,
+  'permission-bits-and-special-modes': linuxPermissionsPreset,
+  'os02-l14-posix-permissions-mode-bits-umask': linuxPermissionsPreset,
 
   // Preset 2: Operator Scripting & Log Analysis Pipeline (Track 04 - Lesson 25)
   'os04-l25-bash-one-liners-pipelines-awk-sed': {
@@ -336,9 +347,9 @@ export const WORKBENCH_PRESETS: Record<string, WorkbenchConfig> = {
     id: 'os06-l49-live-blacksky-full-killchain',
     lessonId: 'os06-l49-blind-network-reconnaissance-and-initial-foothold',
     title:
-      'Chiến dịch Đột kích Doanh nghiệp: Operation BlackSky (Full Killchain Pentest)',
+      'Chiến dịch Đột kích Doanh nghiệp: Operation BlackSky (Cyber Range Simulation Lab)',
     summary:
-      'Trải nghiệm trọn vẹn quy trình xâm nhập mục tiêu doanh nghiệp thực chiến từ số 0: Network Recon, Directory Fuzzing, API Leaks, SSH Foothold, Local Enumeration, GTFOBins Privilege Escalation và Chiếm quyền Root.',
+      'Khảo sát 8 giai đoạn xâm nhập mục tiêu doanh nghiệp (Recon, Fuzzing, API Leaks, Foothold, PrivEsc, Root). Lưu ý: Môi trường in-browser đóng vai trò giả lập điều hướng chiến dịch (Cyber Range Simulation) theo ADR-001; khai thác mạng thực tế yêu cầu môi trường phòng lab VM/VPN kết nối riêng.',
     mode: 'cyber-range',
     availableModes: ['cyber-range', 'terminal', 'telemetry', 'ad-graph'],
     instructions: [

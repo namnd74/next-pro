@@ -1,0 +1,1091 @@
+{
+  "id": "os14-m03-memory-failures-and-mitigations",
+  "slug": "memory-failures-and-mitigations",
+  "trackId": "os14-reverse-engineering",
+  "title": "Lỗ Hổng Vùng Nhớ, Cơ Chế Giảm Thiểu Khai Thác & Kỹ Thuật Bypass ROP Chain",
+  "summary": "Khảo sát nguyên lý kiểm soát luồng thực thi thông qua tràn bộ đệm ngăn xếp (Stack-based Buffer Overflow), phân tích các cơ chế phòng thủ hiện đại của hệ điều hành và trình biên dịch (DEP/NX, ASLR, Stack Canaries, Shadow Stack CET), và xây dựng chuỗi Return-Oriented Programming (ROP Chain) để hoàn tất bài tập Capstone Reverse Engineering.",
+  "difficulty": "expert",
+  "estimatedMinutes": 540,
+  "careerPaths": ["vulnerability-research", "exploit-development", "reverse-engineering"],
+  "domains": ["reverse-engineering", "memory-corruption", "mitigations", "rop"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os14-l136-stack-buffer-overflows-and-control-flow-hijacking",
+      "slug": "stack-buffer-overflows-and-control-flow-hijacking",
+      "title": "Tràn Bộ Đệm Ngăn Xếp (Stack Overflow), Ghi Đè Con Trỏ RIP & Chiếm Quyền Thực Thi",
+      "summary": "Bóc tách cơ chế giải phẫu Stack Frame trong các hàm C dễ bị tổn thương (strcpy, gets), tính toán offset chính xác bằng cyclic pattern, ghi đè địa chỉ trả về Saved RIP và kỹ thuật nạp mã thực thi nhị phân (Shellcode).",
+      "difficulty": "advanced",
+      "durationMinutes": 180,
+      "prerequisites": [],
+      "outcomes": [
+        "Hiểu bản chất cơ chế tràn bộ đệm tuyến tính trên ngăn xếp từ các hàm C không an toàn.",
+        "Sử dụng De Bruijn cyclic pattern để tính toán chính xác khoảng cách offset tới Saved RIP.",
+        "Giải thích cấu trúc và nguyên lý hoạt động của mã máy độc lập vị trí (Shellcode).",
+        "Phân tích sự sụp đổ của luồng điều khiển khi con trỏ RIP trỏ vào vùng nhớ do người dùng kiểm soát."
+      ],
+      "careerPaths": [
+        "vulnerability-research",
+        "exploit-development",
+        "reverse-engineering"
+      ],
+      "domains": ["reverse-engineering", "memory-corruption"],
+      "attackTactics": ["TA0001", "TA0002"],
+      "keywords": [
+        "buffer-overflow",
+        "stack-overflow",
+        "rip-overwrite",
+        "shellcode",
+        "cyclic-pattern"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Khi ghi dữ liệu vượt quá kích thước mảng bộ đệm cục bộ trên ngăn xếp mà không kiểm tra độ dài, dữ liệu thừa sẽ tràn tuyến tính lên các ô nhớ địa chỉ cao hơn, tuần tự ghi đè lên Saved RBP và Saved RIP của hàm gọi.",
+      "visual": {
+        "title": "Cơ Chế Tràn Bộ Đệm Ngăn Xếp Tuyến Tính",
+        "caption": "Quá trình dữ liệu người dùng ghi đè từ mảng cục bộ tới con trỏ lệnh Saved RIP",
+        "steps": [
+          {
+            "label": "Local Buffer",
+            "detail": "Bộ đệm 64 bytes được cấp phát trên stack nằm gần đỉnh RSP.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Buffer Overflow",
+            "detail": "Hàm nhập liệu không giới hạn sao chép 128 bytes, tràn qua ranh giới mảng.",
+            "tone": "caution"
+          },
+          {
+            "label": "Saved RBP Overwrite",
+            "detail": "Dữ liệu tràn tiếp tục ghi đè 8 bytes con trỏ khung ngăn xếp RBP.",
+            "tone": "allow"
+          },
+          {
+            "label": "Saved RIP Hijack",
+            "detail": "Địa chỉ trả về Saved RIP bị thay thế bằng địa chỉ do kẻ tấn công chọn.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Nguyên Lý Tràn Bộ Đệm Tuyến Tính Trên Ngăn Xếp (Stack Buffer Overflow)",
+          "paragraphs": [
+            "Lỗ hổng tràn bộ đệm ngăn xếp là một trong những lỗ hổng kinh điển và nguy hiểm nhất trong lịch sử an ninh mạng, được mô tả chi tiết từ bài viết \"Smashing The Stack For Fun And Profit\" của Aleph One trên tạp chí Phrack năm 1996. Nguyên nhân bắt nguồn từ việc các hàm thư viện chuẩn của C (như `strcpy`, `gets`, `scanf(\"%s\")`, `sprintf`) sao chép dữ liệu từ nguồn vào đích mà không hề kiểm tra kích thước tối đa của bộ đệm đích.",
+            "Do kiến trúc ngăn xếp x86-64 phát triển từ địa chỉ cao xuống thấp nhưng các thao tác ghi chuỗi (như memcpy hoặc strcpy) lại ghi dữ liệu tuần tự từ địa chỉ thấp lên cao, dữ liệu ghi tràn sẽ đi thẳng về phía đáy của Stack Frame hiện tại, lần lượt ghi đè lên các biến cục bộ lân cận, con trỏ khung ngăn xếp Saved RBP và cuối cùng là địa chỉ trả về Saved RIP."
+          ]
+        },
+        {
+          "title": "Kỹ Thuật Định Vị Offset Bằng Chuỗi De Bruijn Cyclic Pattern",
+          "paragraphs": [
+            "Để kiểm soát chính xác giá trị nạp vào con trỏ lệnh RIP, kẻ tấn công cần biết chính xác số lượng bytes cần thiết để lấp đầy từ đầu bộ đệm đến vị trí của Saved RIP. Thay vì đoán mò thủ công, phương pháp chuẩn mực là sử dụng chuỗi mẫu không lặp lại (De Bruijn Cyclic Sequence).",
+            "Các công cụ như `pattern_create` và `pattern_offset` (trong Metasploit hoặc pwntools) tạo ra chuỗi văn bản đặc biệt (ví dụ: `Aa0Aa1Aa2...`) trong đó mọi chuỗi con 8-byte đều là duy nhất. Khi chương trình sụp đổ và debugger báo lỗi tại giá trị RIP (ví dụ: `0x3561413461413361`), công cụ sẽ tra cứu giá trị này để tính ra khoảng cách offset chính xác tuyệt đối (ví dụ: đúng 72 bytes)."
+          ]
+        },
+        {
+          "title": "Cấu Trúc Mã Thực Thi Độc Lập Vị Trí (Shellcode Architecture)",
+          "paragraphs": [
+            "Shellcode là một đoạn mã máy nhị phân thô được thiết kế để thực thi một tác vụ cụ thể (như mở shell `/bin/sh` hoặc tạo kết nối mạng ngược Reverse Shell) khi luồng điều khiển của CPU bị chuyển hướng về nó. Shellcode phải có khả năng tự vận hành mà không phụ thuộc vào OS Loader.",
+            "Đặc tính then chốt của Shellcode truyền thống bao gồm: tính độc lập vị trí (Position-Independent), không chứa byte NULL (`0x00`) vì byte NULL sẽ làm đứt quãng các hàm xử lý chuỗi như `strcpy`, và kích thước tối thiểu để vừa vặn trong các bộ đệm ngăn xếp hạn chế."
+          ]
+        },
+        {
+          "title": "Chiếm Quyền Điều Khiển Luồng Thực Thi (Control Flow Hijacking)",
+          "paragraphs": [
+            "Khi hàm thực thi chỉ lệnh kết thúc `RET`, CPU tự động lấy 8 bytes tại đỉnh ngăn xếp [RSP] nạp vào thanh ghi con trỏ lệnh RIP và tăng RSP thêm 8 bytes. Nếu kẻ tấn công đã ghi đè ô nhớ này bằng địa chỉ của bộ đệm chứa Shellcode, CPU sẽ nhảy thẳng vào thực thi các lệnh mã độc.",
+            "Tuy nhiên, trên các hệ thống hiện đại, kỹ thuật chuyển hướng trực tiếp vào ngăn xếp này hoàn toàn bị vô hiệu hóa bởi các cơ chế phòng thủ phần cứng và hệ điều hành, đặt ra yêu cầu phải nghiên cứu các cơ chế bảo vệ và phương thức vượt qua nâng cao."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Thực Hành Khai Thác Tràn Bộ Đệm Ngăn Xếp Cổ Điển",
+        "objective": "Phân tích mã nhị phân có lỗi strcpy, tính toán offset chính xác và ghi đè thanh ghi RIP trong môi trường thử nghiệm đã tắt cơ chế bảo vệ.",
+        "scenario": "Một dịch vụ mạng nội bộ sử dụng hàm strcpy để xử lý chuỗi định danh người dùng. Bạn cần tính toán khoảng cách offset chính xác để ghi đè con trỏ RIP bằng một giá trị kiểm thử đã định trước (0x4242424242424242).",
+        "constraints": [
+          "Chạy trên máy ảo thử nghiệm có cờ -z execstack và -fno-stack-protector.",
+          "Không thực thi payload phá hoại hệ thống.",
+          "Tính toán offset chính xác không thừa thiếu 1 byte."
+        ],
+        "successCriteria": [
+          "Tạo được payload cyclic pattern kích hoạt lỗi Segmentation Fault.",
+          "Xác định đúng độ lệch offset tới Saved RIP là 120 bytes.",
+          "Ghi đè thành công giá trị 0x4242424242424242 vào thanh ghi RIP khi crash."
+        ],
+        "evidenceTemplate": [
+          "Lệnh pwntools sinh pattern và kết quả tính offset",
+          "Output màn hình GDB hiển thị thanh ghi RIP = 0x4242424242424242",
+          "Script khai thác proof-of-concept bằng Python"
+        ],
+        "reset": "Khởi động lại dịch vụ mạng mục tiêu.",
+        "cleanup": "Xóa tệp core dump và payload tạm thời.",
+        "cases": [
+          {
+            "id": "case-136-01",
+            "title": "Tính Toán Offset Saved RIP Bằng Cyclic Pattern",
+            "context": "Gửi chuỗi cyclic pattern dài 200 bytes vào ứng dụng mục tiêu khiến chương trình sụp đổ trong GDB với lỗi: `Invalid address 0x6241416141413941`. Dùng công cụ `cyclic -l 0x6241416141413941` cho kết quả: `72`.",
+            "prompt": "Để ghi đè chính xác địa chỉ trả về Saved RIP bằng địa chỉ `0x00401156`, cấu trúc payload gửi đi cần được định dạng như thế nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "72 bytes ký tự \"A\" + địa chỉ 0x00401156 (8 bytes dạng Little-Endian).",
+                "correct": true,
+                "rationale": "Offset 72 bytes lấp đầy bộ đệm cục bộ và Saved RBP; 8 bytes kế tiếp sẽ ghi đè chính xác vào Saved RIP theo định dạng Little-Endian trên x86-64."
+              },
+              {
+                "id": "B",
+                "label": "Địa chỉ 0x00401156 đặt ở đầu + 72 bytes ký tự \"A\".",
+                "correct": false,
+                "rationale": "Địa chỉ đặt ở đầu sẽ chỉ ghi vào đầu bộ đệm, không chạm tới Saved RIP."
+              },
+              {
+                "id": "C",
+                "label": "200 bytes ký tự \"A\" ngẫu nhiên.",
+                "correct": false,
+                "rationale": "Không kiểm soát được địa chỉ nhảy."
+              },
+              {
+                "id": "D",
+                "label": "72 bytes ký tự NULL (0x00).",
+                "correct": false,
+                "rationale": "Ký tự NULL sẽ làm hàm strcpy dừng lại ngay byte đầu tiên, không gây tràn bộ đệm."
+              }
+            ]
+          },
+          {
+            "id": "case-136-02",
+            "title": "Bẫy Bad Characters (Ký Tự Hỏng) Trong Payload Khai Thác",
+            "context": "Khi gửi payload khai thác qua hàm `strcpy`, bạn nhận thấy chương trình chỉ ghi được 15 bytes đầu tiên của payload và dừng lại, không làm sụp đổ chương trình.",
+            "prompt": "Nguyên nhân kỹ thuật phổ biến nhất dẫn đến hiện tượng này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Máy tính bị mất nguồn điện đột ngột.",
+                "correct": false,
+                "rationale": "Không liên quan."
+              },
+              {
+                "id": "B",
+                "label": "Payload của bạn chứa ký tự NULL (`0x00`) hoặc ký tự xuống dòng (`\\n` / `\\r`); hàm `strcpy` coi byte 0x00 là dấu kết thúc chuỗi (Null Terminator) và ngừng sao chép ngay lập tức.",
+                "correct": true,
+                "rationale": "Hàm strcpy sao chép cho đến khi gặp byte 0x00. Mọi byte nằm sau byte 0x00 trong payload sẽ bị loại bỏ hoàn toàn; các byte này gọi là Bad Characters."
+              },
+              {
+                "id": "C",
+                "label": "Trình biên dịch đã tự động vá lỗ hổng khi chương trình đang chạy.",
+                "correct": false,
+                "rationale": "Trình biên dịch không can thiệp động vào nhị phân đã build."
+              },
+              {
+                "id": "D",
+                "label": "Bộ xử lý CPU bị quá nhiệt.",
+                "correct": false,
+                "rationale": "Suy diễn vô căn cứ."
+              }
+            ]
+          },
+          {
+            "id": "case-136-03",
+            "title": "Phân Tích Lỗ Hổng Off-By-One Đảo Khung Ngăn Xếp",
+            "context": "Một hàm đọc dữ liệu có kiểm tra độ dài: `if (len <= 64) memcpy(buf, input, len + 1)`. Bộ đệm `buf` có kích thước đúng 64 bytes và nằm ngay trước con trỏ Saved RBP.",
+            "prompt": "Kỹ thuật khai thác nào có thể được áp dụng khi chỉ có đúng 1 byte bị tràn qua ranh giới bộ đệm?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không thể khai thác được vì 1 byte là quá nhỏ để thay đổi địa chỉ RIP 64-bit.",
+                "correct": false,
+                "rationale": "1 byte tràn đủ để thay đổi byte thấp nhất của Saved RBP."
+              },
+              {
+                "id": "B",
+                "label": "Khai thác Off-by-one Frame Pointer Overwrite: 1 byte tràn ghi đè byte thấp nhất của Saved RBP, làm con trỏ khung của hàm caller bị lệch về phía bộ đệm do người dùng kiểm soát; khi caller thực thi lệnh LEAVE/RET, ngăn xếp giả lập sẽ chiếm quyền điều khiển (Stack Pivoting).",
+                "correct": true,
+                "rationale": "Kỹ thuật Off-by-one ghi đè byte thấp của RBP là kỹ thuật kinh điển giúp xoay chuyển khung ngăn xếp (Fake Frame) để kiểm soát RIP khi caller kết thúc."
+              },
+              {
+                "id": "C",
+                "label": "Tự động kích hoạt cơ chế xóa toàn bộ ổ đĩa của Linux.",
+                "correct": false,
+                "rationale": "Lỗi bộ nhớ không kích hoạt logic xóa đĩa."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển chương trình sang chế độ debug của nhân hệ điều hành.",
+                "correct": false,
+                "rationale": "Lỗi user-space không ảnh hưởng kernel mode."
+              }
+            ]
+          }
+        ]
+      },
+      "governance": {
+        "prevent": [
+          "Tuyệt đối cấm sử dụng các hàm C không an toàn (strcpy, gets, sprintf); thay bằng strncpy, snprintf hoặc C++ std::string.",
+          "Bật cơ chế bảo vệ Stack Protector (-fstack-protector-all) trên mọi tệp biên dịch.",
+          "Thực hiện kiểm toán mã nguồn tĩnh với Flawfinder hoặc Semgrep để bắt các hàm buffer copy thô."
+        ],
+        "observe": [
+          "Giám sát các tín hiệu SIGSEGV do con trỏ lệnh RIP truy cập địa chỉ không hợp lệ.",
+          "Theo dõi sự cố sụp đổ tiến trình lặp đi lặp lại trong thời gian ngắn (chỉ dấu dò offset).",
+          "Cảnh báo EDR khi phát hiện ngăn xếp tiến trình bị ghi đè các chuỗi mẫu De Bruijn."
+        ],
+        "respond": [
+          "Cách ly tiến trình dịch vụ bị lỗi tràn bộ đệm.",
+          "Thu thập core dump và tệp pcap gói tin mạng để bóc tách payload khai thác.",
+          "Phát hành bản vá giới hạn độ dài chuỗi nhập liệu tại tầng biên mạng."
+        ],
+        "residualRisk": [
+          "Lỗ hổng Heap Overflow vẫn tồn tại độc lập với stack protection.",
+          "Integer Overflow có thể dẫn đến việc tính sai kích thước truyền vào hàm an toàn.",
+          "Format String vulnerability có thể đọc/ghi bộ nhớ tùy ý mà không cần tràn tuyến tính."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Tràn bộ đệm chỉ có thể xảy ra trên hệ điều hành 32-bit, không thể xảy ra trên 64-bit.",
+          "correction": "Cơ chế tràn ngăn xếp tuyến tính hoàn toàn giống nhau trên 32-bit và 64-bit; điểm khác biệt duy nhất là kích thước con trỏ (8 bytes thay vì 4 bytes) và không gian địa chỉ rộng hơn."
+        },
+        {
+          "claim": "Hàm strncpy luôn an toàn 100% trong mọi trường hợp.",
+          "correction": "strncpy không tự động gắn byte kết thúc NULL nếu chuỗi nguồn dài bằng hoặc hơn kích thước bộ đệm đích, dẫn tới lỗi rò rỉ bộ nhớ hoặc tràn chuỗi ở các hàm xử lý tiếp theo."
+        },
+        {
+          "claim": "Shellcode bắt buộc phải mở được giao diện dòng lệnh /bin/sh thì mới được coi là khai thác thành công.",
+          "correction": "Rất nhiều shellcode chỉ thực hiện các tác vụ tinh gọn như nạp thêm file nhị phân, mở một cổng TCP lắng nghe hoặc thêm một tài khoản quản trị mới vào hệ thống."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os14-l136-q1",
+          "difficulty": "easy",
+          "question": "Hàm nhập liệu nào trong thư viện chuẩn C bị loại bỏ hoàn toàn khỏi tiêu chuẩn C11 do nguy cơ tràn bộ đệm không thể khắc phục?",
+          "options": [
+            {
+              "id": "A",
+              "label": "fgets"
+            },
+            {
+              "id": "B",
+              "label": "gets"
+            },
+            {
+              "id": "C",
+              "label": "scanf"
+            },
+            {
+              "id": "D",
+              "label": "getchar"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Hàm `gets()` không nhận tham số giới hạn kích thước bộ đệm và đã chính thức bị xóa bỏ khỏi chuẩn C11 do không thể sử dụng an toàn."
+        },
+        {
+          "id": "os14-l136-q2",
+          "difficulty": "medium",
+          "question": "Tại sao chuỗi mẫu De Bruijn (Cyclic Pattern) lại được ưu tiên sử dụng để xác định offset ghi đè con trỏ RIP thay vì chuỗi các ký tự \"A\"?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì chuỗi ký tự \"A\" sẽ làm hỏng CPU phần cứng"
+            },
+            {
+              "id": "B",
+              "label": "Vì mọi chuỗi con độ dài 8 bytes trong chuỗi De Bruijn là duy nhất, cho phép tính toán chính xác tuyệt đối khoảng cách offset từ giá trị RIP sụp đổ"
+            },
+            {
+              "id": "C",
+              "label": "Vì chuỗi De Bruijn có khả năng tự động bypass cơ chế ASLR"
+            },
+            {
+              "id": "D",
+              "label": "Vì chuỗi \"A\" bị cấm bởi hệ điều hành Linux"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Tính chất độc nhất của mọi chuỗi con trong chuỗi De Bruijn cho phép tra cứu ngược lập tức vị trí offset chính xác khi chương trình sụp đổ với giá trị RIP cụ thể."
+        },
+        {
+          "id": "os14-l136-q3",
+          "difficulty": "hard",
+          "question": "Byte nào sau đây thường bị coi là \"Bad Character\" nghiêm ngặt nhất trong payload tràn bộ đệm qua hàm strcpy?",
+          "options": [
+            {
+              "id": "A",
+              "label": "0xFF"
+            },
+            {
+              "id": "B",
+              "label": "0x90"
+            },
+            {
+              "id": "C",
+              "label": "0x00 (Null byte)"
+            },
+            {
+              "id": "D",
+              "label": "0x41"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Byte 0x00 là ký tự kết thúc chuỗi (Null-terminator) của C; hàm strcpy sẽ dừng sao chép ngay khi gặp byte này, làm đứt đoạn payload."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một thiết bị router mạng nhúng sử dụng phiên bản phần mềm cũ có daemon quản lý HTTP lắng nghe trên cổng 8080. Hàm xử lý header User-Agent sử dụng strcpy vào một bộ đệm 128 bytes.",
+        "tasks": [
+          "Sử dụng pwntools tạo payload cyclic pattern và gửi tới dịch vụ để kích hoạt crash.",
+          "Bóc tách giá trị thanh ghi RIP từ GDB để xác định khoảng cách offset chính xác tới con trỏ trả về.",
+          "Viết tài liệu Proof-of-Concept chứng minh khả năng kiểm soát thanh ghi RIP bằng chuỗi ký tự kiểm định `0xdeadbeefdeadbeef`."
+        ],
+        "requiredEvidence": [
+          "Đoạn script Python gửi request HTTP kèm header độc hại.",
+          "Ảnh chụp màn hình GDB hiển thị thanh ghi RIP nhận giá trị 0xdeadbeefdeadbeef.",
+          "Báo cáo khuyến nghị thay thế hàm strcpy bằng hàm an toàn và bật cờ bảo vệ trình biên dịch."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Phrack Issue 49 - Smashing The Stack For Fun And Profit",
+          "url": "http://phrack.org/issues/49/14.html",
+          "publisher": "Phrack Magazine (Aleph One)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Bài báo nền tảng về cơ chế tràn bộ đệm ngăn xếp",
+            "Kiến trúc giải phẫu stack frame và kỹ thuật nạp shellcode"
+          ]
+        },
+        {
+          "title": "SEI CERT C Coding Standard - Rule STR31-C: Guarantee that storage for strings has sufficient space for character data and the null terminator",
+          "url": "https://wiki.sei.cmu.edu/confluence/display/c/STR31-C",
+          "publisher": "Carnegie Mellon University Software Engineering Institute",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Quy chuẩn an toàn chuỗi trong C/C++",
+            "Các giải pháp phòng ngừa lỗi tràn bộ đệm chuỗi"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os14-l137-exploit-mitigations-dep-nx-aslr-canaries-and-cet",
+      "slug": "exploit-mitigations-dep-nx-aslr-canaries-and-cet",
+      "title": "Các Cơ Chế Giảm Thiểu Khai Thác Hiện Đại: DEP/NX, ASLR, Stack Canaries & Intel CET",
+      "summary": "Khảo sát toàn diện 4 trụ cột phòng thủ mã nhị phân: Ngăn chặn thực thi dữ liệu (DEP/NX bit), Ngẫu nhiên hóa không gian địa chỉ (ASLR & PIE), Con chim hoàng yến bảo vệ ngăn xếp (Stack Canaries), và Công nghệ thực thi luồng điều khiển phần cứng Intel CET (Shadow Stack & IBT).",
+      "difficulty": "advanced",
+      "durationMinutes": 180,
+      "prerequisites": ["os14-l136-stack-buffer-overflows-and-control-flow-hijacking"],
+      "outcomes": [
+        "Phân tích cơ chế hoạt động của cờ phần cứng NX/XD bit và nguyên tắc W^X (Write XOR Execute).",
+        "Giải thích cơ chế ngẫu nhiên hóa entropy của ASLR và PIE trên Linux và Windows.",
+        "Nhận diện thuật toán kiểm tra Stack Canary (__stack_chk_fail) và kỹ thuật rò rỉ Canary qua Information Leak.",
+        "Đánh giá hiệu quả bảo vệ phần cứng của Intel CET Shadow Stack đối với các cuộc tấn công chiếm quyền điều khiển."
+      ],
+      "careerPaths": [
+        "vulnerability-research",
+        "exploit-development",
+        "reverse-engineering"
+      ],
+      "domains": ["reverse-engineering", "mitigations"],
+      "attackTactics": ["TA0001", "TA0002"],
+      "keywords": [
+        "dep",
+        "nx-bit",
+        "aslr",
+        "pie",
+        "stack-canary",
+        "intel-cet",
+        "shadow-stack"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Các cơ chế phòng thủ hiện đại không sửa lỗi lập trình trong mã nguồn; chúng dựng lên các rào cản toán học và phần cứng khiến cho việc biến một lỗi sụp đổ (Crash) thành một cuộc tấn công thực thi mã (RCE) trở nên vô cùng đắt đỏ hoặc bất khả thi.",
+      "visual": {
+        "title": "Ma Trận 4 Lớp Phòng Thủ Nhị Phân Hiện Đại",
+        "caption": "Sự phối hợp giữa trình biên dịch, hệ điều hành và phần cứng CPU",
+        "steps": [
+          {
+            "label": "Stack Canary",
+            "detail": "Trình biên dịch chèn giá trị ngẫu nhiên trước Saved RBP; kiểm tra trước khi RET.",
+            "tone": "allow"
+          },
+          {
+            "label": "DEP / NX Bit",
+            "detail": "Phần cứng CPU cấm thực thi mã trên các trang nhớ ngăn xếp và heap (W^X).",
+            "tone": "neutral"
+          },
+          {
+            "label": "ASLR / PIE",
+            "detail": "Hệ điều hành ngẫu nhiên hóa địa chỉ base của Stack, Heap, Libc và Code.",
+            "tone": "caution"
+          },
+          {
+            "label": "Intel CET",
+            "detail": "CPU duy trì Shadow Stack phần cứng chỉ đọc; so sánh Return Address khi RET.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cơ Chế Ngăn Chặn Thực Thi Dữ Liệu (DEP / NX Bit & Nguyên Lý W^X)",
+          "paragraphs": [
+            "Data Execution Prevention (DEP trên Windows) hoặc No-Execute (NX bit trên Linux / AMD64) là cơ chế bảo mật cấp độ phần cứng dựa trên bit thứ 63 của mục nhập bảng trang (Page Table Entry - PTE). Khi bit NX được thiết lập, MMU của CPU sẽ từ chối nạp chỉ lệnh từ trang nhớ đó và kích hoạt ngắt Page Fault nếu con trỏ lệnh RIP trỏ vào.",
+            "Cơ chế này hiện thực hóa nguyên lý W^X (Write XOR Execute): một trang bộ nhớ có thể có quyền ghi (Write), hoặc quyền thực thi (Execute), nhưng không bao giờ được phép có đồng thời cả hai quyền. Nhờ có NX bit, kỹ thuật nạp shellcode trực tiếp lên stack hoặc heap và nhảy vào thực thi đã hoàn toàn bị vô hiệu hóa trên các hệ thống hiện đại."
+          ]
+        },
+        {
+          "title": "Ngẫu Nhiên Hóa Không Gian Địa Chỉ (ASLR & Position Independent Executable)",
+          "paragraphs": [
+            "Address Space Layout Randomization (ASLR) là cơ chế bảo mật của nhân hệ điều hành ngẫu nhiên hóa vị trí bắt đầu của các phân vùng bộ nhớ chính (Stack, Heap, các thư viện chia sẻ như libc.so hoặc ntdll.dll) mỗi khi tiến trình được khởi chạy. Do đó, kẻ tấn công không thể hardcode một địa chỉ cố định để chuyển hướng luồng thực thi.",
+            "Tuy nhiên, nếu tệp nhị phân chính không được biên dịch với cờ PIE (Position Independent Executable), phân đoạn mã lệnh (.text) vẫn được nạp tại một địa chỉ cố định (thường là `0x400000` trên Linux x86-64). Khi PIE được kích hoạt đầy đủ cùng với ASLR, toàn bộ không gian địa chỉ ảo của tiến trình đều biến đổi ngẫu nhiên ở mỗi phiên chạy, triệt tiêu các địa chỉ tĩnh."
+          ]
+        },
+        {
+          "title": "Cơ Chế Bảo Vệ Ngăn Xếp Bằng Chim Hoàng Yến (Stack Canaries)",
+          "paragraphs": [
+            "Stack Canary (Stack Guard / SSP) là cơ chế do trình biên dịch (GCC, Clang, MSVC) tự động chèn vào giữa các biến cục bộ và con trỏ khung Saved RBP trong Function Prologue. Giá trị Canary là một số ngẫu nhiên 8 bytes (trên 64-bit) được lấy từ cấu trúc TLS (Thread Local Storage qua thanh ghi phân đoạn FS:[0x28] trên Linux).",
+            "Đặc biệt, byte thấp nhất của Stack Canary luôn là byte NULL (`0x00`) nhằm ngăn chặn việc rò rỉ giá trị này qua các hàm in chuỗi (như printf/puts). Trong Function Epilogue, trước khi lệnh RET được thực thi, trình biên dịch chèn mã so sánh giá trị Canary trên stack với bản gốc trong FS:[0x28]. Nếu giá trị bị sai lệch do tràn bộ đệm, hàm `__stack_chk_fail` được gọi ngay lập tức để chấm dứt tiến trình an toàn."
+          ]
+        },
+        {
+          "title": "Bảo Vệ Luồng Điều Khiển Bằng Phần Cứng: Intel CET (Control-flow Enforcement Technology)",
+          "paragraphs": [
+            "Để đối phó với các kỹ thuật khai thác bỏ qua DEP bằng cách tái sử dụng mã (như ROP chain), các nhà sản xuất vi xử lý đã giới thiệu công nghệ bảo vệ phần cứng thế hệ mới: Intel CET và ARM Pointer Authentication (PAC). Intel CET giới thiệu hai tính năng cốt lõi: Shadow Stack và Indirect Branch Tracking (IBT).",
+            "Shadow Stack là một ngăn xếp thứ hai hoàn toàn do phần cứng CPU quản lý và được bảo vệ ở cấp độ MMU (không cho phép user-space ghi đè). Mỗi khi lệnh CALL thực thi, địa chỉ trả về được đẩy đồng thời vào cả Normal Stack và Shadow Stack. Khi lệnh RET chạy, CPU so sánh hai giá trị; nếu phát hiện sai lệch (dấu hiệu của ROP chain ghi đè stack), ngắt Control Protection (#CP) được kích hoạt ngay lập tức."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Thực Hành Kiểm Tra Ma Trận Bảo Vệ Nhị Phân & Rò Rỉ Canary",
+        "objective": "Sử dụng checksec để đánh giá trạng thái các cơ chế bảo vệ nhị phân và khai thác lỗ hổng format string để rò rỉ giá trị Stack Canary.",
+        "scenario": "Một tệp nhị phân dịch vụ được biên dịch với đầy đủ Canary và NX. Bạn cần khai thác một lỗi rò rỉ thông tin (Information Leak) để đọc trộm giá trị Stack Canary trong phiên chạy hiện tại.",
+        "constraints": [
+          "Phân tích trong môi trường lab đã bật ASLR và Canary.",
+          "Không tắt các cờ bảo mật của hệ điều hành.",
+          "Bảo toàn giá trị byte thấp 0x00 của Canary khi xây dựng payload."
+        ],
+        "successCriteria": [
+          "Chạy checksec xác định chính xác trạng thái 4 cơ chế bảo vệ: Canary, NX, PIE, RELRO.",
+          "Xác định đúng vị trí offset của Canary trên stack thông qua định dạng %p trong printf.",
+          "Đọc thành công giá trị ngẫu nhiên của Canary và chứng minh byte kết thúc là 0x00."
+        ],
+        "evidenceTemplate": [
+          "Bảng kết quả chạy lệnh `checksec ./service`",
+          "Chuỗi payload Format String rò rỉ giá trị ô nhớ",
+          "Log GDB chứng minh giá trị Canary rò rỉ trùng khớp 100% với giá trị tại $fs_base + 0x28"
+        ],
+        "reset": "Tái khởi động dịch vụ mục tiêu.",
+        "cleanup": "Xóa tệp nhật ký tạm thời.",
+        "cases": [
+          {
+            "id": "case-137-01",
+            "title": "Giải Mã Kết Quả Công Cụ Checksec",
+            "context": "Chạy lệnh `checksec ./target` trên máy chủ Linux cho kết quả:\n`RELRO: Full RELRO`\n`Stack: Canary found`\n`NX: NX enabled`\n`PIE: PIE enabled`",
+            "prompt": "Nhận định nào sau đây mô tả đúng nhất về không gian tấn công đối với nhị phân này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tệp nhị phân này hoàn toàn không thể bị tấn công bằng bất kỳ hình thức nào.",
+                "correct": false,
+                "rationale": "Vẫn có thể bị tấn công bằng chuỗi lỗ hổng logic hoặc Info Leak kết hợp ROP."
+              },
+              {
+                "id": "B",
+                "label": "Tệp nhị phân được bảo vệ tối đa: Shellcode truyền thống bị chặn bởi NX; tràn stack trực tiếp bị chặn bởi Canary; địa chỉ mã và thư viện bị ngẫu nhiên hóa bởi PIE/ASLR; ghi đè GOT bị chặn bởi Full RELRO. Kẻ tấn công bắt buộc phải có Information Leak trước khi nghĩ tới việc chuyển hướng luồng thực thi.",
+                "correct": true,
+                "rationale": "Đây là cấu hình bảo vệ đầy đủ chuẩn hiện đại (Hardened Binary); khai thác đòi hỏi phải kết hợp rò rỉ thông tin bộ nhớ (Info Leak) để vượt qua cả Canary và ASLR."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần gửi 500 bytes ký tự \"A\" là có thể mở được shell root.",
+                "correct": false,
+                "rationale": "Stack canary sẽ phát hiện và abort ngay lập tức."
+              },
+              {
+                "id": "D",
+                "label": "Tệp nhị phân là mã nguồn Python chưa biên dịch.",
+                "correct": false,
+                "rationale": "Checksec phân tích tệp thực thi ELF nhị phân."
+              }
+            ]
+          },
+          {
+            "id": "case-137-02",
+            "title": "Kỹ Thuật Rò Rỉ Stack Canary Bằng Format String",
+            "context": "Ứng dụng có lỗi `printf(user_input)`. Bằng cách gửi chuỗi `%11$p`, chương trình in ra giá trị: `0x8f4d2a1b9c0e4400`.",
+            "prompt": "Tại sao có thể khẳng định chắc chắn giá trị này chính là Stack Canary?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Vì nó bắt đầu bằng tiền tố 0x8f.",
+                "correct": false,
+                "rationale": "Giá trị ngẫu nhiên có thể bắt đầu bằng bất kỳ byte nào."
+              },
+              {
+                "id": "B",
+                "label": "Vì byte thấp nhất của giá trị là `00` (kết thúc bằng hai số 0), đặc trưng bắt buộc của Stack Canary trên Linux nhằm chặn việc rò rỉ qua các hàm chuỗi như strcpy/printf.",
+                "correct": true,
+                "rationale": "Stack Canary được cố tình thiết kế với byte thấp nhất luôn là 0x00 để biến nó thành ký tự kết thúc chuỗi (Null byte), ngăn các hàm chuỗi vô tình in tràn qua nó."
+              },
+              {
+                "id": "C",
+                "label": "Vì giá trị này là địa chỉ của hàm main trong libc.",
+                "correct": false,
+                "rationale": "Địa chỉ hàm code không có byte cuối là 0x00 ngẫu nhiên như canary."
+              },
+              {
+                "id": "D",
+                "label": "Vì chuỗi này chứa chữ cái f và d.",
+                "correct": false,
+                "rationale": "Không liên quan."
+              }
+            ]
+          },
+          {
+            "id": "case-137-03",
+            "title": "Hiệu Quả Bảo Vệ Của Intel CET Shadow Stack Trước ROP Chain",
+            "context": "Một hệ thống máy chủ mới được trang bị CPU Intel Core thế hệ 12 hỗ trợ Intel CET Shadow Stack. Kẻ tấn công thành công trong việc rò rỉ Canary và ghi đè một chuỗi ROP Gadgets hợp lệ lên ngăn xếp.",
+            "prompt": "Điều gì sẽ xảy ra khi hàm kết thúc và chỉ lệnh `RET` đầu tiên được thực thi?",
+            "options": [
+              {
+                "id": "A",
+                "label": "ROP Chain thực thi trơn tru và kẻ tấn công mở được shell thành công.",
+                "correct": false,
+                "rationale": "Bỏ qua cơ chế Shadow Stack của Intel CET."
+              },
+              {
+                "id": "B",
+                "label": "CPU thực hiện lệnh RET sẽ so sánh địa chỉ trả về trên Normal Stack (đã bị sửa thành ROP gadget) với địa chỉ trả về lưu trên Shadow Stack phần cứng (vẫn giữ nguyên địa chỉ caller gốc). Do hai giá trị không trùng khớp, CPU phát sinh ngắt #CP (Control Protection Exception) và lập tức dừng tiến trình.",
+                "correct": true,
+                "rationale": "Intel CET Shadow Stack được phần cứng bảo vệ và lưu bản sao độc lập của Return Address. Mọi nỗ lực ghi đè Saved RIP trên Normal Stack đều bị phát hiện và ngăn chặn tại chỉ lệnh RET."
+              },
+              {
+                "id": "C",
+                "label": "Hệ thống tự động khởi động lại toàn bộ máy chủ.",
+                "correct": false,
+                "rationale": "Ngắt #CP chỉ chấm dứt tiến trình vi phạm trong user-space."
+              },
+              {
+                "id": "D",
+                "label": "Kẻ tấn công bị ghi hình qua camera máy tính.",
+                "correct": false,
+                "rationale": "Suy diễn phi thực tế."
+              }
+            ]
+          }
+        ]
+      },
+      "governance": {
+        "prevent": [
+          "Biên dịch 100% ứng dụng với cờ bảo vệ tối đa: -fstack-protector-strong, -fPIE -pie, -Wl,-z,relro,-z,now.",
+          "Kích hoạt Intel CET (-fcf-protection=full) trên các hệ thống có phần cứng hỗ trợ.",
+          "Bật cơ chế Exploit Guard / ASLR bắt buộc trên toàn hệ thống Windows."
+        ],
+        "observe": [
+          "Giám sát các thông điệp cảnh báo `*** stack smashing detected ***` trong nhật ký syslog.",
+          "Phát hiện sự cố sụp đổ tiến trình với mã ngoại lệ STATUS_CONTROL_PROTECTION_EXCEPTION (0xC0000409).",
+          "Ghi nhận tỷ lệ sụp đổ bất thường trên các tiến trình có kích hoạt ASLR."
+        ],
+        "respond": [
+          "Cách ly dịch vụ ngay khi ghi nhận tín hiệu stack smashing lặp lại.",
+          "Đánh giá xem kẻ tấn công đã thu thập được thông tin rò rỉ bộ nhớ (Info Leak) hay chưa.",
+          "Vá triệt để lỗi tràn bộ đệm gốc thay vì chỉ dựa vào cơ chế giảm thiểu."
+        ],
+        "residualRisk": [
+          "Lỗ hổng Type Confusion hoặc Logic Bugs có thể không làm kích hoạt các cơ chế bảo vệ bộ nhớ.",
+          "Tấn công nhắm vào con trỏ hàm trên Heap (vtable overwrite) có thể vượt qua Stack Canary.",
+          "Kỹ thuật Data-Only Attack sửa đổi biến logic (như cờ is_admin) mà không thay đổi luồng điều khiển con trỏ lệnh."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Bật ASLR là có thể ngăn chặn hoàn toàn việc thực thi mã khai thác.",
+          "correction": "ASLR chỉ ngẫu nhiên hóa vị trí nạp; nếu kẻ tấn công có một lỗ hổng rò rỉ bộ nhớ (Information Leak) dù chỉ 1 con trỏ, họ có thể tính toán lại toàn bộ địa chỉ cơ sở (Base Address) và vô hiệu hóa ASLR."
+        },
+        {
+          "claim": "Stack Canary bảo vệ được toàn bộ các biến trong chương trình.",
+          "correction": "Canary chỉ nằm ở đáy của Stack Frame trước Saved RBP; nó không thể bảo vệ các biến cục bộ nằm trước nó khỏi việc bị ghi đè lẫn nhau, cũng như không bảo vệ được vùng nhớ Heap."
+        },
+        {
+          "claim": "DEP/NX ngăn chặn được các cuộc tấn công tái sử dụng mã (ROP/JOP).",
+          "correction": "DEP/NX chỉ cấm thực thi mã trên vùng dữ liệu; kỹ thuật ROP lạm dụng các đoạn mã thực thi hợp lệ sẵn có trong phân đoạn .text của ứng dụng và thư viện, do đó hoàn toàn không bị ảnh hưởng bởi DEP."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os14-l137-q1",
+          "difficulty": "easy",
+          "question": "Nguyên lý bảo mật W^X (Write XOR Execute) của cơ chế DEP/NX quy định điều gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Một trang bộ nhớ có thể vừa đọc vừa ghi tùy ý"
+            },
+            {
+              "id": "B",
+              "label": "Một trang bộ nhớ không bao giờ được phép vừa có quyền ghi (Write) vừa có quyền thực thi (Execute) đồng thời"
+            },
+            {
+              "id": "C",
+              "label": "Mọi tệp thực thi phải được mã hóa bằng phép toán XOR"
+            },
+            {
+              "id": "D",
+              "label": "Ngăn xếp phải luôn có kích thước là lũy thừa của 2"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "W^X (Write XOR Execute) là nguyên tắc nền tảng ngăn chặn việc nạp và thực thi shellcode trực tiếp trên vùng nhớ dữ liệu (Stack/Heap)."
+        },
+        {
+          "id": "os14-l137-q2",
+          "difficulty": "medium",
+          "question": "Trên hệ điều hành Linux 64-bit, byte thấp nhất của Stack Canary luôn có giá trị là bao nhiêu?",
+          "options": [
+            {
+              "id": "A",
+              "label": "0xFF"
+            },
+            {
+              "id": "B",
+              "label": "0x7F"
+            },
+            {
+              "id": "C",
+              "label": "0x00"
+            },
+            {
+              "id": "D",
+              "label": "Ngẫu nhiên hoàn toàn cả 8 bytes"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Byte thấp nhất của Stack Canary luôn là byte NULL (0x00) nhằm ngăn chặn việc rò rỉ giá trị này qua các hàm chuỗi (string functions) như puts/printf."
+        },
+        {
+          "id": "os14-l137-q3",
+          "difficulty": "hard",
+          "question": "Công nghệ Intel CET (Control-flow Enforcement Technology) bảo vệ địa chỉ trả về của hàm trước kỹ thuật ROP bằng cơ chế phần cứng nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Mã hóa bộ nhớ RAM bằng phần cứng AES-NI"
+            },
+            {
+              "id": "B",
+              "label": "Duy trì một Shadow Stack phần cứng chỉ đọc độc lập để đối chiếu địa chỉ trả về tại lệnh RET"
+            },
+            {
+              "id": "C",
+              "label": "Tự động chèn lệnh NOP vào giữa mọi hàm"
+            },
+            {
+              "id": "D",
+              "label": "Khóa cứng toàn bộ thanh ghi của CPU khi xảy ra lỗi Segfault"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Intel CET sử dụng Shadow Stack được quản lý ở mức phần cứng để lưu trữ bản sao địa chỉ trả về và đối chiếu tại mỗi lệnh RET, triệt tiêu ROP chain."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được giao nhiệm vụ đánh giá an ninh của một tệp nhị phân dịch vụ thanh toán trực tuyến. Tệp được biên dịch với Stack Canary, nhưng có một hàm in thông báo lỗi bị dính lỗ hổng Format String.",
+        "tasks": [
+          "Sử dụng checksec để lập ma trận đánh giá các cơ chế bảo mật của tệp nhị phân.",
+          "Xây dựng kịch bản Format String để đọc trộm giá trị Stack Canary và địa chỉ cơ sở của libc từ ngăn xếp.",
+          "Viết tài liệu giải thích cách thức một chuỗi khai thác đa tầng (Multi-stage exploit) có thể vượt qua toàn bộ cơ chế bảo vệ này nếu không vá lỗ hổng format string."
+        ],
+        "requiredEvidence": [
+          "Bảng ma trận đánh giá các cơ chế bảo vệ trích xuất từ checksec.",
+          "Đoạn log trích xuất thành công giá trị Canary có byte kết thúc 0x00.",
+          "Sơ đồ chuỗi khai thác (Exploit Chain Diagram) minh họa việc kết hợp Info Leak với ROP."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Intel Control-flow Enforcement Technology (CET) Specification",
+          "url": "https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html",
+          "publisher": "Intel Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả kỹ thuật kiến trúc Intel CET",
+            "Nguyên lý hoạt động của Shadow Stack và Indirect Branch Tracking"
+          ]
+        },
+        {
+          "title": "GCC Stack-Smashing Protector (SSP) Implementation Details",
+          "url": "https://gcc.gnu.org/wiki/StackProtector",
+          "publisher": "GNU Project",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế hoạt động của cờ -fstack-protector",
+            "Bản chất hàm __stack_chk_fail và cấu trúc Canary"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os14-l138-return-oriented-programming-and-reverse-engineering-capstone",
+      "slug": "return-oriented-programming-and-reverse-engineering-capstone",
+      "title": "Kỹ Thuật Tái Sử Dụng Mã Lệnh (ROP Chain), Stack Pivoting & Bài Tập Capstone Dịch Ngược",
+      "summary": "Làm chủ kỹ thuật Return-Oriented Programming (ROP) để vượt qua cơ chế DEP/NX, tìm kiếm và xâu chuỗi các ROP Gadgets (kết thúc bằng lệnh RET), kỹ thuật xoay chuyển ngăn xếp (Stack Pivoting), và hoàn thành bài tập Capstone tổng hợp dịch ngược và khai thác nhị phân nhiều lớp bảo vệ.",
+      "difficulty": "expert",
+      "durationMinutes": 180,
+      "prerequisites": [
+        "os14-l136-stack-buffer-overflows-and-control-flow-hijacking",
+        "os14-l137-exploit-mitigations-dep-nx-aslr-canaries-and-cet"
+      ],
+      "outcomes": [
+        "Hiểu bản chất của kỹ thuật tấn công tái sử dụng mã lệnh (Code Reuse Attack) thông qua ROP Gadgets.",
+        "Sử dụng công cụ ROPgadget hoặc ropper để tìm kiếm các đoạn mã `pop rdi; ret` trong nhị phân và thư viện liên kết.",
+        "Xây dựng một ROP Chain hoàn chỉnh thiết lập thanh ghi tham số và gọi hàm `execve(\"/bin/sh\", 0, 0)` hoặc `system()`.",
+        "Hoàn thành bài tập Capstone: Dịch ngược binary bảo mật, kết hợp Info Leak bypass Canary/ASLR và thực thi ROP chain."
+      ],
+      "careerPaths": [
+        "vulnerability-research",
+        "exploit-development",
+        "reverse-engineering"
+      ],
+      "domains": ["reverse-engineering", "rop", "capstone"],
+      "attackTactics": ["TA0001", "TA0002"],
+      "keywords": [
+        "rop",
+        "rop-chain",
+        "gadget",
+        "stack-pivoting",
+        "capstone",
+        "code-reuse"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Khi không thể đưa mã mới vào để thực thi do rào cản DEP/NX, kẻ tấn công biến toàn bộ mã máy hợp lệ sẵn có trong chương trình thành một kho từ điển các đoạn chỉ lệnh ngắn (Gadgets), dùng lệnh RET để xâu chuỗi chúng thành một chương trình tính toán Turing-complete tùy ý.",
+      "visual": {
+        "title": "Cơ Chế Xâu Chuỗi ROP Chain Vượt Qua NX/DEP",
+        "caption": "Mỗi gadget thực thi một chỉ lệnh nạp tham số và dùng lệnh RET để gọi gadget kế tiếp",
+        "steps": [
+          {
+            "label": "Saved RIP -> Gadget 1",
+            "detail": "Chuyển hướng RIP tới lệnh `pop rdi; ret` để nạp tham số đầu tiên.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Stack Data -> RDI",
+            "detail": "Lệnh POP lấy con trỏ chuỗi \"/bin/sh\" từ stack nạp vào thanh ghi RDI.",
+            "tone": "allow"
+          },
+          {
+            "label": "RET -> Gadget 2",
+            "detail": "Lệnh RET lấy địa chỉ kế tiếp trên stack nạp vào RIP, chuyển tới Gadget 2.",
+            "tone": "caution"
+          },
+          {
+            "label": "Call Target Function",
+            "detail": "Gadget cuối cùng gọi hàm `system` hoặc thực hiện syscall `execve`.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bản Chất Kỹ Thuật Của Return-Oriented Programming (ROP)",
+          "paragraphs": [
+            "Khi cơ chế DEP/NX cấm thực thi mã trên ngăn xếp và heap, kẻ tấn công không thể sử dụng Shellcode thông thường. Kỹ thuật Return-Oriented Programming (ROP) ra đời như một giải pháp thay thế triệt để, dựa trên nguyên lý tái sử dụng mã (Code Reuse Attack). Thay vì tiêm mã mới, ROP tìm kiếm các đoạn mã nhị phân có sẵn trong phân đoạn thực thi (.text của binary hoặc libc.so).",
+            "Các đoạn mã này được gọi là Gadgets, thường chỉ dài từ 2 đến 5 chỉ lệnh và luôn kết thúc bằng chỉ lệnh `RET` (opcode `0xC3`). Bằng cách sắp xếp cẩn thận các địa chỉ của các gadget xen kẽ với dữ liệu trên ngăn xếp, mỗi khi một gadget kết thúc bằng lệnh `RET`, CPU sẽ tự động lấy địa chỉ của gadget tiếp theo từ đỉnh stack nạp vào RIP, tạo thành một chuỗi thực thi liên hoàn mà không hề vi phạm cơ chế W^X."
+          ]
+        },
+        {
+          "title": "Giải Phẫu Cấu Trúc ROP Chain Gọi Hàm Thực Thi Lệnh",
+          "paragraphs": [
+            "Trên kiến trúc x86-64 tuân theo System V AMD64 ABI, để gọi hàm `system(\"/bin/sh\")` hoặc syscall `execve(\"/bin/sh\", NULL, NULL)`, kẻ tấn công cần đưa địa chỉ của chuỗi ký tự `\"/bin/sh\"` vào thanh ghi RDI trước khi gọi hàm. Do đó, gadget quan trọng hàng đầu trong mọi bộ khai thác x86-64 là: `pop rdi; ret`.",
+            "Cấu trúc của một ROP Chain cơ bản trên stack bao gồm: (1) Địa chỉ của gadget `pop rdi; ret`; (2) Địa chỉ của chuỗi `\"/bin/sh\"` trong bộ nhớ (được POP vào RDI); (3) Địa chỉ của gadget `ret` đơn lẻ (dùng để căn chỉnh ranh giới 16-byte cho ngăn xếp nhằm tránh crash trong hàm `do_system` của glibc); và (4) Địa chỉ của hàm `system()` trong thư viện libc."
+          ]
+        },
+        {
+          "title": "Kỹ Thuật Xoay Chuyển Ngăn Xếp (Stack Pivoting)",
+          "paragraphs": [
+            "Trong nhiều kịch bản thực tế, không gian bộ đệm bị tràn trên ngăn xếp rất hạn chế (ví dụ chỉ tràn được 16 hoặc 24 bytes sau Saved RIP), không đủ chỗ để chứa một ROP Chain dài hàng chục ô nhớ. Kỹ thuật Stack Pivoting cho phép di chuyển con trỏ ngăn xếp RSP sang một vùng nhớ khác rộng rãi hơn do kẻ tấn công kiểm soát hoàn toàn (như vùng Heap, BSS hoặc bộ đệm nhận gói tin lớn).",
+            "Stack Pivoting được thực hiện thông qua các gadget chuyên dụng làm thay đổi trực tiếp thanh ghi RSP, phổ biến nhất là: `pop rsp; ret`, `xchg rax, rsp; ret`, hoặc chuỗi lệnh `leave; ret` (trong đó lệnh LEAVE tương đương với `mov rsp, rbp; pop rbp`). Khi con trỏ RSP bị bẻ hướng sang vùng nhớ mới, CPU tiếp tục thực thi phần còn lại của ROP Chain tại đó."
+          ]
+        },
+        {
+          "title": "Bài Tập Capstone: Dịch Ngược & Vô Hiệu Hóa Nhị Phân Nhiều Lớp",
+          "paragraphs": [
+            "Bài tập Capstone tổng hợp của Track 14 yêu cầu học viên kết hợp toàn bộ các kỹ năng đã học để phân tích và đánh bại một tệp nhị phân kiên cố hóa (Hardened Binary) được trang bị đầy đủ Canary, NX, ASLR, và PIE.",
+            "Quy trình giải quyết bao gồm 3 bước logic chặt chẽ: (1) Dịch ngược nhị phân với Ghidra để xác định luồng logic và phát hiện hai lỗ hổng độc lập: một lỗ hổng rò rỉ bộ nhớ (Info Leak) và một lỗ hổng tràn bộ đệm; (2) Sử dụng GDB và pwntools để xây dựng giai đoạn 1 (Stage 1): gửi payload khai thác lỗi Info Leak để tính toán địa chỉ base của libc và đọc giá trị Stack Canary bí mật; (3) Xây dựng giai đoạn 2 (Stage 2): gửi payload tràn bộ đệm bảo toàn Canary, pivot ngăn xếp và thực thi ROP chain gọi `execve` để xác thực toàn diện năng lực."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Thực Hành Xây Dựng ROP Chain & Capstone Reverse Engineering",
+        "objective": "Tìm kiếm gadgets trong tệp nhị phân ELF x86-64 và xây dựng ROP chain hoàn chỉnh để gọi hàm system vượt qua cơ chế NX.",
+        "scenario": "Một tệp nhị phân ELF 64-bit có cờ NX enabled và No PIE chứa một lỗ hổng tràn bộ đệm ngăn xếp. Trong tệp có sẵn hàm win() bị ẩn và chuỗi \"/bin/sh\". Bạn cần tìm gadget pop rdi; ret và xây dựng ROP chain để chuyển hướng thực thi.",
+        "constraints": [
+          "Chạy trong môi trường máy ảo cách ly.",
+          "Không tắt cơ chế NX của nhị phân.",
+          "Căn chỉnh stack 16-byte chuẩn mực trước khi gọi hàm."
+        ],
+        "successCriteria": [
+          "Tìm được gadget `pop rdi; ret` bằng công cụ ROPgadget.",
+          "Tính toán đúng địa chỉ chuỗi \"/bin/sh\" và hàm mục tiêu.",
+          "Thực thi thành công ROP chain mở shell tương tác trong terminal."
+        ],
+        "evidenceTemplate": [
+          "Danh sách gadget trích xuất từ lệnh `ROPgadget --binary ./vuln`",
+          "Đoạn mã script pwntools xây dựng cấu trúc ROP chain",
+          "Ảnh chụp terminal hiển thị phiên shell thành công"
+        ],
+        "reset": "Khởi động lại binary mục tiêu trong debugger.",
+        "cleanup": "Đóng tiến trình shell và xóa các payload khai thác.",
+        "cases": [
+          {
+            "id": "case-138-01",
+            "title": "Lựa Chọn ROP Gadget Nạp Tham Số Cho Hàm System",
+            "context": "Bạn cần gọi hàm `system(char *cmd)` trên hệ điều hành Linux x86-64. Công cụ ROPgadget liệt kê danh sách các gadgets có sẵn trong tệp nhị phân.",
+            "prompt": "Gadget nào sau đây là bắt buộc phải có để đưa con trỏ chuỗi lệnh vào đúng thanh ghi tham số đầu tiên?",
+            "options": [
+              {
+                "id": "A",
+                "label": "`pop rax; ret`",
+                "correct": false,
+                "rationale": "RAX dùng cho giá trị trả về hoặc số hiệu syscall, không phải tham số thứ nhất."
+              },
+              {
+                "id": "B",
+                "label": "`pop rdi; ret`",
+                "correct": true,
+                "rationale": "Theo chuẩn System V AMD64 ABI, tham số đầu tiên của hàm bắt buộc phải nằm trong thanh ghi RDI; gadget `pop rdi; ret` sẽ lấy địa chỉ chuỗi từ đỉnh stack nạp vào RDI và RET về lệnh kế tiếp."
+              },
+              {
+                "id": "C",
+                "label": "`xor ebx, ebx; ret`",
+                "correct": false,
+                "rationale": "EBX là callee-saved register, không dùng cho tham số hàm."
+              },
+              {
+                "id": "D",
+                "label": "`push rsi; ret`",
+                "correct": false,
+                "rationale": "PUSH làm thay đổi stack và không nạp được giá trị mong muốn vào thanh ghi."
+              }
+            ]
+          },
+          {
+            "id": "case-138-02",
+            "title": "Khắc Phục Lỗi Sụp Đổ Do Không Căn Chỉnh Ngăn Xếp 16-Byte",
+            "context": "ROP chain của bạn đã nạp đúng RDI và nhảy tới địa chỉ của hàm `system()`. Tuy nhiên, chương trình sụp đổ tại lệnh `movaps [rsp+0x40], xmm0` bên trong hàm `do_system` của thư viện glibc.",
+            "prompt": "Nguyên nhân và giải pháp chuẩn mực để khắc phục lỗi sụp đổ này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Lệnh movaps yêu cầu con trỏ ngăn xếp RSP phải được căn chỉnh ranh giới 16 bytes (RSP % 16 == 0); giải pháp là chèn thêm một gadget `ret` đơn lẻ vào ROP chain ngay trước địa chỉ hàm system để làm lệch stack thêm 8 bytes.",
+                "correct": true,
+                "rationale": "Lệnh MOVAPS của tập lệnh SSE yêu cầu địa chỉ ô nhớ phải căn chỉnh 16-byte; việc chèn thêm một lệnh RET đơn lẻ (gọi là ret sled / alignment gadget) là cách chuẩn mực để căn chỉnh stack."
+              },
+              {
+                "id": "B",
+                "label": "CPU của bạn bị lỗi phần cứng; cần thay thế thanh RAM mới.",
+                "correct": false,
+                "rationale": "Lỗi phần mềm do vi phạm quy ước gọi hàm của ABI."
+              },
+              {
+                "id": "C",
+                "label": "Hàm system đã bị xóa khỏi thư viện libc.",
+                "correct": false,
+                "rationale": "Chương trình đã nhảy vào hàm system và crash bên trong nó."
+              },
+              {
+                "id": "D",
+                "label": "Giảm kích thước payload xuống còn 10 bytes.",
+                "correct": false,
+                "rationale": "Không giải quyết được lỗi căn chỉnh stack."
+              }
+            ]
+          },
+          {
+            "id": "case-138-03",
+            "title": "Áp Dụng Kỹ Thuật Stack Pivoting Khi Bộ Đệm Quá Nhỏ",
+            "context": "Lỗ hổng tràn bộ đệm chỉ cho phép bạn ghi đè 16 bytes sau Saved RBP (đúng 2 ô nhớ 8-byte). Bạn đã chuẩn bị sẵn một ROP Chain đầy đủ dài 80 bytes trong một biến toàn cục `char g_buffer[256]` nằm trong phân đoạn .bss.",
+            "prompt": "Chuỗi 2 ô nhớ ghi đè nào sau đây sẽ thực hiện xoay chuyển ngăn xếp (Stack Pivot) thành công sang `g_buffer`?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Ghi đè Saved RBP bằng địa chỉ `g_buffer`, và ghi đè Saved RIP bằng địa chỉ của gadget `leave; ret`.",
+                "correct": true,
+                "rationale": "Lệnh LEAVE thực hiện `mov rsp, rbp; pop rbp`. Khi hàm thực thi lệnh LEAVE thứ hai tại gadget, RSP sẽ được gán bằng giá trị của RBP (chính là địa chỉ `g_buffer`), chuyển toàn bộ ngăn xếp sang biến toàn cục."
+              },
+              {
+                "id": "B",
+                "label": "Ghi đè Saved RBP bằng 0 và Saved RIP bằng 0.",
+                "correct": false,
+                "rationale": "Gây crash sụp đổ ngay lập tức."
+              },
+              {
+                "id": "C",
+                "label": "Ghi đè Saved RIP bằng địa chỉ hàm exit(0).",
+                "correct": false,
+                "rationale": "Chương trình thoát mà không thực thi ROP chain."
+              },
+              {
+                "id": "D",
+                "label": "Ghi đè cả hai ô nhớ bằng chuỗi ký tự \"AAAAAAAA\".",
+                "correct": false,
+                "rationale": "Không định hướng được ngăn xếp."
+              }
+            ]
+          }
+        ]
+      },
+      "governance": {
+        "prevent": [
+          "Kích hoạt cơ chế bảo vệ Control Flow Guard (CFG / Intel CET) để xác thực tính hợp lệ của các điểm rẽ nhánh.",
+          "Biên dịch kèm tính năng SafeStack hoặc Shadow Stack để bảo vệ con trỏ trả về độc lập.",
+          "Sử dụng các ngôn ngữ an toàn bộ nhớ (Rust, Go) cho các module tiếp xúc trực tiếp với dữ liệu ngoại vi."
+        ],
+        "observe": [
+          "Phát hiện hành vi thực thi ROP chain thông qua các bộ đếm phần cứng LBR (Last Branch Record).",
+          "Giám sát tỷ lệ chỉ lệnh RET thực thi bất thường trong khoảng thời gian ngắn.",
+          "Cảnh báo EDR khi phát hiện con trỏ ngăn xếp RSP trỏ ra ngoài dải bộ nhớ stack hợp lệ (Stack Pivot detection)."
+        ],
+        "respond": [
+          "Chấm dứt tiến trình vi phạm ngay khi phát hiện chuỗi gadget ROP.",
+          "Thu thập nhật ký LBR và bộ nhớ heap để bóc tách toàn bộ ROP chain.",
+          "Cập nhật chữ ký phòng thủ trên hệ thống IPS/WAF để chặn chuỗi payload byte nhị phân."
+        ],
+        "residualRisk": [
+          "Kỹ thuật Blind ROP (BROP) có thể dò tìm gadgets từ xa mà không cần tệp nhị phân gốc.",
+          "Kỹ thuật JOP (Jump-Oriented Programming) sử dụng các lệnh nhảy gián tiếp thay vì RET để lẩn tránh kiểm tra.",
+          "Lỗ hổng logic nghiệp vụ cấp ứng dụng hoàn toàn độc lập với các cơ chế phòng thủ ROP."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Cơ chế DEP/NX ngăn chặn được 100% mọi hình thức khai thác nhị phân.",
+          "correction": "DEP/NX chỉ ngăn chặn việc thực thi mã trên vùng dữ liệu (Shellcode injection); kỹ thuật ROP lạm dụng mã thực thi hợp lệ sẵn có trong .text và thư viện để vượt qua hoàn toàn DEP/NX."
+        },
+        {
+          "claim": "ROP chain bắt buộc phải có sẵn chuỗi \"/bin/sh\" trong tệp nhị phân thì mới mở được shell.",
+          "correction": "Nếu không có sẵn chuỗi \"/bin/sh\", kẻ tấn công có thể dùng ROP chain gọi hàm `read()` để tự ghi chuỗi \"/bin/sh\" vào vùng nhớ ghi được (.bss) trước khi gọi hàm `system()`."
+        },
+        {
+          "claim": "Kỹ thuật ROP chỉ có thể áp dụng được trên hệ điều hành Linux.",
+          "correction": "ROP là kỹ thuật độc lập với hệ điều hành; nó được áp dụng phổ biến trên cả Windows (gọi VirtualProtect để tắt DEP), macOS, iOS, và firmware nhúng."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os14-l138-q1",
+          "difficulty": "easy",
+          "question": "Mọi đoạn mã ROP Gadget trong kỹ thuật Return-Oriented Programming bắt buộc phải kết thúc bằng chỉ lệnh nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "JMP"
+            },
+            {
+              "id": "B",
+              "label": "CALL"
+            },
+            {
+              "id": "C",
+              "label": "RET (0xC3)"
+            },
+            {
+              "id": "D",
+              "label": "INT 3"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Chỉ lệnh RET (Return) là linh hồn của ROP, nó lấy địa chỉ kế tiếp trên stack nạp vào RIP, cho phép xâu chuỗi liên hoàn các gadgets."
+        },
+        {
+          "id": "os14-l138-q2",
+          "difficulty": "medium",
+          "question": "Kỹ thuật Stack Pivoting được sử dụng trong trường hợp nào sau đây?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Khi không gian bộ đệm bị tràn trên ngăn xếp quá hạn hẹp, cần di chuyển con trỏ RSP sang một vùng nhớ rộng rãi hơn để chứa ROP Chain"
+            },
+            {
+              "id": "B",
+              "label": "Khi cần xóa sạch toàn bộ tệp nhị phân trên đĩa"
+            },
+            {
+              "id": "C",
+              "label": "Khi CPU bị quá tải"
+            },
+            {
+              "id": "D",
+              "label": "Khi muốn chuyển đổi ứng dụng từ 32-bit sang 64-bit"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Stack Pivoting là kỹ thuật bẻ hướng con trỏ ngăn xếp RSP sang một vùng nhớ khác (như Heap hoặc BSS) để thực thi các ROP chain có kích thước lớn."
+        },
+        {
+          "id": "os14-l138-q3",
+          "difficulty": "hard",
+          "question": "Tại sao việc chèn thêm một gadget `ret` đơn lẻ (Alignment Gadget) vào ROP chain lại giúp ngăn ngừa lỗi crash trong hàm `system` của glibc trên Linux x86-64?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Nó mã hóa payload thành chuỗi an toàn"
+            },
+            {
+              "id": "B",
+              "label": "Nó làm thay đổi giá trị RSP thêm 8 bytes, đảm bảo ngăn xếp được căn chỉnh đúng ranh giới 16 bytes (RSP % 16 == 0) theo yêu cầu của lệnh MOVAPS trong glibc"
+            },
+            {
+              "id": "C",
+              "label": "Nó tự động cấp quyền root cho tiến trình"
+            },
+            {
+              "id": "D",
+              "label": "Nó tắt cơ chế ghi log của nhân Linux"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Lệnh MOVAPS của SSE bên trong glibc bắt buộc stack phải căn chỉnh ranh giới 16-byte; một lệnh RET đơn lẻ điều chỉnh offset stack thêm 8 bytes để thỏa mãn điều kiện căn chỉnh này."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Trong bài tập Capstone tổng hợp, bạn được cung cấp một binary máy chủ ELF x86-64 có cờ NX và Canary. Ứng dụng dính hai lỗi: (1) Lỗi format string trong hàm chào mừng cho phép đọc bộ nhớ; (2) Lỗi tràn bộ đệm 64-byte trong hàm xử lý lệnh.",
+        "tasks": [
+          "Sử dụng Ghidra và GDB để xác định vị trí Canary và địa chỉ cơ sở của libc thông qua lỗi Format String.",
+          "Sử dụng công cụ ROPgadget để tìm kiếm gadget `pop rdi; ret` và gadget `ret` căn chỉnh trong thư viện libc đã xác định.",
+          "Viết một kịch bản khai thác hoàn chỉnh bằng Python (pwntools) xâu chuỗi hai giai đoạn để mở shell tương tác thành công."
+        ],
+        "requiredEvidence": [
+          "Mã nguồn kịch bản exploit.py hoàn chỉnh có chú thích rõ ràng hai giai đoạn (Stage 1: Leak, Stage 2: ROP).",
+          "Log output của terminal chứng minh quá trình leak Canary/libc và mở shell thành công.",
+          "Báo cáo kỹ thuật chi tiết phân tích nguyên nhân gốc và các biện pháp khắc phục triệt để."
+        ]
+      },
+      "sources": [
+        {
+          "title": "The Geometry of Innocent Flesh on the Bone: Return-into-libc without Function Calls (on the x86)",
+          "url": "https://hovav.net/ucsd/dist/geometry.pdf",
+          "publisher": "ACM Conference on Computer and Communications Security (CCS)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Bài báo khoa học khai sinh kỹ thuật Return-Oriented Programming (ROP)",
+            "Chứng minh tính toán Turing-complete của ROP Gadgets"
+          ]
+        },
+        {
+          "title": "Bypassing Memory Mitigations: A Journey through ROP and Stack Pivoting",
+          "url": "https://googleprojectzero.blogspot.com/",
+          "publisher": "Google Project Zero",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kỹ thuật vượt qua DEP/NX bằng ROP Chain hiện đại",
+            "Cơ chế Stack Pivoting và căn chỉnh ABI"
+          ]
+        }
+      ]
+    }
+  ]
+}
