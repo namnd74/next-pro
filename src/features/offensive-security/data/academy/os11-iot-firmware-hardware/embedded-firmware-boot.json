@@ -1,0 +1,1109 @@
+{
+  "id": "os11-m01-embedded-firmware-boot",
+  "slug": "embedded-firmware-boot",
+  "trackId": "os11-iot-firmware-hardware",
+  "title": "Kiến Trúc Hệ Thống Nhúng, Trích Xuất Firmware, Chuỗi Khởi Động & Cập Nhật An Toàn",
+  "summary": "Phân tích kiến trúc vi xử lý nhúng (ARM, MIPS, RISC-V), kỹ thuật trích xuất và giải mã hệ thống tệp firmware (Binwalk, SquashFS, UBIFS), mô phỏng môi trường thực thi QEMU, và đánh giá tính toàn vẹn của chuỗi khởi động an toàn (Secure Boot Chain, Hardware Root of Trust, FOTA Cryptographic Updates).",
+  "difficulty": "intermediate",
+  "estimatedMinutes": 420,
+  "careerPaths": ["penetration-test", "vulnerability-research"],
+  "domains": ["iot", "firmware", "hardware"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os11-l100-embedded-architectures-memory-and-firmware-structures",
+      "slug": "embedded-architectures-memory-and-firmware-structures",
+      "title": "Kiến Trúc Vi Xử Lý Nhúng (ARM, MIPS, RISC-V), Bản Đồ Bộ Nhớ & Định Dạng Nhị Phân Firmware",
+      "summary": "Phân tích chuyên sâu các họ vi xử lý nhúng phổ biến (ARM Cortex-A/M, MIPS32/64, RISC-V RV32/64), cơ chế endianness (Big-Endian vs Little-Endian), tổ chức bản đồ bộ nhớ vật lý (SRAM, DRAM, SPI Flash, eMMC, NAND/NOR), các định dạng nhị phân đóng gói firmware (Raw Binary, Intel HEX, Motorola S-Record, ELF) và phân biệt ranh giới thực thi giữa hệ điều hành thời gian thực (RTOS như FreeRTOS, Zephyr) với Linux nhúng.",
+      "difficulty": "intermediate",
+      "durationMinutes": 140,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân biệt đặc tính vi kiến trúc và quy ước gọi hàm của các họ vi xử lý nhúng ARM, MIPS và RISC-V, bao gồm chế độ tập lệnh (Thumb, microMIPS), branch delay slots và tác động của endianness đối với phân tích mã máy.",
+        "Xây dựng và phân tích bản đồ không gian địa chỉ bộ nhớ vật lý (Memory Map), phân định ranh giới giữa Flash, SRAM, DRAM và các thanh ghi ngoại vi ánh xạ bộ nhớ (Memory-Mapped I/O - MMIO).",
+        "Phân tích cú pháp các định dạng đóng gói firmware tiêu chuẩn (Intel HEX, Motorola S-Record, ELF) và tính toán chính xác Base Address để tái định vị con trỏ lệnh cho firmware thô (Raw Binary) trong Ghidra và IDA Pro.",
+        "So sánh mô hình an ninh không gian bộ nhớ phẳng của hệ điều hành thời gian thực (RTOS thiếu MMU) với mô hình phân trang bộ nhớ ảo của Linux nhúng, đánh giá ranh giới cô lập tiến trình và khả năng khai thác bộ nhớ."
+      ],
+      "careerPaths": ["penetration-test", "vulnerability-research"],
+      "domains": ["iot", "firmware", "hardware"],
+      "attackTactics": ["initial-access", "discovery", "execution", "defense-evasion"],
+      "keywords": [
+        "embedded-architectures",
+        "arm-cortex",
+        "mips-endianness",
+        "risc-v",
+        "memory-map",
+        "intel-hex",
+        "motorola-s-record",
+        "raw-binary",
+        "rtos-vs-linux"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Khác với kiến trúc máy tính x86 chuẩn hóa với BIOS/UEFI thống nhất, thế giới hệ thống nhúng bị phân mảnh sâu sắc bởi các kiến trúc CPU khác nhau (ARM, MIPS, RISC-V), chế độ endianness đa dạng và bản đồ bộ nhớ tĩnh (Memory Map) do nhà sản xuất quy định cứng. Hiểu rõ kiến trúc vi điều khiển, sơ đồ phân vùng bộ nhớ Flash/RAM và định dạng đóng gói nhị phân là chìa khóa then chốt để tái định vị con trỏ lệnh (base address rebasing) và dịch ngược mã máy chính xác khi phân tích firmware không có bảng biểu tượng (stripped symbols).",
+      "visual": {
+        "title": "Bản Đồ Không Gian Địa Chỉ Bộ Nhớ Nhúng và Quy Trình Ánh Xạ Firmware",
+        "caption": "Sơ đồ ánh xạ địa chỉ từ bộ nhớ Flash không khả biến (Non-volatile Flash) vào bộ nhớ khả biến (SRAM/DRAM) dựa trên bảng Vector Table và Base Address.",
+        "steps": [
+          {
+            "label": "Đọc Bảng Vector Table & Reset Handler",
+            "detail": "Khi cấp nguồn, vi điều khiển nạp giá trị Initial Stack Pointer tại 0x00000000 và nhảy tới địa chỉ Reset Vector tại 0x00000004 để bắt đầu chuỗi thực thi mã khởi động.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Sao Chép Phân Vùng Dữ Liệu Flash sang RAM",
+            "detail": "Startup Code sao chép phần dữ liệu khởi tạo (.data) từ Flash sang SRAM nội bộ và xóa trắng phân vùng biến toàn cục (.bss) trước khi gọi hàm main().",
+            "tone": "allow"
+          },
+          {
+            "label": "Nhận Diện Endianness & Branch Delay Slots",
+            "detail": "Trình phân tích phải xác định đúng thứ tự byte Little-Endian hay Big-Endian; trên kiến trúc MIPS, lệnh sau lệnh rẽ nhánh (Delay Slot) luôn được thực thi bất kể điều kiện nhảy.",
+            "tone": "caution"
+          },
+          {
+            "label": "Đánh Giá Ranh Giới Bảo Vệ Bộ Nhớ (MMU/MPU)",
+            "detail": "Hệ thống RTOS thiếu MMU vận hành trong không gian địa chỉ phẳng 32-bit; bất kỳ lỗi tràn bộ đệm nào cũng trực tiếp can thiệp vào thanh ghi phần cứng MMIO và stack của các task khác.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Vi Xử Lý Nhúng: ARM Cortex, MIPS và Sự Bùng Nổ của RISC-V",
+          "paragraphs": [
+            "Hệ sinh thái thiết bị nhúng và IoT chủ yếu được vận hành bởi ba kiến trúc tập lệnh vi xử lý (ISA) chủ đạo: ARM, MIPS và RISC-V. Họ vi xử lý ARM thống trị thị trường từ các vi điều khiển năng lượng thấp (ARM Cortex-M0/M3/M4/M7) cho đến các bộ xử lý ứng dụng hiệu năng cao (ARM Cortex-A53/A72 chạy AArch64). Trên dòng Cortex-M, vi xử lý hoạt động hoàn toàn ở chế độ tập lệnh Thumb hoặc Thumb-2 (độ dài lệnh 16-bit xen kẽ 32-bit), trong khi dòng Cortex-A hỗ trợ chuyển đổi linh hoạt giữa chế độ 32-bit ARM và 64-bit AArch64. Điểm đặc thù của kiến trúc ARM là bit thấp nhất (LSB) của địa chỉ hàm đích được sử dụng làm cờ chỉ thị chế độ Thumb: nếu bit 0 bằng 1, CPU sẽ chuyển sang thực thi Thumb mode, điều này giải thích tại sao các con trỏ hàm trong vector table của Cortex-M luôn là số lẻ.",
+            "Kiến trúc MIPS (MIPS32/MIPS64) vẫn hiện diện phổ biến trong các thiết bị hạ tầng mạng như router gia đình, điểm truy cập Wi-Fi và gateway băng rộng (Broadcom, MediaTek, Realtek). Một đặc trưng kỹ thuật quan trọng của MIPS mà kiểm toán viên nhị phân bắt buộc phải nắm vững là cơ chế 'Branch Delay Slot' (khe trễ nhánh): do kiến trúc đường ống lệnh 5 tầng (pipeline) truyền thống, lệnh nằm ngay phía sau lệnh rẽ nhánh (branch hoặc jump) luôn luôn được CPU nạp và thực thi trước khi luồng thực thi thực sự chuyển đến nhãn đích. Ngoài ra, MIPS hỗ trợ cả hai chế độ sắp xếp byte: Little-Endian (MIPSEL) và Big-Endian (MIPSEB). Việc nhận diện sai endianness sẽ khiến toàn bộ opcode bị đảo ngược thứ tự byte và trình dịch ngược sẽ tạo ra mã máy hoàn toàn vô nghĩa.",
+            "Kiến trúc RISC-V đang trở thành tiêu chuẩn mở phát triển nhanh nhất trong ngành công nghiệp bán dẫn nhúng, loại bỏ chi phí bản quyền sở hữu trí tuệ của ARM. RISC-V có thiết kế dạng mô-đun hóa cao độ xoay quanh tập lệnh cơ sở RV32I hoặc RV64I kèm theo các phần mở rộng tiêu chuẩn: 'M' (phép nhân/chia số nguyên), 'A' (các thao tác nguyên tử atomic), 'F'/'D' (dấu phẩy động đơn/kép), và 'C' (nén lệnh 16-bit tương tự Thumb). Do tính linh hoạt của RISC-V, nhiều nhà sản xuất SoC tích hợp thêm các lệnh tùy biến (custom instructions) cho mã hóa hoặc xử lý tín hiệu số, tạo ra những thách thức độc nhất vô nhị khi phân tích nhị phân dịch ngược."
+          ]
+        },
+        {
+          "title": "Tổ Chức Bộ Nhớ Vật Lý: SPI NOR, NAND Flash, eMMC và Bản Đồ Địa Chỉ Bộ Nhớ",
+          "paragraphs": [
+            "Khác với kiến trúc x86 với không gian địa chỉ bộ nhớ được quy định phần lớn bởi chuẩn ACPI và PCI enumeration, các thiết bị nhúng sử dụng sơ đồ bản đồ bộ nhớ (Memory Map) được liên kết tĩnh (hardwired) trong silicon SoC. Không gian địa chỉ 32-bit (4GB) hoặc 64-bit được phân chia thành các vùng chức năng chuyên biệt: BootROM nội bộ (thường bắt đầu từ 0x00000000 hoặc 0xFFFF0000), bộ nhớ SRAM tĩnh nội vi (On-chip SRAM với dung lượng từ vài chục KB đến vài MB), không gian bộ nhớ ngoài DRAM (DDR3/DDR4 nạp tại 0x80000000), và không gian thanh ghi ngoại vi ánh xạ bộ nhớ (Memory-Mapped I/O - MMIO) điều khiển GPIO, UART, SPI, I2C.",
+            "Về lưu trữ không khả biến (Non-volatile Storage), có hai công nghệ Flash chính: NOR Flash và NAND Flash. SPI NOR Flash có dung lượng nhỏ (thường từ 2MB đến 32MB) nhưng cho phép truy cập ngẫu nhiên theo từng byte dữ liệu. Nhờ đặc tính này, CPU có thể thực thi mã trực tiếp từ chip Flash mà không cần tải vào RAM trước — cơ chế này gọi là Execute-in-Place (XIP), rất phổ biến trên các vi điều khiển Cortex-M và router giá rẻ. Ngược lại, NAND Flash (và phiên bản đóng gói tích hợp bộ điều khiển là eMMC) có dung lượng lớn hơn nhiều (từ hàng trăm MB đến hàng trăm GB) nhưng chỉ hỗ trợ đọc/ghi theo từng trang (Page, 2KB-8KB) và xóa theo từng khối (Block, 128KB-512KB). NAND Flash yêu cầu phần mềm phải xử lý quản lý ô nhớ hỏng (Bad Block Management) và cân bằng độ mòn (Wear Leveling) thông qua hệ thống tệp MTD (Memory Technology Device) hoặc bộ điều khiển phần cứng eMMC.",
+            "Khi kiểm toán một tệp dump firmware, việc xác định đúng loại chip Flash và kích thước phân vùng là bước quyết định. Nếu nhà phát triển ghi dữ liệu cấu hình hoặc khóa bảo mật vào các sector cuối cùng của SPI Flash, việc dump thiếu một vài sector do cấu hình sai dung lượng chip nhớ trong máy nạp ROM (programmer) sẽ làm mất hoàn toàn chứng cứ phân tích."
+          ]
+        },
+        {
+          "title": "Định Dạng Tệp Tin Nhị Phân Firmware: Raw Binary, Intel HEX, Motorola S-Record và ELF",
+          "paragraphs": [
+            "Trong quá trình phát triển và nạp phần mềm nhúng, firmware tồn tại dưới nhiều định dạng đóng gói khác nhau. Định dạng cao cấp nhất là Executable and Linkable Format (ELF). Tệp ELF chứa đầy đủ thông tin metadata, bao gồm Program Headers chỉ định rõ ràng địa chỉ nạp vật lý (Physical Address - paddr) và địa chỉ nạp ảo (Virtual Address - vaddr) của từng phân vùng (.text, .rodata, .data), bảng ký hiệu hàm (symbol table) và bảng tái định vị (relocation entries). Tệp ELF thường là đầu ra trực tiếp của chuỗi công cụ biên dịch (GCC/Clang toolchain) trước khi chuyển đổi để nạp vào thiết bị thương mại.",
+            "Để nạp mã qua các giao diện nạp bootloader hoặc lập trình chip công nghiệp, các kỹ sư thường chuyển đổi ELF sang các định dạng văn bản dựa trên bản ghi (record-based text formats) như Intel HEX (.hex) hoặc Motorola S-Record (.srec, .s19, .s28, .s37). Định dạng Intel HEX mã hóa dữ liệu thành các dòng văn bản ASCII bắt đầu bằng ký tự hai chấm (`:`), theo sau là độ dài dữ liệu (Byte Count), địa chỉ offset 16-bit (Address), kiểu bản ghi (Record Type: 00 là dữ liệu, 01 là End of File, 04 là Extended Linear Address để mở rộng không gian 32-bit), dữ liệu hex và checksum 8-bit. Định dạng Motorola S-Record có cấu trúc tương tự bắt đầu bằng chữ 'S' và số chỉ định kiểu bản ghi (S1/S2/S3 tương ứng với địa chỉ 16/24/32-bit). Ưu điểm của Intel HEX và S-Record là chúng bảo lưu thông tin địa chỉ tuyệt đối mà dữ liệu cần được ghi vào bộ nhớ Flash.",
+            "Tuy nhiên, khi trích xuất trực tiếp từ chip nhớ SPI Flash bằng kẹp SOIC-8 hoặc lệnh dump bộ nhớ bootloader, dữ liệu thu được thường là định dạng nhị phân thô (Raw Binary / Flat Binary). Raw Binary không chứa bất kỳ header, magic bytes hay metadata nào; nó chỉ là chuỗi byte liên tục được ghi tuần tự từ offset 0x0 của chip Flash. Thách thức lớn nhất khi nạp Raw Binary vào Ghidra hoặc IDA Pro là xác định Base Address (địa chỉ nạp cơ sở). Nếu chọn sai Base Address, toàn bộ các tham chiếu con trỏ tuyệt đối (Absolute Pointers) trong bảng hàm, chuỗi ký tự (String Literals) và biến toàn cục sẽ bị lệch, khiến trình dịch ngược không thể phân giải được luồng điều khiển và tham chiếu chéo (Cross-References - XREFs)."
+          ]
+        },
+        {
+          "title": "Mô Hình Thực Thi: Hệ Điều Hành Thời Gian Thực (RTOS) So Với Linux Nhúng",
+          "paragraphs": [
+            "Một phân định kiến trúc cốt lõi trong bảo mật nhúng là sự khác biệt giữa hệ điều hành thời gian thực (RTOS như FreeRTOS, Zephyr, VxWorks, ThreadX) và hệ điều hành đa nhiệm có bộ nhớ ảo (Embedded Linux). Đa số các hệ thống RTOS chạy trên các vi điều khiển không có bộ quản lý bộ nhớ phần cứng (Memory Management Unit - MMU). Không có MMU, toàn bộ hệ điều hành và các tác vụ (tasks/threads) cùng chia sẻ một không gian địa chỉ bộ nhớ vật lý phẳng (Flat Memory Model). Không có khái niệm phân tách không gian nhân (Kernel Space) và không gian người dùng (User Space), không có phân trang bộ nhớ ảo, và không có cơ chế Address Space Layout Randomization (ASLR).",
+            "Mặc dù một số vi điều khiển hiện đại tích hợp Bộ bảo vệ bộ nhớ (Memory Protection Unit - MPU) cho phép định nghĩa các vùng cấm đọc/ghi/thực thi tĩnh, đa phần các nhà phát triển RTOS thương mại thường tắt MPU hoặc cấu hình nó một cách lỏng lẻo vì lý do đơn giản hóa lập trình. Do đó, nếu kẻ tấn công khai thác thành công một lỗ hổng tràn bộ đệm stack hoặc heap (ví dụ lỗi trong hàm quản lý heap `pvPortMalloc` của FreeRTOS), payload mã khai thác có thể ghi đè trực tiếp lên cấu trúc Task Control Block (TCB), thay đổi con trỏ Top of Stack của bất kỳ task nào khác, hoặc trực tiếp thao tác các thanh ghi MMIO điều khiển phần cứng mà không hề bị hệ điều hành ngăn chặn.",
+            "Ngược lại, Linux nhúng yêu cầu bộ xử lý phải có MMU (như ARM Cortex-A hoặc MIPS32 với TLB). Nhân Linux thiết lập các bảng trang (Page Tables) để cung cấp không gian bộ nhớ ảo 32-bit hoặc 64-bit độc lập cho mỗi tiến trình. Lỗ hổng tràn bộ đệm trong một daemon người dùng (ví dụ httpd) sẽ chỉ làm sập tiến trình đó hoặc cho phép thực thi mã trong phạm vi đặc quyền của người dùng đó (thường là root trên hệ thống nhúng, nhưng vẫn bị giam trong không gian user space). Để can thiệp vào tầng vật lý hoặc nhân kernel, kẻ tấn công bắt buộc phải thực hiện thêm bước leo thang đặc quyền thông qua các lệnh gọi hệ thống (syscalls) hoặc lỗ hổng trong kernel module/driver."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Xác Định Kiến Trúc CPU, Endianness và Tái Định Vị Base Address Firmware Nhị Phân Không Cấu Trúc",
+        "objective": "Nhận diện kiến trúc CPU, chiều byte endianness, cấu trúc bản đồ địa chỉ bộ nhớ và tính toán chính xác Base Address để tải firmware nguyên khối vào trình dịch ngược Ghidra/IDA Pro.",
+        "scenario": "Đội ngũ nghiên cứu an ninh thu được một tệp dump SPI Flash dung lượng 4MB (scada_gateway_dump.bin) từ một bộ điều khiển giám sát công nghiệp (SCADA IoT Gateway). Tệp tin có định dạng raw binary (không có ELF header hay bảng ký hiệu). Bạn cần phân tích cấu trúc nhị phân để nạp tệp vào Ghidra một cách chính xác, khôi phục tham chiếu chuỗi và định vị hàm xử lý lệnh mạng.",
+        "constraints": [
+          "Chỉ được sử dụng các công cụ phân tích nhị phân an toàn ngoại tuyến (hexdump, strings, radare2/rabin2, Ghidra).",
+          "Không được thực thi tệp tin nhị phân trực tiếp trên hệ thống chủ để tránh nguy cơ kích hoạt mã độc phần cứng không rõ nguồn gốc.",
+          "Mọi phép tính Base Address phải được chứng minh bằng ít nhất hai chuỗi tham chiếu con trỏ bộ nhớ (String Cross-References) khớp hoàn hảo."
+        ],
+        "cases": [
+          {
+            "id": "case-100-01",
+            "title": "Nhận Diện Kiến Trúc CPU và Endianness Từ Mẫu Opcode Đặc Trưng",
+            "context": "Khi mở tệp scada_gateway_dump.bin bằng hexdump ở đầu offset 0x00000000, bạn quan sát thấy chuỗi byte: `00 00 00 00 7C 10 00 00 03 E0 00 08 00 00 00 00`. Tại offset 0x00000008, bạn thấy giá trị `03 E0 00 08`, và ngay sau đó tại 0x0000000C là `00 00 00 00` (lệnh NOP).",
+            "prompt": "Dựa trên các đặc tính mã máy trên, tệp firmware này được biên dịch cho kiến trúc CPU nào và sử dụng quy ước byte endianness gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "MIPS Architecture, chế độ Big-Endian (MIPSEB). Mẫu byte `03 E0 00 08` chính là lệnh `jr $ra` (Jump Register Return Address) kinh điển của MIPS được mã hóa theo thứ tự Big-Endian, và lệnh `00 00 00 00` theo sau là lệnh `nop` nằm trong Branch Delay Slot bắt buộc của kiến trúc MIPS.",
+                "correct": true,
+                "rationale": "Trong tập lệnh MIPS, lệnh `jr $ra` có opcode nhị phân 0x03E00008; việc byte cao nhất (03) nằm ở địa chỉ bộ nhớ thấp chứng minh định dạng Big-Endian, và lệnh NOP theo sau là chỉ dấu không thể nhầm lẫn của khe trễ nhánh (branch delay slot) trong MIPS."
+              },
+              {
+                "id": "B",
+                "label": "ARM Cortex-M Architecture, chế độ Little-Endian, với vector Reset Handler trỏ tới địa chỉ 0x0000107C.",
+                "correct": false,
+                "rationale": "Nếu là ARM Little-Endian, mẫu byte 03 E0 00 08 sẽ được đọc thành 0x0800E003, không tương ứng với bất kỳ lệnh return hợp lệ nào của ARM Thumb, và ARM không có cơ chế branch delay slot với lệnh NOP bắt buộc."
+              },
+              {
+                "id": "C",
+                "label": "x86-64 Architecture, chế độ Little-Endian, với lệnh nhảy far jump tương đối.",
+                "correct": false,
+                "rationale": "Kiến trúc x86-64 sử dụng tập lệnh độ dài biến thiên (CISC) với các byte opcode như 0xC3 cho lệnh ret, hoàn toàn khác biệt với cấu trúc 4-byte cố định của MIPS."
+              },
+              {
+                "id": "D",
+                "label": "RISC-V 32-bit (RV32I), chế độ Big-Endian, sử dụng lệnh jalr x0, x1, 0.",
+                "correct": false,
+                "rationale": "Trong RISC-V RV32I, lệnh ret (tương đương jalr x0, x1, 0) được mã hóa là 0x00008067, không khớp với giá trị byte 03 E0 00 08."
+              }
+            ]
+          },
+          {
+            "id": "case-100-02",
+            "title": "Tính Toán Base Address Tái Định Vị Bộ Nhớ Cho Firmware Nhị Phân Thô",
+            "context": "Trong tệp nhị phân thô, bạn tìm thấy chuỗi ký tự ASCII 'SCADA_ADMIN_READY' tại file offset `0x00012050`. Khi tìm kiếm các chuỗi 4-byte có khả năng là con trỏ trỏ tới chuỗi này trong vùng mã lệnh, bạn tìm thấy giá trị 4-byte Big-Endian `80 03 20 50` xuất hiện tại file offset `0x00004500` làm tham số cho một hàm khởi tạo chuỗi.",
+            "prompt": "Địa chỉ nạp cơ sở (Base Address / Image Base) chính xác của tệp firmware này trong không gian bộ nhớ của thiết bị là bao nhiêu?",
+            "options": [
+              {
+                "id": "A",
+                "label": "0x00000000",
+                "correct": false,
+                "rationale": "Nếu Base Address là 0x00000000 thì con trỏ tới chuỗi phải có giá trị là 0x00012050, trong khi con trỏ thực tế trong mã máy là 0x80032050."
+              },
+              {
+                "id": "B",
+                "label": "0x80020000. Công thức tính Base Address: Giá trị con trỏ (0x80032050) trừ đi File Offset của chuỗi (0x00012050) = 0x80020000. Địa chỉ này khớp với vùng kseg0 (0x80000000+) của kiến trúc MIPS.",
+                "correct": true,
+                "rationale": "Phép tính Base Address chuẩn: Virtual Address của chuỗi (0x80032050) = Base Address + File Offset (0x00012050). Suy ra Base Address = 0x80032050 - 0x00012050 = 0x80020000, hoàn toàn phù hợp với không gian kseg0 được ánh xạ vào RAM trong MIPS."
+              },
+              {
+                "id": "C",
+                "label": "0x80000000",
+                "correct": false,
+                "rationale": "Nếu Base Address là 0x80000000 thì địa chỉ chuỗi tại offset 0x00012050 sẽ là 0x80012050, không khớp với giá trị con trỏ 0x80032050 tìm thấy trong mã máy."
+              },
+              {
+                "id": "D",
+                "label": "0x08000000",
+                "correct": false,
+                "rationale": "0x08000000 là không gian flash thường thấy trên vi điều khiển ARM Cortex-M STM32, không liên quan đến không gian địa chỉ MIPS 0x80000000+."
+              }
+            ]
+          },
+          {
+            "id": "case-100-03",
+            "title": "Đánh Giá Mô Hình Quản Lý Bộ Nhớ và Khả Năng Khai Thác Khi Thiếu MMU",
+            "context": "Sau khi nạp firmware vào Ghidra với Base Address 0x80020000 và kiến trúc MIPS:BE:32, bạn phát hiện mã nguồn sử dụng kernel FreeRTOS thay vì Linux nhúng. Hàm xử lý gói tin Modbus TCP `vProcessModbusPacket` gọi `memcpy` với độ dài do người dùng gửi từ mạng mà không kiểm tra giới hạn mảng bộ đệm tĩnh nằm trong phân vùng dữ liệu toàn cục.",
+            "prompt": "Hậu quả an ninh nghiêm trọng nhất phát sinh từ lỗi tràn bộ đệm này trong môi trường RTOS không có MMU là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ làm sập tiến trình modbus_daemon và tiến trình này sẽ tự động được init daemon khởi động lại mà không ảnh hưởng tới các dịch vụ mạng khác.",
+                "correct": false,
+                "rationale": "FreeRTOS không có khái niệm tiến trình riêng lẻ hay init daemon; mọi thành phần đều là các task chạy chung một không gian bộ nhớ."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công không thể khai thác được vì cơ chế Address Space Layout Randomization (ASLR) của FreeRTOS sẽ ngẫu nhiên hóa vị trí của stack và heap sau mỗi chu kỳ xung nhịp.",
+                "correct": false,
+                "rationale": "FreeRTOS trên vi điều khiển không có ASLR hay MMU; mọi địa chỉ bộ nhớ đều là địa chỉ vật lý cố định hoàn toàn có thể đoán trước."
+              },
+              {
+                "id": "C",
+                "label": "Kẻ tấn công có thể ghi đè trực tiếp cấu trúc Task Control Block (TCB) của các tác vụ hệ thống trọng yếu khác, sửa đổi con trỏ Top of Stack (pxTopOfStack) hoặc ghi đè trực tiếp vào các thanh ghi MMIO điều khiển ngắt phần cứng, chiếm quyền kiểm soát toàn bộ thiết bị ngay lập tức mà không gặp bất kỳ cơ chế cô lập bộ nhớ nào.",
+                "correct": true,
+                "rationale": "Trong mô hình bộ nhớ phẳng của RTOS không có MMU, ranh giới cách ly giữa các task hoàn toàn không tồn tại; việc tràn bộ đệm tại một task cho phép ghi đè lên toàn bộ không gian RAM của hệ thống và thanh ghi phần cứng."
+              },
+              {
+                "id": "D",
+                "label": "Hệ điều hành sẽ kích hoạt SEAndroid AVC denial để chặn truy cập ghi trái phép vào vùng nhớ ngoại vi.",
+                "correct": false,
+                "rationale": "SEAndroid chỉ tồn tại trên Android/Linux, hoàn toàn không có mặt trên các hệ điều hành vi điều khiển RTOS nhỏ gọn như FreeRTOS."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Nhận diện chính xác mẫu opcode và khe trễ nhánh (branch delay slot) đặc trưng của kiến trúc MIPS Big-Endian.",
+          "Tính toán chính xác Base Address tái định vị (0x80020000) từ độ lệch con trỏ chuỗi và file offset.",
+          "Phân tích đúng tác động của mô hình không gian bộ nhớ phẳng trong hệ điều hành RTOS không có MMU đối với tính khai thác của lỗ hổng bộ nhớ."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo phân tích hexdump và bảng tra cứu opcode chỉ ra mã lệnh `jr $ra` và khe trễ nhánh MIPS",
+          "Bảng tính toán Base Address chi tiết đối chiếu giữa file offset chuỗi và giá trị con trỏ trong mã máy",
+          "Ảnh chụp màn hình cấu hình Memory Map trong Ghidra sau khi đã nạp firmware với Base Address chính xác",
+          "Biên bản đánh giá rủi ro an ninh đối với kiến trúc FreeRTOS không MMU kèm phân tích cấu trúc TCB bị ảnh hưởng"
+        ],
+        "reset": "Đặt lại cấu hình công cụ dịch ngược Ghidra và khôi phục tệp scada_gateway_dump.bin về trạng thái ban đầu.",
+        "cleanup": "Xóa bỏ các dự án Ghidra tạm, tệp cơ sở dữ liệu phân tích (.gpr/.rep) và log xuất ra trong phiên làm việc."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc cấu hình kích hoạt Bộ bảo vệ bộ nhớ (MPU - Memory Protection Unit) trên vi điều khiển RTOS để thiết lập ranh giới cách ly cấm ghi/thực thi giữa các vùng nhớ của từng tác vụ.",
+          "Sử dụng các cờ biên dịch bảo vệ ngăn xếp (`-fstack-protector-strong`) và loại bỏ hoàn toàn các hàm sao chép bộ nhớ không an toàn (strcpy, memcpy thiếu bounds check) trong mã nguồn firmware.",
+          "Xóa bỏ hoàn toàn bảng biểu tượng gỡ lỗi (strip symbols) và vô hiệu hóa các chuỗi ký tự debug rò rỉ tên hàm nội bộ trước khi xuất bản bản build production."
+        ],
+        "observe": [
+          "Giám sát thanh ghi ngoại vi quản lý lỗi phần cứng (Hardware Fault Registers, ví dụ CFSR/HFSR trên ARM Cortex-M) để phát hiện sự kiện MemManage Fault hoặc Bus Fault phát sinh khi có truy cập bộ nhớ bất thường.",
+          "Triển khai cơ chế theo dõi tràn ngăn xếp (Stack Overflow Hook) được tích hợp sẵn trong RTOS (ví dụ `vApplicationStackOverflowHook` trong FreeRTOS).",
+          "Thu thập và phân tích crash dump qua kênh viễn trắc an toàn (telemetry) để phát hiện sớm các nỗ lực thăm dò khai thác bộ đệm từ xa."
+        ],
+        "respond": [
+          "Khi phát hiện lỗi truy cập vùng nhớ cấm hoặc tràn ngăn xếp, cấu hình hệ thống thực hiện khởi động lại khẩn cấp (Software Reset) thay vì rơi vào vòng lặp vô tận (infinite loop hang).",
+          "Ghi nhận thông tin con trỏ lệnh (Program Counter) và thanh ghi liên kết (Link Register) vào bộ nhớ Flash nhật ký an toàn (crashlog partition) trước khi khởi động lại để phục vụ điều tra sự cố.",
+          "Phát hành bản vá firmware khẩn cấp khắc phục lỗi bounds-checking và cập nhật phiên bản phần mềm qua kênh FOTA an toàn."
+        ],
+        "residualRisk": [
+          "Các thiết bị IoT thế hệ cũ sử dụng vi điều khiển giá rẻ hoàn toàn không có phần cứng MPU không thể áp dụng cơ chế cách ly bộ nhớ ở tầng phần cứng.",
+          "Kỹ thuật phân tích dịch ngược nhị phân ngoại tuyến không bị giới hạn bởi bất kỳ rào cản phòng vệ runtime nào một khi kẻ tấn công đã trích xuất được tệp dump SPI Flash."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Mọi tệp firmware trích xuất từ thiết bị IoT thương mại đều có định dạng ELF chuẩn chứa đầy đủ thông tin phân vùng và tên hàm để dịch ngược dễ dàng.",
+          "correction": "Phần lớn firmware thương mại nạp vào chip Flash vi điều khiển là tệp nhị phân thô (Raw Binary) đã bị loại bỏ hoàn toàn metadata và biểu tượng debug (stripped); kiểm toán viên bắt buộc phải tự suy luận kiến trúc CPU, endianness và Base Address dựa trên opcode và con trỏ chuỗi."
+        },
+        {
+          "claim": "Kiến trúc MIPS và ARM trên các thiết bị mạng gia đình luôn luôn sử dụng quy ước byte Little-Endian tương tự như máy tính x86.",
+          "correction": "Rất nhiều thiết bị định tuyến mạng và vi điều khiển công nghiệp sử dụng MIPS Big-Endian (MIPSEB) hoặc ARM Big-Endian (BE-8); nếu chọn sai endianness trong công cụ dịch ngược, toàn bộ mã máy sẽ bị giải mã sai lệch hoàn toàn."
+        },
+        {
+          "claim": "Hệ điều hành thời gian thực FreeRTOS hoặc Zephyr chạy trên vi điều khiển 32-bit cũng cung cấp cơ chế bảo vệ phân tách không gian tiến trình ảo giống như Linux nhúng.",
+          "correction": "Đa số RTOS chạy trên vi xử lý không có MMU, hoạt động hoàn toàn trong không gian địa chỉ vật lý phẳng không có phân trang; mọi tác vụ chia sẻ chung bộ nhớ và có thể đọc/ghi trực tiếp vào stack hoặc dữ liệu của tác vụ khác nếu không có MPU bảo vệ."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os11-l100-q1",
+          "difficulty": "easy",
+          "question": "Trong kiến trúc MIPS, đặc tính kỹ thuật nào giải thích tại sao lệnh nằm ngay sau lệnh rẽ nhánh (branch/jump) luôn luôn được bộ xử lý thực thi?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Branch Delay Slot (Khe trễ nhánh)"
+            },
+            {
+              "id": "B",
+              "label": "Execute-in-Place (XIP)"
+            },
+            {
+              "id": "C",
+              "label": "Memory-Mapped I/O (MMIO)"
+            },
+            {
+              "id": "D",
+              "label": "Thumb Mode Switching"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Do kiến trúc đường ống lệnh 5 tầng (pipeline) truyền thống của MIPS, chu kỳ xung nhịp ngay sau khi lệnh rẽ nhánh được nạp đã nạp sẵn lệnh kế tiếp; lệnh này nằm trong 'Branch Delay Slot' và luôn được thực thi trước khi luồng điều khiển nhảy sang nhãn đích."
+        },
+        {
+          "id": "os11-l100-q2",
+          "difficulty": "medium",
+          "question": "Khi nạp một tệp firmware định dạng Raw Binary vào Ghidra, yếu tố nào dưới đây là quan trọng nhất để trình dịch ngược có thể phân giải chính xác các tham chiếu chéo (Cross-References) giữa con trỏ mã lệnh và chuỗi ký tự?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Bật tính năng tạo mã khử nhiễu tự động Decompiler Optimization Level 3."
+            },
+            {
+              "id": "B",
+              "label": "Xác định đúng Base Address (Địa chỉ nạp cơ sở) để ánh xạ đúng không gian bộ nhớ của thiết bị."
+            },
+            {
+              "id": "C",
+              "label": "Chuyển đổi tệp Raw Binary thành tệp nén ZIP trước khi phân tích."
+            },
+            {
+              "id": "D",
+              "label": "Cấu hình Ghidra chạy ở chế độ giả lập x86-64."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Tệp Raw Binary không chứa thông tin header chỉ định địa chỉ nạp. Nếu cấu hình sai Base Address, các con trỏ tuyệt đối trong mã máy sẽ bị lệch so với vị trí thực tế của chuỗi và hàm, khiến Ghidra không thể tạo ra các liên kết tham chiếu chéo (XREFs) chính xác."
+        },
+        {
+          "id": "os11-l100-q3",
+          "difficulty": "hard",
+          "question": "Điểm khác biệt cốt lõi về mặt kiến trúc phần cứng ảnh hưởng trực tiếp đến khả năng phân tách ranh giới bảo mật tiến trình giữa vi điều khiển chạy RTOS (ví dụ ARM Cortex-M4) và bộ xử lý chạy Linux nhúng (ví dụ ARM Cortex-A53) là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cortex-M4 chỉ hỗ trợ số thực dấu phẩy động đơn còn Cortex-A53 hỗ trợ dấu phẩy động kép."
+            },
+            {
+              "id": "B",
+              "label": "Cortex-M4 không có Bộ quản lý bộ nhớ phần cứng (MMU) hỗ trợ phân trang bộ nhớ ảo, trong khi Cortex-A53 có MMU cho phép cô lập không gian bộ nhớ ảo giữa từng tiến trình và giữa User Space với Kernel Space."
+            },
+            {
+              "id": "C",
+              "label": "Cortex-M4 sử dụng tập lệnh CISC phức tạp trong khi Cortex-A53 sử dụng tập lệnh RISC đơn giản."
+            },
+            {
+              "id": "D",
+              "label": "Cortex-M4 không có các thanh ghi đa dụng (General Purpose Registers) như Cortex-A53."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Cortex-M4 thiếu MMU nên RTOS chỉ chạy trong không gian bộ nhớ vật lý phẳng không có bộ nhớ ảo; Cortex-A53 có MMU hỗ trợ bảng phân trang (page tables), cho phép nhân Linux cô lập hoàn toàn không gian bộ nhớ của các tiến trình độc lập."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một thiết bị Internet of Things Gateway kết nối trạm quan trắc môi trường sử dụng vi điều khiển RISC-V 32-bit (RV32IMAC) chạy hệ điều hành Zephyr RTOS. Đội ngũ an ninh thu được tệp flash dump 2MB (zephyr_firmware.bin) không rõ cấu trúc. Bạn được giao nhiệm vụ xác định Base Address, tìm kiếm bảng ngắt interrupt vector table, và định vị hàm xử lý chứng chỉ TLS client trong firmware.",
+        "tasks": [
+          "Sử dụng công cụ r2/rabin2 hoặc ghidra để phân tích mẫu opcode RISC-V, xác định quy ước endianness và tìm kiếm địa chỉ bắt đầu của bảng vector table.",
+          "Áp dụng phương pháp tính toán con trỏ chuỗi tham chiếu chéo để xác định chính xác Base Address của phân vùng mã Flash trong không gian bộ nhớ 32-bit.",
+          "Dịch ngược hàm nạp khóa riêng tư TLS, đánh giá xem khóa được lưu trữ dưới dạng bản rõ (plaintext) trong bộ nhớ Flash hay được bảo vệ qua Secure Element."
+        ],
+        "requiredEvidence": [
+          "Biên bản tính toán Base Address kèm offset của chuỗi 'ZEPHYR_INIT' và con trỏ 32-bit tương ứng trong mã máy",
+          "Tệp xuất đồ thị luồng điều khiển (CFG) của hàm khởi tạo bảng vector table trong Ghidra",
+          "Báo cáo thẩm định an toàn về vị trí lưu trữ chứng chỉ TLS kèm khuyến nghị bảo vệ khóa bằng phần cứng ngoại vi"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Arm Cortex-M4 Devices Generic User Guide",
+          "url": "https://developer.arm.com/documentation/dui0553/latest/",
+          "publisher": "Arm Limited",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu trúc bảng Vector Table và thanh ghi Reset Handler trên dòng vi điều khiển Cortex-M",
+            "Mô hình không gian bộ nhớ phẳng và cơ chế hoạt động của Memory Protection Unit (MPU)"
+          ]
+        },
+        {
+          "title": "The RISC-V Instruction Set Manual, Volume I: Unprivileged Architecture",
+          "url": "https://riscv.org/technical/specifications/",
+          "publisher": "RISC-V International",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Tập lệnh cơ sở RV32I/RV64I và các phần mở rộng tiêu chuẩn M, A, F, D, C",
+            "Quy ước gọi hàm, tổ chức thanh ghi và mô hình endianness chuẩn của RISC-V"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os11-l101-firmware-extraction-analysis-and-emulation",
+      "slug": "firmware-extraction-analysis-and-emulation",
+      "title": "Kỹ Thuật Trích Xuất Firmware, Phân Tích Hệ Thống Tệp & Mô Phỏng Môi Trường QEMU",
+      "summary": "Phương pháp trích xuất firmware từ dump bộ nhớ SPI Flash và gói cập nhật nhà sản xuất, phân tích entropy để nhận diện phân vùng mã hóa/nén, sử dụng Binwalk và Sasquatch để bóc tách hệ thống tệp nhúng (SquashFS, CramFS, JFFS2, UBIFS), phân tích tĩnh cấu hình dịch vụ mạng và thông tin xác thực hardcoded, cùng kỹ thuật mô phỏng nhị phân (Emulation) qua QEMU (User-mode và System-mode với Firmadyne/FirmAE).",
+      "difficulty": "intermediate",
+      "durationMinutes": 140,
+      "prerequisites": [
+        "os11-l100-embedded-architectures-memory-and-firmware-structures"
+      ],
+      "outcomes": [
+        "Sử dụng công cụ Binwalk kết hợp phân tích biểu đồ Shannon Entropy để phân định ranh giới giữa bootloader, kernel nhúng, phân vùng nén và phân vùng mã hóa trong tệp firmware nguyên khối.",
+        "Trích xuất và phục hồi toàn vẹn cấu trúc hệ thống tệp nhúng đặc thù (SquashFS nén LZMA tùy biến, JFFS2, YAFFS2, UBIFS) bằng các công cụ trích xuất chuyên dụng như Sasquatch và ubireader.",
+        "Tiến hành kiểm toán tĩnh hệ thống tệp gốc (rootfs): phát hiện tài khoản backdoor ẩn, mật khẩu băm yếu trong /etc/shadow, khóa bí mật SSL/SSH nhúng tĩnh và lỗ hổng injection trong kịch bản khởi tạo init/CGI.",
+        "Thiết lập môi trường mô phỏng dịch vụ mạng nhúng bằng QEMU (User-mode chroot kết hợp LD_PRELOAD shim hooking thư viện NVRAM, và Full-system emulation qua FirmAE) để kiểm thử động lỗ hổng tiền xác thực."
+      ],
+      "careerPaths": ["penetration-test", "vulnerability-research"],
+      "domains": ["iot", "firmware", "hardware"],
+      "attackTactics": ["initial-access", "discovery", "collection", "execution"],
+      "keywords": [
+        "firmware-extraction",
+        "binwalk",
+        "shannon-entropy",
+        "squashfs",
+        "ubifs",
+        "sasquatch",
+        "qemu-emulation",
+        "nvram-hooking",
+        "firmadyne-firmae"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Firmware nhúng thường được đóng gói thành các khối dữ liệu đa tầng (Multi-stage container): bootloader, kernel nhúng và hệ thống tệp nén (SquashFS/UBIFS). Thông qua phân tích biểu đồ entropy (Shannon Entropy) và bóc tách chữ ký ma thuật (magic bytes), kiểm toán viên an ninh có thể cô lập hệ thống tệp gốc (rootfs), phục hồi cấu hình hệ thống, phát hiện các bí mật tĩnh (hardcoded secrets, private keys, backdoor accounts) và đưa các tệp thực thi web/daemon vào môi trường giả lập QEMU mà không cần phần cứng vật lý.",
+      "visual": {
+        "title": "Quy Trình Bóc Tách Hệ Thống Tệp Firmware và Giả Lập Daemon Nhúng",
+        "caption": "Từ tệp dump nhị phân thô đến giải nén rootfs và mô phỏng dịch vụ web server bằng QEMU User/System mode.",
+        "steps": [
+          {
+            "label": "Quét Chữ Ký Nhị Phân & Biểu Đồ Entropy",
+            "detail": "Binwalk quét magic bytes (U-Boot uImage, gzip/lzma kernel, SquashFS superblocks) kết hợp đồ thị entropy để phát hiện ranh giới phân vùng nén hoặc mã hóa.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Trích Xuất Hệ Thống Tệp Bằng Sasquatch",
+            "detail": "Sử dụng Sasquatch để giải nén các biến thể SquashFS phi chuẩn của nhà sản xuất vốn bị công cụ unsquashfs thông thường từ chối phân tích.",
+            "tone": "allow"
+          },
+          {
+            "label": "Kiểm Toán Tĩnh RootFS & Secrets Hardcoded",
+            "detail": "Rà soát /etc/passwd, /etc/shadow, cấu hình NVRAM mặc định, chứng chỉ private key và các kịch bản CGI tiềm ẩn lỗi command injection.",
+            "tone": "caution"
+          },
+          {
+            "label": "Mô Phỏng Daemon Qua QEMU & Shim Hooking",
+            "detail": "Thực thi daemon web MIPS/ARM qua qemu-mips-static kết hợp chroot và nạp libnvram.so qua LD_PRELOAD để giả lập phần cứng ngoại vi NVRAM.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Phân Tích Chữ Ký Nhị Phân và Đồ Thị Entropy Của Firmware",
+          "paragraphs": [
+            "Tệp firmware tải về từ trang web của nhà sản xuất hoặc dump trực tiếp từ chip nhớ Flash hiếm khi là một khối nhị phân đồng nhất. Thay vào đó, nó là một cấu trúc nhiều tầng bao gồm các thành phần ghép nối tiếp: Header của nhà sản xuất (Vendor-specific Header), Bootloader (ví dụ U-Boot), Device Tree Blob (.dtb), Nhân Linux đã nén (uImage / zImage chứa kernel gzip/lzma), và một hoặc nhiều phân vùng hệ thống tệp (Root Filesystem, Data Partition). Công cụ tiêu chuẩn đầu tiên được sử dụng để khảo sát cấu trúc này là `binwalk`.",
+            "Binwalk hoạt động dựa trên cơ chế quét chữ ký nhị phân (magic signature scanning). Nó chứa một cơ sở dữ liệu lớn các chuỗi byte ma thuật đặc trưng cho các định dạng lưu trữ (ví dụ `hsqs` hoặc `shsq` cho SquashFS, `UBI#` cho UBIFS, `27 05 19 56` cho U-Boot uImage header). Tuy nhiên, nếu tệp tin bị mã hóa hoặc nén toàn phần, việc quét chữ ký ma thuật đơn thuần sẽ thất bại. Để giải quyết tình huống này, kỹ thuật phân tích biểu đồ độ hỗn loạn thông tin Shannon Entropy (`binwalk -E`) là công cụ định tính tối quan trọng.",
+            "Giá trị Shannon Entropy dao động từ 0 (độ ngẫu nhiên thấp nhất, ví dụ các khối padding toàn byte 0x00 hoặc 0xFF của Flash) đến 8 (độ ngẫu nhiên tối đa). Các vùng mã máy thực thi không nén hoặc dữ liệu chuỗi văn bản thường có entropy từ 5.5 đến 6.8. Các vùng dữ liệu nén (Gzip, LZMA, Bzip2) có entropy rất cao, thường dao động ổn định trong khoảng 7.5 đến 7.9. Nếu một vùng dữ liệu lớn có entropy đạt tiệm cận tuyệt đối 8.000 (đường đồ thị phẳng phiu ở mức đỉnh), khả năng rất cao là phân vùng đó đã bị mã hóa đối xứng (ví dụ AES-CBC/GCM) trước khi đóng gói, đòi hỏi kiểm toán viên phải tìm kiếm khóa giải mã từ bootloader hoặc tệp nhị phân nạp trước đó."
+          ]
+        },
+        {
+          "title": "Bóc Tách Các Định Dạng Hệ Thống Tệp Nhúng: SquashFS, JFFS2, YAFFS và UBIFS",
+          "paragraphs": [
+            "Trên hệ thống Linux nhúng, các hệ thống tệp được tối ưu hóa cao độ cho đặc tính của bộ nhớ Flash. Hệ thống tệp phổ biến nhất cho phân vùng rootfs là SquashFS. SquashFS là hệ thống tệp chỉ đọc (Read-Only) được nén khối cao độ. Do tính bất biến, nó bảo vệ hệ điều hành khỏi bị lỗi khi mất nguồn đột ngột. Tuy nhiên, nhiều nhà sản xuất thiết bị nhúng (như D-Link, Netgear, Huawei) sửa đổi cấu trúc superblock hoặc thuật toán nén LZMA tiêu chuẩn (vendor custom magic bytes hoặc non-standard LZMA header). Điều này khiến công cụ `unsquashfs` mặc định của Linux báo lỗi 'Can't find a SQUASHFS superblock'. Để khắc phục, công cụ `sasquatch` được phát triển để tự động quét brute-force và giải nén hầu hết các biến thể SquashFS tùy biến.",
+            "Đối với các phân vùng cần khả năng ghi (Read-Write) trên raw Flash (chip NAND/NOR Flash không có controller tích hợp), Linux sử dụng hệ thống tệp MTD chuyên biệt. Trên NOR Flash nhỏ, JFFS2 (Journaling Flash File System v2) ghi dữ liệu theo cấu trúc log-structured nodes. Trên NAND Flash dung lượng lớn, công nghệ tiêu chuẩn hiện đại là UBI (Unsorted Block Images) và UBIFS. UBI đóng vai trò là tầng quản lý khối nhớ logic, xử lý cân bằng độ mòn (wear leveling) và đánh dấu khối hỏng (bad blocks) cho NAND Flash; UBIFS là hệ thống tệp chạy trên nền UBI.",
+            "Để trích xuất nội dung từ một tệp dump UBI/UBIFS mà không cần phần cứng thật, kiểm toán viên sử dụng bộ công cụ `ubi_reader` (với các lệnh `ubireader_extract_images` và `ubireader_extract_files`). Công cụ này phân tích các bảng thể tích UBI (UBI Volume Table), ghép nối các khối phân tán và xuất ra toàn bộ cây thư mục tệp tin gốc mà không cần phải nạp kernel module nandsim của Linux."
+          ]
+        },
+        {
+          "title": "Phân Tích Tĩnh Hệ Thống Tệp Gốc: Điểm Mù Cấu Hình, Khóa Bí Mật và Dịch Vụ Mạng",
+          "paragraphs": [
+            "Sau khi bóc tách thành công hệ thống tệp gốc (rootfs), kiểm toán viên an ninh sở hữu toàn bộ mã nguồn script và tệp nhị phân của thiết bị. Bước tiếp theo là kiểm toán tĩnh bề mặt tấn công. Bắt đầu từ tệp cấu hình tài khoản người dùng `/etc/passwd` và `/etc/shadow`: kiểm tra các tài khoản có UID 0 ngoài root, kiểm tra hash mật khẩu (nhiều thiết bị nhúng đời cũ vẫn sử dụng hàm băm DES lỗi thời bắt đầu bằng ký tự rỗng hoặc MD5 `$1$`), và đặc biệt là kiểm tra các tài khoản bảo trì của nhà sản xuất (Hardcoded Backdoor Accounts) có mật khẩu cố định.",
+            "Khảo sát các khóa mật mã và chứng chỉ: tìm kiếm các tệp khóa riêng tư SSH host key (`dropbear_dss_host_key`, `dropbear_rsa_host_key` trong `/etc/dropbear/`), khóa riêng tư chứng chỉ web server TLS (`server.key`, `server.crt` trong `/etc/ssl/` hoặc `/etc/lighttpd/`). Trong rất nhiều sản phẩm IoT, nhà sản xuất đã đóng gói cùng một cặp khóa RSA/ECC trên hàng triệu thiết bị bán ra thị trường, biến mọi kết nối TLS/SSH thành đối tượng có thể bị tấn công giải mã Man-in-the-Middle (MitM).",
+            "Phân tích các tệp kịch bản khởi động trong `/etc/init.d/`, `/etc/rc.d/` hoặc `/etc/inittab`: các kịch bản shell này chỉ định chính xác những dịch vụ mạng nào được khởi chạy cùng hệ thống (như web server `mini_httpd`, `boa`, `goahead`, dịch vụ UPnP `miniupnpd`, daemon telnet/ssh `dropbear`). Tiếp tục rà soát thư mục web root (thường là `/www`, `/htdocs`, hoặc `/usr/www`): các tệp nhị phân CGI (`.cgi`) hoặc kịch bản ASP/PHP thường xuyên chứa các lỗ hổng thực thi lệnh tùy ý (Command Injection) thông qua việc truyền tham số người dùng chưa được lọc vào hàm `system()`, `popen()` hoặc `execve()`."
+          ]
+        },
+        {
+          "title": "Mô Phỏng Môi Trường Nhúng Bằng QEMU: User-Mode Chroot So Với Full-System Emulation",
+          "paragraphs": [
+            "Thử nghiệm động (Dynamic Testing) là điều bắt buộc để xác nhận khả năng khai thác lỗ hổng nhị phân mà không cần mua thiết bị phần cứng thật. Giải pháp hàng đầu là sử dụng QEMU (Quick Emulator). QEMU cung cấp hai chế độ mô phỏng: User-Mode Emulation và Full-System Emulation.",
+            "Trong chế độ QEMU User-Mode, ta sử dụng tệp thực thi biên dịch tĩnh tương ứng với kiến trúc mục tiêu (ví dụ `/usr/bin/qemu-mips-static` hoặc `qemu-arm-static`). Sau khi sao chép qemu-static vào thư mục rootfs đã giải nén, ta thực hiện lệnh đổi thư mục gốc `chroot` để chạy trực tiếp một tệp nhị phân duy nhất (ví dụ web server `httpd`). Tuy nhiên, thách thức lớn nhất của QEMU User-mode là sự phụ thuộc phần cứng: đa số các daemon nhúng IoT đều cố gắng mở tệp thiết bị `/dev/nvram` hoặc gọi hàm thư viện `nvram_get()` / `nvram_set()` của hãng để đọc cấu hình IP, cổng mạng và tài khoản. Nếu không có driver NVRAM của nhân, daemon sẽ lập tức báo lỗi 'segmentation fault' hoặc thoát chương trình.",
+            "Để khắc phục, kiểm toán viên sử dụng kỹ thuật nạp trước thư viện chia sẻ (Dynamic Library Interception via `LD_PRELOAD`) với các thư viện shim như `libnvram.so`. Thư viện shim này hook trực tiếp vào các hàm `nvram_get()`, giả lập các giá trị trả về từ một tệp cấu hình phẳng đơn giản trên ổ đĩa, đánh lừa daemon rằng phần cứng đang hoạt động bình thường. Đối với các kịch bản phức tạp cần mô phỏng toàn bộ hệ sinh thái (bao gồm kernel, bridge mạng và nhiều daemon liên tác vụ), các framework tự động hóa Full-System Emulation như `Firmadyne` và `FirmAE` sẽ tạo một máy ảo Linux đầy đủ trong QEMU System Mode, tự động vá kernel nhúng và cấu hình giao diện mạng ảo (tap interface) để cung cấp quyền truy cập vào giao diện web của thiết bị như một phần cứng thực thụ."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Phân Tích Trích Xuất RootFS Firmware Router và Xử Lý Xung Đột Mô Phỏng Daemon NVRAM Trên QEMU",
+        "objective": "Trích xuất thành công hệ thống tệp SquashFS từ gói cập nhật firmware router, bóc tách cấu trúc rootfs, phát hiện tài khoản backdoor ẩn và cấu hình thư viện shim giả lập NVRAM để chạy daemon web trên QEMU User mode.",
+        "scenario": "Trong một dự án kiểm thử thâm nhập thiết bị mạng văn phòng (SOHO Wi-Fi Router), bạn nhận được gói cập nhật firmware định dạng `router_fw_v2.0.bin`. Khi kiểm tra bằng lệnh unsquashfs mặc định, hệ thống báo lỗi không nhận dạng được superblock. Bạn cần phân tích cấu trúc, trích xuất rootfs và mô phỏng daemon quản trị web `boa` trên môi trường phân tích ngoại vi.",
+        "constraints": [
+          "Chỉ được thực hiện phân tích và mô phỏng trong môi trường sandbox cô lập không có kết nối ra mạng nội bộ doanh nghiệp.",
+          "Mọi tương tác với daemon web mô phỏng phải thông qua giao diện mạng loopback hoặc host-only tap interface.",
+          "Phải ghi lại toàn bộ các lời gọi hàm NVRAM bị chặn bởi thư viện shim để phục vụ biên bản chứng cứ kiểm toán."
+        ],
+        "cases": [
+          {
+            "id": "case-101-01",
+            "title": "Xử Lý Lỗi Giải Nén Superblock SquashFS Phi Chuẩn Bằng Sasquatch",
+            "context": "Bạn chạy lệnh `binwalk -e router_fw_v2.0.bin`. Kết quả hiển thị tìm thấy chữ ký SquashFS tại offset `0x001B0000`, nhưng thư mục xuất ra trống rỗng và log hiển thị: 'unsquashfs: Can't find a SQUASHFS superblock on router_fw_v2.0.bin'. Khi kiểm tra 16 byte đầu của phân vùng này bằng hexdump, bạn phát hiện 4 byte magic là `73 71 73 68` (shsq) nhưng thuật toán nén sử dụng block size 256KB tùy biến của vendor.",
+            "prompt": "Phương pháp kỹ thuật chính xác nhất để trích xuất thành công toàn bộ hệ thống tệp rootfs trong trường hợp này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đổi tên tệp firmware thành .tar.gz rồi sử dụng lệnh `tar -xvf` để giải nén trực tiếp.",
+                "correct": false,
+                "rationale": "Tệp tin là định dạng SquashFS nhị phân chứ không phải kho lưu trữ tarball nén gzip; việc đổi tên file không thể giải mã được cấu trúc nén khối của SquashFS."
+              },
+              {
+                "id": "B",
+                "label": "Sử dụng lệnh `dd` để cắt phân vùng SquashFS bắt đầu từ offset 0x001B0000 ra một tệp riêng, sau đó sử dụng công cụ `sasquatch` (công cụ được vá để hỗ trợ brute-force nhận dạng các biến thể SquashFS và LZMA phi chuẩn của các nhà sản xuất thiết bị nhúng) để bóc tách rootfs.",
+                "correct": true,
+                "rationale": "Sasquatch là bản vá chuyên dụng của unsquashfs được thiết kế riêng cho bảo mật firmware, có khả năng phân giải các biến thể SquashFS tùy biến, magic bytes đảo ngược và kích thước khối phi chuẩn của các nhà sản xuất thiết bị nhúng."
+              },
+              {
+                "id": "C",
+                "label": "Chạy lệnh `strings` để xuất toàn bộ chuỗi ra tệp văn bản và tự tái cấu trúc lại thư mục bằng tay.",
+                "correct": false,
+                "rationale": "Lệnh strings chỉ trích xuất các chuỗi ASCII in được, hoàn toàn không thể phục hồi được cây thư mục, tệp nhị phân ELF và metadata quyền hạn file."
+              },
+              {
+                "id": "D",
+                "label": "Nạp toàn bộ tệp router_fw_v2.0.bin vào Wireshark để giải mã giao thức nén.",
+                "correct": false,
+                "rationale": "Wireshark là công cụ phân tích bắt gói tin mạng, không có khả năng phân tích hay giải nén hệ thống tệp nhúng cục bộ."
+              }
+            ]
+          },
+          {
+            "id": "case-101-02",
+            "title": "Kiểm Toán Tĩnh RootFS và Phát Hiện Tài Khoản Backdoor Trong Kịch Bản Khởi Tạo",
+            "context": "Sau khi trích xuất rootfs thành công vào thư mục `squashfs-root`, bạn rà soát tệp `etc/init.d/rcS`. Bạn phát hiện dòng lệnh: `telnetd -l /bin/sh -p 9999 &` được kích hoạt nếu giá trị biến môi trường `factory_test` bằng 1, và trong tệp `etc/shadow` có dòng: `service_tech:$1$9zK3j...:18000:0:99999:7:::`. Kiểm tra mã nguồn kịch bản web CGI `www/cgi-bin/system.cgi`, bạn phát hiện chuỗi: `char cmd[256]; sprintf(cmd, \"ping -c 1 %s\", query_string); system(cmd);`.",
+            "prompt": "Đánh giá mức độ nghiêm trọng và vector tấn công nguy hiểm nhất có thể khai thác từ xa qua cổng quản trị web mà không cần thông tin đăng nhập?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Lỗ hổng Command Injection trong system.cgi. Do hàm `system()` thực thi trực tiếp chuỗi được định dạng từ tham số `query_string` mà không qua bất kỳ cơ chế làm sạch (sanitization) hay lọc ký tự meta-shell nào, kẻ tấn công từ xa có thể gửi payload chứa ký tự phân tách lệnh (ví dụ `;` hoặc `|`) để thực thi mã tùy ý với quyền root trên thiết bị.",
+                "correct": true,
+                "rationale": "Hàm sprintf kết hợp system() với dữ liệu đầu vào người dùng không được lọc là lỗ hổng Command Injection kinh điển (CWE-78); nó cho phép kẻ tấn công thực thi mã tùy ý trực tiếp với quyền hạn của tiến trình web server (thường là root)."
+              },
+              {
+                "id": "B",
+                "label": "Tài khoản service_tech chỉ là nguy cơ thấp vì mật khẩu hash trong /etc/shadow sử dụng thuật toán bcrypt không thể bẻ khóa.",
+                "correct": false,
+                "rationale": "Tiền tố $1$ chỉ định thuật toán băm MD5 cũ kỹ có chi phí tính toán rất thấp và dễ dàng bị bẻ khóa bằng Hashcat/John the Ripper; tuy nhiên nó vẫn đòi hỏi phải truy cập được cổng xác thực."
+              },
+              {
+                "id": "C",
+                "label": "Cổng telnetd cổng 9999 tự động mở cho mọi người dùng trên Internet mà không cần điều kiện nào.",
+                "correct": false,
+                "rationale": "Kịch bản rcS quy định telnetd chỉ mở khi biến factory_test bằng 1, đây là điều kiện phụ thuộc trạng thái cấu hình nội bộ."
+              },
+              {
+                "id": "D",
+                "label": "Hệ thống hoàn toàn an toàn vì các tệp tin trong SquashFS là chỉ đọc (read-only), ngăn chặn kẻ tấn công ghi đè tệp tin.",
+                "correct": false,
+                "rationale": "SquashFS chỉ đọc không ngăn cản được kẻ tấn công thực thi lệnh trong bộ nhớ RAM, mở reverse shell hoặc sửa đổi các tệp cấu hình trong /tmp (tmpfs)."
+              }
+            ]
+          },
+          {
+            "id": "case-101-03",
+            "title": "Mô Phỏng Web Daemon Qua QEMU User-Mode và Cấu Hình NVRAM Shim Hooking",
+            "context": "Bạn sao chép `qemu-mips-static` vào `squashfs-root` và thực thi: `chroot squashfs-root ./qemu-mips-static usr/sbin/boa`. Tiến trình lập tức bị sập và in ra thông báo lỗi: `nvram_init: open(/dev/nvram): No such file or directory` và kết thúc với `SIGSEGV`.",
+            "prompt": "Giải pháp kỹ thuật chuẩn xác nhất để mô phỏng thành công daemon `boa` trong môi trường QEMU User-mode mà không cần nạp kernel module thật là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tạo một tệp tin rỗng tại `dev/nvram` bằng lệnh `touch dev/nvram` là đủ để daemon đọc dữ liệu.",
+                "correct": false,
+                "rationale": "Daemon gọi các hàm ioctl đặc thù hoặc đọc cấu trúc nhị phân của driver NVRAM; một tệp rỗng sẽ gây lỗi parsing cấu trúc và vẫn dẫn đến crash."
+              },
+              {
+                "id": "B",
+                "label": "Sử dụng cơ chế `LD_PRELOAD` để nạp thư viện shim `libnvram.so` (ví dụ từ dự án Firmadyne hoặc custom shim). Thư viện này đánh chặn các hàm `nvram_get()`, `nvram_set()`, `nvram_bufget()` và chuyển hướng các truy vấn NVRAM sang một tệp cấu hình phẳng (key-value text file) chứa các tham số mạng cần thiết, ngăn chặn việc gọi trực tiếp vào driver phần cứng `/dev/nvram`.",
+                "correct": true,
+                "rationale": "LD_PRELOAD nvram interceptor shim là giải pháp tiêu chuẩn trong cộng đồng phân tích firmware; nó bẫy mọi lời gọi hàm API NVRAM và trả về giá trị giả lập từ file cấu hình, cho phép daemon thực thi bình thường mà không cần kernel driver thực tế."
+              },
+              {
+                "id": "C",
+                "label": "Biên dịch lại nhân Linux của máy phân tích sang kiến trúc MIPS để hỗ trợ trực tiếp tệp nhị phân.",
+                "correct": false,
+                "rationale": "Biên dịch lại nhân máy chủ không giúp máy chủ x86 chạy được mã máy MIPS mà không thông qua trình giả lập hoặc bo mạch phần cứng MIPS."
+              },
+              {
+                "id": "D",
+                "label": "Tắt hoàn toàn tường lửa iptables trên máy phân tích để cho phép QEMU kết nối socket mạng.",
+                "correct": false,
+                "rationale": "Lỗi ở đây xuất phát từ việc thiếu thiết bị phần cứng /dev/nvram, hoàn toàn không liên quan đến cấu hình tường lửa mạng của máy chủ."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Bóc tách thành công hệ thống tệp SquashFS tùy biến bằng Sasquatch khi unsquashfs mặc định thất bại.",
+          "Phân tích đúng vị trí và cơ chế khai thác của lỗ hổng Command Injection trong tệp CGI nhúng.",
+          "Triển khai thành công kỹ thuật LD_PRELOAD nvram shim để đánh chặn lời gọi phần cứng và giả lập daemon web nhúng trên QEMU."
+        ],
+        "evidenceTemplate": [
+          "Nhật ký lệnh trích xuất firmware bằng sasquatch kèm danh sách cấu trúc cây thư mục rootfs thu được",
+          "Báo cáo phân tích tĩnh mã nguồn kịch bản CGI chỉ rõ đoạn mã dính lỗ hổng Command Injection và PoC giả lập",
+          "File cấu hình nvram.ini chứa các cặp khóa-giá trị giả lập cho daemon web",
+          "Ảnh chụp màn hình phiên mô phỏng QEMU User mode đang lắng nghe trên cổng HTTP cục bộ qua lệnh netstat/ss"
+        ],
+        "reset": "Khởi động lại tiến trình QEMU, xóa bỏ thư mục rootfs đã giải nén tạm thời và đặt lại biến môi trường LD_PRELOAD.",
+        "cleanup": "Xóa toàn bộ các tệp thư viện shim đã biên dịch, tệp dump trung gian và kết thúc các tiến trình qemu-mips-static đang chạy nền."
+      },
+      "governance": {
+        "prevent": [
+          "Tuyệt đối không nhúng các tài khoản quản trị viên hoặc bảo trì cố định (hardcoded credentials/backdoors) vào trong hình ảnh firmware phát hành.",
+          "Loại bỏ hoàn toàn việc sử dụng hàm `system()` và `popen()` trong các kịch bản web CGI; thay thế bằng các hàm gọi an toàn với mảng tham số cố định (như `execve` không qua shell wrapper).",
+          "Áp dụng mã hóa và ký số toàn vẹn gói cập nhật firmware trước khi phân phối cho khách hàng để ngăn chặn việc phân tích dịch ngược dễ dàng."
+        ],
+        "observe": [
+          "Giám sát các tiến trình con được sinh ra từ daemon web bằng Auditd hoặc cơ chế ghi log tiến trình nhúng để phát hiện dấu hiệu bùng nổ shell bất thường.",
+          "Theo dõi các yêu cầu HTTP gửi tới thư mục `/cgi-bin/` chứa các ký tự đặc biệt của shell như `;`, `|`, `` ` ``, `$()` để cảnh báo tấn công injection.",
+          "Định kỳ quét các bản build firmware trong đường ống CI/CD bằng các công cụ phân tích tĩnh tự động để phát hiện khóa riêng tư và tài khoản hardcoded trước khi xuất xưởng."
+        ],
+        "respond": [
+          "Khi phát hiện khóa riêng tư hoặc backdoor bị công khai từ việc trích xuất firmware, lập tức thu hồi chứng chỉ và phát hành bản vá cập nhật khẩn cấp loại bỏ tài khoản.",
+          "Cấu hình tự động vô hiệu hóa các cổng dịch vụ gỡ lỗi (telnet, debug HTTP) khi thiết bị chuyển từ chế độ kiểm thử xuất xưởng sang chế độ thương mại.",
+          "Thông báo tới khách hàng về các vector tấn công Command Injection và khuyến cáo cách ly giao diện quản trị khỏi mạng Internet công cộng."
+        ],
+        "residualRisk": [
+          "Các thiết bị đã ngừng hỗ trợ cập nhật (End-of-Life) sẽ mãi mãi tồn tại các lỗ hổng hardcoded backdoor nếu không có biện pháp thay thế phần cứng hoặc cách ly mạng vật lý.",
+          "Kẻ tấn công có thể trích xuất firmware từ các thiết bị đang hoạt động bằng cách tháo chip Flash vật lý ngay cả khi nhà sản xuất không công khai file cập nhật trên mạng."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Nếu công cụ binwalk quét firmware mà không trích xuất được hệ thống tệp nào thì chắc chắn firmware đó đã được mã hóa an toàn.",
+          "correction": "Nhiều nhà sản xuất đóng gói firmware bằng cấu trúc header độc quyền hoặc sử dụng các biến thể SquashFS/CramFS phi chuẩn làm binwalk bỏ sót; kiểm toán viên cần kiểm tra biểu đồ Shannon Entropy: nếu entropy dưới 7.5 thì dữ liệu vẫn chưa bị mã hóa và có thể bóc tách bằng các công cụ chuyên sâu như Sasquatch."
+        },
+        {
+          "claim": "Chỉ cần chroot vào rootfs nhúng và chạy qemu-arch-static là mọi ứng dụng daemon của router đều sẽ hoạt động hoàn hảo như trên phần cứng thật.",
+          "correction": "Hầu hết các daemon IoT phụ thuộc chặt chẽ vào các driver phần cứng ngoại vi và giao diện NVRAM; chúng sẽ lập tức bị crash nếu không có cơ chế hooking shim (như LD_PRELOAD libnvram) để giả lập các phản hồi của phần cứng."
+        },
+        {
+          "claim": "Hệ thống tệp SquashFS là loại bộ nhớ đọc-ghi trực tiếp trên Flash giống như ext4 trên máy chủ Linux.",
+          "correction": "SquashFS là hệ thống tệp nén chỉ đọc (Read-Only); mọi dữ liệu cần thay đổi trong quá trình hoạt động của thiết bị bắt buộc phải được lưu tạm trên RAM (tmpfs) hoặc chuyển sang phân vùng ghi riêng biệt như JFFS2 hoặc UBIFS."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os11-l101-q1",
+          "difficulty": "easy",
+          "question": "Dải giá trị Shannon Entropy nào dưới đây thường chỉ ra rằng một phân vùng firmware là dữ liệu nén (Compressed Data) thay vì dữ liệu mã hóa mật mã học ngẫu nhiên hoàn hảo?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Khoảng từ 1.0 đến 3.0"
+            },
+            {
+              "id": "B",
+              "label": "Khoảng từ 7.5 đến 7.9"
+            },
+            {
+              "id": "C",
+              "label": "Cố định ở mức 8.000 tuyệt đối"
+            },
+            {
+              "id": "D",
+              "label": "Chính xác bằng 0.0"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Dữ liệu nén (như gzip, lzma, squashfs) thường có entropy dao động trong khoảng 7.5 đến 7.9; trong khi dữ liệu được mã hóa mạnh bằng các thuật toán như AES-CBC/GCM sẽ có entropy tiệm cận tuyệt đối 8.000 với đồ thị phẳng."
+        },
+        {
+          "id": "os11-l101-q2",
+          "difficulty": "medium",
+          "question": "Tại sao công cụ Sasquatch thường được các chuyên gia bảo mật firmware ưu tiên sử dụng thay thế cho lệnh unsquashfs mặc định khi bóc tách rootfs của các thiết bị IoT thương mại?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì Sasquatch tự động bẻ khóa mật khẩu root trong /etc/shadow bằng GPU."
+            },
+            {
+              "id": "B",
+              "label": "Vì Sasquatch được vá để hỗ trợ nhận dạng và giải nén các biến thể SquashFS tùy biến của nhà sản xuất (custom magic bytes, non-standard block sizes, modified LZMA headers) vốn bị unsquashfs chuẩn từ chối."
+            },
+            {
+              "id": "C",
+              "label": "Vì Sasquatch có thể biến đổi mã MIPS thành mã x86 mà không cần QEMU."
+            },
+            {
+              "id": "D",
+              "label": "Vì Sasquatch chỉ hoạt động trên môi trường Windows mà không cần Linux."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Nhiều nhà sản xuất thiết bị nhúng tùy biến cấu trúc SquashFS (thay đổi magic bytes, header nén LZMA); Sasquatch được phát triển riêng để giải quyết các dị biệt này mà công cụ unsquashfs tiêu chuẩn không hỗ trợ."
+        },
+        {
+          "id": "os11-l101-q3",
+          "difficulty": "hard",
+          "question": "Khi mô phỏng một daemon web quản trị nhúng (ví dụ httpd) bằng QEMU User-mode (qemu-mips-static) trong môi trường chroot, kỹ thuật nào là hiệu quả nhất để giải quyết tình trạng daemon bị crash do không mở được tệp thiết bị phần cứng /dev/nvram?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tạo liên kết tượng trưng (symlink) từ /dev/nvram trỏ tới /dev/null."
+            },
+            {
+              "id": "B",
+              "label": "Sử dụng LD_PRELOAD để nạp một thư viện shim (ví dụ libnvram.so) nhằm đánh chặn các lệnh gọi hàm API NVRAM của daemon và trả về dữ liệu giả lập từ tệp cấu hình phẳng."
+            },
+            {
+              "id": "C",
+              "label": "Chạy QEMU với quyền sudo để tự động cấp quyền tạo thiết bị phần cứng cho tiến trình con."
+            },
+            {
+              "id": "D",
+              "label": "Xóa bỏ tệp thực thi httpd và thay thế bằng máy chủ web Apache2 của Ubuntu."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Kỹ thuật Dynamic Library Interception via LD_PRELOAD cho phép nạp thư viện shim đánh chặn các hàm nvram_get()/nvram_set(), cung cấp dữ liệu giả lập cho daemon mà không cần driver phần cứng thực tế của kernel."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một thiết bị camera an ninh IP công nghiệp (IP Camera SmartVision) bị nghi ngờ chứa mã độc gián điệp gửi dữ liệu về máy chủ lạ. Đội ngũ Incident Response thu được bản cập nhật firmware định dạng `smartvision_firmware_v4.bin`. Bạn được giao nhiệm vụ trích xuất hệ thống tệp UBIFS, phân tích tĩnh danh sách máy chủ kết nối và mô phỏng daemon xử lý luồng video RTSP `rtspd` bằng QEMU User mode.",
+        "tasks": [
+          "Sử dụng công cụ ubi_reader để phân tích tệp dump UBI, trích xuất phân vùng rootfs UBIFS mà không làm hỏng cấu trúc tệp tin.",
+          "Kiểm toán các tệp cấu hình mạng và dịch vụ DNS trong rootfs để xác định các địa chỉ IP hoặc tên miền C2 hardcoded.",
+          "Thiết lập môi trường chroot với qemu-arm-static, biên dịch thư viện shim đánh chặn các lệnh gọi cảm biến hình ảnh `/dev/video0` để duy trì tiến trình `rtspd` hoạt động phục vụ kiểm thử gửi gói tin thăm dò."
+        ],
+        "requiredEvidence": [
+          "Báo cáo xuất log từ lệnh ubireader_extract_files xác nhận các thể tích UBI đã được trích xuất hoàn chỉnh",
+          "Danh sách các địa chỉ IP/FQDN trích xuất từ các chuỗi nhị phân của rtspd kèm phân tích mức độ độc hại",
+          "Mã nguồn thư viện shim C đánh chặn hàm `open` cho `/dev/video0` kèm ảnh chụp màn hình tiến trình rtspd chạy thành công trong QEMU"
+        ]
+      },
+      "sources": [
+        {
+          "title": "OWASP Firmware Security Testing Methodology",
+          "url": "https://scriptingxss.gitbook.io/firmware-security-testing-methodology",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Phương pháp bóc tách và phân tích hệ thống tệp nhúng (SquashFS, JFFS2, UBIFS)",
+            "Kỹ thuật kiểm toán tĩnh rootfs phát hiện backdoor, hardcoded secrets và kịch bản khởi tạo"
+          ]
+        },
+        {
+          "title": "Linux Memory Technology Device (MTD) Subsystem Documentation",
+          "url": "https://www.linux-mtd.infradead.org/doc/ubi.html",
+          "publisher": "Linux MTD Project",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc hệ thống tầng lưu trữ UBI (Unsorted Block Images) và hệ thống tệp UBIFS",
+            "Cơ chế quản lý khối nhớ hỏng (bad block management) và wear leveling trên NAND Flash"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os11-l102-secure-boot-chains-and-cryptographic-updates",
+      "slug": "secure-boot-chains-and-cryptographic-updates",
+      "title": "Chuỗi Khởi Động An Toàn (Secure Boot Chain), Hardware Root of Trust & Cập Nhật Mã Hóa FOTA",
+      "summary": "Kiểm toán tính toàn vẹn của chuỗi khởi động tin cậy (Chain of Trust từ BootROM, First-Stage Bootloader SPL, U-Boot / ATF / UEFI đến Linux Kernel), kiến trúc phần cứng Hardware Root of Trust (eFuses, One-Time Programmable - OTP, ARM TrustZone, HSM / TPM / Secure Element), và đánh giá an ninh cơ chế cập nhật firmware qua sóng vô tuyến (FOTA - Firmware Over-The-Air) theo chuẩn NIST SP 800-193 (Firmware Resilience: Protection, Detection, Recovery), kỹ thuật chống rollback (Anti-Rollback / Monotonic Counters) và phân tích các vector tấn công bypass secure boot (Fault Injection, Glitching, TOCTOU, U-Boot console hijack).",
+      "difficulty": "intermediate",
+      "durationMinutes": 140,
+      "prerequisites": [
+        "os11-l100-embedded-architectures-memory-and-firmware-structures",
+        "os11-l101-firmware-extraction-analysis-and-emulation"
+      ],
+      "outcomes": [
+        "Phân tích kiến trúc chuỗi khởi động tin cậy nhiều giai đoạn (Multi-stage Chain of Trust: BootROM -> SPL -> ATF -> U-Boot -> Kernel), nhận diện cơ chế thẩm định chữ ký số mật mã học giữa từng mắt xích.",
+        "Đánh giá các cơ chế phần cứng Hardware Root of Trust (eFuses, OTP memory, ARM TrustZone, Secure Elements) và cách thức neo giữ (anchoring) băm khóa công khai gốc (ROTPK) để ngăn chặn giả mạo firmware cấp độ thấp.",
+        "Kiểm toán quy trình cập nhật firmware qua sóng vô tuyến (FOTA) dựa trên khung tiêu chuẩn NIST SP 800-193 (Bảo vệ, Phát hiện, Phục hồi) và cấu trúc phân vùng cập nhật kép A/B (Dual-Bank updates).",
+        "Nhận diện và thử nghiệm các vector tấn công vượt qua chuỗi khởi động an toàn: tấn công hạ cấp phiên bản (Rollback/Downgrade Attacks), ngắt giao diện dòng lệnh U-Boot Console qua UART, điều kiện tranh đoạt thời gian (TOCTOU) và tấn công xung lỗi vật lý (Fault Injection/Glitching)."
+      ],
+      "careerPaths": ["penetration-test", "vulnerability-research"],
+      "domains": ["iot", "firmware", "hardware"],
+      "attackTactics": [
+        "defense-evasion",
+        "persistence",
+        "privilege-escalation",
+        "impact"
+      ],
+      "keywords": [
+        "secure-boot",
+        "chain-of-trust",
+        "bootrom",
+        "hardware-root-of-trust",
+        "efuses-otp",
+        "u-boot-verified-boot",
+        "fit-image",
+        "nist-sp-800-193",
+        "fota-security",
+        "anti-rollback",
+        "fault-injection-glitching"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Chuỗi khởi động an toàn (Secure Boot) là một chuỗi ủy thác mật mã học bắt đầu từ Hardware Root of Trust bất biến (ROM masked trên SoC và eFuses ghi một lần) để xác thực từng giai đoạn bootloader trước khi chuyển giao quyền thực thi. Một chuỗi bảo vệ chỉ mạnh bằng mắt xích yếu nhất: nếu cơ chế chống hạ cấp phiên bản (Anti-rollback) bị bỏ qua, hoặc khóa công khai trong U-Boot FIT image không được neo vào phần cứng, hoặc giao diện gỡ lỗi/console UART không bị vô hiệu hóa, kẻ tấn công có thể làm sụp đổ toàn bộ hàng rào phòng thủ của thiết bị nhúng.",
+      "visual": {
+        "title": "Chuỗi Ủy Thác Khởi Động An Toàn và Cơ Chế Xác Thực Chữ Ký Số Đa Tầng",
+        "caption": "Quy trình kiểm tra tính toàn vẹn từ BootROM phần cứng, SPL/ATF, U-Boot FIT Image đến Linux Kernel và cập nhật FOTA.",
+        "steps": [
+          {
+            "label": "Hardware Root of Trust & BootROM",
+            "detail": "SoC BootROM đọc băm khóa công khai gốc (ROTPK) từ eFuses phần cứng; xác minh chữ ký số của SPL/FSBL trước khi sao chép mã vào SRAM nội bộ.",
+            "tone": "allow"
+          },
+          {
+            "label": "SPL Khởi Tạo DRAM & Xác Minh U-Boot",
+            "detail": "Secondary Program Loader khởi tạo bộ điều khiển DDR và xác minh tính toàn vẹn chữ ký của U-Boot binary cùng ARM Trusted Firmware (TF-A).",
+            "tone": "allow"
+          },
+          {
+            "label": "U-Boot Verified Boot Xác Thực FIT Image",
+            "detail": "U-Boot kiểm tra chữ ký RSA/ECDSA của cấu hình FIT Image (chứa Kernel Image, Initramfs và DTB) dựa trên khóa công khai nhúng trong Control DTB.",
+            "tone": "caution"
+          },
+          {
+            "label": "Kiểm Tra Anti-Rollback Counter & FOTA Recovery",
+            "detail": "Bộ đếm đơn điệu phần cứng (Hardware Monotonic Counter) kiểm tra số hiệu phiên bản; từ chối nạp firmware cũ và kích hoạt phân vùng phục hồi A/B nếu xác thực thất bại.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Chuỗi Khởi Động Tin Cậy: Từ BootROM, SPL/ATF Đến U-Boot Verified Boot",
+          "paragraphs": [
+            "Mục tiêu cốt lõi của Chuỗi khởi động tin cậy (Chain of Trust) là đảm bảo rằng mọi byte mã máy thực thi trên thiết bị đều được xác thực nguồn gốc và tính toàn vẹn trước khi được trao quyền điều khiển CPU. Quy trình khởi động của hệ thống nhúng dựa trên Linux thường trải qua ít nhất 4 giai đoạn nối tiếp nhau. Mắt xích đầu tiên là Primary Bootloader (thường gọi là BootROM hoặc ROM Code). BootROM là đoạn mã được ghi cố định vào mặt nạ silicon của SoC trong quá trình chế tạo tại nhà máy đúc chip (Mask ROM); nó không thể bị xóa hay sửa đổi bởi bất kỳ phần mềm nào.",
+            "Do dung lượng SRAM nội vi của SoC rất nhỏ (chỉ từ vài chục đến vài trăm KB) và bộ nhớ ngoài DRAM chưa được khởi tạo, BootROM chỉ nạp một tệp thực thi rất nhỏ gọi là Secondary Program Loader (SPL) hoặc First-Stage Bootloader (FSBL). Trước khi nhảy tới SPL, BootROM tính toán mã băm của SPL và xác minh chữ ký số bất đối xứng (RSA-2048/4096 hoặc ECDSA P-256) của nó. Nếu chữ ký hợp lệ, SPL được nạp vào SRAM để thực thi. Nhiệm vụ chính của SPL là khởi tạo bộ điều khiển xung nhịp (Clock Tree) và bộ điều khiển bộ nhớ ngoài DRAM (DDR3/DDR4), sau đó nạp Third-Stage Bootloader (thường là U-Boot) cùng môi trường bảo mật ARM Trusted Firmware (TF-A / ATF chạy ở mức đặc quyền Exception Level 3 - EL3).",
+            "Ở giai đoạn tiếp theo, Das U-Boot triển khai cơ chế 'Verified Boot'. Thay vì nạp nhân Linux theo kiểu truyền thống (uImage riêng lẻ dễ bị tráo đổi), U-Boot Verified Boot sử dụng định dạng Flat Image Tree (FIT Image). FIT Image là một tệp đóng gói duy nhất theo cấu trúc Device Tree, chứa đồng thời Linux Kernel image, ramdisk (initramfs), Device Tree Blob (.dtb), và các khối chữ ký số mật mã học. U-Boot sử dụng khóa công khai được tích hợp sẵn trong cấu hình Control Device Tree để xác thực chữ ký của cấu hình FIT. Nếu băm nội dung hoặc chữ ký số không khớp, U-Boot lập tức kích hoạt panic và dừng hoàn toàn quá trình khởi động."
+          ]
+        },
+        {
+          "title": "Hardware Root of Trust: eFuses, Khóa Bí Mật OTP và ARM TrustZone",
+          "paragraphs": [
+            "Một câu hỏi kiến trúc nền tảng được đặt ra: Khóa công khai dùng để xác thực SPL hoặc U-Boot lấy từ đâu, và làm thế nào để đảm bảo chính khóa công khai đó không bị kẻ tấn công đánh tráo? Câu trả lời nằm ở Gốc ủy thác phần cứng (Hardware Root of Trust - RoT). Trọng tâm của RoT là bộ nhớ chỉ ghi một lần (One-Time Programmable - OTP), thường được triển khai dưới dạng các cầu chì điện tử (eFuses) tích hợp ngay trong đế chip SoC.",
+            "Trong quá trình sản xuất thiết bị (provisioning phase), nhà sản xuất tính toán mã băm SHA-256 của Khóa công khai gốc (Root of Trust Public Key - ROTPK) và áp một điện áp xung lập trình để 'thổi' (burn/blow) vĩnh viễn chuỗi 256-bit này vào các mảng eFuse. Sau khi eFuse được thổi, mạch điện logic phần cứng sẽ khóa vĩnh viễn chế độ ghi. Khi BootROM khởi động, nó đọc ROTPK đi kèm với hình ảnh SPL, tự tính toán mã băm của khóa này, và so sánh từng bit với giá trị lưu trong eFuses. Nếu hai chuỗi băm khớp nhau, BootROM mới sử dụng khóa đó để giải mã và xác minh chữ ký số của SPL. Bằng cách này, kẻ tấn công dù có thay thế hoàn toàn chip Flash bên ngoài cũng không thể khởi động được firmware giả mạo vì không sở hữu khóa riêng tư tương ứng với ROTPK đã bị khóa cứng trong eFuses.",
+            "Bên cạnh eFuses, công nghệ ARM TrustZone cung cấp khả năng phân tách phần cứng toàn diện thành hai thế giới riêng biệt trên cùng một lõi CPU: Thế giới Bình thường (Normal World / Non-Secure World) chạy hệ điều hành thông thường (Linux) và Thế giới Bảo mật (Secure World) chạy hệ điều hành tin cậy (Trusted OS như OP-TEE). Secure World có quyền truy cập độc quyền vào các vùng RAM bảo mật, thanh ghi mã hóa phần cứng và Secure Storage. Các tác vụ nhạy cảm như quản lý khóa mật mã, ký số và xác thực sinh trắc học được thực thi hoàn toàn bên trong Trusted Applications (TAs), cách ly tuyệt đối khỏi các lỗ hổng nhân của Linux nhúng."
+          ]
+        },
+        {
+          "title": "An Toàn Cập Nhật Firmware Từ Xa (FOTA) và Khung Tiêu Chuẩn NIST SP 800-193",
+          "paragraphs": [
+            "Cơ chế cập nhật firmware qua sóng vô tuyến (Firmware Over-The-Air - FOTA) là huyết mạch để vá lỗ hổng từ xa cho hàng triệu thiết bị IoT phân tán, nhưng đồng thời cũng là vector tấn công thảm họa nếu bị xâm phạm. Viện Tiêu chuẩn và Công nghệ Quốc gia Hoa Kỳ đã ban hành NIST SP 800-193 (Platform Firmware Resiliency Guidelines) định hình ba trụ cột an ninh cốt lõi cho firmware: Bảo vệ (Protection), Phát hiện (Detection), và Phục hồi (Recovery).",
+            "Trụ cột Bảo vệ (Protection) yêu cầu mọi gói cập nhật firmware tải về thiết bị phải được xác thực tính toàn vẹn và nguồn gốc bằng mật mã học bất đối xứng trước khi cho phép ghi vào Flash, đồng thời kênh truyền tải phải sử dụng TLS có xác thực lẫn nhau (mTLS) để chống nghe lén và giả mạo máy chủ. Trụ cột Phát hiện (Detection) đòi hỏi thiết bị phải có khả năng tự kiểm tra tính toàn vẹn của mã nhị phân trong bộ nhớ Flash trước mỗi lần khởi động và định kỳ trong khi chạy.",
+            "Trụ cột Phục hồi (Recovery) giải quyết rủi ro thiết bị bị 'brick' (biến thành cục gạch) do mất điện đột ngột trong khi ghi Flash hoặc do bản cập nhật mới bị lỗi logic. Kiến trúc chuẩn mực để đáp ứng Recovery là cơ chế phân vùng kép A/B (Dual-Bank A/B Partitioning). Thiết bị chia bộ nhớ Flash thành hai tập phân vùng độc lập: Phân vùng A (Active/Đang chạy) và Phân vùng B (Standby/Nhàn rỗi). Bản cập nhật mới luôn được ghi vào phân vùng B. Sau khi ghi và xác thực chữ ký thành công, bootloader đánh dấu phân vùng B ở trạng thái 'Thử nghiệm' (Trial). Khi thiết bị khởi động lại từ phân vùng B, một watchdog timer phần cứng được kích hoạt. Nếu hệ thống khởi động thành công và vượt qua các bài kiểm tra tự chẩn đoán (self-tests), nó sẽ gửi tín hiệu 'kick' watchdog và đánh dấu phân vùng B là vĩnh viễn; nếu hệ thống bị treo hoặc kernel panic, watchdog sẽ hết hạn và kích hoạt khởi động lại tự động quay về phân vùng A cũ."
+          ]
+        },
+        {
+          "title": "Điểm Yếu, Vector Tấn Công Bypass Secure Boot và Kỹ Thuật Phòng Thủ Anti-Rollback",
+          "paragraphs": [
+            "Mặc dù chuỗi khởi động an toàn được thiết kế với các thuật toán mật mã học mạnh mẽ, kẻ tấn công thực tế thường khai thác các điểm mù trong quá trình triển khai (implementation flaws). Vector tấn công phổ biến hàng đầu là Tấn công hạ cấp phiên bản (Rollback Attack / Downgrade Attack). Nếu thiết bị chỉ xác minh chữ ký số của nhà sản xuất mà không kiểm tra số hiệu phiên bản bảo mật (Security Version Number - SVN), kẻ tấn công có thể nạp lại một bản firmware cũ hợp lệ nhưng chứa lỗ hổng thực thi mã từ xa (RCE) đã được công bố từ trước. Để ngăn chặn, kiến trúc bắt buộc phải triển khai cơ chế Chống hạ cấp (Anti-Rollback) dựa trên Bộ đếm đơn điệu phần cứng (Hardware Monotonic Counters). Bộ đếm này thường được lưu trong eFuses hoặc chip bảo mật TPM/Replay Protected Memory Block (RPMB) của eMMC; bộ đếm chỉ có thể tăng lên mà không bao giờ giảm xuống, và bootloader sẽ từ chối thực thi bất kỳ firmware nào có SVN nhỏ hơn giá trị hiện tại của bộ đếm.",
+            "Vector tấn công thứ hai là can thiệp vào giao diện điều khiển U-Boot Console qua cổng UART vật lý. Trong nhiều sản phẩm thương mại, nhà sản xuất quên vô hiệu hóa biến môi trường `bootdelay` của U-Boot (hoặc không đặt `bootdelay=-1`). Kẻ tấn công nối dây vào chân UART RX/TX, bấm phím ngắt bootloader trong vài giây đầu tiên khi bật nguồn để rơi vào dấu nhắc lệnh `U-Boot#`. Từ đây, kẻ tấn công có thể sử dụng các lệnh như `setenv bootargs` để chèn tham số `init=/bin/sh` bỏ qua hoàn toàn cơ chế xác thực đăng nhập, hoặc dùng lệnh `md` (memory display) và `mm` (memory modify) để đọc trộm khóa mã hóa trong RAM hoặc vá mã lệnh trong bộ nhớ.",
+            "Vector tấn công cao cấp cuối cùng là Tấn công chèn xung lỗi vật lý (Fault Injection / Glitching). Kẻ tấn công sử dụng các thiết bị tạo xung (như ChipWhisperer) để gây sụt áp đột ngột (Voltage Glitch) trên đường cấp nguồn VDD của vi xử lý hoặc tạo xung nhiễu trên đường tín hiệu Clock đúng vào chu kỳ xung nhịp mà BootROM thực hiện lệnh rẽ nhánh điều kiện so khớp chữ ký (`if (signature_valid)`). Xung nhiễu khiến thanh ghi trạng thái hoặc bộ đếm lệnh của CPU bị nhảy cóc qua khối mã kiểm tra lỗi, lừa SoC tiếp tục nạp và thực thi mã độc không có chữ ký hợp lệ. Để phòng thủ trước glitching, mã nguồn bootloader phải triển khai kỹ thuật bảo vệ luồng điều khiển (Control Flow Integrity - CFI) và các biến điều kiện kép (Double Checking with Complementary Flags)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Chuỗi Khởi Động U-Boot Verified Boot, Cấu Hình eFuses và Đánh Giá Nguy Cơ Downgrade FOTA",
+        "objective": "Đánh giá tính toàn vẹn của chuỗi khởi động U-Boot Verified Boot, phát hiện cấu hình thiếu neo Root of Trust vào eFuses phần cứng, kiểm tra nguy cơ U-Boot Console Hijack qua UART và cấu hình cơ chế Anti-Rollback ngăn chặn tấn công hạ cấp.",
+        "scenario": "Một nhà máy sản xuất thiết bị y tế IoT đang chuẩn bị thương mại hóa máy theo dõi bệnh nhân thông minh (Smart Patient Monitor) chạy trên SoC NXP i.MX8M (ARM Cortex-A53). Hệ thống sử dụng U-Boot Verified Boot với FIT image và cập nhật FOTA. Bạn được chỉ định làm chuyên gia đánh giá độc lập để kiểm toán an ninh chuỗi khởi động và ngăn chặn các nguy cơ chiếm quyền điều khiển thiết bị.",
+        "constraints": [
+          "Phải tuân thủ nghiêm ngặt khung tiêu chuẩn NIST SP 800-193 về tính linh hoạt và an toàn firmware nhúng.",
+          "Mọi phân tích cấu trúc chữ ký FIT image và cấu hình U-Boot phải dựa trên công cụ `dumpimage` và `fit_check_sign`.",
+          "Không được thực hiện thao tác thổi eFuse thật (burn fuse) trên phần cứng vật lý trong quá trình thử nghiệm để tránh gây hư hỏng vĩnh viễn bo mạch."
+        ],
+        "cases": [
+          {
+            "id": "case-102-01",
+            "title": "Phát Hiện Lỗ Hổng Neo Khóa U-Boot Control DTB Khi Chưa Thổi eFuse Phần Cứng",
+            "context": "Bạn kiểm tra hình ảnh firmware và phát hiện U-Boot được biên dịch với cờ `CONFIG_FIT_SIGNATURE=y`. Lệnh `fit_check_sign` xác nhận rằng FIT Image chứa chữ ký RSA-2048 hợp lệ được ký bởi khóa riêng của nhà sản xuất, và khóa công khai được lưu trong tệp `u-boot.dtb` (Control Device Tree). Tuy nhiên, khi kiểm tra trạng thái phần cứng SoC qua lệnh u-boot `fuse read 1 0`, bạn phát hiện thanh ghi SRK (Super Root Key Hash) trong eFuses vẫn chứa toàn giá trị `00000000` và cờ SEC_CONFIG vẫn ở trạng thái `HAB_OPEN` (chưa đóng/chưa khóa secure boot).",
+            "prompt": "Hậu quả an ninh nghiêm trọng nhất phát sinh từ trạng thái cấu hình phần cứng này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Mặc dù U-Boot có kiểm tra chữ ký FIT Image của Linux kernel, nhưng vì eFuse SEC_CONFIG chưa được thổi sang trạng thái CLOSED và SRK hash chưa được lập trình, SoC BootROM sẽ nạp bất kỳ mã SPL/U-Boot nào được ghi vào chip SPI Flash mà không kiểm tra chữ ký số. Kẻ tấn công có thể tháo chip Flash, thay thế U-Boot gốc bằng một bản U-Boot tùy biến đã vô hiệu hóa tính năng kiểm tra FIT signature, qua đó vô hiệu hóa hoàn toàn toàn bộ chuỗi bảo mật.",
+                "correct": true,
+                "rationale": "Chuỗi Chain of Trust chỉ có giá trị nếu mắt xích đầu tiên (BootROM) được khóa cứng bằng eFuse phần cứng; nếu SoC vẫn ở trạng thái Open, kẻ tấn công có thể thay thế bootloader ở các giai đoạn sau để vượt qua mọi kiểm tra phần mềm."
+              },
+              {
+                "id": "B",
+                "label": "Thiết bị sẽ tự động xóa sạch dữ liệu người dùng sau 3 lần khởi động lại do kích hoạt cơ chế tự hủy tamper-evident.",
+                "correct": false,
+                "rationale": "Trạng thái HAB_OPEN là chế độ mặc định của nhà sản xuất trong giai đoạn phát triển, không kích hoạt bất kỳ cơ chế xóa dữ liệu tự động nào."
+              },
+              {
+                "id": "C",
+                "label": "U-Boot sẽ từ chối nạp kernel và hệ thống sẽ bị treo vĩnh viễn ở chế độ Recovery Mode.",
+                "correct": false,
+                "rationale": "Ở chế độ Open, BootROM bỏ qua kiểm tra lỗi chữ ký và tiếp tục nạp mã bình thường mà không gây treo hệ thống."
+              },
+              {
+                "id": "D",
+                "label": "Tất cả các gói tin mạng truyền qua cổng Ethernet sẽ bị mã hóa bằng thuật toán AES-128 phần cứng.",
+                "correct": false,
+                "rationale": "Cấu hình eFuse Secure Boot chỉ điều khiển việc xác thực tính toàn vẹn của mã khởi động, hoàn toàn không liên quan đến mã hóa lưu lượng mạng Ethernet."
+              }
+            ]
+          },
+          {
+            "id": "case-102-02",
+            "title": "Kiểm Toán Nguy Cơ U-Boot Console Hijack Qua Giao Diện UART",
+            "context": "Trong quá trình kiểm tra bo mạch phần cứng, bạn phát hiện 4 chân header UART (VCC, GND, TX, RX) trên mạch in PCB. Khi kết nối bộ chuyển đổi USB-to-UART ở tốc độ baud 115200 và cấp nguồn cho bo mạch, màn hình hiển thị: 'Hit any key to stop autoboot: 3'. Bạn bấm phím cách (Spacebar) và ngay lập tức nhận được dấu nhắc lệnh `u-boot=>`.",
+            "prompt": "Kỹ thuật nào dưới đây cho phép kẻ tấn công sở hữu quyền root trên hệ điều hành Linux nhúng trong vòng vài giây mà không cần biết mật khẩu quản trị?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Gửi lệnh `reset` liên tục để làm quá tải bộ nhớ đệm UART của vi xử lý.",
+                "correct": false,
+                "rationale": "Lệnh reset chỉ khởi động lại bo mạch, không cung cấp quyền truy cập hay bỏ qua cơ chế xác thực hệ thống."
+              },
+              {
+                "id": "B",
+                "label": "Sử dụng lệnh U-Boot `setenv bootargs \"console=ttymxc0,115200 root=/dev/mmcblk0p2 rw init=/bin/sh\"` sau đó chạy lệnh `boot`. Tham số `init=/bin/sh` hướng dẫn nhân Linux bỏ qua tiến trình khởi tạo chuẩn (`/sbin/init`) và khởi chạy trực tiếp một root shell trên cổng console mà không yêu cầu nhập tài khoản hay mật khẩu.",
+                "correct": true,
+                "rationale": "Tham số kernel init=/bin/sh là vector kinh điển để chiếm root shell cục bộ khi có quyền can thiệp vào U-Boot environment variables; nó chỉ định shell làm tiến trình PID 1 thay vì daemon xác thực người dùng."
+              },
+              {
+                "id": "C",
+                "label": "Nhập lệnh `ping 8.8.8.8` để tải bản phân phối Ubuntu Server mới về máy.",
+                "correct": false,
+                "rationale": "U-Boot chỉ hỗ trợ các giao thức mạng cơ bản như TFTP/NFS trong mạng nội bộ, không thể tải hay cài đặt trực tiếp hệ điều hành từ Internet qua lệnh ping."
+              },
+              {
+                "id": "D",
+                "label": "Thay đổi tốc độ baud rate của cổng UART lên 921600 để gây lỗi tràn bộ đệm phần cứng trên SoC.",
+                "correct": false,
+                "rationale": "Thay đổi baud rate chỉ làm sai lệch tín hiệu truyền thông nối tiếp khiến ký tự hiển thị bị rác (garbled), không tạo ra lỗ hổng tràn bộ đệm phần cứng."
+              }
+            ]
+          },
+          {
+            "id": "case-102-03",
+            "title": "Đánh Giá Nguy Cơ Tấn Công Downgrade FOTA và Giải Pháp Hardware Anti-Rollback",
+            "context": "Hệ thống FOTA của thiết bị y tế tải bản cập nhật qua giao thức HTTPS và kiểm tra chữ ký RSA-4096 của nhà sản xuất trước khi ghi vào phân vùng Flash. Bản phát hành hiện tại là v2.4 (đã vá lỗ hổng RCE nghiêm trọng trong thư viện phân giải gói tin y tế). Tuy nhiên, kẻ tấn công thu được gói cập nhật chính thức v1.2 cũ từ kho lưu trữ của nhà sản xuất (vốn được ký bằng khóa hợp lệ của hãng) và phát lại gói này cho tiến trình cập nhật.",
+            "prompt": "Hệ thống có chấp nhận bản cập nhật v1.2 này không và giải pháp kiến trúc nào theo NIST SP 800-193 là bắt buộc để ngăn chặn cuộc tấn công này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Hệ thống sẽ từ chối vì chứng chỉ HTTPS của máy chủ máy trạm sẽ bị hết hạn ngay lập tức.",
+                "correct": false,
+                "rationale": "Kẻ tấn công có thể giả mạo máy chủ cập nhật hoặc gửi tệp qua giao diện USB/cục bộ nếu thiết bị hỗ trợ cập nhật ngoại tuyến."
+              },
+              {
+                "id": "B",
+                "label": "Hệ thống sẽ chấp nhận bản cập nhật v1.2 vì chữ ký RSA-4096 là hoàn toàn hợp lệ từ nhà sản xuất. Để ngăn chặn, kiến trúc bắt buộc phải triển khai cơ chế Chống hạ cấp (Anti-Rollback) dựa trên Bộ đếm đơn điệu phần cứng (Hardware Monotonic Counter) lưu trong eFuses hoặc Replay Protected Memory Block (RPMB) của eMMC; bootloader sẽ so sánh Security Version Number (SVN) của gói tin với giá trị bộ đếm và từ chối thực thi nếu SVN thấp hơn giá trị phần cứng hiện tại.",
+                "correct": true,
+                "rationale": "Chữ ký hợp lệ không bảo vệ được hệ thống trước tấn công hạ cấp (Downgrade/Rollback attack); chỉ có cơ chế Anti-Rollback neo vào phần cứng không thể đảo ngược (eFuses/RPMB Monotonic Counter) mới có thể loại bỏ hoàn toàn rủi ro nạp lại firmware cũ dính lỗ hổng đã biết."
+              },
+              {
+                "id": "C",
+                "label": "Hệ thống sẽ chấp nhận nhưng nhân Linux sẽ tự động nâng cấp mã nguồn của v1.2 lên v2.4 bằng trí tuệ nhân tạo tích hợp.",
+                "correct": false,
+                "rationale": "Nhân Linux không có khả năng tự vá lỗi hay nâng cấp mã nguồn tự động khi nạp một bản phân phối nhị phân cũ."
+              },
+              {
+                "id": "D",
+                "label": "Thiết bị sẽ tự động chuyển sang sử dụng hệ điều hành Windows CE để duy trì tính liên tục của dịch vụ y tế.",
+                "correct": false,
+                "rationale": "Thiết bị nhúng ARM Linux không thể tự động chuyển đổi sang một hệ điều hành hoàn toàn khác không được biên dịch tương thích."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phát hiện chính xác rủi ro khi U-Boot Verified Boot chưa được neo bằng việc thổi eFuse Secure Boot phần cứng (HAB_CLOSED/ROTPK).",
+          "Mô phỏng thành công vector tấn công chiếm quyền điều khiển root thông qua việc sửa đổi tham số bootargs trên U-Boot Console qua cổng UART.",
+          "Thiết kế giải pháp phòng thủ Anti-Rollback toàn diện dựa trên Bộ đếm đơn điệu phần cứng (Hardware Monotonic Counter) tuân thủ tiêu chuẩn NIST SP 800-193."
+        ],
+        "evidenceTemplate": [
+          "Biên bản xuất trạng thái thanh ghi eFuse phần cứng chứng minh hệ thống đang ở chế độ Open nguy hiểm",
+          "Nhật ký phiên kết nối UART ghi lại quá trình ngắt autoboot và chèn tham số kernel `init=/bin/sh`",
+          "Tài liệu phân tích cấu trúc FIT Image kèm thông số Security Version Number (SVN) trong Device Tree",
+          "Bản thiết kế kiến trúc cập nhật FOTA phân vùng kép A/B kết hợp phần cứng RPMB Monotonic Counter theo NIST SP 800-193"
+        ],
+        "reset": "Khởi động lại bo mạch mô phỏng, xóa các biến môi trường tạm thời của U-Boot bằng lệnh `env default -a` và ghi lại môi trường mặc định.",
+        "cleanup": "Ngắt kết nối bộ chuyển đổi nối tiếp UART, thu hồi các file cấu hình FIT image kiểm thử và xóa bỏ các artifact nhị phân trung gian khỏi máy phân tích."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc thực hiện quy trình thổi eFuses phần cứng (Hardware Root of Trust Provisioning) trước khi xuất xưởng thiết bị: lập trình giá trị băm ROTPK và chuyển cờ SEC_CONFIG sang chế độ Closed/Enforcing.",
+          "Vô hiệu hóa hoàn toàn U-Boot interactive console trên bản build phát hành thương mại bằng cách cấu hình `CONFIG_BOOTDELAY=-2` hoặc loại bỏ hoàn toàn mã nguồn xử lý lệnh console.",
+          "Triển khai cơ chế Anti-Rollback phần cứng dựa trên eFuses hoặc Replay Protected Memory Block (RPMB) của chip eMMC để ngăn chặn tuyệt đối các cuộc tấn công hạ cấp phiên bản firmware."
+        ],
+        "observe": [
+          "Giám sát các nhật ký xác thực khởi động bảo mật từ BootROM và U-Boot qua kênh ghi log an toàn (Secure Event Log) để phát hiện sự kiện chữ ký không hợp lệ.",
+          "Theo dõi các cảnh báo từ bộ đếm lỗi phần cứng (Hardware Security Controller) để nhận diện các dấu hiệu tấn công xung lỗi vật lý (Fault Injection/Glitching).",
+          "Ghi nhận toàn bộ các yêu cầu cập nhật FOTA trên máy chủ phân phối để phát hiện các thiết bị liên tục gửi yêu cầu tải về các phiên bản phần mềm cũ."
+        ],
+        "respond": [
+          "Khi phát hiện sự kiện xác thực chữ ký số thất bại tại bất kỳ mắt xích nào của chuỗi khởi động, hệ thống phải lập tức chuyển sang chế độ Panic/Halt hoặc tự động phục hồi từ phân vùng sao lưu A/B an toàn.",
+          "Nếu khóa riêng tư của nhà sản xuất bị lộ lọt, kích hoạt cơ chế thu hồi khóa (Key Revocation) thông qua việc thổi eFuse chỉ định khóa bị hủy bỏ và chuyển sang khóa dự phòng đã được cấp phát sẵn trong cấu trúc ROTPK.",
+          "Phát hành bản thông cáo an ninh và triển khai chiến dịch FOTA bắt buộc để nâng mức bộ đếm Anti-Rollback trên toàn bộ các thiết bị ngoài hiện trường."
+        ],
+        "residualRisk": [
+          "Các cuộc tấn công vật lý mức độ cao sử dụng kính hiển vi điện tử quét (FIB/SEM) hoặc kỹ thuật glitching laser tinh vi trong phòng thí nghiệm chuyên dụng vẫn có thể phá vỡ logic kiểm tra phần cứng của một số dòng vi xử lý giá rẻ.",
+          "Lỗi lập trình trong chính mã nguồn của BootROM silicon không thể vá được bằng phần mềm nếu nhà sản xuất không thu hồi và thay thế chip vật lý."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Chỉ cần kích hoạt tính năng U-Boot Verified Boot trong mã nguồn cấu hình phần mềm là thiết bị đã hoàn toàn an toàn trước nguy cơ nạp firmware độc hại.",
+          "correction": "Nếu khóa công khai dùng để kiểm tra chữ ký U-Boot không được neo vào phần cứng eFuses/OTP của SoC và chế độ Secure Boot phần cứng chưa được kích hoạt (thổi cầu chì), kẻ tấn công có thể thay thế toàn bộ chip nhớ Flash hoặc sửa đổi mã nguồn U-Boot để vượt qua mọi kiểm tra phần mềm."
+        },
+        {
+          "claim": "Ký số mã hóa gói cập nhật firmware FOTA bằng chữ ký số bất đối xứng là biện pháp bảo vệ toàn diện chống lại mọi cuộc tấn công nạp firmware.",
+          "correction": "Chữ ký hợp lệ không ngăn chặn được cuộc tấn công hạ cấp phiên bản (Downgrade/Rollback Attack); kẻ tấn công có thể nạp lại một bản firmware cũ của chính nhà sản xuất vốn đã được ký hợp lệ nhưng chứa các lỗ hổng RCE đã biết, trừ khi có cơ chế phần cứng Anti-Rollback Monotonic Counter ngăn chặn."
+        },
+        {
+          "claim": "Nếu thiết bị IoT được đóng trong vỏ hộp kín có niêm phong thì các cổng giao tiếp như UART và JTAG không còn là mối đe dọa bảo mật.",
+          "correction": "Kẻ tấn công vật lý có thể dễ dàng cạy mở vỏ hộp, hàn dây kết nối vào các điểm đo (test points) hoặc chân header UART để ngắt chuỗi autoboot của U-Boot và chiếm root shell nếu cổng console không bị vô hiệu hóa trong mã nguồn."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os11-l102-q1",
+          "difficulty": "easy",
+          "question": "Thành phần phần cứng nào trên vi xử lý SoC nhúng thường được sử dụng để lưu trữ giá trị băm của Khóa công khai gốc (ROTPK) dưới dạng bộ nhớ chỉ ghi một lần (OTP) nhằm neo giữ chuỗi khởi động tin cậy?",
+          "options": [
+            {
+              "id": "A",
+              "label": "eFuses (Cầu chì điện tử)"
+            },
+            {
+              "id": "B",
+              "label": "SRAM nội vi"
+            },
+            {
+              "id": "C",
+              "label": "Phân vùng swap trên thẻ nhớ SD"
+            },
+            {
+              "id": "D",
+              "label": "Thanh ghi bộ nhớ đệm L1 Cache"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "eFuses (Electronic Fuses) là mảng bộ nhớ chỉ ghi một lần (OTP) trên silicon SoC; sau khi được 'thổi' giá trị băm ROTPK, các kết nối vật lý bị ngắt vĩnh viễn, ngăn chặn hoàn toàn việc sửa đổi khóa gốc từ phần mềm."
+        },
+        {
+          "id": "os11-l102-q2",
+          "difficulty": "medium",
+          "question": "Trong kiến trúc U-Boot Verified Boot, cấu trúc tệp tin nào được sử dụng để đóng gói đồng thời Linux Kernel Image, Device Tree Blob (DTB), Initramfs và các chữ ký số mật mã học thành một gói duy nhất nhằm ngăn chặn tấn công tráo đổi phân vùng?",
+          "options": [
+            {
+              "id": "A",
+              "label": "FIT Image (Flat Image Tree)"
+            },
+            {
+              "id": "B",
+              "label": "Tệp nén Zip chuẩn PKZIP"
+            },
+            {
+              "id": "C",
+              "label": "Kho lưu trữ TAR không nén"
+            },
+            {
+              "id": "D",
+              "label": "Tệp hình ảnh đĩa ISO-9660"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "FIT Image (Flat Image Tree) dựa trên cú pháp Device Tree Source (.dts) cho phép đóng gói đa thành phần (kernel, dtb, ramdisk) cùng các khối chữ ký số mật mã học, giúp U-Boot xác thực toàn vẹn toàn bộ cấu hình trước khi nạp."
+        },
+        {
+          "id": "os11-l102-q3",
+          "difficulty": "hard",
+          "question": "Tại sao cơ chế cập nhật firmware FOTA áp dụng chữ ký số bất đối xứng RSA/ECDSA hợp lệ vẫn có thể bị kẻ tấn công xâm nhập nếu thiết bị thiếu cơ chế Hardware Anti-Rollback Counter theo tiêu chuẩn NIST SP 800-193?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì thuật toán RSA-4096 có thể bị bẻ khóa bằng máy tính bỏ túi trong vòng vài giây."
+            },
+            {
+              "id": "B",
+              "label": "Vì kẻ tấn công có thể thực hiện cuộc tấn công hạ cấp (Downgrade/Rollback Attack) bằng cách phát lại một bản firmware cũ chính thức của nhà sản xuất (vốn có chữ ký hợp lệ) nhưng chứa các lỗ hổng bảo mật nghiêm trọng đã biết từ trước để khai thác."
+            },
+            {
+              "id": "C",
+              "label": "Vì nhân Linux sẽ tự động xóa khóa công khai sau mỗi 30 ngày sử dụng."
+            },
+            {
+              "id": "D",
+              "label": "Vì tiêu chuẩn NIST SP 800-193 chỉ áp dụng cho máy tính lượng tử."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Chữ ký số chỉ chứng minh tính toàn vẹn và nguồn gốc tại thời điểm tạo chữ ký; nó không ngăn chặn việc kẻ tấn công nạp lại một bản phát hành cũ hợp lệ nhưng chứa lỗ hổng (Downgrade attack). Chỉ có Hardware Anti-Rollback Counter mới từ chối các phiên bản firmware có số hiệu bảo mật cũ."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một thiết bị điều khiển ô tô kết nối mạng (Automotive Telematics Control Unit - TCU) sử dụng SoC ARM Cortex-A53 chạy Linux nhúng với U-Boot Verified Boot. Nhóm phát triển muốn triển khai tính năng cập nhật FOTA qua sóng 4G/5G đáp ứng quy chuẩn an ninh mạng phương tiện UNECE R155 và NIST SP 800-193. Bạn được giao nhiệm vụ thiết kế kiến trúc chuỗi khởi động an toàn và quy trình cập nhật firmware chống bricking và chống downgrade.",
+        "tasks": [
+          "Thiết kế sơ đồ chuỗi ủy thác khởi động (Chain of Trust) từ BootROM đến Kernel, chỉ rõ vị trí lưu trữ ROTPK hash trong eFuses và cấu trúc FIT image của U-Boot.",
+          "Xây dựng cơ chế cập nhật phân vùng kép A/B (Dual-Bank updates) kết hợp phần cứng Watchdog Timer để tự động khôi phục trạng thái hoạt động nếu firmware mới không thể khởi động.",
+          "Triển khai cơ chế chống hạ cấp phiên bản (Anti-Rollback) sử dụng Replay Protected Memory Block (RPMB) của bộ nhớ eMMC để bảo vệ số hiệu phiên bản bảo mật (Security Version Number)."
+        ],
+        "requiredEvidence": [
+          "Bản vẽ kiến trúc kỹ thuật chi tiết mô tả luồng xác thực chữ ký số từ phần cứng eFuses đến tầng ứng dụng",
+          "Kịch bản thử nghiệm kiểm thử tấn công giả lập nạp firmware cũ (Downgrade test) và chứng minh hệ thống từ chối nạp qua RPMB counter",
+          "Bảng ma trận đánh giá tuân thủ 3 trụ cột (Protection, Detection, Recovery) của tiêu chuẩn NIST SP 800-193 cho hệ thống TCU"
+        ]
+      },
+      "sources": [
+        {
+          "title": "NIST SP 800-193: Platform Firmware Resiliency Guidelines",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-193/final",
+          "publisher": "National Institute of Standards and Technology",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Ba trụ cột khả năng phục hồi firmware nền tảng: Bảo vệ (Protection), Phát hiện (Detection), và Phục hồi (Recovery)",
+            "Yêu cầu kỹ thuật về cơ chế xác thực chuỗi khởi động và ngăn chặn tấn công hạ cấp (Anti-Rollback)"
+          ]
+        },
+        {
+          "title": "Das U-Boot Documentation: Verified Boot",
+          "url": "https://source.denx.de/u-boot/u-boot/-/blob/master/doc/uImage.FIT/signature.txt",
+          "publisher": "DENX Software Engineering",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế ký số và xác minh tính toàn vẹn của FIT Image (Flat Image Tree) trong U-Boot",
+            "Cấu hình Control Device Tree chứa khóa công khai và quy trình bảo vệ chuỗi khởi động"
+          ]
+        }
+      ]
+    }
+  ]
+}

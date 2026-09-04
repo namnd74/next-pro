@@ -1,0 +1,1143 @@
+{
+  "id": "os08-m01-ad-architecture-protocols",
+  "slug": "ad-architecture-protocols",
+  "trackId": "os08-active-directory",
+  "title": "Kiến trúc Active Directory, Miền, Rừng, DNS, LDAP, Kerberos & NTLM",
+  "summary": "Nắm vững kiến trúc định danh doanh nghiệp Active Directory: phân cấp miền và rừng, cấu trúc Global Catalog, phân giải dịch vụ qua DNS SRV, truy vấn LDAP, và cơ chế xác thực vé Kerberos v5 so với NTLMv2.",
+  "difficulty": "intermediate",
+  "estimatedMinutes": 420,
+  "careerPaths": ["penetration-test", "red-team", "purple-team"],
+  "domains": ["windows", "active-directory"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os08-l67-active-directory-domains-forests-and-trust-architecture",
+      "slug": "active-directory-domains-forests-and-trust-architecture",
+      "title": "Kiến trúc Active Directory: Miền, Rừng, FSMO Roles, Global Catalog & Trust Architecture",
+      "summary": "Phân tích kiến trúc phân cấp Active Directory Domain Services: ranh giới bảo mật thực sự giữa Miền và Rừng, 5 vai trò FSMO, cơ chế đồng bộ đa chủ thể qua các Directory Partitions, định vị Domain Controller qua DNS SRV, kiến trúc Global Catalog, và các rủi ro leo thang quyền xuyên rừng qua cơ chế ủy thác và SID History injection.",
+      "difficulty": "intermediate",
+      "durationMinutes": 140,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân biệt ranh giới bảo mật thực sự (Security Boundary) của Rừng (Forest) so với ranh giới quản trị (Administrative Boundary) của Miền (Domain) trong Active Directory.",
+        "Đánh giá tác động bảo mật và các vector tấn công đối với 5 Flexible Single Master Operation (FSMO) roles cùng cơ chế lưu trữ phân vùng NTDS.dit.",
+        "Kiểm tra và khai thác các cấu hình ủy thác liên miền/rừng (Domain & Forest Trusts), cơ chế SID Filtering và kỹ thuật leo thang đặc quyền bằng sIDHistory injection.",
+        "Phân tích quy trình DC Locator thông qua các bản ghi DNS SRV và vai trò của Global Catalog (GC) trong việc phân giải Universal Group Membership."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["windows", "active-directory"],
+      "attackTactics": [
+        "discovery",
+        "privilege-escalation",
+        "initial-access",
+        "lateral-movement"
+      ],
+      "keywords": [
+        "active-directory",
+        "forest-boundary",
+        "domain-trust",
+        "fsmo-roles",
+        "global-catalog",
+        "sid-filtering",
+        "sid-history",
+        "dns-srv",
+        "dc-locator"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Trong Active Directory, Rừng (Forest) mới là ranh giới bảo mật tối hậu (Ultimate Security Boundary), không phải Miền (Domain). Bất kỳ ai kiểm soát được quyền Domain Admin trong một child domain đều có thể thỏa hiệp Enterprise Admins và chiếm quyền toàn bộ Forest nếu không có ranh giới cô lập vật lý hoặc cơ chế SID Filtering nghiêm ngặt; mọi đối tượng AD đều được định danh bằng SID bất biến và đồng bộ hóa qua các Naming Contexts riêng biệt.",
+      "visual": {
+        "title": "Cơ chế Ủy thác Rừng Active Directory và Điểm Kiểm tra SID Filtering",
+        "caption": "Luồng xác thực xuyên rừng (Cross-Forest Trust) và điểm kiểm tra SID Filtering tại ranh giới Domain Controller.",
+        "steps": [
+          {
+            "label": "Khởi tạo Yêu cầu Xuyên Rừng",
+            "detail": "Người dùng thuộc Forest A yêu cầu vé truy cập tài nguyên thuộc máy chủ trong Forest B qua cơ chế Kerberos Referral.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Kiểm tra SID Filtering tại KDC",
+            "detail": "Domain Controller của Forest B tiếp nhận vé và áp dụng bộ lọc SID Filtering nhằm loại bỏ các SID ngoài phạm vi domain nguồn hoặc SID đặc quyền.",
+            "tone": "caution"
+          },
+          {
+            "label": "Chặn Đứng Giả mạo sIDHistory",
+            "detail": "Nếu SID Filtering được bật (Quarantined), các SID như Enterprise Admins (RID 519) giả mạo trong thuộc tính sIDHistory sẽ bị tước bỏ hoàn toàn.",
+            "tone": "allow"
+          },
+          {
+            "label": "Nguy cơ Thỏa hiệp Toàn diện Rừng",
+            "detail": "Nếu trust cấu hình tắt SID Filtering (Enable-SIDHistory: Yes), kẻ tấn công chiếm quyền domain con có thể tiêm SID Enterprise Admins để chiếm toàn bộ Forest.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Phân cấp Rừng (Forest), Miền (Domain) và Ranh giới Bảo mật Thực tế (Security Boundary)",
+          "paragraphs": [
+            "Active Directory Domain Services (AD DS) tổ chức dữ liệu định danh theo mô hình phân cấp gồm Cây (Trees), Miền (Domains) và Rừng (Forests). Cơ sở dữ liệu cốt lõi NTDS.dit trên mỗi Domain Controller được chia thành các phân vùng logic gọi là Naming Contexts (NC) hoặc Directory Partitions: Schema Partition (định nghĩa thuộc tính và lớp đối tượng toàn rừng), Configuration Partition (cấu hình topo mạng, site, dịch vụ toàn rừng), Domain Partition (chứa users, groups, computers của riêng domain đó), và Application Partitions (lưu trữ DNS zones như ForestDnsZones và DomainDnsZones).",
+            "Một hiểu lầm phổ biến và nguy hiểm nhất trong quản trị AD là xem Domain như một ranh giới bảo mật độc lập. Microsoft đã chính thức xác định rằng Domain chỉ là một ranh giới quản trị (Administrative Boundary). Ranh giới bảo mật thực sự (Security Boundary) duy nhất trong Active Directory là Rừng (Forest). Người quản trị nắm giữ quyền Domain Admins tại một Domain con (Child Domain) hoàn toàn có khả năng leo thang đặc quyền lên Enterprise Admins và kiểm soát toàn bộ các Domain khác trong cùng một Forest thông qua quyền chỉnh sửa Schema, cấu hình Configuration Partition, hoặc lạm dụng cơ chế sao chép dữ liệu.",
+            "Mỗi đối tượng trong Active Directory được định danh duy nhất bởi một Security Identifier (SID). SID bao gồm cấu trúc tiền tố Domain Identifier (ví dụ S-1-5-21-...) và kết thúc bằng một Relative Identifier (RID). Các RID dưới 1000 được định nghĩa là Well-Known RIDs (ví dụ 500 là Administrator, 502 là krbtgt, 512 là Domain Admins, 519 là Enterprise Admins). Sự phân chia ranh giới và kiểm soát quyền truy cập đều dựa trên việc so khớp SID này trong Access Token của người dùng với Security Descriptor (DACL) của đối tượng mục tiêu."
+          ]
+        },
+        {
+          "title": "Kiến trúc 5 FSMO Roles và Rủi ro Thỏa hiệp Master Single-Operation",
+          "paragraphs": [
+            "Mặc dù Active Directory hoạt động chủ yếu theo cơ chế Multi-Master Replication (cho phép ghi dữ liệu đồng thời trên bất kỳ Domain Controller nào), có 5 tác vụ đặc biệt bắt buộc phải xử lý đơn chủ thể (Single-Master) để tránh xung đột dữ liệu. Những tác vụ này được gọi là Flexible Single Master Operation (FSMO) roles.",
+            "Hai vai trò có phạm vi áp dụng toàn Rừng (Forest-Wide): (1) Schema Master — kiểm soát việc sửa đổi và mở rộng cấu trúc schema của toàn bộ Forest. Bất kỳ sự thay đổi schema trái phép nào cũng có thể phá vỡ tính toàn vẹn của thư mục; (2) Domain Naming Master — quản lý việc thêm hoặc xóa các domain và ánh xạ tên miền trong forest. Kẻ tấn công kiểm soát vai trò này có thể can thiệp vào topo định danh của doanh nghiệp.",
+            "Ba vai trò có phạm vi áp dụng trong từng Miền (Domain-Wide): (3) PDC Emulator (Primary Domain Controller Emulator) — vai trò quan trọng nhất trong vận hành hàng ngày: là nguồn đồng bộ thời gian chuẩn (NTP) cho toàn domain, xử lý khẩn cấp các thay đổi mật khẩu (urgent password replication), xử lý xác thực fallback NTLM, và là nơi mặc định chỉnh sửa Group Policy Objects (GPOs). Nếu PDC Emulator bị kiểm soát, kẻ tấn công có thể thao túng thời gian để phá vỡ Kerberos hoặc can thiệp GPO toàn công ty; (4) RID Pool Manager — phân bổ các khối RID (mặc định 500 RID mỗi khối) cho các DC khác trong domain khi tạo đối tượng mới; (5) Infrastructure Master — chịu trách nhiệm cập nhật các tham chiếu đối tượng liên miền (cross-domain object references) và phantom objects, đảm bảo tính nhất quán giữa các domain."
+          ]
+        },
+        {
+          "title": "Kiến trúc Trust, Cơ chế Ủy thác Kerberos Referral và Tấn công SID History",
+          "paragraphs": [
+            "Mối quan hệ ủy thác (Trust) cho phép người dùng từ miền này xác thực và truy cập tài nguyên tại miền khác. Trust được phân loại theo hướng (One-way hoặc Two-way) và tính bắc cầu (Transitive hoặc Non-transitive). Các loại trust phổ biến gồm: Parent-Child Trust (tự động tạo ra giữa domain cha và con, hai chiều, bắc cầu), Tree-Root Trust (giữa các cây khác namespace trong cùng forest), Forest Trust (giữa hai forest khác nhau, bắc cầu), External Trust (giữa hai domain thuộc forest khác nhau hoặc domain NT4 legacy, không bắc cầu), và Shortcut Trust (tối ưu hóa luồng xác thực giữa hai domain con xa nhau).",
+            "Khi người dùng từ Domain A truy cập tài nguyên tại Domain B thông qua Kerberos, KDC của Domain A không thể cấp vé trực tiếp cho dịch vụ của Domain B. Thay vào đó, nó cấp một vé Kerberos Referral (Inter-realm TGT) được mã hóa bằng mật khẩu chia sẻ của mối quan hệ trust (Trust Key / Inter-realm Kerberos Key). Client mang vé này sang KDC của Domain B để tiếp tục xin vé dịch vụ TGS.",
+            "Điểm mấu chốt về an ninh nằm ở thuộc tính `sIDHistory`. Thuộc tính này vốn được thiết kế để hỗ trợ di chuyển (migration) tài khoản giữa các domain mà không làm mất quyền truy cập tài nguyên cũ. Khi người dùng xác thực, tất cả các SID lưu trong `sIDHistory` đều được KDC đưa vào PAC (Privilege Attribute Certificate) trong vé Kerberos. Trong kịch bản tấn công, nếu kẻ xâm nhập chiếm được quyền Domain Admin ở child domain, họ có thể ghi thêm SID của Enterprise Admins (Domain_Forest_Root-519) vào thuộc tính `sIDHistory` của một tài khoản thông thường. Nếu ranh giới trust không kích hoạt tính năng lọc SID (SID Filtering), KDC của forest root sẽ tin tưởng PAC này, trao quyền Enterprise Admin tối cao cho kẻ tấn công."
+          ]
+        },
+        {
+          "title": "Hạ tầng Phân giải Dịch vụ: DNS SRV Records, DC Locator Process và Global Catalog",
+          "paragraphs": [
+            "Active Directory phụ thuộc hoàn toàn vào hệ thống DNS để các máy trạm và máy chủ có thể định vị các dịch vụ thư mục. Dịch vụ Netlogon trên mỗi Domain Controller chịu trách nhiệm đăng ký định kỳ các bản ghi DNS SRV (Service Location Records) trong vùng `_msdcs.<ForestRootDomain>`. Cấu trúc bản ghi SRV bao gồm: Service, Protocol, Priority, Weight, Port và Target FQDN.",
+            "Quy trình DC Locator hoạt động như sau: Khi máy trạm cần đăng nhập hoặc tìm DC, nó gửi truy vấn DNS SRV đối với `_ldap._tcp.dc._msdcs.<DomainName>` hoặc bản ghi gắn với Active Directory Site cục bộ `_ldap._tcp.<SiteName>._sites.dc._msdcs.<DomainName>`. Sau khi nhận được danh sách IP của các DC, máy trạm gửi gói tin Netlogon ping (qua UDP port 389) để chọn ra DC phản hồi nhanh nhất và cùng Site địa lý, tối ưu hóa băng thông mạng WAN.",
+            "Bên cạnh đó, Global Catalog (GC) là một máy chủ DC lưu trữ bản sao đầy đủ của tất cả đối tượng trong Domain của chính nó, cộng thêm một tập hợp thuộc tính thu gọn (Partial Attribute Set - PAS) của tất cả các đối tượng trong toàn bộ Forest. GC lắng nghe trên cổng TCP 3268 (LDAP) và 3269 (LDAPS). Vai trò tối quan trọng của Global Catalog là phân giải các nhóm Universal Groups khi người dùng đăng nhập trong môi trường đa miền. Nếu không liên lạc được với GC, quá trình tạo mã định danh truy cập (Token Creation) có thể bị thất bại hoặc thiếu hụt quyền hạn nhóm universal."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm toán Ranh giới Rừng, Cấu hình FSMO và Đánh giá Rủi ro SID Filtering",
+        "objective": "Phân tích kiến trúc phân cấp Active Directory, đánh giá cấu hình Trust liên rừng, phát hiện nguy cơ leo thang đặc quyền qua thuộc tính sIDHistory và chẩn đoán sự cố DC Locator DNS SRV.",
+        "scenario": "Bạn đang thực hiện đánh giá an ninh kiến trúc Active Directory cho Tập đoàn MegaCorp. Tập đoàn sở hữu một Forest gốc (corp.local) và một công ty con mới sáp nhập (sub.corp.local) liên kết qua Forest Trust. Đội ngũ quản trị muốn đảm bảo rằng việc thỏa hiệp ở công ty con không thể ảnh hưởng tới Forest gốc.",
+        "constraints": [
+          "Phải tuân thủ mô hình phân tích ranh giới bảo mật thực tế của Microsoft: Forest là Security Boundary.",
+          "Phải đánh giá chính xác tác động của thuộc tính sIDHistory và trạng thái kích hoạt SID Filtering trên các liên kết Trust.",
+          "Mọi khuyến nghị khắc phục phải đảm bảo không làm gián đoạn luồng xác thực đăng nhập của người dùng qua Global Catalog."
+        ],
+        "cases": [
+          {
+            "id": "case-67-01",
+            "title": "Đánh giá Ranh giới Bảo mật trong Môi trường Multi-Domain",
+            "context": "Đội ngũ IT của công ty con (sub.corp.local) yêu cầu cấp quyền quản trị riêng biệt và tuyên bố rằng họ có thể cài đặt bất kỳ phần mềm nào trên DC của sub.corp.local mà không gây rủi ro bảo mật cho corp.local vì họ chỉ là \"Domain Admins của domain con\".",
+            "prompt": "Nhận định nào sau đây phản ánh chính xác ranh giới an ninh kỹ thuật trong kiến trúc Active Directory?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đúng, vì Domain là ranh giới bảo mật độc lập tuyệt đối; người quản trị sub.corp.local không có tài khoản trong corp.local nên không thể truy cập bất kỳ tài nguyên nào của corp.local.",
+                "correct": false,
+                "rationale": "Domain chỉ là ranh giới quản trị (Administrative Boundary), không phải Security Boundary; trong cùng một forest, quyền domain con có thể leo thang lên root."
+              },
+              {
+                "id": "B",
+                "label": "Sai, vì trong cùng một Active Directory Forest, Forest mới là ranh giới an ninh tối thượng. Một Domain Admin tại child domain có quyền truy cập vật lý/logic vào NTDS.dit của DC con, có thể thao túng việc đồng bộ hóa dữ liệu hoặc khai thác quan hệ trust hai chiều nội bộ để thỏa hiệp toàn bộ Forest.",
+                "correct": true,
+                "rationale": "Microsoft khẳng định Forest là ranh giới bảo mật duy nhất. Thỏa hiệp bất kỳ DC nào trong forest đều dẫn tới nguy cơ mất an toàn cho toàn bộ forest."
+              },
+              {
+                "id": "C",
+                "label": "Đúng, chỉ cần Domain Controller của sub.corp.local không nắm giữ vai trò Schema Master thì không thể gây ảnh hưởng tới corp.local.",
+                "correct": false,
+                "rationale": "Việc không giữ Schema Master không ngăn cản được các kỹ thuật leo thang đặc quyền khác qua PAC manipulation, sIDHistory hoặc replication tampering."
+              },
+              {
+                "id": "D",
+                "label": "Sai, vì child domain không có cơ sở dữ liệu NTDS.dit riêng mà dùng chung file NTDS.dit từ corp.local qua mạng.",
+                "correct": false,
+                "rationale": "Mỗi Domain Controller đều lưu trữ cơ sở dữ liệu NTDS.dit cục bộ chứa các partition của riêng mình."
+              }
+            ]
+          },
+          {
+            "id": "case-67-02",
+            "title": "Thẩm tra Cấu hình Forest Trust và Rủi ro SID Filtering Bypass",
+            "context": "Trong quá trình audit quan hệ External Trust giữa corp.local và một đối tác bên ngoài partner.local, bạn kiểm tra cấu hình trust bằng lệnh netdom và phát hiện cờ SIDFilteringQuarantined đang được đặt là No (Enable-SIDHistory = Yes).",
+            "prompt": "Rủi ro an ninh nghiêm trọng nhất phát sinh từ cấu hình này là gì và biện pháp khắc phục chuẩn xác là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Rủi ro: Kẻ tấn công kiểm soát partner.local có thể gán SID của Domain Admins hoặc Enterprise Admins (RID 512, 519) vào thuộc tính sIDHistory của tài khoản partner; khi xác thực qua trust, KDC của corp.local không lọc bỏ SID này và trao quyền đặc quyền tối cao. Khắc phục: Kích hoạt SID Filtering bằng lệnh `netdom trust corp.local /domain:partner.local /quarantine:yes`.",
+                "correct": true,
+                "rationale": "Khi tắt SID Filtering, KDC tin tưởng các SID trong sIDHistory của domain nguồn, dẫn tới lỗ hổng leo thang đặc quyền kinh điển cross-forest/cross-domain."
+              },
+              {
+                "id": "B",
+                "label": "Rủi ro: Làm chậm tốc độ phân giải DNS giữa hai miền do thiếu bản ghi SRV. Khắc phục: Cấu hình lại DNS Conditional Forwarder.",
+                "correct": false,
+                "rationale": "SID Filtering là cơ chế lọc mã định danh bảo mật trong vé Kerberos/NTLM token, hoàn toàn không liên quan đến hiệu năng DNS."
+              },
+              {
+                "id": "C",
+                "label": "Rủi ro: Mật khẩu người dùng từ partner.local sẽ bị lộ dạng bản rõ qua mạng khi đồng bộ hóa. Khắc phục: Bật giao thức mã hóa IPsec.",
+                "correct": false,
+                "rationale": "SID History không truyền mật khẩu người dùng mà chỉ chứa danh sách các SID lịch sử."
+              },
+              {
+                "id": "D",
+                "label": "Rủi ro: Mọi tài khoản trong corp.local sẽ tự động bị chuyển đổi thành Universal Group. Khắc phục: Tắt dịch vụ Global Catalog trên DC.",
+                "correct": false,
+                "rationale": "Cấu hình trust không tự động chuyển đổi loại nhóm người dùng trong thư mục."
+              }
+            ]
+          },
+          {
+            "id": "case-67-03",
+            "title": "Chẩn đoán Sự cố Định vị DC Locator và Phân giải Dịch vụ DNS SRV",
+            "context": "Các máy trạm mới gia nhập mạng tại chi nhánh văn phòng TP.HCM liên tục mất hơn 3 phút để đăng nhập hoặc báo lỗi \"No Domain Controller available\", mặc dù có một DC cục bộ tên HCM-DC01 đang hoạt động bình thường trên cùng dải subnet IP.",
+            "prompt": "Nguyên nhân kỹ thuật sâu xa có khả năng nhất và phương pháp kiểm tra chính xác là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "HCM-DC01 bị thiếu chứng chỉ TLS trên cổng 443 nên máy trạm từ chối kết nối.",
+                "correct": false,
+                "rationale": "Quá trình đăng nhập AD và DC Locator mặc định dùng DNS SRV, Kerberos cổng 88 và LDAP cổng 389, không phụ thuộc cổng 443 HTTPS."
+              },
+              {
+                "id": "B",
+                "label": "Dịch vụ Netlogon trên HCM-DC01 chưa đăng ký bản ghi SRV đúng site (`_ldap._tcp.HCM-Site._sites.dc._msdcs.<domain>`) vào DNS, hoặc subnet IP của chi nhánh chưa được gắn vào HCM-Site trong Active Directory Sites and Services, khiến máy trạm phải fallback gửi broadcast hoặc truy vấn các DC ở xa qua mạng WAN chậm.",
+                "correct": true,
+                "rationale": "DC Locator sử dụng DNS SRV theo Site; nếu subnet không được định nghĩa hoặc bản ghi SRV bị thiếu, client sẽ truy vấn các DC khác site gây trễ hoặc timeout."
+              },
+              {
+                "id": "C",
+                "label": "Cơ sở dữ liệu NTDS.dit trên HCM-DC01 vượt quá kích thước tối đa 2GB nên không thể tiếp nhận thêm kết nối.",
+                "correct": false,
+                "rationale": "NTDS.dit dựa trên ESE engine (Jet Database) hỗ trợ kích thước hàng chục terabyte, không có giới hạn 2GB."
+              },
+              {
+                "id": "D",
+                "label": "Máy trạm chưa được cấp vé TGS cho dịch vụ Global Catalog trước khi gửi DNS query.",
+                "correct": false,
+                "rationale": "Truy vấn DNS SRV diễn ra trước khi xác thực Kerberos; không thể có vé TGS trước khi định vị được Domain Controller."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác sự khác biệt giữa Security Boundary (Forest) và Administrative Boundary (Domain).",
+          "Phân tích đúng cơ chế sIDHistory injection và đề xuất lệnh cấu hình SID Filtering Quarantine chính xác.",
+          "Chỉ ra đúng luồng hoạt động của DC Locator, DNS SRV records và Active Directory Sites & Services."
+        ],
+        "evidenceTemplate": [
+          "Bảng phân tích 5 FSMO roles: tên role, phạm vi (Forest/Domain), DC nắm giữ, và rủi ro khi bị tấn công",
+          "Kết quả kiểm tra trạng thái SID Filtering trên các liên kết Trust bằng PowerShell hoặc netdom",
+          "Danh sách các bản ghi DNS SRV cốt lõi phục vụ quá trình DC Locator và trạng thái đăng ký của từng DC",
+          "Đề xuất cấu hình kiến trúc phân tầng (Tiering Model) cô lập Domain Controllers và Forest Root"
+        ],
+        "reset": "Đặt lại toàn bộ các kịch bản phân tích kiến trúc Active Directory về trạng thái ban đầu.",
+        "cleanup": "Xóa bỏ các bản ghi kiểm toán tạm thời và tài liệu phân tích mô phỏng khỏi bộ nhớ hệ thống."
+      },
+      "governance": {
+        "prevent": [
+          "Kích hoạt bắt buộc cơ chế SID Filtering (Quarantine: Yes) trên tất cả các quan hệ External Trust và Forest Trust liên kết với các thực thể ngoài ranh giới kiểm soát.",
+          "Áp dụng mô hình quản trị phân tầng (Tiered Administration Model - Tier 0, Tier 1, Tier 2) nhằm cô lập tuyệt đối các Domain Controller và tài khoản đặc quyền cấp Forest.",
+          "Giới hạn và audit định kỳ quyền ghi trên thuộc tính sIDHistory của tất cả tài khoản trong thư mục, đảm bảo không tài khoản thường nào chứa well-known privileged RIDs."
+        ],
+        "observe": [
+          "Giám sát Windows Security Event ID 4672 (Special Privileges Assigned) và Event ID 4624 để phát hiện các đăng nhập có chứa SID đặc quyền trong phần sIDHistory.",
+          "Theo dõi các thay đổi đối với cấu hình Trust thông qua Event ID 4706 (A trust was created), 4707 (A trust was removed) và 4716 (Trusted domain information was modified).",
+          "Thiết lập cảnh báo đối với các truy vấn DNS SRV bất thường hoặc lưu lượng Netlogon ping đột biến có dấu hiệu quét định vị Domain Controller diện rộng."
+        ],
+        "respond": [
+          "Khi phát hiện có dấu hiệu lạm dụng sIDHistory xuyên trust, cô lập liên kết Trust ngay lập tức bằng cách vô hiệu hóa hoặc thu hồi trust relationship.",
+          "Sử dụng PowerShell ActiveDirectory module để rà soát và thanh trừng toàn bộ các giá trị sIDHistory trái phép trên tài khoản người dùng.",
+          "Tiến hành đổi mật khẩu tài khoản Inter-realm Trust Key (Trust Account Password) để vô hiệu hóa các vé Kerberos Referral giả mạo."
+        ],
+        "residualRisk": [
+          "Các liên kết Trust nội bộ hai chiều trong cùng một Forest mặc định không lọc SID giữa các domain con, do đó bảo mật của Forest phụ thuộc vào mắt xích yếu nhất trong các child domains.",
+          "Độ trễ sao chép dữ liệu đa chủ thể (Replication Latency) giữa các Active Directory Sites có thể tạo ra cửa sổ thời gian ngắn cho các cấu hình bất đồng bộ."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Một Domain trong Active Directory là một ranh giới bảo mật độc lập tuyệt đối (Security Boundary) chống lại sự can thiệp từ các Domain khác trong cùng Forest.",
+          "correction": "Microsoft xác định rõ Domain chỉ là ranh giới quản trị (Administrative Boundary). Trong một Forest, chỉ có Forest mới là Security Boundary thực sự; bất kỳ Domain Admin nào tại domain con đều có thể leo thang quyền lên Enterprise Admins nếu không có sự phân tách rừng vật lý riêng biệt."
+        },
+        {
+          "claim": "Bản ghi DNS SRV chỉ đóng vai trò tương tự như bản ghi Host (A/AAAA) thông thường để phân giải tên máy sang địa chỉ IP.",
+          "correction": "Bản ghi SRV chứa thêm thông tin về cổng dịch vụ (Port), độ ưu tiên (Priority), trọng số (Weight) và giao thức (TCP/UDP), được DC Locator Service sử dụng để định tuyến client tới đúng Domain Controller gần nhất theo cấu trúc Active Directory Sites."
+        },
+        {
+          "claim": "Thuộc tính sIDHistory là một tính năng tự động bảo mật giúp người dùng giữ nguyên quyền hạn khi đổi tên tài khoản.",
+          "correction": "sIDHistory là thuộc tính phục vụ việc di chuyển (migration) tài khoản giữa các domain. Nếu không được kiểm soát bởi cơ chế SID Filtering, nó trở thành vector tấn công nghiêm trọng cho phép kẻ tấn công tự gán quyền đặc quyền (Domain/Enterprise Admins) vào tài khoản thường."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os08-l67-q1",
+          "difficulty": "easy",
+          "question": "FSMO role nào trong Active Directory chịu trách nhiệm đồng bộ thời gian (NTP), xử lý khẩn cấp các thay đổi mật khẩu và làm máy chủ mặc định để chỉnh sửa Group Policy Objects (GPO)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Schema Master"
+            },
+            {
+              "id": "B",
+              "label": "RID Pool Manager"
+            },
+            {
+              "id": "C",
+              "label": "PDC Emulator"
+            },
+            {
+              "id": "D",
+              "label": "Infrastructure Master"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "PDC Emulator là role FSMO quan trọng nhất trong vận hành hàng ngày của một domain: đồng bộ giờ hệ thống qua NTP, xử lý cập nhật mật khẩu khẩn cấp (urgent replication), và là master DC để biên tập GPO."
+        },
+        {
+          "id": "os08-l67-q2",
+          "difficulty": "medium",
+          "question": "Trong cấu hình Forest Trust giữa hai rừng Active Directory, điều kiện tiên quyết nào cho phép kẻ tấn công khai thác kỹ thuật sIDHistory injection để leo thang đặc quyền từ rừng này sang rừng kia?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cơ chế SID Filtering đã bị vô hiệu hóa (SIDFilteringQuarantined = No / Enable-SIDHistory = Yes) trên mối quan hệ Trust"
+            },
+            {
+              "id": "B",
+              "label": "Hai rừng phải dùng chung một máy chủ DNS Root duy nhất"
+            },
+            {
+              "id": "C",
+              "label": "Giao thức xác thực giữa hai rừng bị suy giảm bắt buộc về NTLMv1"
+            },
+            {
+              "id": "D",
+              "label": "Máy chủ Domain Controller của rừng nguồn phải giữ vai trò Schema Master"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Khi SID Filtering bị tắt, KDC của domain đích sẽ chấp nhận và đưa tất cả các SID lưu trong thuộc tính sIDHistory của vé Kerberos từ domain nguồn vào Access Token, cho phép kẻ tấn công đưa RID đặc quyền (512, 519) vào token."
+        },
+        {
+          "id": "os08-l67-q3",
+          "difficulty": "hard",
+          "question": "Trong môi trường Active Directory đa miền (Multi-Domain Forest), thành phần nào lưu trữ Partial Attribute Set (PAS) của tất cả đối tượng trong toàn bộ Forest để phục vụ việc xác định Universal Group Membership tại thời điểm người dùng đăng nhập?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Read-Only Domain Controller (RODC)"
+            },
+            {
+              "id": "B",
+              "label": "RID Master Controller"
+            },
+            {
+              "id": "C",
+              "label": "Global Catalog (GC) Server"
+            },
+            {
+              "id": "D",
+              "label": "Key Distribution Center Proxy (KDC Proxy)"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Global Catalog lưu trữ toàn bộ đối tượng của domain sở tại và một tập hợp thuộc tính giới hạn (PAS) của tất cả đối tượng thuộc các domain khác trong cùng Forest. Nó là thành phần bắt buộc để phân giải Universal Group khi người dùng đăng nhập."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được chỉ định kiểm toán an ninh kiến trúc Active Directory cho một tập đoàn đa quốc gia đang chuẩn bị sáp nhập hạ tầng của một đối tác bên ngoài qua liên kết Two-Way Forest Trust. Bạn cần kiểm tra ranh giới bảo mật, rà soát cấu hình Trust, audit thuộc tính sIDHistory và đánh giá hạ tầng DNS SRV.",
+        "tasks": [
+          "Thực hiện audit trạng thái SID Filtering trên tất cả các liên kết Trust hiện hữu bằng PowerShell (`Get-ADTrust -Filter *`) và lệnh `netdom trust`, đánh giá các nguy cơ tiềm ẩn.",
+          "Viết script truy vấn Active Directory để phát hiện tất cả các tài khoản người dùng có thuộc tính sIDHistory chứa các RID đặc quyền (500, 502, 512, 519) hoặc các SID không thuộc dải domain hợp lệ.",
+          "Phân tích cấu hình vùng DNS `_msdcs` và các bản ghi SRV để xác nhận mọi Domain Controller đều được đăng ký chính xác theo Active Directory Sites and Services, loại bỏ các bản ghi mồ côi (orphaned SRV records)."
+        ],
+        "requiredEvidence": [
+          "Bảng tổng hợp trạng thái các mối quan hệ Trust, bao gồm kiểu Trust, hướng Trust, tính bắc cầu và trạng thái SID Filtering Quarantine",
+          "Báo cáo kết quả kiểm tra thuộc tính sIDHistory trên toàn bộ tài khoản trong thư mục kèm đánh giá mức độ rủi ro",
+          "Sơ đồ topo DNS SRV và kiến trúc Sites & Services thể hiện luồng DC Locator tối ưu cho các văn phòng chi nhánh"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Active Directory Forest as a Security Boundary",
+          "url": "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/security-best-practices/forest-design-models",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Ranh giới bảo mật thực sự giữa Miền và Rừng trong Active Directory",
+            "Mô hình thiết kế Forest và khuyến nghị cô lập danh tính doanh nghiệp"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — How Domain and Forest Trusts Work",
+          "url": "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/how-domain-and-forest-trusts-work",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế ủy thác Kerberos Referral xuyên miền và xuyên rừng",
+            "Chi tiết kỹ thuật về cơ chế bảo vệ SID Filtering và thuộc tính sIDHistory"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Sub-technique T1484: Domain Policy Modification",
+          "url": "https://attack.mitre.org/techniques/T1484/",
+          "publisher": "MITRE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Các kỹ thuật thao túng chính sách và mối quan hệ Trust trong Active Directory",
+            "Chiến thuật leo thang đặc quyền trong hạ tầng định danh doanh nghiệp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os08-l68-kerberos-authentication-mechanics-and-ticket-exchanges",
+      "slug": "kerberos-authentication-mechanics-and-ticket-exchanges",
+      "title": "Cơ chế xác thực Kerberos v5: Ticket Exchanges (AS-REQ/REP, TGS), PAC & NTLMv2 Fallback",
+      "summary": "Nắm vững nguyên lý hoạt động của giao thức Kerberos v5 trong Active Directory: ba giai đoạn trao đổi vé (AS, TGS, AP), cấu trúc và cơ chế ký số bảo vệ PAC, vai trò của Service Principal Name (SPN), bản chất mật mã học của tấn công Kerberoasting và AS-REP Roasting, điều kiện suy giảm (fallback) về NTLMv2 và các chiến lược phòng chống NTLM Relay.",
+      "difficulty": "intermediate",
+      "durationMinutes": 140,
+      "prerequisites": [
+        "os08-l67-active-directory-domains-forests-and-trust-architecture"
+      ],
+      "outcomes": [
+        "Phân tích chi tiết chuỗi bắt tay ba bước của giao thức Kerberos v5: Authentication Service (AS), Ticket-Granting Service (TGS), và Application Exchange (AP).",
+        "Bóc tách cấu trúc dữ liệu Privilege Attribute Certificate (PAC), cơ chế chữ ký kép KDC/Server Signature, và các lỗ hổng mạo danh định danh liên quan đến PAC.",
+        "Giải thích vai trò của Service Principal Name (SPN), cơ chế mã hóa vé dịch vụ bằng hash của Service Account, và nguyên lý khai thác kỹ thuật Kerberoasting.",
+        "Xác định các nguyên nhân dẫn đến suy giảm (fallback) từ Kerberos về NTLMv2, phân tích rủi ro NetNTLM Relay và xây dựng lộ trình triệt tiêu hoàn toàn NTLM."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["windows", "active-directory"],
+      "attackTactics": ["credential-access", "lateral-movement", "defense-evasion"],
+      "keywords": [
+        "kerberos",
+        "tgt",
+        "tgs",
+        "pac",
+        "spn",
+        "as-req",
+        "as-rep",
+        "ntlmv2",
+        "kerberoasting",
+        "pass-the-ticket"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Kerberos là giao thức phân phối vé dựa trên bên thứ ba tin cậy (KDC). Client không bao giờ gửi password thô cho Server; thay vào đó, KDC mã hóa vé TGT bằng hash bí mật của krbtgt, và mã hóa vé TGS bằng hash của tài khoản sở hữu SPN dịch vụ. Mọi đặc quyền của người dùng được niêm phong trong cấu trúc PAC có chữ ký số kép của KDC; bất kỳ sự thoái lui (fallback) nào về NTLM đều làm suy yếu toàn bộ chuỗi ủy thác này do tính dễ bị Relay của NetNTLM.",
+      "visual": {
+        "title": "Chu kỳ Trao đổi Vé Kerberos v5 và Điểm Xác thực Toàn vẹn PAC",
+        "caption": "Ba giai đoạn bắt tay Kerberos (AS, TGS, AP) và cơ chế ký số cấu trúc PAC bởi KDC.",
+        "steps": [
+          {
+            "label": "Giai đoạn 1: AS-REQ & AS-REP",
+            "detail": "Client gửi timestamp mã hóa bằng mật khẩu của mình; KDC xác thực và cấp vé TGT được mã hóa bằng master key của tài khoản krbtgt cùng Session Key.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Giai đoạn 2: TGS-REQ & TGS-REP",
+            "detail": "Client gửi TGT và Authenticator yêu cầu vé dịch vụ; KDC giải mã TGT, kiểm tra quyền và cấp vé TGS được mã hóa bằng hash của Service Account đích.",
+            "tone": "allow"
+          },
+          {
+            "label": "Giai đoạn 3: AP-REQ & PAC Validation",
+            "detail": "Client xuất trình vé TGS chứa PAC cho Application Server; Server giải mã vé bằng secret key của mình và kiểm tra tính hợp lệ của PAC signatures.",
+            "tone": "caution"
+          },
+          {
+            "label": "Nguy cơ Suy giảm NTLM Fallback",
+            "detail": "Nếu phân giải SPN thất bại hoặc client chỉ định IP thô, xác thực tự động rơi về NTLMv2, phơi bày NetNTLM challenge-response trước rủi ro Relay.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Giải phẫu Chu kỳ Trao đổi Vé Kerberos v5 (AS-REQ/REP, TGS-REQ/REP, AP-REQ/REP)",
+          "paragraphs": [
+            "Giao thức Kerberos v5 (RFC 4120) là cơ chế xác thực mặc định và an toàn nhất trong mạng Windows Active Directory. Mô hình Kerberos vận hành dựa trên ba thực thể chính: Client (người dùng hoặc tiến trình yêu cầu dịch vụ), Application Server (máy chủ lưu trữ tài nguyên cần truy cập), và Key Distribution Center (KDC - dịch vụ chạy trực tiếp trên Domain Controller, bao gồm hai thành phần: Authentication Service và Ticket-Granting Service).",
+            "Giai đoạn 1 (AS Exchange): Client gửi gói tin AS-REQ tới KDC (cổng TCP/UDP 88). Để chứng minh danh tính mà không gửi mật khẩu qua mạng, client sử dụng cơ chế Pre-Authentication (PA-ENC-TIMESTAMP), mã hóa mốc thời gian hiện tại bằng khóa dẫn xuất từ mật khẩu người dùng (NTLM hash hoặc AES-128/256 key). KDC giải mã timestamp bằng bản sao khóa người dùng lưu trong NTDS.dit; nếu độ lệch thời gian không vượt quá dung sai (mặc định 5 phút), KDC phản hồi gói tin AS-REP chứa: (1) Ticket Granting Ticket (TGT) được mã hóa bằng Master Key của tài khoản `krbtgt`, và (2) Logon Session Key được mã hóa bằng khóa bí mật của chính client. Nếu tài khoản bị bật cờ \"Do not require Kerberos preauthentication\" (DONT_REQ_PREAUTH), KDC sẽ trả về AS-REP ngay lập tức mà không cần xác thực timestamp, mở đường cho kỹ thuật tấn công AS-REP Roasting để bẻ khóa mật khẩu offline.",
+            "Giai đoạn 2 (TGS Exchange): Khi client cần truy cập một tài nguyên cụ thể, nó gửi gói tin TGS-REQ tới KDC, đính kèm TGT, Authenticator (mã hóa bằng Logon Session Key), và tên định danh dịch vụ mục tiêu (Service Principal Name - SPN). KDC giải mã TGT bằng khóa `krbtgt`, xác minh tính hợp lệ của client, sau đó sinh ra vé dịch vụ (Ticket-Granting Service Ticket - TGS). Vé TGS này chứa thông tin danh tính client, session key mới cho dịch vụ, và cấu trúc PAC, toàn bộ được mã hóa bằng khóa bí mật của tài khoản sở hữu SPN đó.",
+            "Giai đoạn 3 (AP Exchange): Client gửi gói tin AP-REQ tới Application Server, xuất trình vé TGS cùng một Authenticator mới. Application Server sử dụng chính khóa bí mật của mình để giải mã vé TGS, trích xuất Service Session Key, xác thực Authenticator, và thiết lập phiên làm việc được bảo vệ. Nếu cần thiết, server phản hồi gói tin AP-REP để thực hiện xác thực hai chiều (Mutual Authentication)."
+          ]
+        },
+        {
+          "title": "Cấu trúc PAC (Privilege Attribute Certificate) và Cơ chế Ký số Xác thực Danh tính",
+          "paragraphs": [
+            "Trong đặc tả Kerberos gốc của IETF, vé chỉ xác nhận danh tính người dùng (Username/Realm) chứ không chứa thông tin về quyền hạn hay nhóm thành viên. Microsoft đã mở rộng giao thức bằng cách nhúng một cấu trúc dữ liệu đặc biệt gọi là Privilege Attribute Certificate (PAC - chuẩn MS-PAC) vào trường Authorization-Data của vé Kerberos.",
+            "Cấu trúc PAC chứa toàn bộ thông tin ủy quyền cần thiết để Windows xây dựng Access Token: SID của người dùng, Primary Group RID, danh sách tất cả Group SIDs (cả trực tiếp và kế thừa), User Account Control flags, và các thuộc tính liên quan đến chính sách Resource-Based Constrained Delegation. Nhờ có PAC, Application Server không cần phải gửi truy vấn ngược lại Domain Controller mỗi khi người dùng kết nối, giúp giảm tải tối đa cho hệ thống phân tán.",
+            "Để ngăn chặn việc người dùng can thiệp hoặc tự thêm các SID đặc quyền (như Domain Admins RID 512) vào vé TGS, KDC áp dụng cơ chế chữ ký số kép trên cấu trúc PAC: (1) Server Signature — được tạo bằng khóa của tài khoản sở hữu dịch vụ mục tiêu, cho phép server xác minh rằng PAC không bị client sửa đổi dọc đường; và (2) KDC Signature — được tạo bằng khóa của tài khoản `krbtgt`. Chữ ký KDC đảm bảo rằng chỉ có Domain Controller hợp pháp mới có thể sinh ra nội dung PAC này. Trong một số trường hợp cấu hình hoặc lỗ hổng lịch sử (như MS14-068 hay CVE-2021-42287/CVE-2021-42278), sự thiếu sót trong việc kiểm tra chữ ký PAC hoặc xác thực tên tài khoản đã từng cho phép kẻ tấn công giả mạo vé đặc quyền toàn năng."
+          ]
+        },
+        {
+          "title": "Service Principal Names (SPN), Mật mã hóa Vé Dịch vụ và Cơ chế Kerberoasting",
+          "paragraphs": [
+            "Service Principal Name (SPN) là chuỗi định danh duy nhất cho một phiên bản dịch vụ chạy trong hạ tầng Windows, được KDC sử dụng để ánh xạ dịch vụ mục tiêu tới tài khoản bảo mật (Logon Account) sở hữu dịch vụ đó. Cú pháp chuẩn của SPN có dạng: `ServiceClass/Host:Port/ServiceName` (ví dụ: `MSSQLSvc/db01.corp.local:1433` hoặc `HTTP/intranet.corp.local`).",
+            "SPN có thể được gán cho hai loại tài khoản: (1) Machine Account (tài khoản máy tính của server, ví dụ `DB01$`) — mật khẩu của tài khoản máy tính được hệ điều hành Windows tự sinh ngẫu nhiên với độ dài 120 ký tự và tự động xoay vòng mỗi 30 ngày; hoặc (2) User Account (tài khoản người dùng thông thường được dùng làm Service Account) — mật khẩu thường do con người thiết lập và có thể là mật khẩu yếu, không đổi định kỳ.",
+            "Bản chất của kỹ thuật Kerberoasting: Theo thiết kế mặc định của Kerberos, bất kỳ tài khoản domain hợp lệ nào (kể cả tài khoản người dùng có quyền thấp nhất) cũng được phép gửi yêu cầu TGS-REQ tới KDC để xin vé TGS cho bất kỳ SPN nào đã đăng ký trong thư mục. Khi KDC nhận được yêu cầu, nó cấp vé TGS được mã hóa bằng hash của tài khoản sở hữu SPN đó (sử dụng thuật toán RC4-HMAC hoặc AES). Kẻ tấn công trích xuất vé TGS từ bộ nhớ RAM hoặc bắt gói tin TGS-REP trả về, sau đó lưu lại dưới dạng hash để tiến hành bẻ khóa mật khẩu ngoại tuyến (Offline Password Cracking bằng Hashcat hoặc John the Ripper). Quá trình bẻ khóa này diễn ra hoàn toàn trên máy tính của kẻ tấn công, không gửi bất kỳ gói tin đăng nhập nào tới DC nên không bao giờ kích hoạt cơ chế khóa tài khoản (Account Lockout)."
+          ]
+        },
+        {
+          "title": "Kerberos vs NTLMv2: Cơ chế Suy giảm (Fallback), Rủi ro NetNTLM Relay và Lộ trình Triệt tiêu",
+          "paragraphs": [
+            "Mặc dù Kerberos là giao thức chính, hệ điều hành Windows vẫn duy trì cơ chế bảo mật cũ NT LAN Manager (NTLM) để phục vụ tính tương thích ngược. Khi người dùng cố gắng kết nối tới một tài nguyên mạng, hệ thống sẽ tự động suy giảm (fallback) từ Kerberos về NTLM nếu rơi vào một trong các trường hợp: (1) Kết nối bằng địa chỉ IP thay vì FQDN (ví dụ: `\\\\192.168.1.10\\share`), vì Windows không thể tìm thấy SPN tương ứng với địa chỉ IP trong Active Directory; (2) Tên SPN của dịch vụ bị sai, trùng lặp hoặc chưa từng được đăng ký; (3) Cổng mạng Kerberos 88 bị firewall chặn; hoặc (4) Máy trạm client không thuộc thành viên của Domain.",
+            "Cơ chế xác thực NTLMv2 hoạt động theo chu kỳ Challenge-Response gồm 3 bước: Type 1 Negotiate (client gửi yêu cầu), Type 2 Challenge (server gửi lại một chuỗi số ngẫu nhiên gọi là Server Challenge), và Type 3 Authenticate (client mã hóa Server Challenge kết hợp với Client Challenge bằng NTLM Hash của người dùng và gửi lại server - chuỗi này gọi là NetNTLMv2 Response). Điểm yếu cốt tử của NTLM là: theo mặc định, phản hồi NetNTLM không được liên kết mật mã với kênh truyền tải mạng (thiếu Channel Binding hoặc Message Signing).",
+            "Lỗ hổng này mở ra kỹ thuật tấn công NTLM Relay kinh điển: Kẻ tấn công đứng giữa (bằng kỹ thuật LLMNR/NBT-NS spoofing, DHCP poisoning hoặc ép buộc kết nối qua PrinterBug/PetitPotam), chặn gói tin Type 3 của nạn nhân và chuyển tiếp (relay) nguyên vẹn gói tin xác thực này tới một dịch vụ mục tiêu khác trong mạng (như LDAP, SMB, hoặc HTTP AD CS Web Enrollment). Dịch vụ đích xác thực thành công và cấp phiên làm việc với đặc quyền của nạn nhân cho kẻ tấn công. Để triệt tiêu hoàn toàn rủi ro này, doanh nghiệp bắt buộc phải kích hoạt SMB Signing, LDAP Channel Binding & Signing, và triển khai chính sách GPO \"Network security: Restrict NTLM\" để chuyển dần sang môi trường Kerberos-Only."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Phân tích Giao thức Kerberos, Đánh giá Nguy cơ Kerberoasting và Chống NTLM Relay",
+        "objective": "Bắt gói tin phân tích chu kỳ trao đổi vé Kerberos, kiểm toán các tài khoản dịch vụ có SPN dễ tổn thương trước Kerberoasting, và cấu hình chính sách củng cố hệ thống nhằm ngăn chặn triệt để tấn công NTLM Relay.",
+        "scenario": "Đội ngũ Red Team trong cuộc diễn tập nội bộ đã thu thập được vé TGS của tài khoản `svc_sql_admin` và bẻ khóa thành công mật khẩu trong vòng 20 phút. Đồng thời, họ đã thực hiện thành công NTLM Relay từ một máy trạm kế toán sang máy chủ LDAP của Domain Controller để tạo tài khoản mới. Bạn cần phân tích nguyên nhân kỹ thuật và thiết lập cấu hình phòng thủ triệt để.",
+        "constraints": [
+          "Phải phân tích chính xác cấu trúc gói tin Kerberos RFC 4120 và các trường mã hóa trong AS-REQ/REP và TGS-REQ/REP.",
+          "Khuyến nghị xử lý Kerberoasting không được làm tê liệt các ứng dụng đang chạy dưới quyền tài khoản dịch vụ.",
+          "Phương án loại bỏ NTLM phải có giai đoạn kiểm toán (Auditing) trước khi thực thi lệnh Deny hoàn toàn để tránh gián đoạn dịch vụ legacy."
+        ],
+        "cases": [
+          {
+            "id": "case-68-01",
+            "title": "Điều tra Thuộc tính DONT_REQ_PREAUTH và Phòng chống AS-REP Roasting",
+            "context": "Trong quá trình rà soát tài khoản Active Directory, bạn phát hiện tài khoản `backup_operator` có cờ `DONT_REQ_PREAUTH` (UserAccountControl bit 0x400000) được bật. Một tài khoản thường không đặc quyền trong domain có thể gửi AS-REQ tới KDC và nhận về vé AS-REP chứa dữ liệu mã hóa của tài khoản này.",
+            "prompt": "Cơ chế tấn công nào đang diễn ra và giải pháp khắc phục triệt để nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tấn công AS-REP Roasting: KDC trả về gói tin AS-REP chứa bản mã hóa bằng mật khẩu của backup_operator mà không cần pre-auth; kẻ tấn công trích xuất hash để bẻ khóa offline. Khắc phục: Bỏ chọn tùy chọn \"Do not require Kerberos preauthentication\" trên tài khoản và đặt mật khẩu phức tạp trên 25 ký tự.",
+                "correct": true,
+                "rationale": "Khi cờ DONT_REQ_PREAUTH được bật, KDC bỏ qua bước xác thực timestamp trong AS-REQ và trả về AS-REP có thể crack offline."
+              },
+              {
+                "id": "B",
+                "label": "Tấn công Golden Ticket: Kẻ tấn công đã chiếm được hash của tài khoản krbtgt và tự ký vé TGT. Khắc phục: Cài đặt lại toàn bộ hệ điều hành của Domain Controller.",
+                "correct": false,
+                "rationale": "DONT_REQ_PREAUTH liên quan đến AS-REP Roasting, hoàn toàn không phải là Golden Ticket."
+              },
+              {
+                "id": "C",
+                "label": "Tấn công Pass-the-Hash: Kẻ tấn công sử dụng NTLM hash để đăng nhập qua giao thức SMB. Khắc phục: Tắt dịch vụ Server Service trên DC.",
+                "correct": false,
+                "rationale": "Pass-the-Hash sử dụng trực tiếp hash NTLM đã có sẵn, trong khi ở đây kẻ tấn công chưa có hash và đang tìm cách lấy bản mã từ AS-REP."
+              },
+              {
+                "id": "D",
+                "label": "Tấn công Kerberoasting: Kẻ tấn công yêu cầu vé TGS cho dịch vụ backup. Khắc phục: Xóa bỏ thuộc tính ServicePrincipalName của tài khoản.",
+                "correct": false,
+                "rationale": "AS-REP Roasting xảy ra ở giai đoạn AS Exchange với vé TGT, khác với Kerberoasting xảy ra ở TGS Exchange với vé TGS."
+              }
+            ]
+          },
+          {
+            "id": "case-68-02",
+            "title": "Thẩm định Kiến trúc Service Account và Giảm thiểu Rủi ro Kerberoasting",
+            "context": "Tài khoản dịch vụ `svc_sql_admin` đang chạy dịch vụ Microsoft SQL Server trên máy chủ SQL01. Tài khoản này là tài khoản người dùng thông thường (User Account), thuộc nhóm Domain Admins, và có SPN là `MSSQLSvc/sql01.corp.local:1433`.",
+            "prompt": "Tại sao kiến trúc này tạo ra rủi ro nghiêm trọng và giải pháp kiến trúc dài hạn chuẩn mực nhất theo khuyến nghị của Microsoft là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Rủi ro: Bất kỳ domain user nào cũng có thể yêu cầu vé TGS cho SPN này và bẻ khóa offline để chiếm quyền Domain Admin. Giải pháp: Hạ quyền tài khoản khỏi Domain Admins, chuyển đổi tài khoản sang Group Managed Service Account (gMSA) với mật khẩu 128 ký tự tự động xoay vòng và nâng cấp thuật toán mã hóa vé lên AES-256.",
+                "correct": true,
+                "rationale": "gMSA sử dụng mật khẩu ngẫu nhiên phức tạp 128-bit do DC tự xoay định kỳ, khiến việc bẻ khóa offline vé TGS bằng brute-force là bất khả thi về mặt toán học."
+              },
+              {
+                "id": "B",
+                "label": "Rủi ro: Cổng 1433 SQL Server mở ra internet cho phép kẻ tấn công kết nối trực tiếp. Giải pháp: Đổi cổng SQL Server sang cổng 8080.",
+                "correct": false,
+                "rationale": "Kerberoasting diễn ra qua cổng 88 của KDC, không phụ thuộc vào việc cổng 1433 có mở hay không."
+              },
+              {
+                "id": "C",
+                "label": "Rủi ro: Tên SPN chứa FQDN khiến hacker biết được địa chỉ IP máy chủ. Giải pháp: Đổi tên SPN sang địa chỉ IP thô.",
+                "correct": false,
+                "rationale": "Đổi SPN sang địa chỉ IP sẽ làm hỏng Kerberos và ép hệ thống suy giảm về NTLM, gây nguy cơ bảo mật lớn hơn."
+              },
+              {
+                "id": "D",
+                "label": "Rủi ro: Dịch vụ SQL Server sẽ tự động giải mã toàn bộ vé TGS của các người dùng khác. Giải pháp: Tắt giao thức Kerberos trên SQL Server.",
+                "correct": false,
+                "rationale": "SQL Server chỉ giải mã vé cấp riêng cho dịch vụ của chính nó; tắt Kerberos sẽ buộc dùng NTLM."
+              }
+            ]
+          },
+          {
+            "id": "case-68-03",
+            "title": "Chặn Đứng Chuỗi Tấn công NTLM Relay và Kích hoạt Ranh giới Bảo vệ",
+            "context": "Trong quá trình pentest, chuyên gia bảo mật đã lợi dụng việc một máy trạm truy cập chia sẻ file qua địa chỉ IP `\\\\10.0.0.5\\share` để kích hoạt NTLM fallback, sau đó bắt gói tin NetNTLM Type 3 và chuyển tiếp (relay) thành công sang cổng 389 của Domain Controller để tạo mới tài khoản quản trị domain.",
+            "prompt": "Tổ hợp cấu hình bảo mật nào sau đây sẽ triệt tiêu hoàn toàn đường dẫn tấn công NTLM Relay này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cần cài đặt phần mềm Antivirus trên Domain Controller và đổi tên tài khoản Administrator.",
+                "correct": false,
+                "rationale": "Antivirus không kiểm soát tính toàn vẹn của giao thức xác thực; NTLM Relay là khai thác logic giao thức hợp lệ."
+              },
+              {
+                "id": "B",
+                "label": "Bắt buộc ký số SMB (SMB Signing = Required) trên toàn bộ hệ thống, kích hoạt LDAP Server Signing và LDAP Channel Binding Token (EPA - Extended Protection for Authentication) trên Domain Controller, đồng thời triển khai GPO kiểm toán và chặn NTLM (Restrict NTLM: Audit/Deny).",
+                "correct": true,
+                "rationale": "Ký số SMB và LDAP Signing/EPA đảm bảo tính toàn vẹn phiên; kẻ tấn công không thể chuyển tiếp phiên xác thực sang server khác nếu không có session key hợp lệ."
+              },
+              {
+                "id": "C",
+                "label": "Tắt hoàn toàn tường lửa Windows Firewall trên Domain Controller để KDC nhận diện gói tin nhanh hơn.",
+                "correct": false,
+                "rationale": "Tắt tường lửa làm gia tăng nghiêm trọng bề mặt tấn công mạng."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển toàn bộ máy trạm sang sử dụng NTLMv1 vì NTLMv1 không hỗ trợ tính năng Relay.",
+                "correct": false,
+                "rationale": "NTLMv1 sử dụng mã hóa DES cực kỳ yếu và có thể bị bẻ khóa trong vài giờ, tuyệt đối không được sử dụng."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Giải thích chi tiết luồng dữ liệu ba bước AS, TGS, AP trong giao thức Kerberos v5 RFC 4120.",
+          "Phân tích chính xác vai trò của chữ ký kép trong PAC và phương án triển khai gMSA để triệt tiêu rủi ro Kerberoasting.",
+          "Đề xuất đúng các chính sách củng cố hạ tầng: SMB Signing, LDAP Channel Binding & Signing, và GPO Restrict NTLM."
+        ],
+        "evidenceTemplate": [
+          "Sơ đồ chi tiết chu kỳ xác thực Kerberos với các trường mã hóa và Session Keys tương ứng",
+          "Danh sách các tài khoản có SPN dễ bị tổn thương kèm kế hoạch di chuyển sang Group Managed Service Accounts (gMSA)",
+          "Bản trích xuất cấu hình chính sách GPO về SMB Signing, LDAP Signing và Restrict NTLM",
+          "Kế hoạch kiểm toán NTLM Operational Log Event ID 8001-8004 trước khi tắt NTLM diện rộng"
+        ],
+        "reset": "Đặt lại môi trường mô phỏng phân tích Kerberos và NTLM về trạng thái ban đầu.",
+        "cleanup": "Thanh lọc các bản ghi lưu vết vé Kerberos và bảng phân tích gói tin khỏi bộ nhớ tạm."
+      },
+      "governance": {
+        "prevent": [
+          "Triển khai Group Managed Service Accounts (gMSA) cho tất cả các dịch vụ nội bộ yêu cầu SPN, vô hiệu hóa hoàn toàn việc dùng tài khoản người dùng có mật khẩu tĩnh làm Service Account.",
+          "Vô hiệu hóa tùy chọn \"Do not require Kerberos preauthentication\" trên 100% tài khoản Active Directory nhằm triệt tiêu bề mặt tấn công AS-REP Roasting.",
+          "Ép buộc ký số SMB (Require SMB Signing) và kích hoạt bắt buộc LDAP Channel Binding và LDAP Server Signing trên tất cả các Domain Controller trong doanh nghiệp."
+        ],
+        "observe": [
+          "Giám sát Windows Security Event ID 4768 (Kerberos TGT Request) để phát hiện các yêu cầu TGT sử dụng thuật toán mã hóa lỗi thời (RC4 - Encryption Type 0x17).",
+          "Theo dõi Event ID 4769 (Kerberos Service Ticket Request) nhằm phát hiện dấu hiệu Kerberoasting khi một tài khoản gửi yêu cầu vé TGS bất thường cho nhiều SPN trong khoảng thời gian ngắn.",
+          "Kích hoạt NTLM Operational Log và theo dõi Event ID 8001, 8002, 8003, 8004 để định danh chính xác các ứng dụng và máy trạm còn đang phụ thuộc vào NTLM trước khi chặn hoàn toàn."
+        ],
+        "respond": [
+          "Khi phát hiện tài khoản dịch vụ bị Kerberoast, lập tức đổi mật khẩu tài khoản với chuỗi ngẫu nhiên trên 30 ký tự hoặc chuyển ngay sang tài khoản gMSA.",
+          "Thu hồi các vé Kerberos hiện hành của tài khoản bị thỏa hiệp bằng cách thiết lập lại thuộc tính pwdLastSet và vô hiệu hóa phiên làm việc của user.",
+          "Trong trường hợp nghi ngờ lộ Master Key của tài khoản krbtgt, thực hiện quy trình xoay mật khẩu tài khoản krbtgt hai lần liên tiếp (cách nhau thời gian tối đa của vé TGT) để vô hiệu hóa toàn bộ Golden Tickets."
+        ],
+        "residualRisk": [
+          "Một số ứng dụng thương mại legacy cũ không hỗ trợ cơ chế Kerberos hoặc SPN, buộc tổ chức phải duy trì ngoại lệ NTLM cục bộ cho các phân vùng mạng cô lập.",
+          "Quy trình xoay mật khẩu krbtgt hai lần liên tiếp nếu thực hiện quá sát nhau có thể làm gián đoạn tức thì toàn bộ phiên đăng nhập của các dịch vụ trong toàn bộ doanh nghiệp."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Kẻ tấn công phải có quyền Administrator trên máy chủ dịch vụ mới có thể trích xuất vé TGS để thực hiện tấn công Kerberoasting.",
+          "correction": "Bất kỳ người dùng hợp lệ nào trong Domain (kể cả tài khoản có đặc quyền thấp nhất) đều có quyền hợp pháp theo chuẩn Kerberos để yêu cầu KDC cấp vé TGS cho mọi SPN đã đăng ký trong thư mục."
+        },
+        {
+          "claim": "Giao thức Kerberos tự động mã hóa toàn bộ nội dung dữ liệu truyền tải giữa client và server trong mọi ứng dụng mạng.",
+          "correction": "Kerberos chỉ là giao thức xác thực danh tính (Authentication). Việc mã hóa dữ liệu truyền tải (Data Encryption/Integrity) phụ thuộc vào giao thức ứng dụng tầng trên (ví dụ: SMB 3.x Encryption, HTTPS/TLS, hoặc RPC Encryption)."
+        },
+        {
+          "claim": "Khi người dùng kết nối tới chia sẻ file qua địa chỉ IP (ví dụ \\\\192.168.1.10\\share), Windows vẫn ưu tiên xác thực bằng Kerberos để đảm bảo an toàn.",
+          "correction": "Kerberos bắt buộc phải có tên SPN để tra cứu danh tính máy chủ trong Active Directory. Địa chỉ IP không thể ánh xạ trực tiếp sang SPN hợp lệ trong cấu hình mặc định, khiến Windows tự động suy giảm (fallback) về giao thức NTLM."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os08-l68-q1",
+          "difficulty": "easy",
+          "question": "Trong chu kỳ xác thực Kerberos v5, gói tin nào do KDC phát hành cho client, được mã hóa bằng mật khẩu của tài khoản `krbtgt` và đóng vai trò như vé thông hành để xin các vé dịch vụ tiếp theo?",
+          "options": [
+            {
+              "id": "A",
+              "label": "TGS-REP (Service Ticket)"
+            },
+            {
+              "id": "B",
+              "label": "AS-REP chứa TGT (Ticket Granting Ticket)"
+            },
+            {
+              "id": "C",
+              "label": "AP-REQ (Application Request)"
+            },
+            {
+              "id": "D",
+              "label": "NTLM Challenge Type 2"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Gói tin AS-REP từ Authentication Service của KDC trả về Ticket Granting Ticket (TGT) được mã hóa bằng khóa bí mật của tài khoản krbtgt, cho phép client chứng minh danh tính khi yêu cầu vé TGS."
+        },
+        {
+          "id": "os08-l68-q2",
+          "difficulty": "medium",
+          "question": "Tại sao kỹ thuật Kerberoasting cho phép kẻ tấn công tiến hành bẻ khóa mật khẩu ngoại tuyến (offline) mà không kích hoạt chính sách khóa tài khoản (Account Lockout Policy) của Active Directory?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì KDC tự động vô hiệu hóa chính sách Lockout đối với các tài khoản có đăng ký SPN"
+            },
+            {
+              "id": "B",
+              "label": "Vì quá trình thử mật khẩu brute-force diễn ra hoàn toàn cục bộ trên máy của kẻ tấn công đối với bản mã vé TGS đã lưu, không gửi bất kỳ yêu cầu đăng nhập nào tới Domain Controller"
+            },
+            {
+              "id": "C",
+              "label": "Vì vé TGS được giải mã trực tiếp trên Domain Controller nên không ghi log thất bại"
+            },
+            {
+              "id": "D",
+              "label": "Vì kẻ tấn công sử dụng giao thức UDP không có cơ chế bắt tay kiểm tra lỗi"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Client chỉ thực hiện một yêu cầu TGS-REQ hợp lệ duy nhất để nhận vé TGS về máy mình. Việc bẻ khóa hash mã hóa của vé diễn ra hoàn toàn offline trên phần cứng của kẻ tấn công, DC không hề nhận được bất kỳ request nào."
+        },
+        {
+          "id": "os08-l68-q3",
+          "difficulty": "hard",
+          "question": "Cấu trúc dữ liệu Privilege Attribute Certificate (PAC) trong vé Kerberos được bảo vệ chống lại việc người dùng tự ý sửa đổi hoặc chèn thêm Group SID đặc quyền nhờ vào cơ chế mật mã học nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cơ chế mã hóa đối xứng AP-REQ bằng session key của client"
+            },
+            {
+              "id": "B",
+              "label": "Cơ chế chữ ký số kép: Server Signature (ký bởi tài khoản dịch vụ) và KDC Signature (ký bởi tài khoản krbtgt)"
+            },
+            {
+              "id": "C",
+              "label": "Bảng kiểm soát truy cập DACL được kiểm tra trực tiếp qua cổng LDAP 389"
+            },
+            {
+              "id": "D",
+              "label": "Quá trình mã hóa AES-GCM phần cứng của chip TPM trên máy trạm"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "PAC chứa hai chữ ký quan trọng: Server Signature (được tạo bằng khóa của service account mục tiêu) và KDC Signature (được tạo bằng master key của tài khoản krbtgt), đảm bảo tính toàn vẹn tuyệt đối của thông tin ủy quyền."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một tổ chức tài chính lớn phát hiện dấu hiệu kẻ tấn công trong mạng nội bộ đang thực hiện thu hoạch vé TGS hàng loạt (Kerberoasting) đối với các tài khoản dịch vụ cơ sở dữ liệu và lợi dụng NTLM Relay trên một số hệ thống máy in và Web API cũ. Bạn được chỉ định thiết kế phương án khắc phục toàn diện nhằm hardening Kerberos và loại bỏ NTLM.",
+        "tasks": [
+          "Xây dựng kịch bản kiểm toán SPN bằng PowerShell để quét và phân loại tất cả các tài khoản dịch vụ có SPN đang gắn với tài khoản người dùng (User Accounts), đánh giá độ mạnh của mật khẩu và thuật toán mã hóa (RC4 vs AES).",
+          "Lập kế hoạch chuyển đổi các User Service Accounts quan trọng sang mô hình Group Managed Service Accounts (gMSA), bao gồm việc tạo KDS Root Key và cấu hình quyền hạn gMSA tương ứng.",
+          "Thiết kế chính sách Group Policy để ép buộc SMB Signing, LDAP Channel Binding & Signing trên toàn domain, đồng thời thiết lập lộ trình audit và loại bỏ NTLM thông qua Event ID 8001-8004."
+        ],
+        "requiredEvidence": [
+          "Bảng danh sách toàn bộ SPN trong thư mục kèm phân loại tài khoản sở hữu, thuật toán mã hóa và mức độ rủi ro Kerberoasting",
+          "Tài liệu hướng dẫn kỹ thuật triển khai gMSA từng bước thay thế cho tài khoản dịch vụ truyền thống",
+          "Báo cáo phân tích lưu lượng NTLM từ Event Log và kế hoạch rollout chính sách Network security: Restrict NTLM theo từng giai đoạn an toàn"
+        ]
+      },
+      "sources": [
+        {
+          "title": "IETF RFC 4120 — The Kerberos Network Authentication Service (V5)",
+          "url": "https://datatracker.ietf.org/doc/html/rfc4120",
+          "publisher": "IETF",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả kỹ thuật chuẩn của giao thức xác thực Kerberos v5",
+            "Cấu trúc các gói tin AS-REQ/REP, TGS-REQ/REP và AP-REQ/REP"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — [MS-PAC]: Privilege Attribute Certificate Data Structure",
+          "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-pac/166d8064-c863-41e1-9c23-dc5f1a30f947",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Định dạng cấu trúc dữ liệu PAC nhúng trong vé Kerberos",
+            "Chi tiết cơ chế ký số kép Server Signature và KDC Signature"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Technique T1558: Steal or Forge Kerberos Tickets",
+          "url": "https://attack.mitre.org/techniques/T1558/",
+          "publisher": "MITRE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Chiến thuật và kỹ thuật tấn công Kerberoasting, AS-REP Roasting",
+            "Các phương thức phát hiện và phòng thủ vé Kerberos trong doanh nghiệp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os08-l69-ldap-enumeration-and-active-directory-telemetry",
+      "slug": "ldap-enumeration-and-active-directory-telemetry",
+      "title": "Truy vấn LDAP, Phân giải Dịch vụ DNS SRV & Telemetry Sự kiện Định danh AD",
+      "summary": "Làm chủ cú pháp bộ lọc LDAP (RFC 4515) để thu thập thông tin định danh, phân tích kiến trúc Active Directory Integrated DNS (ADIDNS) và rủi ro ngộ độc DNS, thiết kế hệ thống telemetry giám sát sự kiện bảo mật (Event IDs 4624, 4672, 4768, 4769, 1644) và nắm vững nguyên lý phân tích đồ thị đường dẫn tấn công (Attack-Path Graphs).",
+      "difficulty": "intermediate",
+      "durationMinutes": 140,
+      "prerequisites": [
+        "os08-l67-active-directory-domains-forests-and-trust-architecture",
+        "os08-l68-kerberos-authentication-mechanics-and-ticket-exchanges"
+      ],
+      "outcomes": [
+        "Xây dựng các bộ lọc truy vấn LDAP nâng cao (RFC 4515) kết hợp bitwise rules để phát hiện các tài khoản có thuộc tính nhạy cảm và cấu hình ủy quyền nguy hiểm.",
+        "Phân tích kiến trúc Active Directory Integrated DNS (ADIDNS), cơ chế Dynamic Updates và các kịch bản tấn công ngộ độc bản ghi WPAD hoặc wildcard injection.",
+        "Thiết kế pipeline giám sát telemetry định danh dựa trên các Windows Event IDs cốt lõi (4624, 4672, 4768, 4769, 1644) và tích hợp Sysmon.",
+        "Vận dụng mô hình đồ thị quan hệ đối tượng Active Directory (Directory Schema, Object Classes, DACLs) để nhận diện và triệt tiêu các đường dẫn tấn công (Attack Paths)."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["windows", "active-directory"],
+      "attackTactics": ["discovery", "credential-access", "defense-evasion"],
+      "keywords": [
+        "ldap",
+        "ldap-filter",
+        "adidns",
+        "dns-srv",
+        "telemetry",
+        "event-log",
+        "sysmon",
+        "bloodhound",
+        "attack-path",
+        "schema"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Active Directory bản chất là một cơ sở dữ liệu phân tán có cấu trúc phân cấp, cho phép bất kỳ danh tính domain nào cũng có quyền đọc mặc định (Default Read) đối với hầu hết các thuộc tính đối tượng qua LDAP. Nhờ đặc điểm này, quá trình thu thập thông tin (Reconnaissance) của kẻ tấn công trông giống hệt như các thao tác nghiệp vụ hợp lệ của hệ điều hành; phòng thủ định danh không thể dựa vào việc \"chặn đọc LDAP\" mà phải dựa trên telemetry giám sát tần suất, mẫu truy vấn bất thường và phân tích đồ thị quan hệ ACL.",
+      "visual": {
+        "title": "Kiến trúc Truy vấn LDAP và Luồng Thu thập Telemetry Bảo mật AD",
+        "caption": "Quá trình client thực thi LDAP Search Filter trên Active Directory và các telemetry sự kiện được sinh ra trên Domain Controller.",
+        "steps": [
+          {
+            "label": "Client LDAP Bind & Search Request",
+            "detail": "Tài khoản thường thực hiện LDAP Bind (cổng 389/636) và gửi truy vấn tìm kiếm với bộ lọc RFC 4515 nhắm vào các thuộc tính đặc quyền.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Kiểm tra DACL & Trả lời từ NTDS.dit",
+            "detail": "Domain Controller kiểm tra DACL; do thuộc tính chung mở quyền Read cho Authenticated Users, dữ liệu cấu trúc đối tượng được trả về đầy đủ.",
+            "tone": "allow"
+          },
+          {
+            "label": "Tái hiện Đồ thị Quan hệ Tấn công",
+            "detail": "Kẻ tấn công tổng hợp thông tin LDAP (thành viên nhóm, DACL, session) để dựng đồ thị phân tích đường dẫn ngắn nhất tới Domain Admin.",
+            "tone": "caution"
+          },
+          {
+            "label": "Kích hoạt Cảnh báo Telemetry SIEM",
+            "detail": "Hệ thống phòng thủ kích hoạt cảnh báo thông qua Event ID 1644 (LDAP Query Logging), Event ID 4624 Logon Type 3, và Sysmon Event ID 3.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cơ chế Truy vấn LDAP (RFC 4515) và Khai thác Thuộc tính Nhạy cảm trong AD",
+          "paragraphs": [
+            "Lightweight Directory Access Protocol (LDAP - RFC 4511) là giao thức cốt lõi để truy vấn và thao tác trên cơ sở dữ liệu Active Directory. Mỗi đối tượng trong thư mục được định vị bởi một Distinguished Name (DN) duy nhất, ví dụ: `CN=John Doe,OU=Users,DC=corp,DC=local`. Các thuộc tính của đối tượng được định nghĩa nghiêm ngặt trong Schema Partition.",
+            "Một đặc điểm thiết kế nền tảng của Active Directory là cơ chế phân quyền mặc định: nhóm \"Authenticated Users\" (mọi tài khoản hợp lệ trong domain) đều có quyền đọc (Read) đối với hầu hết các đối tượng và thuộc tính trong thư mục. Điều này cho phép người dùng bình thường có thể thực hiện trinh sát toàn diện (Reconnaissance) mà không cần bất kỳ đặc quyền quản trị nào.",
+            "Cú pháp bộ lọc tìm kiếm LDAP (RFC 4515) sử dụng ký hiệu tiền tố (prefix notation) với các toán tử logic `(&)` (AND), `(|)` (OR), `(!)` (NOT). Đặc biệt, Active Directory hỗ trợ các quy tắc khớp bitwise thông qua Extensible Match Rules: `LDAP_MATCHING_RULE_BIT_AND` (OID: `1.2.840.113556.1.4.803`) và `LDAP_MATCHING_RULE_BIT_OR` (OID: `1.2.840.113556.1.4.804`). Các bộ lọc kinh điển phục vụ việc trinh sát bảo mật bao gồm: (1) Tìm tài khoản có đăng ký SPN để Kerberoast: `(&(objectCategory=person)(objectClass=user)(servicePrincipalName=*))`; (2) Tìm tài khoản không yêu cầu pre-auth (AS-REP Roasting): `(&(objectCategory=person)(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=4194304))`; (3) Tìm tài khoản được cấu hình Unconstrained Delegation: `(&(objectCategory=person)(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=524288))`; và (4) Tìm các tài khoản được bảo vệ bởi AdminSDHolder: `(adminCount=1)`."
+          ]
+        },
+        {
+          "title": "Active Directory Integrated DNS (ADIDNS), DNS Dynamic Updates và Nguy cơ Poisoning",
+          "paragraphs": [
+            "Active Directory Integrated DNS (ADIDNS) là mô hình tích hợp dịch vụ DNS trực tiếp vào cơ sở dữ liệu NTDS.dit. Thay vì lưu trữ bản ghi DNS dưới dạng các tập tin văn bản phẳng, ADIDNS lưu trữ các bản ghi DNS dưới dạng đối tượng có lớp `dnsNode` nằm trong các phân vùng ứng dụng: `DC=DomainDnsZones,DC=corp,DC=local` (sao chép giữa các DC trong domain) và `DC=ForestDnsZones,DC=corp,DC=local` (sao chép giữa tất cả các DC trong toàn forest).",
+            "Ưu điểm của ADIDNS là kế thừa cơ chế sao chép đa chủ thể (Multi-Master Replication) và bảng kiểm soát truy cập (DACL) của Active Directory. Tuy nhiên, cấu hình mặc định của ADIDNS tiềm ẩn rủi ro rất lớn: nó cho phép tính năng Secure Dynamic Updates, trong đó bất kỳ người dùng đã xác thực nào (Authenticated Users) cũng có quyền tự động tạo ra các bản ghi DNS mới nếu tên bản ghi đó chưa tồn tại trong zone.",
+            "Kẻ tấn công có thể lợi dụng đặc điểm này để thực hiện các kỹ thuật đầu độc DNS trong mạng nội bộ: (1) Tấn công WPAD Spoofing — tạo bản ghi DNS có tên `wpad` trỏ về IP của kẻ tấn công. Khi các máy trạm trong mạng kích hoạt tính năng tự động dò proxy của trình duyệt (Web Proxy Auto-Discovery), chúng sẽ gửi yêu cầu xác thực NTLM tới máy chủ WPAD giả mạo, cho phép kẻ tấn công thu hoạch NetNTLM hash hoặc thực hiện NTLM Relay; (2) Tấn công Wildcard Record Injection — tạo bản ghi đại diện (`*`) để bắt toàn bộ các truy vấn DNS đối với các tên miền nội bộ không tồn tại. Để phòng thủ, quản trị viên bắt buộc phải tạo sẵn các bản ghi WPAD tĩnh và kiểm soát chặt chẽ quyền ghi trên DNS zone."
+          ]
+        },
+        {
+          "title": "Thiết kế Telemetry Giám sát Định danh: Security Event Logs và Sysmon Integration",
+          "paragraphs": [
+            "Xây dựng hệ thống giám sát và phát hiện đe dọa định danh đòi hỏi phải cấu hình chính sách kiểm toán nâng cao (Advanced Audit Policies) trên Domain Controller và thu thập các Windows Security Event IDs quan trọng.",
+            "Ma trận các Event ID bảo mật định danh cốt lõi trên Domain Controller: (1) Event ID 4624 — Đăng nhập thành công (Successful Logon), cần phân tích kỹ trường Logon Type: Type 2 (Interactive - đăng nhập tại bàn phím), Type 3 (Network - đăng nhập qua mạng như SMB/RPC/LDAP), Type 10 (RemoteInteractive - RDP); (2) Event ID 4625 — Đăng nhập thất bại (Failed Logon), chỉ số quan trọng để phát hiện tấn công Password Spraying hoặc Brute-Force; (3) Event ID 4672 — Gán đặc quyền đặc biệt (Special Privileges Assigned to New Logon), ghi lại khi tài khoản có các quyền như SeDebugPrivilege hoặc SeTcbPrivilege đăng nhập; (4) Event ID 4768 — Yêu cầu vé Kerberos TGT (AS-REQ), cho biết loại mã hóa và trạng thái pre-authentication; (5) Event ID 4769 — Yêu cầu vé Kerberos Service Ticket (TGS-REQ), tần suất đột biến của event này với mã hóa RC4 là dấu hiệu đặc trưng của Kerberoasting; (6) Event ID 4776 — Xác thực thông tin qua NTLM (Credential Validation).",
+            "Ngoài các Security Event thông thường, Domain Controller hỗ trợ tính năng LDAP Query Logging chuyên sâu thông qua khóa registry NTDS Diagnostics (Field Engineering). Khi được kích hoạt, Event ID 1644 sẽ ghi lại chi tiết các truy vấn LDAP đắt đỏ (Expensive Searches) hoặc không hiệu quả (Inefficient Searches), bao gồm: IP máy khách, tài khoản thực hiện, thời gian thực thi, số lượng đối tượng quét qua, và toàn bộ chuỗi Search Filter. Kết hợp với Sysmon (System Monitor) thu thập Event ID 3 (Network Connection tới cổng 389/636/88) và Event ID 1 (Process Create chạy các công cụ trinh sát như SharpHound hoặc adsisearcher), SOC có thể phát hiện các đợt trinh sát thư mục ngay từ giai đoạn đầu."
+          ]
+        },
+        {
+          "title": "Mô hình Đồ thị Định danh và Nguyên lý Phân tích Đường dẫn Tấn công (Attack Paths)",
+          "paragraphs": [
+            "Cách tiếp cận bảo mật truyền thống thường tập trung vào danh sách kiểm soát truy cập cục bộ (Access Control Lists - ACLs) hoặc chỉ kiểm tra thành viên của các nhóm đặc quyền cao nhất như Domain Admins. Tuy nhiên, trong môi trường Active Directory phức tạp của doanh nghiệp, các mối quan hệ ủy quyền và quyền hạn kế thừa tạo thành một đồ thị toán học phức tạp (Identity Graph).",
+            "Mô hình đồ thị định danh được cấu thành từ: (1) Các nút (Nodes) — đại diện cho các đối tượng bảo mật: Users, Computers, Groups, OUs, GPOs, Domains; và (2) Các cạnh (Edges) — đại diện cho các quyền hạn và mối quan hệ thực tế giữa các nút: `MemberOf` (thành viên nhóm), `GenericAll` (toàn quyền kiểm soát), `WriteDacl` (quyền sửa đổi danh sách phân quyền), `WriteOwner` (quyền chiếm quyền sở hữu), `AllowedToDelegate` (được phép ủy quyền Kerberos), và `HasSession` (phiên làm việc của người dùng đang đăng nhập trên một máy tính).",
+            "Bản chất nguy hiểm của đồ thị tấn công là tính chất bắc cầu (Transitive Attack Path): Một kẻ tấn công ban đầu chỉ chiếm quyền User A trên Workstation 1. User A có quyền local admin trên Workstation 1, nơi User B (thành viên nhóm Server Admins) đang có phiên đăng nhập hoạt động (`HasSession`). Kẻ tấn công trích xuất token/credential của User B từ LSASS. User B lại có quyền `GenericAll` trên nhóm Helpdesk. Nhóm Helpdesk lại có quyền `ResetPassword` trên tài khoản Domain Admin. Như vậy, kẻ tấn công đã hoàn thành một chuỗi leo thang 4 bước để chiếm toàn quyền Domain mà không cần khai thác bất kỳ lỗ hổng phần mềm (0-day) nào. Tư duy phòng thủ hiện đại dựa trên BloodHound/BloodHound Enterprise không chỉ là vá lỗi mà là \"Bẻ gãy các cạnh của đồ thị\" (Edge Breaking) thông qua mô hình phân tầng Tiering Model và các máy trạm quản trị đặc quyền (Privileged Access Workstations - PAW)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Thực thi Truy vấn LDAP Nâng cao, Kiểm toán ADIDNS và Giám sát Telemetry Định danh",
+        "objective": "Sử dụng các bộ lọc LDAP bitwise để định danh các đối tượng có cấu hình nguy hiểm, kiểm toán và bảo vệ hệ thống ADIDNS chống đầu độc bản ghi, và phân tích log sự kiện trên Domain Controller để phát hiện các cuộc quét trinh sát.",
+        "scenario": "Hệ thống SIEM của tổ chức ghi nhận hàng loạt kết nối cổng 389 LDAP từ một máy trạm kế toán. Bạn cần xây dựng bộ lọc để kiểm tra những gì kẻ tấn công có thể đã thấy trong thư mục, đánh giá các bản ghi DNS trong ADIDNS và thiết lập các luật phát hiện tương quan cho SOC.",
+        "constraints": [
+          "Phải sử dụng đúng chuẩn cú pháp RFC 4515 và OID bitwise rules của Microsoft LDAP.",
+          "Các đề xuất cấu hình ADIDNS phải đảm bảo các máy trạm hợp lệ vẫn có thể tự động cập nhật bản ghi IP động của mình.",
+          "Luật giám sát SIEM phải phân biệt được giữa lưu lượng LDAP bình thường của các dịch vụ hệ thống với hành vi quét trinh sát của công cụ chuyên biệt (như SharpHound)."
+        ],
+        "cases": [
+          {
+            "id": "case-69-01",
+            "title": "Xây dựng Bộ lọc LDAP Truy vấn Cấu hình Unconstrained Delegation",
+            "context": "Bạn cần viết một truy vấn LDAP chuẩn để tìm kiếm tất cả các tài khoản người dùng hoặc máy tính trong domain được cấu hình tính năng nguy hiểm Kerberos Unconstrained Delegation (cờ `TRUSTED_FOR_DELEGATION` trong thuộc tính `userAccountControl`, tương ứng với bit value `0x80000` = `524288`).",
+            "prompt": "Bộ lọc tìm kiếm LDAP nào sau đây là chuẩn xác nhất theo đặc tả RFC 4515 và Microsoft OID rules?",
+            "options": [
+              {
+                "id": "A",
+                "label": "`(userAccountControl=524288)`",
+                "correct": false,
+                "rationale": "So sánh bằng tuyệt đối (=) sẽ bỏ qua tất cả các tài khoản có thêm các cờ khác kết hợp (ví dụ NORMAL_ACCOUNT 512 + 524288 = 524800)."
+              },
+              {
+                "id": "B",
+                "label": "`(&(objectCategory=person)(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=524288))`",
+                "correct": true,
+                "rationale": "Sử dụng đúng OID 1.2.840.113556.1.4.803 (LDAP_MATCHING_RULE_BIT_AND) để kiểm tra xem bit 524288 có được bật trong trường userAccountControl hay không."
+              },
+              {
+                "id": "C",
+                "label": "`(&(objectCategory=computer)(unconstrainedDelegation=TRUE))`",
+                "correct": false,
+                "rationale": "Active Directory không có thuộc tính nào tên là unconstrainedDelegation; tính năng này được quản lý qua cờ bit trong userAccountControl."
+              },
+              {
+                "id": "D",
+                "label": "`(|(objectClass=user)(userAccountControl:OR:=524288))`",
+                "correct": false,
+                "rationale": "Cú pháp OR:= là không hợp lệ trong chuẩn LDAP RFC 4515."
+              }
+            ]
+          },
+          {
+            "id": "case-69-02",
+            "title": "Kiểm toán Rủi ro ADIDNS và Ngăn chặn Tấn công WPAD Spoofing",
+            "context": "Trong quá trình rà soát vùng DNS `corp.local` trong Active Directory Integrated DNS, bạn nhận thấy vùng DNS này đang bật chế độ Secure Dynamic Updates, nhưng trong danh sách bản ghi chưa hề có bản ghi nào tên là `wpad`. Bất kỳ người dùng domain nào cũng có thể gửi bản tin Dynamic Update để tạo bản ghi này.",
+            "prompt": "Hậu quả nguy hiểm nhất nếu kẻ tấn công tạo bản ghi `wpad` và biện pháp phòng ngừa chuẩn mực nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Hậu quả: Toàn bộ máy chủ DNS sẽ bị crash do cạn kiệt bộ nhớ RAM. Biện pháp: Khởi động lại dịch vụ DNS Server định kỳ mỗi 24 giờ.",
+                "correct": false,
+                "rationale": "Tạo bản ghi DNS hợp lệ không gây tràn bộ nhớ hay làm crash dịch vụ DNS."
+              },
+              {
+                "id": "B",
+                "label": "Hậu quả: Các máy trạm Windows tự động tìm kiếm WPAD sẽ kết nối tới máy chủ của kẻ tấn công, bị ép xác thực NTLM và dẫn tới mất NetNTLM hash hoặc bị NTLM Relay. Biện pháp: Tạo ngay một bản ghi DNS tĩnh tên `wpad` trỏ về IP loopback (127.0.0.1) hoặc một proxy an toàn, đồng thời khóa quyền chỉnh sửa DACL của bản ghi này chỉ cho phép Domain Admins.",
+                "correct": true,
+                "rationale": "Tạo sẵn bản ghi wpad tĩnh ngăn không cho người dùng thường tạo mới bản ghi này, triệt tiêu hoàn toàn vector tấn công WPAD spoofing trong ADIDNS."
+              },
+              {
+                "id": "C",
+                "label": "Hậu quả: Kẻ tấn công có thể chỉnh sửa mật khẩu của tài khoản Administrator. Biện pháp: Cài đặt phần mềm chống virus trên các máy trạm.",
+                "correct": false,
+                "rationale": "Bản ghi DNS không cho phép chỉnh sửa trực tiếp mật khẩu của tài khoản Administrator."
+              },
+              {
+                "id": "D",
+                "label": "Hậu quả: Làm mất hiệu lực của tất cả các chứng chỉ số AD CS. Biện pháp: Thu hồi chứng chỉ CA gốc.",
+                "correct": false,
+                "rationale": "WPAD liên quan đến cấu hình proxy của trình duyệt, không ảnh hưởng trực tiếp tới tính hợp lệ của chứng chỉ số CA."
+              }
+            ]
+          },
+          {
+            "id": "case-69-03",
+            "title": "Phát hiện Hoạt động Thu thập Đồ thị BloodHound / SharpHound qua Telemetry",
+            "context": "Công cụ trinh sát SharpHound khi chạy với tùy chọn mặc định (CollectionMethod All) sẽ gửi hàng chục ngàn truy vấn LDAP để thu thập danh sách đối tượng, thuộc tính, thành viên nhóm, và đồng thời mở kết nối RPC tới các máy trạm để kiểm tra phiên đăng nhập (Session Enumeration) và thành viên Local Admin.",
+            "prompt": "Sự kết hợp các tín hiệu telemetry nào sau đây là chỉ dấu tin cậy nhất (High-Fidelity Detection) để SOC phát hiện hoạt động thu thập của SharpHound?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cần quan sát thấy dung lượng CPU của Domain Controller tăng lên 100% trong 5 giây.",
+                "correct": false,
+                "rationale": "CPU tăng có thể do nhiều nguyên nhân bảo trì hoặc tác vụ sao chép thông thường, không phải là chỉ dấu tin cậy."
+              },
+              {
+                "id": "B",
+                "label": "Tín hiệu kết hợp: Sự gia tăng đột biến của Event ID 1644 (truy vấn LDAP quét toàn bộ lớp objectClass=* hoặc phạm vi Search Scope Subtree) từ một địa chỉ IP máy trạm duy nhất, kết hợp với hàng loạt Event ID 4624 Logon Type 3 kết nối tới cổng RPC/SMB (445/135) của hàng trăm máy trạm khác nhau trong thời gian ngắn từ cùng một tiến trình (Sysmon Event ID 3).",
+                "correct": true,
+                "rationale": "SharpHound có hai hành vi đặc trưng không thể che giấu: quét LDAP diện rộng trên DC và mở kết nối đồng loạt tới hàng trăm máy trạm để thu thập Session/LocalAdmin."
+              },
+              {
+                "id": "C",
+                "label": "Quan sát thấy sự kiện xóa tài khoản người dùng trong Event ID 4726 trên Domain Controller.",
+                "correct": false,
+                "rationale": "SharpHound là công cụ thu thập thông tin chỉ đọc (read-only), nó không bao giờ thực hiện hành động xóa tài khoản."
+              },
+              {
+                "id": "D",
+                "label": "Domain Controller ghi nhận nhiều gói tin ICMP Ping request từ mạng internet gửi vào.",
+                "correct": false,
+                "rationale": "Lưu lượng ICMP từ internet không liên quan tới hoạt động trinh sát định danh nội bộ của SharpHound."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Viết chính xác các bộ lọc LDAP nâng cao sử dụng toán tử logic và OID bitwise matching rules.",
+          "Phân tích đúng rủi ro bảo mật của ADIDNS Dynamic Updates và đưa ra phương án xử lý WPAD chuẩn.",
+          "Xây dựng ma trận tương quan sự kiện giữa LDAP query logging, Logon Type 3 và Sysmon để phát hiện trinh sát diện rộng."
+        ],
+        "evidenceTemplate": [
+          "Bảng tổng hợp các bộ lọc tìm kiếm LDAP nâng cao (SPN, DONT_REQ_PREAUTH, Unconstrained Delegation, AdminCount=1)",
+          "Tài liệu kiểm toán cấu hình ADIDNS và chính sách bảo vệ bản ghi WPAD tĩnh",
+          "Đặc tả quy tắc phát hiện tương quan SIEM (Sigma/KQL rule) phát hiện hành vi chạy SharpHound / BloodHound",
+          "Sơ đồ đồ thị minh họa một chuỗi tấn công bắc cầu (Transitive Attack Path) và điểm bẻ gãy tương ứng"
+        ],
+        "reset": "Đặt lại toàn bộ các bài tập thực hành LDAP và ma trận telemetry về trạng thái mặc định.",
+        "cleanup": "Xóa bỏ các tập tin trích xuất log và báo cáo kiểm toán tạm thời khỏi hệ thống."
+      },
+      "governance": {
+        "prevent": [
+          "Tạo bản ghi tĩnh `wpad` trong ADIDNS trỏ về địa chỉ an toàn (127.0.0.1) và khóa quyền DACL ngăn chặn người dùng thường sửa đổi hoặc ghi đè.",
+          "Cấu hình Confidentiality Bit hoặc tinh chỉnh DACL trên các Organizational Units (OUs) nhạy cảm nhằm hạn chế quyền đọc thuộc tính tùy tiện của tài khoản thường.",
+          "Áp dụng mô hình phân tầng Tiered Administration và cấm triệt để việc tài khoản Tier 0 (Domain Admins) đăng nhập hoặc để lại session trên các máy trạm Tier 2."
+        ],
+        "observe": [
+          "Bật tính năng ghi log LDAP Search (Field Engineering / Event ID 1644) trên các Domain Controller với ngưỡng cảnh báo thích hợp để phát hiện các truy vấn đắt đỏ.",
+          "Giám sát Event ID 4662 (Directory Service Access) trên các đối tượng nhạy cảm khi có quyền hạn truy cập đặc biệt được kích hoạt.",
+          "Theo dõi lưu lượng kết nối mạng (Sysmon Event ID 3) phát sinh từ các tiến trình không chuẩn kết nối tới cổng LDAP 389/636 với tần suất cao."
+        ],
+        "respond": [
+          "Khi phát hiện máy trạm thực hiện quét LDAP trinh sát diện rộng, lập tức cách ly máy trạm khỏi mạng nội bộ (Network Isolation).",
+          "Rà soát và xóa bỏ ngay lập tức các bản ghi DNS bất thường mới được tạo trong ADIDNS bởi tài khoản bị nghi ngờ.",
+          "Đăng xuất cưỡng bức tất cả các phiên đăng nhập (Sessions) hiện hành của tài khoản bị lộ thông tin và yêu cầu đổi mật khẩu ngay lập tức."
+        ],
+        "residualRisk": [
+          "Active Directory về mặt kiến trúc vẫn yêu cầu Authenticated Users có quyền đọc phần lớn thông tin thư mục để các dịch vụ Windows có thể hoạt động bình thường.",
+          "Việc bật kiểm toán chi tiết LDAP Event 1644 ở mức độ quá sâu có thể tạo ra khối lượng log khổng lồ và gây suy giảm nhẹ hiệu năng của Domain Controller."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Người dùng thông thường không có quyền đọc danh sách phòng ban hoặc danh sách các tài khoản quản trị trong Active Directory.",
+          "correction": "Theo thiết kế mặc định của Active Directory, nhóm \"Authenticated Users\" có quyền Read đối với phần lớn các thuộc tính của tất cả các đối tượng trong domain để phục vụ các dịch vụ Windows."
+        },
+        {
+          "claim": "Để bảo vệ Active Directory, người quản trị chỉ cần tập trung rà soát và bảo vệ các thành viên trong nhóm Domain Admins là đủ.",
+          "correction": "Nhóm Domain Admins chỉ là đích đến cuối cùng; phần lớn các con đường leo thang quyền lực thực tế xuất phát từ các quyền ủy quyền gián tiếp (WriteDacl, GenericAll) trên các nhóm hỗ trợ và các phiên đăng nhập tồn tại trên máy trạm thông thường."
+        },
+        {
+          "claim": "Hệ thống DNS trong Windows Server hoạt động độc lập hoàn toàn và không liên quan gì tới phân quyền Active Directory.",
+          "correction": "Active Directory Integrated DNS (ADIDNS) lưu trữ các bản ghi DNS dưới dạng đối tượng trực tiếp trong cơ sở dữ liệu NTDS.dit, kế thừa toàn bộ cơ chế bảo mật phân quyền DACL và sao chép đa chủ thể của Active Directory."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os08-l69-q1",
+          "difficulty": "easy",
+          "question": "Bộ lọc LDAP nào sau đây sử dụng quy tắc khớp bitwise AND (OID `1.2.840.113556.1.4.803`) để tìm kiếm chính xác các tài khoản người dùng có cờ DONT_REQ_PREAUTH (bit 4194304) được kích hoạt trong thuộc tính userAccountControl?",
+          "options": [
+            {
+              "id": "A",
+              "label": "`(&(objectCategory=person)(objectClass=user)(userAccountControl:1.2.840.113556.1.4.803:=4194304))`"
+            },
+            {
+              "id": "B",
+              "label": "`(&(objectCategory=person)(objectClass=user)(userAccountControl=4194304))`"
+            },
+            {
+              "id": "C",
+              "label": "`(&(objectCategory=group)(userAccountControl:bit:=4194304))`"
+            },
+            {
+              "id": "D",
+              "label": "`(|(userAccountControl:eq:=4194304)(objectClass=user))`"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Quy tắc khớp OID 1.2.840.113556.1.4.803 (LDAP_MATCHING_RULE_BIT_AND) cho phép lọc các đối tượng có một bit cụ thể (4194304 = 0x400000 DONT_REQ_PREAUTH) được bật, bất kể các bit khác có giá trị gì."
+        },
+        {
+          "id": "os08-l69-q2",
+          "difficulty": "medium",
+          "question": "Kẻ tấn công lợi dụng cơ chế cấu hình mặc định nào của Active Directory Integrated DNS (ADIDNS) để tạo bản ghi WPAD giả mạo nhằm thu hoạch NetNTLM hash của các máy trạm trong mạng nội bộ?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cơ chế sao chép phân vùng DNS Zone Transfer (AXFR) không cần xác thực"
+            },
+            {
+              "id": "B",
+              "label": "Cơ chế Secure Dynamic Updates mặc định cho phép bất kỳ Authenticated User nào cũng có quyền tạo mới bản ghi DNS nếu tên bản ghi đó chưa tồn tại trong zone"
+            },
+            {
+              "id": "C",
+              "label": "Lỗ hổng thực thi mã từ xa trong dịch vụ DNS RPC của Domain Controller"
+            },
+            {
+              "id": "D",
+              "label": "Khả năng giả mạo chữ ký số DNSSEC của máy chủ KDC"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trong ADIDNS với Secure Dynamic Updates, mọi tài khoản domain hợp lệ đều có quyền tạo bản ghi DNS mới. Nếu tên \"wpad\" chưa có sẵn, kẻ tấn công có thể tạo nó và trỏ traffic proxy về máy của mình."
+        },
+        {
+          "id": "os08-l69-q3",
+          "difficulty": "hard",
+          "question": "Khi phân tích telemetry trên Domain Controller, sự kết hợp giữa các Windows Event ID nào phản ánh chính xác nhất hành vi một công cụ trinh sát đồ thị (như SharpHound) đang thực hiện thu thập dữ liệu diện rộng?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Event ID 4625 (Logon Failed) và Event ID 4648 (Logon with Explicit Credentials)"
+            },
+            {
+              "id": "B",
+              "label": "Sự bùng nổ của Event ID 1644 (LDAP Expensive/Inefficient Search) với Search Filter quét toàn bộ cây thư mục, đi kèm với hàng loạt Event ID 4624 Logon Type 3 kết nối tới các máy trạm trong mạng"
+            },
+            {
+              "id": "C",
+              "label": "Event ID 4720 (User Created) và Event ID 4726 (User Deleted) liên tiếp"
+            },
+            {
+              "id": "D",
+              "label": "Event ID 7045 (New Service Installed) và Event ID 4672 trên tất cả các máy chủ"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "SharpHound thực hiện hai hành vi cốt lõi: gửi các truy vấn LDAP đồ sộ tới DC (sinh ra Event ID 1644 nếu bật logging) và mở phiên mạng Logon Type 3 (SMB/RPC) tới hàng loạt máy trạm để trích xuất session và group local."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Đội ngũ SOC của doanh nghiệp phát hiện một tài khoản nhân viên văn phòng phát sinh hơn 5.000 truy vấn LDAP trong vòng 2 phút tới Domain Controller và đồng thời gửi yêu cầu tạo một bản ghi DNS mới trong vùng ADIDNS. Bạn cần tái hiện hành vi, phân tích telemetry và thiết lập rào chắn bảo vệ.",
+        "tasks": [
+          "Xây dựng các truy vấn LDAP an toàn bằng PowerShell (`[adsisearcher]`) để trích xuất danh sách các tài khoản có nguy cơ cao: Unconstrained Delegation, tài khoản có SPN dễ tổn thương và tài khoản bật cờ DONT_REQ_PREAUTH.",
+          "Phân tích mẫu log Event ID 1644 và Event ID 4624 để tái dựng phạm vi thông tin mà kẻ tấn công đã trích xuất từ cơ sở dữ liệu NTDS.dit.",
+          "Thiết lập chính sách phòng thủ ADIDNS bằng cách tạo bản ghi WPAD tĩnh an toàn và cấu hình luật cảnh báo tương quan SIEM (Sigma rule) phát hiện hành vi quét trinh sát LDAP bất thường."
+        ],
+        "requiredEvidence": [
+          "Bảng tổng hợp kết quả trích xuất từ 3 bộ lọc LDAP nhạy cảm kèm đánh giá mức độ rủi ro tương ứng",
+          "Báo cáo phân tích sự kiện telemetry chi tiết chỉ ra IP nguồn, tài khoản thực hiện, và các thuộc tính đã bị truy vấn",
+          "Đặc tả quy tắc phát hiện tương quan SIEM và tài liệu cấu hình củng cố an ninh ADIDNS"
+        ]
+      },
+      "sources": [
+        {
+          "title": "IETF RFC 4515 — Lightweight Directory Access Protocol (LDAP): String Representation of Search Filters",
+          "url": "https://datatracker.ietf.org/doc/html/rfc4515",
+          "publisher": "IETF",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cú pháp chuẩn của bộ lọc tìm kiếm chuỗi trong giao thức LDAP",
+            "Các toán tử logic và cấu trúc truy vấn đối tượng thư mục"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — Active Directory Domain Services: Active Directory-Integrated DNS Zones",
+          "url": "https://learn.microsoft.com/en-us/windows-server/networking/dns/deploy/dns-zones",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu trúc lưu trữ của ADIDNS trong các phân vùng NTDS.dit",
+            "Cơ chế Dynamic Updates và phân quyền truy cập trên bản ghi DNS"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — Use Windows Event Forwarding to help with intrusion detection",
+          "url": "https://learn.microsoft.com/en-us/windows/security/threat-protection/use-windows-event-forwarding-to-assist-in-intrusion-detection",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Thiết kế telemetry giám sát an ninh định danh trên Domain Controller",
+            "Phân tích các Windows Security Event IDs phục vụ phát hiện tấn công"
+          ]
+        }
+      ]
+    }
+  ]
+}

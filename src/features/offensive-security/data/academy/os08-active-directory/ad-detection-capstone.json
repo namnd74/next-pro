@@ -1,0 +1,1116 @@
+{
+  "id": "os08-m04-ad-detection-capstone",
+  "slug": "ad-detection-capstone",
+  "trackId": "os08-active-directory",
+  "title": "Giám Sát Telemetry, Hardening Doanh Nghiệp & Bài Tập Capstone Active Directory Đa Máy Chủ",
+  "summary": "Xây dựng hệ thống giám sát sự kiện định danh chuyên sâu (Event IDs 4624, 4672, 4768, 4769, 4662), triển khai kiến trúc phân tầng Enterprise Access Model (Tier 0/1/2) kết hợp LAPS và gMSA, và thực hiện bài tập Capstone tổng hợp phân tích chuỗi tấn công đa máy chủ từ Initial Foothold đến Domain Dominance và quy trình khắc phục sự cố triệt để.",
+  "difficulty": "expert",
+  "estimatedMinutes": 600,
+  "careerPaths": ["penetration-test", "red-team", "purple-team"],
+  "domains": ["windows", "active-directory"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os08-l76-active-directory-telemetry-and-event-id-monitoring",
+      "slug": "active-directory-telemetry-and-event-id-monitoring",
+      "title": "Giám Sát Định Danh Chuyên Sâu: Windows Event Logs, Kerberos Telemetry (4768, 4769, 4771) & Truy Vết Directory Service Access (4662)",
+      "summary": "Nghiên cứu kiến trúc Event Logging trong Windows Active Directory, thiết lập chính sách Advanced Audit Policy trên Domain Controllers, bóc tách các trường dữ liệu quan trọng trong Kerberos telemetry (Event ID 4768, 4769, 4771), giám sát truy cập đối tượng LDAP nhạy cảm (Event ID 4662/SACL), phát hiện DCSync, Golden/Silver Ticket, Kerberoasting và AS-REP Roasting bằng SIEM/KQL.",
+      "difficulty": "expert",
+      "durationMinutes": 200,
+      "prerequisites": [],
+      "outcomes": [
+        "Cấu hình chính sách Advanced Audit Configuration trên Domain Controller thông qua GPO để kích hoạt ghi vết chi tiết cho Kerberos Authentication, Kerberos Service Ticket Operations, Directory Service Access và Account Management.",
+        "Phân tích cấu trúc trường dữ liệu chuyên sâu của các Windows Security Event IDs cốt lõi (4768, 4769, 4771, 4624, 4672, 4662) để nhận diện các bất thường về Ticket Options, Encryption Types, Service Names và SACL Access Masks.",
+        "Xây dựng quy tắc phát hiện (Detection Rules) theo chuẩn MITRE ATT&CK và Sigma/KQL đối với các kỹ thuật tấn công trọng yếu: DCSync (DS-Replication-Get-Changes-All qua 4662), Kerberoasting (RC4/0x17 Ticket Encryption qua 4769) và AS-REP Roasting (Ticket without Pre-Auth qua 4768).",
+        "Tích hợp cơ chế thu thập tập trung Windows Event Forwarding (WEF) và Sysmon vào hạ tầng SIEM/EDR, thiết lập ngưỡng cảnh báo bất thường định danh và giảm thiểu tỷ lệ báo động giả (False Positives)."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["windows", "active-directory"],
+      "attackTactics": [
+        "credential-access",
+        "discovery",
+        "lateral-movement",
+        "defense-evasion"
+      ],
+      "keywords": [
+        "telemetry",
+        "event-id-4768",
+        "event-id-4769",
+        "event-id-4662",
+        "kerberoasting-detection",
+        "dcsync-detection",
+        "advanced-audit-policy",
+        "kql",
+        "sigma"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Bản chất kỹ thuật của việc giám sát Active Directory không phải là ghi lại mọi thứ (khiến hệ sinh thái bị tràn ngập hàng triệu log rác mỗi giờ), mà là đặt các cảm biến chính xác tại các điểm chuyển đổi trạng thái giao thức Kerberos và cơ chế kiểm soát truy cập đối tượng LDAP. Mọi hành vi tấn công từ dò quét, trích xuất vé đến leo thang đặc quyền đều buộc phải tương tác với dịch vụ KDC hoặc NTDS service trên Domain Controller. Khi kẻ tấn công thực hiện Kerberoasting, KDC buộc phải sinh Event 4769 với loại mã hóa yếu RC4 (0x17) cho một tài khoản dịch vụ có SPN; khi thực hiện DCSync, RPC replication gọi quyền DS-Replication-Get-Changes-All buộc phải kích hoạt Event 4662 theo SACL được định nghĩa trên Domain Root. Do đó, việc hiểu rõ cấu trúc nhị phân của các trường dữ liệu Kerberos Ticket Options, Encryption Types và LDAP GUIDs chính là chìa khóa để phân biệt hành vi quản trị hợp pháp với hoạt động của đối thủ tinh vi.",
+      "visual": {
+        "title": "Chuỗi Phân Tích Telemetry Kerberos & LDAP Trên Domain Controller",
+        "caption": "Luồng đối soát sự kiện từ yêu cầu vé ban đầu (AS/TGS) đến truy cập thuộc tính thư mục nhạy cảm.",
+        "steps": [
+          {
+            "label": "KDC Sinh Event 4768 (TGT Request)",
+            "detail": "Giám sát Pre-Auth Type, Client Address và cờ mã hóa Ticket Encryption Type (phát hiện AS-REP Roasting khi Pre-Auth = 0 hoặc Pre-Auth Type bị thiếu).",
+            "tone": "caution"
+          },
+          {
+            "label": "KDC Sinh Event 4769 (TGS Request)",
+            "detail": "Kiểm tra Service Name bất thường và Ticket Encryption 0x17 (RC4-HMAC) yêu cầu từ máy trạm nhân viên thay vì từ máy chủ dịch vụ hợp lệ (dấu hiệu Kerberoasting).",
+            "tone": "caution"
+          },
+          {
+            "label": "LSASS Sinh Event 4624/4672 (Logon & Privileges)",
+            "detail": "Ghi nhận Logon Type 3 (Network) kèm theo SeDebugPrivilege hoặc SeTakeOwnershipPrivilege trên máy chủ quản trị xuất phát từ địa chỉ IP bất thường.",
+            "tone": "allow"
+          },
+          {
+            "label": "NTDS Sinh Event 4662 (Directory Service Access)",
+            "detail": "Đối chiếu Object Type và Access Mask kiểm tra GUID 1131f6aa-9c07-11d1-f79f-00c04fc2dcd2 (DCSync) không xuất phát từ Domain Controller hợp lệ.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Advanced Audit Policy và Cấu Hình SACL Giám Sát Đối Tượng Active Directory",
+          "paragraphs": [
+            "Trong môi trường Windows Server, các chính sách kiểm toán truyền thống (Legacy Audit Policies) chỉ cung cấp 9 danh mục kiểm toán cấp cao với độ chi tiết rất thô, dẫn đến việc hoặc là bỏ sót dấu vết tấn công nguy hiểm, hoặc là làm bùng nổ hàng triệu sự kiện không cần thiết trong Security Log. Từ phiên bản Windows Server 2008 R2 trở đi, Microsoft đã giới thiệu Advanced Audit Policy Configuration nằm trong Group Policy tại đường dẫn Computer Configuration -> Policies -> Windows Settings -> Security Settings -> Advanced Audit Policy Configuration. Kiến trúc này chia nhỏ 9 danh mục thành 53 danh mục phụ (subcategories), cho phép đội ngũ Blue Team và Purple Team bật kiểm toán chọn lọc ở mức vi mô mà không làm suy giảm hiệu năng của Domain Controller.",
+            "Để giám sát toàn diện hạ tầng Active Directory, 4 nhóm subcategories quan trọng nhất bắt buộc phải được cấu hình 'Success and Failure' trên Domain Controllers: (1) Account Logon -> Audit Kerberos Authentication Service (Event ID 4768, 4771) và Audit Kerberos Service Ticket Operations (Event ID 4769, 4770); (2) Account Management -> Audit User Account Management (4720, 4722, 4724, 4738) và Audit Security Group Management (4728, 4732, 4756); (3) DS Access -> Audit Directory Service Access (4662) và Audit Directory Service Changes (5136, 5137); (4) Logon/Logoff -> Audit Logon (4624, 4625) và Audit Special Logon (4672).",
+            "Tuy nhiên, việc chỉ bật subcategory 'Audit Directory Service Access' là chưa đủ để ghi lại các thao tác can thiệp vào đối tượng LDAP. Windows yêu cầu đối tượng trong Active Directory phải được gán System Access Control List (SACL). SACL xác định cụ thể người dùng/nhóm nào (Trustee), thực hiện quyền hạn gì (Access Mask), trên đối tượng hoặc thuộc tính nào (Attribute/Object GUID) thì hệ thống sẽ kích hoạt sự kiện Event ID 4662. Cấu hình SACL trên Domain Root (DC=domain,DC=local) là điều kiện kỹ thuật tiên quyết để phát hiện các kỹ thuật nguy hiểm như DCSync hoặc can thiệp AdminSDHolder."
+          ]
+        },
+        {
+          "title": "Giải Phẫu Chuyên Sâu Kerberos Telemetry: Event IDs 4768, 4769, 4771 và Bất Thường Mã Hóa",
+          "paragraphs": [
+            "Khi máy khách tương tác với Kerberos Key Distribution Center (KDC) trên Domain Controller, KDC tạo ra các bản ghi sự kiện có cấu trúc XML phong phú. Event ID 4768 được ghi nhận mỗi khi KDC cấp phát thành công vé TGT (Ticket Granting Ticket) trong bước KRB_AS_REQ / KRB_AS_REP. Trường 'Pre-Authentication Type' phản ánh cơ chế xác thực ban đầu: giá trị 2 đại diện cho PA-ENC-TIMESTAMP (xác thực mật khẩu thông thường), giá trị 16 hoặc 17 đại diện cho PKINIT (xác thực chứng chỉ số AD CS), trong khi giá trị 0 hoặc trường này bị trống thể hiện tài khoản không yêu cầu Pre-Authentication (DONT_REQ_PREAUTH). Đây chính là dấu vết không thể chối cãi của kỹ thuật AS-REP Roasting (MITRE ATT&CK T1558.004).",
+            "Event ID 4769 được ghi nhận khi client gửi KRB_TGS_REQ kèm theo vé TGT hợp lệ để xin vé dịch vụ TGS (Ticket Granting Service). Điểm mấu chốt để săn lùng tấn công Kerberoasting (MITRE ATT&CK T1558.003) nằm ở hai trường: 'Service Name' và 'Ticket Encryption Type'. Trong môi trường doanh nghiệp hiện đại hỗ trợ AES, các vé TGS hợp pháp thường mang mã loại mã hóa 0x12 (AES256-CTS-HMAC-SHA1-96) hoặc 0x11 (AES128-CTS-HMAC-SHA1-96). Khi kẻ tấn công sử dụng công cụ như Rubeus hoặc Impacket GetUserSPNs.py, chúng cố tình gửi cờ yêu cầu hạ cấp mã hóa xuống 0x17 (RC4-HMAC) vì thuật toán RC4 có chi phí tính toán bẻ khóa offline trên GPU nhanh gấp hàng chục lần so với AES. Do đó, một chuỗi Event 4769 liên tiếp yêu cầu vé RC4 (0x17) cho các tài khoản không phải là máy tính (không có dấu $ ở cuối Service Name) là chỉ dấu xâm phạm (IoC) xác thực của Kerberoasting.",
+            "Event ID 4771 được kích hoạt khi bước xác thực ban đầu thất bại (KRB_AS_REQ failed). Trường 'Failure Code' cung cấp nguyên nhân chính xác: mã 0x18 (KDC_ERR_PREAUTH_FAILED) biểu thị sai mật khẩu, mã 0x12 (KDC_ERR_CLIENT_REVOKED) biểu thị tài khoản đã bị khóa hoặc vô hiệu hóa, mã 0x17 (KDC_ERR_KEY_EXPIRED) biểu thị mật khẩu đã hết hạn. Việc kết hợp chuỗi Event 4771 mã 0x18 từ nhiều máy trạm khác nhau nhắm vào một tài khoản duy nhất phản ánh hành vi Password Spraying có phân tán."
+          ]
+        },
+        {
+          "title": "Truy Vết Kỹ Thuật DCSync và Lạm Dụng Quyền Nhân Bản Qua Event ID 4662",
+          "paragraphs": [
+            "Kỹ thuật DCSync cho phép kẻ tấn công giả lập một Domain Controller hợp lệ thông qua giao thức Directory Replication Service Remote Protocol (MS-DRSR) để yêu cầu Domain Controller mục tiêu kết xuất dữ liệu tài khoản và mã băm mật khẩu NTDS.dit (bao gồm cả tài khoản nhạy cảm krbtgt và Domain Admins). Về mặt bảo mật, Windows kiểm tra hai quyền nhân bản đặc biệt (Extended Rights) trên đối tượng gốc của Domain: (1) DS-Replication-Get-Changes (GUID: 1131f6aa-9c07-11d1-f79f-00c04fc2dcd2); (2) DS-Replication-Get-Changes-All (GUID: 1131f6ad-9c07-11d1-f79f-00c04fc2dcd2); và đối với môi trường lọc thuộc tính có thêm DS-Replication-Get-Changes-In-Filtered-Set (GUID: 89e95b96-444f-4702-a0b9-637a3d86f79d).",
+            "Khi một tiến trình gọi hàm RPC `IDL_DRSGetNCChanges` tới Domain Controller, NTDS sẽ kiểm tra SACL và sinh sự kiện Event ID 4662 (An operation was performed on an object). Trong bản ghi Event 4662, trường 'Object Server' mang giá trị 'DS', 'Access Mask' mang giá trị '0x100' (Control Access), và trường 'Properties' sẽ chứa trực tiếp chuỗi GUID nhị phân đại diện cho quyền replication nói trên. Điều cốt tử trong kỹ thuật Detection Engineering là phân biệt giữa replication hợp pháp và DCSync độc hại.",
+            "Trong hoạt động bình thường, sự kiện nhân bản diễn ra liên tục giữa các Domain Controller trong cùng miền hoặc forest. Các yêu cầu này có thuộc tính 'SubjectUserName' luôn là tài khoản máy tính của Domain Controller (kết thúc bằng ký tự $) và địa chỉ IP kết nối thuộc dải mạng nội bộ của Domain Controllers. Nếu một bản ghi Event 4662 xuất hiện chứa quyền `1131f6ad-9c07-11d1-f79f-00c04fc2dcd2` nhưng 'SubjectUserName' là một tài khoản người dùng thông thường, hoặc là một tài khoản máy tính của máy trạm nhân viên (như WKSTN01$), đó chính là bằng chứng xác thực của cuộc tấn công DCSync đang diễn ra."
+          ]
+        },
+        {
+          "title": "Giám Sát Đăng Nhập Đặc Quyền, Pass-the-Hash, Golden/Silver Ticket & KQL Detection Engineering",
+          "paragraphs": [
+            "Bên cạnh Kerberos telemetry, việc phân tích sự kiện xác thực hệ thống (Logon Events) đóng vai trò sống còn trong việc phát hiện di chuyển ngang (Lateral Movement) và lạm dụng vé giả mạo. Event ID 4624 (An account was successfully logged on) cung cấp trường 'Logon Type': Logon Type 2 (Interactive - đăng nhập tại bàn phím cục bộ), Logon Type 3 (Network - truy cập chia sẻ SMB, RPC, WinRM), Logon Type 10 (RemoteInteractive - kết nối Remote Desktop RDP), và Logon Type 9 (NewCredentials - thường sinh ra khi kẻ tấn công sử dụng mimikatz/rubeus với cờ /netonly để Pass-the-Hash).",
+            "Event ID 4672 (Special privileges assigned to new logon) được kích hoạt đồng thời với 4624 khi một phiên đăng nhập nhận được các đặc quyền nhạy cảm như `SeDebugPrivilege`, `SeTakeOwnershipPrivilege`, `SeImpersonatePrivilege` hoặc `SeBackupPrivilege`. Khi kẻ tấn công sử dụng Pass-the-Hash để kết nối vào Domain Controller qua SMB, hệ thống sẽ sinh Event 4624 Type 3 với Package Name là NTLM (thay vì Kerberos) kèm theo Event 4776 xác thực gói NTLM thành công. Trong một môi trường đã chuẩn hóa Kerberos, mọi kết nối mạng quản trị bằng NTLM đều là đối tượng cần điều tra ưu tiên.",
+            "Đối với kỹ thuật Golden Ticket (MITRE ATT&CK T1558.001), kẻ tấn công sử dụng khóa băm krbtgt để tự ký vé TGT ngoại tuyến. Khi kẻ tấn công xuất trình vé TGT giả mạo này tới KDC để xin vé dịch vụ, Domain Controller sẽ sinh Event 4769. Tuy nhiên, nếu đối chiếu ngược lại trong Security Log, KDC hoàn toàn KHÔNG hề có bản ghi Event 4768 (TGT Request) tương ứng cho tài khoản đó trong vòng 10 giờ trước đó! Ngoài ra, kẻ tấn công thường đặt thời hạn vé Golden Ticket lên tới 10 năm (vượt xa giới hạn mặc định 10 giờ của Kerberos Policy) hoặc gán cho tài khoản các SID thuộc nhóm quản trị tối cao mà thực tế tài khoản không hề thuộc về trong Active Directory. Bằng cách viết các câu truy vấn KQL (Kusto Query Language) trên Microsoft Sentinel hoặc Splunk, các chuyên viên phân tích có thể tự động hóa việc tương quan chéo giữa Event 4768 và Event 4769 để phát hiện vé TGT ma quái này."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Thiết Lập Ma Trận Giám Sát Telemetry AD & Điều Tra Sự Cố Đột Nhập Bằng Event Logs",
+        "objective": "Cấu hình Advanced Audit Policy và SACL trên AD DS, phân tích vết Kerberoasting qua Event 4769 RC4, phát hiện dấu vết DCSync qua Event 4662 và nhận diện Golden Ticket anomaly.",
+        "scenario": "Trung tâm SOC phát hiện nhiều cảnh báo bất thường liên quan đến dịch vụ định danh. Bạn đóng vai trò Chuyên viên Purple Team / Detection Engineer được phân công điều tra chuỗi sự kiện, kiểm tra log Kerberos và Directory Service trên Domain Controller DC01 để xác định bản chất tấn công và tối ưu quy tắc cảnh báo.",
+        "constraints": [
+          "Không được bật tùy chọn audit 'Failure' trên toàn bộ các subcategories gây nghẽn I/O đĩa cứng của Domain Controller.",
+          "Quy tắc cảnh báo DCSync phải loại trừ hoàn toàn các yêu cầu replication hợp pháp giữa các Domain Controller nội bộ.",
+          "Cấu hình SACL trên Domain Root phải nhắm đúng GUID replication permissions thay vì audit toàn bộ thao tác đọc LDAP thông thường."
+        ],
+        "cases": [
+          {
+            "id": "case-76-01",
+            "title": "Phân Tích Cảnh Báo Kerberoasting Qua Event ID 4769 và Loại Mã Hóa 0x17",
+            "context": "Hệ thống SIEM ghi nhận trong vòng 60 giây, tài khoản nhân viên 'jdoe' từ địa chỉ IP 10.0.10.45 đã tạo ra 45 bản ghi Event ID 4769 trên DC01. Tất cả các bản ghi này đều yêu cầu vé TGS cho các tài khoản dịch vụ như SQLService, WebAppSvc, BackupAgent với trường 'Ticket Encryption Type' mang giá trị '0x17' (RC4-HMAC), mặc dù môi trường domain đã bật chính sách hỗ trợ AES256.",
+            "prompt": "Hành động phân tích và xử lý kỹ thuật nào sau đây là chính xác nhất để xác nhận và ngăn chặn đợt tấn công này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Bỏ qua cảnh báo vì Event 4769 là sự kiện thông thường khi người dùng truy cập các dịch vụ mạng trong nội bộ doanh nghiệp.",
+                "correct": false,
+                "rationale": "Việc gửi hàng loạt yêu cầu vé dịch vụ trong 60 giây với mã hóa hạ cấp 0x17 (RC4) là dấu hiệu kinh điển của Kerberoasting nhằm trích xuất vé đem đi bẻ khóa offline, không thể coi là hành vi thông thường."
+              },
+              {
+                "id": "B",
+                "label": "Xác nhận đây là hành vi Kerberoasting diện rộng; lập tức cô lập máy trạm 10.0.10.45 khỏi mạng, vô hiệu hóa tạm thời tài khoản 'jdoe', đồng thời kích hoạt quy trình đổi mật khẩu khẩn cấp với độ dài trên 25 ký tự ngẫu nhiên cho tất cả các tài khoản dịch vụ bị yêu cầu vé và cấu hình thuộc tính msDS-SupportedEncryptionTypes để chỉ chấp nhận AES128/AES256.",
+                "correct": true,
+                "rationale": "Đây là quy trình phản ứng chuẩn mực: cô lập nguồn tấn công, bảo vệ tài khoản bị lạm dụng và triệt tiêu nguy cơ bẻ khóa vé bằng cách xoay vòng mật khẩu sang độ phức tạp cao kèm nâng cấp mã hóa Kerberos lên AES."
+              },
+              {
+                "id": "C",
+                "label": "Xóa toàn bộ các bản ghi DNS SRV của Domain Controller để máy trạm không thể kết nối tới cổng 88 của Kerberos KDC nữa.",
+                "correct": false,
+                "rationale": "Xóa DNS SRV sẽ làm tê liệt toàn bộ khả năng xác thực Kerberos của tất cả máy trạm và máy chủ trong toàn bộ doanh nghiệp."
+              },
+              {
+                "id": "D",
+                "label": "Cấu hình lại tường lửa trên Domain Controller để chặn cổng UDP/TCP 88 đối với tất cả các máy trạm thuộc dải mạng 10.0.10.0/24.",
+                "correct": false,
+                "rationale": "Chặn cổng 88 sẽ khiến toàn bộ người dùng hợp pháp trong dải mạng đó không thể đăng nhập vào Windows hoặc truy cập tài nguyên mạng."
+              }
+            ]
+          },
+          {
+            "id": "case-76-02",
+            "title": "Phát Hiện Dấu Vết DCSync Trích Xuất Dữ Liệu Miền Qua Event ID 4662",
+            "context": "Hệ thống giám sát SIEM hiển thị một bản ghi Event ID 4662 trên DC01 với Object Server: DS, Object Type: domainDNS, Access Mask: 0x100. Thuộc tính Properties chứa chuỗi nhị phân `{1131f6ad-9c07-11d1-f79f-00c04fc2dcd2}`. Trường SubjectUserName ghi nhận tài khoản 'svc_printer' xuất phát từ địa chỉ IP 10.0.10.88 (máy chủ in ấn nội bộ).",
+            "prompt": "Nhận định kỹ thuật nào sau đây mô tả chính xác nhất bản chất của sự kiện trên và hành động phản ứng cần thực hiện?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tài khoản 'svc_printer' đang thực hiện đồng bộ hóa danh bạ in ấn bình thường qua giao thức LDAP phân tán, không có nguy cơ bảo mật.",
+                "correct": false,
+                "rationale": "GUID 1131f6ad-9c07-11d1-f79f-00c04fc2dcd2 là quyền DS-Replication-Get-Changes-All (quyền nhân bản toàn bộ cơ sở dữ liệu bao gồm mật khẩu), dịch vụ in ấn không bao giờ cần quyền hạn này."
+              },
+              {
+                "id": "B",
+                "label": "Đây là cuộc tấn công DCSync nguy cấp; tài khoản 'svc_printer' đã bị kẻ tấn công chiếm quyền hoặc được gán thừa quyền Replicating Directory Changes All và đang kết xuất toàn bộ mã băm mật khẩu trong NTDS.dit (kể cả krbtgt). Cần lập tức vô hiệu hóa tài khoản 'svc_printer', cô lập máy chủ 10.0.10.88, thu hồi quyền replication bất hợp pháp trên Domain Root và khởi động quy trình thay đổi mật khẩu tài khoản krbtgt.",
+                "correct": true,
+                "rationale": "GUID 1131f6ad xuất hiện dưới danh tính một tài khoản dịch vụ in ấn là bằng chứng trực tiếp của tấn công DCSync để chiếm toàn bộ tài khoản miền; phản ứng khẩn cấp là bắt buộc."
+              },
+              {
+                "id": "C",
+                "label": "Sự kiện này chỉ phản ánh lỗi cấu hình dịch vụ DNS trên Domain Controller và chỉ cần khởi động lại dịch vụ DNS Server.",
+                "correct": false,
+                "rationale": "Sự kiện 4662 liên quan đến quyền truy cập đối tượng Directory Service, hoàn toàn không liên quan đến chức năng phân giải tên miền DNS."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần xóa nhật ký sự kiện Security Event Log trên Domain Controller để tránh làm đầy dung lượng ổ cứng máy chủ.",
+                "correct": false,
+                "rationale": "Xóa log là hành vi tiêu hủy chứng cứ kỹ thuật số, làm mất khả năng điều tra và khắc phục sự cố an ninh."
+              }
+            ]
+          },
+          {
+            "id": "case-76-03",
+            "title": "Nhận Diện Bất Thường Vé Golden Ticket Qua Tương Quan Telemetry",
+            "context": "Nhà phân tích SOC phát hiện một phiên đăng nhập mạng (Event 4624 Type 3) vào thư mục C$\\ của DC01 dưới danh tính tài khoản 'admin_sec' xuất phát từ một máy trạm lạ. Trước đó vài giây có Event 4769 cấp vé dịch vụ cifs/DC01 cho 'admin_sec'. Tuy nhiên, khi kiểm tra toàn bộ Security Log của các Domain Controller trong vòng 7 ngày qua, KHÔNG hề có bất kỳ bản ghi Event ID 4768 (TGT Request) nào cho tài khoản 'admin_sec'.",
+            "prompt": "Hiện tượng kỹ thuật này chỉ ra điều gì về phương thức tấn công của kẻ xâm nhập?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công đã sử dụng kỹ thuật Golden Ticket: vé TGT được tạo ra và ký số ngoại tuyến bằng mã băm bí mật của tài khoản krbtgt mà không cần tương tác với KDC trong bước AS-REQ; do đó không hề tồn tại Event ID 4768 trên bất kỳ Domain Controller nào.",
+                "correct": true,
+                "rationale": "Golden Ticket được rèn ngoại tuyến (offline forged) bằng khóa krbtgt, kẻ tấn công xuất trình trực tiếp TGT này để xin vé TGS (sinh Event 4769) mà không qua bước xin TGT ban đầu (không có Event 4768)."
+              },
+              {
+                "id": "B",
+                "label": "Người dùng 'admin_sec' đã đăng nhập bằng thẻ thông minh Smart Card nên hệ thống tự động bỏ qua việc ghi nhận Event ID 4768.",
+                "correct": false,
+                "rationale": "Đăng nhập Smart Card sử dụng Kerberos PKINIT vẫn bắt buộc phải gửi AS-REQ và KDC luôn sinh bản ghi Event ID 4768 với Pre-Auth Type 16 hoặc 17."
+              },
+              {
+                "id": "C",
+                "label": "Hệ điều hành Windows Server bị lỗi dịch vụ Event Log và tự động đánh mất bản ghi sự kiện 4768 một cách ngẫu nhiên.",
+                "correct": false,
+                "rationale": "Windows Security Event Log hoạt động theo cơ chế ghi nhật ký giao dịch đáng tin cậy của kernel, không tự đánh mất sự kiện chọn lọc như vậy."
+              },
+              {
+                "id": "D",
+                "label": "Tài khoản 'admin_sec' sử dụng giao thức NTLMv1 thay vì Kerberos nên KDC không tạo Event ID 4768.",
+                "correct": false,
+                "rationale": "Nếu sử dụng NTLM thì hệ thống sẽ sinh Event 4776 và không thể sinh ra Event 4769 (vốn là sự kiện cấp vé dịch vụ của giao thức Kerberos)."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác các trường dữ liệu quan trọng trong Event ID 4768 và 4769 để phát hiện kỹ thuật Kerberoasting và AS-REP Roasting.",
+          "Phân tích bản ghi Event ID 4662 và nhận diện đúng các GUID đại diện cho quyền nhân bản Active Directory trong tấn công DCSync.",
+          "Áp dụng nguyên lý tương quan telemetry (Event 4768 vs 4769) để chứng minh sự hiện diện của vé Kerberos giả mạo Golden Ticket."
+        ],
+        "evidenceTemplate": [
+          "Bản kết xuất tệp XML của các bản ghi sự kiện Event ID 4769 thể hiện mã loại mã hóa 0x17 kèm danh sách tài khoản dịch vụ bị khai thác",
+          "Bản ghi chi tiết Event ID 4662 trên Domain Controller thể hiện Access Mask 0x100 và GUID quyền DS-Replication-Get-Changes-All",
+          "Báo cáo tương quan thời gian giữa Event 4624, 4672, 4769 và sự thiếu vắng của Event 4768 chứng minh sự tồn tại của Golden Ticket"
+        ],
+        "reset": "Khôi phục chính sách kiểm toán Advanced Audit Configuration mặc định trên Domain Controller và làm sạch các bộ lọc sự kiện tạm thời trong SIEM.",
+        "cleanup": "Xóa các chỉ số giám sát thử nghiệm, thiết lập lại trạng thái bình thường của các tài khoản dịch vụ kiểm toán và đóng phiên phân tích."
+      },
+      "governance": {
+        "prevent": [
+          "Thiết lập chính sách mật khẩu mạnh cho toàn bộ tài khoản dịch vụ có đăng ký Service Principal Name (SPN) với độ dài tối thiểu 25 ký tự, hoặc chuyển đổi sang mô hình Group Managed Service Accounts (gMSA) để triệt tiêu hoàn toàn khả năng bẻ khóa Kerberoasting.",
+          "Rà soát và thu hồi toàn bộ quyền nhân bản danh bạ không hợp lệ (Replicating Directory Changes / Replicating Directory Changes All) trên Domain Root khỏi các tài khoản người dùng hoặc nhóm không thuộc diện Domain Controllers quản trị.",
+          "Kích hoạt cờ 'Do not require Kerberos preauthentication' = FALSE trên 100% tài khoản Active Directory để ngăn chặn việc trích xuất vé TGT không có xác thực ban đầu (AS-REP Roasting)."
+        ],
+        "observe": [
+          "Theo dõi liên tục các bản ghi Windows Security Event ID 4769 có Ticket Encryption Type 0x17 (RC4-HMAC) yêu cầu từ máy trạm nhân viên nhắm vào các tài khoản dịch vụ quan trọng.",
+          "Giám sát bản ghi Event ID 4662 trên Domain Controllers chứa thuộc tính Properties với các GUID nhân bản `{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}` hoặc `{1131f6ad-9c07-11d1-f79f-00c04fc2dcd2}` không xuất phát từ tài khoản máy tính của Domain Controller hợp lệ.",
+          "Thiết lập quy tắc tương quan SIEM phát hiện bất thường Event 4769 không có Event 4768 đi kèm trong chu kỳ 10 giờ để cảnh báo hành vi giả mạo Golden Ticket."
+        ],
+        "respond": [
+          "Khi phát hiện tấn công DCSync, lập tức vô hiệu hóa tài khoản người dùng hoặc máy tính thực hiện lệnh gọi RPC nhân bản, cô lập thiết bị nguồn và tiến hành quy trình xoay vòng mật khẩu tài khoản krbtgt hai lần liên tiếp.",
+          "Khi phát hiện Kerberoasting, tiến hành đổi mật khẩu khẩn cấp cho toàn bộ tài khoản dịch vụ bị nhắm mục tiêu sang mật khẩu ngẫu nhiên phức tạp cao và xem xét chuyển sang gMSA.",
+          "Thu hồi quyền truy cập mạng và kết xuất ảnh bộ nhớ RAM (Memory Dump) của máy trạm phát sinh các yêu cầu vé ma quái để thu thập mẫu mã độc hoặc công cụ tấn công bộ nhớ."
+        ],
+        "residualRisk": [
+          "Kẻ tấn công có thể thực hiện Kerberoasting với tần suất rất thấp (Low-and-Slow) yêu cầu vé AES256 nhằm vượt qua các ngưỡng phát hiện tần suất và loại mã hóa của SIEM.",
+          "Nếu dung lượng lưu trữ log trên Domain Controller không đủ lớn, các sự kiện kiểm toán có thể bị ghi đè (Log Overwrite) trước khi kịp chuyển tiếp về hệ thống SIEM trung tâm.",
+          "Kẻ tấn công sở hữu quyền quản trị cục bộ trên Domain Controller có thể tạm thời vô hiệu hóa dịch vụ EventLog hoặc chỉnh sửa bộ nhớ LSASS để ngăn chặn việc ghi bản ghi sự kiện."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Bật chính sách kiểm toán ở mức tối đa trên toàn bộ hệ thống Domain Controller là cách tốt nhất để đảm bảo không bỏ sót bất kỳ cuộc tấn công nào.",
+          "correction": "Bật kiểm toán tối đa trên tất cả các danh mục sẽ tạo ra hàng chục gigabyte log rác mỗi giờ (như hàng triệu sự kiện lọc gói tin WFP hoặc truy cập LDAP bình thường), gây tắc nghẽn I/O đĩa cứng của Domain Controller, làm tê liệt đường truyền mạng chuyển tiếp log và khiến các nhà phân tích SOC bị quá tải báo động giả (Alert Fatigue)."
+        },
+        {
+          "claim": "Nếu KDC cấp vé dịch vụ TGS sử dụng mã hóa AES256 (0x12) thì kẻ tấn công hoàn toàn không thể thực hiện kỹ thuật Kerberoasting.",
+          "correction": "Kẻ tấn công vẫn có thể yêu cầu vé dịch vụ mã hóa AES256 bình thường nếu chúng không hạ cấp xuống RC4. Mặc dù chi phí tính toán để bẻ khóa AES256 cao hơn RC4 gấp nhiều lần, nếu tài khoản dịch vụ sử dụng mật khẩu ngắn hoặc mật khẩu yếu phổ biến, kẻ tấn công vẫn có thể bẻ khóa thành công bằng các dàn máy đào hash chuyên dụng."
+        },
+        {
+          "claim": "Mọi sự kiện Event ID 4662 xuất hiện trên Domain Controller đều là dấu hiệu của hành vi xâm nhập hoặc tấn công DCSync.",
+          "correction": "Event 4662 xuất hiện thường xuyên trong quá trình hoạt động bình thường khi các Domain Controller hợp lệ đồng bộ dữ liệu thư mục với nhau. Chỉ khi nào Event 4662 chứa GUID quyền nhân bản đặc biệt (Get-Changes-All) và được gọi bởi một tài khoản không phải là Domain Controller thì mới cấu thành chỉ báo tấn công."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os08-l76-q1",
+          "difficulty": "easy",
+          "question": "Trong hệ thống Windows Security Event Log trên Domain Controller, Event ID nào được ghi nhận mỗi khi dịch vụ KDC cấp phát thành công một vé TGS (Ticket Granting Service) cho máy khách?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Event ID 4624"
+            },
+            {
+              "id": "B",
+              "label": "Event ID 4768"
+            },
+            {
+              "id": "C",
+              "label": "Event ID 4769"
+            },
+            {
+              "id": "D",
+              "label": "Event ID 4662"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Event ID 4769 ghi nhận thao tác yêu cầu và cấp phát vé dịch vụ Kerberos (Kerberos Service Ticket Operations - TGS-REQ / TGS-REP)."
+        },
+        {
+          "id": "os08-l76-q2",
+          "difficulty": "medium",
+          "question": "Khi phân tích nhật ký sự kiện Kerberos để phát hiện tấn công Kerberoasting truyền thống, trường dữ liệu 'Ticket Encryption Type' trong Event ID 4769 thường mang giá trị nào phản ánh việc kẻ tấn công cố tình hạ cấp thuật toán?",
+          "options": [
+            {
+              "id": "A",
+              "label": "0x12 (AES256-CTS-HMAC-SHA1-96)"
+            },
+            {
+              "id": "B",
+              "label": "0x17 (RC4-HMAC)"
+            },
+            {
+              "id": "C",
+              "label": "0x11 (AES128-CTS-HMAC-SHA1-96)"
+            },
+            {
+              "id": "D",
+              "label": "0x03 (DES-CBC-MD5)"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Giá trị 0x17 tương ứng với thuật toán mã hóa RC4-HMAC, thường được các công cụ tấn công như Rubeus hoặc Impacket chủ động yêu cầu vì chi phí tính toán bẻ khóa mật khẩu ngoại tuyến nhanh hơn rất nhiều so với AES."
+        },
+        {
+          "id": "os08-l76-q3",
+          "difficulty": "hard",
+          "question": "Trong bản ghi sự kiện Directory Service Access (Event ID 4662) trên Domain Controller, chuỗi GUID nào trong trường thuộc tính 'Properties' thể hiện quyền hạn tối cao 'DS-Replication-Get-Changes-All' được sử dụng trong kỹ thuật tấn công DCSync?",
+          "options": [
+            {
+              "id": "A",
+              "label": "{1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}"
+            },
+            {
+              "id": "B",
+              "label": "{1131f6ad-9c07-11d1-f79f-00c04fc2dcd2}"
+            },
+            {
+              "id": "C",
+              "label": "{bf9679c0-0de6-11d0-a285-00aa003049e2}"
+            },
+            {
+              "id": "D",
+              "label": "{f30e3bc2-9ff0-11d1-b603-0000f80367c1}"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "GUID {1131f6ad-9c07-11d1-f79f-00c04fc2dcd2} là mã định danh quyền Extended Right 'DS-Replication-Get-Changes-All' (cho phép sao chép cả dữ liệu bí mật như password hashes), trong khi {1131f6aa-...} là quyền 'DS-Replication-Get-Changes' thông thường."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Doanh nghiệp của bạn đang chuyển đổi hạ tầng giám sát sang nền tảng SIEM đám mây. Bạn được giao nhiệm vụ xây dựng bộ quy tắc phát hiện tấn công định danh Active Directory chuyên sâu, giảm thiểu tỷ lệ cảnh báo giả và tối ưu hóa việc sử dụng băng thông chuyển tiếp log sự kiện từ 10 Domain Controllers phân tán về trung tâm chỉ huy an ninh mạng.",
+        "tasks": [
+          "Xây dựng tài liệu cấu hình Group Policy triển khai Advanced Audit Policy Configuration chuẩn hóa cho toàn bộ Domain Controllers, bảo đảm chỉ kích hoạt các subcategories thiết yếu phục vụ phát hiện Kerberoasting, AS-REP Roasting, DCSync và Account Tampering.",
+          "Viết 3 câu truy vấn phát hiện bằng ngôn ngữ KQL (Kusto Query Language) để phát hiện tự động: (1) Tấn công Kerberoasting với mã hóa 0x17 vượt ngưỡng tần suất; (2) Tấn công DCSync phát sinh từ các tài khoản không thuộc nhóm Domain Controllers; (3) Hành vi mạo danh vé Golden Ticket dựa trên sự bất đối xứng giữa Event 4768 và Event 4769.",
+          "Thiết lập cấu hình System Access Control List (SACL) trên đối tượng Domain Root để kích hoạt Event ID 4662 khi có truy cập vào các quyền Replication Extended Rights, đồng thời lập tài liệu kiểm thử xác thực bằng script mô phỏng an toàn."
+        ],
+        "requiredEvidence": [
+          "Tệp xuất cấu hình Group Policy Object (GPO) dạng HTML/XML thể hiện chi tiết các chính sách Advanced Audit Configuration đã được phê duyệt",
+          "Bộ mã nguồn 3 quy tắc KQL kèm ảnh chụp màn hình kết quả kiểm thử trên môi trường giả lập xác nhận phát hiện chính xác các hành vi tấn công",
+          "Báo cáo kiểm toán phân tích tải hiệu năng CPU/RAM và dung lượng băng thông mạng của Domain Controller trước và sau khi kích hoạt chính sách kiểm toán mới"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Advanced security audit policy settings",
+          "url": "https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/advanced-security-audit-policy-settings",
+          "publisher": "Microsoft",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Định nghĩa chi tiết các danh mục phụ Advanced Audit Policies",
+            "Cấu trúc và ý nghĩa của các Windows Security Event IDs 4624, 4662, 4768, 4769"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Sub-technique T1003.006: OS Credential Dumping: DCSync",
+          "url": "https://attack.mitre.org/techniques/T1003/006/",
+          "publisher": "MITRE",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế kỹ thuật của cuộc tấn công DCSync",
+            "Các phương thức phát hiện dựa trên RPC DRSUAPI và Event ID 4662"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os08-l77-enterprise-active-directory-hardening-and-tiering-architecture",
+      "slug": "enterprise-active-directory-hardening-and-tiering-architecture",
+      "title": "Hardening Hạ Tầng Doanh Nghiệp: Kiến Trúc Phân Tầng Enterprise Access Model, LAPS v2 & Quản Trị gMSA",
+      "summary": "Thiết kế và triển khai kiến trúc bảo mật định danh nhiều tầng (Enterprise Access Model Tier 0/1/2, Red Forest / PAW), củng cố đặc quyền quản trị cục bộ bằng Windows LAPS v2 (LAPS tích hợp Entra/AD), triển khai tài khoản dịch vụ nhóm gMSA (Group Managed Service Accounts) tự động xoay vòng mật khẩu 128 ký tự, cấu hình Authentication Policies, Silos và Protected Users Security Group.",
+      "difficulty": "expert",
+      "durationMinutes": 200,
+      "prerequisites": ["os08-l76-active-directory-telemetry-and-event-id-monitoring"],
+      "outcomes": [
+        "Thiết kế kiến trúc phân tầng Enterprise Access Model (Tier 0: Control Plane, Tier 1: Management Plane/Servers, Tier 2: User Workstations) kết hợp triển khai Trạm Làm Việc Đặc Quyền Riêng Biệt (PAW - Privileged Access Workstations).",
+        "Triển khai Windows LAPS v2 thông qua Group Policy và phân quyền Active Directory (lapsx.dll / msLAPS attributes) để mã hóa mật khẩu Local Administrator và ngăn chặn hoàn toàn Lateral Movement.",
+        "Chuyển đổi các tài khoản Service Accounts truyền thống sang Group Managed Service Accounts (gMSA) sử dụng KDS Root Key, triệt tiêu nguy cơ Kerberoasting và loại bỏ mật khẩu tĩnh.",
+        "Cấu hình nhóm an ninh Protected Users, áp dụng Kerberos Armoring (FAST), thiết lập Authentication Policies và Authentication Policy Silos để giới hạn phạm vi cấp vé TGT trên các máy chủ Tier 0."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["windows", "active-directory"],
+      "attackTactics": [
+        "privilege-escalation",
+        "lateral-movement",
+        "credential-access",
+        "defense-evasion"
+      ],
+      "keywords": [
+        "tiering-architecture",
+        "enterprise-access-model",
+        "paw",
+        "laps-v2",
+        "gmsa",
+        "kds-root-key",
+        "protected-users",
+        "authentication-policy-silos",
+        "kerberos-fast"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Mô hình bảo mật Active Directory truyền thống thường sụp đổ bởi vì các ranh giới ủy quyền bị vi phạm ngang dọc: Quản trị viên sử dụng tài khoản Domain Admin để đăng nhập vào máy trạm nhân viên nhằm sửa lỗi máy in, để lại mã băm NTLM hoặc vé TGT trong bộ nhớ LSASS của một máy trạm không an toàn. Kẻ tấn công chỉ cần chiếm được máy trạm đó là có thể trích xuất thông tin xác thực để leo thang ngược lên Domain Controller. Kiến trúc phân tầng Enterprise Access Model (hoặc Tiering Architecture) thiết lập nguyên tắc 'Bất biến quyền hạn': Tài khoản ở cấp đặc quyền cao hơn (Tier 0) tuyệt đối không bao giờ được phép gửi chứng thực hoặc đăng nhập vào hệ thống ở cấp đặc quyền thấp hơn (Tier 1 hoặc Tier 2). Khi kết hợp với Windows LAPS (xóa bỏ mật khẩu local admin dùng chung), gMSA (tự động xoay khóa dịch vụ 128-bit) và Protected Users Group (loại bỏ NTLM, DES/RC4 và ủy quyền Credential Delegation), kẻ tấn công dù có kiểm soát được toàn bộ máy trạm nhân viên cũng không thể di chuyển ngang sang các máy chủ tài nguyên quan trọng.",
+      "visual": {
+        "title": "Luồng Phân Tách Đặc Quyền Theo Enterprise Access Model và Ranh Giới Tiering",
+        "caption": "Kiểm soát một chiều từ PAW chuyên dụng tới các lớp tài sản định danh mà không làm rò rỉ credential xuống tầng dưới.",
+        "steps": [
+          {
+            "label": "Tier 2 (Workstations & User Identities)",
+            "detail": "Người dùng thông thường sử dụng máy trạm; quản trị viên cục bộ được bảo vệ bởi Windows LAPS v2 với mật khẩu ngẫu nhiên riêng biệt cho từng máy tính.",
+            "tone": "allow"
+          },
+          {
+            "label": "Tier 1 (Enterprise Servers & Applications)",
+            "detail": "Máy chủ ứng dụng chạy dưới tài khoản dịch vụ gMSA không mật khẩu tĩnh; quản trị viên Tier 1 đăng nhập độc lập và hoàn toàn không có quyền trên Tier 0.",
+            "tone": "allow"
+          },
+          {
+            "label": "Tier 0 Boundary (Identity Control Plane)",
+            "detail": "Domain Controllers, PKI, ADFS, Azure AD Connect được cô lập; chỉ cho phép quản trị từ Privileged Access Workstations (PAW) qua kênh bảo vệ mạng nghiêm ngặt.",
+            "tone": "caution"
+          },
+          {
+            "label": "Cưỡng Chế Protected Users & Policy Silos",
+            "detail": "KDC từ chối cấp vé TGT cho tài khoản Tier 0 nếu yêu cầu xuất phát từ máy chủ hoặc máy trạm không thuộc Tier 0 Authentication Policy Silo.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Enterprise Access Model và Thiết Kế Privileged Access Workstations (PAW)",
+          "paragraphs": [
+            "Mô hình phân tầng truyền thống của Microsoft (Administrative Tier Model) chia tài sản doanh nghiệp thành 3 cấp: Tier 0 (Quản trị danh tính tối cao: Domain Controllers, PKI, ADFS), Tier 1 (Hệ điều hành máy chủ và ứng dụng: File Server, SQL, IIS), và Tier 2 (Thiết bị người dùng cuối: máy trạm, laptop, thiết bị di động). Trong bối cảnh điện toán đám mây và định danh lai hiện đại, mô hình này đã được Microsoft phát triển thành 'Enterprise Access Model', phân định ranh giới theo 3 bình diện: Control Plane (mặt phẳng điều khiển danh tính), Management Plane (mặt phẳng quản trị tài nguyên), và User Access Plane (mặt phẳng truy cập người dùng).",
+            "Nguyên tắc nền tảng của mô hình là 'Clean Source Principle': Một đối tượng quản trị không bao giờ có thể an toàn hơn hệ thống được sử dụng để quản trị nó. Nếu quản trị viên Domain Admin mở trình duyệt web hoặc đọc email trên cùng một máy tính dùng để quản trị Domain Controller, mã độc từ máy trạm có thể chiếm quyền điều khiển phiên làm việc thông qua Keylogger, Token Impersonation hoặc Memory Injection. Để giải quyết triệt để vấn đề này, kiến trúc Privileged Access Workstations (PAW) ra đời. PAW là các máy trạm vật lý riêng biệt, được khóa chặt (hardened), không có kết nối Internet tự do, không cài đặt ứng dụng văn phòng, và chỉ dùng duy nhất cho mục đích kết nối quản trị tới các hệ thống Tier 0.",
+            "Về mặt kỹ thuật mạng và Active Directory, việc thực thi Tiering đòi hỏi phải triển khai cấu trúc Tổ Chức (Organizational Units - OU) riêng biệt cho từng Tier, kết hợp với các chính sách User Rights Assignment trong Group Policy: (1) Cấu hình 'Deny log on locally', 'Deny log on through Remote Desktop Services' và 'Deny access to this computer from the network' đối với tài khoản Tier 0 trên tất cả các máy trạm Tier 1 và Tier 2; (2) Thiết lập tường lửa Windows Defender Firewall chỉ cho phép kết nối cổng RPC (135/445) và RDP (3389) tới Domain Controller từ dải địa chỉ IP tĩnh dành riêng cho các máy PAW."
+          ]
+        },
+        {
+          "title": "Triển Khai Windows LAPS v2 và Quản Trị Mật Khẩu Quản Trị Viên Cục Bộ",
+          "paragraphs": [
+            "Một trong những vector di chuyển ngang phổ biến nhất trong các cuộc tấn công Active Directory là việc sử dụng chung mật khẩu cho tài khoản Local Administrator trên hàng ngàn máy trạm và máy chủ thành viên. Khi kẻ tấn công chiếm được một máy trạm và trích xuất mã băm NTLM hoặc mật khẩu của tài khoản Administrator cục bộ từ SAM registry, chúng có thể sử dụng kỹ thuật Pass-the-Hash để chiếm quyền điều khiển tất cả các máy trạm còn lại trong mạng.",
+            "Giải pháp Local Administrator Password Solution (LAPS) giải quyết triệt để lỗ hổng này bằng cách tự động gán một mật khẩu ngẫu nhiên, duy nhất và định kỳ xoay vòng cho tài khoản quản trị viên cục bộ trên mỗi máy tính. Phiên bản mới nhất 'Windows LAPS v2' (được tích hợp sẵn trong nhân Windows từ các bản cập nhật năm 2023) đã mang lại nhiều cải tiến vượt trội so với Legacy LAPS: thay vì lưu mật khẩu dạng bản rõ (cleartext) trong thuộc tính `ms-Mcs-AdmPwd`, Windows LAPS v2 lưu trữ mật khẩu trong thuộc tính `msLAPS-Password` và được mã hóa tự động bằng công nghệ Cryptography Next Generation (CNG) / DPAPI-ng, chỉ cho phép các máy chủ và quản trị viên được chỉ định giải mã.",
+            "Ngoài ra, Windows LAPS v2 hỗ trợ tính năng tự động xoay vòng mật khẩu ngay sau khi sử dụng (Post-authentication reset), hỗ trợ quản lý cả tài khoản cục bộ do quản trị viên tùy biến tên, và tích hợp sẵn với Microsoft Entra ID bên cạnh Active Directory on-premises. Để bảo vệ dữ liệu mật khẩu, quản trị viên sử dụng lệnh PowerShell `Set-LapsADReadPasswordPermission` để cấp quyền giải mã thuộc tính `msLAPS-Password` cho nhóm quản trị viên Tier tương ứng, ngăn chặn việc quản trị viên máy trạm đọc được mật khẩu của các máy chủ quan trọng."
+          ]
+        },
+        {
+          "title": "Cấu Hình Group Managed Service Accounts (gMSA) và Khử Bỏ Nguy Cơ Kerberoasting",
+          "paragraphs": [
+            "Các tài khoản dịch vụ truyền thống (Service Accounts) chạy các ứng dụng như SQL Server, IIS Application Pool hay dịch vụ sao lưu thường là tài khoản người dùng thông thường trong Active Directory. Do yêu cầu hoạt động liên tục 24/7, mật khẩu của các tài khoản này hiếm khi được thay đổi, thường được đặt đơn giản để tránh sự cố gián đoạn, và được gán Service Principal Name (SPN). Điều này biến chúng thành mồi ngon cho kỹ thuật tấn công Kerberoasting.",
+            "Group Managed Service Accounts (gMSA), được giới thiệu từ Windows Server 2012, là giải pháp tối thượng loại bỏ hoàn toàn mật khẩu tĩnh cho các dịch vụ mạng. Khi một dịch vụ chạy dưới danh tính gMSA, hệ điều hành Windows và Active Directory sẽ tự động phối hợp quản lý vòng đời mật khẩu: Domain Controller tự động tạo ra một mật khẩu giả ngẫu nhiên có độ dài lên tới 128 ký tự phức tạp và tự động xoay vòng mật khẩu đó sau mỗi 30 ngày (hoặc chu kỳ tùy chọn). Quản trị viên con người hoàn toàn không biết mật khẩu của gMSA là gì, do đó không thể bị lộ lọt qua phishing hoặc đánh cắp.",
+            "Nền tảng mật mã học của gMSA dựa trên Microsoft Key Distribution Services (KDS) Root Key. Quản trị viên kích hoạt KDS Root Key trong Active Directory thông qua lệnh `Add-KdsRootKey -EffectiveImmediately`. Sau đó, đối tượng tài khoản gMSA được tạo bằng lệnh `New-ADServiceAccount` với tham số `PrincipalsAllowedToRetrieveManagedPassword` chỉ định rõ danh sách các máy chủ thành viên nào được phép truy vấn KDC để lấy mật khẩu giải mã. Vì mật khẩu gồm 128 ký tự phức tạp, kẻ tấn công dù có trích xuất được vé TGS thông qua Kerberoasting cũng không bao giờ có thể bẻ khóa offline thành công."
+          ]
+        },
+        {
+          "title": "Nhóm Protected Users, Authentication Policies, Authentication Policy Silos & Kerberos FAST",
+          "paragraphs": [
+            "Để thiết lập ranh giới phòng thủ vững chắc cho các tài khoản quản trị cấp cao, Windows Server cung cấp nhóm an ninh đặc biệt 'Protected Users'. Bất kỳ tài khoản nào được đưa vào nhóm Protected Users sẽ tự động bị hệ điều hành áp đặt các hạn chế bảo mật vô cùng nghiêm ngặt: (1) Hoàn toàn không thể xác thực qua giao thức NTLM; (2) Không thể sử dụng các thuật toán mã hóa yếu DES hoặc RC4 cho Kerberos (bắt buộc phải sử dụng AES128/AES256); (3) Không thể được ủy quyền thông qua Kerberos Unconstrained Delegation hoặc Constrained Delegation; (4) Thời hạn hiệu lực của vé TGT bị giới hạn tối đa chỉ còn 4 giờ (thay vì 10 giờ) và không thể gia hạn (non-renewable); (5) Mã băm mật khẩu và vé Kerberos của tài khoản sẽ không được lưu vào bộ nhớ đệm (cache) trên các máy trạm sau khi đăng xuất.",
+            "Để tăng cường hơn nữa khả năng kiểm soát truy cập, Active Directory cung cấp cơ chế Authentication Policies và Authentication Policy Silos (giới thiệu từ Windows Server 2012 R2). Một Authentication Policy Silo cho phép nhóm các tài khoản người dùng, tài khoản máy tính và tài khoản dịch vụ thuộc cùng một tầng (ví dụ Tier 0 Silo) lại với nhau. Khi một tài khoản thuộc Tier 0 Silo yêu cầu vé TGT từ KDC, KDC sẽ kiểm tra xem máy trạm mà yêu cầu đó xuất phát có thuộc danh sách máy tính được phép trong Silo hay không. Nếu một Domain Admin cố tình đăng nhập từ một máy trạm Tier 2, KDC sẽ từ chối cấp vé ngay lập tức.",
+            "Cuối cùng, Kerberos Armoring (hay Flexible Authentication Secure Tunneling - FAST, RFC 6113) cung cấp một đường hầm mã hóa bảo vệ toàn bộ quá trình trao đổi AS-REQ / AS-REP giữa client và KDC. Bằng cách sử dụng khóa phiên máy tính (Computer Account credential) để mã hóa gói tin xác thực của người dùng, FAST ngăn chặn hoàn toàn việc kẻ nghe lén trên mạng bắt gói tin AS-REQ để bẻ khóa mật khẩu offline, đồng thời vô hiệu hóa các kỹ thuật tấn công can thiệp vào quá trình đàm phán mã hóa Kerberos."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Củng Cố Toàn Diện Môi Trường Active Directory Bằng Tiering, LAPS v2 và gMSA",
+        "objective": "Triển khai cấu trúc OU phân tầng Tier 0/1/2, cấu hình Group Policy kích hoạt Windows LAPS v2 với mã hóa AD, chuyển đổi tài khoản ứng dụng sang gMSA và đưa tài khoản quản trị vào Protected Users Group.",
+        "scenario": "Doanh nghiệp vừa trải qua một đợt đánh giá an ninh nội bộ và bị Red Team chiếm quyền Domain Admin chỉ trong 4 giờ thông qua một tài khoản Local Admin dùng chung và một tài khoản dịch vụ IIS chạy mật khẩu tĩnh. Bạn được giao trọng trách Lead Architect tái cấu trúc toàn bộ an ninh định danh theo chuẩn Enterprise Access Model.",
+        "constraints": [
+          "Không được chuyển tài khoản có sử dụng Kerberos Delegation không tương thích vào nhóm Protected Users mà chưa kiểm tra.",
+          "Quá trình kích hoạt LAPS v2 phải đảm bảo quản trị viên Tier 2 chỉ đọc được mật khẩu máy trạm thuộc phạm vi quản lý của mình.",
+          "Không được tạo KDS Root Key với thời gian hiệu lực bị trễ gây lỗi đăng ký gMSA trên các máy chủ ứng dụng sản xuất."
+        ],
+        "cases": [
+          {
+            "id": "case-77-01",
+            "title": "Chiến Lược Phân Quyền Đọc Mật Khẩu Trong Windows LAPS v2",
+            "context": "Doanh nghiệp bắt đầu triển khai Windows LAPS v2 cho toàn bộ 500 máy trạm Tier 2 và 50 máy chủ Tier 1. Bạn cần thiết lập quyền phân cấp trên Active Directory để đội ngũ Helpdesk (Tier 2 Admin) chỉ có quyền đọc mật khẩu Local Administrator của các máy trạm trong OU Workstations, tuyệt đối không được phép đọc mật khẩu của các máy chủ trong OU Tier1-Servers.",
+            "prompt": "Quy trình thực thi kỹ thuật nào sau đây đảm bảo đúng nguyên tắc phân tầng đặc quyền bảo mật của Windows LAPS v2?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Gán quyền Domain Admins cho toàn bộ nhân viên Helpdesk để họ có đủ thẩm quyền truy vấn thuộc tính msLAPS-Password qua PowerShell.",
+                "correct": false,
+                "rationale": "Gán Domain Admins cho nhân viên Helpdesk là vi phạm nghiêm trọng nguyên tắc phân quyền tối thiểu (Least Privilege) và phá vỡ ranh giới Tiering."
+              },
+              {
+                "id": "B",
+                "label": "Thực thi lệnh PowerShell `Set-LapsADReadPasswordPermission -Identity 'OU=Workstations,DC=corp,DC=local' -AllowedPrincipals 'Helpdesk-Admins'` trên OU máy trạm; và tuyệt đối không chạy lệnh này với nhóm Helpdesk trên OU Tier1-Servers.",
+                "correct": true,
+                "rationale": "Lệnh `Set-LapsADReadPasswordPermission` phân quyền đọc và giải mã thuộc tính `msLAPS-Password` chính xác tại phạm vi OU được chỉ định, đảm bảo nhóm Helpdesk chỉ giải mã được mật khẩu máy trạm Tier 2."
+              },
+              {
+                "id": "C",
+                "label": "Tắt tính năng mã hóa mật khẩu trong chính sách LAPS GPO để bất kỳ ai trong mạng cũng có thể đọc thuộc tính msLAPS-Password dưới dạng cleartext.",
+                "correct": false,
+                "rationale": "Lưu mật khẩu dạng cleartext khiến bất kỳ tài khoản người dùng nào có quyền đọc thông thường cũng đánh cắp được mật khẩu Local Admin của mọi máy tính."
+              },
+              {
+                "id": "D",
+                "label": "Xóa bỏ hoàn toàn tài khoản Local Administrator trên tất cả các máy tính thành viên trong miền.",
+                "correct": false,
+                "rationale": "Không thể xóa bỏ tài khoản Administrator tích hợp sẵn (RID 500) trên Windows, và việc này sẽ làm mất khả năng cứu hộ máy cục bộ khi mất kết nối mạng hoặc lỗi Domain Trust."
+              }
+            ]
+          },
+          {
+            "id": "case-77-02",
+            "title": "Chuyển Đổi Dịch Vụ Ứng Dụng Sang Group Managed Service Account (gMSA)",
+            "context": "Máy chủ ứng dụng tài chính SRV-FIN01 đang chạy ứng dụng web IIS kết nối cơ sở dữ liệu SQL Server dưới danh tính tài khoản `corp\\svc_webapp` có SPN `HTTP/srv-fin01.corp.local`. Đội ngũ kiểm toán phát hiện mật khẩu của tài khoản này đã không thay đổi trong 4 năm và dễ dàng bị tấn công Kerberoasting. Bạn được yêu cầu thay thế tài khoản này bằng gMSA `gmsa_webapp$`.",
+            "prompt": "Trình tự các bước kỹ thuật chuẩn mực để cấu hình và kích hoạt tài khoản gMSA này trong môi trường Active Directory là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Khởi tạo KDS Root Key trên Active Directory (`Add-KdsRootKey -EffectiveImmediately`), tạo tài khoản gMSA (`New-ADServiceAccount -Name gmsa_webapp -DNSHostName gmsa_webapp.corp.local -PrincipalsAllowedToRetrieveManagedPassword 'SRV-FIN01$'`), gán SPN cho gMSA, cài đặt gMSA trên máy chủ (`Install-ADServiceAccount gmsa_webapp`), và cấu hình Application Pool trên IIS chạy dưới danh tính `corp\\gmsa_webapp$` với mật khẩu để trống.",
+                "correct": true,
+                "rationale": "Đây là quy trình chuẩn xác 100%: khởi tạo KDS Root Key, tạo gMSA cấp quyền cho máy chủ SRV-FIN01$, cài đặt lên máy chủ và cấu hình dịch vụ không cần mật khẩu tĩnh."
+              },
+              {
+                "id": "B",
+                "label": "Tạo một tài khoản người dùng bình thường, đặt mật khẩu phức tạp 8 ký tự, chia sẻ mật khẩu cho nhân viên quản trị IIS và thiết lập cờ 'Password never expires'.",
+                "correct": false,
+                "rationale": "Cách làm này duy trì tài khoản dịch vụ truyền thống với mật khẩu tĩnh, không giải quyết được nguy cơ Kerberoasting và lộ lọt thông tin xác thực."
+              },
+              {
+                "id": "C",
+                "label": "Cấu hình dịch vụ IIS chạy dưới tài khoản Local System (NT AUTHORITY\\SYSTEM) để không cần sử dụng bất kỳ tài khoản Active Directory nào.",
+                "correct": false,
+                "rationale": "Chạy dưới Local System khiến ứng dụng xác thực sang SQL Server bằng tài khoản máy SRV-FIN01$, không thể phân quyền chi tiết và tạo rủi ro nghiêm trọng nếu ứng dụng web bị lỗi RCE."
+              },
+              {
+                "id": "D",
+                "label": "Xóa thuộc tính ServicePrincipalName khỏi tài khoản dịch vụ cũ và giữ nguyên cấu hình để ứng dụng tiếp tục hoạt động.",
+                "correct": false,
+                "rationale": "Xóa SPN sẽ phá vỡ cơ chế xác thực Kerberos, buộc ứng dụng hạ cấp sang NTLM hoặc gây lỗi xác thực hoàn toàn đối với người dùng truy cập."
+              }
+            ]
+          },
+          {
+            "id": "case-77-03",
+            "title": "Áp Dụng Nhóm Protected Users Cho Tài Khoản Quản Trị Tier 0",
+            "context": "Sau khi thiết lập hệ thống máy trạm PAW cho đội ngũ Enterprise Admins, bạn chuẩn bị đưa các tài khoản quản trị cấp cao vào nhóm 'Protected Users' của Active Directory. Tuy nhiên, một ứng dụng quản lý sao lưu cũ vẫn đang sử dụng giao thức NTLM để xác thực với tài khoản Domain Admin từ xa.",
+            "prompt": "Hành động nào sau đây là giải pháp đúng đắn trước khi kích hoạt thành viên nhóm Protected Users để không gây đứt gãy hệ thống vận hành?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Lập tức đưa tài khoản Domain Admin vào Protected Users và tắt tính năng cảnh báo của ứng dụng sao lưu.",
+                "correct": false,
+                "rationale": "Protected Users chặn đứng hoàn toàn việc xác thực NTLM, hành động này sẽ khiến ứng dụng sao lưu bị lỗi xác thực ngay lập tức và ngừng hoạt động sao lưu toàn hệ thống."
+              },
+              {
+                "id": "B",
+                "label": "Tách biệt tài khoản: Tạo một tài khoản dịch vụ chuyên dụng riêng cho ứng dụng sao lưu (áp dụng quyền tối thiểu cần thiết cho sao lưu) cấu hình Kerberos hoặc nâng cấp giao thức; sau đó mới đưa các tài khoản Domain Admin của con người vào nhóm Protected Users, đồng thời giám sát Event ID 4768 và 4769 để đảm bảo các tài khoản này chỉ xác thực qua AES và không còn phụ thuộc vào NTLM.",
+                "correct": true,
+                "rationale": "Tách biệt tài khoản dịch vụ khỏi tài khoản quản trị cá nhân là nguyên tắc cốt lõi của Tiering; chỉ đưa tài khoản cá nhân của quản trị viên vào Protected Users sau khi đã loại bỏ sự phụ thuộc NTLM."
+              },
+              {
+                "id": "C",
+                "label": "Chỉnh sửa mã nguồn của Domain Controller để cho phép nhóm Protected Users tiếp tục sử dụng NTLM trong trường hợp khẩn cấp.",
+                "correct": false,
+                "rationale": "Quy tắc của Protected Users được mã hóa cứng trong nhân dịch vụ xác thực LSASS/KDC của Windows Server, không thể chỉnh sửa tùy tiện."
+              },
+              {
+                "id": "D",
+                "label": "Hạ cấp Domain Functional Level xuống Windows Server 2003 để vô hiệu hóa tính năng kiểm tra hạn chế của Protected Users.",
+                "correct": false,
+                "rationale": "Hạ cấp DFL làm suy giảm an ninh toàn diện của hệ thống và nhóm Protected Users vốn chỉ hoạt động từ DFL Windows Server 2012 R2 trở lên."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Thiết kế cấu trúc phân cấp Organizational Unit (OU) và ranh giới phân quyền kiểm soát truy cập cho Tier 0, Tier 1 và Tier 2.",
+          "Cấu hình và kiểm thử thành công việc phân quyền đọc mật khẩu mã hóa Windows LAPS v2 qua lệnh Set-LapsADReadPasswordPermission.",
+          "Triển khai hoàn chỉnh vòng đời tài khoản gMSA bao gồm KDS Root Key, New-ADServiceAccount và xác thực Kerberos không mật khẩu tĩnh."
+        ],
+        "evidenceTemplate": [
+          "Sơ đồ kiến trúc Enterprise Access Model và cấu trúc phân vùng OU trong Active Directory Users and Computers",
+          "Ảnh chụp kết quả lệnh PowerShell kiểm tra thuộc tính msLAPS-Password và quyền giải mã của nhóm quản trị viên tương ứng",
+          "Bản ghi xác thực thành công của dịch vụ ứng dụng chạy dưới tài khoản gMSA trong Windows Event Log (Event ID 4624)"
+        ],
+        "reset": "Khôi phục cấu hình phân quyền OU về trạng thái ban đầu và gỡ bỏ chính sách LAPS v2 trên các máy tính thử nghiệm.",
+        "cleanup": "Xóa các tài khoản gMSA thử nghiệm và loại bỏ tài khoản kiểm thử ra khỏi nhóm Protected Users."
+      },
+      "governance": {
+        "prevent": [
+          "Cấm hoàn toàn việc tài khoản quản trị viên Tier 0 (Domain Admins, Enterprise Admins) đăng nhập tương tác hoặc gửi dữ liệu xác thực tới bất kỳ máy trạm hoặc máy chủ nào thuộc Tier 1 hoặc Tier 2.",
+          "Kích hoạt Windows LAPS v2 trên 100% máy trạm và máy chủ thành viên, bắt buộc mã hóa thuộc tính mật khẩu bằng Active Directory hoặc Entra ID và thiết lập thời gian tự động đổi mật khẩu sau mỗi lần sử dụng.",
+          "Chuyển đổi toàn bộ các tài khoản dịch vụ chạy trên hệ điều hành Windows sang mô hình Group Managed Service Accounts (gMSA), nghiêm cấm sử dụng tài khoản người dùng thông thường cho các dịch vụ mạng có SPN."
+        ],
+        "observe": [
+          "Giám sát Windows Event ID 4625 và 4776 trên các máy chủ thành viên để phát hiện các nỗ lực đăng nhập thất bại của tài khoản Tier 0 xuất phát từ các vùng mạng không được phép.",
+          "Theo dõi các sự kiện đọc thuộc tính `msLAPS-Password` trong Directory Service Access (Event ID 4662) để phát hiện hành vi trích xuất mật khẩu quản trị viên cục bộ trái phép.",
+          "Theo dõi Windows Event ID 4820 (A Kerberos Ticket-granting Ticket (TGT) was denied because the user, device, or both don't meet the access control restrictions) liên quan đến vi phạm chính sách Authentication Policy Silos."
+        ],
+        "respond": [
+          "Nếu phát hiện tài khoản Tier 0 đăng nhập vào máy trạm Tier 2, lập tức cô lập máy trạm đó, cưỡng chế đăng xuất phiên làm việc và thực hiện reset mật khẩu ngay lập tức cho tài khoản quản trị bị phơi nhiễm.",
+          "Khi phát hiện sự cố rò rỉ mật khẩu máy trạm qua LAPS, kích hoạt lệnh PowerShell `Reset-LapsPassword` để buộc hệ thống xoay vòng mật khẩu Local Administrator ngay lập tức.",
+          "Nếu một tài khoản trong nhóm Protected Users bị phát hiện có hoạt động bất thường, lập tức khóa tài khoản trên Domain Controller và thu hồi toàn bộ vé Kerberos đang hoạt động."
+        ],
+        "residualRisk": [
+          "Việc áp dụng nhóm Protected Users có thể gây gián đoạn các ứng dụng di sản (Legacy Applications) chưa hỗ trợ mã hóa AES hoặc vẫn phụ thuộc vào giao thức NTLM.",
+          "KDS Root Key khi tạo với cờ `-EffectiveImmediately` có thể mất tối đa 10 giờ để đồng bộ hoàn toàn giữa tất cả các Domain Controller trong các môi trường Active Directory quy mô lớn phân tán địa lý.",
+          "Nếu máy trạm PAW bị tấn công chuỗi cung ứng phần cứng hoặc bị cài đặt phần mềm gián điệp vật lý (Hardware Keylogger), kẻ tấn công vẫn có thể chiếm đoạt phiên làm việc của quản trị viên Tier 0."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Chỉ cần cài đặt giải pháp LAPS cho các máy trạm người dùng là toàn bộ hệ thống doanh nghiệp đã miễn nhiễm trước kỹ thuật Pass-the-Hash.",
+          "correction": "LAPS chỉ bảo vệ mật khẩu của tài khoản Administrator cục bộ. Nếu quản trị viên miền (Domain Admin) đăng nhập vào máy trạm đó, vé TGT hoặc mã băm của Domain Admin vẫn sẽ nằm lại trong bộ nhớ LSASS của máy trạm. Kẻ tấn công có thể trích xuất thông tin xác thực của Domain Admin để di chuyển ngang mà không cần quan tâm đến mật khẩu LAPS."
+        },
+        {
+          "claim": "Tài khoản gMSA có thể được sử dụng để đăng nhập trực tiếp qua Remote Desktop (RDP) để thực hiện công việc quản trị máy chủ thuận tiện hơn.",
+          "correction": "Tài khoản gMSA được thiết kế thuần túy cho các dịch vụ nền (Background Services, IIS AppPools, Scheduled Tasks). Hệ điều hành Windows ngăn chặn việc đăng nhập tương tác (Interactive Logon / RDP) đối với tài khoản gMSA vì bản thân con người không sở hữu mật khẩu của tài khoản này."
+        },
+        {
+          "claim": "Đưa tài khoản người dùng vào nhóm Protected Users sẽ tự động mã hóa toàn bộ dữ liệu trên ổ đĩa cứng của máy tính mà họ sử dụng.",
+          "correction": "Nhóm Protected Users chỉ kiểm soát các ràng buộc về giao thức xác thực danh tính (chặn NTLM, hạ cấp mã hóa, ủy quyền vé và giới hạn thời gian TGT). Nhóm này hoàn toàn không có chức năng mã hóa dữ liệu ổ cứng (vốn thuộc về công nghệ BitLocker)."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os08-l77-q1",
+          "difficulty": "easy",
+          "question": "Trong kiến trúc phân tầng Enterprise Access Model của Microsoft, thành phần nào sau đây thuộc phạm vi quản lý tối cao của Mặt phẳng điều khiển (Tier 0 / Control Plane)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Máy chủ ứng dụng cơ sở dữ liệu Microsoft SQL Server (Tier 1)"
+            },
+            {
+              "id": "B",
+              "label": "Domain Controllers, máy chủ AD CS (PKI) và máy chủ đồng bộ danh tính Entra Connect"
+            },
+            {
+              "id": "C",
+              "label": "Máy trạm làm việc của nhân viên phòng kế toán (Tier 2)"
+            },
+            {
+              "id": "D",
+              "label": "Máy chủ chia sẻ tệp tin nội bộ File Server của phòng nhân sự"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Tier 0 (Control Plane) bao gồm toàn bộ các hệ thống có quyền lực kiểm soát trực tiếp hoặc gián tiếp đối với hạ tầng định danh của toàn bộ doanh nghiệp: Domain Controllers, PKI/CA, ADFS, Azure AD Connect và PAW."
+        },
+        {
+          "id": "os08-l77-q2",
+          "difficulty": "medium",
+          "question": "Điểm cải tiến kỹ thuật nổi bật nhất của Windows LAPS v2 so với giải pháp Legacy LAPS trước đây là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Windows LAPS v2 không cần cài đặt Group Policy Client Side Extension và hỗ trợ mã hóa thuộc tính mật khẩu msLAPS-Password bằng công nghệ CNG/DPAPI-ng"
+            },
+            {
+              "id": "B",
+              "label": "Windows LAPS v2 cho phép tất cả tài khoản người dùng trong miền đọc mật khẩu mà không cần phân quyền"
+            },
+            {
+              "id": "C",
+              "label": "Windows LAPS v2 tự động gán quyền Domain Admin cho tài khoản Administrator cục bộ của máy tính"
+            },
+            {
+              "id": "D",
+              "label": "Windows LAPS v2 bắt buộc phải lưu trữ mật khẩu trên máy chủ đám mây của bên thứ ba qua giao thức FTP"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Windows LAPS v2 được tích hợp sẵn vào hệ điều hành (in-box), lưu trữ mật khẩu trong thuộc tính msLAPS-Password và được mã hóa bằng DPAPI-ng, khắc phục hoàn toàn điểm yếu lưu mật khẩu dạng cleartext trong ms-Mcs-AdmPwd của Legacy LAPS."
+        },
+        {
+          "id": "os08-l77-q3",
+          "difficulty": "hard",
+          "question": "Khi một tài khoản người dùng được thêm vào nhóm an ninh đặc biệt 'Protected Users' trong Active Directory, hạn chế bảo mật nào sau đây sẽ lập tức được hệ điều hành áp đặt đối với tài khoản đó?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tài khoản bị cấm đổi mật khẩu vĩnh viễn và bắt buộc phải đăng nhập bằng giao thức Telnet"
+            },
+            {
+              "id": "B",
+              "label": "Xác thực NTLM bị vô hiệu hóa hoàn toàn, Kerberos chỉ chấp nhận mã hóa AES, cấm ủy quyền Credential Delegation và thời hạn vé TGT bị giới hạn tối đa 4 giờ không thể gia hạn"
+            },
+            {
+              "id": "C",
+              "label": "Tài khoản tự động bị khóa sau 3 lần đăng nhập thất bại và chỉ có thể mở khóa bởi nhà cung cấp dịch vụ Internet"
+            },
+            {
+              "id": "D",
+              "label": "Hệ thống tự động chuyển toàn bộ tệp tin của người dùng lên phân vùng sao lưu công cộng của Domain Controller"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Nhóm Protected Users loại bỏ hoàn toàn các cơ chế xác thực rủi ro: chặn NTLM, cấm mã hóa yếu DES/RC4, chặn Kerberos unconstrained/constrained delegation, và giới hạn TGT xuống 4 giờ không thể gia hạn."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một tập đoàn tài chính đang vận hành hệ thống Active Directory gồm 10.000 người dùng, 12 Domain Controllers và hơn 300 máy chủ ứng dụng. Một cuộc đánh giá bảo mật độc lập đã chỉ ra rằng quản trị viên thường xuyên dùng tài khoản Domain Admin để đăng nhập vào máy chủ web và máy trạm nhân viên, mật khẩu Local Admin trên các máy trạm giống hệt nhau, và các dịch vụ quan trọng đều chạy dưới tài khoản Domain User có mật khẩu tĩnh.",
+        "tasks": [
+          "Thiết kế bản vẽ kiến trúc phân tầng Enterprise Access Model chi tiết cho tập đoàn, phân định rõ phạm vi quản lý của Tier 0, Tier 1, Tier 2 và xây dựng lộ trình triển khai Privileged Access Workstations (PAW) cho 15 quản trị viên cấp cao.",
+          "Xây dựng kế hoạch triển khai Windows LAPS v2 toàn diện: cấu hình GPO, phân quyền giải mã msLAPS-Password cho từng nhóm quản trị viên theo Tier, và xây dựng quy trình xoay vòng mật khẩu tự động sau khi hỗ trợ kỹ thuật (Post-authentication reset).",
+          "Lập danh mục toàn bộ các tài khoản dịch vụ đang có SPN trong Active Directory, đánh giá tính khả thi và lập quy trình chuyển đổi từng bước sang Group Managed Service Accounts (gMSA) sử dụng KDS Root Key mà không làm gián đoạn các ứng dụng đang chạy."
+        ],
+        "requiredEvidence": [
+          "Bản thiết kế kiến trúc phân tầng Enterprise Access Model hoàn chỉnh bao gồm sơ đồ phân vùng OU, ma trận phân quyền quản trị và chính sách User Rights Assignment",
+          "Kịch bản thử nghiệm triển khai Windows LAPS v2 kèm nhật ký câu lệnh PowerShell chứng minh tính năng phân quyền đọc mật khẩu theo phạm vi OU",
+          "Bảng ma trận đánh giá rủi ro và kế hoạch chuyển đổi tài khoản dịch vụ sang gMSA kèm tài liệu hướng dẫn khắc phục sự cố (Rollback Plan)"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Enterprise access model",
+          "url": "https://learn.microsoft.com/en-us/security/privileged-access-workstations/privileged-access-access-model",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc phân tầng bảo mật Enterprise Access Model",
+            "Nguyên tắc Clean Source và thiết kế Privileged Access Workstations"
+          ]
+        },
+        {
+          "title": "NIST SP 800-207: Zero Trust Architecture",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-207/final",
+          "publisher": "NIST",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Các nguyên tắc kiểm soát truy cập phân tầng và cô lập tài sản tối quan trọng",
+            "Cơ chế xác thực động và loại bỏ sự tin cậy ngầm định trong mạng nội bộ"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os08-l78-multi-host-enterprise-active-directory-capstone",
+      "slug": "multi-host-enterprise-active-directory-capstone",
+      "title": "Bài Tập Capstone Tổng Hợp: Điều Tra Chuỗi Tấn Công Đa Máy Chủ & Ứng Cứu Sự Cố Khẩn Cấp Rừng Active Directory",
+      "summary": "Thực hiện bài tập Capstone tổng hợp giả lập hạ tầng mạng doanh nghiệp đa máy chủ (Multi-Host AD Lab): phân tích chuỗi tấn công hoàn chỉnh từ Initial Access trên máy trạm nhân viên, vượt qua EDR, di chuyển ngang qua Pass-the-Hash/Kerberoasting lên máy chủ Tier 1, lạm dụng cấu hình AD CS ESC1 để chiếm quyền Domain Controller Tier 0, và thực thi quy trình Purple Team / DFIR khôi phục Active Directory (KDC krbtgt dual-reset, ACL cleanup, Directory hardening).",
+      "difficulty": "expert",
+      "durationMinutes": 200,
+      "prerequisites": [
+        "os08-l76-active-directory-telemetry-and-event-id-monitoring",
+        "os08-l77-enterprise-active-directory-hardening-and-tiering-architecture"
+      ],
+      "outcomes": [
+        "Tái hiện và phân tích toàn diện chuỗi tấn công đa máy chủ (Multi-Host Attack Path) xuyên suốt 3 tầng (Tier 2 Workstation -> Tier 1 Application Server -> Tier 0 Domain Controller/AD CS) theo chuẩn MITRE ATT&CK.",
+        "Đối soát chéo nguồn dữ liệu telemetry đa nguồn: kết hợp Sysmon (Process Creation Event 1, Network Event 3), Windows Security Log (Event 4624, 4769, 4662) và EDR alerts để dựng lại mốc thời gian (Timeline Reconstruction) của đối thủ.",
+        "Thực thi quy trình ứng phó sự cố Active Directory chuyên sâu: quy trình khôi phục tài khoản krbtgt kép (Dual-password reset với script New-KrbtgtKeys.ps1), thu hồi chứng chỉ số độc hại, hủy bỏ quyền ủy quyền bất hợp pháp và cô lập tài sản bị xâm phạm.",
+        "Biên soạn báo cáo đánh giá kỹ thuật chuyên sâu (Capstone Post-Mortem Assessment Report) bao gồm sơ đồ luồng tấn công BloodHound, bằng chứng trích xuất số và kế hoạch cải tổ kiến trúc định danh dài hạn cho tổ chức."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["windows", "active-directory"],
+      "attackTactics": [
+        "initial-access",
+        "credential-access",
+        "lateral-movement",
+        "privilege-escalation",
+        "persistence"
+      ],
+      "keywords": [
+        "multi-host-capstone",
+        "bloodhound-analysis",
+        "krbtgt-dual-reset",
+        "timeline-reconstruction",
+        "incident-response",
+        "dfir",
+        "active-directory-recovery",
+        "purple-team",
+        "post-mortem"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Trong một sự cố an ninh định danh doanh nghiệp quy mô lớn, kẻ tấn công không bao giờ dừng lại ở một điểm đơn lẻ. Chúng thiết lập nhiều điểm bám trụ (foothold), tạo lập các cửa sau âm thầm (Shadow Admin, ACL backdoors, DCSync rights, CA templates độc hại, hoặc Golden Ticket). Việc chỉ đơn giản thay mật khẩu tài khoản Domain Admin hoặc cô lập một máy trạm bị nhiễm là một sai lầm chết người, bởi vì kẻ tấn công vẫn sở hữu vé Kerberos TGT giả mạo hoặc chứng chỉ số chưa bị thu hồi để tiếp tục duy trì quyền lực tối cao. Quy trình điều tra và cứu hộ Capstone đòi hỏi chuyên viên phải có tư duy hệ thống: đồng thời bóc tách dấu vết trên toàn bộ các máy trạm (Tier 2), máy chủ thành viên (Tier 1) và Domain Controller (Tier 0); xác định chính xác 'Patient Zero' và ranh giới xâm phạm; sau đó thực hiện chiến dịch dập tắt đồng bộ: xoay vòng khóa krbtgt hai lần liên tiếp (cách nhau khoảng thời gian tối đa của ticket lifetime), thanh lọc triệt để DACL trên các container quản trị, thu hồi CA certificates bị mạo danh, và thiết lập lại toàn bộ ranh giới Tiering mà không làm tê liệt hoạt động kinh doanh của doanh nghiệp.",
+      "visual": {
+        "title": "Sơ Đồ Chuỗi Tấn Công Đa Máy Chủ & Tiến Trình Cứu Hộ Active Directory Capstone",
+        "caption": "Đối soát 4 giai đoạn tấn công của đối thủ và lộ trình 4 bước cứu hộ khẩn cấp của đội ngũ Blue/Purple Team.",
+        "steps": [
+          {
+            "label": "Giai Đoạn 1: Initial Foothold (Tier 2)",
+            "detail": "Kẻ tấn công xâm nhập máy trạm WKSTN-01 qua Phishing, trích xuất mã băm NTLM Local Admin và dùng mật khẩu dùng chung để di chuyển sang máy chủ ứng dụng SRV-APP01 (Tier 1).",
+            "tone": "caution"
+          },
+          {
+            "label": "Giai Đoạn 2: Leo Thang Sang AD CS & PKINIT",
+            "detail": "Từ SRV-APP01, kẻ tấn công trích xuất vé Kerberoasting và lạm dụng mẫu chứng chỉ ESC1 trên Enterprise CA để yêu cầu chứng chỉ số mạo danh Domain Admin.",
+            "tone": "caution"
+          },
+          {
+            "label": "Giai Đoạn 3: Domain Dominance & Persistence (Tier 0)",
+            "detail": "Đổi chứng chỉ lấy TGT qua PKINIT trên DC01, thực hiện DCSync kết xuất toàn bộ cơ sở dữ liệu NTDS.dit và tạo lập Golden Ticket làm cửa sau dự phòng.",
+            "tone": "stop"
+          },
+          {
+            "label": "Giai Đoạn 4: Cứu Hộ Khẩn Cấp & Phục Hồi Forest",
+            "detail": "Đội ứng cứu cô lập hệ thống, thực hiện Dual krbtgt password reset, thu hồi chứng chỉ số và template ESC1, dọn dẹp DACL độc hại và áp dụng Enterprise Access Model.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Môi Trường Lab Đa Máy Chủ (GOAD-Style Architecture) và Chuỗi Tấn Công End-to-End",
+          "paragraphs": [
+            "Để đánh giá toàn diện năng lực phòng thủ và tấn công trong môi trường doanh nghiệp thực tế, bài tập Capstone được thiết kế trên mô hình mạng đa máy chủ kinh điển (lấy cảm hứng từ kiến trúc Game of Active Directory - GOAD). Hệ thống bao gồm: (1) Domain Controller DC01 (Windows Server 2022, Forest Root `corp.local`); (2) Máy chủ Certification Authority CA01 (Windows Server 2022, AD CS Enterprise Root CA); (3) Máy chủ ứng dụng nghiệp vụ SRV-APP01 (Windows Server 2019, chạy IIS và SQL Server thuộc Tier 1); (4) Máy trạm người dùng WKSTN-01 và WKSTN-02 (Windows 11 Enterprise thuộc Tier 2). Môi trường phản ánh đầy đủ các vấn đề cấu hình sai thường gặp trong các tập đoàn lớn.",
+            "Chuỗi tấn công hoàn chỉnh (Kill Chain) của đối thủ diễn ra qua 5 giai đoạn liên hoàn: Giai đoạn 1 - Initial Access: Kẻ tấn công gửi email lừa đảo (Phishing) chứa tệp macro độc hại, chiếm quyền thực thi trên máy trạm WKSTN-01 của nhân viên kế toán. Giai đoạn 2 - Credential Dumping & Lateral Movement: Kẻ tấn công trích xuất mã băm NTLM của tài khoản Administrator cục bộ trên WKSTN-01; do doanh nghiệp không triển khai LAPS, mã băm này trùng khớp với mật khẩu Local Admin trên máy chủ SRV-APP01, cho phép kẻ tấn công di chuyển ngang qua giao thức WinRM/WMI (Logon Type 3).",
+            "Giai đoạn 3 - Domain Privilege Escalation: Trên SRV-APP01, kẻ tấn công phát hiện một Certificate Template mang tên 'WebServer-ClientAuth' trên CA01 bật cờ `CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT` (lỗ hổng ESC1). Kẻ tấn công gửi CSR yêu cầu chứng chỉ số kèm Subject Alternative Name (SAN) mang danh tính tài khoản `Administrator@corp.local`. Giai đoạn 4 - Domain Dominance: Kẻ tấn công sử dụng công cụ Rubeus gửi yêu cầu PKINIT tới DC01 để đổi chứng chỉ lấy TGT của Domain Admin, sau đó thực hiện lệnh DCSync kết xuất toàn bộ tệp NTDS.dit, trích xuất mã băm của tài khoản `krbtgt` và tạo Golden Ticket có thời hạn 10 năm làm cơ chế bám trụ vĩnh viễn (Persistence)."
+          ]
+        },
+        {
+          "title": "Quy Trình Tái Dựng Mốc Thời Gian (Timeline Reconstruction) Đa Nguồn Telemetry",
+          "paragraphs": [
+            "Khi một sự cố an ninh mạng nổ ra, nhiệm vụ quan trọng hàng đầu của chuyên viên DFIR / Purple Team là tái dựng mốc thời gian chi tiết (Timeline Reconstruction) để xác định chính xác 'Patient Zero' (máy trạm bị nhiễm đầu tiên), thời điểm xâm nhập, con đường di chuyển ngang và danh sách tài sản bị tổn thương. Quá trình này đòi hỏi phải kết hợp chéo dữ liệu từ 3 tầng telemetry: Sysmon log trên endpoints, Windows Security Log trên máy chủ và Domain Controllers, cùng với Network Flow logs.",
+            "Trên máy trạm WKSTN-01, Sysmon Event ID 1 (Process Creation) ghi nhận tiến trình `EXCEL.EXE` khởi tạo tiến trình con `powershell.exe` với cờ thực thi ẩn (`-WindowStyle Hidden -Enc ...`). Sau đó, Sysmon Event ID 10 (ProcessAccess) phản ánh hành vi tiến trình lạ đọc bộ nhớ của `lsass.exe` với quyền truy cập `0x1010` (PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_VM_READ). Đồng thời, Sysmon Event ID 3 (Network Connection) cho thấy kết nối từ WKSTN-01 tới cổng 5985 (WinRM) của máy chủ SRV-APP01 (10.0.10.50).",
+            "Trên Domain Controller DC01, Windows Security Log ghi nhận chuỗi sự kiện nối tiếp: Event ID 4768 xuất hiện vào lúc 14:22:15 với Pre-Authentication Type 16 (PKINIT) cấp TGT cho tài khoản `Administrator` từ địa chỉ IP nguồn 10.0.10.50 (SRV-APP01). Ngay sau đó 12 giây, Event ID 4662 được ghi nhận với Object Type `domainDNS`, Access Mask `0x100` và GUID `{1131f6ad-9c07-11d1-f79f-00c04fc2dcd2}` (DCSync). Bằng cách sắp xếp các sự kiện theo dấu thời gian UTC và tương quan Logon ID, đội điều tra xác định được toàn bộ chuỗi mắt xích tấn công chỉ diễn ra vỏn vẹn trong vòng 28 phút kể từ khi người dùng mở tệp đính kèm độc hại."
+          ]
+        },
+        {
+          "title": "Chiến Lược Cứu Hộ và Triệt Tiêu Persistence Trong Active Directory",
+          "paragraphs": [
+            "Một sai lầm chí tử trong phản ứng sự cố Active Directory là chỉ đổi mật khẩu của các tài khoản quản trị viên thông thường mà bỏ quên tài khoản `krbtgt`. Mật khẩu của tài khoản `krbtgt` được dùng để tạo khóa bí mật mã hóa và ký số tất cả các vé TGT trong miền. Nếu kẻ tấn công đã tạo Golden Ticket, vé này vẫn hoàn toàn hợp lệ chừng nào mật khẩu của `krbtgt` chưa bị thay đổi, bất kể tài khoản Domain Admin có đổi mật khẩu bao nhiêu lần đi chăng nữa.",
+            "Quy trình xoay vòng mật khẩu tài khoản krbtgt kép (Dual krbtgt Password Reset) là biện pháp bắt buộc để vô hiệu hóa hoàn toàn Golden Ticket. Active Directory lưu trữ mật khẩu hiện tại và mật khẩu liền trước (current and previous password) của tài khoản `krbtgt` nhằm đảm bảo tính liên tục của các vé Kerberos đang lưu hành. Do đó, quản trị viên phải thay đổi mật khẩu tài khoản `krbtgt` đúng hai lần. Tuy nhiên, giữa hai lần thay đổi mật khẩu phải có một khoảng thời gian giãn cách tối thiểu (thường tương đương với thời gian tối đa của Kerberos Ticket Lifetime, mặc định là 10 giờ, hoặc tối thiểu vài giờ sau khi toàn bộ DC đã hoàn tất đồng bộ hóa) để tránh làm mất hiệu lực đột ngột của các vé TGT hợp pháp của hàng ngàn người dùng trong doanh nghiệp. Microsoft cung cấp kịch bản chính thức `New-KrbtgtKeys.ps1` để tự động hóa và giám sát an toàn quá trình này.",
+            "Bên cạnh việc reset `krbtgt`, đội ngũ cứu hộ phải tiến hành rà soát và triệt tiêu các cơ chế duy trì quyền lực ngầm (Persistence Mechanisms) khác: (1) Xóa bỏ các quyền Extended Rights bất hợp pháp trên Domain Root và các container nhạy cảm (DCSync permissions); (2) Kiểm tra và thu hồi các chứng chỉ số đã phát hành trái phép trên Enterprise CA bằng lệnh `certutil -revoke`, đồng thời công bố danh sách thu hồi CRL mới (`certutil -CRL`); (3) Xóa bỏ các thuộc tính `msDS-KeyCredentialLink` bất thường trên các tài khoản quản trị (Shadow Credentials backdoor); (4) Vô hiệu hóa hoặc cấu hình lại các Certificate Templates vi phạm (ESC1); (5) Kiểm tra container `AdminSDHolder` để đảm bảo DACL gốc không bị cấy quyền ủy quyền ngầm."
+          ]
+        },
+        {
+          "title": "Tái Cấu Trúc Hậu Sự Cố (Post-Incident Hardening) và Biên Soạn Báo Cáo Capstone Post-Mortem",
+          "paragraphs": [
+            "Sau khi kiểm soát được sự cố và loại bỏ hoàn toàn các cửa sau của kẻ tấn công, giai đoạn phục hồi đòi hỏi phải thực hiện tái cấu trúc toàn diện (Remediation & Hardening) để ngăn chặn kẻ tấn công tái thâm nhập qua các lỗ hổng tương tự. Doanh nghiệp cần lập tức triển khai lộ trình củng cố 30-60-90 ngày: (1) Áp dụng ngay Windows LAPS v2 để phá vỡ con đường di chuyển ngang bằng Local Admin password reuse; (2) Chuyển đổi toàn bộ dịch vụ trên SRV-APP01 sang gMSA; (3) Cách ly các Domain Controllers vào mạng con riêng biệt, chỉ cho phép kết nối quản trị từ các trạm PAW chuyên dụng; (4) Cấu hình nâng cao chính sách thẩm tra chứng chỉ mạnh theo bản vá KB5014754 trên Domain Controllers.",
+            "Báo cáo Đánh Giá Sau Sự Cố (Post-Mortem Assessment Report) là sản phẩm chuyển giao cốt lõi của chuyên viên bảo mật cho Ban Giám đốc và các bên liên quan. Báo cáo phải được cấu trúc một cách chuyên nghiệp và mạch lạc: Phần 1 - Executive Summary: Tóm tắt bức tranh toàn cảnh bằng ngôn ngữ phi kỹ thuật, nêu rõ phạm vi tổn thất, ranh giới dữ liệu bị ảnh hưởng và tình trạng an toàn hiện tại của tổ chức. Phần 2 - Attack Narrative & Technical Details: Phân tích chi tiết từng bước khai thác của đối thủ, lập bản đồ tương ứng với ma trận MITRE ATT&CK Enterprise (Initial Access -> Credential Dumping -> Lateral Movement -> Privilege Escalation -> Persistence), đính kèm bằng chứng đồ thị trực quan hóa từ BloodHound thể hiện con đường ngắn nhất dẫn đến Domain Compromise.",
+            "Phần 3 - Root Cause Analysis (RCA): Chỉ rõ các nguyên nhân gốc rễ về mặt kỹ thuật và chính sách quản trị (thiếu phân tầng Tiering, mật khẩu Local Admin dùng chung, Certificate Template bị cấu hình sai sót nghiêm trọng, giám sát thiếu hụt Event 4662/4769). Phần 4 - Comprehensive Remediation Roadmap: Đưa ra danh sách khuyến nghị chiến lược và chiến thuật kèm theo mốc thời gian, người chịu trách nhiệm và độ ưu tiên rõ ràng nhằm đưa hạ tầng Active Directory đạt trạng thái an ninh bền vững."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Capstone Challenge: Phân Tích Chuỗi Tấn Công Toàn Diện & Thực Thi Quy Trình Cứu Hộ Forest Active Directory",
+        "objective": "Đánh giá toàn bộ vết tích tấn công trong môi trường đa máy chủ, định vị các cơ chế duy trì quyền lực ngầm (Persistence mechanisms) và thực thi đúng trình tự cứu hộ khẩn cấp mà không gây mất mát dữ liệu hoặc gián đoạn dịch vụ diện rộng.",
+        "scenario": "Một tập đoàn bán lẻ đa quốc gia bị tấn công mạng nghiêm trọng. Kẻ tấn công đã xâm nhập từ một máy trạm kế toán, di chuyển ngang qua máy chủ thanh toán và chiếm quyền điều khiển Domain Controller, để lại nghi vấn về Golden Ticket và backdoor trong cấu hình AD CS. Ban Giám đốc chỉ định bạn dẫn dắt đội phản ứng khẩn cấp (Incident Response Lead) để làm rõ vụ việc và tái lập trật tự an ninh cho toàn bộ hệ thống.",
+        "constraints": [
+          "Quy trình khôi phục krbtgt phải tuân thủ nghiêm ngặt thời gian giãn cách giữa hai lần đổi mật khẩu để tránh làm đứt gãy xác thực của hàng ngàn nhân viên đang làm việc.",
+          "Không được hạ gục (demote) Domain Controller duy nhất mà phải thực hiện khử trùng và phục hồi trực tiếp trên hệ thống đang chạy.",
+          "Mọi bằng chứng pháp lý số (Digital Forensic Artifacts) phải được trích xuất và bảo toàn tính toàn vẹn (Hashing SHA-256) trước khi thực hiện dọn dẹp hệ thống."
+        ],
+        "cases": [
+          {
+            "id": "case-78-01",
+            "title": "Tái Dựng Lộ Trình Di Chuyển Ngang Từ Máy Trạm Lên Máy Chủ Ứng Dụng",
+            "context": "Trong quá trình phân tích pháp y máy trạm WKSTN-01, bạn tìm thấy dấu vết của công cụ Mimikatz đã trích xuất mã băm NTLM của tài khoản `Administrator` cục bộ. Tiếp tục kiểm tra nhật ký mạng trên SRV-APP01, bạn phát hiện phiên đăng nhập Event ID 4624 (Logon Type 3) xuất phát từ WKSTN-01 sử dụng đúng tài khoản Administrator cục bộ đó.",
+            "prompt": "Biện pháp kỹ thuật nào sau đây giải thích chính xác nhất vì sao cuộc di chuyển ngang này thành công và giải pháp ngăn chặn triệt để là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cuộc tấn công thành công do hai máy tính cùng sử dụng chung một mật khẩu Administrator cục bộ; để khắc phục triệt để, cần triển khai giải pháp Windows LAPS v2 nhằm ngẫu nhiên hóa và mã hóa mật khẩu Local Administrator riêng biệt cho từng máy tính, đồng thời kích hoạt chính sách chặn đăng nhập từ xa qua mạng (Deny access from the network) cho tài khoản quản trị cục bộ.",
+                "correct": true,
+                "rationale": "Lỗ hổng cốt lõi ở đây là Local Admin password reuse; giải pháp triệt để là triển khai Windows LAPS v2 kết hợp chính sách hạn chế mạng đối với tài khoản local admin."
+              },
+              {
+                "id": "B",
+                "label": "Cuộc tấn công thành công do giao thức DNS bị giả mạo bản ghi A; giải pháp là khởi động lại dịch vụ DNS Server trên máy trạm.",
+                "correct": false,
+                "rationale": "Sự cố bắt nguồn từ việc sử dụng chung thông tin xác thực quản trị cục bộ, hoàn toàn không liên quan đến dịch vụ phân giải tên miền DNS."
+              },
+              {
+                "id": "C",
+                "label": "Cuộc tấn công thành công do máy chủ SRV-APP01 chưa cài đặt phần mềm nén tệp WinRAR; chỉ cần cập nhật phần mềm này lên phiên bản mới.",
+                "correct": false,
+                "rationale": "Phần mềm nén tệp không liên quan đến cơ chế kiểm soát truy cập và xác thực mạng của hệ điều hành Windows."
+              },
+              {
+                "id": "D",
+                "label": "Cuộc tấn công thành công do máy trạm WKSTN-01 sử dụng cáp mạng Cat5e thay vì Cat6; cần thay toàn bộ hệ thống dây cáp mạng vật lý.",
+                "correct": false,
+                "rationale": "Hạ tầng cáp vật lý không ảnh hưởng đến logic phân quyền và xác thực mật khẩu trong Active Directory."
+              }
+            ]
+          },
+          {
+            "id": "case-78-02",
+            "title": "Vô Hiệu Hóa Lỗ Hổng Mẫu Chứng Chỉ ESC1 và Thu Hồi Chứng Chỉ Mạo Danh",
+            "context": "Điều tra trên máy chủ Enterprise CA CA01, bạn phát hiện một mẫu chứng chỉ tùy chỉnh tên 'AppAuth-Custom' chứa EKU Client Authentication, cấp quyền Enroll cho nhóm Domain Users, và bật cờ ENROLLEE_SUPPLIES_SUBJECT. Trong bảng Certificate Log của CA, bạn tìm thấy chứng chỉ số Serial '4a8b1c9d...' đã được cấp phát cho tài khoản mạo danh `Administrator@corp.local` cách đây 3 giờ.",
+            "prompt": "Chuỗi hành động cứu hộ kỹ thuật nào sau đây cần được thực hiện ngay lập tức trên máy chủ CA01?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cần đổi tên mẫu chứng chỉ 'AppAuth-Custom' thành 'AppAuth-Disabled' trong giao diện quản trị Certificate Templates Console.",
+                "correct": false,
+                "rationale": "Đổi tên template không làm mất hiệu lực của template trên CA và hoàn toàn không vô hiệu hóa được chứng chỉ số độc hại đã được ký phát trước đó."
+              },
+              {
+                "id": "B",
+                "label": "Thực hiện thu hồi chứng chỉ số vi phạm ngay lập tức (`certutil -revoke 4a8b1c9d... 1`), xuất bản danh sách thu hồi chứng chỉ khẩn cấp (`certutil -CRL`), gỡ bỏ mẫu chứng chỉ 'AppAuth-Custom' khỏi danh sách phát hành của CA, và chỉnh sửa cấu hình template trên Active Directory để tắt bỏ cờ ENROLLEE_SUPPLIES_SUBJECT hoặc yêu cầu Manager Approval.",
+                "correct": true,
+                "rationale": "Đây là quy trình phản ứng chuẩn mực: thu hồi chứng chỉ độc hại, cập nhật CRL ngay lập tức để KDC từ chối PKINIT, và triệt tiêu cấu hình sai ESC1 trên template."
+              },
+              {
+                "id": "C",
+                "label": "Xóa toàn bộ cơ sở dữ liệu dịch vụ thư mục Active Directory và cài đặt lại Domain Controller từ đầu.",
+                "correct": false,
+                "rationale": "Hành động này gây thảm họa gián đoạn dịch vụ toàn tập đoàn và không cần thiết khi có thể thu hồi chứng chỉ và sửa lỗi template trực tiếp."
+              },
+              {
+                "id": "D",
+                "label": "Tắt nguồn điện của máy chủ Enterprise CA CA01 và bỏ qua việc kiểm tra danh sách thu hồi chứng chỉ.",
+                "correct": false,
+                "rationale": "Tắt nguồn CA sẽ làm tê liệt toàn bộ các ứng dụng phụ thuộc vào PKI nhưng chứng chỉ độc hại đã cấp vẫn có thể dùng để xác thực PKINIT nếu KDC không kiểm tra được CRL."
+              }
+            ]
+          },
+          {
+            "id": "case-78-03",
+            "title": "Thực Thi Quy Trình Xoay Vòng Mật Khẩu Tài Khoản krbtgt Kép (Dual krbtgt Reset)",
+            "context": "Sau khi phát hiện bằng chứng kẻ tấn công đã thực hiện DCSync thành công và có thể đã tạo vé Golden Ticket với thời hạn 10 năm, đội ứng cứu sự cố quyết định thực hiện thay đổi mật khẩu tài khoản `krbtgt` để vô hiệu hóa toàn bộ các vé Kerberos bất hợp pháp.",
+            "prompt": "Quy trình thực thi kỹ thuật nào sau đây đảm bảo tiêu diệt hoàn toàn vé Golden Ticket mà KHÔNG gây gián đoạn xác thực hàng loạt cho người dùng hợp pháp trong doanh nghiệp?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đổi mật khẩu tài khoản krbtgt một lần duy nhất qua công cụ Active Directory Users and Computers và lập tức khởi động lại toàn bộ Domain Controllers.",
+                "correct": false,
+                "rationale": "Đổi mật khẩu krbtgt 1 lần chỉ đưa khóa cũ vào previous key; Golden Ticket tạo từ khóa cũ vẫn tiếp tục có hiệu lực cho đến khi khóa đó bị đẩy ra khỏi lịch sử ở lần reset thứ hai."
+              },
+              {
+                "id": "B",
+                "label": "Sử dụng script chính thức của Microsoft `New-KrbtgtKeys.ps1`: Thực hiện lần đổi mật khẩu krbtgt thứ nhất, kiểm tra việc đồng bộ hóa dữ liệu hoàn tất trên 100% Domain Controllers trong toàn forest; chờ đợi một khoảng thời gian tương đương với Kerberos Ticket Lifetime tối đa (mặc định 10 giờ) để các vé hợp pháp được làm mới tự nhiên; sau đó thực hiện lần đổi mật khẩu krbtgt thứ hai để đẩy hoàn toàn khóa bị lộ ra khỏi lịch sử lưu trữ.",
+                "correct": true,
+                "rationale": "Đây là quy trình chuẩn xác 100% theo hướng dẫn của Microsoft: đổi lần 1 -> chờ đồng bộ và hết hạn chu kỳ vé hợp pháp -> đổi lần 2 để xóa sổ hoàn toàn khóa cũ bị đánh cắp."
+              },
+              {
+                "id": "C",
+                "label": "Xóa vĩnh viễn tài khoản krbtgt khỏi Active Directory và tạo một tài khoản người dùng thông thường mới tên là krbtgt2.",
+                "correct": false,
+                "rationale": "Xóa tài khoản krbtgt tích hợp sẵn sẽ phá hủy hoàn toàn dịch vụ KDC và làm sụp đổ toàn bộ hạ tầng xác thực Kerberos của Active Directory."
+              },
+              {
+                "id": "D",
+                "label": "Đổi mật khẩu tài khoản krbtgt liên tiếp 10 lần trong vòng 5 giây để đảm bảo tính ngẫu nhiên của thuật toán băm.",
+                "correct": false,
+                "rationale": "Đổi mật khẩu liên tiếp không có khoảng giãn cách đồng bộ sẽ làm đứt gãy tức thì toàn bộ các vé TGT hợp pháp của mọi người dùng và dịch vụ trong doanh nghiệp, gây tê liệt toàn bộ hệ thống."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Tái dựng hoàn chỉnh sơ đồ luồng tấn công End-to-End từ máy trạm Tier 2 qua máy chủ Tier 1 đến Domain Controller Tier 0 dựa trên nhật ký sự kiện.",
+          "Thực hiện thành thạo quy trình thu hồi chứng chỉ số giả mạo và dọn dẹp cấu hình mẫu chứng chỉ ESC1 trên Enterprise CA.",
+          "Áp dụng chính xác quy trình xoay vòng mật khẩu tài khoản krbtgt kép (Dual-reset) bảo đảm vô hiệu hóa Golden Ticket mà không làm gián đoạn sản xuất."
+        ],
+        "evidenceTemplate": [
+          "Bản báo cáo dòng thời gian sự kiện (Timeline Reconstruction Report) đối soát giữa Sysmon Process Creation và Windows Event Logs 4768/4769/4662",
+          "Ảnh chụp chứng minh chứng chỉ số mạo danh đã bị thu hồi kèm số hiệu Serial và trạng thái xuất bản CRL mới trên CA01",
+          "Nhật ký thực thi câu lệnh New-KrbtgtKeys.ps1 chứng minh tài khoản krbtgt đã được xoay vòng mật khẩu an toàn qua 2 giai đoạn"
+        ],
+        "reset": "Khôi phục trạng thái lab ban đầu từ bản sao lưu máy ảo (VM Snapshot) sạch trước thời điểm diễn ra kịch bản tấn công.",
+        "cleanup": "Xóa bỏ các công cụ trích xuất bộ nhớ, thu hồi các chứng chỉ tạm thời và dọn dẹp các tệp nhật ký điều tra trên toàn bộ các máy tính tham gia lab."
+      },
+      "governance": {
+        "prevent": [
+          "Triển khai triệt để kiến trúc Enterprise Access Model (Tier 0/1/2) kết hợp Windows LAPS v2 trên toàn bộ hệ thống máy trạm và máy chủ để triệt tiêu hoàn toàn khả năng di chuyển ngang bằng mật khẩu quản trị viên cục bộ.",
+          "Khóa chặt dịch vụ Active Directory Certificate Services (AD CS): cấm toàn bộ mẫu chứng chỉ cho phép client tự định nghĩa SAN có EKU Client Authentication và bắt buộc phê duyệt quản trị viên (Certificate Manager Approval).",
+          "Thiết lập quy trình định kỳ xoay vòng mật khẩu tài khoản `krbtgt` ít nhất mỗi năm một lần theo phương thức Dual-reset để giảm thiểu rủi ro tích tụ các vé Golden Ticket ngầm."
+        ],
+        "observe": [
+          "Thiết lập hệ thống giám sát SIEM thời gian thực tương quan chéo giữa các sự kiện Sysmon trên máy trạm (Event 1, 3, 10) và sự kiện định danh trên Domain Controller (Event 4624, 4662, 4768, 4769).",
+          "Giám sát chặt chẽ hoạt động cấp phát chứng chỉ số trên CA (Event ID 4886/4887) đối với bất kỳ chứng chỉ nào chứa thuộc tính Subject Alternative Name (SAN) khác biệt với danh tính của tài khoản gửi yêu cầu.",
+          "Theo dõi các lệnh gọi RPC DRSUAPI nhân bản cơ sở dữ liệu NTDS.dit qua Event ID 4662 để cảnh báo ngay lập tức mọi nỗ lực DCSync từ các máy chủ không thuộc diện Domain Controller."
+        ],
+        "respond": [
+          "Khi phát hiện sự cố chiếm quyền toàn bộ Active Directory, lập tức kích hoạt Kế Hoạch Ứng Cứu Khẩn Cấp (Active Directory Forest Recovery Plan), cô lập các phân vùng mạng bị nhiễm và triển khai quy trình Dual krbtgt password reset.",
+          "Thực hiện thu hồi khẩn cấp toàn bộ các chứng chỉ số nghi vấn trên Enterprise CA và ban hành danh sách thu hồi CRL mới nhất tới tất cả các máy trạm và máy chủ.",
+          "Tiến hành rà soát toàn diện cơ sở dữ liệu NTDS.dit và cấu hình Active Directory để phát hiện và thanh lọc các cơ chế duy trì quyền lực ngầm: Shadow Credentials (msDS-KeyCredentialLink), AdminSDHolder tampering và ACL backdoors."
+        ],
+        "residualRisk": [
+          "Nếu kẻ tấn công đã cài đặt các công cụ backdoor ở mức nhân hệ điều hành (Kernel Rootkits) hoặc firmware/UEFI trên Domain Controller, việc khôi phục bằng phần mềm trong Active Directory vẫn không thể loại bỏ hoàn toàn sự hiện diện của đối thủ.",
+          "Khoảng thời gian chờ đợi giữa 2 lần reset mật khẩu krbtgt (10 giờ) là cửa sổ thời gian mà kẻ tấn công có thể cố gắng thực hiện các hành động phá hoại dữ liệu cuối cùng trước khi mất hoàn toàn quyền truy cập.",
+          "Việc cô lập mạng diện rộng trong quá trình cứu hộ có thể gây tổn thất tài chính lớn cho doanh nghiệp do ngừng trệ các hoạt động giao dịch nghiệp vụ trực tuyến."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Khi Domain Controller bị tấn công chiếm quyền, cách duy nhất để đảm bảo an toàn tuyệt đối là format cài đặt lại toàn bộ hệ điều hành của tất cả các máy tính trong toàn bộ doanh nghiệp.",
+          "correction": "Trong các doanh nghiệp lớn với hàng ngàn máy chủ, việc cài đặt lại toàn bộ là bất khả thi về mặt chi phí và thời gian. Quy trình cứu hộ chuyên nghiệp tập trung vào việc cô lập nguồn lây nhiễm, làm sạch các điểm bám trụ, xoay vòng khóa bí mật cốt lõi (krbtgt dual-reset, LAPS, CA certificates) và nâng cấp kiến trúc phòng thủ phân tầng, cho phép khôi phục an toàn mà không cần phá hủy toàn bộ hạ tầng."
+        },
+        {
+          "claim": "Chỉ cần thay đổi mật khẩu của tài khoản Administrator của miền (Domain Administrator) là kẻ tấn công sẽ lập tức bị đá văng khỏi mạng và mất quyền kiểm soát.",
+          "correction": "Kẻ tấn công sau khi chiếm quyền thường thiết lập nhiều cơ chế bám trụ: vé Golden Ticket (dùng khóa krbtgt), chứng chỉ số AD CS mạo danh, Shadow Credentials, hoặc các tài khoản Shadow Admin. Thay đổi mật khẩu tài khoản Domain Admin không hề làm mất hiệu lực của các cơ chế persistence này."
+        },
+        {
+          "claim": "Script xoay vòng mật khẩu krbtgt có thể chạy liên tiếp 2 lần trong 1 giây để tiết kiệm thời gian mà không gây ảnh hưởng gì đến hệ thống.",
+          "correction": "Nếu reset krbtgt 2 lần liên tiếp không có thời gian giãn cách, tất cả các vé Kerberos TGT hợp pháp hiện có của mọi người dùng và dịch vụ trong toàn miền sẽ lập tức bị hủy bỏ. Hàng ngàn phiên làm việc, ứng dụng web và cơ sở dữ liệu sẽ bị lỗi xác thực đồng loạt, gây ra sự cố từ chối dịch vụ tự phát diện rộng."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os08-l78-q1",
+          "difficulty": "easy",
+          "question": "Trong quy trình ứng cứu sự cố khi Active Directory bị chiếm quyền điều khiển, tại sao việc chỉ thay đổi mật khẩu của tài khoản Domain Administrator lại KHÔNG thể loại bỏ được nguy cơ từ kỹ thuật Golden Ticket?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì vé Golden Ticket được mã hóa và ký số bằng khóa băm bí mật của tài khoản krbtgt, chứ không sử dụng mật khẩu của tài khoản Domain Administrator"
+            },
+            {
+              "id": "B",
+              "label": "Vì vé Golden Ticket được lưu trữ vĩnh viễn trong chip BIOS của máy tính người dùng"
+            },
+            {
+              "id": "C",
+              "label": "Vì tài khoản Domain Administrator không có quyền truy cập vào dịch vụ Kerberos KDC"
+            },
+            {
+              "id": "D",
+              "label": "Vì giao thức Kerberos tự động khôi phục mật khẩu cũ của Domain Administrator sau 15 phút"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Vé Golden Ticket được rèn và ký số bằng mã băm NTLM/AES của tài khoản dịch vụ KDC krbtgt; do đó việc đổi mật khẩu Domain Admin hoàn toàn không ảnh hưởng đến tính hợp lệ của vé Golden Ticket."
+        },
+        {
+          "id": "os08-l78-q2",
+          "difficulty": "medium",
+          "question": "Tại sao quy trình chuẩn của Microsoft khi khôi phục tài khoản krbtgt (Dual krbtgt Password Reset) lại bắt buộc phải thực hiện thay đổi mật khẩu HAI lần liên tiếp kèm khoảng thời gian giãn cách thích hợp?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Để thỏa mãn yêu cầu của chính sách mật khẩu phức tạp bắt buộc phải có ít nhất 2 chữ số"
+            },
+            {
+              "id": "B",
+              "label": "Active Directory duy trì cả mật khẩu hiện tại và mật khẩu trước đó của krbtgt; lần đổi thứ hai mới đẩy hoàn toàn khóa bị lộ ra khỏi lịch sử, trong khi thời gian giãn cách giúp các vé hợp pháp được làm mới mà không gây gián đoạn xác thực hàng loạt"
+            },
+            {
+              "id": "C",
+              "label": "Lần đổi thứ nhất dùng cho giao thức NTLM và lần đổi thứ hai dùng riêng cho giao thức LDAP"
+            },
+            {
+              "id": "D",
+              "label": "Để hệ thống tự động gửi thông báo qua email cho tất cả người dùng trong doanh nghiệp"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "AD lưu trữ khóa hiện tại và khóa liền trước của krbtgt để hỗ trợ chuyển đổi vé. Lần reset thứ 2 mới xóa sổ hoàn toàn khóa cũ bị đánh cắp; khoảng giãn cách (thường bằng Ticket Lifetime ~10h) bảo đảm các vé hợp pháp không bị ngắt đột ngột."
+        },
+        {
+          "id": "os08-l78-q3",
+          "difficulty": "hard",
+          "question": "Trong quá trình điều tra dấu vết số (Digital Forensics) trên Domain Controller sau cuộc tấn công AD CS ESC1, nguồn dữ liệu nào sau đây cung cấp bằng chứng rõ ràng nhất về việc chứng chỉ số mạo danh đã được sử dụng để lấy vé TGT quản trị?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Windows Security Event ID 4768 với trường Pre-Authentication Type mang giá trị 16 hoặc 17 (PKINIT) kết hợp với chứng chỉ số mạo danh SAN trong CA Issued Requests Log"
+            },
+            {
+              "id": "B",
+              "label": "Bản ghi tệp tin index.html trên máy chủ web IIS công cộng"
+            },
+            {
+              "id": "C",
+              "label": "Windows System Event ID 7036 thông báo dịch vụ Print Spooler đã khởi động thành công"
+            },
+            {
+              "id": "D",
+              "label": "Bản ghi cấu hình phân giải tên miền trong tệp tin C:\\Windows\\System32\\drivers\\etc\\hosts"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Event ID 4768 với Pre-Authentication Type 16 hoặc 17 thể hiện xác thực Kerberos PKINIT qua chứng chỉ số, khi đối soát với danh sách chứng chỉ chứa SAN mạo danh trên CA sẽ hình thành chuỗi bằng chứng pháp lý đanh thép."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được mời làm Trưởng nhóm Tư vấn Ứng phó Sự cố (Incident Response Lead) cho một ngân hàng quốc tế vừa bị Red Team giả lập tấn công xâm nhập toàn diện hạ tầng Active Directory đa máy chủ. Ban Giám đốc yêu cầu bạn trình bày một báo cáo kỹ thuật Post-Mortem hoàn chỉnh, thực thi quy trình khử trùng hệ thống và thiết lập ranh giới an ninh mới nhằm đạt chứng chỉ tuân thủ bảo mật.",
+        "tasks": [
+          "Xây dựng biểu đồ chuỗi tấn công hoàn chỉnh (Kill Chain Timeline) đối soát chéo các nguồn telemetry: trích xuất tiến trình Sysmon trên máy trạm, sự kiện di chuyển ngang WinRM trên máy chủ ứng dụng, và sự kiện PKINIT / DCSync trên Domain Controller.",
+          "Thực thi quy trình khôi phục Forest: lập kế hoạch và kịch bản thực hiện Dual krbtgt password reset an toàn bằng script New-KrbtgtKeys.ps1, thu hồi các chứng chỉ độc hại trên Enterprise CA và rà soát triệt để các thuộc tính msDS-KeyCredentialLink trên toàn bộ tài khoản quản trị.",
+          "Soạn thảo Báo cáo Post-Mortem Assessment Report chuyên nghiệp dành cho Hội đồng Quản trị và Ban Lãnh đạo Công nghệ thông tin, bao gồm tóm tắt rủi ro, phân tích nguyên nhân gốc rễ (RCA), sơ đồ phân tích BloodHound và lộ trình Hardening 30-60-90 ngày theo Enterprise Access Model."
+        ],
+        "requiredEvidence": [
+          "Báo cáo phân tích dòng thời gian sự cố (Incident Timeline Analysis) thể hiện chi tiết từng bước tấn công kèm mã định danh Event ID và Log Snippets tương ứng",
+          "Biên bản thực hiện quy trình xoay vòng mật khẩu krbtgt kép kèm chữ ký xác nhận của đội ngũ vận hành hạ tầng và an toàn thông tin",
+          "Tài liệu Báo cáo Đánh giá Sau Sự cố (Post-Mortem Assessment Report) hoàn chỉnh bao gồm sơ đồ BloodHound, ma trận MITRE ATT&CK và lộ trình cải tổ kiến trúc phân tầng 30-60-90 ngày"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Active Directory Forest Recovery Guide",
+          "url": "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/manage/forest-recovery-guide/ad-forest-recovery-guide",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Quy trình phục hồi khẩn cấp rừng Active Directory",
+            "Hướng dẫn xoay vòng khóa krbtgt an toàn và xử lý sự cố xác thực"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Enterprise Matrix: Active Directory Tactics and Techniques",
+          "url": "https://attack.mitre.org/matrices/enterprise/",
+          "publisher": "MITRE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Chuỗi tấn công liên hoàn trong môi trường Windows và Active Directory",
+            "Các kỹ thuật khai thác, di chuyển ngang và duy trì quyền lực ngầm"
+          ]
+        }
+      ]
+    }
+  ]
+}

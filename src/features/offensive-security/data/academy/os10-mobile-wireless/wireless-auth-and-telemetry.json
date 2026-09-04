@@ -1,0 +1,1152 @@
+{
+  "id": "os10-m03-wireless-auth-and-telemetry",
+  "slug": "wireless-auth-and-telemetry",
+  "trackId": "os10-mobile-wireless",
+  "title": "Mạng Không Dây, Xác Thực Doanh Nghiệp WPA3/802.1X, Bluetooth Low Energy & Telemetry",
+  "summary": "Nghiên cứu chuyên sâu giao thức vô tuyến 802.11 (WPA2 4-way handshake, WPA3 SAE Dragonfly, PMKID capture), bóc tách kiến trúc xác thực doanh nghiệp 802.1X / RADIUS (PEAP-MSCHAPv2 credential harvesting qua Rogue AP), an ninh sóng ngắn Bluetooth Low Energy (GATT/GAP sniffing), và giám sát không gian mạng vô tuyến qua hệ thống WIPS Telemetry.",
+  "difficulty": "advanced",
+  "estimatedMinutes": 480,
+  "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+  "domains": ["wireless", "wifi", "bluetooth", "telemetry"],
+  "safetyLevel": "instructor-controlled",
+  "lessons": [
+    {
+      "id": "os10-l97-wifi-protocols-wpa2-wpa3-and-eap-exchanges",
+      "slug": "wifi-protocols-wpa2-wpa3-and-eap-exchanges",
+      "title": "Giao Thức Wi-Fi 802.11: Bắt Bắt Tay WPA2 4-Way Handshake, Tấn Công PMKID & Cơ Chế WPA3 SAE Dragonfly",
+      "summary": "Phân tích cấu trúc khung vô tuyến IEEE 802.11 (Management, Control, Data), nguyên lý mã hóa WPA2-PSK và luồng dẫn xuất khóa 4-way handshake (PMK, PTK, GTK), kỹ thuật tấn công bẻ khóa offline không cần client qua PMKID capture trên 802.11r/802.11i, bóc tách lỗ hổng tái cài đặt khóa KRACK (CVE-2017-13077), và kiến trúc bảo mật WPA3 Simultaneous Authentication of Equals (SAE Dragonfly handshake) cùng các lỗ hổng kênh rẽ nhánh Dragonblood.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân tích cấu trúc các loại khung vô tuyến IEEE 802.11 (Management, Control, Data), vai trò của Information Elements (IE) và rủi ro tấn công Deauthentication do thiếu vắng tính năng Protected Management Frames (802.11w PMF).",
+        "Bóc tách từng bước trao đổi EAPOL-Key trong WPA2 4-Way Handshake, chứng minh quy trình dẫn xuất khóa PMK/PTK/GTK và giải thích cơ chế tấn công tái cài đặt khóa KRACK (CVE-2017-13077).",
+        "Thực thi kỹ thuật thu thập PMKID từ khung EAPOL Message 1 của Access Point hỗ trợ 802.11r/802.11i (Clientless PMKID capture) và thực hiện bẻ khóa mật mã PSK ngoại tuyến bằng Hashcat mode 22000.",
+        "Đánh giá cơ chế xác thực WPA3-Personal dựa trên giao thức SAE Dragonfly (RFC 7664), tính chất Forward Secrecy và nhận diện các kênh rẽ nhánh đo lường thời gian (Timing/Cache side-channels) trong thuật toán Hunting-and-Pecking (Dragonblood CVE-2019-9494)."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+      "domains": ["wireless", "wifi"],
+      "attackTactics": [
+        "initial-access",
+        "credential-access",
+        "collection",
+        "reconnaissance"
+      ],
+      "keywords": [
+        "802-11",
+        "wpa2-personal",
+        "4-way-handshake",
+        "pmkid-attack",
+        "wpa3-sae",
+        "dragonfly-handshake",
+        "dragonblood",
+        "krack-cve-2017-13077"
+      ],
+      "safetyLevel": "instructor-controlled",
+      "mentalModel": "Trong mạng không dây 802.11, sóng vô tuyến là môi trường truyền dẫn chia sẻ mở, nơi các khung quản trị nguyên bản hoàn toàn không được ký số toàn vẹn, cho phép giả mạo Deauth frame làm client ngắt kết nối để thu thập 4-way handshake. WPA2-PSK biến mật khẩu thành PMK tĩnh qua PBKDF2 rồi dẫn xuất PTK qua trao đổi Nonce công khai; điều này cho phép kẻ tấn công kiểm tra dự đoán mật khẩu ngoại tuyến (offline dictionary attack) khi đã thu thập đủ Handshake hoặc giá trị PMKID nằm trong EAPOL M1. WPA3 SAE Dragonfly triệt tiêu hoàn toàn tấn công từ điển offline nhờ nguyên lý Zero-Knowledge Proof trên đường cong elliptic (PWE), nơi khóa phiên chỉ được đồng thuận thông qua trao đổi tương tác thời gian thực.",
+      "visual": {
+        "title": "Tiến Trình Dẫn Xuất Khóa 802.11: WPA2 4-Way Handshake, Tấn Công PMKID và WPA3 SAE Dragonfly",
+        "caption": "So sánh luồng trao đổi khóa và các vector tấn công mật mã từ WPA2-PSK đến WPA3 SAE.",
+        "steps": [
+          {
+            "label": "WPA2 EAPOL M1 & Tấn Công PMKID",
+            "detail": "AP gửi EAPOL M1 chứa ANonce; nếu AP bật 802.11r/i, RSN IE chứa PMKID được tính từ PMK. Kẻ tấn công bắt khung này để crack offline mật khẩu PSK mà không cần bất kỳ Station nào kết nối.",
+            "tone": "stop"
+          },
+          {
+            "label": "WPA2 4-Way Handshake & Deauth Trigger",
+            "detail": "STA và AP trao đổi ANonce, SNonce, MIC và GTK. Kẻ tấn công tiêm Deauth frame không mã hóa ép STA tái kết nối nhằm ghi lại trọn vẹn 4 gói tin EAPOL-Key phục vụ bẻ khóa.",
+            "tone": "caution"
+          },
+          {
+            "label": "WPA3 SAE Commit Phase (Dragonfly)",
+            "detail": "STA và AP độc lập biến đổi mật khẩu thành Password Element (PWE) trên đường cong Elliptic, sau đó trao đổi Scalar và Element mà không bao giờ lộ Nonce hay PMK tĩnh.",
+            "tone": "neutral"
+          },
+          {
+            "label": "WPA3 SAE Confirm & Triệt Tiêu Crack Offline",
+            "detail": "Hai bên xác thực lẫn nhau qua mã MAC của các giá trị trao đổi và dẫn xuất PMK phiên; kẻ nghe lén trên sóng vô tuyến hoàn toàn không thể thực hiện tấn công từ điển offline.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cấu Trúc Khung Vô Tuyến IEEE 802.11: Management, Control, Data và Điểm Yếu Không Mã Hóa Khung Quản Trị",
+          "paragraphs": [
+            "Chuẩn mạng không dây IEEE 802.11 định nghĩa cấu trúc khung tại tầng liên kết dữ liệu (Data Link Layer / MAC Sublayer) gồm ba nhóm khung chức năng cơ bản: Management Frames (Khung Quản trị), Control Frames (Khung Điều khiển), và Data Frames (Khung Dữ liệu). Mỗi khung 802.11 đều mang trường Frame Control (2 bytes) xác định kiểu (Type), kiểu con (Subtype), cùng các cờ điều hướng luồng như To DS và From DS. Trường địa chỉ MAC trong tiêu đề 802.11 có thể chứa tới 4 địa chỉ tùy thuộc vào mô hình phân phối: Destination Address (DA), Source Address (SA), Receiver Address (RA - BSSID của trạm thu), và Transmitter Address (TA).",
+            "Khung Quản trị đóng vai trò sống còn trong việc duy trì kết nối vô tuyến, bao gồm: Beacon Frames (phát quảng bá định kỳ bởi Access Point để thông báo sự hiện diện của mạng BSSID, tốc độ hỗ trợ, cấu hình mã hóa qua RSN IE), Probe Request/Response (quét tìm mạng chủ động), Authentication Frames (xác thực mở hoặc chia sẻ), Association Request/Response (gia nhập mạng), cùng các khung ngắt kết nối như Deauthentication và Disassociation. Khung Điều khiển phụ trách việc điều tiết truy cập kênh truyền môi trường chia sẻ thông qua cơ chế CSMA/CA (Carrier Sense Multiple Access with Collision Avoidance), bao gồm Request to Send (RTS), Clear to Send (CTS), và Acknowledgment (ACK). Khung Dữ liệu mang tải trọng gói tin IP tầng mạng được đóng gói theo định dạng LLC/SNAP.",
+            "Điểm yếu kiến trúc cốt lõi của chuẩn 802.11 nguyên bản là toàn bộ Khung Quản trị và Khung Điều khiển được truyền phát dưới dạng văn bản thuần túy (cleartext) hoàn toàn không có cơ chế bảo vệ tính toàn vẹn mật mã (cryptographic integrity). Kẻ tấn công trong phạm vi phủ sóng có thể giả mạo địa chỉ MAC của Access Point hoặc của thiết bị máy trạm (Station - STA) để tiêm các khung Deauthentication (Subtype 0x000C) hoặc Disassociation (Subtype 0x000A) với Reason Code 7 (Class 3 frame received from nonassociated STA). Trình điều khiển Wi-Fi của client khi nhận được khung này buộc phải giải phóng ngữ cảnh kết nối ngay lập tức (Deauthentication Attack), dẫn đến từ chối dịch vụ vô tuyến diện rộng hoặc cưỡng ép client thực hiện lại quá trình tái kết nối (reassociation) để kẻ tấn công thu thập các gói tin bắt tay.",
+            "Nhằm giải quyết lỗ hổng này, chuẩn IEEE 802.11w-2009 (được hợp nhất vào chuẩn chính 802.11-2012 và bắt buộc trong WPA3) đã giới thiệu tính năng Protected Management Frames (PMF). PMF sử dụng giao thức Broadcast Integrity Protocol (BIP) dựa trên thuật toán AES-128-CMAC (Cipher-based Message Authentication Code) để gắn mã tính toán toàn vẹn MIC vào các khung quản trị unicast và broadcast (qua Management MIC Information Element - MMIE). Nhờ đó, bất kỳ khung Deauthentication nào bị kẻ tấn công tiêm vào mà không có mã MIC hợp lệ đều bị trạm thu âm thầm loại bỏ, triệt tiêu hoàn toàn kỹ thuật tấn công Deauth ngắt kết nối truyền thống."
+          ]
+        },
+        {
+          "title": "Bóc Tách WPA2 4-Way Handshake: Dẫn Xuất Khóa PMK/PTK/GTK và Lỗ Hổng KRACK (CVE-2017-13077)",
+          "paragraphs": [
+            "Trong mạng không dây bảo mật WPA2-Personal (WPA2-PSK), toàn bộ quá trình bảo vệ dữ liệu unicast dựa trên cơ chế bắt tay 4 bước (4-Way Handshake) theo chuẩn IEEE 802.11i. Trước khi bắt tay diễn ra, cả Access Point (AP - Authenticator) và Station (STA - Supplicant) đều sở hữu cùng một mật khẩu chia sẻ trước (Pre-Shared Key - PSK). Mật khẩu này kết hợp với tên mạng (SSID) được đưa vào hàm dẫn xuất khóa PBKDF2 (Password-Based Key Derivation Function 2) với 4096 vòng lặp băm HMAC-SHA1 để tạo ra Pairwise Master Key (PMK) có độ dài 256 bits (32 bytes): PMK = PBKDF2(HMAC-SHA1, Passphrase, SSID, 4096, 256). PMK là giá trị tĩnh đối với một cặp mật khẩu/SSID và không bao giờ được truyền trực tiếp trên sóng vô tuyến.",
+            "Mục tiêu của 4-Way Handshake là sử dụng PMK để dẫn xuất một khóa phiên dùng một lần gọi là Pairwise Transient Key (PTK) có độ dài 512 bits (đối với CCMP-128) để mã hóa dữ liệu unicast giữa STA và AP, đồng thời chuyển giao Group Temporal Key (GTK) để giải mã dữ liệu multicast/broadcast. PTK được tính toán qua hàm mở rộng giả ngẫu nhiên PRF: PTK = PRF-512(PMK, 'Pairwise key expansion', Min(AA, SPA) || Max(AA, SPA) || Min(ANonce, SNonce) || Max(ANonce, SNonce)), trong đó AA là MAC của AP, SPA là MAC của STA, ANonce là số ngẫu nhiên do AP sinh ra, và SNonce là số ngẫu nhiên do STA sinh ra. Cấu trúc PTK gồm ba thành phần: Key Confirmation Key (KCK - 128 bits, dùng để tính toán mã kiểm tra tính toàn vẹn MIC trong các gói tin EAPOL), Key Encryption Key (KEK - 128 bits, dùng để mã hóa khóa GTK khi gửi qua sóng), và Temporal Key (TK - 128 bits, dùng trực tiếp cho thuật toán AES-CCMP mã hóa dữ liệu người dùng).",
+            "Bốn bước trao đổi EAPOL-Key diễn ra tuần tự: Message 1 (AP gửi ANonce tới STA dưới dạng văn bản rõ); Message 2 (STA tạo SNonce, tính toán PTK, gửi SNonce kèm mã tính toán toàn vẹn Message Integrity Code - MIC được ký bởi KCK về AP; AP nhận M2, tự tính PTK và kiểm tra MIC); Message 3 (AP gửi ANonce và khóa GTK đã được mã hóa bởi KEK kèm MIC về STA để xác nhận cả hai bên đã đồng bộ); Message 4 (STA gửi bản tin xác nhận MIC ACK về AP, chính thức hoàn tất bắt tay và nạp khóa TK vào phần cứng Wi-Fi để bắt đầu truyền dữ liệu mã hóa). Bất kỳ kẻ tấn công nào bắt được trọn vẹn 4 gói tin EAPOL này (hoặc chỉ cần M1 + M2) đều có đầy đủ tham số công khai: SSID, AA, SPA, ANonce, SNonce và MIC để tiến hành tấn công từ điển offline (Brute-force / Dictionary Attack) nhằm tìm ra PSK gốc.",
+            "Lỗ hổng tái cài đặt khóa KRACK (Key Reinstallation Attack - CVE-2017-13077) do Mathy Vanhoef công bố năm 2017 đã làm rung chuyển nền tảng an ninh 802.11i bằng cách khai thác trực tiếp máy trạng thái (state machine) của chuẩn 802.11. Chuẩn quy định rằng nếu AP không nhận được Message 4 từ STA (do mất gói tin), AP sẽ truyền phát lại Message 3. Khi STA nhận được Message 3 tái phát, hệ thống Supplicant (đặc biệt là wpa_supplicant trên Linux và Android 6.0+) sẽ cài đặt lại cùng một Temporal Key (TK) vào nhân kernel và reset lại bộ đếm số thứ tự gói tin (Replay Counter / Nonce) về giá trị ban đầu 0. Bằng cách chặn gói M4 và truyền phát lại M3 cho client, kẻ tấn công đứng ở vị trí Man-in-the-Middle có thể buộc client tái sử dụng cùng một cặp Key/Nonce trong thuật toán dòng AES-CCMP hoặc GCMP, phá vỡ thuộc tính bí mật và cho phép giải mã các gói tin mạng, tiêm gói tin TCP/IP độc hại, hoặc thậm chí khôi phục lưu lượng nhạy cảm mà không cần biết mật khẩu Wi-Fi."
+          ]
+        },
+        {
+          "title": "Cơ Chế Tấn Công PMKID Capture Trên 802.11r/802.11i: Bẻ Khóa Offline Không Cần Client",
+          "paragraphs": [
+            "Trước năm 2018, quy trình kiểm thử xâm nhập mạng Wi-Fi WPA2-Personal truyền thống luôn đòi hỏi phải có ít nhất một máy trạm (Station) đang hoạt động thực sự kết nối vào Access Point, sau đó chuyên gia bảo mật phải gửi các khung Deauthentication giả mạo để ép client đứt kết nối và thực hiện lại quá trình 4-Way Handshake. Kỹ thuật này gây ra sự gián đoạn dịch vụ rõ ràng, dễ bị các hệ thống WIPS (Wireless Intrusion Prevention System) phát hiện và phụ thuộc hoàn toàn vào sự hiện diện của người dùng cuối tại thời điểm kiểm thử.",
+            "Vào tháng 8 năm 2018, nhà nghiên cứu mật mã Jens Steube (tác giả của công cụ Hashcat) đã phát hiện ra kỹ thuật tấn công đột phá cho phép bẻ khóa mật khẩu WPA2 mà hoàn toàn không cần sự hiện diện của bất kỳ client nào (Clientless Attack). Cuộc tấn công khai thác tính năng Fast BSS Transition (FT) thuộc chuẩn IEEE 802.11r (hoặc tính năng PMK Caching trong 802.11i). Để giảm thiểu độ trễ xác thực khi một thiết bị chuyển vùng (roaming) giữa các Access Point trong cùng một mạng doanh nghiệp, AP sẽ tạo ra và lưu trữ một định danh khóa gọi là Pairwise Master Key Identifier (PMKID).",
+            "Công thức mật mã học tính toán PMKID được định nghĩa nghiêm ngặt trong chuẩn IEEE 802.11: PMKID = HMAC-SHA1-128(PMK, 'PMK Name' || MAC_AP || MAC_STA). Trong đó, 'PMK Name' là chuỗi ký tự cố định 8 bytes, MAC_AP là địa chỉ BSSID của Access Point, MAC_STA là địa chỉ MAC của trạm yêu cầu kết nối, và khóa bí mật của hàm băm chính là Pairwise Master Key (PMK) dẫn xuất từ mật khẩu Wi-Fi. Giá trị PMKID có độ dài 16 bytes (128 bits) và được AP nhúng trực tiếp vào trường Robust Security Network Information Element (RSN IE) bên trong gói tin EAPOL-Key Message 1.",
+            "Khai thác thực tế: Kẻ tấn công chỉ cần sử dụng card Wi-Fi ở chế độ Monitor Mode và chạy công cụ như hcxdumptool để gửi một khung Association Request giả lập tới Access Point mục tiêu. Ngay khi nhận được yêu cầu gia nhập mạng, AP sẽ phản hồi lại bằng EAPOL Message 1 chứa RSN IE với giá trị PMKID được tính toán dựa trên MAC của kẻ tấn công. Toàn bộ quá trình này diễn ra chỉ trong vài mili-giây mà không làm ảnh hưởng tới bất kỳ người dùng nào trên mạng. Kẻ tấn công trích xuất chuỗi băm PMKID sang định dạng tệp chuẩn (PMKID/EAPOL hash file) và nạp trực tiếp vào Hashcat (sử dụng Hash Mode 22000 - WPA-PBKDF2-PMKID+EAPOL) để thực hiện tấn công vét cạn hoặc từ điển trên cụm GPU tốc độ cao."
+          ]
+        },
+        {
+          "title": "Kiến Trúc WPA3 SAE Dragonfly, Thuộc Tính Forward Secrecy và Lỗ Hổng Kênh Rẽ Nhánh Dragonblood",
+          "paragraphs": [
+            "Để giải quyết triệt để điểm yếu cố hữu của WPA2-Personal trước các cuộc tấn công bẻ khóa offline (cả 4-Way Handshake lẫn PMKID), Liên minh Wi-Fi (Wi-Fi Alliance) đã phát hành chuẩn WPA3 vào năm 2018. Thay vì sử dụng cơ chế Pre-Shared Key tĩnh, WPA3-Personal áp dụng giao thức Simultaneous Authentication of Equals (SAE) — một triển khai chuẩn hóa của giao thức trao đổi khóa xác thực bằng mật khẩu Dragonfly (Dragonfly Key Exchange, định nghĩa trong RFC 7664) dựa trên mật mã học đường cong Elliptic (ECC NIST P-256 / secp256r1 hoặc Brainpool).",
+            "Nguyên lý vận hành cốt lõi của SAE là cơ chế Proof of Knowledge (Bằng chứng Tri thức): hai thiết bị chứng minh cho nhau thấy chúng cùng biết mật khẩu chia sẻ mà không bao giờ truyền mật khẩu, chuỗi băm của mật khẩu, hay các khóa dẫn xuất trực tiếp lên sóng vô tuyến. Quy trình SAE bắt đầu bằng việc cả hai bên độc lập chuyển đổi mật khẩu và địa chỉ MAC thành một điểm trên đường cong elliptic gọi là Password Element (PWE). Sau đó, hai bên thực hiện hai pha trao đổi thông điệp Authentication: Commit Phase (mỗi bên chọn một số ngẫu nhiên bí mật và tính toán một Scalar và một Element trên đường cong PWE để gửi cho đối phương) và Confirm Phase (hai bên tính toán khóa phiên chung KCK/PMK và gửi mã kiểm tra MAC để xác nhận).",
+            "Ưu điểm bảo mật vượt trội của WPA3 SAE gồm hai thuộc tính then chốt: Thứ nhất là khả năng kháng hoàn toàn các cuộc tấn công từ điển ngoại tuyến (Offline Dictionary Attack Resistance). Một kẻ nghe lén thu thập toàn bộ các gói tin trao đổi SAE trên sóng vô tuyến không thể kiểm tra tính đúng đắn của bất kỳ mật khẩu dự đoán nào mà không tương tác trực tiếp với AP; mọi nỗ lực đoán mật khẩu đều buộc kẻ tấn công phải thực hiện bắt tay trực tuyến (Online Attack), cho phép AP thiết lập giới hạn tốc độ (Rate Limiting) và khóa địa chỉ vi phạm. Thứ hai là thuộc tính Bảo mật Chuyển tiếp Hoàn hảo (Forward Secrecy): ngay cả khi mật khẩu Wi-Fi bị lộ lọt trong tương lai, kẻ tấn công cũng không thể giải mã các phiên lưu lượng mạng đã ghi lại trong quá khứ vì mỗi phiên đều dẫn xuất một khóa PMK ngẫu nhiên độc lập.",
+            "Tuy nhiên, việc triển khai WPA3 SAE trong thực tế đã bộc lộ những điểm yếu mật mã học nghiêm trọng được công bố bởi Mathy Vanhoef và Eyal Ronen qua chuỗi lỗ hổng mang tên Dragonblood (CVE-2019-9494, CVE-2019-9495, CVE-2019-9496). Lỗ hổng bắt nguồn từ thuật toán Hunting-and-Pecking được sử dụng để ánh xạ mật khẩu thành Password Element (PWE) trên đường cong Elliptic. Do thuật toán sử dụng vòng lặp kiểm tra tính chất thặng dư bậc hai (quadratic residue) phụ thuộc vào giá trị ký tự của mật khẩu và địa chỉ MAC, kẻ tấn công có thể đo lường thời gian phản hồi (Timing Attack qua CVE-2019-9494) hoặc phân tích truy cập bộ nhớ đệm (Cache-timing Side-Channel qua CVE-2019-9495 bằng kỹ thuật Flush+Reload) để khôi phục mật khẩu từng ký tự một. Wi-Fi Alliance đã phải cập nhật đặc tả WPA3, khuyến nghị chuyển đổi từ thuật toán Hunting-and-Pecking sang thuật toán băm trực tiếp đẳng hình kín thời gian (Constant-time Hash-to-Curve - H2C) nhằm triệt tiêu hoàn toàn các kênh rẽ nhánh."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán An Ninh Giao Thức Wi-Fi: Phân Tích Handshake Capture, Khai Thác PMKID và Đánh Giá Lỗ Hổng SAE",
+        "objective": "Đánh giá các kỹ thuật thu thập chứng thư WPA2/WPA3, phân tích rủi ro từ chối dịch vụ do thiếu vắng 802.11w PMF, và đưa ra quyết định kiến trúc an toàn cho mạng vô tuyến doanh nghiệp.",
+        "scenario": "Bạn được giao nhiệm vụ đánh giá an ninh mạng vô tuyến cho một tổ chức tài chính với 50 chi nhánh. Hệ thống hiện đang sử dụng kết hợp giữa WPA2-PSK cho các máy bán hàng không dây (POS), WPA3-Transition Mode cho thiết bị nhân viên, và hệ thống kiểm soát mạng không dây đang ghi nhận nhiều cảnh báo rớt mạng bất thường.",
+        "constraints": [
+          "Phải tuân thủ đạo đức nghề nghiệp và quy tắc giao chiến trong môi trường kiểm thử vô tuyến có kiểm soát.",
+          "Phải phân biệt rõ ràng giữa kỹ thuật thu thập thụ động (Passive capture) và các hành vi tiêm gói tin chủ động gây gián đoạn hoạt động sản xuất.",
+          "Mọi phân tích cấu trúc gói tin phải dựa trên chuẩn IEEE 802.11i/r/w và RFC 7664."
+        ],
+        "cases": [
+          {
+            "id": "case-97-01",
+            "title": "Lựa Chọn Phương Pháp Bắt Dữ Liệu Xác Thực WPA2-PSK: Deauth 4-Way Handshake vs. Clientless PMKID",
+            "context": "Tại chi nhánh giao dịch đang hoạt động, mạng Wi-Fi 'POS-Retail' sử dụng WPA2-PSK với Access Point hỗ trợ chuẩn chuyển vùng nhanh 802.11r (Fast BSS Transition). Các thiết bị thanh toán POS đang liên tục xử lý các giao dịch thẻ của khách hàng. Bạn cần kiểm tra độ mạnh của mật khẩu Wi-Fi mà không được phép làm gián đoạn bất kỳ giao dịch thanh toán nào đang diễn ra.",
+            "prompt": "Phương thức tiếp cận kỹ thuật nào là tối ưu và an toàn nhất để thu thập dữ liệu xác thực phục vụ kiểm tra độ phức tạp mật khẩu?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Gửi một loạt khung Deauthentication giả mạo nhắm vào địa chỉ Broadcast (FF:FF:FF:FF:FF:FF) để ép toàn bộ thiết bị POS ngắt kết nối đồng loạt và tái kết nối, từ đó ghi lại 4-Way Handshake của thiết bị đầu tiên hoàn tất bắt tay.",
+                "correct": false,
+                "rationale": "Việc gửi Deauth broadcast sẽ làm tê liệt toàn bộ thiết bị POS tại quầy giao dịch, vi phạm trực tiếp ràng buộc không gây gián đoạn hoạt động kinh doanh và kích hoạt cảnh báo WIPS ngay lập tức."
+              },
+              {
+                "id": "B",
+                "label": "Khai thác kỹ thuật Clientless PMKID Capture bằng cách gửi một khung Association Request đơn lẻ từ card mạng kiểm thử tới AP; trích xuất giá trị PMKID nằm trong trường RSN Information Element của gói tin EAPOL Message 1 do AP phản hồi, sau đó tiến hành bẻ khóa offline qua Hashcat mode 22000.",
+                "correct": true,
+                "rationale": "Kỹ thuật PMKID capture trên AP hỗ trợ 802.11r chỉ tương tác trực tiếp giữa máy kiểm thử và AP thông qua EAPOL M1, hoàn toàn không cần can thiệp hay làm rớt kết nối của bất kỳ thiết bị POS nào đang hoạt động, đảm bảo an toàn vận hành 100%."
+              },
+              {
+                "id": "C",
+                "label": "Thiết lập một Access Point giả mạo (Evil Twin) có cùng BSSID và SSID nhưng không đặt mật khẩu để các thiết bị POS tự động kết nối sang mà không cần bắt handshake.",
+                "correct": false,
+                "rationale": "Thiết bị POS đã được cấu hình WPA2-PSK sẽ từ chối kết nối tới mạng Open không có mã hóa; hành động này không thu thập được mật khẩu hiện tại."
+              },
+              {
+                "id": "D",
+                "label": "Sử dụng kỹ thuật Replay Attack truyền phát lại các khung dữ liệu mã hóa CCMP cũ để buộc AP trả về khóa PMK dưới dạng văn bản rõ.",
+                "correct": false,
+                "rationale": "Giao thức CCMP sử dụng bộ đếm Replay Counter 48-bit; việc phát lại các khung cũ sẽ bị AP loại bỏ ngay lập tức và AP không bao giờ gửi PMK trong dữ liệu CCMP."
+              }
+            ]
+          },
+          {
+            "id": "case-97-02",
+            "title": "Phân Tích Đợt Tấn Công Từ Chối Dịch Vụ Vô Tuyến Deauth Flood và Đánh Giá Hiệu Lực Của 802.11w PMF",
+            "context": "Hệ thống giám sát không dây ghi nhận sự cố hàng loạt thiết bị máy tính bảng của nhân viên liên tục bị ngắt kết nối Wi-Fi mỗi 30 giây. Bắt gói tin pcap tại khu vực cho thấy có hàng trăm khung Management Frame kiểu Subtype 0x000C (Deauthentication) với địa chỉ nguồn là MAC của AP và địa chỉ đích là MAC của client, trường Reason Code mang giá trị 0x0002 (Previous authentication no longer valid). Mạng hiện đang cấu hình WPA2-Personal không bật tính năng Protected Management Frames.",
+            "prompt": "Biện pháp kỹ thuật cốt lõi nào cần được triển khai trên hệ thống mạng không dây để triệt tiêu hoàn toàn cuộc tấn công này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Thay đổi mật khẩu WPA2-PSK sang một chuỗi ký tự ngẫu nhiên dài hơn 30 ký tự chứa đầy đủ ký tự đặc biệt.",
+                "correct": false,
+                "rationale": "Khung Deauthentication là khung quản trị không được mã hóa trong WPA2 nguyên bản; độ dài mật khẩu hoàn toàn không ảnh hưởng đến khả năng AP và client chấp nhận khung Deauth giả mạo."
+              },
+              {
+                "id": "B",
+                "label": "Kích hoạt tính năng ẩn SSID (Disable SSID Broadcast) để ngăn kẻ tấn công nhìn thấy tên mạng Wi-Fi.",
+                "correct": false,
+                "rationale": "Ẩn SSID không che giấu được BSSID và các khung Probe Request/Response; kẻ tấn công vẫn dễ dàng bắt được BSSID qua lưu lượng dữ liệu và tiếp tục gửi Deauth."
+              },
+              {
+                "id": "C",
+                "label": "Kích hoạt bắt buộc chuẩn IEEE 802.11w (Protected Management Frames - PMF = Required) trên toàn bộ Access Point và cấu hình client hỗ trợ PMF, sử dụng thuật toán AES-128-CMAC để ký số toàn vẹn khung quản trị unicast và multicast.",
+                "correct": true,
+                "rationale": "Khi PMF được kích hoạt ở chế độ Required, các khung Deauthentication hợp lệ bắt buộc phải có mã xác thực toàn vẹn MIC (MMIE); các khung Deauth do kẻ tấn công tiêm vào sẽ thiếu khóa MIC hợp lệ và bị hệ điều hành client loại bỏ âm thầm, dập tắt hoàn toàn tấn công Deauth flood."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển toàn bộ băng tần phát sóng từ 2.4 GHz sang 5 GHz vì sóng 5 GHz không bị ảnh hưởng bởi khung Deauthentication.",
+                "correct": false,
+                "rationale": "Cấu trúc khung quản trị 802.11 là như nhau trên cả băng tần 2.4 GHz, 5 GHz và 6 GHz; băng tần 5 GHz vẫn hoàn toàn bị tổn thương trước tấn công Deauth nếu không có PMF."
+              }
+            ]
+          },
+          {
+            "id": "case-97-03",
+            "title": "Đánh Giá Rủi Ro Chế Độ Chuyển Tiếp WPA3 Transition Mode và Nguy Cơ Tấn Công Hạ Cấp (Downgrade Attack)",
+            "context": "Để tạo điều kiện cho các thiết bị cũ trong công ty chưa hỗ trợ WPA3 vẫn kết nối được, phòng CNTT đã cấu hình mạng Wi-Fi văn phòng hoạt động ở chế độ 'WPA3-Personal Transition Mode' (hỗ trợ đồng thời cả WPA2-PSK và WPA3-SAE trên cùng một SSID). Bạn tiến hành kiểm toán an ninh cấu hình này.",
+            "prompt": "Rủi ro bảo mật tiềm ẩn nghiêm trọng nhất của WPA3 Transition Mode đối với một kẻ tấn công đứng gần vùng phát sóng là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cấu hình này hoàn toàn miễn nhiễm với mọi cuộc tấn công vì các máy trạm hiện đại sẽ tự động mã hóa lưu lượng bằng thuật toán RSA-4096.",
+                "correct": false,
+                "rationale": "WPA3 sử dụng mật mã đường cong Elliptic (ECC), không dùng RSA-4096 cho lưu lượng không dây; chế độ chuyển tiếp không miễn nhiễm với tấn công hạ cấp."
+              },
+              {
+                "id": "B",
+                "label": "Access Point sẽ tự động tắt tính năng tường lửa nội bộ khi phát hiện gói tin SAE Commit Phase.",
+                "correct": false,
+                "rationale": "SAE là cơ chế xác thực tầng liên kết dữ liệu, hoàn toàn độc lập với các quy tắc tường lửa mạng của Access Point."
+              },
+              {
+                "id": "C",
+                "label": "Kẻ tấn công có thể thực hiện tấn công hạ cấp (Downgrade Attack): giả mạo một Rogue AP hoặc sửa đổi Information Element trong Beacon/Probe Response để báo rằng mạng chỉ hỗ trợ WPA2; khi client hỗ trợ WPA3 buộc phải fallback về WPA2-PSK, kẻ tấn công có thể bắt 4-Way Handshake thông thường và crack offline mật khẩu chia sẻ chung.",
+                "correct": true,
+                "rationale": "WPA3 Transition Mode bắt buộc phải hỗ trợ WPA2 và thường phải đặt PMF ở chế độ Optional (tùy chọn) để tương thích với client cũ; điều này mở ra khả năng cho kẻ tấn công thực hiện tấn công hạ cấp bảo mật, ép client sử dụng WPA2 để thu thập Handshake và bẻ khóa từ điển."
+              },
+              {
+                "id": "D",
+                "label": "Toàn bộ chứng chỉ số X.509 trên máy chủ RADIUS nội bộ sẽ bị thu hồi tự động do vi phạm chính sách của Wi-Fi Alliance.",
+                "correct": false,
+                "rationale": "WPA3-Personal sử dụng mật khẩu chia sẻ trước SAE, hoàn toàn không liên quan đến máy chủ RADIUS hay chứng chỉ X.509 (vốn thuộc về WPA3-Enterprise)."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân tích chính xác ưu thế của kỹ thuật Clientless PMKID capture so với tấn công Deauth Handshake truyền thống.",
+          "Chứng minh vai trò của chuẩn IEEE 802.11w PMF trong việc ngăn chặn tấn công từ chối dịch vụ Deauthentication flood.",
+          "Chỉ ra được các điểm yếu kiến trúc trong chế độ chuyển tiếp WPA3-Personal Transition Mode và nguy cơ tấn công hạ cấp."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo phân tích cấu trúc khung EAPOL Message 1 trích xuất trường RSN Information Element chứa mã băm PMKID",
+          "Tệp pcap ghi lại lưu lượng tấn công Deauth flood kèm cấu hình xác thực tính toàn vẹn 802.11w PMF",
+          "Biên bản đánh giá an ninh cấu hình WPA3 Transition Mode kèm khuyến nghị tách biệt SSID chuyên dụng cho WPA3-Only"
+        ],
+        "reset": "Đặt lại cấu hình card Wi-Fi ảo, Access Point mô phỏng và các tham số mã hóa WPA2/WPA3 về trạng thái ban đầu của phòng lab.",
+        "cleanup": "Xóa toàn bộ các tệp pcap capture tạm thời, file hash PMKID trích xuất và tiến trình hcxdumptool/hashcat trong môi trường thử nghiệm."
+      },
+      "governance": {
+        "prevent": [
+          "Cấu hình bắt buộc chuẩn IEEE 802.11w Protected Management Frames (PMF = Required) trên tất cả các mạng không dây WPA2 và chuyển dịch sang WPA3-Only để triệt tiêu tấn công giả mạo Deauth.",
+          "Tách biệt hoàn toàn SSID dành cho thiết bị hỗ trợ WPA3-Only (SAE) với SSID dành cho thiết bị cũ (Legacy WPA2-PSK), tránh sử dụng chế độ Transition Mode dùng chung mật khẩu.",
+          "Áp dụng chính sách mật khẩu PSK phức tạp tối thiểu 20 ký tự ngẫu nhiên kết hợp thay đổi mật khẩu định kỳ nếu vẫn buộc phải duy trì mạng WPA2-Personal.",
+          "Vô hiệu hóa tính năng Fast BSS Transition (802.11r) trên các Access Point không đòi hỏi chuyển vùng nhanh để loại bỏ việc phơi bày PMKID trong EAPOL Message 1."
+        ],
+        "observe": [
+          "Giám sát liên tục tần suất xuất hiện các khung 802.11 Deauthentication và Disassociation trên hệ thống WIPS để phát hiện sớm các chiến dịch tấn công từ chối dịch vụ hoặc thu thập handshake.",
+          "Theo dõi các sự kiện Association Request bất thường từ các địa chỉ MAC lạ gửi tới AP mà không hoàn tất quá trình bắt tay 4-way handshake (dấu hiệu của công cụ quét PMKID).",
+          "Thiết lập cảnh báo tự động khi phát hiện các khung Beacon phát cùng SSID nhưng sai lệch các tham số bảo mật RSN IE (dấu hiệu của tấn công Downgrade hoặc Rogue AP)."
+        ],
+        "respond": [
+          "Khi phát hiện đợt tấn công Deauth flood nhắm vào một BSSID, kích hoạt cơ chế nhảy kênh tần số động (Dynamic Channel Assignment) và cô lập địa chỉ MAC của nguồn phát nếu xác định được tọa độ.",
+          "Nếu phát hiện mã băm PMKID hoặc 4-Way Handshake của mạng WPA2 bị thu thập, tiến hành thay đổi ngay lập tức mật khẩu PSK trên toàn bộ các Access Point và máy trạm.",
+          "Thu hồi quyền truy cập và chuyển đổi các thiết bị bị ảnh hưởng sang mạng nội bộ có dây hoặc phân đoạn VLAN cách ly cho đến khi sự cố được khắc phục."
+        ],
+        "residualRisk": [
+          "Các thiết bị IoT cũ không hỗ trợ phần cứng cho chuẩn 802.11w PMF vẫn sẽ đối mặt với nguy cơ bị ngắt kết nối bởi các cuộc tấn công Deauth nếu duy trì trên mạng Wi-Fi.",
+          "Thuật toán Hunting-and-Pecking trên các thiết bị triển khai WPA3 SAE phiên bản đầu vẫn có khả năng bị tấn công kênh rẽ nhánh thời gian (Dragonblood) nếu chưa được cập nhật bản vá Hash-to-Curve."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Mật khẩu WPA2-PSK dài 8 ký tự bao gồm chữ hoa, chữ thường và chữ số là an toàn tuyệt đối trước các đợt tấn công bẻ khóa ngoại tuyến.",
+          "correction": "Với sức mạnh tính toán của các cụm máy chủ GPU hiện đại (khả năng xử lý hàng triệu phép thử PBKDF2 mỗi giây với Hashcat), mật khẩu 8 ký tự bất kể độ phức tạp đều có thể bị vét cạn hoàn toàn trong thời gian ngắn; mật khẩu WPA2 an toàn phải có độ dài tối thiểu từ 16 đến 20 ký tự ngẫu nhiên."
+        },
+        {
+          "claim": "Tấn công mạng Wi-Fi WPA2 luôn bắt buộc phải có ít nhất một client hợp lệ đang kết nối để gửi gói deauth và bắt trọn vẹn 4-way handshake.",
+          "correction": "Với kỹ thuật khai thác PMKID trên chuẩn 802.11r/802.11i, kẻ tấn công chỉ cần gửi Association Request đơn lẻ tới AP để trích xuất PMKID từ EAPOL Message 1 và bẻ khóa mật khẩu offline mà hoàn toàn không cần bất kỳ người dùng nào hiện diện."
+        },
+        {
+          "claim": "WPA3-Personal (SAE) loại bỏ hoàn toàn khả năng bị tấn công bẻ khóa mật khẩu nên doanh nghiệp có thể đặt mật khẩu đơn giản, dễ nhớ.",
+          "correction": "WPA3 chỉ loại bỏ khả năng bẻ khóa ngoại tuyến (Offline Dictionary Attack); kẻ tấn công vẫn có thể thực hiện tấn công từ điển trực tuyến (Online Brute-force) hoặc khai thác các kênh rẽ nhánh thời gian Dragonblood nếu mật khẩu quá yếu và dễ đoán."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os10-l97-q1",
+          "difficulty": "easy",
+          "question": "Trong bắt tay WPA2 4-Way Handshake, thành phần nào do Access Point sinh ra và gửi cho Station trong gói tin EAPOL-Key Message 1?",
+          "options": [
+            {
+              "id": "A",
+              "label": "ANonce"
+            },
+            {
+              "id": "B",
+              "label": "SNonce"
+            },
+            {
+              "id": "C",
+              "label": "Mã băm NTLM"
+            },
+            {
+              "id": "D",
+              "label": "Pre-Shared Key dạng văn bản rõ"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Trong bước đầu tiên của 4-Way Handshake (Message 1), Access Point sinh ra một số ngẫu nhiên gọi là Authenticator Nonce (ANonce) và gửi tới Station để Station sử dụng cùng với SNonce tính toán Pairwise Transient Key (PTK)."
+        },
+        {
+          "id": "os10-l97-q2",
+          "difficulty": "medium",
+          "question": "Kỹ thuật tấn công Clientless PMKID Capture dựa trên đặc tả của chuẩn mở rộng nào trong giao thức mạng không dây IEEE 802.11?",
+          "options": [
+            {
+              "id": "A",
+              "label": "IEEE 802.11b cho phép truyền dữ liệu tốc độ 11 Mbps"
+            },
+            {
+              "id": "B",
+              "label": "IEEE 802.11r (Fast BSS Transition) và PMK Caching trong 802.11i nhúng giá trị PMKID vào trường RSN IE của EAPOL Message 1"
+            },
+            {
+              "id": "C",
+              "label": "IEEE 802.11h quản lý công suất phát sóng vô tuyến ngoài trời"
+            },
+            {
+              "id": "D",
+              "label": "IEEE 802.3af cấp nguồn qua đường cáp mạng có dây Power over Ethernet"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "PMKID capture khai thác tính năng chuyển vùng nhanh (Fast Roaming) của chuẩn IEEE 802.11r/802.11i, nơi Access Point tính toán PMKID từ PMK và nhúng sẵn vào RSN Information Element trong EAPOL Message 1 để tăng tốc độ xác thực."
+        },
+        {
+          "id": "os10-l97-q3",
+          "difficulty": "hard",
+          "question": "Chuỗi lỗ hổng Dragonblood (CVE-2019-9494, CVE-2019-9495) trong WPA3-Personal khai thác điểm yếu mật mã học nào trong quá trình bắt tay SAE Dragonfly?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Khai thác việc phát tán trực tiếp Pre-Shared Key trong gói tin Authentication Frame"
+            },
+            {
+              "id": "B",
+              "label": "Khai thác kênh rẽ nhánh đo lường thời gian (Timing) và bộ nhớ đệm (Cache side-channel) trong thuật toán Hunting-and-Pecking khi ánh xạ mật khẩu thành Password Element (PWE) trên đường cong Elliptic"
+            },
+            {
+              "id": "C",
+              "label": "Khai thác việc nhân Linux tự động chuyển đổi WPA3 sang WEP khi gặp gói tin kích thước lớn"
+            },
+            {
+              "id": "D",
+              "label": "Khai thác sự cố tràn bộ nhớ đệm heap trong giao thức DHCP cấp phát địa chỉ IP"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Lỗ hổng Dragonblood chỉ ra rằng thuật toán Hunting-and-Pecking để tạo Password Element (PWE) có số vòng lặp và thời gian thực thi phụ thuộc vào ký tự mật khẩu; bằng cách đo lường thời gian phản hồi hoặc phân tích cache Flush+Reload, kẻ tấn công có thể khôi phục mật khẩu WPA3 từng ký tự."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một tập đoàn bán lẻ phát hiện các thiết bị kiểm kho cầm tay và máy quẹt thẻ POS tại 10 trung tâm thương mại liên tục bị mất sóng Wi-Fi bí ẩn vào các khung giờ cao điểm mua sắm. Đội ngũ an ninh nghi ngờ có đối thủ sử dụng thiết bị gây nhiễu hoặc tấn công Deauth flood để phá hoại, đồng thời hệ thống đang sử dụng WPA2-PSK với SSID phát công khai. Bạn được yêu cầu điều tra nguyên nhân gốc rễ, phân tích dữ liệu pcap vô tuyến và xây dựng giải pháp chuyển đổi hạ tầng Wi-Fi an toàn.",
+        "tasks": [
+          "Triển khai bắt gói tin sóng vô tuyến ở chế độ Monitor Mode tại hiện trường; phân tích tần suất, địa chỉ MAC nguồn/đích và trường Reason Code của các khung Management Frame để xác nhận dấu hiệu tấn công Deauthentication flood.",
+          "Thực hiện kiểm thử xâm nhập có kiểm soát: sử dụng kỹ thuật Clientless PMKID capture trên các AP chi nhánh để đánh giá độ phức tạp của mật khẩu PSK đang lưu hành và ước tính thời gian bẻ khóa qua GPU.",
+          "Thiết kế kiến trúc nâng cấp mạng không dây toàn diện: đề xuất lộ trình kích hoạt 802.11w PMF, phân tách SSID chuyên dụng cho WPA3-Only (SAE), và loại bỏ hoàn toàn WPA2-PSK trên các phân đoạn mạng xử lý giao dịch tài chính."
+        ],
+        "requiredEvidence": [
+          "Báo cáo phân tích chuyên sâu tệp tin pcap chứng minh các khung Deauth flood giả mạo BSSID của Access Point kèm biểu đồ thống kê lưu lượng gói tin theo thời gian",
+          "Kết quả trích xuất và bẻ khóa thực nghiệm PMKID capture bằng Hashcat mode 22000 chứng minh mức độ rủi ro mật khẩu PSK nội bộ",
+          "Bản tài liệu quy hoạch kiến trúc mạng không dây doanh nghiệp chuẩn hóa: ma trận cấu hình 802.11w PMF, chính sách phân đoạn SSID, và lộ trình triển khai WPA3-Enterprise / SAE"
+        ]
+      },
+      "sources": [
+        {
+          "title": "IEEE Std 802.11-2020: Wireless LAN Medium Access Control (MAC) and Physical Layer (PHY) Specifications",
+          "url": "https://standards.ieee.org/ieee/802.11/7028/",
+          "publisher": "IEEE Computer Society",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu trúc khung quản trị, điều khiển và dữ liệu IEEE 802.11",
+            "Đặc tả mật mã học WPA2 4-Way Handshake và 802.11w Protected Management Frames"
+          ]
+        },
+        {
+          "title": "RFC 7664: Dragonfly Key Exchange",
+          "url": "https://www.rfc-editor.org/rfc/rfc7664.html",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Nguyên lý giao thức trao đổi khóa Dragonfly và Simultaneous Authentication of Equals (SAE)",
+            "Thuật toán Password Element (PWE) và cơ chế chống tấn công từ điển ngoại tuyến"
+          ]
+        },
+        {
+          "title": "Wi-Fi Alliance WPA3 Security Specification",
+          "url": "https://www.wi-fi.org/discover-wi-fi/security",
+          "publisher": "Wi-Fi Alliance",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Yêu cầu triển khai WPA3-Personal, WPA3-Enterprise và Protected Management Frames",
+            "Khuyến nghị vá lỗi kênh rẽ nhánh Dragonblood và chuyển đổi sang Hash-to-Curve"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os10-l98-enterprise-wireless-radius-and-8021x-attacks",
+      "slug": "enterprise-wireless-radius-and-8021x-attacks",
+      "title": "Xác Thực Mạng Không Dây Doanh Nghiệp 802.1X, Giao Thức RADIUS & Tấn Công Thu Thập Chứng Thư Rogue AP",
+      "summary": "Phân tích cấu trúc xác thực mạng doanh nghiệp IEEE 802.1X/EAP, vai trò trung chuyển của Authenticator và RADIUS AAA Server, bóc tách luồng bắt tay các biến thể EAP (PEAP-MSCHAPv2, EAP-TTLS, EAP-TLS), kỹ thuật tấn công Rogue AP / Evil Twin thu thập băm MSCHAPv2 NetNTLM từ Supplicant cấu hình lỗi, và giải pháp phòng thủ xác thực hai chiều EAP-TLS qua Enterprise PKI.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": ["os10-l97-wifi-protocols-wpa2-wpa3-and-eap-exchanges"],
+      "outcomes": [
+        "Phân tích kiến trúc ba thành phần IEEE 802.1X (Supplicant, Authenticator, Authentication Server) và cơ chế đóng gói EAPOL trên sóng vô tuyến kết hợp RADIUS Attributes trên mạng nội bộ có dây.",
+        "Bóc tách sự khác biệt mật mã học giữa các phương thức EAP phổ biến trong doanh nghiệp: cơ chế đường hầm hai pha của PEAP-MSCHAPv2 / EAP-TTLS so với xác thực tương hỗ bằng chứng chỉ số hai chiều EAP-TLS.",
+        "Thực hiện dựng trạm phát sóng giả mạo Rogue AP / Evil Twin (hostapd-mana/EAPHammer) để bắt giữ các cặp trao đổi MSCHAPv2 Challenge/Response từ các thiết bị Supplicant không kiểm tra chứng chỉ CA gốc.",
+        "Thiết lập cấu hình phòng thủ Supplicant chuẩn hóa qua Active Directory Group Policy (GPO) và Mobile Device Management (MDM), kết hợp cơ chế gán Dynamic VLAN và kiểm soát Network Access Control (NAC)."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+      "domains": ["wireless", "wifi"],
+      "attackTactics": [
+        "initial-access",
+        "credential-access",
+        "man-in-the-middle",
+        "defense-evasion"
+      ],
+      "keywords": [
+        "802-1x",
+        "radius",
+        "peap-mschapv2",
+        "eap-tls",
+        "rogue-ap",
+        "evil-twin",
+        "eap-downgrade",
+        "asleap-hashcat"
+      ],
+      "safetyLevel": "instructor-controlled",
+      "mentalModel": "Mạng không dây doanh nghiệp 802.1X chuyển dịch gánh nặng xác thực từ AP sang RADIUS Server tập trung, cho phép gán quyền theo danh tính từng người dùng. Tuy nhiên, trong mô hình PEAP-MSCHAPv2 phổ biến, tính an toàn của toàn bộ hệ thống phụ thuộc hoàn toàn vào việc Supplicant có kiểm tra nghiêm ngặt chứng chỉ số của RADIUS Server hay không. Khi Supplicant bị cấu hình bỏ qua xác thực máy chủ (Trust On First Use hoặc tắt Validate Server Certificate), kẻ tấn công với một Rogue AP phát cùng ESSID có thể mạo danh RADIUS Server, cấp chứng chỉ tự ký để bóc tách thông điệp MSCHAPv2 Challenge/Response, thu thập mật khẩu băm NTLM của nhân sự doanh nghiệp.",
+      "visual": {
+        "title": "Kiến Trúc Xác Thực 802.1X / RADIUS và Luồng Tấn Công Thu Thập Chứng Thư Qua Rogue AP",
+        "caption": "Luồng xác thực EAPOL/RADIUS nội bộ chuẩn so với cạm bẫy Rogue AP khai thác lỗ hổng cấu hình Supplicant.",
+        "steps": [
+          {
+            "label": "Supplicant Khởi Tạo EAPOL-Start",
+            "detail": "Thiết bị người dùng kết nối AP doanh nghiệp và gửi khung EAPOL-Start; AP gửi EAP-Request/Identity và chuyển tiếp danh tính người dùng về RADIUS Server.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Dựng Đường Hầm TLS Bên Ngoài (Outer Tunnel)",
+            "detail": "Trong PEAP, RADIUS Server gửi chứng chỉ X.509 để dựng TLS tunnel. Nếu Supplicant không xác thực CA gốc, Rogue AP có thể thế chỗ RADIUS Server bằng chứng chỉ giả.",
+            "tone": "caution"
+          },
+          {
+            "label": "Trao Đổi MSCHAPv2 & Thu Thập Băm Mật Khẩu",
+            "detail": "Rogue AP gửi Auth Challenge ngẫu nhiên; Supplicant gửi MSCHAPv2 Response chứa mật khẩu được băm NTLM. Rogue AP lưu lại gói tin để bẻ khóa offline qua hashcat mode 5500.",
+            "tone": "stop"
+          },
+          {
+            "label": "Cấp Quyền Qua EAP-TLS Tương Hỗ",
+            "detail": "Khi triển khai EAP-TLS, cả Server và Client đều phải trình chứng chỉ số ký bởi Enterprise PKI; Rogue AP không thể giải mã hay mạo danh danh tính.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Ba Thành Phần IEEE 802.1X: Supplicant, Authenticator và RADIUS AAA Server",
+          "paragraphs": [
+            "Khác với mô hình mạng gia đình WPA2-Personal nơi tất cả người dùng chia sẻ cùng một mật khẩu tĩnh, mạng không dây doanh nghiệp (Enterprise Wireless) triển khai kiến trúc kiểm soát truy cập dựa trên cổng theo chuẩn IEEE 802.1X kết hợp khung giao thức xác thực mở rộng Extensible Authentication Protocol (EAP, định nghĩa trong RFC 3748). Kiến trúc này phân chia hệ thống thành ba thực thể phân biệt với ranh giới trách nhiệm rõ ràng: Supplicant (Thiết bị yêu cầu truy cập), Authenticator (Thiết bị chứng thực), và Authentication Server (Máy chủ xác thực).",
+            "Supplicant là phần mềm hoặc dịch vụ hệ điều hành chạy trên thiết bị đầu cuối của người dùng (như Windows WLAN AutoConfig, macOS Network Service, Android WpaSupplicant). Authenticator là thiết bị mạng biên — thông thường là một Access Point (AP) độc lập hoặc một bộ điều khiển mạng không dây tập trung (Wireless LAN Controller - WLC). Authenticator đóng vai trò như một người gác cổng (gatekeeper); ban đầu, cổng logic của AP bị khóa ở trạng thái Uncontrolled Port, chỉ cho phép truyền tải duy nhất các khung xác thực EAP. Authentication Server là máy chủ AAA chuyên trách chạy giao thức RADIUS (Remote Authentication Dial-In User Service, RFC 2865) như Microsoft Network Policy Server (NPS), FreeRADIUS, Cisco Identity Services Engine (ISE), hoặc Aruba ClearPass.",
+            "Quy trình đóng gói thông điệp diễn ra qua hai tầng mạng: Giữa Supplicant và Authenticator trên sóng vô tuyến, các bản tin EAP được đóng gói trực tiếp vào khung liên kết dữ liệu Layer 2 gọi là EAP over LAN (EAPOL, EtherType 0x888E). Giữa Authenticator và Authentication Server trên mạng có dây nội bộ, Authenticator giải nén tải trọng EAP từ khung EAPOL, đóng gói nó vào các thuộc tính RADIUS (chủ yếu là thuộc tính RADIUS Attribute 79 - EAP-Message và Attribute 80 - Message-Authenticator) và truyền tải qua giao thức UDP (thông thường trên port 1812 cho Authentication và 1813 cho Accounting). Điểm mấu chốt là Authenticator hoàn toàn đóng vai trò cầu nối chuyển tiếp (pass-through bridge); nó không thể đọc hay giải mã nội dung xác thực nhạy cảm bên trong EAP payload.",
+            "Sau khi Authentication Server xác thực thành công danh tính người dùng thông qua cơ sở dữ liệu thư mục (như Active Directory qua LDAP/Kerberos), RADIUS Server gửi bản tin RADIUS Access-Accept về cho Authenticator. Bản tin này mang theo hai thuộc tính mã hóa đặc biệt do Microsoft định nghĩa: MS-MPPE-Send-Key và MS-MPPE-Recv-Key. Các thuộc tính này chứa Pairwise Master Key (PMK) được dẫn xuất từ phiên làm việc EAP. Khi nhận được PMK, Authenticator sẽ mở cổng Controlled Port cho phép client truy cập mạng, đồng thời bắt đầu quy trình 4-Way Handshake với Supplicant để thiết lập khóa phiên mã hóa vô tuyến unicast PTK."
+          ]
+        },
+        {
+          "title": "Bóc Tách Cơ Chế Hoạt Động Các Biến Thể EAP: PEAP, EAP-TTLS, EAP-FAST và EAP-TLS",
+          "paragraphs": [
+            "Khung giao thức EAP tự thân không quy định thuật toán xác thực cụ thể mà cho phép cắm ghép nhiều phương thức EAP (EAP Methods) khác nhau. Trong môi trường doanh nghiệp, sự lựa chọn phương thức EAP quyết định trực tiếp đến mức độ an toàn mật mã của toàn bộ hệ thống. Các phương thức EAP cũ như EAP-MD5 chỉ cung cấp xác thực băm mật khẩu một chiều, không xác thực được máy chủ và không hỗ trợ dẫn xuất khóa PMK cho mạng vô tuyến, do đó bị cấm tuyệt đối trên Wi-Fi doanh nghiệp.",
+            "Phương thức phổ biến nhất hiện nay trong các tổ chức là PEAP (Protected EAP, do Microsoft, Cisco và RSA đồng phát triển) và EAP-TTLS (Tunneled Transport Layer Security, RFC 5281). Cả hai phương thức này đều áp dụng kiến trúc xác thực hai pha (Two-phase authentication / Tunneled EAP): Pha 1 (Outer Authentication): Supplicant và RADIUS Server thiết lập một đường hầm mã hóa TLS tương tự như HTTPS. Tuy nhiên, trong đa số trường hợp, đây chỉ là xác thực một chiều (Server-authenticated TLS) — chỉ có máy chủ RADIUS xuất trình chứng chỉ số X.509 để client thẩm định. Pha 2 (Inner Authentication): Khi đường hầm TLS đã được mã hóa an toàn, client mới gửi thông tin định danh và mật khẩu người dùng bên trong đường hầm. Với PEAP, giao thức nội hàm hầu như luôn là MSCHAPv2 (Microsoft Challenge Handshake Authentication Protocol v2); với EAP-TTLS, giao thức nội hàm có thể linh hoạt hơn như PAP, CHAP hoặc MSCHAPv2.",
+            "Bóc tách cơ chế xác thực nội hàm MSCHAPv2: RADIUS Server gửi một chuỗi 16-byte Authenticator Challenge ngẫu nhiên. Supplicant tạo ra một chuỗi 16-byte Peer Challenge, kết hợp với User Password băm NTLM (MD4 của mật khẩu UTF-16LE) và Username để tính toán ra 24-byte Peer Response. Cấu trúc của MSCHAPv2 Response thực chất là mã hóa Challenge bằng cách chia băm NTLM 16-byte thành ba khóa DES 7-byte (với 2 byte cuối được đệm số 0). Điểm yếu mật mã cốt tử ở đây là thuật toán DES với không gian khóa chỉ 56-bit đã bị phá vỡ hoàn toàn về mặt lý thuyết và thực tiễn, đồng thời toàn bộ giao thức MSCHAPv2 không có khả năng chống lại tấn công từ điển nếu kẻ tấn công bắt được gói trao đổi Challenge-Response.",
+            "Tiêu chuẩn vàng về bảo mật không dây doanh nghiệp là EAP-TLS (EAP Transport Layer Security, định nghĩa trong RFC 5216). EAP-TLS triển khai cơ chế xác thực tương hỗ bằng chứng chỉ số hai chiều (Mutual Authentication). Trong EAP-TLS, không có mật khẩu người dùng nào được sử dụng hay truyền tải trên mạng. Máy chủ RADIUS phải xuất trình chứng chỉ máy chủ hợp lệ và Supplicant của người dùng/thiết bị cũng bắt buộc phải xuất trình một chứng chỉ số X.509 (Client Certificate) hợp lệ được cấp phát bởi hệ thống thẩm quyền chứng chỉ số nội bộ (Enterprise PKI). Khóa riêng tư (Private Key) của chứng chỉ thiết bị được lưu trữ an toàn trong chip TPM (Trusted Platform Module) hoặc Secure Enclave, loại bỏ hoàn toàn bề mặt tấn công lừa đảo, nghe lén mật khẩu hay mạo danh Access Point."
+          ]
+        },
+        {
+          "title": "Nguyên Lý Tấn Công Rogue AP / Evil Twin và Kỹ Thuật Bẻ Khóa PEAP-MSCHAPv2 Offline",
+          "paragraphs": [
+            "Mặc dù PEAP-MSCHAPv2 được thiết kế để bảo vệ thông tin mật khẩu bên trong đường hầm TLS, tính an toàn của nó sụp đổ hoàn toàn khi triển khai trên thực tế do hành vi người dùng và cấu hình Supplicant lỏng lẻo. Lỗ hổng không nằm ở thuật toán mã hóa TLS mà nằm ở điểm mù trong quy trình thẩm định chứng chỉ số của máy khách (Client Certificate Validation Failure). Khi một thiết bị kết nối vào mạng Wi-Fi 802.1X, hệ điều hành cần phải kiểm tra xem chứng chỉ do RADIUS Server gửi tới có được ký bởi một Certificate Authority (CA) gốc đáng tin cậy trong kho lưu trữ hay không và tên miền trong chứng chỉ (Common Name / SAN) có khớp với máy chủ hợp lệ hay không.",
+            "Trong phần lớn các mạng doanh nghiệp triển khai vội vã hoặc cho phép thiết bị cá nhân (BYOD), người quản trị không phân phối chứng chỉ CA gốc qua cấu hình tự động. Khi người dùng kết nối lần đầu, hệ điều hành (như Android, iOS, Windows) hiển thị một hộp thoại cảnh báo dạng Trust On First Use (TOFU) thông báo rằng chứng chỉ máy chủ chưa được xác minh. Người dùng cuối theo thói quen hầu như luôn nhấn nút 'Accept', 'Trust', hoặc 'Connect Anyway' để có mạng. Nguy hiểm hơn, trên nhiều máy trạm Windows, tùy chọn 'Validate server certificate' trong cấu hình kết nối mạng không dây bị người dùng hoặc kỹ thuật viên IT bỏ tích để tránh các lỗi kết nối phiền toái.",
+            "Khai thác thực tế qua trạm phát sóng giả mạo Rogue AP / Evil Twin: Kẻ tấn công sử dụng một bộ chuyển đổi Wi-Fi USB công suất cao kết hợp các công cụ chuyên dụng như hostapd-wpe (Wireless Pwnage Edition), hostapd-mana, hoặc EAPHammer. Kẻ tấn công cấu hình Rogue AP phát sóng với cùng tên mạng (ESSID) của doanh nghiệp (ví dụ 'Corp-WiFi-Secure') nhưng sử dụng một chứng chỉ TLS tự ký (Self-signed Certificate). Để dụ dỗ các máy trạm chuyển vùng sang trạm giả mạo, kẻ tấn công có thể phát công suất sóng vô tuyến mạnh hơn hoặc gửi các khung Deauthentication giả mạo nhắm vào Access Point thật gần đó.",
+            "Khi Supplicant của nạn nhân chuyển vùng sang kết nối với Rogue AP, pha 1 của PEAP diễn ra: Rogue AP gửi chứng chỉ TLS tự ký và thiết bị nạn nhân (do cấu hình bỏ qua kiểm tra chứng chỉ) lập tức chấp nhận và hoàn tất đường hầm TLS với kẻ tấn công. Ngay sau đó, ở pha 2, Rogue AP gửi một thông điệp MSCHAPv2 Challenge ngẫu nhiên tới nạn nhân. Nạn nhân gửi lại MSCHAPv2 Response chứa tên đăng nhập miền (Domain Username) và băm phản hồi mật khẩu. Rogue AP lập tức ghi nhận toàn bộ gói tin này vào log và gửi trả thông điệp EAP-Success giả hoặc EAP-Failure để kết thúc phiên. Kẻ tấn công trích xuất chuỗi băm MSCHAPv2 (định dạng NetNTLMv1 / JTR) và nạp vào Hashcat (Hash Mode 5500) hoặc công cụ asleap kết hợp bảng cầu vồng để bẻ khóa mật khẩu Active Directory dạng văn bản thuần chỉ trong vài phút."
+          ]
+        },
+        {
+          "title": "Kiến Trúc Phòng Thủ 802.1X: Triển Khai EAP-TLS Với Enterprise PKI, SCEP/NDES và Cấu Hình Supplicant GPO",
+          "paragraphs": [
+            "Để triệt tiêu hoàn toàn nguy cơ tấn công Rogue AP và đánh cắp thông tin xác thực, giải pháp an ninh tối thượng cho mạng không dây doanh nghiệp là loại bỏ hoàn toàn các phương thức xác thực dựa trên mật khẩu (như PEAP-MSCHAPv2) và chuyển đổi sang EAP-TLS với cơ chế xác thực chứng chỉ số hai chiều. Trong mô hình EAP-TLS chuẩn hóa, máy chủ RADIUS chỉ chấp nhận kết nối từ các thiết bị sở hữu chứng chỉ số hợp lệ do Enterprise PKI phát hành, đồng thời thiết bị người dùng cũng chỉ chấp nhận kết nối tới máy chủ RADIUS có chứng chỉ khớp chính xác với danh tính đã định cấu hình.",
+            "Thách thức lớn nhất của EAP-TLS là việc quản lý và cấp phát vòng đời chứng chỉ số cho hàng ngàn máy trạm và thiết bị di động. Để tự động hóa quy trình này, doanh nghiệp triển khai dịch vụ chứng thực Active Directory Certificate Services (ADCS) kết hợp dịch vụ đăng ký thiết bị mạng Network Device Enrollment Service (NDES) hỗ trợ giao thức Simple Certificate Enrollment Protocol (SCEP) hoặc ACME. Thông qua các giải pháp Mobile Device Management (MDM) như Microsoft Intune, VMware Workspace ONE, hoặc Jamf Pro, hồ sơ mạng Wi-Fi (Wi-Fi Profile) cùng chứng chỉ thiết bị được đẩy tự động xuống thiết bị đầu cuối mà không cần bất kỳ sự can thiệp thủ công nào từ người dùng cuối.",
+            "Trong trường hợp tổ chức vẫn bắt buộc phải duy trì PEAP-MSCHAPv2 trong giai đoạn chuyển đổi, việc khóa chặt cấu hình Supplicant trên máy trạm thông qua Active Directory Group Policy Objects (GPO) là yêu cầu bắt buộc sống còn. Trong chính sách GPO mạng không dây (Wireless Network (802.11) Policies), quản trị viên phải cấu hình các thiết lập bất biến sau: 1) Tích chọn bắt buộc 'Validate server certificate'; 2) Chỉ định đích danh chứng chỉ của Enterprise Root CA trong danh sách 'Trusted Root Certification Authorities'; 3) Khai báo chính xác danh sách Fully Qualified Domain Name (FQDN) của các máy chủ RADIUS hợp lệ trong mục 'Connect to these servers' (ví dụ: `radius01.corp.internal;radius02.corp.internal`); và 4) Bật tùy chọn 'Do not prompt user to authorize new servers or trusted CAs' để tước bỏ hoàn toàn quyền của người dùng cuối trong việc tự ý bấm tin tưởng chứng chỉ lạ.",
+            "Bên cạnh kiểm soát xác thực, kiến trúc mạng không dây doanh nghiệp hiện đại kết hợp giải pháp Network Access Control (NAC) để thực thi phân đoạn mạng động. Thông qua các thuộc tính RADIUS trả về trong gói Access-Accept (chẳng hạn như Tunnel-Type = VLAN, Tunnel-Medium-Type = 802, và Tunnel-Private-Group-ID = VLAN_ID), hệ thống có thể tự động gán thiết bị vào các VLAN cách ly dựa trên danh tính người dùng, phòng ban, và kết quả kiểm tra tư thế an ninh thiết bị (Device Posture Assessment: kiểm tra trạng thái EDR, bản vá hệ điều hành, mã hóa ổ đĩa BitLocker trước khi cấp quyền truy cập tài nguyên nội bộ)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Kiến Trúc Xác Thực 802.1X Doanh Nghiệp, Phân Tích Cạm Bẫy Rogue AP và Thiết Kế Phòng Ngự EAP-TLS",
+        "objective": "Đánh giá các rủi ro cấu hình Supplicant PEAP-MSCHAPv2, phân tích lưu lượng thu thập chứng thư qua Rogue AP, và hoạch định kiến trúc xác thực EAP-TLS an toàn.",
+        "scenario": "Một tập đoàn tài chính đang sử dụng mạng Wi-Fi 'CORP-SECURE' xác thực qua Microsoft NPS với giao thức PEAP-MSCHAPv2. Sau một đợt rà soát an ninh, nhóm Red Team đã thu thập được hơn 150 cặp băm MSCHAPv2 của nhân viên tại sảnh tòa nhà và bẻ khóa thành công nhiều tài khoản Domain User. Bạn được giao nhiệm vụ phân tích nguyên nhân kỹ thuật, tái hiện cơ chế tấn công trong lab cô lập và thiết kế phương án khắc phục triệt để.",
+        "constraints": [
+          "Phải thực hiện trong môi trường kiểm thử ảo hóa cô lập hoàn toàn với sóng vô tuyến thực tế bên ngoài.",
+          "Phải phân tích chi tiết cấu trúc các gói tin EAPOL, RADIUS Attributes và băm mật mã MSCHAPv2 Response.",
+          "Mọi giải pháp khắc phục phải đảm bảo tính liên tục của hoạt động nghiệp vụ và tương thích với hạ tầng Active Directory hiện hữu."
+        ],
+        "cases": [
+          {
+            "id": "case-98-01",
+            "title": "Kiểm Toán Cấu Hình Supplicant Trên Máy Trạm Doanh Nghiệp và Rủi Ro Thu Thập Chứng Thư MSCHAPv2",
+            "context": "Kiểm tra cấu hình profile Wi-Fi trên các máy tính xách tay của nhân viên bộ phận tài chính bằng lệnh PowerShell `netsh wlan show profile name='CORP-SECURE' key=clear`. Bạn phát hiện trong tệp XML cấu hình EAP: thuộc tính `<PerformServerValidation>` được đặt là `false`, và mục `<TrustedRootCA>` hoàn toàn để trống.",
+            "prompt": "Hậu quả an ninh nghiêm trọng nhất phát sinh từ cấu hình Supplicant này là gì khi nhân viên mang máy tính làm việc tại các khu vực công cộng hoặc khuôn viên tòa nhà?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Máy tính sẽ bị khóa hoàn toàn quyền truy cập Internet do hệ điều hành Windows từ chối gửi gói tin EAPOL-Start nếu thiếu chứng chỉ CA gốc.",
+                "correct": false,
+                "rationale": "Khi PerformServerValidation=false, Windows sẽ không từ chối kết nối mà trái lại sẽ chấp nhận bất kỳ chứng chỉ nào do máy chủ gửi tới mà không kiểm tra."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công có thể dựng một trạm phát sóng Rogue AP / Evil Twin phát cùng SSID 'CORP-SECURE' với chứng chỉ TLS tự ký bất kỳ; máy trạm của nạn nhân sẽ tự động kết nối và hoàn tất đường hầm TLS giả mạo, sau đó gửi thông tin MSCHAPv2 Challenge-Response về cho Rogue AP, cho phép kẻ tấn công bẻ khóa offline mật khẩu tài khoản miền Active Directory.",
+                "correct": true,
+                "rationale": "Việc tắt xác thực chứng chỉ máy chủ trên Supplicant biến thiết bị thành miếng mồi ngon cho Rogue AP; Supplicant sẽ trao đổi thông tin xác thực mật khẩu người dùng với bất kỳ máy chủ giả mạo nào."
+              },
+              {
+                "id": "C",
+                "label": "Toàn bộ dữ liệu ổ cứng của máy trạm sẽ bị mã hóa bằng thuật toán BitLocker do lỗi đồng bộ chính sách bảo mật mạng.",
+                "correct": false,
+                "rationale": "Cấu hình Wi-Fi Supplicant hoàn toàn không can thiệp vào cơ chế mã hóa ổ đĩa BitLocker của hệ điều hành."
+              },
+              {
+                "id": "D",
+                "label": "Access Point thật của công ty sẽ tự động vô hiệu hóa cổng mạng switch kết nối tới máy chủ RADIUS do nghi ngờ lưu lượng lạ.",
+                "correct": false,
+                "rationale": "Access Point chỉ đóng vai trò chuyển tiếp EAP-Message, nó không thể nhận biết được cấu hình Supplicant của client có bật xác thực chứng chỉ hay không."
+              }
+            ]
+          },
+          {
+            "id": "case-98-02",
+            "title": "Điều Tra Sự Cố Rogue AP / Evil Twin Phát Sóng Trong Khuôn Viên Trụ Sở Doanh Nghiệp",
+            "context": "Hệ thống WIPS của tòa nhà phát hiện một Access Point lạ có địa chỉ MAC lạ đang phát SSID 'CORP-SECURE' trên kênh 6 băng tần 2.4 GHz với công suất phát rất lớn (RSSI -35 dBm). Trong tệp pcap phân tích lưu lượng EAPOL bắt được tại khu vực, bạn nhận thấy có sự xuất hiện của các khung EAP-Failure gửi liên tục tới các máy trạm sau khi máy trạm gửi bản tin EAP-Response/Identity mang tên người dùng thật.",
+            "prompt": "Dấu hiệu kỹ thuật trên phản ánh kịch bản tấn công nào và mục đích chính của kẻ tấn công là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Access Point thật đang thực hiện nâng cấp firmware tự động qua giao thức TFTP.",
+                "correct": false,
+                "rationale": "Nâng cấp firmware AP không tạo ra MAC lạ phát cùng SSID và không gửi các khung EAPOL bất thường tới client."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công đang vận hành một Rogue AP (sử dụng công cụ như hostapd-mana hoặc EAPHammer) ở chế độ credential harvesting: dụ client kết nối, bắt lấy thông điệp MSCHAPv2 Response chứa băm mật khẩu, sau đó gửi EAP-Failure để client ngắt kết nối và tự động quay trở lại kết nối với AP thật mà người dùng không hề hay biết đã bị đánh cắp thông tin xác thực.",
+                "correct": true,
+                "rationale": "Đây là kỹ thuật kinh điển của các công cụ Rogue AP chuyên nghiệp: capture thông tin xác thực rồi drop kết nối bằng EAP-Failure để tránh gây chú ý cho nạn nhân."
+              },
+              {
+                "id": "C",
+                "label": "Máy chủ RADIUS NPS bị tràn dung lượng RAM dẫn đến từ chối tất cả các yêu cầu đăng nhập hợp lệ.",
+                "correct": false,
+                "rationale": "Sự cố tràn RAM trên RADIUS server sẽ không giải thích được sự xuất hiện của Access Point phát sóng với địa chỉ MAC lạ tại hiện trường."
+              },
+              {
+                "id": "D",
+                "label": "Đây là hành vi bình thường của cơ chế Fast BSS Transition khi thiết bị chuyển vùng giữa các Access Point.",
+                "correct": false,
+                "rationale": "Fast BSS Transition sử dụng các khung Action Frame và Reassociation, hoàn toàn không sinh ra trạm phát sóng MAC lạ gửi EAP-Failure hàng loạt."
+              }
+            ]
+          },
+          {
+            "id": "case-98-03",
+            "title": "Lựa Chọn Kiến Trúc Di Chuyển Từ PEAP-MSCHAPv2 Sang EAP-TLS Cho Môi Trường Thiết Bị Đa Dạng",
+            "context": "Sau sự cố rò rỉ chứng thư, Hội đồng An ninh thông tin quyết định loại bỏ hoàn toàn PEAP-MSCHAPv2 trên toàn bộ 5000 thiết bị của tập đoàn (gồm 3500 máy tính xách tay Windows do Domain quản lý, 1000 MacBook của nhân viên công nghệ, và 500 thiết bị di động iOS/Android). Bạn được giao vai trò kiến trúc sư trưởng để xây dựng lộ trình nâng cấp an toàn.",
+            "prompt": "Phương án kiến trúc tổng thể nào đảm bảo khả năng triển khai EAP-TLS thành công, an toàn tối đa và giảm thiểu chi phí hỗ trợ người dùng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tiếp tục duy trì PEAP-MSCHAPv2 nhưng yêu cầu tất cả 5000 nhân viên đổi mật khẩu hàng ngày với độ dài trên 25 ký tự.",
+                "correct": false,
+                "rationale": "Đổi mật khẩu thường xuyên không giải quyết được lỗ hổng kiến trúc cốt lõi của việc thiếu xác thực máy chủ và tạo ra gánh nặng vận hành khổng lồ."
+              },
+              {
+                "id": "B",
+                "label": "Yêu cầu kỹ thuật viên IT đến từng máy tính để cài đặt chứng chỉ số thủ công từ USB và nhập mật khẩu bảo vệ khóa riêng tư bằng tay.",
+                "correct": false,
+                "rationale": "Phương pháp thủ công không thể mở rộng cho quy mô 5000 thiết bị, dễ xảy ra sai sót con người và không thể quản lý vòng đời xoay vòng chứng chỉ khi hết hạn."
+              },
+              {
+                "id": "C",
+                "label": "Thiết lập hạ tầng Enterprise PKI (Microsoft ADCS) kết hợp NDES/SCEP; sử dụng Group Policy (GPO) để tự động phát hành chứng chỉ Computer Certificate cho máy trạm Windows qua Auto-enrollment, tích hợp hệ thống MDM (Microsoft Intune/Jamf) để đẩy chứng chỉ thiết bị và cấu hình profile Wi-Fi EAP-TLS cho macOS/iOS/Android; đồng thời cấu hình RADIUS Server thẩm định chứng chỉ số hai chiều kết hợp gán Dynamic VLAN theo nhóm quyền.",
+                "correct": true,
+                "rationale": "Đây là kiến trúc chuẩn mực của doanh nghiệp: tự động hóa cấp phát chứng chỉ số qua SCEP/NDES kết hợp MDM và GPO, triệt tiêu hoàn toàn mật khẩu người dùng trên sóng vô tuyến và miễn nhiễm trước Rogue AP."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển toàn bộ hệ thống sang mạng Wi-Fi mở (Open Network) kết hợp giao diện Captive Portal xác thực qua tin nhắn SMS OTP.",
+                "correct": false,
+                "rationale": "Mạng Wi-Fi Open không hề có mã hóa trên sóng vô tuyến, toàn bộ lưu lượng dữ liệu nội bộ sẽ bị nghe lén công khai bởi bất kỳ ai trong vùng phủ sóng."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác lỗ hổng bảo mật phát sinh từ việc cấu hình sai Supplicant thiếu xác thực chứng chỉ máy chủ.",
+          "Phân tích đúng cơ chế hoạt động của Rogue AP trong việc thu thập gói tin MSCHAPv2 Challenge-Response.",
+          "Đề xuất mô hình chuyển đổi sang EAP-TLS toàn diện kết hợp Enterprise PKI, NDES/SCEP và tự động hóa qua GPO/MDM."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo kiểm toán cấu hình tệp XML Wi-Fi profile trích xuất từ lệnh netsh wlan trên máy trạm Windows",
+          "Tệp tin log và pcap trích xuất từ Rogue AP lab thể hiện quá trình thu thập cặp MSCHAPv2 Challenge/Response",
+          "Tài liệu thiết kế kiến trúc triển khai EAP-TLS tự động qua Microsoft ADCS, NDES và Intune Wi-Fi Profile"
+        ],
+        "reset": "Khôi phục cấu hình máy chủ RADIUS thử nghiệm, xóa bỏ các trạm phát sóng ảo hostapd-wpe và đặt lại profile kết nối Wi-Fi về mặc định.",
+        "cleanup": "Xóa toàn bộ các tệp log chứa chuỗi băm MSCHAPv2, chứng chỉ TLS giả lập tạm thời và cơ sở dữ liệu người dùng thử nghiệm."
+      },
+      "governance": {
+        "prevent": [
+          "Triển khai bắt buộc EAP-TLS với chứng chỉ số hai chiều cho toàn bộ thiết bị doanh nghiệp, loại bỏ hoàn toàn các phương thức xác thực dựa trên mật khẩu như PEAP-MSCHAPv2 và EAP-TTLS.",
+          "Khóa chặt cấu hình Supplicant trên máy trạm thông qua GPO và MDM: bắt buộc bật 'Validate server certificate', chỉ định rõ Trusted Root CA và khai báo chính xác danh sách FQDN của máy chủ RADIUS.",
+          "Tắt tùy chọn cho phép người dùng cuối tự bấm tin tưởng chứng chỉ mới hoặc CA mới ('Do not prompt user to authorize new servers or trusted CAs').",
+          "Áp dụng chính sách kiểm soát truy cập mạng Network Access Control (NAC) để cô lập ngay lập tức các thiết bị chưa tuân thủ chính sách bảo mật hoặc chưa cài đặt chứng chỉ hợp lệ."
+        ],
+        "observe": [
+          "Giám sát liên tục nhật ký sự kiện trên máy chủ RADIUS (Event ID 6272 - Success, Event ID 6273 - Failure trên Microsoft NPS) để phát hiện các đợt tăng đột biến các lỗi xác thực EAP.",
+          "Theo dõi các cảnh báo từ hệ thống WIPS về sự xuất hiện của các Access Point lạ phát trùng SSID của doanh nghiệp (Evil Twin detection).",
+          "Giám sát lưu lượng Active Directory để phát hiện các hành vi xác thực Kerberos hoặc NTLM bất thường xuất phát từ các tài khoản vừa kết nối vào mạng không dây."
+        ],
+        "respond": [
+          "Khi phát hiện Rogue AP phát sóng trong khuôn viên, kích hoạt quy trình định vị vô tuyến WIPS để xác định vị trí thực tế và tiến hành ngắt kết nối cổng switch tương ứng.",
+          "Nếu tài khoản người dùng bị nghi ngờ lộ băm MSCHAPv2 do kết nối vào Rogue AP, lập tức khóa tài khoản Active Directory và yêu cầu đặt lại mật khẩu bắt buộc.",
+          "Thu hồi chứng chỉ số của các thiết bị bị mất cắp hoặc bị xâm nhập thông qua danh sách Certificate Revocation List (CRL) trên máy chủ CA."
+        ],
+        "residualRisk": [
+          "Các thiết bị khách (Guest) hoặc thiết bị cá nhân (BYOD) không chịu sự quản lý của GPO/MDM vẫn có thể bị lừa kết nối vào Rogue AP nếu người dùng tự ý bấm tin tưởng chứng chỉ giả.",
+          "Nguy cơ lộ lọt khóa riêng tư (Private Key) của chứng chỉ máy trạm nếu thiết bị không trang bị chip TPM phần cứng và bị mã độc xâm nhập trích xuất bộ nhớ."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Mạng Wi-Fi doanh nghiệp sử dụng 802.1X / WPA2-Enterprise là an toàn tuyệt đối trước các đòn tấn công giả mạo AP kiểu Evil Twin.",
+          "correction": "802.1X chỉ an toàn tuyệt đối khi triển khai EAP-TLS hoặc cấu hình Supplicant kiểm tra nghiêm ngặt chứng chỉ máy chủ; nếu sử dụng PEAP-MSCHAPv2 mà Supplicant không kiểm tra CA gốc, kẻ tấn công dễ dàng dựng Evil Twin để thu thập băm mật khẩu của toàn bộ người dùng."
+        },
+        {
+          "claim": "Giao thức PEAP-MSCHAPv2 luôn đảm bảo an toàn vì thông tin mật khẩu người dùng được truyền bên trong đường hầm mã hóa TLS.",
+          "correction": "Đường hầm TLS chỉ bảo vệ dữ liệu nếu client thẩm định đúng danh tính của máy chủ; khi client chấp nhận chứng chỉ tự ký của Rogue AP, đường hầm TLS được thiết lập trực tiếp tới kẻ tấn công, khiến toàn bộ thông điệp mật khẩu bên trong bị kẻ tấn công giải mã hoàn toàn."
+        },
+        {
+          "claim": "Chỉ cần cài đặt RADIUS Server có chứng chỉ SSL mua từ một CA thương mại công cộng (Public CA) là đã bảo vệ được toàn bộ máy trạm doanh nghiệp.",
+          "correction": "Nhiều hệ điều hành mặc định tin tưởng hàng trăm Public CA; nếu kẻ tấn công mua một chứng chỉ số hợp lệ từ bất kỳ Public CA nào khác cho một tên miền của chúng, Supplicant nếu chỉ kiểm tra 'chứng chỉ hợp lệ' mà không chỉ định đích danh Root CA nội bộ và FQDN máy chủ thì vẫn sẽ chấp nhận kết nối tới AP giả mạo."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os10-l98-q1",
+          "difficulty": "easy",
+          "question": "Trong kiến trúc kiểm soát truy cập mạng IEEE 802.1X, Access Point đóng vai trò là thực thể nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Supplicant"
+            },
+            {
+              "id": "B",
+              "label": "Authenticator"
+            },
+            {
+              "id": "C",
+              "label": "Authentication Server"
+            },
+            {
+              "id": "D",
+              "label": "Certificate Authority"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Theo chuẩn IEEE 802.1X, Access Point đóng vai trò là Authenticator (thiết bị chứng thực), đứng ở vị trí trung chuyển các bản tin EAPOL từ Supplicant sang các bản tin RADIUS gửi tới Authentication Server."
+        },
+        {
+          "id": "os10-l98-q2",
+          "difficulty": "medium",
+          "question": "Điểm khác biệt cốt lõi về mặt mật mã học giữa phương thức PEAP-MSCHAPv2 và EAP-TLS là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "PEAP sử dụng mã hóa RC4 trong khi EAP-TLS sử dụng mã hóa DES 56-bit"
+            },
+            {
+              "id": "B",
+              "label": "PEAP chỉ bắt buộc máy chủ xuất trình chứng chỉ số và người dùng xác thực bằng mật khẩu băm, trong khi EAP-TLS bắt buộc xác thực tương hỗ bằng chứng chỉ số hai chiều (cả Server và Client đều phải có chứng chỉ X.509)"
+            },
+            {
+              "id": "C",
+              "label": "EAP-TLS không hỗ trợ tạo khóa Pairwise Master Key cho WPA2"
+            },
+            {
+              "id": "D",
+              "label": "PEAP chỉ hoạt động trên hệ điều hành Linux còn EAP-TLS chỉ hoạt động trên macOS"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "EAP-TLS yêu cầu xác thực hai chiều bằng chứng chỉ số X.509 cho cả Server và Supplicant (Mutual Authentication), loại bỏ hoàn toàn mật khẩu người dùng; trong khi PEAP thường chỉ xác thực một chiều phía server và gửi mật khẩu băm MSCHAPv2 bên trong đường hầm."
+        },
+        {
+          "id": "os10-l98-q3",
+          "difficulty": "hard",
+          "question": "Tại sao một trạm phát sóng Rogue AP sử dụng chứng chỉ tự ký có thể thu thập thành công thông điệp MSCHAPv2 Response từ một máy trạm chạy Windows cấu hình PEAP?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Do nhân Windows tự động gửi băm mật khẩu văn bản rõ qua cổng NetBIOS 139 trước khi bắt tay EAPOL"
+            },
+            {
+              "id": "B",
+              "label": "Do cấu hình Supplicant trên máy trạm bị tắt cờ 'Validate server certificate' hoặc người dùng bấm chấp nhận Trust On First Use, khiến máy trạm thiết lập đường hầm TLS với Rogue AP và gửi thông điệp xác thực MSCHAPv2"
+            },
+            {
+              "id": "C",
+              "label": "Do chuẩn IEEE 802.1X quy định khóa riêng tư của RADIUS Server phải được công khai cho tất cả Access Point"
+            },
+            {
+              "id": "D",
+              "label": "Do card mạng Wi-Fi bị tràn bộ đệm phần cứng khi nhận khung EAP-Request/Identity"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Khi Supplicant không xác thực chứng chỉ máy chủ (bỏ chọn Validate server certificate hoặc người dùng bấm bỏ qua cảnh báo), Supplicant sẽ chấp nhận chứng chỉ của Rogue AP và thiết lập đường hầm TLS; bên trong đường hầm đó, nó gửi MSCHAPv2 Response về cho Rogue AP."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một ngân hàng thương mại phát hiện các thông tin đăng nhập tài khoản miền Active Directory của nhân viên chi nhánh trung tâm bị rao bán trên diễn đàn ngầm. Kết quả điều tra ban đầu cho thấy mạng Wi-Fi nội bộ sử dụng PEAP-MSCHAPv2 và có bằng chứng một thiết bị phát sóng không dây lạ (mang dấu hiệu của Pineapple / hostapd-mana) đã hoạt động gần khu vực căn tin trong giờ nghỉ trưa. Ban Giám đốc yêu cầu bạn đánh giá toàn bộ bề mặt tấn công 802.1X, mô phỏng lại kịch bản thu thập chứng thư và xây dựng kế hoạch chuyển đổi khẩn cấp sang EAP-TLS.",
+        "tasks": [
+          "Thiết lập môi trường kiểm thử cô lập mô phỏng trạm Rogue AP với cùng SSID và cấu hình PEAP-MSCHAPv2; ghi lại toàn bộ quy trình bắt cặp Challenge-Response từ một thiết bị Supplicant thử nghiệm chưa được cấu hình kiểm tra chứng chỉ.",
+          "Thực hiện phân tích cấu trúc băm MSCHAPv2 trích xuất được; chứng minh tính khả thi của việc bẻ khóa ngoại tuyến qua Hashcat và giải thích tại sao cơ chế DES-based response của MSCHAPv2 dễ bị tổn thương trước các cuộc tấn công vét cạn.",
+          "Xây dựng bộ tài liệu kỹ thuật hoàn chỉnh để triển khai EAP-TLS cho toàn ngân hàng: thiết kế cấu hình Active Directory GPO chuẩn hóa cho Supplicant, quy trình cấp phát chứng chỉ thiết bị tự động qua SCEP/NDES, và ma trận chuyển đổi không gián đoạn dịch vụ."
+        ],
+        "requiredEvidence": [
+          "Biên bản thực nghiệm mô phỏng Rogue AP trong lab: nhật ký trích xuất các gói tin EAPOL/MSCHAPv2 từ máy Supplicant thử nghiệm",
+          "Tệp kết quả kiểm thử bẻ khóa MSCHAPv2 bằng công cụ Hashcat kèm phân tích cấu trúc 3 khóa DES 56-bit",
+          "Bản chính sách GPO mạng không dây (Wireless Policy XML) chuẩn hóa bắt buộc kiểm tra chứng chỉ máy chủ và kế hoạch triển khai EAP-TLS chi tiết"
+        ]
+      },
+      "sources": [
+        {
+          "title": "RFC 5216: The EAP-TLS Authentication Protocol",
+          "url": "https://www.rfc-editor.org/rfc/rfc5216.html",
+          "publisher": "Internet Engineering Task Force (IETF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả kỹ thuật giao thức EAP-TLS và cơ chế xác thực tương hỗ bằng chứng chỉ số",
+            "Nguyên lý dẫn xuất Master Session Key (MSK) và Pairwise Master Key (PMK)"
+          ]
+        },
+        {
+          "title": "NIST SP 800-153: Guidelines for Securing Wireless Local Area Networks (WLANs)",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-153/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Hướng dẫn an toàn cấu hình mạng không dây doanh nghiệp 802.1X và RADIUS",
+            "Kiểm soát phòng chống Rogue AP và thiết lập chính sách quản lý Supplicant"
+          ]
+        },
+        {
+          "title": "Microsoft Documentation: 802.1X Authenticated Wireless Access Overview",
+          "url": "https://learn.microsoft.com/en-us/windows-server/networking/technologies/network-policy-server/nps-wireless-access-overview",
+          "publisher": "Microsoft Corporation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc tích hợp Network Policy Server (NPS) với Active Directory",
+            "Cấu hình chính sách Group Policy cho Supplicant mạng không dây"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os10-l99-bluetooth-low-energy-and-wireless-telemetry-monitoring",
+      "slug": "bluetooth-low-energy-and-wireless-telemetry-monitoring",
+      "title": "An Ninh Bluetooth Low Energy (BLE), Khai Thác GATT/GAP & Giám Sát Không Gian Mạng Vô Tuyến WIPS Telemetry",
+      "summary": "Nghiên cứu mô hình an ninh sóng ngắn Bluetooth Low Energy (BLE), cấu trúc Generic Access Profile (GAP) và Generic Attribute Profile (GATT), kỹ thuật sniffing lưu lượng BLE, phân tích điểm yếu ghép đôi BLE Legacy Pairing so với LE Secure Connections, khai thác các đặc tính GATT không xác thực (Unauthenticated GATT Write), và thiết kế hệ thống giám sát không gian mạng vô tuyến Wireless Intrusion Prevention System (WIPS) sử dụng telemetry RF, tương quan có dây - không dây và tam giác đạc sóng vô tuyến (RF Triangulation).",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [
+        "os10-l97-wifi-protocols-wpa2-wpa3-and-eap-exchanges",
+        "os10-l98-enterprise-wireless-radius-and-8021x-attacks"
+      ],
+      "outcomes": [
+        "Phân tích kiến trúc phân tầng Bluetooth Low Energy (BLE), cơ chế quảng bá Generic Access Profile (GAP Advertising) và tổ chức dữ liệu theo cây Generic Attribute Profile (GATT Services, Characteristics, Descriptors).",
+        "Đánh giá rủi ro mật mã học trong các phương thức ghép đôi BLE: điểm yếu bẻ khóa Temporary Key trong BLE Legacy Pairing (Just Works, Passkey Entry) và cơ chế phòng thủ trao đổi khóa công khai ECDH trong LE Secure Connections.",
+        "Thực hiện kiểm toán và khai thác các thuộc tính GATT Characteristics cấu hình thiếu quyền kiểm soát (Unauthenticated GATT Read/Write) trên các thiết bị IoT văn phòng thông minh.",
+        "Thiết kế và vận hành hệ thống Wireless Intrusion Prevention System (WIPS) Telemetry: phát hiện các cuộc tấn công không dây (Deauth flood, Rogue AP, Karma attack) qua tương quan Wired-to-Wireless và định vị nguồn phát bằng thuật toán tam giác đạc RF RSSI."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+      "domains": ["bluetooth", "telemetry", "wireless"],
+      "attackTactics": ["initial-access", "discovery", "collection", "credential-access"],
+      "keywords": [
+        "bluetooth-low-energy",
+        "ble-gap-gatt",
+        "gatt-characteristics",
+        "ble-sniffing",
+        "wips-telemetry",
+        "rogue-ap-detection",
+        "airmon-ng",
+        "rf-triangulation"
+      ],
+      "safetyLevel": "instructor-controlled",
+      "mentalModel": "Bluetooth Low Energy (BLE) mở rộng bề mặt tấn công vật lý của doanh nghiệp thông qua hàng trăm cảm biến IoT, thiết bị y tế và thiết bị kiểm soát ra vào thường áp dụng mô hình ghép đôi yếu hoặc bỏ qua kiểm soát quyền ghi trên các thuộc tính GATT. Ở tầng không gian mạng tổng thể, sóng vô tuyến không bị giới hạn bởi tường vật lý; do đó, giám sát an ninh mạng không dây đòi hỏi một lớp phòng thủ Telemetry chủ động (WIPS) thu thập liên tục các chỉ số RF, giải mã các khung quản trị 802.11 bất thường, tương quan lưu lượng có dây và không dây để phân biệt giữa Access Point hàng xóm vô hại với Rogue AP kết nối trực tiếp vào mạng nội bộ.",
+      "visual": {
+        "title": "Kiến Trúc Bề Mặt Tấn Công BLE IoT và Hệ Thống Cảm Biến Giám Sát Vô Tuyến WIPS Telemetry",
+        "caption": "So sánh luồng khai thác giao thức BLE ngoại vi với cơ chế thu thập telemetry và tam giác đạc RF của hệ thống WIPS.",
+        "steps": [
+          {
+            "label": "Quét Sóng BLE GAP & Bắt Gói Quảng Bá",
+            "detail": "Thiết bị IoT phát gói ADV_IND trên kênh 37/38/39; thiết bị kiểm toán thu thập UUID, Tx Power và địa chỉ MAC để xác định profile thiết bị.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Khám Phá Cây GATT & Thao Tác Trái Phép",
+            "detail": "Kết nối vào thiết bị BLE, đọc cây Services và Characteristics; gửi lệnh Unauthenticated Write tới đặc tính điều khiển do thiết bị dùng Just Works pairing.",
+            "tone": "caution"
+          },
+          {
+            "label": "Cảm Biến WIPS Bắt Dấu Vết Tấn Công Vô Tuyến",
+            "detail": "Cảm biến WIPS chuyên dụng (Overlay Sensor) phát hiện chuỗi Deauth Flood bất thường và khung Beacon giả mạo BSSID của Access Point doanh nghiệp.",
+            "tone": "stop"
+          },
+          {
+            "label": "Tam Giác Đạc RF & Ngăn Chặn Chủ Động",
+            "detail": "Hệ thống WIPS tính toán chỉ số RSSI từ ít nhất 3 cảm biến để xác định tọa độ nguồn phát sóng độc hại trên sơ đồ tầng và kích hoạt cách ly vô tuyến có kiểm soát.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Bluetooth Low Energy (BLE): Phân Tầng Giao Thức, GAP Advertising và Cây Dữ Liệu GATT",
+          "paragraphs": [
+            "Bluetooth Low Energy (BLE), được giới thiệu từ chuẩn Bluetooth 4.0 và liên tục hoàn thiện trong Bluetooth 5.x, là giao thức truyền thông vô tuyến sóng ngắn hoạt động trên băng tần 2.4 GHz ISM (Industrial, Scientific, and Medical). Khác với Bluetooth Classic (BR/EDR) được thiết kế cho luồng dữ liệu liên tục băng thông cao (như truyền âm thanh), BLE được tối ưu hóa tối đa cho mức tiêu thụ năng lượng cực thấp, cho phép các cảm biến IoT, thiết bị y tế và thẻ định vị hoạt động bằng pin cúc áo trong nhiều năm.",
+            "Băng tần 2.4 GHz của BLE được chia thành 40 kênh tần số với độ rộng 2 MHz mỗi kênh (từ 2402 MHz đến 2480 MHz). Điểm đặc thù trong phân bổ kênh là: 3 kênh được dành riêng làm kênh quảng bá chính (Primary Advertising Channels: kênh 37 [2402 MHz], kênh 38 [2426 MHz], và kênh 39 [2480 MHz]). Ba kênh này được bố trí chiến lược nằm ngoài hoặc nằm xen giữa các kênh phát Wi-Fi chính (kênh 1, 6, 11 của 802.11b/g/n) nhằm giảm thiểu tối đa hiện tượng can nhiễu tần số. 37 kênh còn lại (kênh 0 đến 36) là các kênh truyền dữ liệu (Data Channels), sử dụng kỹ thuật nhảy tần trải phổ thích ứng (Adaptive Frequency Hopping - AFH) khi hai thiết bị đã thiết lập kết nối.",
+            "Kiến trúc phân tầng BLE gồm hai khối chính: Controller (chạy trực tiếp trên vi điều khiển sóng RF gồm Physical Layer và Link Layer) và Host (chạy trên bộ xử lý chính gồm L2CAP, Security Manager - SM, Attribute Protocol - ATT, Generic Attribute Profile - GATT, và Generic Access Profile - GAP). Tầng GAP quy định các vai trò thiết bị trong quá trình khám phá và kết nối: Broadcaster (chỉ phát quảng bá gói tin ADV_IND), Observer (lắng nghe quảng bá), Peripheral (thiết bị ngoại vi hỗ trợ kết nối đơn lẻ như cảm biến, vòng đeo tay), và Central (thiết bị trung tâm có năng lực xử lý mạnh như smartphone, gateway kết nối tới nhiều peripheral).",
+            "Tầng GATT định nghĩa cấu trúc dữ liệu phân cấp hình cây (GATT Hierarchy) để trao đổi thông tin khi đã kết nối: Profile chứa một hoặc nhiều Services (được định danh bằng 16-bit UUID chuẩn hóa của Bluetooth SIG hoặc 128-bit Vendor UUID tự định nghĩa). Mỗi Service chứa một hoặc nhiều Characteristics (đặc tính đại diện cho một thông số cụ thể như nhiệt độ, trạng thái khóa, firmware). Mỗi Characteristic gồm: một Value, một tập hợp các thuộc tính Properties (READ, WRITE, WRITE WITHOUT RESPONSE, NOTIFY, INDICATE), các quyền truy cập Permissions (Open, Encryption Required, Authentication Required, Authorization Required), và các bộ mô tả Descriptors (tiêu biểu như Client Characteristic Configuration Descriptor - CCCD dùng để kích hoạt tính năng thông báo Notify)."
+          ]
+        },
+        {
+          "title": "Mô Hình An Ninh Ghép Đôi BLE: Phân Tích BLE Legacy Pairing So Với LE Secure Connections",
+          "paragraphs": [
+            "Mô hình an ninh trong Bluetooth Low Energy được điều khiển bởi tầng Security Manager (SM), định nghĩa các chế độ bảo mật (Security Modes) và mức độ bảo mật (Security Levels). Quá trình thiết lập khóa mã hóa giữa Central và Peripheral được gọi là ghép đôi (Pairing). Lịch sử phát triển của BLE chứng kiến sự thay đổi căn bản giữa hai cơ chế ghép đôi: BLE Legacy Pairing (Bluetooth 4.0/4.1) và LE Secure Connections (Bluetooth 4.2+).",
+            "BLE Legacy Pairing sử dụng thuật toán mã hóa đối xứng AES-128 để dẫn xuất khóa tạm thời Temporary Key (TK), từ đó tạo ra khóa ngắn hạn Short Term Key (STK) dùng để mã hóa kênh truyền L2CAP. Ba phương thức ghép đôi Legacy gồm: 1) Just Works (thiết bị không có màn hình/bàn phím, giá trị TK được đặt mặc định cố định bằng 0); 2) 6-digit Passkey Entry (một thiết bị hiển thị số ngẫu nhiên 6 chữ số từ 000000 đến 999999 và người dùng nhập vào thiết bị còn lại; TK chính là giá trị số này); và 3) Out of Band (OOB, trao đổi TK qua kênh phụ như NFC). Điểm yếu chí mạng của Legacy Pairing là không gian khóa của Passkey Entry chỉ có đúng 1.000.000 khả năng (chưa đến 20 bits entropy). Bất kỳ kẻ tấn công nào sử dụng phần cứng sniffer (như Ubertooth One, nRF52840 dongle) nghe lén được các gói tin Pairing Request, Pairing Response, Pairing Confirm và Pairing Random trên sóng vô tuyến đều có thể thực hiện tấn công vét cạn offline (Brute-force TK) chỉ trong vòng chưa đầy 1 giây để khôi phục STK và giải mã toàn bộ dữ liệu.",
+            "Nhằm khắc phục triệt để điểm mù này, chuẩn Bluetooth 4.2 giới thiệu LE Secure Connections. Thay vì dựa vào khóa TK đối xứng, LE Secure Connections áp dụng mật mã học khóa công khai bất đối xứng dựa trên đường cong Elliptic Diffie-Hellman (ECDH P-256). Hai thiết bị sinh ra cặp khóa công khai/riêng tư ECDH độc lập và chỉ trao đổi khóa công khai trên sóng; sau đó, chúng độc lập tính toán khóa phiên chung Long Term Key (LTK). Với LE Secure Connections, ngay cả khi kẻ tấn công bắt được trọn vẹn 100% các gói tin trao đổi ghép đôi trên sóng vô tuyến, kẻ đó vẫn hoàn toàn bất lực trong việc tính toán LTK nếu không giải được bài toán logarit rời rạc trên đường cong Elliptic, cung cấp khả năng kháng nghe lén thụ động (Passive Eavesdropping Resistance) tuyệt đối.",
+            "Mặc dù LE Secure Connections cung cấp nền tảng mật mã vững chắc, thực tế triển khai trên các thiết bị IoT văn phòng (khóa cửa thông minh, máy in, biển báo điện tử) lại thường xuyên gặp lỗ hổng cấu hình nghiêm trọng: nhà sản xuất kích hoạt chế độ ghép đôi Just Works để đơn giản hóa trải nghiệm người dùng, hoặc tệ hơn là cấu hình các Characteristic nhạy cảm với quyền hạn 'Open' (không yêu cầu mã hóa, không yêu cầu ghép đôi). Lỗ hổng Unauthenticated GATT Write cho phép bất kỳ ai đứng trong phạm vi phủ sóng BLE gửi lệnh ghi trực tiếp vào các thanh ghi điều khiển thiết bị, dẫn đến việc mở khóa cửa trái phép, làm giả dữ liệu cảm biến hoặc ghi đè firmware độc hại."
+          ]
+        },
+        {
+          "title": "Kiến Trúc Hệ Thống Giám Sát & Ngăn Chặn Xâm Nhập Không Dây (WIPS/WIDS Telemetry)",
+          "paragraphs": [
+            "Trong môi trường doanh nghiệp hiện đại, ranh giới an ninh vật lý không thể ngăn cản sóng vô tuyến truyền ra ngoài bãi đỗ xe hoặc các tầng lân cận. Một Access Point độc hại (Rogue AP) do nhân viên vô tình cắm vào cổng mạng switch nội bộ để phát Wi-Fi cho điện thoại, hoặc do kẻ tấn công cắm lén vào phòng họp, có thể tạo ra một cửa hậu (backdoor) nguy hiểm xuyên thủng toàn bộ hệ thống tường lửa thế hệ mới (NGFW). Để kiểm soát bề mặt tấn công này, các tổ chức triển khai hệ thống Giám sát và Ngăn chặn Xâm nhập Không dây (Wireless Intrusion Prevention System - WIPS / WIDS).",
+            "Hệ thống WIPS vận hành dựa trên mạng lưới các cảm biến vô tuyến (Wireless Sensors) liên tục thu thập dữ liệu viễn trắc (Telemetry) trên toàn bộ phổ tần số 2.4 GHz, 5 GHz và 6 GHz (Wi-Fi 6E/7). Mô hình triển khai cảm biến gồm hai dạng: Integrated Sensor (Access Point phục vụ người dùng đồng thời chuyển kênh định kỳ ở chế độ nền - Background Scanning) và Dedicated Overlay Sensor (cảm biến phần cứng chuyên dụng 100% thời gian chỉ làm nhiệm vụ giám sát phổ sóng vô tuyến, không phục vụ lưu lượng kết nối của người dùng). Cảm biến chuyên dụng mang lại độ bao phủ liên tục, bắt trọn vẹn các khung tin bất thường mà không làm suy giảm hiệu năng mạng Wi-Fi.",
+            "Nhiệm vụ cốt lõi đầu tiên của WIPS Telemetry là phân loại thiết bị vô tuyến (Device Classification). Mọi thiết bị phát sóng thu nhận được đều được tự động phân loại thành 4 nhóm: 1) Authorized APs (Access Point nội bộ thuộc danh mục quản lý hợp pháp); 2) Neighbor APs (Access Point của các công ty lân cận trong cùng tòa nhà, phát sóng trùng tần số nhưng không kết nối vào mạng có dây của tổ chức); 3) Rogue APs (Access Point chưa được cấp phép nhưng đang kết nối vật lý trực tiếp vào mạng LAN nội bộ); và 4) Rogue Clients (thiết bị nội bộ vi phạm chính sách kết nối vào mạng Wi-Fi lạ bên ngoài).",
+            "Kỹ thuật phân biệt then chốt giữa Neighbor AP (vô hại) và Rogue AP (nguy hiểm) là thuật toán Tương quan Có dây - Không dây (Wired-to-Wireless Correlation). Khi cảm biến WIPS phát hiện một BSSID lạ trên sóng vô tuyến, hệ thống WIPS sẽ gửi các gói tin thăm dò đặc biệt (chẳng hạn như gói ARP hoặc UDP broadcast mang mã băm định danh duy nhất) qua mạng LAN có dây tới các switch nội bộ. Đồng thời, các cảm biến không dây lắng nghe trên sóng; nếu gói tin thăm dò đó xuất hiện trên sóng vô tuyến phát ra từ Access Point lạ kia, WIPS xác nhận chắc chắn 100% rằng thiết bị đó đã được cắm vật lý vào mạng LAN nội bộ và kích hoạt còi báo động khẩn cấp."
+          ]
+        },
+        {
+          "title": "Phân Tích Tấn Công Vô Tuyến, Thuật Toán Tam Giác Đạc RF (RSSI Triangulation) và Cơ Chế Wireless Containment",
+          "paragraphs": [
+            "Telemetry vô tuyến từ các cảm biến WIPS liên tục được đối chiếu với cơ sở dữ liệu chữ ký tấn công (Attack Signature Database) và các mô hình hành vi bất thường (Behavioral Anomaly Detection). Các mẫu tấn công 802.11 phổ biến bao gồm: Deauthentication / Disassociation Flood (tấn công ngắt kết nối diện rộng), Association Table Overflow (kẻ tấn công tạo hàng ngàn địa chỉ MAC ảo để làm cạn kiệt bảng bộ nhớ của AP), Fake AP Beacon Spoofing (phát hàng trăm Beacon SSID rác để làm tê liệt trình quét Wi-Fi của máy khách), Karma / MANA Attacks (AP giả mạo tự động phản hồi tích cực cho tất cả các bản tin Probe Request của client nhằm dụ client kết nối), và EAPOL Start Flood.",
+            "Khi phát hiện một thiết bị vi phạm hoặc nguồn phát sóng tấn công, yêu cầu bức thiết của đội ngũ phản ứng sự cố là xác định vị trí thực tế của thiết bị trong tòa nhà nhiều tầng. WIPS sử dụng thuật toán Tam giác đạc sóng vô tuyến (RF Triangulation / Multilateration) kết hợp mô hình suy hao tín hiệu theo khoảng cách (Log-Distance Path Loss Model). Giá trị chỉ số cường độ tín hiệu thu nhận Received Signal Strength Indicator (RSSI, tính bằng dBm) được đo lường đồng thời bởi ít nhất ba cảm biến WIPS khác nhau đặt tại các vị trí đã biết trước trên sơ đồ tầng (Floor Plan).",
+            "Dựa trên sự chênh lệch suy hao RSSI giữa các cảm biến, hệ thống giải hệ phương trình đường tròn/mặt cầu để ước tính tọa độ không gian (X, Y) của nguồn phát. Các hệ thống WIPS cao cấp còn áp dụng phương pháp RF Fingerprinting (so khớp mẫu tín hiệu đo được với bản đồ nhiệt RF Heatmap đã hiệu chuẩn trước) để đạt độ chính xác định vị trong phạm vi dưới 2 đến 3 mét, giúp lực lượng bảo vệ vật lý nhanh chóng tiếp cận và thu giữ thiết bị Rogue AP hoặc máy tính xách tay của kẻ tấn công.",
+            "Bên cạnh việc phát hiện và định vị, WIPS cung cấp cơ chế ngăn chặn vô tuyến chủ động (Wireless Containment). Khi kích hoạt ngăn chặn một Rogue AP hoặc một client đang kết nối trái phép, cảm biến WIPS gần nhất sẽ chuyển sang chế độ truyền phát (Transmitter) và liên tục gửi các khung 802.11 Deauthentication có định hướng (Targeted Deauth Frames) giả mạo địa chỉ MAC của Rogue AP gửi tới Client và ngược lại. Quá trình này phá vỡ hoàn toàn khả năng trao đổi gói tin IP giữa client và AP độc hại. Tuy nhiên, tính năng Wireless Containment phải được quản trị cực kỳ nghiêm ngặt; việc cấu hình sai hoặc kích hoạt nhầm tính năng này lên các Access Point lân cận (Neighbor APs) có thể cấu thành hành vi vi phạm pháp luật nghiêm trọng về can nhiễu tần số vô tuyến theo quy định của cơ quan quản lý tần số (như FCC tại Hoa Kỳ hoặc Cục Tần số Vô tuyến điện tại Việt Nam)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán An Ninh Bluetooth Low Energy (GATT/GAP) và Vận Hành Hệ Thống WIPS Telemetry",
+        "objective": "Thực hiện kiểm toán thiết bị BLE IoT thông qua bóc tách cây thuộc tính GATT, phân tích dữ liệu viễn trắc WIPS để phát hiện Rogue AP và xử lý sự cố can thiệp sóng vô tuyến có kiểm soát.",
+        "scenario": "Một tòa nhà trụ sở thông minh triển khai hệ thống chiếu sáng và khóa cửa phòng họp điều khiển qua Bluetooth Low Energy (BLE), đồng thời vận hành mạng Wi-Fi doanh nghiệp được giám sát bởi hệ thống WIPS chuyên dụng. Trung tâm SOC nhận được cảnh báo về lưu lượng BLE bất thường tại phòng họp Hội đồng quản trị và một cảnh báo WIPS về thiết bị Rogue AP kết nối vào cổng mạng switch tầng 8.",
+        "constraints": [
+          "Phải tuân thủ các quy định an toàn tần số vô tuyến, tuyệt đối không phát sóng gây nhiễu ra ngoài phạm vi phòng lab được che chắn (RF Shielded Box / Faraday Cage).",
+          "Phải phân tích chính xác các trường dữ liệu GAP Advertising và quyền hạn GATT Characteristics.",
+          "Mọi quyết định ngăn chặn WIPS phải dựa trên bằng chứng tương quan có dây - không dây (Wired-to-Wireless Correlation) đã được thẩm định."
+        ],
+        "cases": [
+          {
+            "id": "case-99-01",
+            "title": "Điều Tra Sự Cố Rogue AP Kết Nối Vào Hạ Tầng Mạng Doanh Nghiệp Qua Tương Quan Có Dây - Không Dây",
+            "context": "Hệ thống WIPS phát hiện một thiết bị phát Wi-Fi lạ mang BSSID `00:11:22:33:44:55` phát sóng SSID 'Free-Guest-Internet' ngay tại tầng 8. Người quản trị mạng nghi ngờ đây chỉ là một trạm phát sóng cá nhân (Neighbor AP) của văn phòng công ty bên cạnh. Tuy nhiên, module Wired-to-Wireless Correlation của WIPS ghi nhận gói tin ARP probe thử nghiệm gửi từ switch nội bộ cổng Gi1/0/24 đã bị bắt lại trên sóng vô tuyến của BSSID này.",
+            "prompt": "Kết quả phân tích tương quan này chứng minh điều gì và hành động phản ứng sự cố chuẩn xác nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đây chỉ là hiện tượng nhiễu sóng ngẫu nhiên; không cần hành động gì vì SSID này có tên là 'Free-Guest-Internet'.",
+                "correct": false,
+                "rationale": "Gói tin ARP probe có chữ ký nội bộ không thể tự nhiên xuất hiện trên sóng vô tuyến nếu thiết bị không cắm vào mạng có dây; tên SSID không phản ánh bản chất bảo mật của thiết bị."
+              },
+              {
+                "id": "B",
+                "label": "Gói tin ARP nội bộ xuất hiện trên sóng vô tuyến chứng minh chắc chắn 100% rằng thiết bị này là một Rogue AP đang kết nối vật lý trực tiếp vào cổng Gi1/0/24 của switch mạng LAN nội bộ; SOC cần lập tức vô hiệu hóa cổng switch Gi1/0/24 (shutdown port) và cử nhân sự an ninh tới vị trí phòng tầng 8 để thu giữ thiết bị vật lý.",
+                "correct": true,
+                "rationale": "Thuật toán Wired-to-Wireless Correlation loại bỏ hoàn toàn khả năng nhầm lẫn với Neighbor AP; việc ngắt cổng switch lập tức cắt đứt cửa hậu mạng và cử người thu giữ thiết bị là quy trình ứng phó sự cố chuẩn mực."
+              },
+              {
+                "id": "C",
+                "label": "Kích hoạt tính năng phát Deauth flood công suất tối đa để làm sập toàn bộ các Access Point trong bán kính 100 mét xung quanh tòa nhà.",
+                "correct": false,
+                "rationale": "Hành vi phát deauth diện rộng làm sập các AP hợp pháp lân cận là hành vi vi phạm pháp luật về tần số vô tuyến và gây gián đoạn hoạt động của toàn công ty."
+              },
+              {
+                "id": "D",
+                "label": "Thay đổi địa chỉ IP của máy chủ RADIUS để ngăn chặn Rogue AP đọc trộm dữ liệu.",
+                "correct": false,
+                "rationale": "Thay đổi IP của RADIUS server không ngăn chặn được việc Rogue AP đang bắc cầu (bridge) lưu lượng mạng nội bộ ra sóng vô tuyến."
+              }
+            ]
+          },
+          {
+            "id": "case-99-02",
+            "title": "Kiểm Toán An Ninh Thiết Bị BLE IoT Văn Phòng Thông Minh và Nguy Cơ Unauthenticated GATT Write",
+            "context": "Trong quá trình kiểm toán thiết bị khóa cửa phòng họp điều khiển bằng Bluetooth Low Energy, bạn sử dụng công cụ `gatttool` và `bettercap` để quét dịch vụ. Kết quả phân tích cây GATT: Service UUID `0000ffe0-0000-1000-8000-00805f9b34fb` chứa Characteristic UUID `0000ffe1-0000-1000-8000-00805f9b34fb` có thuộc tính `Properties: WRITE, READ` và `Permissions: OPEN (No encryption, No authentication)`. Thiết bị sử dụng cơ chế ghép đôi BLE Legacy Just Works.",
+            "prompt": "Lỗ hổng an ninh trên cho phép kẻ tấn công thực hiện hành vi nào mà không cần biết mật mã hay khóa ghép đôi?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công không thể làm gì vì giao thức BLE luôn tự động kích hoạt mã hóa AES-256 ở tầng phần cứng Link Layer.",
+                "correct": false,
+                "rationale": "Mã hóa Link Layer chỉ được kích hoạt sau khi hoàn tất quy trình ghép đôi và phụ thuộc vào Permissions của Characteristic; nếu Permission là OPEN thì dữ liệu truyền hoàn toàn không mã hóa."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công trong phạm vi phủ sóng BLE có thể kết nối trực tiếp tới thiết bị mà không cần ghép đôi, gửi lệnh ghi trực tiếp (Unauthenticated GATT Write) với payload điều khiển tới Characteristic `0000ffe1` để mở chốt khóa cửa vật lý của phòng họp mà không để lại dấu vết xác thực.",
+                "correct": true,
+                "rationale": "Characteristic có thuộc tính WRITE và Permission OPEN cho phép bất kỳ ai kết nối cũng có thể ghi dữ liệu điều khiển; cơ chế Just Works không cung cấp bất kỳ sự bảo vệ nào chống lại việc ghi lệnh trái phép."
+              },
+              {
+                "id": "C",
+                "label": "Thiết bị khóa cửa sẽ tự động phát nổ pin nếu nhận được gói tin GATT Write từ một địa chỉ MAC lạ.",
+                "correct": false,
+                "rationale": "Đây là khẳng định phi lý; lỗi bảo mật phần mềm không gây ra hiện tượng phát nổ phần cứng như mô tả."
+              },
+              {
+                "id": "D",
+                "label": "Hệ điều hành Android của kẻ tấn công sẽ tự động bị khóa màn hình vĩnh viễn do vi phạm bản quyền Bluetooth SIG.",
+                "correct": false,
+                "rationale": "Bluetooth SIG là tổ chức tiêu chuẩn, không có cơ chế điều khiển hay khóa thiết bị di động từ xa."
+              }
+            ]
+          },
+          {
+            "id": "case-99-03",
+            "title": "Ứng Phó Cuộc Tấn Công Từ Chối Dịch Vụ Vô Tuyến Diện Rộng (Deauth Flood DoS) Bằng WIPS Telemetry",
+            "context": "Mạng Wi-Fi văn phòng đang bị tấn công Deauth flood làm tê liệt toàn bộ kết nối của nhân viên. Dữ liệu RSSI Telemetry từ 3 cảm biến WIPS tại tầng 5 ghi nhận tín hiệu của nguồn phát tấn công (địa chỉ MAC giả mạo) như sau: Cảm biến Sensor-5A ghi nhận RSSI -45 dBm; Sensor-5B ghi nhận RSSI -72 dBm; Sensor-5C ghi nhận RSSI -80 dBm. Sơ đồ tầng cho thấy Sensor-5A được đặt gần khu vực thang máy và phòng vệ sinh nam.",
+            "prompt": "Phương pháp luận nào là khoa học nhất để xử lý dứt điểm sự cố này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tắt toàn bộ hệ thống điện của tòa nhà để reset lại toàn bộ các thiết bị vô tuyến.",
+                "correct": false,
+                "rationale": "Tắt điện toàn tòa nhà gây gián đoạn hoạt động kinh doanh nghiêm trọng và không giải quyết được nguồn phát pin di động của kẻ tấn công."
+              },
+              {
+                "id": "B",
+                "label": "Sử dụng thuật toán Tam giác đạc RF (RSSI Triangulation/Multilateration): kết hợp độ suy hao tín hiệu mạnh nhất (-45 dBm tại Sensor-5A) để khoanh vùng nguồn phát sóng trong bán kính 3-5 mét quanh Sensor-5A (khu vực thang máy/phòng vệ sinh), cử đội an ninh vật lý kiểm tra và tịch thu thiết bị phát sóng tấn công (như Wi-Fi Deauther / Flipper Zero); đồng thời trên hệ thống mạng, kích hoạt cấu hình bắt buộc 802.11w PMF trên toàn bộ Access Point.",
+                "correct": true,
+                "rationale": "Sự kết hợp giữa tam giác đạc RF định vị vật lý và biện pháp phòng vệ mật mã học 802.11w PMF là phương pháp xử lý sự cố toàn diện, vừa xử lý được nguồn phát vừa miễn nhiễm mạng trước các cuộc tấn công tương tự."
+              },
+              {
+                "id": "C",
+                "label": "Cấu hình tường lửa mạng chặn tất cả các cổng TCP từ 1 đến 65535 trên mạng có dây.",
+                "correct": false,
+                "rationale": "Tấn công Deauth flood diễn ra ở tầng liên kết dữ liệu 802.11 trên sóng vô tuyến, hoàn toàn không liên quan đến tường lửa cổng TCP mạng có dây."
+              },
+              {
+                "id": "D",
+                "label": "Kích hoạt tính năng WPA2-PSK với mật khẩu ngắn để tăng tốc độ xử lý của chip Wi-Fi.",
+                "correct": false,
+                "rationale": "Mật khẩu ngắn làm suy yếu an ninh mật mã và không hề giải quyết được việc các khung Deauth không được bảo vệ."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân tích đúng cơ chế xác thực Wired-to-Wireless Correlation để nhận diện Rogue AP.",
+          "Chỉ ra được lỗ hổng kiến trúc Unauthenticated GATT Write trên thiết bị BLE IoT văn phòng.",
+          "Ứng dụng thành công thuật toán Tam giác đạc RSSI RF để khoanh vùng tọa độ nguồn phát sóng tấn công trên sơ đồ tầng."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo phân tích tương quan có dây - không dây (Wired-to-Wireless Correlation Log) xác định cổng switch kết nối Rogue AP",
+          "Tệp dump GATT Characteristics thể hiện chi tiết UUID, Properties và Permissions của thiết bị BLE bị lỗi",
+          "Biên bản định vị nguồn phát vô tuyến qua bản đồ nhiệt RSSI Triangulation trên sơ đồ mặt bằng tầng"
+        ],
+        "reset": "Đặt lại các cảm biến WIPS mô phỏng, xóa bỏ các địa chỉ MAC giả mạo và khôi phục trạng thái kết nối cổng switch mạng.",
+        "cleanup": "Xóa toàn bộ các tệp log telemetry, dữ liệu bắt gói tin Bluetooth HCI snoop log và các script gatttool thử nghiệm khỏi môi trường lab."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc triển khai tiêu chuẩn BLE LE Secure Connections với cơ chế xác thực khóa công khai ECDH P-256 trên toàn bộ thiết bị IoT, cấm tuyệt đối việc sử dụng BLE Legacy Just Works trên các thiết bị điều khiển vật lý.",
+          "Cấu hình phân quyền nghiêm ngặt trên tất cả các GATT Characteristics nhạy cảm: bắt buộc yêu cầu cờ 'Authentication Required' và 'Encryption Required' trước khi cho phép thực hiện thao tác READ hoặc WRITE.",
+          "Bật tính năng 802.1X Port Security (hoặc MAC Authentication Bypass - MAB kết hợp 802.1X) trên tất cả các cổng switch mạng LAN nội bộ để ngăn chặn việc cắm các Access Point lạ vào mạng.",
+          "Phủ sóng cảm biến WIPS chuyên dụng (Dedicated Overlay Sensors) tại các khu vực nhạy cảm (phòng máy chủ, phòng họp ban giám đốc, khu vực giao dịch tài chính)."
+        ],
+        "observe": [
+          "Giám sát liên tục telemetry vô tuyến từ các cảm biến WIPS để phát hiện các mẫu tấn công 802.11 (Deauth flood, Association table overflow, Karma attack).",
+          "Thiết lập cơ chế kiểm tra tự động Wired-to-Wireless Correlation định kỳ để phát hiện ngay lập tức bất kỳ Access Point nào kết nối trái phép vào hạ tầng mạng có dây.",
+          "Theo dõi các thiết bị BLE phát quảng bá lạ xuất hiện liên tục trong khu vực phòng họp với các dịch vụ GATT không xác định."
+        ],
+        "respond": [
+          "Khi phát hiện Rogue AP kết nối vào mạng nội bộ, tự động kích hoạt lệnh ngắt cổng switch (port shutdown) qua giao thức SNMP hoặc API của giải pháp NAC.",
+          "Sử dụng thuật toán tam giác đạc RF RSSI để định vị tọa độ nguồn phát sóng độc hại trên bản đồ tầng và điều động nhân sự an ninh kiểm tra thực địa.",
+          "Kích hoạt cách ly vô tuyến (Wireless Containment) có kiểm soát nhắm đích vào các client nội bộ đang cố gắng kết nối vào các Access Point lạ không an toàn."
+        ],
+        "residualRisk": [
+          "Các thiết bị BLE di động của khách vãng lai mang vào văn phòng vẫn có thể bị nghe lén nếu các thiết bị đó sử dụng chuẩn BLE Legacy Pairing cũ.",
+          "Thuật toán tam giác đạc sóng RF có thể có sai số từ 2-5 mét tại các khu vực có nhiều vật cản kim loại hoặc tường bê tông cốt thép dày làm suy hao tín hiệu không đồng nhất."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Tất cả các Access Point không dây lạ phát sóng xung quanh tòa nhà văn phòng đều là Rogue AP cần phải kích hoạt tính năng tiêu diệt sóng (containment).",
+          "correction": "Đa số các Access Point lạ phát hiện được chỉ là Neighbor AP (Access Point hợp pháp của các công ty lân cận); một thiết bị chỉ được coi là Rogue AP nguy hiểm khi nó có kết nối vật lý trực tiếp vào mạng LAN nội bộ của công ty (xác nhận qua Wired-to-Wireless correlation)."
+        },
+        {
+          "claim": "Giao thức Bluetooth Low Energy (BLE) sử dụng mã hóa AES nên không bao giờ có thể bị nghe lén hoặc chèn lệnh điều khiển từ khoảng cách xa.",
+          "correction": "Mã hóa AES chỉ phát huy tác dụng khi quá trình ghép đôi an toàn; với BLE Legacy Pairing sử dụng Passkey Entry hoặc Just Works, kẻ tấn công có thể bẻ khóa Temporary Key trong tích tắc; ngoài ra nếu Characteristic không yêu cầu mã hóa (Open Permission), dữ liệu và lệnh điều khiển được truyền dưới dạng văn bản rõ hoàn toàn."
+        },
+        {
+          "claim": "Một hệ thống WIPS chỉ cần các Access Point thông thường thực hiện quét nền định kỳ (background scanning) là đủ để phát hiện và ngăn chặn 100% các cuộc tấn công vô tuyến thời gian thực.",
+          "correction": "Access Point thông thường phải dành phần lớn thời gian phục vụ lưu lượng kết nối của người dùng; việc quét nền chuyển kênh chỉ diễn ra trong vài phần trăm thời gian, tạo ra các điểm mù lớn khiến hệ thống bỏ sót các đợt tấn công chớp nhoáng (như Deauth burst hoặc PMKID capture) trừ khi sử dụng cảm biến chuyên dụng 100% (Dedicated Overlay Sensors)."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os10-l99-q1",
+          "difficulty": "easy",
+          "question": "Trong kiến trúc Bluetooth Low Energy (BLE), ba kênh nào được chỉ định làm kênh quảng bá chính (Primary Advertising Channels)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Kênh 1, 6, và 11"
+            },
+            {
+              "id": "B",
+              "label": "Kênh 37, 38, và 39"
+            },
+            {
+              "id": "C",
+              "label": "Kênh 0, 1, và 2"
+            },
+            {
+              "id": "D",
+              "label": "Kênh 20, 40, và 60"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Chuẩn BLE quy định 40 kênh tần số từ 0 đến 39, trong đó kênh 37 (2402 MHz), 38 (2426 MHz) và 39 (2480 MHz) là ba kênh quảng bá chính (Primary Advertising Channels) được bố trí để tránh các kênh Wi-Fi phổ biến."
+        },
+        {
+          "id": "os10-l99-q2",
+          "difficulty": "medium",
+          "question": "Cơ chế kỹ thuật nào cho phép hệ thống WIPS phân biệt chính xác giữa một Access Point của văn phòng lân cận (Neighbor AP) và một Access Point độc hại cắm lén vào mạng nội bộ (Rogue AP)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Dựa vào độ dài của tên mạng SSID"
+            },
+            {
+              "id": "B",
+              "label": "Kỹ thuật Tương quan Có dây - Không dây (Wired-to-Wireless Correlation) bằng cách gửi gói tin thăm dò qua mạng LAN có dây và lắng nghe xem gói tin đó có bị phát ra sóng vô tuyến bởi AP lạ hay không"
+            },
+            {
+              "id": "C",
+              "label": "Kiểm tra xem Access Point đó có logo của nhà sản xuất Cisco hay không"
+            },
+            {
+              "id": "D",
+              "label": "Đo nhiệt độ bề mặt của vỏ Access Point"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Wired-to-Wireless Correlation là cơ chế kỹ thuật duy nhất chứng minh một AP lạ có kết nối vật lý vào mạng có dây của doanh nghiệp: WIPS tiêm gói tin có chữ ký vào switch nội bộ và kiểm tra xem gói tin đó có xuất hiện trên sóng của AP lạ hay không."
+        },
+        {
+          "id": "os10-l99-q3",
+          "difficulty": "hard",
+          "question": "Tại sao cơ chế ghép đôi BLE LE Secure Connections (từ Bluetooth 4.2+) lại có khả năng chống lại các cuộc tấn công nghe lén thụ động (Passive Eavesdropping) vượt trội hơn hoàn toàn so với BLE Legacy Pairing?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Do LE Secure Connections sử dụng mật mã khóa công khai Elliptic Curve Diffie-Hellman (ECDH P-256) để hai bên độc lập tính toán khóa phiên mà không truyền thông tin bí mật trên sóng, trong khi Legacy Pairing chỉ sử dụng Temporary Key (TK) có entropy thấp dễ bị bẻ khóa vét cạn"
+            },
+            {
+              "id": "B",
+              "label": "Do LE Secure Connections chuyển toàn bộ lưu lượng sang truyền dẫn bằng tia hồng ngoại"
+            },
+            {
+              "id": "C",
+              "label": "Do chuẩn Bluetooth 4.2 cấm tất cả các card mạng hoạt động ở chế độ Promiscuous / Monitor mode"
+            },
+            {
+              "id": "D",
+              "label": "Do LE Secure Connections tự động tăng công suất phát sóng lên 1000 Watt để áp đảo kẻ tấn công"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "LE Secure Connections sử dụng trao đổi khóa bất đối xứng ECDH P-256, nơi kẻ nghe lén trên sóng chỉ thấy các khóa công khai và không thể tính toán được khóa chia sẻ chung nếu không giải được bài toán logarit rời rạc; ngược lại Legacy Pairing dựa trên Temporary Key (Passkey 6 chữ số) có thể bị crack offline trong tích tắc."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một tập đoàn công nghệ phát hiện trong tòa nhà trụ sở có một thiết bị Rogue AP được cắm giấu phía sau bảng điện phòng họp tầng 7, đồng thời hệ thống khóa cửa thông minh điều khiển qua BLE của các phòng nghiên cứu trọng yếu đang bị nghi ngờ có lỗ hổng cho phép mở khóa không cần thẻ. Ban Lãnh đạo yêu cầu bạn chủ trì dự án rà soát không gian mạng vô tuyến, tái hiện lỗ hổng BLE IoT và thiết lập hệ thống WIPS Telemetry giám sát 24/7.",
+        "tasks": [
+          "Sử dụng các công cụ kiểm toán BLE (như bettercap, gatttool, nRF Connect) để quét cây thuộc tính GATT của hệ thống khóa cửa thông minh; chứng minh khả năng thực thi lệnh Unauthenticated GATT Write để mở khóa vật lý và đề xuất bản vá cấu hình phân quyền.",
+          "Phân tích dữ liệu Telemetry từ hệ thống WIPS: sử dụng thuật toán tam giác đạc RF RSSI từ 3 cảm biến tầng 7 để khoanh vùng tọa độ của thiết bị Rogue AP; trích xuất bằng chứng Wired-to-Wireless correlation chứng minh cổng switch mà thiết bị này đang kết nối.",
+          "Xây dựng tài liệu quy chuẩn vận hành hệ thống WIPS cho đội ngũ SOC: quy trình xử lý cảnh báo Rogue AP, nguyên tắc an toàn pháp lý khi kích hoạt tính năng Wireless Containment, và kế hoạch định kỳ kiểm toán an ninh các thiết bị IoT không dây."
+        ],
+        "requiredEvidence": [
+          "Báo cáo kiểm toán bảo mật thiết bị BLE kèm bản trích xuất cây thuộc tính GATT Services/Characteristics và mã PoC khai thác Unauthenticated Write",
+          "Sơ đồ mặt bằng tầng 7 thể hiện kết quả tam giác đạc RSSI Triangulation định vị Rogue AP kèm nhật ký cổng switch switchport shutdown",
+          "Bộ quy trình chuẩn (SOP) giám sát và ứng phó sự cố an ninh mạng không dây vô tuyến WIPS Telemetry dành cho SOC"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Bluetooth Core Specification Version 5.4: Generic Attribute Profile (GATT) and Security Architecture",
+          "url": "https://www.bluetooth.com/specifications/specs/core-specification-5-4/",
+          "publisher": "Bluetooth Special Interest Group (SIG)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả kiến trúc BLE GAP, GATT Services, Characteristics và Descriptors",
+            "Mô hình an ninh LE Secure Connections và phân tích rủi ro BLE Legacy Pairing"
+          ]
+        },
+        {
+          "title": "NIST SP 800-121 Rev. 2: Guide to Bluetooth Security",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-121/rev-2/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đánh giá rủi ro bảo mật Bluetooth và Bluetooth Low Energy",
+            "Khuyến nghị cấu hình an toàn các chế độ ghép đôi và xác thực thiết bị IoT"
+          ]
+        },
+        {
+          "title": "NIST SP 800-153: Guidelines for Securing Wireless Local Area Networks (WLANs)",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-153/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc hệ thống Wireless Intrusion Prevention System (WIPS)",
+            "Kỹ thuật phát hiện Rogue AP và định vị nguồn phát vô tuyến"
+          ]
+        }
+      ]
+    }
+  ]
+}
