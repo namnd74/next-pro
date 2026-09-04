@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import {
+  BookOpen,
   Check,
   Copy,
   CornerDownLeft,
@@ -12,8 +13,9 @@ import {
 import type { TerminalExecutionResult, VfsState, WorkbenchConfig } from '../types';
 import {
   createInitialVfsState,
-  executeBashCommand,
-} from '../engines/virtual-posix-engine';
+  executeHonestShellCommand,
+} from '../../fixtures/default-vfs-fixture';
+import { indexedDbStorageEngine } from '../storage/indexeddb-storage-engine';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -50,10 +52,38 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
   const [currentInput, setCurrentInput] = React.useState('');
   const [historyIndex, setHistoryIndex] = React.useState<number | null>(null);
   const [copiedCmd, setCopiedCmd] = React.useState<string | null>(null);
+  const [isRestoredFromDb, setIsRestoredFromDb] = React.useState(false);
+  const [showCheatSheet, setShowCheatSheet] = React.useState(false);
 
   const outputContainerRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const isMountedRef = React.useRef(false);
+
+  // Restore session snapshot from IndexedDB on lesson mount
+  React.useEffect(() => {
+    let isCancelled = false;
+    indexedDbStorageEngine.loadSnapshot(config.lessonId).then((snapshot) => {
+      if (isCancelled || !snapshot?.vfs) return;
+      const restoredVfs = snapshot.vfs as VfsState;
+      setVfsState(restoredVfs);
+      setIsRestoredFromDb(true);
+      setHistoryItems((prev) => [
+        ...prev,
+        {
+          id: `restore-${Date.now()}`,
+          command: '',
+          cwd: restoredVfs.cwd || '/home/operator',
+          stdout:
+            '💾 [INDEXEDDB] Đã khôi phục trạng thái môi trường làm việc từ phiên trước.\n',
+          stderr: '',
+          exitCode: 0,
+        },
+      ]);
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, [config.lessonId]);
 
   React.useEffect(() => {
     if (!isMountedRef.current) {
@@ -76,8 +106,18 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
       return;
     }
 
-    const result = executeBashCommand(trimmed, vfsState);
+    const result = executeHonestShellCommand(trimmed, vfsState);
     setVfsState(result.updatedState);
+
+    // Persist snapshot to IndexedDB asynchronously (zero UI blocking)
+    indexedDbStorageEngine
+      .saveSnapshot(config.lessonId, {
+        schemaVersion: 1,
+        timestamp: Date.now(),
+        vfs: result.updatedState,
+        history: result.updatedState.history,
+      })
+      .catch((err) => console.warn('[TerminalView] Failed to save snapshot:', err));
 
     const newItem: TerminalHistoryItem = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -88,7 +128,8 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
       exitCode: result.exitCode,
     };
 
-    setHistoryItems((prev) => [...prev, newItem]);
+    // Keep DOM buffer lean: cap at last 150 items to eliminate scroll jank
+    setHistoryItems((prev) => [...prev, newItem].slice(-150));
     setCurrentInput('');
     setHistoryIndex(null);
 
@@ -96,6 +137,32 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
+    // Ctrl+L or Cmd+K: Clear screen
+    if ((e.ctrlKey && e.key === 'l') || ((e.metaKey || e.ctrlKey) && e.key === 'k')) {
+      e.preventDefault();
+      setHistoryItems([]);
+      setCurrentInput('');
+      setHistoryIndex(null);
+      return;
+    }
+
+    // Ctrl+C: Cancel current input line
+    if (e.ctrlKey && e.key === 'c') {
+      e.preventDefault();
+      const cancelItem: TerminalHistoryItem = {
+        id: `cancel-${Date.now()}`,
+        command: currentInput,
+        cwd: vfsState.cwd,
+        stdout: '^C',
+        stderr: '',
+        exitCode: 130,
+      };
+      setHistoryItems((prev) => [...prev, cancelItem].slice(-150));
+      setCurrentInput('');
+      setHistoryIndex(null);
+      return;
+    }
+
     if (e.key === 'Enter') {
       e.preventDefault();
       handleRunCommand(currentInput);
@@ -168,15 +235,17 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
     }
   };
 
-  const handleReset = (): void => {
+  const handleReset = async (): Promise<void> => {
+    await indexedDbStorageEngine.clearSnapshot(config.lessonId);
+    setIsRestoredFromDb(false);
     const fresh = createInitialVfsState(config.initialVfs);
     setVfsState(fresh);
     setHistoryItems([
       {
-        id: 'reset-1',
+        id: `reset-${Date.now()}`,
         command: '',
         cwd: '/home/operator',
-        stdout: 'Terminal session reset to fresh state.\n',
+        stdout: '🔄 [RESET] Môi trường VFS đã được đặt lại về trạng thái sạch ban đầu.\n',
         stderr: '',
         exitCode: 0,
       },
@@ -236,15 +305,36 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {isRestoredFromDb && (
+              <Badge
+                variant="outline"
+                className="border-sky-500/40 bg-sky-950/40 text-[9px] text-sky-400"
+              >
+                💾 INDEXEDDB RESTORED
+              </Badge>
+            )}
             <Badge
               variant="outline"
-              className="border-emerald-500/40 bg-emerald-950/40 text-[9px] text-emerald-400"
+              className="border-slate-700 bg-slate-900/60 font-mono text-[9px] text-slate-400"
             >
-              POSIX RUNTIME · 45+ CMDS
+              SIMULATION SHELL · DEMO MODE
             </Badge>
             <Button
               variant="ghost"
               size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCheatSheet((prev) => !prev);
+              }}
+              className="h-6 gap-1 px-2 text-[10px] text-amber-400 hover:text-white"
+            >
+              <BookOpen className="h-3 w-3 text-amber-400" />
+              Cheat Sheet
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="reset-vfs-button"
               onClick={(e) => {
                 e.stopPropagation();
                 handleReset();
@@ -252,15 +342,53 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
               className="h-6 gap-1 px-2 text-[10px] text-slate-400 hover:text-white"
             >
               <RotateCcw className="h-3 w-3" />
-              Reset OS
+              Reset VFS
             </Button>
           </div>
         </div>
 
+        {/* Quick Help / Cheat Sheet Drawer */}
+        {showCheatSheet && (
+          <div className="mb-3 space-y-2 rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 font-mono text-[11px] text-slate-300">
+            <div className="flex items-center justify-between border-b border-amber-500/20 pb-1 font-bold text-amber-400">
+              <span>📖 POSIX CHEAT SHEET (45+ UTILITIES & SHORTCUTS)</span>
+              <span className="text-[10px] text-slate-400">
+                Ctrl+L (Clear) · Ctrl+C (Interrupt) · Tab (Complete)
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-[10.5px] sm:grid-cols-4">
+              <div>
+                <span className="font-bold text-emerald-400">Permissions:</span>
+                <div>chmod 640 /etc/shadow</div>
+                <div>chmod 4755 /bin/suid</div>
+                <div>find / -perm -4000</div>
+              </div>
+              <div>
+                <span className="font-bold text-sky-400">Recon & Net:</span>
+                <div>nmap -sV 10.0.4.10</div>
+                <div>curl -I http://10.0.4.10</div>
+                <div>ping -c 3 10.0.4.1</div>
+              </div>
+              <div>
+                <span className="font-bold text-purple-400">Files & Text:</span>
+                <div>cat /etc/passwd | grep root</div>
+                <div>touch, ls -la, head, tail</div>
+                <div>wc -l, sort, uniq, cut</div>
+              </div>
+              <div>
+                <span className="font-bold text-rose-400">Identity & System:</span>
+                <div>whoami, id, uname -a</div>
+                <div>ps aux, kill -9 &lt;pid&gt;</div>
+                <div>history, pwd, cd, env</div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Output Stream */}
         <div
           ref={outputContainerRef}
-          className="max-h-[380px] min-h-[240px] space-y-2 overflow-y-auto pr-1"
+          className="cyber-scrollbar max-h-[380px] min-h-[240px] space-y-2 overflow-y-auto pr-1"
         >
           {historyItems.map((item) => (
             <div key={item.id} className="space-y-1">
@@ -309,6 +437,7 @@ export const TerminalView: React.FC<TerminalViewProps> = ({ config, onExecution 
             <input
               ref={inputRef}
               type="text"
+              data-testid="terminal-input"
               value={currentInput}
               onChange={(e) => setCurrentInput(e.target.value)}
               onKeyDown={handleKeyDown}

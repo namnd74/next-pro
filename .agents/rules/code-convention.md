@@ -27,3 +27,9 @@
 
 - Group imports: 1) External libs 2) Internal modules 3) Types/Styles.
 - Prefer absolute path aliases (e.g., `@/components/...`) over relative paths (`../../`).
+
+## 6. Truthful Execution & Anti-Hardcoding Invariant
+
+- **No Tautological Fixtures**: Never hardcode synthetic responses (e.g. mock HTTP bodies, fake DB rows, pre-baked flags) in verification harnesses to simulate execution truth.
+- **Dynamic Grounding**: Any test asserting `AUTHENTIC_EXECUTION` must obtain data directly from live OS/socket/disk/subprocess I/O.
+- **Receipt Integrity**: Cryptographic receipts can only hash raw I/O process outputs, never in-memory object literals declared in the test script.

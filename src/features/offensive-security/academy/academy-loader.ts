@@ -25,6 +25,31 @@ import accessControlAndInjectionData from '../data/academy/os07-web-api-bug-boun
 import browserCrossOriginAndFilesData from '../data/academy/os07-web-api-bug-bounty/browser-cross-origin-and-files.json';
 import modernApiAndBusinessLogicData from '../data/academy/os07-web-api-bug-bounty/modern-api-and-business-logic.json';
 import bountyReconReportDisclosureData from '../data/academy/os07-web-api-bug-bounty/bounty-recon-report-disclosure.json';
+import adArchitectureProtocolsData from '../data/academy/os08-active-directory/ad-architecture-protocols.json';
+import identitiesPoliciesPathsData from '../data/academy/os08-active-directory/identities-policies-paths.json';
+import adcsTrustHybridData from '../data/academy/os08-active-directory/adcs-trust-hybrid.json';
+import adDetectionCapstoneData from '../data/academy/os08-active-directory/ad-detection-capstone.json';
+import cloudIdentityControlPlaneData from '../data/academy/os09-cloud-container-supply-chain/cloud-identity-control-plane.json';
+import cloudWorkloadsAndTelemetryData from '../data/academy/os09-cloud-container-supply-chain/cloud-workloads-and-telemetry.json';
+import containersKubernetesData from '../data/academy/os09-cloud-container-supply-chain/containers-kubernetes.json';
+import cicdArtifactsCapstoneData from '../data/academy/os09-cloud-container-supply-chain/cicd-artifacts-capstone.json';
+import mobileArchitectureData from '../data/academy/os10-mobile-wireless/mobile-architecture-data.json';
+import mobileIpcRuntimeApiData from '../data/academy/os10-mobile-wireless/mobile-ipc-runtime-api.json';
+import wirelessAuthAndTelemetryData from '../data/academy/os10-mobile-wireless/wireless-auth-and-telemetry.json';
+import embeddedFirmwareBootData from '../data/academy/os11-iot-firmware-hardware/embedded-firmware-boot.json';
+import debugProtocolDeviceIdentityData from '../data/academy/os11-iot-firmware-hardware/debug-protocol-device-identity.json';
+import otSafetyAndCapstoneData from '../data/academy/os11-iot-firmware-hardware/ot-safety-and-capstone.json';
+import aiThreatModelAndInjectionData from '../data/academy/os12-ai-agentic-security/ai-threat-model-and-injection.json';
+import toolsRagIdentityData from '../data/academy/os12-ai-agentic-security/tools-rag-identity.json';
+import aiSupplyChainAndCapstoneData from '../data/academy/os12-ai-agentic-security/ai-supply-chain-and-capstone.json';
+import researchSurfaceSourceAuditData from '../data/academy/os13-vulnerability-research/research-surface-source-audit.json';
+import fuzzingCrashTriageData from '../data/academy/os13-vulnerability-research/fuzzing-crash-triage.json';
+import rootCauseVariantsPatchesData from '../data/academy/os13-vulnerability-research/root-cause-variants-patches.json';
+import cveCweCvssDisclosureData from '../data/academy/os13-vulnerability-research/cve-cwe-cvss-disclosure.json';
+import memoryAssemblyExecutablesData from '../data/academy/os14-reverse-engineering/memory-assembly-executables.json';
+import staticDynamicDebuggingData from '../data/academy/os14-reverse-engineering/static-dynamic-debugging.json';
+import memoryFailuresAndMitigationsData from '../data/academy/os14-reverse-engineering/memory-failures-and-mitigations.json';
+import malwareBehaviorAnalysisData from '../data/academy/os15-malware-c2-emulation/malware-behavior-analysis.json';
 import type { AcademyLesson, AcademyModule } from './types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -167,6 +192,63 @@ export const MODERN_API_AND_BUSINESS_LOGIC_MODULE = parseAcademyModule(
 export const BOUNTY_RECON_REPORT_DISCLOSURE_MODULE = parseAcademyModule(
   bountyReconReportDisclosureData
 );
+export const AD_ARCHITECTURE_PROTOCOLS_MODULE = parseAcademyModule(
+  adArchitectureProtocolsData
+);
+export const IDENTITIES_POLICIES_PATHS_MODULE = parseAcademyModule(
+  identitiesPoliciesPathsData
+);
+export const ADCS_TRUST_HYBRID_MODULE = parseAcademyModule(adcsTrustHybridData);
+export const AD_DETECTION_CAPSTONE_MODULE = parseAcademyModule(adDetectionCapstoneData);
+export const CLOUD_IDENTITY_CONTROL_PLANE_MODULE = parseAcademyModule(
+  cloudIdentityControlPlaneData
+);
+export const CLOUD_WORKLOADS_AND_TELEMETRY_MODULE = parseAcademyModule(
+  cloudWorkloadsAndTelemetryData
+);
+export const CONTAINERS_KUBERNETES_MODULE = parseAcademyModule(containersKubernetesData);
+export const CICD_ARTIFACTS_CAPSTONE_MODULE = parseAcademyModule(
+  cicdArtifactsCapstoneData
+);
+export const MOBILE_ARCHITECTURE_DATA_MODULE = parseAcademyModule(mobileArchitectureData);
+export const MOBILE_IPC_RUNTIME_API_MODULE = parseAcademyModule(mobileIpcRuntimeApiData);
+export const WIRELESS_AUTH_AND_TELEMETRY_MODULE = parseAcademyModule(
+  wirelessAuthAndTelemetryData
+);
+export const EMBEDDED_FIRMWARE_BOOT_MODULE = parseAcademyModule(embeddedFirmwareBootData);
+export const DEBUG_PROTOCOL_DEVICE_IDENTITY_MODULE = parseAcademyModule(
+  debugProtocolDeviceIdentityData
+);
+export const OT_SAFETY_AND_CAPSTONE_MODULE = parseAcademyModule(otSafetyAndCapstoneData);
+export const AI_THREAT_MODEL_AND_INJECTION_MODULE = parseAcademyModule(
+  aiThreatModelAndInjectionData
+);
+export const TOOLS_RAG_IDENTITY_MODULE = parseAcademyModule(toolsRagIdentityData);
+export const AI_SUPPLY_CHAIN_AND_CAPSTONE_MODULE = parseAcademyModule(
+  aiSupplyChainAndCapstoneData
+);
+export const RESEARCH_SURFACE_SOURCE_AUDIT_MODULE = parseAcademyModule(
+  researchSurfaceSourceAuditData
+);
+export const FUZZING_CRASH_TRIAGE_MODULE = parseAcademyModule(fuzzingCrashTriageData);
+export const ROOT_CAUSE_VARIANTS_PATCHES_MODULE = parseAcademyModule(
+  rootCauseVariantsPatchesData
+);
+export const CVE_CWE_CVSS_DISCLOSURE_MODULE = parseAcademyModule(
+  cveCweCvssDisclosureData
+);
+export const MEMORY_ASSEMBLY_EXECUTABLES_MODULE = parseAcademyModule(
+  memoryAssemblyExecutablesData
+);
+export const STATIC_DYNAMIC_DEBUGGING_MODULE = parseAcademyModule(
+  staticDynamicDebuggingData
+);
+export const MEMORY_FAILURES_AND_MITIGATIONS_MODULE = parseAcademyModule(
+  memoryFailuresAndMitigationsData
+);
+export const MALWARE_BEHAVIOR_ANALYSIS_MODULE = parseAcademyModule(
+  malwareBehaviorAnalysisData
+);
 
 export const ACADEMY_MODULES: AcademyModule[] = [
   ROLES_AND_BOUNDARIES_MODULE,
@@ -196,6 +278,31 @@ export const ACADEMY_MODULES: AcademyModule[] = [
   BROWSER_CROSS_ORIGIN_AND_FILES_MODULE,
   MODERN_API_AND_BUSINESS_LOGIC_MODULE,
   BOUNTY_RECON_REPORT_DISCLOSURE_MODULE,
+  AD_ARCHITECTURE_PROTOCOLS_MODULE,
+  IDENTITIES_POLICIES_PATHS_MODULE,
+  ADCS_TRUST_HYBRID_MODULE,
+  AD_DETECTION_CAPSTONE_MODULE,
+  CLOUD_IDENTITY_CONTROL_PLANE_MODULE,
+  CLOUD_WORKLOADS_AND_TELEMETRY_MODULE,
+  CONTAINERS_KUBERNETES_MODULE,
+  CICD_ARTIFACTS_CAPSTONE_MODULE,
+  MOBILE_ARCHITECTURE_DATA_MODULE,
+  MOBILE_IPC_RUNTIME_API_MODULE,
+  WIRELESS_AUTH_AND_TELEMETRY_MODULE,
+  EMBEDDED_FIRMWARE_BOOT_MODULE,
+  DEBUG_PROTOCOL_DEVICE_IDENTITY_MODULE,
+  OT_SAFETY_AND_CAPSTONE_MODULE,
+  AI_THREAT_MODEL_AND_INJECTION_MODULE,
+  TOOLS_RAG_IDENTITY_MODULE,
+  AI_SUPPLY_CHAIN_AND_CAPSTONE_MODULE,
+  RESEARCH_SURFACE_SOURCE_AUDIT_MODULE,
+  FUZZING_CRASH_TRIAGE_MODULE,
+  ROOT_CAUSE_VARIANTS_PATCHES_MODULE,
+  CVE_CWE_CVSS_DISCLOSURE_MODULE,
+  MEMORY_ASSEMBLY_EXECUTABLES_MODULE,
+  STATIC_DYNAMIC_DEBUGGING_MODULE,
+  MEMORY_FAILURES_AND_MITIGATIONS_MODULE,
+  MALWARE_BEHAVIOR_ANALYSIS_MODULE,
 ];
 
 export function getAcademyModuleBySlug(moduleSlug: string): AcademyModule | undefined {

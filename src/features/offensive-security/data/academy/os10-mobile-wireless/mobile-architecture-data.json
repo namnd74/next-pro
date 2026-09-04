@@ -1,0 +1,1113 @@
+{
+  "id": "os10-m01-mobile-architecture-data",
+  "slug": "mobile-architecture-data",
+  "trackId": "os10-mobile-wireless",
+  "title": "Kiến Trúc Ứng Dụng Di Động Android/iOS, Ký Số Gói Tin & Lưu Trữ Dữ Liệu Cục Bộ",
+  "summary": "Bóc tách kiến trúc sandbox Android (Zygote, UID separation, APK/AAB signing v1-v4) và iOS (Mach-O, FairPlay, Code Signing, Entitlements), kỹ thuật đảo ngược và kiểm toán an toàn lưu trữ cục bộ (Keystore, EncryptedSharedPreferences, iOS Keychain, SQLite cipher).",
+  "difficulty": "intermediate",
+  "estimatedMinutes": 360,
+  "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+  "domains": ["mobile", "android", "ios", "storage"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os10-l91-android-architecture-sandboxing-and-signing",
+      "slug": "android-architecture-sandboxing-and-signing",
+      "title": "Kiến Trúc Android OS: Zygote, Phân Tách UID Sandboxing & Cơ Chế Ký Số APK/AAB v1-v4",
+      "summary": "Phân tích sâu mô hình bảo mật Android: khởi tạo tiến trình qua Zygote, ranh giới sandbox nhân Linux dựa trên Linux UID/GID separation, SELinux policy (sepolicy), cấu trúc gói APK/Android App Bundle (AAB), và sự tiến hóa của lược đồ chữ ký số APK Signing Schemes (v1 JAR signing, v2 Whole-file APK, v3 Key Rotation, v4 fs-verity Streaming), kèm theo các vector bypass và khai thác chữ ký như Janus vulnerability (CVE-2017-13156).",
+      "difficulty": "intermediate",
+      "durationMinutes": 120,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân tích cơ chế khởi động ứng dụng Android từ tiến trình Zygote, cơ chế gán Linux UID/GID độc lập (app_*) và ranh giới cô lập SELinux (SEAndroid contexts) tại tầng nhân kernel.",
+        "Đánh giá cấu trúc tệp tin đóng gói Android (APK/AAB), cấu trúc AndroidManifest.xml nhị phân (AXML) và bảng tài nguyên resources.arsc.",
+        "So sánh chi tiết cơ chế bảo vệ và điểm yếu mật mã học giữa 4 thế hệ lược đồ ký số APK: v1 (JAR signing), v2 (APK Signature Scheme v2), v3 (Signing with key rotation), và v4 (fs-verity hash tree streaming).",
+        "Nhận diện và khai thác các điểm mù trong xác thực chữ ký số APK, bao gồm lỗ hổng chèn mã kép Janus (CVE-2017-13156) và kỹ thuật repackaging/tampering khi ứng dụng thiếu kiểm tra chứng chỉ runtime."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+      "domains": ["mobile", "android", "storage"],
+      "attackTactics": [
+        "initial-access",
+        "defense-evasion",
+        "persistence",
+        "privilege-escalation"
+      ],
+      "keywords": [
+        "android-sandboxing",
+        "zygote",
+        "uid-isolation",
+        "selinux-seandroid",
+        "apk-signing-v1-v4",
+        "janus-cve-2017-13156",
+        "repackaging",
+        "fs-verity"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Trong hệ điều hành Android, mỗi ứng dụng được định danh như một người dùng Linux riêng biệt (Unique UID) với sandbox thư mục riêng tại /data/data/<package_name> và bị kiểm soát bởi cơ chế SEAndroid MAC. Kiến trúc ký số APK đã chuyển đổi từ xác thực từng file nén độc lập (v1) sang băm toàn bộ file nhị phân qua APK Signing Block (v2/v3) và cây băm Merkle Tree ở cấp độ hệ thống tệp fs-verity (v4) nhằm triệt tiêu hoàn toàn khả năng chèn payload không hợp lệ vào các khoảng trống zip header.",
+      "visual": {
+        "title": "Tiến Trình Khởi Tạo Ứng Dụng Android và Kiểm Tra Chữ Ký Số APK Signing Block",
+        "caption": "Quy trình kiểm tra chữ ký đa tầng từ Package Manager Service đến phân tách UID qua Zygote fork.",
+        "steps": [
+          {
+            "label": "Xác thực Chữ ký APK khi Cài đặt",
+            "detail": "PackageManagerService kiểm tra chữ ký số qua apksigner: ưu tiên v4/v3/v2 trước khi fallback về v1; xác minh tính toàn vẹn của APK Signing Block nằm trước Central Directory.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Phát hiện Lỗ hổng Chữ ký Cũ (v1 Only)",
+            "detail": "Nếu gói tin chỉ ký v1 JAR signing, tệp tin DEX có thể được chèn nối tiếp ở đầu file zip mà không phá vỡ chữ ký (Janus CVE-2017-13156).",
+            "tone": "stop"
+          },
+          {
+            "label": "Khởi tạo Sandbox qua Zygote Fork",
+            "detail": "Khi khởi chạy, Zygote fork tiến trình con mới, drop quyền root, gán App UID (u0_aX), thiết lập GID supplementary và chuyển SELinux domain sang untrusted_app.",
+            "tone": "allow"
+          },
+          {
+            "label": "Ranh giới Cô lập Thư mục Dữ liệu",
+            "detail": "Nhân Linux chặn hoàn toàn truy cập chéo giữa các thư mục /data/data/<package> của các UID khác nhau trừ khi được chia sẻ qua sharedUserId cùng chứng chỉ ký.",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Phân Tách Quyền Linux UID và Tiến Trình Mẹ Zygote",
+          "paragraphs": [
+            "Khác với các hệ điều hành máy tính để bàn truyền thống nơi tất cả ứng dụng do người dùng khởi chạy đều chạy dưới cùng một User ID (UID), Android tận dụng cơ chế đa người dùng (Multi-user) của nhân Linux để thiết lập ranh giới bảo mật ứng dụng. Mỗi khi một ứng dụng Android được cài đặt, PackageManagerService sẽ cấp phát cho nó một Linux UID duy nhất trong dải AID_APP_START (10000) đến AID_APP_END (19999), thường biểu diễn dưới dạng `u0_a<ID>` (ví dụ u0_a145 cho UID 10145 ở người dùng chính). Thư mục dữ liệu nội bộ `/data/data/<package_name>` được cấp quyền sở hữu `rwx------` dành riêng cho UID đó, ngăn chặn bất kỳ ứng dụng nào khác đọc hoặc ghi dữ liệu.",
+            "Để tối ưu hóa thời gian khởi động và tiết kiệm tài nguyên RAM chia sẻ, Android sử dụng tiến trình nền tảng Zygote (chạy ở cả phiên bản 32-bit và 64-bit: zygote và zygote64). Zygote được khởi động trực tiếp bởi init binary trong quá trình boot hệ điều hành, nạp sẵn toàn bộ các lớp Java Core Framework và thư viện Android Runtime (ART) dùng chung. Khi người dùng mở một ứng dụng, ActivityManagerService gửi yêu cầu qua Unix Domain Socket (`/dev/socket/zygote`). Zygote nhận lệnh và thực hiện lệnh gọi hệ thống `fork()` để tạo ra một tiến trình con là bản sao chính xác của nó.",
+            "Ngay sau khi `fork()`, tiến trình con mới lập tức hạ cấp đặc quyền (privilege dropping) bằng cách gọi `setuid()` và `setgid()` sang UID và GID tương ứng của ứng dụng. Đồng thời, nó cấu hình nhóm quyền bổ sung (supplementary groups) ánh xạ tới các quyền hạn nhạy cảm (ví dụ AID_INET cho quyền truy cập mạng socket). Từ thời điểm này, tiến trình ứng dụng bị cô lập hoàn toàn bên trong sandbox Linux của chính nó, không thể can thiệp vào không gian bộ nhớ của tiến trình khác trừ khi sử dụng các cơ chế IPC có kiểm soát như Binder."
+          ]
+        },
+        {
+          "title": "Cơ Chế SEAndroid (SELinux on Android) và Ranh Giới Sandbox Nhân Linux",
+          "paragraphs": [
+            "Mặc dù cơ chế Discretionary Access Control (DAC) dựa trên Linux UID cung cấp ranh giới cách ly cơ bản, nó không thể ngăn chặn các cuộc tấn công khai thác lỗ hổng trong các tiến trình hệ thống chạy quyền root hoặc daemon hệ thống. Để giải quyết điểm yếu này, từ Android 4.4 và bắt buộc thực thi (Enforcing mode) từ Android 5.0, Google đã tích hợp SEAndroid (Security Enhancements for Android) — một triển khai Mandatory Access Control (MAC) dựa trên SELinux.",
+            "Trong SEAndroid, mọi tiến trình, tệp tin, socket, và dịch vụ Binder đều được gán một nhãn bảo mật (Security Context) theo định dạng `user:role:type:mls_level`. Hầu hết các ứng dụng của bên thứ ba được gán type `untrusted_app` (hoặc `untrusted_app_25`, `untrusted_app_27`, v.v. tùy theo targetSdkVersion). Tập hợp các tệp chính sách (sepolicy) nằm trong `/system/etc/selinux/` và `/vendor/etc/selinux/` định nghĩa nghiêm ngặt những gì mà domain `untrusted_app` được phép thực thi. Bất kỳ thao tác nào không được khai báo tường minh trong policy đều bị nhân Linux chặn lại và ghi log AVC (Access Vector Calculation) denial vào dmesg/logcat.",
+            "SEAndroid áp dụng cơ chế lọc lệnh gọi hệ thống ioctl (ioctl filtering), ngăn chặn ứng dụng gửi các mã ioctl tùy ý tới các trình điều khiển thiết bị phần cứng (kernel device drivers) trong `/dev/`. Nhờ đó, ngay cả khi một ứng dụng của bên thứ ba tìm ra cách chiếm quyền root cục bộ bằng cách lợi dụng một lỗ hổng DAC thông thường, SEAndroid vẫn giam giữ tiến trình đó trong phạm vi hẹp, ngăn nó truy cập vào các phân vùng lưu trữ nhạy cảm, nạp kernel module, hoặc can thiệp vào các tiến trình hệ thống trọng yếu."
+          ]
+        },
+        {
+          "title": "Cấu Trúc Gói Tin APK/AAB và Bóc Tách AndroidManifest.xml Nhị Phân",
+          "paragraphs": [
+            "Tệp APK (Android Package) thực chất là một tệp lưu trữ chuẩn ZIP chứa toàn bộ mã nguồn đã biên dịch, tài nguyên và chữ ký số của ứng dụng. Cấu trúc nội bộ điển hình bao gồm: các tệp mã máy ảo Dalvik Executable (`classes.dex`, `classes2.dex`), tệp kê khai nhị phân `AndroidManifest.xml`, thư mục chứa thư viện native đã biên dịch theo kiến trúc CPU (`lib/arm64-v8a/`, `lib/armeabi-v7a/`, `lib/x86_64/`), bảng tài nguyên nhị phân `resources.arsc`, thư mục tài nguyên thô `res/`, `assets/`, và thư mục chứa chữ ký `META-INF/` (đối với APK Signing Scheme v1).",
+            "Tệp `AndroidManifest.xml` trong file APK không phải là XML dạng văn bản thuần túy mà đã được trình biên dịch `aapt` hoặc `aapt2` chuyển đổi thành định dạng Binary XML (AXML) nhằm tối ưu hóa kích thước và tốc độ phân tích cú pháp của hệ điều hành. Định dạng Binary XML bao gồm một String Pool chứa toàn bộ tên thẻ, thuộc tính và giá trị chuỗi, theo sau là các cấu trúc chunk nhị phân mô tả cây XML (RES_XML_START_NAMESPACE_EXT_TYPE, RES_XML_START_ELEMENT_EXT_TYPE).",
+            "Từ góc độ an ninh, việc phân tích cấu trúc AndroidManifest.xml là bước tiên quyết để xác định bề mặt tấn công của ứng dụng. Các thuộc tính nhạy cảm cần rà soát bao gồm: `android:debuggable` (nếu đặt là true sẽ cho phép đính kèm debugger và chạy mã với UID ứng dụng qua lệnh `run-as`), `android:allowBackup` (cho phép trích xuất dữ liệu qua adb backup), cờ `android:exported` trên các thành phần Activity, Service, Broadcast Receiver, Content Provider (nếu exported=true mà không có permission bảo vệ thì bất kỳ ứng dụng độc hại nào trên máy cũng có thể gọi trực tiếp), và cơ chế chia sẻ UID lỗi thời `android:sharedUserId`."
+          ]
+        },
+        {
+          "title": "Tiến Hóa Của Các Lược Đồ Ký Số APK (v1 Đến v4) và Lỗ Hổng Janus (CVE-2017-13156)",
+          "paragraphs": [
+            "Chữ ký số APK đảm bảo tính toàn vẹn của ứng dụng và xác thực danh tính nhà phát triển. Cơ chế ký ban đầu là APK Signature Scheme v1 (JAR signing). Trong lược đồ v1, tệp tin `META-INF/MANIFEST.MF` lưu trữ chuỗi băm SHA-1/SHA-256 của từng tệp tin riêng lẻ trong kho lưu trữ ZIP. Tệp `CERT.SF` chứa băm của các dòng trong MANIFEST.MF, và tệp `CERT.RSA` chứa chữ ký mã hóa của tệp `CERT.SF` bằng khóa riêng tư của nhà phát triển. Điểm yếu chí mạng của v1 là nó chỉ xác thực nội dung của từng tệp con mà hoàn toàn bỏ qua cấu trúc tổng thể của tệp ZIP, chẳng hạn như phần metadata của Central Directory và các byte dữ liệu nằm ngoài các entry của tệp tin.",
+            "Lỗ hổng kinh điển Janus (CVE-2017-13156) đã khai thác triệt để điểm mù này của v1. Vì định dạng tệp ZIP xác định các entry của nó từ cuối tệp (bắt đầu từ End of Central Directory record), trong khi định dạng Android DEX xác định cấu trúc từ đầu tệp (DEX magic bytes ở byte 0), kẻ tấn công có thể ghép nối một tệp DEX độc hại vào trước một tệp APK được ký v1. Trình xác thực chữ ký v1 bỏ qua phần đầu tệp và xác nhận chữ ký hợp lệ, nhưng máy ảo Android Runtime (ART) lại nhận diện tệp là một file DEX hợp lệ và thực thi trực tiếp mã độc với quyền hạn của ứng dụng gốc.",
+            "Để khắc phục triệt để, Google giới thiệu APK Signature Scheme v2 từ Android 7.0. V2 đưa vào một khối dữ liệu nhị phân đặc biệt gọi là APK Signing Block, được chèn vào ngay trước phần Central Directory của file ZIP. Khối này chứa chuỗi băm 1MB-chunk Merkle Tree bao phủ toàn bộ nội dung của tệp APK (bao gồm ZIP entries, Central Directory, và EOCD). Bất kỳ sự thay đổi dù chỉ 1 byte ở bất kỳ vị trí nào trong file APK đều làm hỏng chữ ký v2. Các phiên bản tiếp theo gồm: v3 (Android 9.0) hỗ trợ xoay vòng khóa ký (Key Rotation với proof-of-rotation lineage) mà không làm mất danh tính ứng dụng, và v4 (Android 11) tạo ra cây băm Merkle tương thích với tính năng `fs-verity` của nhân Linux, cho phép truyền tải trực tuyến (streaming) và xác thực tính toàn vẹn theo từng trang bộ nhớ 4KB theo thời gian thực."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Kiến Trúc Sandbox Android, Lược Đồ Chữ Ký APK và Khai Thác Điểm Yếu Signing Scheme",
+        "objective": "Phân tích cấu trúc tệp APK, xác định phiên bản APK Signing Scheme, đánh giá nguy cơ tấn công chèn mã Janus CVE-2017-13156 và kiểm toán cấu hình quyền hạn AndroidManifest nhị phân.",
+        "scenario": "Một ứng dụng ngân hàng số (com.megabank.mobile) đang chuẩn bị phát hành bản cập nhật đa thị trường. Bạn được chỉ định thực hiện kiểm toán an ninh gói cài đặt APK: kiểm tra các lược đồ ký số đang áp dụng, đánh giá rủi ro từ việc hỗ trợ thiết bị cũ, kiểm tra cờ nhạy cảm trong AndroidManifest và xác minh tính toàn vẹn của sandbox ứng dụng.",
+        "constraints": [
+          "Phải tuân thủ tiêu chuẩn OWASP Mobile Application Security Verification Standard (MASVS-RESILIENCE & MASVS-PLATFORM).",
+          "Phải phân biệt rõ ranh giới kiểm tra chữ ký ở tầng PackageManagerService và tầng runtime kiểm tra chứng chỉ.",
+          "Mọi phân tích cấu trúc APK và chữ ký số phải dựa trên công cụ chuẩn `apksigner` và phân tích nhị phân bytecode an toàn."
+        ],
+        "cases": [
+          {
+            "id": "case-91-01",
+            "title": "Kiểm Toán Lược Đồ Chữ Ký Số APK và Nguy Cơ Lỗ Hổng Janus (CVE-2017-13156)",
+            "context": "Ứng dụng com.megabank.mobile được cấu hình trong build.gradle với `minSdkVersion 19` và `targetSdkVersion 33`. Khi bạn thực thi lệnh `apksigner verify --verbose com.megabank.mobile.apk`, kết quả trả về: 'Verified using v1 scheme: true', 'Verified using v2 scheme: false', 'Verified using v3 scheme: false', 'Verified using v4 scheme: false'.",
+            "prompt": "Đánh giá rủi ro an ninh đối với cấu hình chữ ký này và cơ chế tấn công khả thi nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Gói APK đối mặt với nguy cơ lỗ hổng chèn mã Janus (CVE-2017-13156). Do chỉ được ký bằng v1 scheme (JAR signing), kẻ tấn công có thể ghép nối một tệp DEX độc hại vào đầu tệp APK; trên các thiết bị chạy Android 5.0 đến 7.0 (chưa hỗ trợ v2 hoặc chưa vá lỗi), hệ thống sẽ bỏ qua phần đầu tệp khi kiểm tra chữ ký v1 nhưng lại thực thi mã DEX độc hại đó với đầy đủ quyền hạn của MegaBank.",
+                "correct": true,
+                "rationale": "Lược đồ ký số v1 chỉ băm các entry file trong ZIP mà không băm toàn bộ file nhị phân; việc thiếu v2 scheme cho phép chèn payload DEX vào đầu file APK mà không làm sai lệch chữ ký số."
+              },
+              {
+                "id": "B",
+                "label": "Gói APK sẽ bị Android 13 từ chối cài đặt ngay lập tức vì tất cả ứng dụng có targetSdkVersion trên 30 bắt buộc phải có chữ ký v4 scheme.",
+                "correct": false,
+                "rationale": "Chữ ký v4 scheme chỉ là tùy chọn cho tính năng truyền phát trực tuyến adb install, không phải điều kiện bắt buộc để cài đặt trên Android 13; Android chỉ yêu cầu tối thiểu v2 scheme cho targetSdkVersion cao."
+              },
+              {
+                "id": "C",
+                "label": "Cấu hình này hoàn toàn an toàn vì chữ ký v1 đã bảo vệ tính toàn vẹn của tất cả các lớp trong classes.dex thông qua tệp META-INF/MANIFEST.MF.",
+                "correct": false,
+                "rationale": "Chữ ký v1 chỉ kiểm tra hash của classes.dex gốc bên trong ZIP archive, nhưng không phát hiện được tệp DEX độc hại được tiêm vào trước cấu trúc ZIP header."
+              },
+              {
+                "id": "D",
+                "label": "Ứng dụng sẽ tự động chuyển đổi sang chế độ debuggable vì thiếu chữ ký v3 scheme.",
+                "correct": false,
+                "rationale": "Chế độ debuggable được quy định duy nhất bởi thuộc tính android:debuggable trong AndroidManifest.xml, hoàn toàn không phụ thuộc vào phiên bản chữ ký APK."
+              }
+            ]
+          },
+          {
+            "id": "case-91-02",
+            "title": "Đánh Giá Cấu Hình sharedUserId và Rủi Ro Phá Vỡ Ranh Giới Sandbox UID",
+            "context": "Trong quá trình decompile AndroidManifest.xml của gói tiện ích mở rộng com.megabank.rewards đi kèm, bạn phát hiện thuộc tính `android:sharedUserId=\"com.megabank.shared_identity\"`. Ứng dụng chính com.megabank.mobile cũng sử dụng cùng sharedUserId này và cả hai đều được ký bằng cùng một Release Certificate. Tuy nhiên, com.megabank.rewards chứa một thư viện quảng cáo bên thứ ba có lỗ hổng thực thi mã từ xa (RCE).",
+            "prompt": "Hậu quả an ninh nghiêm trọng nhất phát sinh từ việc sử dụng sharedUserId giữa hai ứng dụng này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không có hậu quả nghiêm trọng nào vì SEAndroid sẽ tự động phân tách domain riêng biệt cho mỗi package name bất kể giá trị sharedUserId.",
+                "correct": false,
+                "rationale": "SEAndroid gán security context dựa trên Linux UID; khi hai ứng dụng dùng chung sharedUserId, chúng dùng chung UID và chia sẻ chung context untrusted_app."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công khai thác lỗ hổng RCE trong thư viện của com.megabank.rewards sẽ chiếm được quyền kiểm soát tiến trình chạy với cùng UID của com.megabank.mobile, qua đó đọc/ghi trực tiếp vào thư mục dữ liệu nội bộ /data/data/com.megabank.mobile, đánh cắp token phiên, cơ sở dữ liệu và khóa bí mật mà không gặp bất kỳ rào cản phân quyền Linux nào.",
+                "correct": true,
+                "rationale": "sharedUserId làm suy yếu hoàn toàn ranh giới phân tách UID của nhân Linux; hai ứng dụng chạy với cùng một UID có toàn quyền truy cập tài nguyên tệp tin của nhau."
+              },
+              {
+                "id": "C",
+                "label": "Hệ điều hành Android sẽ từ chối chạy ứng dụng com.megabank.rewards trên các thiết bị không có cảm biến vân tay.",
+                "correct": false,
+                "rationale": "sharedUserId liên quan đến cơ chế danh tính tiến trình Linux, hoàn toàn không liên quan đến phần cứng sinh trắc học."
+              },
+              {
+                "id": "D",
+                "label": "Mọi cuộc gọi Binder IPC giữa hai ứng dụng sẽ bị mã hóa bắt buộc bằng khóa AES-256 phần cứng.",
+                "correct": false,
+                "rationale": "sharedUserId không kích hoạt mã hóa IPC Binder; trên thực tế việc chia sẻ UID cho phép truy cập trực tiếp hệ thống tệp mà không cần dùng Binder."
+              }
+            ]
+          },
+          {
+            "id": "case-91-03",
+            "title": "Bảo Vệ Tính Toàn Vẹn Của Mã Nguồn Trước Kỹ Thuật Repackaging và Smali Tampering",
+            "context": "Đội ngũ phát triển triển khai cơ chế kiểm tra tính toàn vẹn cục bộ bằng cách so khớp mã hash SHA-256 của chứng chỉ ký tại thời điểm runtime qua hàm `packageManager.getPackageInfo(packageName, GET_SIGNING_CERTIFICATES)`. Tuy nhiên, kẻ tấn công đã decompile ứng dụng sang mã Smali qua apktool, tìm thấy đoạn code kiểm tra và sửa lệnh rẽ nhánh điều kiện (`if-eqz` thành `goto`), sau đó đóng gói lại (repackage) và ký bằng khóa debug của kẻ tấn công.",
+            "prompt": "Đâu là giải pháp kiến trúc phòng thủ toàn diện nhất để ngăn chặn kẻ tấn công vô hiệu hóa kiểm tra tính toàn vẹn cục bộ bằng kỹ thuật decompile/patching?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cần đổi tên biến trong mã nguồn Kotlin bằng ProGuard là đủ để ngăn chặn hoàn toàn việc decompile mã Smali.",
+                "correct": false,
+                "rationale": "Obfuscation bằng ProGuard chỉ gây khó khăn cho việc đọc hiểu tên hàm/biến, không ngăn chặn được việc tìm kiếm chuỗi API getPackageInfo và sửa lệnh điều kiện trong Smali."
+              },
+              {
+                "id": "B",
+                "label": "Lưu trữ chứng chỉ ký trong tệp asset văn bản thuần để ứng dụng so sánh chuỗi trực tiếp.",
+                "correct": false,
+                "rationale": "Lưu trữ chứng chỉ trong tệp asset càng khiến kẻ tấn công dễ dàng thay thế tệp đó khi thực hiện repackaging."
+              },
+              {
+                "id": "C",
+                "label": "Kết hợp kiểm tra chữ ký ở tầng native C/C++ (thực thi qua JNI để gây khó khăn cho việc hook/patch Smali), obfuscate mã nhị phân native bằng OLLVM, và quan trọng nhất là triển khai xác thực tính toàn vẹn từ xa (Remote Attestation thông qua Google Play Integrity API) để máy chủ độc lập thẩm định tính hợp lệ của gói tin và chứng chỉ ký trước khi cấp phiên làm việc.",
+                "correct": true,
+                "rationale": "Nguyên lý phòng thủ theo chiều sâu: kiểm tra cục bộ ở tầng native kết hợp kiểm định độc lập từ xa qua Play Integrity API là biện pháp duy nhất chống lại repackaging toàn diện."
+              },
+              {
+                "id": "D",
+                "label": "Tắt hoàn toàn cơ chế SELinux trên thiết bị người dùng để ngăn chặn tiến trình can thiệp vào mã bộ nhớ.",
+                "correct": false,
+                "rationale": "Tắt SELinux làm mất hoàn toàn lớp phòng vệ MAC của hệ điều hành, tạo điều kiện cho mã độc leo thang đặc quyền dễ dàng hơn."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác lỗ hổng bảo mật liên quan đến chữ ký APK v1 scheme và cơ chế tấn công Janus (CVE-2017-13156).",
+          "Phân tích đúng tác động an ninh của thuộc tính sharedUserId đối với ranh giới sandbox Linux UID.",
+          "Đề xuất mô hình phòng thủ chống repackaging đa tầng kết hợp Native code và Remote Attestation (Play Integrity API)."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo kết quả kiểm tra chữ ký APK bằng lệnh apksigner verify --verbose trên bản build phát hành",
+          "Bảng phân tích cấu trúc AndroidManifest.xml nhị phân: danh sách exported components, debuggable flag, và sharedUserId",
+          "Biên bản đánh giá rủi ro lỗ hổng Janus đối với dải minSdkVersion của ứng dụng kèm khuyến nghị cấu hình signingConfigs",
+          "Tài liệu thiết kế kiến trúc xác thực tính toàn vẹn ứng dụng sử dụng Play Integrity API và JNI native integrity check"
+        ],
+        "reset": "Đặt lại toàn bộ các công cụ phân tích APK, file manifest mẫu và chữ ký số về trạng thái ban đầu của dự án.",
+        "cleanup": "Xóa bỏ các tệp APK đã decompile tạm thời, mã nguồn Smali trích xuất và file build nhị phân trung gian khỏi môi trường lab."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc cấu hình build Gradle kích hoạt đồng thời cả APK Signature Scheme v2 và v3 (`v2SigningEnabled true`, `v3SigningEnabled true`), đồng thời nâng minSdkVersion lên tối thiểu 24 nếu có thể để loại bỏ hoàn toàn việc fallback về cơ chế kiểm tra v1.",
+          "Tuyệt đối loại bỏ thuộc tính `android:sharedUserId` khỏi AndroidManifest.xml để đảm bảo mỗi ứng dụng duy trì một Linux UID độc lập và sandbox riêng biệt.",
+          "Cấu hình `android:debuggable=\"false\"` và `android:allowBackup=\"false\"` trên tất cả các bản build phát hành production."
+        ],
+        "observe": [
+          "Giám sát các sự kiện cài đặt ứng dụng từ PackageManagerService thông qua logcat hệ thống (`tag:PackageManager`) để phát hiện các cảnh báo chữ ký không khớp.",
+          "Theo dõi các phản hồi từ Google Play Integrity API trên backend để phát hiện các thiết bị có tỷ lệ `appLicensingVerdict` hoặc `appRecognitionVerdict` bất thường.",
+          "Thiết lập cơ chế thu thập crash log để nhận diện các trường hợp ứng dụng bị crash do tampering hoặc hooking trái phép vào mã nhị phân."
+        ],
+        "respond": [
+          "Khi phát hiện tệp APK giả mạo hoặc repackaged đang lưu hành, sử dụng tính năng APK Signing Scheme v3 Key Rotation để xoay vòng chứng chỉ ký số nếu chứng chỉ cũ bị nghi ngờ lộ lọt.",
+          "Kích hoạt cờ chặn từ chối dịch vụ trên API Gateway đối với bất kỳ client nào không vượt qua được bước xác thực Play Integrity Token.",
+          "Gửi yêu cầu gỡ bỏ ứng dụng giả mạo (Takedown Notice) tới các chợ ứng dụng không chính thức và cảnh báo người dùng thông qua các kênh chính thức."
+        ],
+        "residualRisk": [
+          "Các thiết bị Android cũ chưa được cập nhật bản vá bảo mật của nhà sản xuất (OEM) vẫn có nguy cơ bị ảnh hưởng bởi lỗ hổng Janus nếu ứng dụng vẫn duy trì tương thích ngược với v1 signing.",
+          "Kẻ tấn công có toàn quyền kiểm soát thiết bị đã root có thể sử dụng Frida hoặc Xposed Framework để hook trực tiếp vào bộ nhớ ART runtime và vượt qua các kiểm tra chữ ký cục bộ."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Chữ ký số APK v1 (JAR signing) bảo vệ toàn vẹn 100% nội dung gói tin APK khỏi bất kỳ sửa đổi nào từ bên ngoài.",
+          "correction": "Lược đồ v1 chỉ kiểm tra mã băm của từng tệp tin riêng lẻ được liệt kê trong MANIFEST.MF; nó không bảo vệ cấu trúc zip header hoặc phần dữ liệu nhị phân nằm ngoài các entry của tệp tin, cho phép lỗ hổng Janus chèn mã DEX vào đầu file mà không làm sai lệch chữ ký."
+        },
+        {
+          "claim": "Việc đặt thuộc tính android:sharedUserId giữa hai ứng dụng là phương thức tối ưu và an toàn để chia sẻ dữ liệu nội bộ trong cùng một doanh nghiệp.",
+          "correction": "Google đã chính thức loại bỏ (deprecate) thuộc tính sharedUserId từ Android 10 (API 29) vì nó hợp nhất ranh giới Linux UID sandbox của hai ứng dụng thành một, khiến lỗ hổng bảo mật ở ứng dụng thứ nhất tự động biến thành nguy cơ thỏa hiệp toàn diện dữ liệu của ứng dụng thứ hai."
+        },
+        {
+          "claim": "Chỉ cần mã hóa obfuscate code bằng ProGuard hoặc R8 là ứng dụng di động đã hoàn toàn miễn nhiễm trước việc bị dịch ngược và sửa đổi mã.",
+          "correction": "ProGuard và R8 chỉ thực hiện rút gọn mã và đổi tên định danh (identifier renaming), không làm thay đổi luồng điều khiển cơ bản hay che giấu các chuỗi API hệ thống; kẻ tấn công vẫn có thể đọc mã Smali, tìm kiếm API nhạy cảm và sửa đổi logic rẽ nhánh dễ dàng."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os10-l91-q1",
+          "difficulty": "easy",
+          "question": "Thành phần nào trong kiến trúc Android chịu trách nhiệm nạp sẵn Android Runtime (ART), các lớp Java Core Framework và fork ra tiến trình con mới cho mỗi ứng dụng khi được khởi chạy?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Zygote"
+            },
+            {
+              "id": "B",
+              "label": "SurfaceFlinger"
+            },
+            {
+              "id": "C",
+              "label": "SystemServer"
+            },
+            {
+              "id": "D",
+              "label": "Vold (Volume Daemon)"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Zygote là tiến trình gốc chứa sẵn runtime ART và các core class; khi một ứng dụng mới cần khởi chạy, Zygote fork tiến trình con và chuyển đổi UID sang UID của ứng dụng đó."
+        },
+        {
+          "id": "os10-l91-q2",
+          "difficulty": "medium",
+          "question": "Điểm khác biệt cốt lõi về mặt kỹ thuật giữa APK Signature Scheme v1 (JAR signing) và APK Signature Scheme v2 (Whole-file signing) là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Lược đồ v1 sử dụng thuật toán RSA-4096 trong khi v2 chỉ hỗ trợ thuật toán ECC đường cong P-256."
+            },
+            {
+              "id": "B",
+              "label": "Lược đồ v1 chỉ kiểm tra tính toàn vẹn của từng tệp con bên trong file ZIP, trong khi v2 băm toàn bộ file nhị phân qua cấu trúc APK Signing Block nằm trước Central Directory bằng cây băm Merkle Tree."
+            },
+            {
+              "id": "C",
+              "label": "Lược đồ v1 yêu cầu thiết bị phải có kết nối Internet để kiểm tra chứng chỉ còn v2 xác thực hoàn toàn ngoại tuyến."
+            },
+            {
+              "id": "D",
+              "label": "Lược đồ v2 chỉ áp dụng cho mã nguồn Kotlin còn v1 áp dụng cho mã Java."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "APK Signature Scheme v2 giải quyết triệt để điểm mù của v1 bằng cách đưa APK Signing Block vào trước Central Directory và tính Merkle hash toàn bộ tệp APK, ngăn chặn mọi kỹ thuật chèn dữ liệu ngoài zip entry."
+        },
+        {
+          "id": "os10-l91-q3",
+          "difficulty": "hard",
+          "question": "Trong lỗ hổng Janus (CVE-2017-13156), tại sao tệp nhị phân độc hại vừa vượt qua được bước kiểm tra chữ ký APK v1 vừa được máy ảo Android Runtime (ART) thực thi?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Do khóa riêng tư của Google Play Store bị lộ lọt nên kẻ tấn công ký được mã độc hợp lệ."
+            },
+            {
+              "id": "B",
+              "label": "Do nhân Linux gặp lỗi tràn bộ đệm stack trong hàm sys_execve khi nạp tệp ELF."
+            },
+            {
+              "id": "C",
+              "label": "Do trình giải nén ZIP tìm kiếm End of Central Directory từ cuối file trở lên (bỏ qua phần đầu file), trong khi máy ảo ART nhận diện file DEX dựa vào magic bytes ở ngay đầu file (offset 0), cho phép ghép nối tệp DEX vào trước file APK."
+            },
+            {
+              "id": "D",
+              "label": "Do SEAndroid bị cấu hình sai từ chối ghi nhận sự kiện AVC denial của tệp tin nhị phân."
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Lỗ hổng Janus tận dụng đặc tính cấu trúc: ZIP đọc ngược từ EOCD ở cuối file nên bỏ qua header rác, còn ART đọc tệp từ byte 0 tìm kiếm DEX header; sự bất đối xứng này cho phép tệp lai (polyglot) vừa là APK v1 hợp lệ vừa là DEX hợp lệ."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một ứng dụng thanh toán di động (MegaPay Android) chuẩn bị mở rộng sang thị trường các quốc gia đang phát triển với tỷ lệ thiết bị Android 6.0 và 7.0 còn cao. Đội ngũ DevOps muốn giữ nguyên cấu hình build hiện tại để đảm bảo cài đặt được trên mọi thiết bị. Bạn cần thực hiện kiểm toán chữ ký số, đánh giá lỗ hổng Janus và thiết kế cơ chế bảo vệ tính toàn vẹn gói tin.",
+        "tasks": [
+          "Sử dụng công cụ apksigner để phân tích chuyên sâu các lược đồ ký số hiện diện trên tệp APK phát hành, ghi lại chi tiết các thuật toán băm và trạng thái xác thực của từng scheme (v1, v2, v3, v4).",
+          "Mô phỏng kịch bản kiểm thử tấn công giả lập chèn mã nhị phân theo kỹ thuật Janus (CVE-2017-13156) trên môi trường thử nghiệm cô lập để chứng minh mức độ nguy hiểm nếu ứng dụng chỉ được ký bằng v1 scheme.",
+          "Thiết lập cấu hình build.gradle chuẩn hóa kích hoạt đồng thời v2 và v3 signing schemes, kết hợp cơ chế kiểm tra tính toàn vẹn đa tầng (Native C JNI + Play Integrity API) và đưa ra kế hoạch nâng mức minSdkVersion khả thi."
+        ],
+        "requiredEvidence": [
+          "Biên bản xuất log chi tiết từ lệnh `apksigner verify --verbose --print-certs` chứng minh trạng thái chữ ký số trước và sau khi tối ưu hóa cấu hình",
+          "Báo cáo phân tích kỹ thuật về lỗ hổng Janus kèm mã kiểm thử PoC chứng minh khả năng phòng thủ khi kích hoạt APK Signature Scheme v2",
+          "Đoạn mã cấu hình build.gradle signingConfigs chuẩn hóa và mã nguồn JNI native kiểm tra hash chứng chỉ ứng dụng tại thời điểm runtime"
+        ]
+      },
+      "sources": [
+        {
+          "title": "OWASP Mobile Application Security Testing Guide (MASTG) — Android Application Security",
+          "url": "https://mas.owasp.org/MASTG/tests/android/MASVS-PLATFORM/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiểm toán cấu hình AndroidManifest nhị phân và các cờ exported/debuggable/sharedUserId",
+            "Đánh giá tính an toàn của cơ chế phân tách quyền Linux UID và SEAndroid sandbox"
+          ]
+        },
+        {
+          "title": "Android Open Source Project — Application Signing & APK Signature Schemes",
+          "url": "https://source.android.com/docs/security/features/apksigning",
+          "publisher": "Google",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế hoạt động chi tiết của APK Signature Scheme v1, v2, v3 và v4",
+            "Nguyên lý bảo vệ chống tấn công chèn mã ZIP và phân tích kỹ thuật lỗ hổng Janus CVE-2017-13156"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os10-l92-ios-architecture-mach-o-and-entitlements",
+      "slug": "ios-architecture-mach-o-and-entitlements",
+      "title": "Kiến Trúc iOS: Cấu Trúc Nhị Phân Mach-O, FairPlay DRM, Code Signing & Phân Quyền Entitlements",
+      "summary": "Khám phá kiến trúc bảo mật sâu của Apple iOS: định dạng nhị phân Mach-O (Load Commands, __TEXT, __DATA, __LINKEDIT), cơ chế mã hóa FairPlay DRM của App Store, quy trình Code Signing bất biến (Code Directory hash tree, CMS signature), hệ thống phân quyền Entitlements, cấu trúc provisioning profiles (.mobileprovision), sandbox container (/var/mobile/Containers), và các cơ chế bảo vệ nhân (XNU sandbox profiles, Pointer Authentication Codes - PAC, Page Protection Layer - PPL).",
+      "difficulty": "intermediate",
+      "durationMinutes": 120,
+      "prerequisites": ["os10-l91-android-architecture-sandboxing-and-signing"],
+      "outcomes": [
+        "Bóc tách cấu trúc tệp thực thi nhị phân iOS Mach-O (Header, Load Commands, LC_CODE_SIGNATURE, LC_ENCRYPTION_INFO) và cơ chế bộ nhớ ảo.",
+        "Phân tích quy trình giải mã FairPlay DRM của App Store và kỹ thuật trích xuất nhị phân giải mã (dump decrypted binary) từ bộ nhớ bằng Frida hoặc lldb.",
+        "Đánh giá cấu trúc Apple Code Signing, chuỗi băm Code Directory (cdhash), Provisioning Profile (.mobileprovision) và các quyền đặc quyền trong Entitlements plist.",
+        "Kiểm toán ranh giới sandbox container iOS, phân quyền IPC qua XPC Services và nhận diện các lỗ hổng leo thang đặc quyền do entitlements bị cấu hình sai (misconfigured entitlements)."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+      "domains": ["mobile", "ios", "storage"],
+      "attackTactics": [
+        "initial-access",
+        "privilege-escalation",
+        "defense-evasion",
+        "discovery"
+      ],
+      "keywords": [
+        "ios-architecture",
+        "mach-o",
+        "fairplay-drm",
+        "code-signing-cdhash",
+        "entitlements",
+        "provisioning-profile",
+        "xnu-sandbox",
+        "app-container"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Kiến trúc bảo mật iOS được xây dựng trên nguyên lý ký số mã nguồn cưỡng bức ở cấp độ nhân kernel (Apple Code Signing). Mọi tệp thực thi Mach-O được băm từng trang nhớ trong Code Directory (CS_CodeDirectory). Nhân XNU từ chối thực thi bất kỳ trang mã nào không khớp hash hoặc thiếu chữ ký hợp lệ từ Apple. Ranh giới ứng dụng bị phong tỏa chặt chẽ trong App Sandbox thông qua các hồ sơ sandbox SBPL, và ứng dụng chỉ được cấp thêm quyền khi sở hữu các Entitlements được ký số bất biến trong Provisioning Profile.",
+      "visual": {
+        "title": "Cấu Trúc Tệp Nhị Phân Mach-O iOS và Chuỗi Kiểm Tra Mã Ký Apple Code Signing",
+        "caption": "Cơ chế xác thực tính toàn vẹn trang nhớ của nhân XNU qua Code Directory hash và Entitlements.",
+        "steps": [
+          {
+            "label": "Phân Tích Mach-O Header & Load Commands",
+            "detail": "Nhân XNU đọc Mach-O Header, kiểm tra kiến trúc ARM64/ARM64e, nạp các segment __TEXT, __DATA và parse LC_CODE_SIGNATURE.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Kiểm Tra Code Directory Page Hashes",
+            "detail": "Mỗi trang bộ nhớ (4KB/16KB) trong segment __TEXT được tính hash SHA-256 và so khớp với bảng băm lưu trong Code Directory.",
+            "tone": "allow"
+          },
+          {
+            "label": "Xác Thực Entitlements trong Chữ Ký CMS",
+            "detail": "Các quyền nhạy cảm (Keychain sharing, App Groups, Push Notifications) được đọc từ XML/DER Entitlements nhúng trong chữ ký và đối chiếu với Provisioning Profile.",
+            "tone": "caution"
+          },
+          {
+            "label": "Chặn Thực Thi Trang Mã Lạ (W^X & PPL)",
+            "detail": "Nếu phát hiện trang nhớ bị sửa đổi, thiếu chữ ký hợp lệ hoặc vi phạm cờ CS_VALID, nhân kernel lập tức gửi tín hiệu SIGKILL (Code 9) tiêu diệt tiến trình.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Nhị Phân Mach-O: Headers, Segments, Sections và Load Commands",
+          "paragraphs": [
+            "Định dạng tệp thực thi cốt lõi của hệ điều hành iOS và macOS là Mach-O (Mach Object file format). Một tệp nhị phân Mach-O 64-bit hiện đại (ARM64 hoặc ARM64e) bao gồm ba thành phần chính: Mach-O Header, danh sách các Load Commands, và các Segments chứa dữ liệu thực tế. Header chỉ định kiểu tệp (MH_EXECUTE, MH_DYLIB), kiến trúc CPU mục tiêu (CPU_TYPE_ARM64), và các cờ thực thi như MH_PIE (Position Independent Executable) bắt buộc để kích hoạt ASLR.",
+            "Các Load Commands hướng dẫn trình nạp động (dynamic linker dyld) cách thức nạp tệp nhị phân vào không gian địa chỉ bộ nhớ ảo. Các lệnh nạp quan trọng bao gồm: `LC_SEGMENT_64` (định nghĩa các phân vùng bộ nhớ), `LC_LOAD_DYLINKER` (chỉ định đường dẫn tới dyld), `LC_LOAD_DYLIB` (danh sách các thư viện liên kết động), `LC_RPATH` (đường dẫn tìm kiếm dylib runtime), và `LC_CODE_SIGNATURE` (chỉ tới phần bù lưu trữ chữ ký số của Apple).",
+            "Không gian bộ nhớ của tệp Mach-O được phân chia thành các Segment với quyền hạn trang nhớ khác nhau tuân thủ nghiêm ngặt nguyên lý W^X (Write XOR Execute): Segment `__TEXT` (chứa mã thực thi, quyền read-execute `r-x`, bao gồm section `__text` chứa mã ASM và `__cstring` chứa hằng chuỗi), Segment `__DATA` (chứa biến toàn cục có thể ghi, quyền read-write `rw-`, bao gồm `__nl_symbol_ptr` và `__la_symbol_ptr`), Segment `__DATA_CONST` (dữ liệu chỉ đọc sau khi relocate, quyền `r--`), và Segment `__LINKEDIT` (chứa bảng ký hiệu, thông tin relocation và chữ ký mã máy)."
+          ]
+        },
+        {
+          "title": "Cơ Chế FairPlay DRM, Mã Hóa Ứng Dụng App Store và Kỹ Thuật Dump Binary",
+          "paragraphs": [
+            "Tất cả các ứng dụng iOS được phân phối chính thức qua Apple App Store đều được đóng gói với cơ chế bảo vệ bản quyền số FairPlay DRM. Khi tải một tệp IPA từ App Store, tệp nhị phân Mach-O chính của ứng dụng bị mã hóa ở mức độ trang nhớ trong segment `__TEXT`. Tình trạng mã hóa này được khai báo trong Load Command `LC_ENCRYPTION_INFO_64`, bao gồm ba trường: `cryptoff` (offset bắt đầu của vùng mã hóa), `cryptsize` (kích thước vùng mã hóa), và `cryptid` (1 nghĩa là đã được mã hóa bởi FairPlay, 0 nghĩa là không mã hóa).",
+            "Khi một tệp Mach-O có `cryptid = 1` được phân tích tĩnh trực tiếp bằng các công cụ dịch ngược (như IDA Pro, Ghidra, Hopper), toàn bộ mã lệnh máy trong segment `__TEXT` chỉ là các byte mã hóa ngẫu nhiên, khiến quá trình decompile thất bại hoàn toàn. Tuy nhiên, kiến trúc phần cứng của Apple yêu cầu CPU ARM phải thực thi các lệnh mã máy rõ ràng trong bộ nhớ RAM. Do đó, khi ứng dụng được khởi chạy trên thiết bị hợp lệ, nhân XNU kết hợp với FairPlay module sẽ sử dụng khóa phần cứng để giải mã từng trang nhớ mã nguồn vào bộ nhớ ảo của tiến trình.",
+            "Dựa trên cơ chế này, kỹ thuật trích xuất nhị phân giải mã (Decrypted Binary Dumping) được thực hiện bằng cách khởi chạy ứng dụng trên thiết bị nghiên cứu (jailbroken test device hoặc Corellium). Khi ứng dụng đã được nhân nạp vào bộ nhớ và giải mã xong, chuyên gia bảo mật sử dụng Frida hoặc lldb để đọc trực tiếp các byte trong vùng nhớ từ `cryptoff` tới `cryptoff + cryptsize`, ghi đè ngược trở lại tệp Mach-O trên đĩa và chỉnh sửa trường `cryptid` từ 1 về 0. Tệp Mach-O thu được hoàn toàn sạch mã hóa và sẵn sàng cho việc phân tích tĩnh chuyên sâu."
+          ]
+        },
+        {
+          "title": "Cơ Chế Apple Code Signing, Cây Băm Code Directory (cdhash) và Provisioning Profile",
+          "paragraphs": [
+            "Hệ thống ký số mã nguồn của Apple (Apple Code Signing) là hàng rào phòng thủ vững chắc nhất của iOS, được giám sát trực tiếp bởi nhân XNU thông qua module Amfi.kext (Apple Mobile File Integrity). Chữ ký số được lưu trữ trong cấu trúc `SuperBlob` tại offset do lệnh `LC_CODE_SIGNATURE` trỏ tới. Cấu trúc này chứa nhiều khối nhị phân: Code Directory (CS_CodeDirectory), Entitlements, Requirement Set, và CMS Signature (PKCS #7 cryptographic signature).",
+            "Cốt lõi của việc kiểm tra tính toàn vẹn là Code Directory. Code Directory chia nhỏ toàn bộ tệp nhị phân Mach-O thành các khối trang nhớ cố định (thường là 4KB trên thiết bị 64-bit). Mỗi trang nhớ được tính băm mật mã học (SHA-1 hoặc SHA-256). Giá trị băm của chính Code Directory được gọi là `cdhash`. Trong quá trình ứng dụng vận hành, mỗi khi hệ thống nạp một trang nhớ vào RAM (page-in), nhân XNU sẽ tính lại hash của trang nhớ đó và đối chiếu với bảng băm trong Code Directory. Nếu bất kỳ byte nào bị sửa đổi (ví dụ chèn inline hook), trang nhớ lập tức bị coi là không hợp lệ (CS_VALID bị xóa) và tiến trình bị tiêu diệt bằng tín hiệu SIGKILL.",
+            "Để ứng dụng có thể cài đặt và chạy trên thiết bị phát triển, Apple sử dụng tệp hồ sơ cấu hình cấp phép `embedded.mobileprovision`. Tệp tin này được ký số bởi chứng chỉ của Apple và chứa: chứng chỉ nhà phát triển được ủy quyền, danh sách định danh thiết bị được phép chạy (UDID list), ngày hết hạn, và đặc biệt là từ điển Entitlements được Apple phê duyệt. Nhân hệ thống chỉ cho phép ứng dụng sở hữu các Entitlements nếu chúng trùng khớp với những gì được ký trong Provisioning Profile."
+          ]
+        },
+        {
+          "title": "Mô Hình Sandbox Container iOS và Phân Quyền Bằng Entitlements",
+          "paragraphs": [
+            "Mọi ứng dụng của bên thứ ba trên iOS đều bị giam giữ bên trong một App Sandbox được thực thi bởi hệ thống con TrustedBSD MAC framework của nhân XNU dựa trên các hồ sơ sandbox (seatbelt profiles). Ranh giới tệp tin của ứng dụng được chia thành hai container vật lý tách biệt: Bundle Container (`/var/containers/Bundle/Application/<UUID>/`) chứa tệp nhị phân chỉ đọc và tài nguyên cài đặt, và Data Container (`/var/mobile/Containers/Data/Application/<UUID>/`) chứa dữ liệu ghi được trong quá trình chạy (Documents, Library, tmp).",
+            "Các ứng dụng không thể truy cập trực tiếp hệ thống tệp của nhau hoặc các thư mục hệ thống. Mọi tương tác xuyên ứng dụng bắt buộc phải thông qua các kênh IPC có kiểm soát như URL Schemes hoặc cơ chế App Groups. Để kích hoạt App Groups, ứng dụng phải sở hữu entitlement `com.apple.security.application-groups`. Khi đó, hệ thống sẽ cấp phát một thư mục chia sẻ chung tại `/var/mobile/Containers/Shared/AppGroup/<Group-UUID>/` cho các ứng dụng có chung định danh nhóm.",
+            "Entitlements đóng vai trò như các thẻ đặc quyền cấp hệ thống (Capability-based security). Một số entitlements nhạy cảm bao gồm: `keychain-access-groups` (quy định nhóm dữ liệu Keychain mà ứng dụng có thể đọc), `com.apple.developer.associated-domains` (Universal Links), và đặc biệt là `get-task-allow`. Nếu một ứng dụng phát hành ra production mà vô tình giữ cờ `get-task-allow = true`, bất kỳ tiến trình nào trên máy cũng có thể gọi hàm `task_for_pid()` để lấy handle của tiến trình, đọc/ghi toàn bộ bộ nhớ RAM và kiểm soát hoàn toàn ứng dụng."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Tệp Thực Thi Mach-O iOS, Giải Mã FairPlay DRM và Thẩm Định Entitlements",
+        "objective": "Thẩm định cấu trúc tệp Mach-O, xác định trạng thái mã hóa FairPlay (cryptid), trích xuất tệp nhị phân đã giải mã từ bộ nhớ và kiểm toán các cấu hình entitlements nguy hiểm trong file .mobileprovision.",
+        "scenario": "Bạn được bàn giao một gói ứng dụng iOS ngân hàng số (MegaPay.ipa) được trích xuất từ App Store để thực hiện đánh giá an ninh chuyên sâu. Nhiệm vụ của bạn là kiểm tra xem ứng dụng có cấu hình sai Entitlements hay không, thực hiện dump nhị phân giải mã FairPlay DRM để phục vụ dịch ngược mã nguồn, và đánh giá an toàn ranh giới App Group.",
+        "constraints": [
+          "Tuân thủ tiêu chuẩn OWASP Mobile Application Security Verification Standard (MASVS-CODE & MASVS-PLATFORM).",
+          "Mọi thao tác trích xuất bộ nhớ giải mã phải thực hiện trên thiết bị kiểm thử jailbreak chuyên dụng trong mạng cô lập.",
+          "Không sử dụng các công cụ bẻ khóa tự động không rõ nguồn gốc có nguy cơ làm sai lệch bằng chứng kiểm thử."
+        ],
+        "cases": [
+          {
+            "id": "case-92-01",
+            "title": "Nhận Diện Trạng Thái Mã Hóa FairPlay DRM và Lập Chiến Lược Reverse Engineering",
+            "context": "Khi sử dụng lệnh `otool -l MegaPay | grep -A 4 LC_ENCRYPTION_INFO_64` trên tệp nhị phân trích xuất từ gói IPA, kết quả hiển thị: 'cmd LC_ENCRYPTION_INFO_64', 'cryptoff 16384', 'cryptsize 20971520', 'cryptid 1'. Khi mở tệp này trong Ghidra, toàn bộ các hàm Objective-C và Swift trong segment __TEXT đều không thể phân tích cú pháp do hiển thị chuỗi byte ngẫu nhiên.",
+            "prompt": "Phương pháp kỹ thuật chuẩn xác nhất để thu được tệp Mach-O đã giải mã hoàn chỉnh phục vụ phân tích tĩnh là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Khởi chạy ứng dụng trên thiết bị nghiên cứu đã jailbreak; khi nhân XNU nạp và giải mã segment __TEXT vào bộ nhớ RAM, sử dụng kịch bản Frida hoặc lldb để dump vùng nhớ từ cryptoff với độ dài cryptsize ra đĩa, vá lại byte cryptid từ 1 thành 0 trong tệp Mach-O mới.",
+                "correct": true,
+                "rationale": "Đây là kỹ thuật tiêu chuẩn (frida-ios-dump): tận dụng việc nhân iOS bắt buộc phải giải mã nhị phân vào RAM khi thực thi để trích xuất mã rõ ràng và cập nhật cryptid=0."
+              },
+              {
+                "id": "B",
+                "label": "Dùng công cụ giải nén 7-Zip giải nén tệp IPA với mật khẩu mặc định của Apple để đọc mã nguồn rõ ràng.",
+                "correct": false,
+                "rationale": "FairPlay DRM mã hóa nhị phân Mach-O bằng thuật toán bất đối xứng cấp phần cứng, không sử dụng mật khẩu nén tệp ZIP."
+              },
+              {
+                "id": "C",
+                "label": "Chỉnh sửa trực tiếp cờ cryptid từ 1 thành 0 bằng hex editor trên tệp hiện tại mà không cần nạp vào bộ nhớ.",
+                "correct": false,
+                "rationale": "Chỉ đổi cờ cryptid thành 0 trên file gốc khi dữ liệu __TEXT vẫn đang bị mã hóa sẽ khiến ứng dụng crash ngay lập tức do CPU không thể thực thi byte rác."
+              },
+              {
+                "id": "D",
+                "label": "Tải khóa riêng tư FairPlay Master Key từ máy chủ công khai của Apple Developer Portal để giải mã offline.",
+                "correct": false,
+                "rationale": "Khóa FairPlay được bảo vệ trong hạ tầng phần cứng của Apple, không bao giờ được công khai trên Developer Portal."
+              }
+            ]
+          },
+          {
+            "id": "case-92-02",
+            "title": "Kiểm Toán Cờ get-task-allow và Rủi Ro Bị Attach Debugger Trên Môi Trường Production",
+            "context": "Trong quá trình audit tệp hồ sơ cấu hình bằng lệnh `security cms -D -i embedded.mobileprovision`, bạn phân tích phần từ điển Entitlements và phát hiện cặp khóa: `<key>get-task-allow</key><true/>`. Ứng dụng này đang được chuẩn bị để đóng gói thành bản release chính thức cho khách hàng.",
+            "prompt": "Tác động an ninh của việc duy trì thuộc tính get-task-allow=true trên bản phát hành production là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không có tác động nào vì Apple App Store sẽ tự động vô hiệu hóa thuộc tính này trong quá trình người dùng tải ứng dụng về máy.",
+                "correct": false,
+                "rationale": "Mặc dù App Store phân phối bản App Store profile, nhưng việc tồn tại cờ này trên bản build nội bộ/Ad-Hoc/Enterprise tạo ra rủi ro bị can thiệp bộ nhớ nghiêm trọng."
+              },
+              {
+                "id": "B",
+                "label": "Ứng dụng sẽ bị giới hạn dung lượng lưu trữ cục bộ tối đa xuống 50MB.",
+                "correct": false,
+                "rationale": "get-task-allow là thuộc tính phân quyền gỡ lỗi tiến trình, hoàn toàn không liên quan đến hạn mức dung lượng đĩa."
+              },
+              {
+                "id": "C",
+                "label": "Thuộc tính này cho phép các tiến trình khác (hoặc kẻ tấn công qua debug server) gọi hàm `task_for_pid()` đối với tiến trình của MegaPay, lấy được quyền điều khiển luồng thực thi (task port), cho phép đọc/ghi bộ nhớ RAM tùy ý, trích xuất khóa mật mã và tiêm mã động mà không cần can thiệp tệp tin trên đĩa.",
+                "correct": true,
+                "rationale": "get-task-allow cho phép debugger attach vào tiến trình; trên thiết bị không jailbreak nếu cờ này bật thì bất kỳ công cụ phát triển nào cũng có thể đọc bộ nhớ tiến trình."
+              },
+              {
+                "id": "D",
+                "label": "Mọi cuộc gọi mạng HTTPS của ứng dụng sẽ tự động chuyển đổi thành HTTP bản rõ.",
+                "correct": false,
+                "rationale": "get-task-allow không làm suy giảm cấu hình mạng App Transport Security (ATS) của hệ điều hành."
+              }
+            ]
+          },
+          {
+            "id": "case-92-03",
+            "title": "Đánh Giá Nguy Cơ Rò Rỉ Dữ Liệu Qua Cấu Hình Sai App Groups Entitlement",
+            "context": "Ứng dụng ngân hàng MegaPay sử dụng một Widget mở rộng để hiển thị số dư nhanh. Hai thành phần này chia sẻ dữ liệu qua thư mục App Group có định danh `group.com.megabank.shared`. Kiểm tra tệp tin trong thư mục chia sẻ `/var/mobile/Containers/Shared/AppGroup/<UUID>/`, bạn tìm thấy một tệp `session.json` chứa Token truy cập API và Số tài khoản dạng bản rõ, có quyền truy cập chung cho mọi tiến trình thuộc nhóm.",
+            "prompt": "Đâu là kịch bản tấn công nguy hiểm nhất và giải pháp kiến trúc khắc phục chuẩn xác?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công phải can thiệp trực tiếp vào chip Baseband của điện thoại để nghe lén gói tin App Group.",
+                "correct": false,
+                "rationale": "App Group là thư mục cục bộ trên hệ thống tệp tin, không liên quan đến chip Baseband di động."
+              },
+              {
+                "id": "B",
+                "label": "Nếu nhà phát triển vô tình hoặc bị tấn công chuỗi cung ứng tạo ra một ứng dụng thứ hai của cùng công ty nhưng kém bảo mật hơn cũng được gán cùng App Group ID này, ứng dụng đó có thể đọc trực tiếp session.json. Khắc phục: Không lưu trữ token nhạy cảm trong App Group thư mục tệp tin thuần túy; thay vào đó sử dụng Keychain Services với thuộc tính kSecAttrAccessGroup được chia sẻ giữa các target.",
+                "correct": true,
+                "rationale": "App Group chia sẻ hệ thống tệp giữa các target; việc lưu token bản rõ trong file JSON tạo rủi ro rò rỉ nếu một target phụ (như Widget) bị khai thác. Dữ liệu nhạy cảm chia sẻ bắt buộc phải lưu trong Keychain Access Groups."
+              },
+              {
+                "id": "C",
+                "label": "Xóa bỏ hoàn toàn App Group và thay thế bằng việc truyền dữ liệu qua SMS nội bộ giữa các ứng dụng.",
+                "correct": false,
+                "rationale": "Truyền dữ liệu qua SMS không khả thi cho IPC nội bộ và gây rò rỉ dữ liệu qua viễn thông."
+              },
+              {
+                "id": "D",
+                "label": "Đổi tên thư mục session.json thành .hidden_session để nhân iOS tự động mã hóa AES-128.",
+                "correct": false,
+                "rationale": "Tiền tố dấu chấm chỉ ẩn tệp trong giao diện người dùng, hoàn toàn không có tính năng bảo mật mật mã học."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác trạng thái mã hóa FairPlay (cryptid) trong cấu trúc LC_ENCRYPTION_INFO_64 của Mach-O.",
+          "Thực hiện thành công phân tích quy trình dump decrypted binary từ bộ nhớ RAM bằng Frida/lldb.",
+          "Chỉ ra đúng rủi ro bảo mật của cờ get-task-allow và đề xuất kiến trúc Keychain Access Groups thay thế lưu trữ file bản rõ trong App Group."
+        ],
+        "evidenceTemplate": [
+          "Bảng kết quả phân tích cấu trúc Mach-O bằng otool hoặc rabin2: cờ MH_PIE, Load Commands và thông số LC_ENCRYPTION_INFO_64",
+          "Biên bản trích xuất và giải mã tệp embedded.mobileprovision hiển thị toàn bộ cây Entitlements được ký",
+          "Nhật ký dump nhị phân từ bộ nhớ (memory dumping log) chứng minh tệp Mach-O đã được chuyển đổi từ cryptid=1 sang cryptid=0",
+          "Tài liệu khuyến nghị cấu hình Xcode Build Settings: đặt CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO và tắt get-task-allow trên Release Scheme"
+        ],
+        "reset": "Khôi phục lại gói ứng dụng IPA nguyên bản và cấu hình provisioning profile về trạng thái ban đầu của nhà phát triển.",
+        "cleanup": "Xóa các tệp Mach-O đã dump trong quá trình kiểm thử, lược đồ entitlements trích xuất và nhật ký gỡ lỗi khỏi thiết bị nghiên cứu."
+      },
+      "governance": {
+        "prevent": [
+          "Đảm bảo trong quy trình CI/CD build Release (Archive), cờ `get-task-allow` được đặt thành `false` tuyệt đối trong Entitlements để ngăn chặn việc đính kèm debugger trái phép.",
+          "Áp dụng cấu hình phân quyền Keychain Access Groups tối thiểu (Principle of Least Privilege), không dùng chung nhóm Keychain giữa các ứng dụng không cần thiết.",
+          "Kiểm tra và xác thực định kỳ các Load Commands trong tệp Mach-O để đảm bảo cờ `MH_PIE` (Position Independent Executable) và ARC (Automatic Reference Counting) luôn được bật."
+        ],
+        "observe": [
+          "Theo dõi các sự kiện crash bất thường với mã lỗi `EXC_CRASH (SIGKILL)` và Exception Subtype `0x9` (mã lỗi do vi phạm chữ ký mã nguồn Code Signing từ nhân XNU).",
+          "Giám sát việc cấp phát các chứng chỉ Apple Enterprise Developer Certificate trong tổ chức nhằm ngăn chặn việc lạm dụng chứng chỉ doanh nghiệp để sideload ứng dụng chứa mã độc.",
+          "Audit định kỳ nội dung của các tệp `embedded.mobileprovision` được nhúng trong các bản phát hành phân phối nội bộ."
+        ],
+        "respond": [
+          "Khi phát hiện tệp nhị phân release bị rò rỉ với cấu hình get-task-allow bật, lập tức thu hồi phiên bản phân phối thông qua App Store Connect và cập nhật bản vá mới.",
+          "Thu hồi chứng chỉ ký số bị lộ lọt (Revoke Certificate) trên Apple Developer Portal để vô hiệu hóa toàn bộ các ứng dụng đã ký bằng chứng chỉ đó trên thiết bị người dùng.",
+          "Kích hoạt cờ vô hiệu hóa phiên làm việc từ backend đối với các client gửi yêu cầu có dấu hiệu chạy từ môi trường jailbreak đã bypass AMFI."
+        ],
+        "residualRisk": [
+          "Trên các thiết bị iOS đã bị jailbreak, module AMFI (Apple Mobile File Integrity) bị vô hiệu hóa hoàn toàn, cho phép kẻ tấn công nạp các tệp nhị phân giả mạo và bỏ qua kiểm tra chữ ký Code Directory.",
+          "Các kỹ thuật tấn công khai thác lỗi trong bootrom phần cứng (như checkm8) cho phép kẻ tấn công can thiệp vào chuỗi Secure Boot và vô hiệu hóa các ranh giới bảo mật của nhân XNU."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Cơ chế mã hóa FairPlay DRM của Apple trên App Store bảo vệ 100% ứng dụng khỏi bị reverse engineering hoặc decompile mã nguồn.",
+          "correction": "FairPlay chỉ mã hóa segment __TEXT của nhị phân Mach-O trên đĩa. Khi ứng dụng khởi chạy trên thiết bị thực tế, nhân iOS bắt buộc phải giải mã toàn bộ mã máy vào RAM để CPU ARM thực thi, cho phép kẻ tấn công hoặc pentester dễ dàng dump mã đã giải mã từ bộ nhớ ra tệp tin."
+        },
+        {
+          "claim": "Thư mục sandbox /var/mobile/Containers/Data/Application/<UUID> có đường dẫn UUID cố định vĩnh viễn trên thiết bị iOS của người dùng.",
+          "correction": "Chuỗi GUID này được hệ điều hành iOS sinh ngẫu nhiên khi cài đặt hoặc nâng cấp ứng dụng nhằm ngăn chặn việc các ứng dụng khác đoán đường dẫn truy cập dữ liệu cục bộ; chỉ có hệ thống mới phân giải được ánh xạ giữa Bundle ID và thư mục Container GUID hiện hành."
+        },
+        {
+          "claim": "Một ứng dụng iOS có thể tự ý khai báo bất kỳ Entitlements nào mà nó muốn trong file MegaPay.entitlements của dự án Xcode để mở rộng quyền hạn.",
+          "correction": "Mọi Entitlements khai báo trong tệp nhị phân bắt buộc phải khớp hoàn toàn với danh sách quyền hạn được ký và chứng thực bởi Apple trong tệp embedded.mobileprovision. Nếu có sự bất nhất, hệ điều hành AMFI (Apple Mobile File Integrity) sẽ từ chối nạp ứng dụng ngay từ khi cài đặt."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os10-l92-q1",
+          "difficulty": "easy",
+          "question": "Trong tệp nhị phân Mach-O của iOS, Load Command nào chứa thông tin về trạng thái mã hóa của ứng dụng tải về từ App Store (bao gồm cryptoff, cryptsize và cryptid)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "LC_ENCRYPTION_INFO_64"
+            },
+            {
+              "id": "B",
+              "label": "LC_CODE_SIGNATURE"
+            },
+            {
+              "id": "C",
+              "label": "LC_LOAD_DYLINKER"
+            },
+            {
+              "id": "D",
+              "label": "LC_MAIN"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "LC_ENCRYPTION_INFO_64 (hoặc LC_ENCRYPTION_INFO trên 32-bit) chứa thông tin FairPlay DRM; giá trị cryptid = 1 chỉ định nhị phân đang được mã hóa bởi App Store."
+        },
+        {
+          "id": "os10-l92-q2",
+          "difficulty": "medium",
+          "question": "Điều gì sẽ xảy ra khi nhân XNU của iOS phát hiện một trang nhớ trong segment __TEXT của ứng dụng bị sửa đổi byte trong khi đang chạy trên thiết bị chưa jailbreak?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Hệ thống tự động bỏ qua lỗi và ghi cảnh báo vào tệp nhật ký sysdiagnose."
+            },
+            {
+              "id": "B",
+              "label": "Nhân XNU đối chiếu hash của trang nhớ với Code Directory trong LC_CODE_SIGNATURE; khi phát hiện không khớp, cờ CS_VALID bị xóa và nhân lập tức gửi tín hiệu SIGKILL tiêu diệt tiến trình."
+            },
+            {
+              "id": "C",
+              "label": "Hệ thống sẽ chuyển ứng dụng sang chạy trong một sandbox cô lập ảo không có quyền truy cập mạng."
+            },
+            {
+              "id": "D",
+              "label": "Ứng dụng sẽ được yêu cầu người dùng nhập mật khẩu Apple ID để tiếp tục thực thi."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Apple Code Signing kiểm tra tính toàn vẹn của từng trang bộ nhớ thông qua Code Directory; bất kỳ sửa đổi nào làm sai lệch băm trang nhớ sẽ khiến AMFI kích hoạt cờ vi phạm và nhân XNU gửi SIGKILL ngay lập tức."
+        },
+        {
+          "id": "os10-l92-q3",
+          "difficulty": "hard",
+          "question": "Thuộc tính nào trong tệp Entitlements (.mobileprovision) nếu được cấu hình là true trên bản phát hành production sẽ cho phép các tiến trình khác gọi hàm task_for_pid() để gắn debugger và can thiệp bộ nhớ ứng dụng?",
+          "options": [
+            {
+              "id": "A",
+              "label": "com.apple.security.app-sandbox"
+            },
+            {
+              "id": "B",
+              "label": "keychain-access-groups"
+            },
+            {
+              "id": "C",
+              "label": "get-task-allow"
+            },
+            {
+              "id": "D",
+              "label": "aps-environment"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "get-task-allow là entitlement đặc biệt cho phép hệ thống cấp task port cho các trình gỡ lỗi (gdb/lldb); cờ này phải luôn được đặt là false (hoặc bị loại bỏ) trên các bản build phân phối chính thức."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một ứng dụng thanh toán cao cấp trên iOS (MegaPay Enterprise) chuẩn bị phát hành bản phân phối qua chương trình Apple Developer Enterprise Program. Bạn được yêu cầu kiểm toán an ninh gói IPA: kiểm tra xem các cờ nhạy cảm trong Entitlements có bị cấu hình sai, xác minh tính toàn vẹn của chữ ký số, và thử nghiệm giải mã tệp Mach-O để đánh giá rủi ro decompile mã nguồn.",
+        "tasks": [
+          "Trích xuất tệp embedded.mobileprovision từ tệp IPA bằng công cụ dòng lệnh, phân tích danh sách Entitlements và đối chiếu với danh sách các quyền hạn tối thiểu được quy định trong chính sách an ninh của tổ chức.",
+          "Thực hiện phân tích cấu trúc nhị phân Mach-O bằng otool/jtool2: kiểm tra trạng thái LC_ENCRYPTION_INFO_64, xác minh sự hiện diện của các cờ bảo vệ bộ nhớ MH_PIE, Stack Canaries, và ARC.",
+          "Xây dựng kịch bản kiểm thử tự động sử dụng Frida để mô phỏng kỹ thuật dump nhị phân Mach-O từ bộ nhớ và đưa ra khuyến nghị phòng thủ chống phân tích động (anti-hooking & integrity check)."
+        ],
+        "requiredEvidence": [
+          "Báo cáo phân tích toàn diện tệp embedded.mobileprovision: chi tiết các khóa TeamIdentifier, Entitlements (đặc biệt là get-task-allow và Keychain groups), và danh sách thiết bị cấp phép",
+          "Bản kết xuất đầu ra từ công cụ otool -hv và otool -l thể hiện chi tiết các Load Commands và trạng thái cờ bảo vệ bộ nhớ của tệp Mach-O",
+          "Đề xuất chi tiết về các giải pháp bảo vệ mã nguồn nhị phân: triển khai OLLVM string encryption, obfuscation luồng điều khiển và kỹ thuật kiểm tra cờ CS_VALID từ tầng ứng dụng"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Apple Developer Documentation — Code Signing and Entitlements Overview",
+          "url": "https://developer.apple.com/documentation/security/code_signing_services",
+          "publisher": "Apple Inc.",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc Apple Code Signing, chuỗi băm Code Directory và cơ chế xác thực trang nhớ",
+            "Cấu trúc Provisioning Profiles và phân quyền hệ thống thông qua Entitlements"
+          ]
+        },
+        {
+          "title": "OWASP Mobile Application Security Testing Guide (MASTG) — iOS Application Security",
+          "url": "https://mas.owasp.org/MASTG/tests/ios/MASVS-PLATFORM/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiểm toán tệp nhị phân iOS Mach-O và cơ chế giải mã FairPlay DRM",
+            "Đánh giá ranh giới sandbox container iOS và các rủi ro cấu hình sai quyền hạn App Groups"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os10-l93-mobile-local-storage-keystore-and-keychain",
+      "slug": "mobile-local-storage-keystore-and-keychain",
+      "title": "Kiểm Toán An Toàn Lưu Trữ Cục Bộ: Android Keystore, EncryptedSharedPreferences, iOS Keychain & SQLite Cipher",
+      "summary": "Nghiên cứu chuyên sâu về kiến trúc lưu trữ dữ liệu an toàn trên nền tảng di động: phân tích nguy cơ rò rỉ dữ liệu qua bộ nhớ chia sẻ không an toàn (SharedPreferences, NSUserDefaults, SQLite bản rõ, Internal vs External Storage), cơ chế mật mã phần cứng (Android Keystore System, TEE/StrongBox, Keymaster/Keymint HAL) và iOS Keychain Services kết hợp Secure Enclave Processor (SEP), thư viện bảo mật Jetpack Security (EncryptedSharedPreferences, MasterKeys), và triển khai mã hóa cơ sở dữ liệu SQLite qua SQLCipher và Room DB.",
+      "difficulty": "intermediate",
+      "durationMinutes": 120,
+      "prerequisites": [
+        "os10-l91-android-architecture-sandboxing-and-signing",
+        "os10-l92-ios-architecture-mach-o-and-entitlements"
+      ],
+      "outcomes": [
+        "Đánh giá các cơ chế lưu trữ dữ liệu cục bộ chuẩn và các điểm yếu rò rỉ phổ biến: SharedPreferences, NSUserDefaults, SQLite databases, Room DB, và Realm.",
+        "Phân tích kiến trúc mã hóa bảo vệ khóa phần cứng của Android Keystore (Trusted Execution Environment - TEE và StrongBox Keymaster) và kỹ thuật cấu hình KeyGenParameterSpec chống trích xuất khóa.",
+        "Kiểm toán cơ chế lưu trữ bảo mật iOS Keychain Services: các lớp bảo vệ kSecAttrAccessible, tích hợp xác thực sinh trắc học qua Secure Enclave (kSecAccessControlBiometryAny) và nguy cơ trích xuất khi thiết bị unlock.",
+        "Triển khai và kiểm thử tính toàn vẹn của mã hóa cơ sở dữ liệu SQLite bằng SQLCipher (PBKDF2 HMAC SHA-1/SHA-256, 256-bit AES-CBC/GCM) và các lỗi quản lý khóa dẫn tới rò rỉ cơ sở dữ liệu."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+      "domains": ["mobile", "android", "ios", "storage"],
+      "attackTactics": [
+        "credential-access",
+        "collection",
+        "defense-evasion",
+        "privilege-escalation"
+      ],
+      "keywords": [
+        "local-storage",
+        "android-keystore",
+        "strongbox-tee",
+        "ios-keychain",
+        "secure-enclave",
+        "encryptedsharedpreferences",
+        "sqlcipher",
+        "ksecattraccessible"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Lưu trữ dữ liệu cục bộ trên thiết bị di động phải dựa trên giả định rằng thiết bị có thể bị root/jailbreak hoặc thất lạc vật lý. Bất kỳ dữ liệu nào lưu trong SharedPreferences hay NSUserDefaults dạng bản rõ đều có thể bị đọc trực tiếp qua ADB hoặc trích xuất backup. Bảo mật thực sự chỉ đạt được khi khóa mã hóa được sinh và lưu trữ trong phần cứng cô lập (Android TEE/StrongBox hoặc Apple Secure Enclave), nơi vật lý của khóa bí mật không bao giờ xuất hiện trong không gian địa chỉ bộ nhớ của CPU ứng dụng.",
+      "visual": {
+        "title": "Kiến Trúc Lưu Trữ Khóa Phần Cứng: Android Keystore / iOS Keychain vs Secure Enclave",
+        "caption": "Luồng sinh và mã hóa dữ liệu cục bộ bảo vệ bởi phần cứng cách ly TEE và SEP.",
+        "steps": [
+          {
+            "label": "Yêu Cầu Sinh Khóa Từ Ứng Dụng",
+            "detail": "Ứng dụng gửi yêu cầu sinh khóa AES-256 / RSA tới Android Keystore Provider hoặc iOS SecKeyGeneratePair API kèm tham số bảo vệ phần cứng.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Cô Lập Trong Phần Cứng TEE / Secure Enclave",
+            "detail": "Khóa riêng tư được sinh trực tiếp bên trong Trusted Execution Environment (StrongBox) hoặc Secure Enclave; khóa không bao giờ rời khỏi chip bảo mật.",
+            "tone": "allow"
+          },
+          {
+            "label": "Ràng Buộc Sinh Trắc Học & Mở Khóa Màn Hình",
+            "detail": "Khóa chỉ có thể giải mã khi người dùng xác thực vân tay/FaceID thành công và thiết bị đang ở trạng thái unlocked (kSecAttrAccessibleWhenUnlockedThisDeviceOnly).",
+            "tone": "caution"
+          },
+          {
+            "label": "Chặn Đứng Trích Xuất Khóa Trực Tiếp Từ Bộ Nhớ",
+            "detail": "Ngay cả khi kẻ tấn công có quyền root/jailbreak và đọc trọn vẹn bộ nhớ RAM của OS, chúng không thể đọc bản rõ của Private Key nằm trong enclave phần cứng.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Rủi Ro Lưu Trữ Bản Rõ: SharedPreferences, NSUserDefaults và Cơ Sở Dữ Liệu SQLite Cục Bộ",
+          "paragraphs": [
+            "Trên hệ điều hành Android, cơ chế lưu trữ mặc định dạng cặp khóa - giá trị `SharedPreferences` lưu trữ dữ liệu dưới dạng các tệp XML bản rõ không mã hóa tại thư mục `/data/data/<package_name>/shared_prefs/`. Tương tự, trên iOS, API `UserDefaults` lưu trữ các thiết lập người dùng trong tệp Property List (.plist) bản rõ tại thư mục `/var/mobile/Containers/Data/Application/<UUID>/Library/Preferences/`. Cả hai cơ chế này vốn chỉ được thiết kế để lưu cấu hình giao diện người dùng (UI preferences), nhưng thường bị các lập trình viên lạm dụng để lưu trữ token xác thực (JWT, OAuth Bearer Tokens), thông tin thẻ tín dụng hoặc dữ liệu định danh người dùng (PII).",
+            "Bên cạnh tệp cấu hình, các ứng dụng di động thường sử dụng cơ sở dữ liệu nhúng SQLite (hoặc các thư viện bọc như Room DB trên Android, Core Data trên iOS) lưu tại thư mục `databases/`. Mặc định, tệp `.db` hoặc `.sqlite` là tệp nhị phân phi cấu trúc không hề được mã hóa. Mọi bảng, chỉ mục và dữ liệu nhạy cảm đều có thể bị truy vấn trực tiếp bằng lệnh `sqlite3` nếu tệp tin bị rò rỉ.",
+            "Các vector tấn công phổ biến khai thác việc lưu trữ bản rõ này bao gồm: (1) Trích xuất bản sao lưu qua ADB (ADB Backup Extraction) khi tệp AndroidManifest để cờ `android:allowBackup=\"true\"` mặc định; (2) Trích xuất dữ liệu khi thiết bị bị thất lạc hoặc người dùng kết nối thiết bị với máy trạm không tin cậy; (3) Khai thác lỗ hổng Path Traversal hoặc Provider Leakage trong ứng dụng; và (4) Đọc trực tiếp từ thiết bị đã root hoặc jailbreak nơi mọi ranh giới UID sandbox đều bị vô hiệu hóa."
+          ]
+        },
+        {
+          "title": "Kiến Trúc Android Keystore System: TEE, StrongBox Keymaster và Jetpack Security",
+          "paragraphs": [
+            "Để giải quyết triệt để bài toán bảo vệ khóa mật mã khỏi sự can thiệp của người dùng có quyền root hoặc mã độc trong nhân hệ điều hành, Android cung cấp hệ thống Android Keystore. Khác với Java KeyStore (JKS) thông thường lưu trữ khóa trên tệp tin, Android Keystore là một nhà cung cấp mật mã hệ thống (Cryptographic Service Provider) cho phép ứng dụng tạo và sử dụng các khóa mật mã mà vật liệu khóa (key material) không bao giờ bị lộ ra ngoài không gian bộ nhớ của tiến trình ứng dụng.",
+            "Android Keystore hoạt động dựa trên phần cứng bảo mật chuyên dụng. Trên hầu hết các thiết bị hiện đại, các thao tác mật mã được thực thi bên trong Trusted Execution Environment (TEE) — một vùng thực thi an toàn của CPU ARM (ARM TrustZone) chạy một hệ điều hành bảo mật độc lập (như Trusty OS). Từ Android 9.0 (API 28), Google giới thiệu StrongBox Keymaster/Keymint — một vi mạch bảo mật phần cứng hoàn toàn độc lập (Dedicated Secure Hardware Element, tương tự chip Titan M), sở hữu CPU, bộ nhớ RAM và bộ lưu trữ flash chống giả mạo vật lý (tamper-resistant).",
+            "Khi tạo khóa thông qua lớp `KeyGenParameterSpec.Builder`, lập trình viên có thể cấu hình các ràng buộc an ninh chặt chẽ: `setIsStrongBoxBacked(true)` yêu cầu lưu trữ trên vi mạch StrongBox; `setUserAuthenticationRequired(true)` yêu cầu người dùng phải xác thực sinh trắc học hoặc mã PIN hợp lệ thì khóa mới được mở; `setUserAuthenticationParameters(timeout, AUTH_BIOMETRIC_STRONG)` giới hạn thời gian hiệu lực của khóa sau khi xác thực. Để đơn giản hóa việc mã hóa dữ liệu, Google cung cấp thư viện Jetpack Security (AndroidX Security Crypto), với lớp `EncryptedSharedPreferences` sử dụng kiến trúc hai tầng: một Master Key được lưu trong Android Keystore dùng để mã hóa khóa dữ liệu (Keyset) bằng chuẩn Google Tink (AES-256-SIV cho khóa và AES-256-GCM cho giá trị)."
+          ]
+        },
+        {
+          "title": "Kiến Trúc iOS Keychain Services, Secure Enclave Processor (SEP) và kSecAccessControl",
+          "paragraphs": [
+            "Trên hệ điều hành iOS, giải pháp lưu trữ dữ liệu nhạy cảm chuẩn mực và an toàn nhất là iOS Keychain Services. Keychain là một cơ sở dữ liệu SQLite trung tâm được mã hóa (`/var/Keychains/keychain-2.db`), được quản lý độc quyền bởi daemon hệ thống `securityd`. Mỗi ứng dụng chỉ có thể truy cập các mục Keychain thuộc về Bundle ID của nó hoặc các nhóm được định nghĩa trong `keychain-access-groups` entitlement.",
+            "Điểm cốt lõi trong bảo mật của Keychain là sự kết hợp với hệ thống phần cứng Secure Enclave Processor (SEP). SEP là một bộ vi xử lý bảo mật chuyên biệt với hệ điều hành sepOS riêng, sở hữu công cụ mã hóa AES phần cứng và bộ nhớ bảo vệ riêng biệt. Khóa mã hóa chính của thiết bị (Hardware UID) được nhúng vĩnh viễn vào vi mạch trong quá trình sản xuất và không thể bị đọc bởi nhân XNU hay CPU chính.",
+            "Khi lưu trữ một mục vào Keychain qua API `SecItemAdd`, ứng dụng phải chỉ định thuộc tính khả dụng (Accessibility Attribute) `kSecAttrAccessible`. Các mức bảo vệ chính bao gồm: `kSecAttrAccessibleAlways` (đã bị deprecate do rủi ro an ninh cao), `kSecAttrAccessibleAfterFirstUnlock` (dữ liệu được giải mã sau lần đầu người dùng mở khóa màn hình sau khi reboot và duy trì trạng thái giải mã ngay cả khi màn hình khóa lại), và mức bảo vệ nghiêm ngặt nhất là `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` (dữ liệu chỉ có thể giải mã khi màn hình đang bật và mở khóa, đồng thời không thể di chuyển sang thiết bị khác qua bản sao lưu iTunes/iCloud).",
+            "Ngoài ra, bằng cách sử dụng `SecAccessControlCreateWithFlags` với cờ `kSecAccessControlBiometryAny` hoặc `kSecAccessControlBiometryCurrentSet`, ứng dụng có thể yêu cầu Touch ID hoặc Face ID phải được xác thực trực tiếp bởi Secure Enclave trước khi mục Keychain được giải mã. Nếu người dùng thêm hoặc đổi dấu vân tay trong cài đặt hệ thống, Secure Enclave sẽ tự động vô hiệu hóa khóa mật mã tương ứng, ngăn chặn kẻ tấn công tự đăng ký sinh trắc học mới để đánh cắp phiên làm việc."
+          ]
+        },
+        {
+          "title": "Mã Hóa Cơ Sở Dữ Liệu SQLite: SQLCipher, Quản Lý Khóa và Các Điểm Yếu Thường Gặp",
+          "paragraphs": [
+            "Đối với các ứng dụng có nhu cầu lưu trữ lượng lớn dữ liệu có cấu trúc ngoại tuyến (offline structured data) như tin nhắn mã hóa, lịch sử giao dịch ngân hàng hoặc dữ liệu danh bạ nội bộ, việc lưu từng mục vào Keychain hay SharedPreferences là không khả thi. Giải pháp tiêu chuẩn công nghiệp là tích hợp SQLCipher — một phần mở rộng mã hóa toàn diện (Full Database Encryption) mã nguồn mở dành cho SQLite.",
+            "SQLCipher hoạt động bằng cách can thiệp vào tầng trừu tượng hóa hệ thống tệp tin của SQLite (Pager / VFS layer). Thay vì chỉ mã hóa từng cột dữ liệu cụ thể, SQLCipher mã hóa toàn bộ tệp cơ sở dữ liệu theo từng trang nhớ (Page-by-page, mặc định mỗi trang 4096 bytes) bằng thuật toán 256-bit AES ở chế độ CBC kết hợp với hàm băm HMAC-SHA256 hoặc HMAC-SHA512 để đảm bảo tính toàn vẹn và chống giả mạo trang nhớ (authenticated encryption). Mỗi trang cơ sở dữ liệu có một véc-tơ khởi tạo (IV) riêng và một phần HMAC dự trữ (16 đến 64 bytes) ở cuối mỗi trang.",
+            "Từ góc độ an ninh, độ an toàn của SQLCipher hoàn toàn phụ thuộc vào cơ chế quản lý khóa mã hóa (Key Management Lifecycle). Một sai lầm kinh điển của các lập trình viên là hardcode chuỗi mật khẩu mã hóa (passphrase) trực tiếp trong mã Java/Swift hoặc ghép chuỗi từ các thông tin tĩnh của thiết bị (như Device Serial, ANDROID_ID, IMEI). Kẻ tấn công có thể dễ dàng decompile ứng dụng, trích xuất chuỗi passphrase tĩnh này và dùng công cụ `sqlcipher` dòng lệnh để giải mã trọn vẹn tệp cơ sở dữ liệu. Kiến trúc an toàn chuẩn mực đòi hỏi khóa giải mã SQLCipher phải là một chuỗi ngẫu nhiên mật mã học (cryptographic random key), được sinh và lưu trữ trực tiếp trong Android Keystore hoặc iOS Keychain được bảo vệ bởi phần cứng TEE/Secure Enclave."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Cơ Chế Lưu Trữ Dữ Liệu Cục Bộ, Đánh Giá Cấu Hình Keystore/Keychain và Giải Mã SQLite",
+        "objective": "Phát hiện các lỗ hổng lưu trữ nhạy cảm dạng bản rõ, thẩm tra cấu hình cờ bảo vệ khóa trong Android Keystore và iOS Keychain, và kiểm toán triển khai cơ sở dữ liệu SQLCipher.",
+        "scenario": "Một ứng dụng ví điện tử xuyên nền tảng (MegaCryptoWallet) lưu trữ cụm từ khôi phục tài khoản (Seed Phrase 12 từ), khóa riêng tư ví và nhật ký giao dịch trên thiết bị di động. Khách hàng yêu cầu kiểm toán toàn diện cơ chế lưu trữ cục bộ: kiểm tra xem seed phrase có bị rò rỉ qua backup hay file cấu hình không, khóa Keystore/Keychain có bị khai thác khi thiết bị bị root/jailbreak không, và cơ sở dữ liệu SQLite đã được bảo vệ đúng cách chưa.",
+        "constraints": [
+          "Tuân thủ tiêu chuẩn OWASP MASVS-STORAGE (MASVS-STORAGE-1 & MASVS-STORAGE-2).",
+          "Phải phân biệt rõ ranh giới an toàn của các lớp bảo vệ Keychain (kSecAttrAccessible) và cấu hình KeyGenParameterSpec.",
+          "Mọi thao tác trích xuất và phân tích dữ liệu phải thực hiện trong môi trường máy ảo hoặc thiết bị kiểm thử cách ly hoàn toàn với dữ liệu người dùng thật."
+        ],
+        "cases": [
+          {
+            "id": "case-93-01",
+            "title": "Kiểm Toán Dữ Liệu Nhạy Cảm Trong SharedPreferences và Rủi Ro android:allowBackup",
+            "context": "Khi kết nối thiết bị Android thử nghiệm qua ADB (chưa bật quyền root), bạn thực thi lệnh `adb backup -f backup.ab com.megacryptowallet.app`. Sau đó sử dụng công cụ android-backup-extractor để giải nén tệp backup.ab. Kiểm tra thư mục giải nén `apps/com.megacryptowallet.app/sp/`, bạn phát hiện tệp XML `wallet_session.xml` lưu trữ Access Token, Refresh Token và cụm từ Seed Phrase dạng chuỗi văn bản thuần túy.",
+            "prompt": "Cấu hình kỹ thuật nào là bắt buộc và chuẩn xác nhất để khắc phục triệt để lỗ hổng rò rỉ dữ liệu này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đặt `android:allowBackup=\"false\"` trong thẻ <application> của AndroidManifest.xml để ngăn trích xuất dữ liệu qua ADB; đồng thời di chuyển việc lưu trữ Seed Phrase và Token sang `EncryptedSharedPreferences` với MasterKey được quản lý bởi Android Keystore phần cứng.",
+                "correct": true,
+                "rationale": "Đây là giải pháp toàn diện: tắt backup ngăn chặn trích xuất dữ liệu qua giao diện adb debug, và sử dụng EncryptedSharedPreferences mã hóa dữ liệu cục bộ bằng khóa phần cứng Keystore."
+              },
+              {
+                "id": "B",
+                "label": "Mã hóa chuỗi Seed Phrase bằng thuật toán Base64 trước khi lưu vào SharedPreferences.",
+                "correct": false,
+                "rationale": "Base64 chỉ là định dạng mã hóa ký tự (encoding), hoàn toàn không phải thuật toán mã hóa mật mã học và có thể giải mã ngay lập tức."
+              },
+              {
+                "id": "C",
+                "label": "Di chuyển tệp wallet_session.xml từ thư mục nội bộ sang thẻ nhớ ngoài (External Storage) để tận dụng quyền Scoped Storage.",
+                "correct": false,
+                "rationale": "Lưu dữ liệu nhạy cảm ra bộ nhớ ngoài là vi phạm nghiêm trọng nguyên tắc an toàn di động vì dữ liệu có thể bị truy cập bởi các ứng dụng có quyền đọc thẻ nhớ."
+              },
+              {
+                "id": "D",
+                "label": "Đổi tên tệp wallet_session.xml thành wallet_session.dat để hệ thống Android tự động chặn lệnh adb backup.",
+                "correct": false,
+                "rationale": "adb backup sao lưu toàn bộ thư mục dữ liệu của ứng dụng bất kể phần mở rộng tệp tin."
+              }
+            ]
+          },
+          {
+            "id": "case-93-02",
+            "title": "Thẩm Tra Cấu Hình Android Keystore và KeyGenParameterSpec Cho Dữ Liệu Cực Kỳ Nhạy Cảm",
+            "context": "Đội ngũ phát triển triển khai sinh khóa AES-256 trong Android Keystore để mã hóa Seed Phrase. Đoạn mã khởi tạo sử dụng: `KeyGenParameterSpec.Builder(\"WalletKey\", PURPOSE_ENCRYPT | PURPOSE_DECRYPT).setBlockModes(BLOCK_MODE_GCM).setEncryptionPaddings(ENCRYPTION_PADDING_NONE).build()`. Tuy nhiên, mã nguồn không thiết lập `setUserAuthenticationRequired(true)`. Trên thiết bị thử nghiệm đã root, kẻ tấn công dùng Frida hook vào hàm gọi `Cipher.doFinal()` của ứng dụng khi đang chạy ngầm để giải mã Seed Phrase mà không cần người dùng nhập vân tay hay mã PIN.",
+            "prompt": "Cấu hình bổ sung nào trong KeyGenParameterSpec sẽ buộc phần cứng TEE/StrongBox từ chối thực hiện giải mã nếu không có sự xác thực sinh trắc học hợp lệ vừa mới diễn ra?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Bổ sung `setRandomizedEncryptionRequired(false)` để vô hiệu hóa IV ngẫu nhiên.",
+                "correct": false,
+                "rationale": "Tắt IV ngẫu nhiên trong chế độ GCM làm suy yếu nghiêm trọng tính bí mật của thuật toán mật mã học."
+              },
+              {
+                "id": "B",
+                "label": "Thiết lập `setKeySize(128)` để giảm độ phức tạp của thuật toán.",
+                "correct": false,
+                "rationale": "Giảm kích thước khóa xuống 128 bit không giải quyết được vấn đề kiểm soát truy cập sinh trắc học."
+              },
+              {
+                "id": "C",
+                "label": "Bổ sung `setUserAuthenticationRequired(true)` và gọi `setUserAuthenticationParameters(0, AUTH_BIOMETRIC_STRONG)` (hoặc truyền CryptoObject vào BiometricPrompt), buộc nhân TEE kiểm tra chữ ký xác thực sinh trắc học của AuthToken trước mỗi lần cho phép phần cứng thực hiện thao tác doFinal().",
+                "correct": true,
+                "rationale": "Cấu hình setUserAuthenticationRequired(true) với timeout=0 liên kết việc giải mã khóa trực tiếp với phiên sinh trắc học BiometricPrompt CryptoObject, ngăn chặn mọi nỗ lực hook giải mã tự động ngầm."
+              },
+              {
+                "id": "D",
+                "label": "Bổ sung `setDigests(DIGEST_MD5)` để tăng tốc độ phân giải chữ ký.",
+                "correct": false,
+                "rationale": "MD5 là thuật toán băm đã lỗi thời và không được chấp nhận trong Android Keystore hiện đại."
+              }
+            ]
+          },
+          {
+            "id": "case-93-03",
+            "title": "Đánh Giá Lớp Bảo Vệ iOS Keychain kSecAttrAccessible Cho Khóa Ví Điện Tử",
+            "context": "Ứng dụng ví trên iOS lưu trữ khóa riêng tư trong Keychain sử dụng API `SecItemAdd` với thuộc tính `kSecAttrAccessibleAfterFirstUnlock`. Người dùng mở khóa điện thoại vào buổi sáng, sau đó khóa màn hình lại và để quên máy tại nơi làm việc. Một kẻ xấu có thiết bị khai thác qua cổng Lightning (hardware exploit kit) kết nối với điện thoại khi máy đang ở trạng thái khóa màn hình (device locked) và trích xuất thành công khóa riêng tư từ tệp tin cơ sở dữ liệu Keychain.",
+            "prompt": "Tại sao khóa riêng tư bị trích xuất thành công trong kịch bản này và thuộc tính Keychain nào lẽ ra phải được sử dụng để ngăn chặn vụ tấn công?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Vì thuộc tính AfterFirstUnlock giữ khóa mã hóa của mục Keychain trong bộ nhớ RAM của Secure Enclave ngay cả khi màn hình đã bị khóa sau lần mở khóa đầu tiên. Để ngăn chặn, ứng dụng bắt buộc phải sử dụng `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` kết hợp với `kSecAccessControlBiometryAny` để Secure Enclave lập tức xóa khóa giải mã khỏi bộ nhớ ngay khi màn hình khóa lại.",
+                "correct": true,
+                "rationale": "kSecAttrAccessibleAfterFirstUnlock giữ khóa giải mã sẵn sàng sau lần mở khóa đầu tiên để phục vụ background task; đối với dữ liệu cực kỳ nhạy cảm phải dùng kSecAttrAccessibleWhenUnlockedThisDeviceOnly kết hợp kiểm soát sinh trắc học."
+              },
+              {
+                "id": "B",
+                "label": "Vì Keychain iOS không hỗ trợ mã hóa cho các ứng dụng ngân hàng của bên thứ ba.",
+                "correct": false,
+                "rationale": "Keychain iOS cung cấp mã hóa phần cứng cho mọi ứng dụng bên thứ ba đáp ứng chuẩn của Apple."
+              },
+              {
+                "id": "C",
+                "label": "Vì kẻ tấn công đã sử dụng cáp USB-C thay vì cáp Lightning nên vượt qua được bảo mật phần cứng.",
+                "correct": false,
+                "rationale": "Loại cáp kết nối vật lý không làm thay đổi logic mã hóa và trạng thái bảo vệ của Secure Enclave."
+              },
+              {
+                "id": "D",
+                "label": "Vì ứng dụng chưa đăng ký cờ kSecAttrCanBackup trong tệp plist của ứng dụng.",
+                "correct": false,
+                "rationale": "Cờ kSecAttrCanBackup không tồn tại trong Keychain API; các thuộc tính ThisDeviceOnly quy định việc không cho phép đưa vào bản backup."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác nguy cơ rò rỉ dữ liệu qua SharedPreferences bản rõ và tệp sao lưu ADB Backup.",
+          "Phân tích đúng cơ chế cấu hình ràng buộc sinh trắc học trong Android Keystore KeyGenParameterSpec.",
+          "Chỉ ra đúng sự khác biệt an ninh giữa kSecAttrAccessibleAfterFirstUnlock và kSecAttrAccessibleWhenUnlockedThisDeviceOnly trong iOS Keychain kết hợp Secure Enclave."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo phân tích dữ liệu trích xuất từ tệp backup.ab qua adb backup: danh sách token và thông tin nhạy cảm bị lộ",
+          "Đoạn mã cấu hình EncryptedSharedPreferences và KeyGenParameterSpec với đầy đủ cờ StrongBox và Biometric authentication",
+          "Bảng kiểm toán các mục iOS Keychain: Accessibility class, Access Control flags, và chứng minh khóa bị vô hiệu hóa khi màn hình khóa",
+          "Biên bản kiểm tra triển khai SQLCipher: phân tích tiêu đề tệp tin nhị phân chứng minh 4096-byte pages được mã hóa và không chứa plaintext string"
+        ],
+        "reset": "Đặt lại toàn bộ các cơ sở dữ liệu mẫu, khóa Keystore/Keychain thử nghiệm và tệp SharedPreferences về trạng thái ban đầu.",
+        "cleanup": "Xóa toàn bộ các tệp cơ sở dữ liệu SQLite đã giải mã, khóa tạm thời và bản sao lưu adb khỏi hệ thống lab thử nghiệm."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc đặt `android:allowBackup=\"false\"` trên AndroidManifest và tắt hoàn toàn việc lưu trữ token hoặc dữ liệu PII trong SharedPreferences/NSUserDefaults bản rõ.",
+          "Áp dụng bắt buộc thư viện `EncryptedSharedPreferences` (với MasterKey nằm trong Android Keystore) trên Android và `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` trên iOS cho mọi khóa bảo mật.",
+          "Triển khai SQLCipher cho mọi cơ sở dữ liệu SQLite cục bộ xử lý thông tin tài chính/định danh, với khóa giải mã được sinh ngẫu nhiên và lưu trữ trong chip phần cứng bảo mật (TEE/StrongBox/Secure Enclave)."
+        ],
+        "observe": [
+          "Giám sát các ngoại lệ `KeyPermanentlyInvalidatedException` trên Android để kịp thời phát hiện sự kiện thay đổi cấu hình sinh trắc học của thiết bị.",
+          "Theo dõi các sự kiện cố gắng truy cập trái phép vào thư mục dữ liệu ứng dụng thông qua hệ thống kiểm toán tệp tin nội bộ.",
+          "Audit mã nguồn định kỳ bằng các công cụ SAST (như MobSF hoặc Semgrep rules) để phát hiện các chuỗi passphrase hardcoded trong code SQLCipher."
+        ],
+        "respond": [
+          "Khi phát hiện thiết bị của người dùng bị root hoặc jailbreak qua các chỉ số telemetry, lập tức xóa sạch (purge) toàn bộ các mục Keychain/Keystore và dữ liệu cơ sở dữ liệu cục bộ.",
+          "Hủy bỏ phiên làm việc trên máy chủ backend (Revoke Refresh Token) và yêu cầu người dùng thiết lập lại xác thực hai yếu tố.",
+          "Thông báo cảnh báo bảo mật tới người dùng qua kênh SMS hoặc Email đăng ký chính thức khi phát hiện nỗ lực trích xuất sao lưu trái phép."
+        ],
+        "residualRisk": [
+          "Trên các thiết bị phần cứng giá rẻ không trang bị chip bảo mật độc lập StrongBox hoặc TEE, các khóa Keystore sẽ được mô phỏng bảo vệ bằng phần mềm trong nhân Linux, tạo rủi ro nếu nhân bị khai thác lỗ hổng zero-day.",
+          "Kẻ tấn công sở hữu thiết bị vật lý có thể sử dụng các kỹ thuật tấn công kênh kề (Side-Channel Attacks hoặc Fault Injection) trên chip nhớ để đọc dữ liệu nếu thiết bị không có cơ chế chống giả mạo vật lý đạt chuẩn FIPS 140-2/3."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Cơ sở dữ liệu SQLite trong thư mục /data/data/<package_name>/databases/ là an toàn tuyệt đối vì cơ chế UID sandboxing của Android ngăn các ứng dụng khác truy cập.",
+          "correction": "UID sandboxing chỉ bảo vệ chống lại các ứng dụng thông thường trên thiết bị chưa root. Nếu người dùng root máy, hoặc cờ android:allowBackup=\"true\" được bật, hoặc có lỗ hổng path traversal/backup injection, toàn bộ tệp SQLite bản rõ sẽ bị trích xuất dễ dàng. Dữ liệu nhạy cảm bắt buộc phải được mã hóa bằng SQLCipher với khóa lưu trong phần cứng."
+        },
+        {
+          "claim": "Thư viện EncryptedSharedPreferences tự động bảo vệ dữ liệu an toàn tuyệt đối mà không cần quan tâm đến phần cứng của thiết bị di động.",
+          "correction": "EncryptedSharedPreferences sử dụng hai tầng mã hóa (Keyset mã hóa dữ liệu và Master Key mã hóa Keyset). Nếu thiết bị không hỗ trợ TEE/StrongBox phần cứng hoặc lập trình viên không cấu hình MasterKey sử dụng Android Keystore chuẩn, Master Key sẽ bị lưu bằng phần mềm trong thư mục ứng dụng, triệt tiêu phần lớn giá trị bảo mật trước tấn công root."
+        },
+        {
+          "claim": "Sử dụng sinh trắc học (BiometricPrompt trên Android hoặc LocalAuthentication trên iOS) chỉ cần kiểm tra kết quả callback onAuthenticationSucceeded hoặc evaluatePolicy thành công là đủ an toàn.",
+          "correction": "Kiểm tra ở tầng ứng dụng (UI callback) rất dễ bị bypass bằng cách hook Frida hoặc sửa lệnh rẽ nhánh trong mã nhị phân. Để an toàn thực sự, việc xác thực sinh trắc học phải được gắn trực tiếp vào việc mở khóa CryptoObject trong Android Keystore hoặc kSecAccessControl trong Secure Enclave; nếu không có vân tay hợp lệ, phần cứng mã hóa sẽ từ chối giải mã khóa bí mật."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os10-l93-q1",
+          "difficulty": "easy",
+          "question": "Thư mục nào sau đây trên Android là nơi lưu trữ mặc định của các tệp SharedPreferences dưới dạng XML bản rõ không mã hóa?",
+          "options": [
+            {
+              "id": "A",
+              "label": "/data/data/<package_name>/shared_prefs/"
+            },
+            {
+              "id": "B",
+              "label": "/sdcard/Android/data/<package_name>/prefs/"
+            },
+            {
+              "id": "C",
+              "label": "/system/etc/security/preferences/"
+            },
+            {
+              "id": "D",
+              "label": "/data/local/tmp/preferences/"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Hệ điều hành Android lưu các tệp SharedPreferences dưới dạng XML bản rõ trong thư mục nội bộ /data/data/<package_name>/shared_prefs/."
+        },
+        {
+          "id": "os10-l93-q2",
+          "difficulty": "medium",
+          "question": "Trong hệ thống Android Keystore, tùy chọn nào trong KeyGenParameterSpec.Builder yêu cầu khóa mật mã phải được sinh và lưu trữ trên một vi mạch phần cứng an toàn chuyên biệt (tương tự Titan M) thay vì chỉ chạy trong TEE?",
+          "options": [
+            {
+              "id": "A",
+              "label": "setRandomizedEncryptionRequired(true)"
+            },
+            {
+              "id": "B",
+              "label": "setIsStrongBoxBacked(true)"
+            },
+            {
+              "id": "C",
+              "label": "setUserPresenceRequired(true)"
+            },
+            {
+              "id": "D",
+              "label": "setBlockModes(BLOCK_MODE_CBC)"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "setIsStrongBoxBacked(true) yêu cầu hệ thống cấp phát và lưu trữ khóa mật mã bên trong vi mạch phần cứng độc lập StrongBox Keymaster có khả năng chống can thiệp vật lý cao hơn TEE."
+        },
+        {
+          "id": "os10-l93-q3",
+          "difficulty": "hard",
+          "question": "Trong cơ chế iOS Keychain Services, mức độ bảo vệ kSecAttrAccessible nào đảm bảo rằng dữ liệu chỉ có thể được giải mã khi màn hình thiết bị đang bật và mở khóa, đồng thời không bao giờ được đưa vào các bản sao lưu iTunes/iCloud?",
+          "options": [
+            {
+              "id": "A",
+              "label": "kSecAttrAccessibleAlways"
+            },
+            {
+              "id": "B",
+              "label": "kSecAttrAccessibleAfterFirstUnlock"
+            },
+            {
+              "id": "C",
+              "label": "kSecAttrAccessibleWhenUnlockedThisDeviceOnly"
+            },
+            {
+              "id": "D",
+              "label": "kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "kSecAttrAccessibleWhenUnlockedThisDeviceOnly là mức bảo vệ nghiêm ngặt nhất: chỉ giải mã khi màn hình đang mở khóa (WhenUnlocked) và gắn với khóa phần cứng riêng của thiết bị không thể phục hồi qua bản backup sang máy khác (ThisDeviceOnly)."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một ứng dụng giao dịch chứng khoán di động (MegaSecurities) đang triển khai tính năng xác thực sinh trắc học để ký quỹ lệnh giao dịch có giá trị cao. Khách hàng yêu cầu bạn đánh giá an ninh kiến trúc lưu trữ khóa ký quỹ: đảm bảo khóa không thể bị trích xuất ngay cả khi thiết bị bị root/jailbreak, và kiểm toán triển khai cơ sở dữ liệu SQLite lưu trữ lịch sử đặt lệnh.",
+        "tasks": [
+          "Thực hiện kiểm toán toàn bộ thư mục dữ liệu nội bộ của ứng dụng trên cả Android và iOS, lập danh sách tất cả các tệp SharedPreferences, Plist, và SQLite, kiểm tra xem có token hoặc dữ liệu tài chính nào bị lưu dạng bản rõ không.",
+          "Phân tích mã nguồn và cấu hình sinh khóa Android Keystore / iOS Keychain, kiểm tra việc thiết lập các cờ ràng buộc sinh trắc học bắt buộc (CryptoObject, kSecAccessControlBiometryAny) và đánh giá khả năng bị bypass bằng Frida hook.",
+          "Đánh giá cấu hình thư viện SQLCipher trong ứng dụng: phân tích quy trình tạo và dẫn xuất khóa (Key Derivation), kiểm tra tính ngẫu nhiên của chuỗi passphrase và đề xuất kiến trúc lưu trữ khóa SQLCipher an toàn trong chip bảo mật phần cứng."
+        ],
+        "requiredEvidence": [
+          "Báo cáo kiểm toán lưu trữ cục bộ: bảng liệt kê chi tiết các tệp tin trong thư mục ứng dụng kèm trạng thái mã hóa và rủi ro rò rỉ",
+          "Đoạn mã Proof-of-Concept kiểm thử khả năng hook Frida vào BiometricPrompt callback và đánh giá mức độ an toàn khi sử dụng CryptoObject gắn với Keystore",
+          "Tài liệu thiết kế kiến trúc lưu trữ dữ liệu hoàn chỉnh: sơ đồ luồng mã hóa SQLCipher sử dụng khóa dẫn xuất từ Android Keystore StrongBox và iOS Secure Enclave"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Android Developers Guide — Android Keystore System & Data Encryption",
+          "url": "https://developer.android.com/privacy-and-security/cryptography",
+          "publisher": "Google",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc mật mã bảo vệ khóa phần cứng Android Keystore, TEE và StrongBox",
+            "Hướng dẫn triển khai EncryptedSharedPreferences và KeyGenParameterSpec an toàn"
+          ]
+        },
+        {
+          "title": "Apple Platform Security Guide — Keychain Data Protection & Secure Enclave",
+          "url": "https://support.apple.com/guide/security/keychain-data-protection-secb0694df1a/web",
+          "publisher": "Apple Inc.",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế bảo vệ dữ liệu Keychain Services và các lớp thuộc tính kSecAttrAccessible",
+            "Kiến trúc vi xử lý bảo mật Secure Enclave Processor (SEP) và xác thực sinh trắc học"
+          ]
+        }
+      ]
+    }
+  ]
+}

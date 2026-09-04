@@ -44,11 +44,14 @@ Adapt the presentation to the domain. Packet flows need network diagrams, Active
 Directory needs identity/relationship graphs, vulnerability research needs a
 crash-to-root-cause flow, and availability lessons need load and recovery metrics.
 
-## WebAssembly Live Workbench Standards
+## Runtime Portfolio Standards (ADR-001)
 
-- Every generated lesson automatically derives a tailored in-browser WASM workbench config via `generateWorkbenchConfigFromLesson()`.
-- Interactive labs support 4 execution modes: `terminal` (BusyBox WASM/POSIX VFS), `sql` (Relational AST Injection), `http` (RFC Repeater), and `packet` (TCP/IP Layers).
-- State inspection (`FS.stat`, mode bits `0600/0640`, file creation, query result rows, status codes) provides instant automated competency verification.
+- Every generated lesson strictly follows ADR-001:
+  - `webcontainer-node`: In-browser Node.js/Web HTTP execution via WebContainerWorkbenchAdapter.
+  - `telemetry-inspector`: Structured log, configuration, and diff reviews via CodeMirror.
+  - `decision-lab`: Authentic professional decision scenarios with comprehensive rationale.
+- Prohibited: Never generate custom regex SQL parsers, POSIX kernels, or mock AD KDCs.
+- Prohibited in Verification: Never hardcode mock HTTP responses or synthetic database objects in contract harnesses. All runtime competency tests must bind to real network sockets, SQLite processes, or OS filesystem calls.
 
 ## Non-negotiable distinctions
 

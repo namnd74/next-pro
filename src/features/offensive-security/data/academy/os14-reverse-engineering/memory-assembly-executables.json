@@ -1,0 +1,1129 @@
+{
+  "id": "os14-m01-memory-assembly-executables",
+  "slug": "memory-assembly-executables",
+  "trackId": "os14-reverse-engineering",
+  "title": "Bố Cục Bộ Nhớ C/C++, Tập Lệnh Hợp Ngữ, Quy Ước Gọi Hàm & Định Dạng Nhị Phân",
+  "summary": "Bóc tách cấu trúc không gian địa chỉ tiến trình (Stack, Heap, BSS, Data, Text), tập lệnh hợp ngữ hiện đại x86-64 và ARM64 (registers, flags, addressing modes), quy ước gọi hàm chuẩn (cdecl, System V AMD64 ABI, Microsoft x64), và giải phẫu các định dạng tập tin thực thi nhị phân ELF, PE/COFF và Mach-O.",
+  "difficulty": "intermediate",
+  "estimatedMinutes": 360,
+  "careerPaths": ["reverse-engineering", "vulnerability-research", "exploit-development"],
+  "domains": ["reverse-engineering", "assembly", "binary-formats"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os14-l130-memory-layout-stack-heap-and-calling-conventions",
+      "slug": "memory-layout-stack-heap-and-calling-conventions",
+      "title": "Bố Cục Bộ Nhớ Tiến Trình C/C++, Khung Ngăn Xếp, Đống Bộ Nhớ & Quy Ước Gọi Hàm",
+      "summary": "Phân tích cấu trúc không gian địa chỉ ảo của tiến trình 64-bit (Text, Data, BSS, Heap, Stack), giải phẫu cơ chế hoạt động của Stack Frame, quản lý động trên Heap (glibc ptmalloc và Windows LFH), và phân biệt các quy ước gọi hàm cdecl, System V AMD64 ABI và Microsoft x64 Calling Convention.",
+      "difficulty": "intermediate",
+      "durationMinutes": 120,
+      "prerequisites": [],
+      "outcomes": [
+        "Bóc tách sơ đồ phân vùng không gian địa chỉ ảo 64-bit của tiến trình C/C++, phân biệt ranh giới và quyền truy cập (Read/Write/Execute) giữa Text, Data, BSS, Heap và Stack.",
+        "Giải phẫu chi tiết cấu trúc Stack Frame (RBP, RSP, biến cục bộ, con trỏ trả về Return Address) và tính toán yêu cầu căn lề bộ nhớ 16-byte phục vụ các chỉ lệnh SIMD/SSE.",
+        "So sánh bản chất cơ chế truyền tham số, dọn dẹp ngăn xếp và bảo lưu thanh ghi giữa quy ước System V AMD64 ABI (Linux/macOS) và Microsoft x64 Calling Convention (Windows).",
+        "Phân tích nguyên lý phân bổ và quản lý khối nhớ Heap trong glibc ptmalloc (arenas, chunks, bins, tcache) và Windows Heap Manager (LFH) để nhận diện các điểm yếu cấu trúc."
+      ],
+      "careerPaths": [
+        "reverse-engineering",
+        "vulnerability-research",
+        "exploit-development"
+      ],
+      "domains": ["reverse-engineering", "memory-layout", "calling-conventions"],
+      "attackTactics": ["execution", "privilege-escalation", "defense-evasion"],
+      "keywords": [
+        "virtual-memory",
+        "stack-frame",
+        "calling-conventions",
+        "system-v-abi",
+        "shadow-space",
+        "heap-ptmalloc"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Trong kiến trúc máy tính hiện đại, một tiến trình không trực tiếp nhìn thấy bộ nhớ vật lý mà hoạt động trong một không gian địa chỉ ảo (Virtual Address Space) do hệ điều hành và MMU quản lý. Khi chương trình thực thi, không gian này được phân chia thành các vùng chức năng nghiêm ngặt: mã máy bất biến nằm ở Text segment, dữ liệu toàn cục khởi tạo ở Data, dữ liệu chưa khởi tạo ở BSS, dữ liệu cấp phát động phình to lên ở Heap, và các ngữ cảnh gọi hàm được đẩy xuống từ đỉnh ở Stack. Quy ước gọi hàm (Calling Convention) chính là bản khế ước phần mềm bất thành văn giữa hàm gọi (Caller) và hàm được gọi (Callee), quy định thanh ghi nào mang tham số, ai chịu trách nhiệm dọn dẹp ngăn xếp, và thanh ghi nào phải được bảo toàn giá trị. Bất kỳ sự hiểu sai nào về quy ước gọi hàm hay bố cục bộ nhớ đều biến các thao tác số học con trỏ thành lỗ hổng tha hóa bộ nhớ nguy hiểm.",
+      "visual": {
+        "title": "Vòng Đời Cấp Phát Ngăn Xếp, Truyền Tham Số Và Cấp Phát Đống Bộ Nhớ",
+        "caption": "Sơ đồ chuyển đổi trạng thái giữa Stack Frame, thanh ghi đối số và khối quản lý Heap trong không gian địa chỉ ảo.",
+        "steps": [
+          {
+            "label": "Thiết Lập Khung Ngăn Xếp & Prologue",
+            "detail": "Đẩy RBP cũ lên ngăn xếp, gán RBP = RSP và trừ RSP để cấp phát không gian cho biến cục bộ, đảm bảo căn lề 16-byte theo chuẩn ABI.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Truyền Tham Số Qua Thanh Ghi & Shadow Space",
+            "detail": "Nạp đối số vào RDI/RSI/RDX/RCX/R8/R9 (System V) hoặc RCX/RDX/R8/R9 kèm 32 bytes Shadow Space trên ngăn xếp (Windows x64).",
+            "tone": "allow"
+          },
+          {
+            "label": "Thu Hồi Ngăn Xếp & Khôi Phục Con Trỏ Trả Về",
+            "detail": "Thực thi Epilogue (leave/ret hoặc mov rsp, rbp; pop rbp; ret) để rút địa chỉ trả về nạp vào RIP và tiếp tục luồng thực thi caller.",
+            "tone": "caution"
+          },
+          {
+            "label": "Phân Cấp Khối Nhớ Động Heap & Quản Lý Arena",
+            "detail": "Chuyển giao yêu cầu malloc qua tcache/fastbins/smallbins hoặc cấp phát trực tiếp trang nhớ mới thông qua lệnh gọi hệ thống brk/mmap.",
+            "tone": "neutral"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Không Gian Địa Chỉ Ảo 64-bit: Phân Vùng Bộ Nhớ Chương Trình C/C++",
+          "paragraphs": [
+            "Trên các kiến trúc vi xử lý x86-64 hiện đại, không gian địa chỉ ảo (Virtual Address Space - VAS) sử dụng chuẩn đánh địa chỉ chuẩn hóa 48-bit (Canonical Addressing), cho phép biểu diễn không gian nhớ lên tới 256 Terabytes. Không gian này được chia đôi thành hai nửa đối xứng: nửa dưới từ 0x0000000000000000 đến 0x00007FFFFFFFFFFF dành riêng cho không gian người dùng (User Space), và nửa trên từ 0xFFFF800000000000 đến 0xFFFFFFFFFFFFFFFF dành riêng cho không gian nhân hệ điều hành (Kernel Space). Việc truy cập vào vùng địa chỉ không chuẩn tắc (Non-canonical addresses) nằm giữa hai ranh giới này sẽ lập tức kích hoạt ngoại lệ General Protection Fault (#GP) ở tầng phần cứng.",
+            "Trong không gian User Space của một tiến trình C/C++, bộ nhớ được ánh xạ thành các phân vùng chuyên biệt với các cờ thuộc tính phân quyền nghiêm ngặt theo nguyên lý W^X (Write XOR Execute) nhằm ngăn chặn thực thi mã độc. Phân vùng Text (.text) chứa toàn bộ mã máy của chương trình, được thiết lập quyền Read và Execute (R-X) nhưng cấm ghi. Phân vùng Data (.data) chứa các biến toàn cục và biến static đã được khởi tạo giá trị khác 0, có quyền Read và Write (RW-). Phân vùng BSS (.bss - Block Started by Symbol) chứa các biến toàn cục và static chưa khởi tạo hoặc khởi tạo bằng 0; phân vùng này không chiếm dung lượng thực tế trên tệp nhị phân ở đĩa mà chỉ được cấp phát các trang nhớ điền sẵn byte 0 khi chương trình bắt đầu chạy vào RAM.",
+            "Nằm phía trên phân vùng BSS là đống bộ nhớ (Heap), bắt đầu từ ranh giới brk (program break) và phình to dần lên phía các địa chỉ cao hơn (Upwards) khi chương trình gọi các hàm cấp phát động như malloc(), calloc() hoặc new trong C++. Ngược lại, ngăn xếp (Stack) nằm ở đỉnh cao của không gian người dùng và phát triển dần xuống phía các địa chỉ thấp hơn (Downwards) khi các hàm được gọi lồng nhau. Khoảng không gian nằm giữa Heap và Stack được dùng làm Memory Mapping Segment, nơi chứa các thư viện liên kết động (như libc.so hoặc ntdll.dll), các tệp được ánh xạ qua mmap(), và các luồng thread stack phụ.",
+            "Cơ chế bảo vệ Address Space Layout Randomization (ASLR) làm xáo trộn ngẫu nhiên địa chỉ cơ sở của Stack, Heap, và Memory Mapping Segment mỗi khi tiến trình khởi động. Nếu tệp thực thi được biên dịch dưới dạng Position Independent Executable (PIE), địa chỉ của phân vùng Text, Data và BSS cũng sẽ được ngẫu nhiên hóa hoàn toàn, buộc chuyên viên nghiên cứu lỗ hổng phải tìm kiếm các nguyên thủy rò rỉ địa chỉ bộ nhớ (Info Leak / Pointer Leak) trước khi có thể thực hiện tấn công chuyển hướng luồng thực thi."
+          ]
+        },
+        {
+          "title": "Giải Phẫu Khung Ngăn Xếp (Stack Frame): Con Trỏ RBP/RSP, Căn Lề 16-byte & Vùng Red Zone",
+          "paragraphs": [
+            "Khung ngăn xếp (Stack Frame hay Activation Record) là cấu trúc dữ liệu tạm thời được tạo ra trên vùng nhớ Stack mỗi khi một hàm được gọi, nhằm lưu trữ ngữ cảnh thực thi của hàm đó: con trỏ trả về (Return Address), giá trị thanh ghi cơ sở của hàm gọi (Saved Frame Pointer), các biến cục bộ (Local Variables), và vùng đệm tạm thời cho các phép tính số học phức tạp. Hoạt động của ngăn xếp được điều phối bởi hai thanh ghi chuyên dụng: Con trỏ đỉnh ngăn xếp (Stack Pointer - RSP trên x86-64) luôn trỏ tới byte dữ liệu hợp lệ cuối cùng vừa được nạp vào Stack, và Con trỏ cơ sở (Base Pointer / Frame Pointer - RBP trên x86-64) trỏ tới điểm mốc cố định của khung ngăn xếp hiện hành.",
+            "Khi một hàm được gọi thông qua lệnh `call`, CPU tự động đẩy (push) địa chỉ của lệnh tiếp theo ngay sau lệnh call vào đỉnh ngăn xếp để làm Return Address, đồng thời làm giảm RSP đi 8 bytes. Sau đó, hàm được gọi sẽ thực thi đoạn mã khởi tạo đầu hàm (Function Prologue) kinh điển: `push rbp` (lưu lại RBP của hàm gọi lên stack, RSP giảm tiếp 8 bytes), tiếp theo là `mov rbp, rsp` (thiết lập RBP mới trỏ vào vị trí hiện tại của RSP), và `sub rsp, N` (dịch chuyển RSP xuống dưới N bytes để tạo khoảng trống cho các biến cục bộ). Các biến cục bộ trong thân hàm sau đó được truy cập thông qua phép định địa chỉ tương đối theo RBP với độ lệch âm (ví dụ: `[rbp - 0x8]`, `[rbp - 0x10]`).",
+            "Khi hàm kết thúc, đoạn mã kết hàm (Function Epilogue) sẽ hoàn trả lại trạng thái ngăn xếp cho hàm gọi. Đoạn mã này có thể được thực thi bằng cặp lệnh `mov rsp, rbp` (thu hồi toàn bộ không gian biến cục bộ) kèm `pop rbp` (khôi phục lại RBP cũ của caller), hoặc thay thế bằng lệnh duy nhất `leave`. Cuối cùng, lệnh `ret` được thực thi, lấy giá trị 8-byte Return Address đang nằm ở đỉnh RSP nạp trở lại thanh ghi con trỏ lệnh RIP và tiếp tục luồng thực thi của hàm gọi. Trong các trình biên dịch hiện đại với cờ tối ưu `-fomit-frame-pointer`, thanh ghi RBP được giải phóng để dùng làm thanh ghi đa dụng, và toàn bộ biến cục bộ được truy cập trực tiếp thông qua RSP (`[rsp + offset]`).",
+            "Một quy tắc tối quan trọng trong đặc tả System V AMD64 ABI là yêu cầu căn lề ngăn xếp 16-byte (16-byte Stack Alignment). Cụ thể, trước khi lệnh `call` được thực thi, giá trị của thanh ghi RSP bắt buộc phải là bội số của 16 (`rsp % 16 == 0`). Khi lệnh `call` đẩy Return Address 8-byte lên stack, tại thời điểm vừa bước vào hàm mới, RSP sẽ có dạng `16n + 8`. Nếu hàm tiếp tục cấp phát biến cục bộ mà không tính toán sao cho RSP trở lại bội số của 16 trước khi gọi hàm kế tiếp hoặc trước khi thực thi các lệnh SIMD/SSE (như `movaps` hoặc `movdqa`), vi xử lý sẽ lập tức kích hoạt ngoại lệ phần cứng sụp đổ tiến trình. Ngoài ra, System V ABI còn định nghĩa một vùng nhớ 128-byte ngay dưới RSP gọi là 'Red Zone', cho phép các hàm lá (Leaf Functions - không gọi thêm hàm nào khác) sử dụng làm bộ đệm tạm thời mà không cần tốn chu kỳ CPU để trừ RSP."
+          ]
+        },
+        {
+          "title": "Quy Ước Gọi Hàm 64-bit: Đối Chiếu System V AMD64 ABI và Microsoft x64",
+          "paragraphs": [
+            "Quy ước gọi hàm (Calling Convention) xác định giao thức giao tiếp nhị phân ở mức vi kiến trúc giữa bên gọi (Caller) và bên được gọi (Callee). Trên hệ điều hành 32-bit trước đây, các quy ước như `cdecl` (tham số đẩy lên stack từ phải qua trái, Caller dọn stack), `stdcall` (Callee dọn stack bằng lệnh `ret N`, dùng trong Win32 API), và `fastcall` (truyền 2 tham số đầu qua ECX, EDX) cùng tồn tại gây ra nhiều sự phân mảnh. Tuy nhiên, trên nền tảng 64-bit, các nhà thiết kế hệ điều hành đã thống nhất chuẩn hóa thành hai quy ước gọi hàm chủ đạo: System V AMD64 ABI (áp dụng trên Linux, macOS, BSD, Solaris) và Microsoft x64 Calling Convention (áp dụng trên Windows).",
+            "Theo quy ước System V AMD64 ABI, 6 tham số kiểu số nguyên hoặc con trỏ đầu tiên được truyền trực tiếp qua 6 thanh ghi theo thứ tự nghiêm ngặt: RDI (tham số 1), RSI (tham số 2), RDX (tham số 3), RCX (tham số 4), R8 (tham số 5), và R9 (tham số 6). Các tham số dấu phẩy động (float/double) được truyền qua các thanh ghi XMM0 đến XMM7. Nếu hàm có nhiều hơn 6 tham số số nguyên, các tham số thứ 7 trở đi mới được đẩy lên ngăn xếp theo thứ tự từ phải qua trái. Giá trị trả về của hàm được chứa trong thanh ghi RAX (và RDX nếu giá trị có kích thước 128-bit). Các thanh ghi được phân loại thành Callee-saved (non-volatile: RBX, RBP, R12, R13, R14, R15 - hàm callee nếu muốn dùng phải lưu lại giá trị cũ và khôi phục trước khi return) và Caller-saved (volatile: RAX, RCX, RDX, RSI, RDI, R8, R9, R10, R11 - giá trị có thể bị ghi đè bất kỳ lúc nào sau lời gọi hàm).",
+            "Ngược lại hoàn toàn, Microsoft x64 Calling Convention trên Windows chỉ sử dụng 4 thanh ghi cho các tham số số nguyên/con trỏ đầu tiên: RCX (tham số 1), RDX (tham số 2), R8 (tham số 3), và R9 (tham số 4). Các tham số thứ 5 trở đi được đẩy lên ngăn xếp. Điểm khác biệt cốt lõi và là nguồn gốc của vô số lỗi crash khi phân tích dịch ngược mã xuyên nền tảng chính là khái niệm 'Shadow Space' (còn gọi là Home Space): Caller bắt buộc phải trừ RSP đi tối thiểu 32 bytes (tương đương 4 quadwords) trên ngăn xếp ngay trước khi gọi lệnh `call`, kể cả khi hàm được gọi nhận ít hơn 4 tham số hoặc không nhận tham số nào!",
+            "Vùng Shadow Space 32-byte này được thiết kế như một vùng đệm dự phòng để Callee có thể đổ (spill) giá trị từ 4 thanh ghi RCX, RDX, R8, R9 xuống ngăn xếp khi cần xử lý biến địa chỉ hoặc phục vụ gỡ lỗi. Trên Windows x64, Caller luôn là bên chịu trách nhiệm dọn dẹp không gian ngăn xếp (bao gồm cả 32 bytes Shadow Space và các tham số thứ 5 trở đi) sau khi Callee trả về (`add rsp, 0x20 + N`). Thêm vào đó, Windows x64 không hỗ trợ vùng 'Red Zone'; bất kỳ dữ liệu nào ghi vào vùng nhớ phía dưới RSP đều có thể bị ghi đè bất ngờ bởi luồng xử lý ngắt hoặc APC của hệ điều hành."
+          ]
+        },
+        {
+          "title": "Kiến Trúc Quản Lý Bộ Nhớ Động Heap: glibc ptmalloc và Windows LFH",
+          "paragraphs": [
+            "Khác với ngăn xếp có vòng đời được quản lý tự động và gắn liền với phạm vi hàm, đống bộ nhớ (Heap) cung cấp cơ chế cấp phát động mà lập trình viên toàn quyền kiểm soát thời điểm xin cấp phát (`malloc`, `calloc`, `realloc`) và thời điểm giải phóng (`free`). Ở tầng hệ điều hành, nhân Linux cung cấp hai lệnh gọi hệ thống nền tảng: `brk()` / `sbrk()` dùng để mở rộng hoặc thu hẹp con trỏ ranh giới dữ liệu liên tục của tiến trình, và `mmap()` dùng để ánh xạ các trang nhớ ẩn danh (Anonymous Pages) độc lập từ nhân. Thư viện chuẩn C (glibc) tích hợp bộ quản lý bộ nhớ `ptmalloc` (viết tắt của pthreads malloc) để trung hòa và tối ưu hóa việc phân bổ tài nguyên này.",
+            "Trong kiến trúc `ptmalloc`, bộ nhớ Heap được tổ chức thành các Arena: Main Arena (gắn liền với luồng chính và sử dụng `brk` lẫn `mmap`) và các Non-main Arenas (được tạo riêng cho các luồng phụ khi có tranh chấp khóa, sử dụng các heap con ánh xạ qua `mmap`). Mỗi khối nhớ cấp phát được đóng gói thành một cấu trúc gọi là Chunk. Một chunk bao gồm phần tiêu đề (Chunk Header) chứa kích thước chunk (Size) và các cờ trạng thái nằm ở 3 bit thấp nhất: bit A (NON_MAIN_ARENA - chunk thuộc arena phụ), bit M (IS_MMAPPED - chunk được cấp phát trực tiếp bằng mmap khi kích thước vượt quá ngưỡng `M_MMAP_THRESHOLD` ~128KB), và bit P (PREV_INUSE - chunk liền kề phía trước đang được sử dụng hay đã giải phóng). Con trỏ trả về cho ứng dụng luôn trỏ tới vùng dữ liệu người dùng (User Payload) ngay sau tiêu đề kích thước.",
+            "Khi một chunk được giải phóng thông qua hàm `free()`, `ptmalloc` không trả lại ngay bộ nhớ cho hệ điều hành mà lưu vào các danh sách liên kết tự do (Bins) để tái sử dụng với tốc độ cao nhất: Tcache (Thread Local Caching - danh sách liên kết đơn không khóa dành riêng cho từng luồng, chứa tối đa 7 chunks cho mỗi kích cỡ lên đến 1032 bytes), Fastbins (danh sách LIFO liên kết đơn chứa các chunk nhỏ từ 16 đến 80 bytes không hợp nhất với chunk lân cận), Smallbins (danh sách FIFO liên kết đôi chứa các chunk có kích thước cố định dưới 1024 bytes), Unsortedbin (nơi tạm trú của các chunk vừa giải phóng trước khi được phân loại), và Largebins (danh sách liên kết đôi sắp xếp theo kích thước giảm dần cho các chunk lớn). Hiểu rõ cấu trúc liên kết con trỏ `fd` (forward) và `bk` (backward) trong các bin này là nền tảng để phân tích các kỹ thuật tấn công Heap Corruption kinh điển (như Tcache Poisoning, Fastbin Dup, hay House of Force).",
+            "Trên hệ điều hành Windows, hệ thống quản lý bộ nhớ Heap (NT Heap Manager) sở hữu cấu trúc hoàn toàn khác biệt nhưng cùng chung mục tiêu giảm thiểu phân mảnh. NT Heap bao gồm hai tầng chính: Tầng Back-end Allocator quản lý các đoạn bộ nhớ lớn (Segments) và danh sách liên kết tự do (Free Lists); và Tầng Front-end Allocator mà nổi bật nhất là Low Fragmentation Heap (LFH). LFH chia bộ nhớ thành 128 kích thước khối định sẵn (Buckets) từ 8 bytes đến 16KB. Khi một bucket được kích hoạt sau một số lượng yêu cầu cấp phát nhất định, LFH sẽ cấp phát các khối nhớ có kích thước đồng nhất trong các trang nhớ cục bộ, triệt tiêu hiện tượng phân mảnh bộ nhớ ngoài và thay đổi hoàn toàn hành vi bố cục con trỏ so với bộ cấp phát truyền thống."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Chẩn Đoán Bố Cục Bộ Nhớ, Xung Đột Quy Ước Gọi Hàm & Phân Mảnh Đống",
+        "objective": "Phân tích và khắc phục các sự cố sụp đổ tiến trình liên quan đến sai lệch quy ước gọi hàm 64-bit, lỗi căn lề ngăn xếp 16-byte và giải phẫu hành vi cấp phát heap động.",
+        "scenario": "Trong vai trò Chuyên viên Dịch ngược và Đánh giá An toàn Nhị phân, bạn được giao xử lý 3 sự cố bộ nhớ phức tạp trong một ứng dụng giao dịch tài chính phân tán hiệu năng cao: một lỗi crash khi porting thư viện tính toán từ Linux x86-64 sang Windows x64, một lỗi ngoại lệ phần cứng bí ẩn trên các lệnh số học véc-tơ SSE, và một hiện tượng phình to bộ nhớ bất thường liên quan đến cơ chế quản lý heap của glibc ptmalloc.",
+        "constraints": [
+          "Mọi lập luận kỹ thuật phải căn cứ trực tiếp trên đặc tả kiến trúc System V AMD64 ABI, Microsoft x64 Calling Convention và glibc ptmalloc internals.",
+          "Phân tích nguyên nhân sụp đổ phải liên kết chính xác giá trị thanh ghi, trạng thái ngăn xếp và mã ngoại lệ phần cứng (#GP, Access Violation).",
+          "Đề xuất biện pháp can thiệp phải đảm bảo tính tương thích nhị phân và duy trì tối ưu hóa hiệu năng vi kiến trúc."
+        ],
+        "cases": [
+          {
+            "id": "case-130-01",
+            "title": "Sự Cố Lệch Quy Ước Gọi Hàm (Calling Convention Mismatch) Khi Port Thư Viện C Sang Windows x64",
+            "context": "Một thư viện giải mã dữ liệu tài chính viết bằng C được biên dịch thành công trên Linux x86-64 (GCC). Khi nhóm phát triển chuyển mã nguồn này sang Windows x64 và biên dịch bằng MSVC, ứng dụng lập tức sụp đổ với mã lỗi Access Violation (0xC0000005) ngay tại lời gọi hàm con trỏ callback `typedef void (*DataCallback)(int id, const char* buffer, size_t len, int priority)`. Kiểm tra trạng thái thanh ghi tại thời điểm crash bằng WinDbg cho thấy hàm callback trên Windows đọc tham số `len` từ thanh ghi R8 và `priority` từ R9, trong khi mã nguồn gốc giả định dữ liệu nằm ở RDX và RCX theo chuẩn Linux, đồng thời thanh ghi RSP bị sai lệch do thiếu 32 bytes không gian lưu trữ.",
+            "prompt": "Nhận định kỹ thuật nào sau đây phân tích chính xác nhất nguyên nhân gốc rễ và giải pháp chuẩn hóa cho sự cố này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Nguyên nhân do biến buffer bị tràn bộ nhớ stack; giải pháp là tăng kích thước vùng đệm khai báo trong hàm callback lên gấp đôi.",
+                "correct": false,
+                "rationale": "Sự cố không liên quan đến tràn bộ nhớ chuỗi; đây là sự khác biệt cơ bản về quy ước gọi hàm giữa hai hệ điều hành 64-bit dẫn tới việc truyền sai thanh ghi và hỏng bố cục stack."
+              },
+              {
+                "id": "B",
+                "label": "Nguyên nhân do xung đột giữa System V AMD64 ABI (truyền 4 tham số đầu qua RDI, RSI, RDX, RCX) và Microsoft x64 ABI (truyền 4 tham số đầu qua RCX, RDX, R8, R9 kèm 32 bytes Shadow Space bắt buộc); giải pháp là chuẩn hóa khai báo hàm bằng macro định kiểu calling convention chuẩn của nền tảng mục tiêu và đảm bảo caller phân bổ đầy đủ 32-byte Shadow Space trên stack.",
+                "correct": true,
+                "rationale": "Đây là phân tích kỹ thuật hoàn hảo: Trên Linux x86-64 4 đối số đầu nằm trong RDI, RSI, RDX, RCX, trong khi trên Windows x64 chúng nằm trong RCX, RDX, R8, R9. Nếu caller không cấp phát 32 bytes Shadow Space, hàm callee khi đổ thanh ghi xuống ngăn xếp sẽ ghi đè trực tiếp lên Return Address của caller, dẫn tới crash Access Violation ngay khi thực thi lệnh ret."
+              },
+              {
+                "id": "C",
+                "label": "Nguyên nhân do Windows x64 không hỗ trợ con trỏ hàm 64-bit; giải pháp là ép kiểu con trỏ hàm về dạng số nguyên 32-bit (unsigned int) trước khi thực hiện lệnh gọi gián tiếp.",
+                "correct": false,
+                "rationale": "Windows x64 hỗ trợ con trỏ 64-bit toàn diện. Ép kiểu về 32-bit sẽ làm mất 32 bit cao của địa chỉ bộ nhớ và gây sụp đổ ngay lập tức do phân giải con trỏ không hợp lệ."
+              },
+              {
+                "id": "D",
+                "label": "Nguyên nhân do trình biên dịch MSVC tự động kích hoạt chế độ cdecl 32-bit; giải pháp là thêm từ khóa __cdecl vào trước định nghĩa hàm callback.",
+                "correct": false,
+                "rationale": "Trên nền tảng x64, trình biên dịch MSVC bỏ qua các từ khóa __cdecl, __stdcall, __fastcall và áp dụng duy nhất một quy ước gọi hàm Microsoft x64 Calling Convention chuẩn hóa."
+              }
+            ]
+          },
+          {
+            "id": "case-130-02",
+            "title": "Hiện Tượng Sụp Đổ Bí Ẩn Do Lỗi Căn Lề Ngăn Xếp 16-Byte (Stack Alignment Fault Trên Lệnh MOVAPS)",
+            "context": "Một đoạn mã xử lý đồ họa tài chính nhúng hợp ngữ inline bằng lệnh `movaps xmmword ptr [rsp + 0x10], xmm0` được chèn vào thân một hàm hook nội bộ. Khi tiến trình thực thi đoạn mã này trên Linux x86-64, hệ điều hành lập tức phát tín hiệu SIGSEGV (Mã lỗi Si_code = SI_KERNEL / SEGV_ACCERR) dù địa chỉ vùng nhớ hoàn toàn thuộc trang nhớ hợp lệ có quyền ghi. Kiểm tra bằng GDB cho thấy tại thời điểm lệnh `movaps` thực thi, giá trị của thanh ghi RSP là `0x7fffffffe348` (kết thúc bằng đuôi 8, tức không chia hết cho 16).",
+            "prompt": "Nguyên nhân cốt lõi của ngoại lệ phần cứng này là gì và phương án xử lý ngăn xếp chuẩn mực là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Lệnh MOVAPS yêu cầu địa chỉ đích trong bộ nhớ phải được căn lề nghiêm ngặt trên ranh giới 16-byte (địa chỉ chia hết cho 16); giá trị RSP kết thúc bằng 8 khiến địa chỉ RSP + 0x10 không chia hết cho 16 và kích hoạt General Protection Fault (#GP); giải pháp là chèn lệnh điều chỉnh ngăn xếp (ví dụ: sub rsp, 8 hoặc and rsp, -16) trong Function Prologue để đảm bảo căn lề 16-byte.",
+                "correct": true,
+                "rationale": "Lệnh MOVAPS (Move Aligned Packed Single-Precision Floating-Point Values) trong tập lệnh SSE của kiến trúc x86-64 bắt buộc toán hạng bộ nhớ phải được căn lề 16-byte. Nếu địa chỉ không chia hết cho 16, CPU sẽ phát sinh ngoại lệ #GP (được Linux chuyển thành SIGSEGV). Biện pháp chuẩn hóa là căn lề RSP chia hết cho 16 trước khi thao tác hoặc sử dụng lệnh MOVUPS (Move Unaligned) nếu chấp nhận đánh đổi một phần nhỏ hiệu năng."
+              },
+              {
+                "id": "B",
+                "label": "Thanh ghi XMM0 đã bị hỏng dữ liệu do xung đột với thanh ghi RDI; giải pháp là thay thế thanh ghi XMM0 bằng thanh ghi đa dụng RAX.",
+                "correct": false,
+                "rationale": "XMM0 là thanh ghi véc-tơ 128-bit độc lập, không xung đột với RDI. Lỗi phát sinh hoàn toàn do vi phạm ràng buộc căn lề địa chỉ bộ nhớ ở tầng phần cứng."
+              },
+              {
+                "id": "C",
+                "label": "Đoạn mã ghi đè vào vùng Red Zone của nhân hệ điều hành; giải pháp là vô hiệu hóa hoàn toàn cơ chế ASLR của nhân Linux.",
+                "correct": false,
+                "rationale": "Vùng Red Zone thuộc quyền kiểm soát của User Space (128 bytes dưới RSP), không phải của nhân, và việc tắt ASLR không làm thay đổi tính chẵn lẻ của độ lệch căn lề 16-byte trên ngăn xếp."
+              },
+              {
+                "id": "D",
+                "label": "Trang nhớ của ngăn xếp bị thiếu quyền thực thi Execute; giải pháp là gọi hàm mprotect() để cấp quyền PROT_EXEC cho toàn bộ vùng nhớ Stack.",
+                "correct": false,
+                "rationale": "Lệnh `movaps` là thao tác ghi dữ liệu (Write), không phải thực thi mã máy trên stack; cấp thêm quyền thực thi vi phạm nguyên tắc W^X và không giải quyết được lỗi căn lề 16-byte."
+              }
+            ]
+          },
+          {
+            "id": "case-130-03",
+            "title": "Phân Tích Cơ Chế Ngưỡng Cấp Phát Heap: brk() So Với mmap() Trong glibc ptmalloc",
+            "context": "Trong quá trình phân tích hành vi cấp phát bộ nhớ của tiến trình xử lý thông điệp mạng trên Linux 64-bit, chuyên viên phát hiện: khi tiến trình gọi `malloc(64 * 1024)` (64KB), địa chỉ chunk trả về nằm kề sát phân vùng BSS và việc gọi `free()` không làm giảm dung lượng bộ nhớ thực tế (Resident Set Size - RSS) trong `/proc/self/status`. Ngược lại, khi tiến trình gọi `malloc(2 * 1024 * 1024)` (2MB), địa chỉ trả về nằm ở vùng nhớ cao gần các thư viện chia sẻ, và ngay khi gọi `free()`, chỉ số RSS của tiến trình lập tức giảm đi đúng 2MB.",
+            "prompt": "Cơ chế quản trị bộ nhớ nào của glibc ptmalloc giải thích bản chất kỹ thuật của hiện tượng trên?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đây là lỗi rò rỉ bộ nhớ (Memory Leak) nghiêm trọng trong hàm malloc 64KB; hệ điều hành bị treo cơ chế dọn rác và cần khởi động lại toàn bộ máy chủ.",
+                "correct": false,
+                "rationale": "Đây là hành vi thiết kế chuẩn mực của glibc ptmalloc để tối ưu hóa hiệu năng thông qua cơ chế phân cấp ngưỡng cấp phát (M_MMAP_THRESHOLD), không phải rò rỉ bộ nhớ."
+              },
+              {
+                "id": "B",
+                "label": "ptmalloc sử dụng brk() cho các yêu cầu cấp phát nhỏ hơn ngưỡng M_MMAP_THRESHOLD (~128KB), mở rộng không gian heap liên tục và giữ lại các chunk đã free trong các bins để tái sử dụng thay vì trả về cho kernel; đối với yêu cầu lớn hơn ngưỡng (như 2MB), ptmalloc sử dụng trực tiếp mmap() để tạo trang nhớ ẩn danh độc lập, và munmap() sẽ lập tức giải phóng hoàn toàn trang nhớ này về cho kernel khi free().",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối: Lệnh gọi hệ thống brk mở rộng ranh giới heap theo dạng khối liên tục, việc giải phóng một chunk nhỏ ở giữa không thể hạ thấp đỉnh brk nên bộ nhớ được giữ lại trong bins (fastbins/tcache/smallbins) làm RSS không đổi. Ngược lại, các khối nhớ vượt ngưỡng được cấp phát bằng mmap riêng biệt có bit IS_MMAPPED = 1, khi free() ptmalloc lập tức gọi munmap() giải phóng trang nhớ về cho hệ điều hành, làm giảm RSS tức thì."
+              },
+              {
+                "id": "C",
+                "label": "Kích thước 2MB vượt quá giới hạn tối đa của kiến trúc x86-64 khiến glibc phải chuyển dữ liệu vào tập tin hoán đổi Swap trên đĩa cứng.",
+                "correct": false,
+                "rationale": "Kiến trúc x86-64 hỗ trợ không gian địa chỉ ảo 48-bit (256TB), kích thước 2MB là rất nhỏ so với giới hạn kiến trúc và không tự động bị đẩy vào Swap nếu RAM còn trống."
+              },
+              {
+                "id": "D",
+                "label": "Tiến trình đang chạy ở chế độ Windows LFH giả lập trên Linux thông qua Wine khiến các bucket cấp phát bị sai lệch cấu trúc.",
+                "correct": false,
+                "rationale": "Đây là môi trường Linux nguyên bản chạy glibc ptmalloc, không liên quan đến Wine hay Windows LFH."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Bóc tách chính xác sự khác biệt về thanh ghi đối số và vùng Shadow Space giữa System V AMD64 ABI và Microsoft x64 Calling Convention.",
+          "Chẩn đoán và chứng minh được nguyên nhân lỗi ngoại lệ phần cứng do vi phạm căn lề ngăn xếp 16-byte trên các lệnh SIMD/SSE.",
+          "Phân định rõ cơ chế cấp phát bộ nhớ động giữa brk() và mmap() trong glibc ptmalloc cùng tác động đối với việc tái sử dụng chunk và giải phóng bộ nhớ."
+        ],
+        "evidenceTemplate": [
+          "Bản kết xuất trạng thái thanh ghi và ngăn xếp (Stack Backtrace) thể hiện sự sai lệch đối số và thiếu hụt Shadow Space",
+          "Tài liệu phân tích mã ngoại lệ phần cứng #GP với giá trị con trỏ RSP không căn lề 16-byte tại chỉ lệnh MOVAPS",
+          "Bản đồ không gian bộ nhớ tiến trình trích xuất từ /proc/<pid>/maps minh chứng ranh giới cấp phát Heap giữa brk và mmap chunks"
+        ],
+        "reset": "Khôi phục lại mã nguồn nhị phân ban đầu, tái thiết lập môi trường gỡ lỗi GDB và WinDbg với các cấu hình biểu tượng chuẩn.",
+        "cleanup": "Xóa các tệp core dump, tệp nhật ký gỡ lỗi và các tệp nhị phân biên dịch thử nghiệm trong thư mục làm việc."
+      },
+      "governance": {
+        "prevent": [
+          "Sử dụng các macro tiêu chuẩn hóa calling convention cross-platform (như __cdecl, WINAPI, hoặc thuộc tính __attribute__((sysv_abi)) / __attribute__((ms_abi)) trong GCC/Clang) khi xây dựng thư viện tương thích đa nền tảng.",
+          "Thiết lập cờ kiểm tra căn lề nghiêm ngặt của trình biên dịch (-mstackrealign trên GCC/Clang hoặc /MD trên MSVC) để tự động duy trì căn lề 16-byte cho ngăn xếp trước mọi lời gọi hàm.",
+          "Áp dụng các công cụ phân tích tĩnh (Clang-Tidy, Coverity) để phát hiện sớm các hành vi sử dụng biến cục bộ chưa khởi tạo trên stack và rò rỉ tài nguyên đống bộ nhớ."
+        ],
+        "observe": [
+          "Giám sát các tín hiệu sụp đổ tiến trình hệ thống (SIGSEGV, SIGBUS trên Linux; 0xC0000005 Access Violation trên Windows) thông qua hệ thống thu thập core dump tập trung.",
+          "Theo dõi chỉ số tiêu thụ bộ nhớ thực tế (RSS) và tần suất gọi lệnh hệ thống brk/mmap bằng công cụ eBPF/BCC để phát hiện bất thường phân mảnh heap.",
+          "Kiểm tra tính toàn vẹn của cấu trúc Stack Frame bằng cách kích hoạt các cờ biên dịch bảo vệ như Stack Canaries (-fstack-protector-strong) và SafeStack."
+        ],
+        "respond": [
+          "Khi ghi nhận sự cố crash do lệch calling convention hoặc alignment, lập tức cô lập phiên bản nhị phân lỗi và thu thập crash dump kèm trạng thái thanh ghi chi tiết.",
+          "Tiến hành kiểm tra chéo chữ ký hàm (Function Prototype) giữa tệp header và định nghĩa thực thi nhị phân để xác định điểm gãy đổ giao thức giao tiếp.",
+          "Phát hành bản vá chuẩn hóa ABI và kiểm thử hồi quy trên toàn bộ ma trận hệ điều hành mục tiêu trước khi tái triển khai sản phẩm."
+        ],
+        "residualRisk": [
+          "Việc biên dịch với cờ -fomit-frame-pointer giúp tăng hiệu năng nhưng làm tăng đáng kể độ khó khi trích xuất call stack và điều tra sự cố bằng công cụ gỡ lỗi.",
+          "Cơ chế Tcache trong các phiên bản glibc hiện đại tối ưu hóa tốc độ nhưng tạo điều kiện thuận lợi cho các kỹ thuật khai thác tấn công Heap Tcache Poisoning nếu ứng dụng có lỗi Double Free.",
+          "Một số thư viện bên thứ ba viết bằng Assembly thuần có thể không tuân thủ hoàn toàn quy ước căn lề 16-byte dẫn tới crash ngắt quãng chỉ xuất hiện trên một số dòng CPU nhất định."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Trên kiến trúc x86-64, mọi hệ điều hành đều áp dụng chung một quy ước gọi hàm duy nhất để truyền tham số qua các thanh ghi giống nhau.",
+          "correction": "Đây là ngộ nhận rất phổ biến. Kiến trúc x86-64 bị phân tách thành hai chuẩn ABI hoàn toàn khác biệt: System V AMD64 ABI (Linux/macOS) dùng RDI, RSI, RDX, RCX, R8, R9; trong khi Microsoft x64 ABI (Windows) dùng RCX, RDX, R8, R9 và bắt buộc phải cấp phát 32 bytes Shadow Space trên ngăn xếp."
+        },
+        {
+          "claim": "Ngăn xếp (Stack) luôn phát triển từ địa chỉ thấp lên địa chỉ cao tương tự như cách mảng trong ngôn ngữ C được lập chỉ mục.",
+          "correction": "Trên hầu hết các kiến trúc máy tính phổ dụng bao gồm x86-64 và ARM64, ngăn xếp phát triển ngược chiều: từ vùng địa chỉ cao đi dần xuống vùng địa chỉ thấp (Downwards). Mỗi thao tác push hoặc trừ RSP đều làm giảm giá trị số học của con trỏ ngăn xếp."
+        },
+        {
+          "claim": "Khi gọi hàm free() trong ngôn ngữ C, toàn bộ bộ nhớ được giải phóng sẽ lập tức được hệ điều hành thu hồi và trả lại cho RAM hệ thống.",
+          "correction": "Hàm free() trong glibc ptmalloc chỉ trả bộ nhớ về cho các danh sách quản lý tự do nội bộ của tiến trình (tcache, fastbins, smallbins) để sẵn sàng tái sử dụng cho các lần malloc() tiếp theo. Chỉ các khối nhớ lớn cấp phát qua mmap() hoặc khi đỉnh brk được co lại thì dung lượng RSS mới thực sự giảm."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os14-l130-q1",
+          "difficulty": "easy",
+          "question": "Theo quy ước gọi hàm System V AMD64 ABI trên Linux, tham số thứ nhất và tham số thứ hai dạng số nguyên được truyền lần lượt qua hai thanh ghi nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "RCX và RDX"
+            },
+            {
+              "id": "B",
+              "label": "RDI và RSI"
+            },
+            {
+              "id": "C",
+              "label": "RAX và RBX"
+            },
+            {
+              "id": "D",
+              "label": "R8 và R9"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Quy ước System V AMD64 ABI quy định 6 tham số số nguyên/con trỏ đầu tiên được truyền qua các thanh ghi theo thứ tự: RDI, RSI, RDX, RCX, R8, R9. Do đó tham số thứ nhất nằm ở RDI và tham số thứ hai nằm ở RSI."
+        },
+        {
+          "id": "os14-l130-q2",
+          "difficulty": "medium",
+          "question": "Trong quy ước gọi hàm Microsoft x64 Calling Convention trên Windows, khái niệm 'Shadow Space' (Home Space) mang ý nghĩa kỹ thuật cốt lõi nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Là vùng nhớ 128-byte nằm dưới RSP mà hàm lá có thể ghi dữ liệu mà không cần di chuyển con trỏ đỉnh ngăn xếp."
+            },
+            {
+              "id": "B",
+              "label": "Là vùng nhớ 32-byte bắt buộc phải được Caller cấp phát trên ngăn xếp ngay trước lệnh call để Callee có thể lưu tạm 4 thanh ghi đối số (RCX, RDX, R8, R9) khi cần."
+            },
+            {
+              "id": "C",
+              "label": "Là vùng nhớ đệm bí mật trong nhân Windows dùng để lưu trữ mã băm mật khẩu của người dùng hiện hành."
+            },
+            {
+              "id": "D",
+              "label": "Là phân vùng bộ nhớ chỉ đọc chứa toàn bộ bảng địa chỉ hàm ảo vtable của các lớp C++."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trên Windows x64, Caller bắt buộc phải cấp phát 32 bytes (4 quadwords) trên ngăn xếp trước mọi lời gọi hàm. Vùng Shadow Space này được dành riêng cho Callee để đổ (spill) 4 thanh ghi tham số RCX, RDX, R8, R9 xuống bộ nhớ khi cần thiết."
+        },
+        {
+          "id": "os14-l130-q3",
+          "difficulty": "hard",
+          "question": "Khi thực thi một lệnh véc-tơ SSE như MOVAPS trong kiến trúc x86-64, điều kiện phần cứng nào bắt buộc phải thỏa mãn để CPU không phát sinh ngoại lệ General Protection Fault (#GP)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Địa chỉ bộ nhớ đích bắt buộc phải được căn lề trên ranh giới 16-byte (chia hết cho 16)."
+            },
+            {
+              "id": "B",
+              "label": "Thanh ghi con trỏ lệnh RIP phải mang giá trị nằm trong phân vùng Kernel Space."
+            },
+            {
+              "id": "C",
+              "label": "Tiến trình phải đang chạy dưới đặc quyền tối cao của người quản trị hệ thống root/Administrator."
+            },
+            {
+              "id": "D",
+              "label": "Toàn bộ các cờ trạng thái ZF, CF và OF trong thanh ghi RFLAGS phải đồng thời bằng 0."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Lệnh MOVAPS (Move Aligned Packed Single-Precision) yêu cầu địa chỉ bộ nhớ thao tác phải được căn lề 16-byte (16-byte aligned). Nếu địa chỉ không chia hết cho 16, CPU sẽ lập tức phát sinh ngoại lệ General Protection Fault (#GP), kích hoạt tín hiệu SIGSEGV trên Linux."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một mô-đun phân tích dữ liệu hiệu năng cao được viết bằng ngôn ngữ C++ chạy trên nền tảng đám mây Linux x86-64 bị sụp đổ ngắt quãng khi xử lý các gói tin tài chính lớn. Nhật ký crash dump ghi nhận lỗi SIGSEGV xảy ra tại các hàm tính toán số học sử dụng lệnh AVX/SSE và bộ đếm heap liên tục tăng trưởng dù các hàm giải phóng bộ nhớ vẫn được gọi đều đặn. Bạn được giao nhiệm vụ phân tích nhị phân, tái dựng trạng thái ngăn xếp và cấu trúc đống để tìm ra nguyên nhân gốc rễ.",
+        "tasks": [
+          "Sử dụng GDB để phân tích khung ngăn xếp tại thời điểm sụp đổ, đo đạc độ lệch căn lề của con trỏ RSP và xác định hàm caller đã phá vỡ chuẩn căn lề 16-byte của System V AMD64 ABI.",
+          "Dịch ngược mã máy của đoạn mã khởi tạo hàm (Prologue) và kết hàm (Epilogue) để phát hiện sự mất cân bằng giữa lệnh đẩy/rút dữ liệu hoặc tối ưu hóa omit-frame-pointer sai sót.",
+          "Phân tích bản đồ bộ nhớ `/proc/<pid>/smaps` và cấu trúc các bins trong ptmalloc để chứng minh cơ chế giữ lại bộ nhớ của brk chunks và đề xuất cấu hình mallopt phù hợp."
+        ],
+        "requiredEvidence": [
+          "Bản ghi phiên gỡ lỗi GDB thể hiện phép tính kiểm tra `p $rsp % 16` tại điểm thực thi lệnh sụp đổ",
+          "Biểu đồ giải phẫu Stack Frame chi tiết chỉ ra vị trí Return Address, Saved RBP và ranh giới căn lề 16-byte",
+          "Báo cáo phân tích hành vi Heap Manager so sánh lưu lượng cấp phát qua brk và mmap kèm giải pháp tinh chỉnh M_MMAP_THRESHOLD"
+        ]
+      },
+      "sources": [
+        {
+          "title": "System V Application Binary Interface: AMD64 Architecture Processor Supplement",
+          "url": "https://gitlab.com/x86-psABIs/x86-64-ABI",
+          "publisher": "x86-64 psABI Working Group",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả bố cục thanh ghi đối số RDI, RSI, RDX, RCX, R8, R9 trong System V AMD64 ABI",
+            "Quy định nghiêm ngặt về căn lề ngăn xếp 16-byte trước lệnh gọi hàm và vùng Red Zone 128-byte"
+          ]
+        },
+        {
+          "title": "Microsoft Learn: x64 Calling Convention and Stack Usage Architecture",
+          "url": "https://learn.microsoft.com/en-us/cpp/build/x64-calling-convention",
+          "publisher": "Microsoft Corporation",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Quy định truyền tham số qua RCX, RDX, R8, R9 và yêu cầu phân bổ 32-byte Shadow Space",
+            "Cơ chế bảo lưu thanh ghi và dọn dẹp ngăn xếp của Caller trong kiến trúc Windows x64"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os14-l131-x86-64-and-arm64-assembly-architecture",
+      "slug": "x86-64-and-arm64-assembly-architecture",
+      "title": "Kiến Trúc Tập Lệnh Hợp Ngữ x86-64 & ARM64 (AArch64): Thanh Ghi, Cờ Hiệu & Chế Độ Định Địa Chỉ",
+      "summary": "Nghiên cứu kiến trúc tập lệnh hợp ngữ CISC x86-64 và RISC ARM64 (AArch64). Bóc tách tập thanh ghi đa dụng và chuyên dụng, các cờ trạng thái RFLAGS / PSTATE, các chế độ định địa chỉ phức tạp (RIP-relative, Base-Index-Scale-Disp, Barrel Shifter), và phương pháp dịch ngược các cấu trúc rẽ nhánh, lặp vòng và con trỏ hàm trong C/C++.",
+      "difficulty": "intermediate",
+      "durationMinutes": 120,
+      "prerequisites": ["os14-l130-memory-layout-stack-heap-and-calling-conventions"],
+      "outcomes": [
+        "Phân tích đối chiếu tập thanh ghi tổng quát và chuyên dụng giữa CISC x86-64 (RAX..R15, RBP, RSP, RIP) và RISC ARM64 (X0..X30, SP, PC, XZR, LR/X30).",
+        "Giải mã cơ chế cập nhật và đánh giá các cờ điều kiện trong thanh ghi RFLAGS (ZF, CF, SF, OF) và PSTATE (N, Z, C, V) đối với các lệnh kiểm tra và rẽ nhánh điều kiện.",
+        "Làm chủ các chế độ định địa chỉ phức tạp: RIP-relative addressing trong mã thực thi độc lập vị trí (PIE) của x86-64, và kỹ thuật tính địa chỉ PC-relative (ADRP + ADD) kết hợp Barrel Shifter trên ARM64.",
+        "Dịch ngược và tái dựng chính xác các cấu trúc điều khiển luồng C/C++ phức tạp (if-else, switch-case với Jump Table, vòng lặp do-while, và gọi gián tiếp qua vtable con trỏ hàm)."
+      ],
+      "careerPaths": [
+        "reverse-engineering",
+        "vulnerability-research",
+        "exploit-development"
+      ],
+      "domains": ["reverse-engineering", "assembly", "x86-64", "arm64"],
+      "attackTactics": ["execution", "defense-evasion"],
+      "keywords": [
+        "x86-64",
+        "arm64",
+        "aarch64",
+        "rip-relative",
+        "rflags",
+        "pstate",
+        "barrel-shifter",
+        "jump-table"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Hợp ngữ (Assembly) là tấm gương phản chiếu trung thực nhất cách phần cứng thực thi ý đồ của lập trình viên. Trong khi x86-64 đại diện cho triết lý CISC với tập lệnh biến độ dài (1 đến 15 bytes) cho phép toán tử truy cập trực tiếp ô nhớ, thì ARM64 (AArch64) đại diện cho triết lý RISC với tập lệnh cố định 32-bit tuân thủ nghiêm ngặt mô hình nạp-lưu (Load-Store Architecture). Người làm dịch ngược không đọc từng dòng lệnh hợp ngữ một cách máy móc, mà tìm kiếm các mô thức thành ngữ (Idiomatic Patterns): cách compiler tối ưu hóa vòng lặp, cách con trỏ lệnh tự tham chiếu để tải chuỗi hằng số, và cách bảng nhảy (Jump Table) chuyển hướng luồng điều khiển. Thấu hiểu cả x86-64 và ARM64 là năng lực bắt buộc khi phân tích mã độc hiện đại trên máy tính cá nhân, máy chủ đám mây lẫn thiết bị di động.",
+      "visual": {
+        "title": "Quy Trình Nạp Lệnh, Tính Địa Chỉ Toán Tử Và Đánh Giá Điều Kiện Nhánh",
+        "caption": "So sánh cơ chế giải mã lệnh, truy cập thanh ghi và rẽ nhánh giữa kiến trúc CISC x86-64 và RISC ARM64.",
+        "steps": [
+          {
+            "label": "Giải Mã Chỉ Lệnh & Độ Dài Lệnh",
+            "detail": "x86-64 giải mã luồng byte biến thiên 1-15 bytes với các tiền tố prefix; ARM64 nạp từ lệnh cố định 32-bit (4 bytes) căn lề tự nhiên.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Tính Toán Toán Tử & Địa Chỉ Hiệu Dụng",
+            "detail": "x86-64 tính địa chỉ phức tạp Base+Index*Scale+Disp hoặc RIP-relative; ARM64 dùng lệnh ADRP kết hợp phần cứng Barrel Shifter dịch bit tức thời.",
+            "tone": "allow"
+          },
+          {
+            "label": "Cập Nhật Cờ Trạng Thái Trong RFLAGS / PSTATE",
+            "detail": "Thực hiện phép trừ ngầm qua CMP/SUBS để thiết lập các cờ Zero (ZF/Z), Carry (CF/C), Sign/Negative (SF/N) và Overflow (OF/V).",
+            "tone": "caution"
+          },
+          {
+            "label": "Điều Hướng Luồng Lệnh & Dự Đoán Nhánh",
+            "detail": "Kiểm tra điều kiện nhảy (Jcc / B.cond) hoặc tra cứu mảng con trỏ mã lệnh Jump Table để chuyển hướng con trỏ lệnh RIP / PC.",
+            "tone": "neutral"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Hệ Thống Thanh Ghi: Khảo Sát x86-64 Đa Phân Cấp và ARM64 Load-Store Cố Định",
+          "paragraphs": [
+            "Kiến trúc tập lệnh x86-64 kế thừa lịch sử phát triển kéo dài hơn 4 thập kỷ của dòng vi xử lý Intel x86, mang đặc trưng thuần túy của triết lý CISC (Complex Instruction Set Computer). x86-64 cung cấp 16 thanh ghi đa dụng 64-bit: RAX (Accumulator), RBX (Base), RCX (Counter), RDX (Data), RSI (Source Index), RDI (Destination Index), RBP (Base Pointer), RSP (Stack Pointer), và 8 thanh ghi được đánh số từ R8 đến R15. Một đặc tính phân cấp độc đáo của x86-64 là khả năng truy cập vào các phần nhỏ hơn của thanh ghi: thanh ghi 32-bit cấp dưới (EAX, EBX, R8D), thanh ghi 16-bit (AX, BX, R8W), và thanh ghi 8-bit thấp (AL, BL, R8B) hoặc 8-bit cao (AH, BH, CH, DH).",
+            "Một quy tắc vi kiến trúc cực kỳ quan trọng trên x86-64 mà chuyên viên dịch ngược bắt buộc phải ghi nhớ: bất kỳ chỉ lệnh nào ghi dữ liệu vào thanh ghi con 32-bit (ví dụ: `mov eax, 0x12345678`) sẽ tự động xóa sạch (zero-extend) toàn bộ 32 bit cao của thanh ghi 64-bit tương ứng (`RAX`), biến nửa trên thành các số 0. Ngược lại, các thao tác ghi vào thanh ghi 8-bit hoặc 16-bit (như `mov al, 0xFF` hoặc `mov ax, 0xFFFF`) sẽ hoàn toàn bảo toàn nguyên vẹn các bit còn lại của thanh ghi 64-bit. Thanh ghi con trỏ lệnh RIP (Instruction Pointer) lưu trữ địa chỉ của chỉ lệnh tiếp theo sẽ được nạp vào đường ống xử lý (Pipeline).",
+            "Trái ngược hoàn toàn với x86-64, kiến trúc ARM64 (AArch64) đại diện cho triết lý RISC (Reduced Instruction Set Computer) hiện đại, tuân thủ nguyên tắc nạp-lưu (Load-Store Architecture): các phép toán số học và logic chỉ có thể thực hiện trực tiếp giữa các thanh ghi; việc đọc và ghi bộ nhớ bắt buộc phải thông qua các chỉ lệnh chuyên biệt như `LDR` (Load) và `STR` (Store). ARM64 trang bị 31 thanh ghi đa dụng 64-bit độc lập, được đặt tên từ X0 đến X30. Mỗi thanh ghi Xn đều có thể được truy cập như một thanh ghi 32-bit Wn đại diện cho 32 bit thấp, và tương tự như x86-64, thao tác ghi vào Wn sẽ tự động xóa 32 bit cao của Xn.",
+            "Bên cạnh các thanh ghi đa dụng, ARM64 sở hữu các thanh ghi chuyên dụng đặc thù: Thanh ghi Zero `XZR` (hoặc `WZR` ở chế độ 32-bit) luôn trả về giá trị 0 khi đọc và đóng vai trò như một hố đen hủy dữ liệu khi ghi vào, giúp loại bỏ sự cần thiết của các chỉ lệnh xóa thanh ghi chuyên biệt. Con trỏ ngăn xếp `SP` là thanh ghi độc lập và bắt buộc phải luôn được căn lề 16-byte khi truy cập bộ nhớ. Thanh ghi X30 đảm nhận vai trò Con trỏ liên kết (Link Register - LR); khi một hàm được gọi qua lệnh `BL` (Branch with Link) hoặc `BLR`, địa chỉ quay về sẽ được phần cứng tự động nạp trực tiếp vào LR/X30 thay vì đẩy lên ngăn xếp như x86-64. Thanh ghi X29 thường được quy ước dùng làm Frame Pointer (FP). Khác với x86-64, thanh ghi con trỏ chương trình `PC` trên ARM64 không thể được đọc hoặc ghi trực tiếp như một thanh ghi số học thông thường."
+          ]
+        },
+        {
+          "title": "Cơ Chế Cờ Hiệu và Rẽ Nhánh Điều Kiện: RFLAGS So Với PSTATE",
+          "paragraphs": [
+            "Luồng điều khiển của mọi chương trình nhị phân phụ thuộc trực tiếp vào trạng thái của các cờ điều kiện phần cứng (Status Flags). Trên kiến trúc x86-64, các cờ này được lưu trữ trong thanh ghi RFLAGS 64-bit. Bốn cờ trạng thái cốt lõi phục vụ các phép so sánh và rẽ nhánh bao gồm: Zero Flag (ZF - bật khi kết quả phép toán bằng 0), Carry Flag (CF - bật khi có hiện tượng mượn hoặc nhớ trong số học không dấu), Sign Flag (SF - phản ánh bit cao nhất MSB của kết quả, bật khi số âm trong biểu diễn bù hai), và Overflow Flag (OF - bật khi xảy ra tràn số trong số học có dấu).",
+            "Các chỉ lệnh kiểm tra điều kiện trên x86-64 thường gặp nhất là `CMP a, b` (thực hiện phép trừ ngầm `a - b` để cập nhật các cờ RFLAGS nhưng vứt bỏ kết quả) và `TEST a, b` (thực hiện phép AND logic ngầm `a & b` để cập nhật cờ ZF và SF). Dựa trên trạng thái cờ, các lệnh nhảy điều kiện (Conditional Jumps - Jcc) sẽ quyết định chuyển hướng: `JE/JZ` (nhảy nếu ZF=1), `JNE/JNZ` (nhảy nếu ZF=0). Trong số học không dấu, compiler sử dụng `JA/JNBE` (Jump if Above: CF=0 và ZF=0) hoặc `JB/JNAE` (Jump if Below: CF=1). Trong số học có dấu, compiler sử dụng `JG/JNLE` (Jump if Greater: ZF=0 và SF=OF) hoặc `JL/JNGE` (Jump if Less: SF!=OF). Sự khác biệt giữa các lệnh nhảy có dấu và không dấu là manh mối then chốt giúp chuyên viên dịch ngược phục hồi chính xác kiểu dữ liệu gốc (`int` so với `unsigned int`).",
+            "Trên kiến trúc ARM64, trạng thái cờ được quản lý thông qua trường trạng thái tiến trình PSTATE (Process State), cụ thể là 4 bit cờ NZCV: N (Negative - tương đương SF), Z (Zero - tương đương ZF), C (Carry - tương đương CF), và V (Overflow - tương đương OF). Điểm khác biệt mang tính cách mạng của ARM64 so với x86-64 là: hầu hết các chỉ lệnh số học thông thường (như `ADD`, `SUB`, `AND`) mặc định KHÔNG làm thay đổi cờ trạng thái, giúp bộ xử lý tránh xung đột dữ liệu và thực thi song song nhiều lệnh. Chỉ khi lập trình viên hoặc compiler thêm hậu tố 'S' vào sau tên lệnh (như `ADDS`, `SUBS`, `ANDS`), các cờ NZCV mới được cập nhật.",
+            "Lệnh so sánh `CMP Xn, Xm` trong ARM64 thực chất chỉ là một bí danh (alias) của lệnh `SUBS XZR, Xn, Xm` (trừ hai thanh ghi và lưu kết quả vào thanh ghi Zero XZR để chỉ cập nhật cờ). ARM64 cung cấp các lệnh rẽ nhánh điều kiện `B.cond` như `B.EQ` (Z=1), `B.NE` (Z=0), `B.CS/B.HS` (C=1), `B.CC/B.LO` (C=0), `B.MI` (N=1), `B.PL` (N=0), `B.GT`, `B.LT`. Đặc biệt hơn, để tối ưu hóa hiệu năng và loại bỏ hoàn toàn việc thiết lập cờ cho các cấu trúc rẽ nhánh đơn giản, ARM64 cung cấp các lệnh kiểm tra và nhảy tức thời không cần cờ: `CBZ Xn, label` (Compare and Branch if Zero), `CBNZ Xn, label` (Compare and Branch if Non-Zero), `TBZ Xn, #bit, label` (Test Bit and Branch if Zero), và `TBNZ Xn, #bit, label`."
+          ]
+        },
+        {
+          "title": "Chế Độ Định Địa Chỉ Nâng Cao: RIP-Relative Addressing và ARM64 Barrel Shifter",
+          "paragraphs": [
+            "Chế độ định địa chỉ (Addressing Modes) xác định cách vi xử lý tính toán địa chỉ hiệu dụng (Effective Address) của ô nhớ cần truy cập. Kiến trúc CISC x86-64 hỗ trợ các chế độ định địa chỉ cực kỳ phức tạp thông qua các byte ModR/M và SIB (Scale-Index-Base). Công thức tổng quát tính địa chỉ trên x86-64 là: `[Base + Index * Scale + Displacement]`, trong đó Base và Index là các thanh ghi 64-bit, Scale có thể nhận các giá trị lũy thừa của hai (1, 2, 4, 8 để khớp với kích thước kiểu byte, word, dword, qword), và Displacement là một hằng số độ lệch bù hai. Chỉ lệnh `LEA` (Load Effective Address) tận dụng phần cứng tính toán địa chỉ này để thực hiện các phép toán số học phức tạp như `lea rax, [rbx + rcx*4 + 0x20]` chỉ trong duy nhất một chu kỳ lệnh mà không hề chạm vào bộ nhớ RAM.",
+            "Khi kỹ thuật bảo vệ ASLR trở thành tiêu chuẩn bắt buộc, mã máy phải được biên dịch dưới dạng mã độc lập vị trí (Position-Independent Code - PIC/PIE). x86-64 giải quyết bài toán này bằng chế độ định địa chỉ tương đối theo con trỏ lệnh RIP (RIP-Relative Addressing). Thay vì nạp địa chỉ tuyệt đối cố định của biến toàn cục (như `mov eax, [0x00404000]`), trình biên dịch sẽ tạo ra lệnh `mov eax, [rip + 0x1200]`. Khi chương trình được nạp vào bất kỳ địa chỉ ngẫu nhiên nào trong bộ nhớ, khoảng cách vật lý giữa chỉ lệnh hiện hành và biến toàn cục luôn là một hằng số cố định, cho phép chương trình chạy hoàn hảo mà không cần thực hiện sửa đổi (relocation) mã thực thi lúc khởi động.",
+            "Ở phía đối diện, kiến trúc RISC ARM64 đối mặt với một thách thức hình học thú vị: toàn bộ các chỉ lệnh ARM64 đều có kích thước cố định chính xác 32-bit (4 bytes). Điều này đồng nghĩa với việc không thể nhét vừa một địa chỉ bộ nhớ 64-bit hoặc thậm chí 32-bit vào bên trong một chỉ lệnh máy duy nhất! Để định vị biến toàn cục hoặc chuỗi hằng số trong bộ nhớ một cách độc lập vị trí (PC-relative), ARM64 sử dụng giải pháp phân tầng tinh xảo thông qua cặp chỉ lệnh `ADRP` (Address Page) kết hợp với `ADD` hoặc `LDR`.",
+            "Chỉ lệnh `ADRP Xd, label` tính toán địa chỉ cơ sở của trang nhớ 4KB (4096 bytes) chứa nhãn mục tiêu bằng cách lấy giá trị PC hiện tại, xóa 12 bit thấp về 0, và cộng thêm một độ lệch 21-bit được dịch trái 12 bit. Sau khi thanh ghi Xd đã nắm giữ địa chỉ đầu trang nhớ 4KB, chỉ lệnh tiếp theo `ADD Xd, Xd, :lo12:label` hoặc `LDR Xd, [Xd, :lo12:label]` sẽ sử dụng 12 bit thấp còn lại của nhãn (độ lệch từ 0 đến 4095) để trích xuất chính xác địa chỉ hoặc dữ liệu cần thiết. Thêm vào đó, ARM64 tích hợp bộ dịch bit phần cứng Barrel Shifter ngay trên đường dẫn dữ liệu của ALU, cho phép toán tử thứ hai trong hầu hết các lệnh số học có thể được dịch trái (LSL), dịch phải logic (LSR), dịch phải số học (ASR) hoặc xoay vòng (ROR) hoàn toàn miễn phí mà không tốn thêm bất kỳ chu kỳ CPU nào (ví dụ: `ADD X0, X1, X2, LSL #3` tương đương `X0 = X1 + (X2 << 3)`)."
+          ]
+        },
+        {
+          "title": "Dịch Ngược Cấu Trúc Điều Khiển C/C++: Nhánh Rẽ, Jump Table và Con Trỏ Hàm Ảo",
+          "paragraphs": [
+            "Khi dịch ngược từ hợp ngữ sang mã giả C/C++, chuyên viên phân tích phải liên tục nhận diện và tái cấu trúc các cấu trúc điều khiển cơ bản từ các khối cơ bản (Basic Blocks) liên kết bởi các lệnh rẽ nhánh. Đối với cấu trúc `if-else`, trình biên dịch thường đảo ngược điều kiện logic: nếu điều kiện sai, CPU sẽ nhảy thẳng sang khối `else` hoặc thoát ra ngoài; nếu điều kiện đúng, CPU sẽ thực thi nối tiếp dòng mã của khối `then`. Để tránh chi phí đắt đỏ của việc dự đoán sai nhánh (Branch Misprediction) trong vi kiến trúc CPU, các compiler hiện đại thường thay thế các nhánh rẽ ngắn bằng lệnh gán điều kiện: `CMOVcc` (Conditional Move) trên x86-64 hoặc `CSEL` (Conditional Select), `CSINC`, `CSINV` trên ARM64.",
+            "Cấu trúc rẽ nhánh nhiều trường hợp `switch-case` là một trong những thành phần thú vị nhất khi phân tích nhị phân. Nếu các giá trị `case` nằm rải rác cách xa nhau (Sparse Cases), compiler sẽ biên dịch chúng thành một cây tìm kiếm nhị phân hoặc chuỗi các lệnh so sánh `if-else cascade`. Tuy nhiên, nếu các giá trị `case` dày đặc và liên tục (ví dụ: các số từ 0 đến 8), compiler sẽ tối ưu hóa thành một Bảng Nhảy (Jump Table). Bảng nhảy là một mảng liên tục các con trỏ địa chỉ mã lệnh nằm trong phân vùng chỉ đọc `.rodata`. Khi thực thi, chương trình chỉ cần thực hiện một phép kiểm tra biên trên (Bounds Check) bằng một lệnh `CMP` và nhảy không dấu `JA/B.HI` về nhãn `default`, sau đó dùng giá trị biến switch làm chỉ số index để tra bảng và thực hiện lệnh nhảy gián tiếp `jmp qword ptr [table + rax*8]` trên x86-64 hoặc `br x16` trên ARM64.",
+            "Đối với các vòng lặp (`while`, `for`, `do-while`), trình biên dịch hầu như luôn tối ưu hóa bằng kỹ thuật 'Test-at-the-bottom' (Loop Inversion). Thay vì đặt điều kiện kiểm tra ở đầu vòng lặp khiến CPU phải thực hiện hai lệnh nhảy mỗi chu kỳ lặp, compiler biến đổi vòng lặp thành dạng `do-while`: đặt điều kiện kiểm tra và lệnh nhảy ngược lên đỉnh ở đáy vòng lặp, và chèn một lệnh nhảy ban đầu nhảy qua thân vòng lặp nếu điều kiện ban đầu không thỏa mãn. Chuyên viên dịch ngược nhận diện cấu trúc vòng lặp thông qua sự xuất hiện của một cạnh ngược (Back-edge) trong đồ thị luồng điều khiển (Control Flow Graph - CFG).",
+            "Trong lập trình hướng đối tượng C++, cơ chế đa hình động (Dynamic Polymorphism) thông qua các phương thức ảo (Virtual Methods) được hiện thực hóa bằng Bảng Hàm Ảo (vtable). Mỗi đối tượng của một lớp có hàm ảo sẽ chứa một con trỏ bí mật ở 8 bytes đầu tiên của cấu trúc đối tượng gọi là `vptr`, trỏ tới bảng `vtable` của lớp đó nằm trong `.rodata`. Một lời gọi hàm ảo như `ptr->Render()` được dịch ngược thành chuỗi thao tác: (1) Nạp con trỏ đối tượng `this` vào thanh ghi tham số đầu tiên (RDI hoặc X0); (2) Giải mã con trỏ `vptr` từ đầu đối tượng `mov rax, [rdi]`; (3) Nạp con trỏ hàm tại chỉ số cố định trong vtable `mov rax, [rax + 0x18]`; và (4) Thực hiện gọi gián tiếp `call rax` trên x86-64 hoặc `blr x3` trên ARM64. Việc nhận diện mô thức truy cập vtable offset là chìa khóa để tái dựng toàn bộ hệ thống kế thừa lớp của ứng dụng C++ bị dịch ngược."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Tái Dựng Cấu Trúc Mã Nguồn C/C++ Từ Hợp Ngữ x86-64 và ARM64",
+        "objective": "Thực hành phân tích và dịch ngược mã máy x86-64 và ARM64, giải mã các bảng nhảy Jump Table, phân tích định địa chỉ RIP/PC-relative và phục hồi cấu trúc gọi hàm ảo C++.",
+        "scenario": "Trong một chiến dịch điều tra mã độc đa nền tảng nhắm vào cơ sở hạ tầng đám mây và thiết bị di động, bạn thu được hai tệp nhị phân bị strip toàn bộ biểu tượng: một tệp x86-64 Linux ELF và một tệp ARM64 Linux ELF. Nhiệm vụ của bạn là bóc tách các khối hợp ngữ then chốt để xác định thuật toán xử lý gói tin, cấu trúc chuyển hướng lệnh và cơ chế điều vận đối tượng nội bộ.",
+        "constraints": [
+          "Phân tích cấu trúc hợp ngữ phải căn cứ trên đúng tài liệu quy chuẩn kiến trúc của Intel 64 và ARM Architecture Reference Manual.",
+          "Tái dựng cấu trúc switch-case và loop phải bảo đảm tính toàn vẹn ngữ nghĩa tương đương tuyệt đối với mã nguồn C nguyên bản.",
+          "Mọi suy luận về con trỏ hàm ảo vtable phải xác định rõ độ lệch byte offset và kiểu gọi con trỏ gián tiếp."
+        ],
+        "cases": [
+          {
+            "id": "case-131-01",
+            "title": "Tái Dựng Cấu Trúc Switch-Case Phức Tạp Bằng Bảng Nhảy Jump Table Trên x86-64",
+            "context": "Trong trình dịch ngược Ghidra, tại một hàm giải mã giao thức nhị phân x86-64, bạn phát hiện đoạn mã hợp ngữ sau:\n  cmp edi, 0x05\n  ja loc_default\n  lea rdx, [rip + 0x2030]\n  movsxd rax, dword ptr [rdx + rdi*4]\n  add rax, rdx\n  jmp rax\nVùng nhớ tại `[rip + 0x2030]` chứa một mảng gồm 6 số nguyên 32-bit có dấu tương ứng với các độ lệch địa chỉ.",
+            "prompt": "Cấu trúc mã nguồn C/C++ nào đã sinh ra đoạn mã hợp ngữ này và cơ chế tính toán địa chỉ nhảy hoạt động như thế nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đây là một vòng lặp while duyệt qua 5 phần tử mảng; lệnh jmp rax nhảy tới hàm printf để in các phần tử.",
+                "correct": false,
+                "rationale": "Đoạn mã không hề có cạnh ngược (back-edge) hay thân vòng lặp, mà là cấu trúc phân nhánh đa trường hợp switch-case."
+              },
+              {
+                "id": "B",
+                "label": "Đây là cấu trúc `switch(edi)` có 6 trường hợp (từ case 0 đến case 5); trình biên dịch sử dụng bảng nhảy Jump Table chứa các độ lệch 32-bit tương đối (relative 32-bit offsets) để tiết kiệm bộ nhớ và hỗ trợ PIE; sau khi kiểm tra biên trên `cmp edi, 0x05; ja loc_default`, chương trình nhân `rdi` với 4 byte để nạp độ lệch, cộng với địa chỉ cơ sở của bảng `rdx` và thực hiện lệnh nhảy gián tiếp `jmp rax`.",
+                "correct": true,
+                "rationale": "Đây là kỹ thuật Jump Table tối ưu hóa kinh điển trên x86-64 PIE: thay vì lưu địa chỉ tuyệt đối 64-bit (8 bytes mỗi mục), compiler lưu các độ lệch 32-bit (movsxd 4 bytes) tương đối so với bảng, sau đó cộng lại `add rax, rdx` để tính ra địa chỉ tuyệt đối của từng case mục tiêu."
+              },
+              {
+                "id": "C",
+                "label": "Đây là một cuộc tấn công Return-Oriented Programming (ROP) do mã độc cài cắm; lệnh jmp rax nhằm vô hiệu hóa cơ chế ASLR của Linux.",
+                "correct": false,
+                "rationale": "Đây là mã máy hoàn toàn chuẩn mực do GCC/Clang sinh ra khi tối ưu hóa switch-case dày đặc, không phải shellcode hay chuỗi ROP payload."
+              },
+              {
+                "id": "D",
+                "label": "Đoạn mã là một hàm đệ quy vô hạn kiểm tra biến edi; nếu edi lớn hơn 5 thì chương trình sẽ tự hủy tiến trình.",
+                "correct": false,
+                "rationale": "Nhãn `loc_default` là nhánh xử lý trường hợp mặc định của lệnh switch, không phải hàm đệ quy hay cơ chế tự hủy."
+              }
+            ]
+          },
+          {
+            "id": "case-131-02",
+            "title": "Phân Tích Cặp Lệnh ADRP + LDR Định Vị Biến Toàn Cục Trong Nhị Phân ARM64 Linux",
+            "context": "Khi phân tích tệp nhị phân ARM64 của mã độc, bạn quan sát thấy chuỗi lệnh sau tại địa chỉ `0x00401100`:\n  adrp x0, 0x404000\n  ldr x1, [x0, #0x828]\n  cbnz x1, loc_connected\nBiết rằng tệp nhị phân được biên dịch dưới dạng mã độc lập vị trí PIE và nhãn `loc_connected` là một nhánh thực thi khác trong hàm.",
+            "prompt": "Cơ chế này giải quyết hạn chế kỹ thuật nào của vi kiến trúc ARM64 và ý nghĩa logic của chuỗi lệnh là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "ARM64 có độ dài lệnh cố định 32-bit nên không thể chứa trực tiếp địa chỉ 64-bit; lệnh ADRP tính địa chỉ trang nhớ 4KB chứa biến (0x404000), sau đó lệnh LDR cộng thêm độ lệch 12-bit (#0x828) để nạp giá trị biến toàn cục vào thanh ghi X1, cuối cùng lệnh CBNZ kiểm tra nếu giá trị khác 0 thì nhảy tới loc_connected.",
+                "correct": true,
+                "rationale": "Phân tích kỹ thuật hoàn hảo: Do kiến trúc RISC lệnh cố định 32-bit, ARM64 chia việc nạp địa chỉ PC-relative thành 2 bước: ADRP nạp trang nhớ 4KB (21 bit cao dịch trái 12 bit cộng PC), và LDR/ADD xử lý 12 bit thấp (:lo12:). Lệnh CBNZ là lệnh rẽ nhánh tối ưu không cần cờ kiểm tra giá trị khác 0."
+              },
+              {
+                "id": "B",
+                "label": "ARM64 không hỗ trợ bộ nhớ ảo nên lệnh ADRP dùng để đổi chế độ CPU từ User Mode sang Kernel Mode nhằm đọc bộ nhớ vật lý.",
+                "correct": false,
+                "rationale": "ARM64 hỗ trợ bộ nhớ ảo đầy đủ thông qua MMU; chuyển đổi chế độ đặc quyền phải thông qua ngoại lệ hệ thống SVC, không thể thực hiện bằng ADRP."
+              },
+              {
+                "id": "C",
+                "label": "Lệnh LDR nạp địa chỉ hàm giải mã vào thanh ghi con trỏ lệnh PC; lệnh CBNZ dùng để xóa toàn bộ dữ liệu trong bộ nhớ đệm Cache.",
+                "correct": false,
+                "rationale": "LDR nạp dữ liệu vào X1, không can thiệp vào PC; CBNZ là lệnh nhảy điều kiện (Compare and Branch if Non-Zero), không liên quan đến xóa bộ nhớ đệm."
+              },
+              {
+                "id": "D",
+                "label": "Đoạn mã là một hàm mã hóa dữ liệu RSA sử dụng phần cứng chuyên dụng Barrel Shifter để dịch bit khóa công khai.",
+                "correct": false,
+                "rationale": "Trong đoạn mã không hề có lệnh mã hóa hay toán tử dịch bit Barrel Shifter, đây chỉ là thao tác nạp biến toàn cục và kiểm tra điều kiện rẽ nhánh cơ bản."
+              }
+            ]
+          },
+          {
+            "id": "case-131-03",
+            "title": "Dịch Ngược Kỹ Thuật Đọc Con Trỏ Hàm Ảo C++ (Vtable Resolution) Từ Mã Máy",
+            "context": "Một đoạn mã x86-64 được trích xuất từ một tiến trình C++:\n  mov rax, qword ptr [rdi]\n  mov rsi, r12\n  call qword ptr [rax + 0x20]\nBiết rằng thanh ghi RDI chứa con trỏ đối tượng `this` được truyền vào từ hàm caller và R12 chứa một tham số kiểu số nguyên.",
+            "prompt": "Đoạn mã hợp ngữ trên đại diện cho cấu trúc lập trình hướng đối tượng C++ nào và cơ chế thực thi diễn ra ra sao?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đây là một thao tác gọi hàm đệ quy tĩnh trong ngôn ngữ C; thanh ghi RAX chứa giá trị của biến toàn cục đếm số lần lặp.",
+                "correct": false,
+                "rationale": "Mô thức giải mã `[rdi]` (vptr) rồi gọi gián tiếp qua `[rax + 0x20]` là đặc trưng tuyệt đối của cơ chế gọi phương thức ảo thông qua vtable trong C++."
+              },
+              {
+                "id": "B",
+                "label": "Đoạn mã thực thi lời gọi phương thức ảo đa hình C++: 8 bytes đầu của đối tượng tại [rdi] chứa con trỏ vptr trỏ tới vtable; lệnh `mov rax, [rdi]` nạp địa chỉ vtable, sau đó `call [rax + 0x20]` gọi phương thức ảo nằm ở chỉ số thứ 4 (offset 0x20 = 32 bytes = 4 con trỏ 8-byte) trong bảng vtable, truyền con trỏ this qua RDI và tham số thứ hai qua RSI.",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối: Đây là cấu trúc kinh điển của đa hình động C++ trên x86-64. Đối tượng chứa vptr tại offset 0, vtable chứa danh sách con trỏ hàm ảo 8-byte (0x20 / 8 = index 4). RDI đóng vai trò con trỏ this theo quy ước gọi hàm System V AMD64."
+              },
+              {
+                "id": "C",
+                "label": "Đoạn mã khởi tạo một luồng thực thi thread mới thông qua hàm pthread_create() của thư viện chuẩn libc.",
+                "correct": false,
+                "rationale": "Không có bất kỳ dấu hiệu nào của lời gọi API pthread_create; đây là một lệnh gọi gián tiếp thông qua bảng con trỏ trong bộ nhớ."
+              },
+              {
+                "id": "D",
+                "label": "Đây là lệnh giải phóng vùng nhớ heap tương đương hàm delete this; offset 0x20 là kích thước của đối tượng cần hủy.",
+                "correct": false,
+                "rationale": "Lệnh call gián tiếp thực hiện một phương thức thành viên, không phải thao tác giải phóng heap; offset 0x20 là vị trí con trỏ hàm trong vtable chứ không phải kích thước đối tượng."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân tích chính xác vai trò và cách phân cấp các thanh ghi trên kiến trúc x86-64 và ARM64 bao gồm hiệu ứng zero-extend.",
+          "Giải mã thành công cơ chế hoạt động của bảng nhảy Jump Table và tái dựng chính xác cấu trúc switch-case.",
+          "Chứng minh được nguyên lý định vị địa chỉ độc lập vị trí PC-relative thông qua cặp lệnh ADRP + ADD/LDR trên ARM64."
+        ],
+        "evidenceTemplate": [
+          "Đoạn mã giả C tái dựng hoàn chỉnh từ khối hợp ngữ switch-case có chú thích chi tiết các nhánh",
+          "Biểu đồ phân tích luồng lệnh rẽ nhánh và trạng thái các cờ điều kiện RFLAGS / PSTATE tại điểm so sánh",
+          "Tài liệu ánh xạ con trỏ vtable và cấu trúc lớp đối tượng C++ trích xuất từ các lệnh gọi gián tiếp"
+        ],
+        "reset": "Làm sạch môi trường phân tích Ghidra/IDA, đưa các tệp nhị phân thử nghiệm x86-64 và ARM64 về trạng thái ban đầu.",
+        "cleanup": "Xóa cơ sở dữ liệu phân tích tạm thời (.gpr, .rep, .idb) sinh ra trong quá trình dịch ngược nhị phân."
+      },
+      "governance": {
+        "prevent": [
+          "Bật các tùy chọn tối ưu hóa an toàn của compiler (như Control Flow Guard / Control-flow Enforcement Technology - CET trên x86-64 và Pointer Authentication Code - PAC / BTI trên ARM64) để ngăn chặn tấn công giả mạo con trỏ hàm gián tiếp.",
+          "Áp dụng cờ biên dịch -fPIE / -pie để đảm bảo toàn bộ mã lệnh và dữ liệu được tạo ra dưới dạng độc lập vị trí, tận dụng tối đa cơ chế ASLR.",
+          "Kiểm tra tính an toàn của các phép ép kiểu con trỏ trong C++ nhằm triệt tiêu nguy cơ Type Confusion phá vỡ cấu trúc vtable."
+        ],
+        "observe": [
+          "Giám sát các hành vi vi phạm toàn vẹn luồng điều khiển (Indirect Branch Tracking Violations) được phát hiện bởi phần cứng CPU thông qua hệ thống telemetry nhân.",
+          "Theo dõi các sự kiện ngoại lệ thực thi chỉ lệnh bất hợp pháp (SIGILL) trên hệ thống, dấu hiệu của việc giải mã sai kiến trúc hoặc chèn shellcode lỗi.",
+          "Kiểm toán các tệp nhị phân xuất xưởng để xác minh sự hiện diện của các cơ chế bảo vệ phần cứng hiện đại (như ARM Branch Target Identification - BTI)."
+        ],
+        "respond": [
+          "Khi phát hiện hành vi tấn công chuyển hướng con trỏ hàm gián tiếp qua vtable, lập tức cô lập tiến trình và thu thập bộ nhớ để phân tích dấu vết heap spray.",
+          "Sử dụng công cụ dịch ngược nhị phân (Ghidra, IDA Pro) để trích xuất hàm mục tiêu bị chiếm quyền và xác định lỗ hổng tha hóa con trỏ gốc.",
+          "Triển khai bản vá tăng cường kiểm tra xác thực con trỏ hoặc tái cấu trúc lớp kế thừa để loại bỏ điểm yếu kiến trúc."
+        ],
+        "residualRisk": [
+          "Các kỹ thuật tấn công ROP/JOP tiên tiến vẫn có thể tìm kiếm các gadget hợp lệ trong mã nhị phân lớn để vượt qua một số cơ chế kiểm tra toàn vẹn luồng lỏng lẻo.",
+          "Việc sử dụng các lệnh gián tiếp tối ưu hóa cao trong thư viện JIT (như JavaScript V8) có thể tạo ra các vùng thực thi khó kiểm soát bằng các quy tắc chữ ký tĩnh.",
+          "Trên các nền tảng ARM64 cũ chưa hỗ trợ phần cứng PAC, việc bảo vệ tính toàn vẹn của Link Register (LR) trên ngăn xếp vẫn hoàn toàn phụ thuộc vào phần mềm Stack Canary."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Khi ghi dữ liệu vào thanh ghi con 32-bit (như EAX hoặc W0), các bit còn lại ở nửa trên của thanh ghi 64-bit (RAX hoặc X0) sẽ luôn được giữ nguyên giá trị cũ.",
+          "correction": "Hoàn toàn sai. Cả hai kiến trúc x86-64 và ARM64 đều quy định rằng bất kỳ phép ghi nào vào thanh ghi con 32-bit (EAX hoặc Wn) đều tự động xóa sạch (zero-extend) toàn bộ 32 bit cao của thanh ghi 64-bit tương ứng thành các số 0 để tránh hiện tượng phụ thuộc dữ liệu sai (false data dependency)."
+        },
+        {
+          "claim": "Kiến trúc ARM64 có thể nạp trực tiếp bất kỳ địa chỉ bộ nhớ 64-bit nào vào thanh ghi chỉ bằng một câu lệnh duy nhất giống như x86-64.",
+          "correction": "Sai lầm nghiêm trọng về kiến trúc. Do toàn bộ các chỉ lệnh ARM64 có kích thước cố định chính xác 32-bit, một lệnh không thể chứa đủ toán hạng 64-bit. ARM64 bắt buộc phải sử dụng chuỗi lệnh (như ADRP kết hợp ADD/LDR hoặc chuỗi lệnh MOVZ/MOVK) để nạp một địa chỉ bộ nhớ đầy đủ."
+        },
+        {
+          "claim": "Mọi lệnh nhảy điều kiện (Jcc) trong x86-64 đều có thể thay thế lẫn nhau giữa số có dấu (signed) và số không dấu (unsigned) mà không làm ảnh hưởng đến logic chương trình.",
+          "correction": "Sai bản chất. Các lệnh nhảy không dấu (như JA, JB) chỉ kiểm tra cờ CF và ZF; trong khi các lệnh nhảy có dấu (như JG, JL) phụ thuộc vào sự kết hợp giữa cờ SF và OF. Dùng sai lệnh nhảy sẽ dẫn tới lỗi logic nghiêm trọng khi giá trị số nguyên vượt ngưỡng biểu diễn số âm."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os14-l131-q1",
+          "difficulty": "easy",
+          "question": "Điều gì sẽ xảy ra với 32 bit cao của thanh ghi RAX khi vi xử lý x86-64 thực thi chỉ lệnh `mov eax, 0x12345678`?",
+          "options": [
+            {
+              "id": "A",
+              "label": "32 bit cao của RAX được giữ nguyên vẹn giá trị trước đó."
+            },
+            {
+              "id": "B",
+              "label": "32 bit cao của RAX tự động bị xóa về 0 (zero-extended)."
+            },
+            {
+              "id": "C",
+              "label": "32 bit cao của RAX tự động được điền toàn bộ bằng bit 1 (0xFFFFFFFF)."
+            },
+            {
+              "id": "D",
+              "label": "CPU lập tức phát sinh ngoại lệ General Protection Fault."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trên kiến trúc x86-64, mọi phép toán ghi vào thanh ghi con 32-bit (như EAX) đều tự động xóa sạch toàn bộ 32 bit cao của thanh ghi 64-bit tương ứng (RAX) về 0."
+        },
+        {
+          "id": "os14-l131-q2",
+          "difficulty": "medium",
+          "question": "Trong kiến trúc ARM64 (AArch64), thanh ghi nào đảm nhận vai trò Link Register (LR) dùng để lưu trữ địa chỉ quay về khi thực thi lệnh gọi hàm `BL`?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Thanh ghi X0"
+            },
+            {
+              "id": "B",
+              "label": "Thanh ghi X16"
+            },
+            {
+              "id": "C",
+              "label": "Thanh ghi X29"
+            },
+            {
+              "id": "D",
+              "label": "Thanh ghi X30"
+            }
+          ],
+          "correctAnswer": "D",
+          "explanation": "Trong kiến trúc ARM64, thanh ghi X30 chính là Link Register (LR). Khi lệnh rẽ nhánh có liên kết `BL` hoặc `BLR` được thực thi, địa chỉ của lệnh tiếp theo được phần cứng tự động ghi vào X30."
+        },
+        {
+          "id": "os14-l131-q3",
+          "difficulty": "hard",
+          "question": "Trong một tệp nhị phân x86-64 được biên dịch dưới dạng mã độc lập vị trí (PIE), tại sao chế độ định địa chỉ RIP-relative (`[rip + offset]`) lại đóng vai trò quyết định giúp chương trình thực thi thành công dưới cơ chế bảo vệ ASLR?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì nó mã hóa dữ liệu ô nhớ bằng thuật toán AES phần cứng trước khi đọc vào thanh ghi."
+            },
+            {
+              "id": "B",
+              "label": "Vì khoảng cách số học giữa chỉ lệnh hiện hành (RIP) và dữ liệu toàn cục trong bộ nhớ luôn là một hằng số cố định không đổi, bất kể địa chỉ cơ sở của chương trình bị ngẫu nhiên hóa đến đâu."
+            },
+            {
+              "id": "C",
+              "label": "Vì nó cho phép vô hiệu hóa quyền ghi của phân vùng ngăn xếp Stack để ngăn chặn tấn công tràn bộ đệm."
+            },
+            {
+              "id": "D",
+              "label": "Vì nó chuyển đổi tự động các lệnh hợp ngữ CISC thành vi mã RISC trước khi nạp vào bộ nhớ đệm L1."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Chế độ định địa chỉ tương đối theo con trỏ lệnh RIP-relative tính toán vị trí dữ liệu dựa trên độ lệch (offset) so với lệnh hiện hành. Khi toàn bộ module nhị phân được nạp vào một địa chỉ cơ sở ngẫu nhiên do ASLR, khoảng cách tương đối giữa mã lệnh và dữ liệu vẫn giữ nguyên, giúp chương trình hoạt động hoàn hảo mà không cần sửa đổi bảng relocation."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một mẫu mã độc tấn công có chủ đích (APT) được phát hiện nhắm vào các máy chủ đám mây ARM64 (AWS Graviton) và máy trạm x86-64. Mã độc sử dụng kỹ thuật che giấu luồng điều khiển tinh vi: nó thay thế các cấu trúc rẽ nhánh thông thường bằng các bảng nhảy tự tính toán và tận dụng các lệnh định vị PC-relative để trích xuất payload giải mã trong bộ nhớ. Bạn được giao nhiệm vụ phân tích nhị phân cả hai phiên bản kiến trúc, tái cấu trúc logic giải mã và bóc tách các con trỏ hàm bị ẩn giấu.",
+        "tasks": [
+          "Phân tích tệp nhị phân ARM64 bằng Ghidra/IDA, giải mã cặp lệnh `ADRP` và `ADD/LDR` tại các điểm truy cập biến toàn cục để xác định địa chỉ chính xác của khóa mã hóa trong phân vùng `.rodata`.",
+          "Tái cấu trúc bảng nhảy Jump Table trong phiên bản x86-64, xác định công thức tính độ lệch tương đối và vẽ lại đồ thị luồng điều khiển (CFG) của hàm phân phối lệnh độc hại.",
+          "Dịch ngược cơ chế gọi con trỏ hàm ảo đa hình trong mô-đun C++, lập bảng ánh xạ các offset trong vtable tới các hàm thực thi tương ứng trong mã máy."
+        ],
+        "requiredEvidence": [
+          "Bản tính toán toán học chi tiết giải mã địa chỉ từ lệnh ADRP (trang nhớ 4KB + độ lệch 12-bit thấp) trên ARM64",
+          "Mã giả C hoàn chỉnh tái lập cấu trúc máy trạng thái (State Machine) từ bảng nhảy x86-64 Jump Table",
+          "Bảng ma trận cấu trúc vtable phân tích đầy đủ các phương thức ảo và địa chỉ hàm tương ứng được gọi trong nhị phân"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Intel 64 and IA-32 Architectures Software Developer's Manual: Volume 1 & Volume 2 (Instruction Set Reference)",
+          "url": "https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html",
+          "publisher": "Intel Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả kiến trúc thanh ghi x86-64, quy tắc zero-extension cho các lệnh 32-bit và cờ RFLAGS",
+            "Cơ chế định địa chỉ ModR/M, SIB và chế độ định địa chỉ tương đối theo con trỏ lệnh RIP-relative"
+          ]
+        },
+        {
+          "title": "Arm Architecture Reference Manual: Armv8 and Armv9-A Architecture Profile",
+          "url": "https://developer.arm.com/documentation/ddi0487/latest",
+          "publisher": "Arm Limited",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả kiến trúc thanh ghi AArch64 (X0..X30, XZR, SP, PC, LR) và trường trạng thái PSTATE",
+            "Nguyên lý nạp địa chỉ PC-relative thông qua chỉ lệnh ADRP kết hợp và cơ chế hoạt động của Barrel Shifter"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os14-l132-executable-formats-elf-pe-macho-and-symbols",
+      "slug": "executable-formats-elf-pe-macho-and-symbols",
+      "title": "Giải Phẫu Định Dạng Tập Tin Thực Thi: ELF, PE/COFF, Mach-O & Cơ Chế Phân Giải Ký Hiệu",
+      "summary": "Bóc tách cấu trúc nội bộ của 3 định dạng nhị phân thực thi hàng đầu thế giới: Executable and Linkable Format (ELF) trên Linux, Portable Executable / Common Object File Format (PE/COFF) trên Windows, và Mach-O trên macOS/iOS. Phân tích Header, Program Headers / Load Commands, Section Headers, Bảng phân giải ký hiệu (Symbol Tables), và cơ chế nạp động (Dynamic Linking / PLT-GOT / IAT / Dyld Chained Fixups).",
+      "difficulty": "intermediate",
+      "durationMinutes": 120,
+      "prerequisites": [
+        "os14-l130-memory-layout-stack-heap-and-calling-conventions",
+        "os14-l131-x86-64-and-arm64-assembly-architecture"
+      ],
+      "outcomes": [
+        "Bóc tách cấu trúc tiêu đề nhị phân và đối chiếu góc nhìn liên kết (Sections) với góc nhìn nạp thực thi (Segments) trong tệp ELF 64-bit.",
+        "Giải phẫu cấu trúc định dạng PE/COFF trên Windows bao gồm DOS Stub, PE Header, Optional Header, Data Directories và Import/Export Tables.",
+        "Khám phá kiến trúc định dạng Mach-O và cơ chế nạp động hiện đại trên macOS (Mach Header, Load Commands, Chained Fixups).",
+        "Phân tích cơ chế phân giải ký hiệu động (Dynamic Linking), hoạt động của bảng PLT/GOT, IAT và tác động của kỹ thuật loại bỏ ký hiệu (Symbol Stripping) đối với dịch ngược."
+      ],
+      "careerPaths": [
+        "reverse-engineering",
+        "vulnerability-research",
+        "exploit-development"
+      ],
+      "domains": ["reverse-engineering", "binary-formats", "dynamic-linking", "symbols"],
+      "attackTactics": ["execution", "persistence", "defense-evasion"],
+      "keywords": [
+        "elf-format",
+        "pe-coff",
+        "mach-o",
+        "plt-got",
+        "iat-import-address-table",
+        "dynamic-linking",
+        "symbol-stripping"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Một tập tin thực thi nhị phân không chỉ là một dãy mã máy thô; nó là một tài liệu có cấu trúc tinh xảo chứa siêu dữ liệu hướng dẫn hệ điều hành cách dựng nên một thế giới sống — tức một tiến trình. Định dạng nhị phân cung cấp hai góc nhìn quan trọng: Góc nhìn Liên kết (Linker View) dựa trên Sections hỗ trợ chia tách mã lệnh, biến hằng và dữ liệu tĩnh; và Góc nhìn Nạp (Execution View) dựa trên Segments/Load Commands phân định các trang nhớ cần nạp vào RAM với cờ quyền cụ thể (RX, RW, RO). Dynamic Linker chính là cây cầu nối runtime, sử dụng các bảng chuyển tiếp (PLT/GOT trên ELF, IAT trên PE, Chained Fixups trên Mach-O) để gắn kết mã ứng dụng với các thư viện chia sẻ (libc, ntdll, libSystem). Hiểu được giải phẫu định dạng tệp là chìa khóa then chốt để giải mã cơ chế nạp mã độc, chèn payload phân tích, và bẻ khóa các kỹ thuật obfuscation/packing.",
+      "visual": {
+        "title": "Chuỗi Nạp Tệp Thực Thi, Ánh Xạ Phân Đoạn Và Phân Giải Ký Hiệu Động",
+        "caption": "Luồng xử lý từ tệp nhị phân tĩnh trên đĩa cứng đến tiến trình sống trong không gian địa chỉ ảo thông qua Dynamic Linker.",
+        "steps": [
+          {
+            "label": "Phân Tích Tiêu Đề Nhị Phân & Nhận Diện Kiến Trúc",
+            "detail": "Trình nạp hệ điều hành đọc Magic Bytes (0x7F'ELF', 'MZ', 0xFEEDFACF), xác thực kiến trúc vi xử lý và cấu trúc dữ liệu endianness.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Ánh Xạ Phân Đoạn (Segments) Vào Không Gian Địa Chỉ Ảo",
+            "detail": "Đọc Program Headers (ELF) / Section Headers (PE) / Load Commands (Mach-O) để mmap các trang nhớ với quyền R, W, X tương ứng.",
+            "tone": "allow"
+          },
+          {
+            "label": "Phân Giải Ký Hiệu Động & Chuyển Vị",
+            "detail": "Khởi động Dynamic Linker để tải các thư viện phụ thuộc, nạp địa chỉ hàm API ngoại vi vào bảng GOT, IAT hoặc giải mã Chained Fixups.",
+            "tone": "caution"
+          },
+          {
+            "label": "Chuyển Giao Quyền Điều Khiển Tới Điểm Nhập",
+            "detail": "Thiết lập con trỏ lệnh tại AddressOfEntryPoint hoặc e_entry để bắt đầu thực thi mã khởi tạo runtime (_start / CRTStartup).",
+            "tone": "neutral"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Định Dạng ELF (Executable and Linkable Format): Cấu Trúc, Segments vs Sections và Dynamic Linking",
+          "paragraphs": [
+            "Định dạng ELF (Executable and Linkable Format) là chuẩn định dạng nhị phân mặc định trên hệ điều hành Linux và hầu hết các hệ thống tương thích Unix. Cấu trúc của một tệp ELF 64-bit bắt đầu bằng một tiêu đề chính ELF Header (`Elf64_Ehdr`) có kích thước cố định 64 bytes. 16 bytes đầu tiên của tiêu đề là mảng nhận dạng `e_ident`, bắt đầu bằng 4 Magic Bytes kinh điển: `0x7F`, `0x45` ('E'), `0x4C` ('L'), `0x46` ('F'). Các byte tiếp theo trong `e_ident` xác định lớp kiến trúc (Class 1 = 32-bit, Class 2 = 64-bit), thứ tự sắp xếp byte (Data 1 = Little-Endian, Data 2 = Big-Endian), phiên bản ELF, và hệ điều hành mục tiêu (OS/ABI). Tiêu đề ELF còn chứa trường `e_type` xác định bản chất tệp (ET_EXEC = tệp thực thi địa chỉ cố định, ET_DYN = thư viện chia sẻ hoặc tệp thực thi PIE, ET_REL = tệp đối tượng tái định vị), trường `e_entry` lưu địa chỉ ảo của điểm nhập (Entry Point), cùng với con trỏ offset tới Bảng Tiêu đề Phân đoạn (Program Header Table) và Bảng Tiêu đề Phân vùng (Section Header Table).",
+            "Đặc trưng cốt lõi của định dạng ELF là cơ chế hai góc nhìn (Dual View): Góc nhìn Liên kết (Linker View) và Góc nhìn Thực thi (Execution View). Trong quá trình biên dịch và liên kết, trình liên kết (Linker) nhìn tệp nhị phân dưới dạng tập hợp các Phân vùng (Sections): `.text` (chứa mã máy thực thi), `.rodata` (chứa chuỗi và hằng số chỉ đọc), `.data` (chứa biến toàn cục khởi tạo), `.bss` (chứa biến toàn cục chưa khởi tạo), `.init` / `.fini` (hàm khởi tạo và hủy), `.symtab` (bảng ký hiệu đầy đủ), và `.strtab` (bảng chuỗi tên ký hiệu). Thông tin của các section này được mô tả trong Section Header Table và hoàn toàn không bắt buộc phải hiện diện khi chương trình chạy thực tế.",
+            "Ngược lại, khi chương trình được nạp vào bộ nhớ để chạy, trình nạp của nhân hệ điều hành (Kernel Loader) hoàn toàn phớt lờ Section Header Table mà chỉ quan tâm tới Bảng Tiêu đề Phân đoạn (Program Header Table) đại diện cho Góc nhìn Thực thi (Segments). Mỗi mục Program Header (`Elf64_Phdr`) mô tả một khối bộ nhớ liên tục cần được nạp vào RAM. Phân đoạn quan trọng nhất là `PT_LOAD`: nhân Linux sẽ tạo các vùng nhớ ánh xạ (vma) tương ứng với các thuộc tính quyền `p_flags` (PF_R = Read, PF_W = Write, PF_X = Execute). Các phân đoạn đặc thù khác bao gồm: `PT_INTERP` (chứa đường dẫn chuỗi tới trình liên kết động, ví dụ `/lib64/ld-linux-x86-64.so.2`), `PT_DYNAMIC` (chứa siêu dữ liệu cho dynamic linking như danh sách thư viện phụ thuộc DT_NEEDED), `PT_GNU_STACK` (xác định cờ quyền thực thi của ngăn xếp nhằm kích hoạt DEP/NX), và `PT_GNU_RELRO` (vùng nhớ chỉ đọc sau khi chuyển vị).",
+            "Cơ chế liên kết động (Dynamic Linking) trên ELF dựa trên sự phối hợp nhịp nhàng giữa Bảng Liên kết Thủ tục (Procedure Linkage Table - PLT) nằm ở phân vùng mã thực thi và Bảng Độ lệch Toàn cục (Global Offset Table - GOT) nằm ở phân vùng dữ liệu. Khi chương trình gọi một hàm thư viện ngoài (như `puts`), mã máy thực hiện lệnh `call puts@plt`. Lệnh đầu tiên trong stub `puts@plt` thực hiện nhảy gián tiếp `jmp qword ptr [puts@got.plt]`. Trong cơ chế liên kết trễ (Lazy Binding), tại lần gọi đầu tiên, ô nhớ trong GOT trỏ ngược lại dòng lệnh tiếp theo của PLT để kích hoạt trình giải mã động `_dl_runtime_resolve`. Dynamic linker tìm kiếm địa chỉ thực tế của `puts` trong libc, ghi đè địa chỉ này vào ô nhớ GOT tương ứng. Từ lần gọi thứ hai trở đi, lệnh nhảy gián tiếp từ PLT sẽ phi thẳng tới hàm `puts` trong libc mà không tốn thêm chi phí giải mã. Kỹ thuật phòng ngự RELRO (Relocation Read-Only) phân định thành Partial RELRO (chỉ bảo vệ `.got`, giữ `.got.plt` có quyền ghi cho lazy binding -> mở đường cho tấn công GOT Overwrite) và Full RELRO (giải mã toàn bộ hàm lúc khởi động và đặt toàn bộ GOT thành Read-Only -> triệt tiêu hoàn toàn tấn công GOT Overwrite)."
+          ]
+        },
+        {
+          "title": "Định Dạng PE/COFF (Portable Executable): Cấu Trúc DOS Header, PE Header, Optional Header & Data Directories",
+          "paragraphs": [
+            "Định dạng Portable Executable (PE), dựa trên định dạng Common Object File Format (COFF), là chuẩn cấu trúc tệp thực thi, thư viện liên kết động (.dll), trình điều khiển (.sys) và tệp điều khiển (.ocx) trên hệ điều hành Microsoft Windows từ thời kỳ Windows NT. Để duy trì tính tương thích ngược với hệ điều hành cổ xưa MS-DOS, mọi tệp PE đều bắt đầu bằng một Tiêu đề DOS (IMAGE_DOS_HEADER) có kích thước 64 bytes. Hai byte đầu tiên của DOS Header luôn là Magic Bytes `MZ` (`0x5A`, `0x4D` - viết tắt tên của Mark Zbikowski, kiến trúc sư trưởng của MS-DOS). Trường cuối cùng của DOS Header tại offset `0x3C` là `e_lfanew` (Long File Address to New header), lưu độ lệch byte trỏ thẳng tới Tiêu đề PE thực sự. Nằm giữa DOS Header và PE Header là đoạn mã DOS Stub, có nhiệm vụ in ra thông báo kinh điển 'This program cannot be run in DOS mode' nếu tệp bị chạy trong môi trường thực MS-DOS.",
+            "Tại vị trí được chỉ định bởi `e_lfanew`, cấu trúc PE Header bắt đầu bằng 4 byte chữ ký Signature `PE\u0000\u0000` (`0x50`, `0x45`, `0x00`, `0x00`). Tiếp nối ngay sau là Tiêu đề Tệp COFF (IMAGE_FILE_HEADER) gồm 20 bytes, cung cấp thông tin phần cứng căn bản: `Machine` (xác định kiến trúc CPU, ví dụ `0x8664` cho AMD64/x64, `0x014C` cho i386, `0xAA64` cho ARM64), `NumberOfSections` (số lượng phân vùng trong tệp), `TimeDateStamp` (thời điểm tệp được liên kết), và `Characteristics` (các cờ trạng thái như IMAGE_FILE_EXECUTABLE_IMAGE hay IMAGE_FILE_DLL).",
+            "Nằm kế tiếp sau File Header là Tiêu đề Tùy chọn (IMAGE_OPTIONAL_HEADER - thực chất là bắt buộc đối với tệp thực thi). Đối với kiến trúc 64-bit (PE32+), Optional Header có kích thước 240 bytes với trường Magic mang giá trị `0x020B` (so với `0x010B` của PE 32-bit). Các trường dữ liệu sống còn trong Optional Header bao gồm: `AddressOfEntryPoint` (RVA - Relative Virtual Address trỏ tới hàm khởi động chương trình, thường là hàm CRTStartup trước khi nhảy vào hàm main của lập trình viên), `ImageBase` (địa chỉ ảo ưu tiên nạp tệp vào bộ nhớ, mặc định là `0x140000000` trên x64), `SectionAlignment` (kích thước căn lề phân vùng trong bộ nhớ RAM, thường là 4096 bytes / 4KB), `FileAlignment` (kích thước căn lề phân vùng trên đĩa cứng, thường là 512 bytes), và `DllCharacteristics` (chứa các cờ an ninh như IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE hỗ trợ ASLR, NX_COMPAT hỗ trợ DEP, và GUARD_CF hỗ trợ Control Flow Guard).",
+            "Phần đuôi của Optional Header chứa mảng Data Directories gồm đúng 16 cấu trúc `IMAGE_DATA_DIRECTORY` (mỗi mục gồm trường RVA và Size), đóng vai trò như mục lục trỏ tới các cấu trúc dữ liệu quan trọng bậc nhất của Windows PE: Thư mục Xuất hàm Export Directory (mục 0 - chứa bảng hàm export trong DLL), Thư mục Nhập hàm Import Directory (mục 1 - chứa danh sách DLL và hàm API cần dùng), Thư mục Tài nguyên Resource Directory (mục 2), Thư mục Xử lý Ngoại lệ Exception Directory (mục 3 - chứa bảng `.pdata` phục vụ cơ chế Structured Exception Handling trên x64), và Thư mục Tái định vị Base Relocation Table (mục 5 - phân vùng `.reloc` phục vụ sửa đổi địa chỉ khi tệp bị nạp lệch ImageBase do ASLR). Trong cơ chế Import, cấu trúc `IMAGE_IMPORT_DESCRIPTOR` chứa hai con trỏ song song: `OriginalFirstThunk` trỏ tới Import Lookup Table (ILT) lưu tên các hàm cần nhập, và `FirstThunk` trỏ tới Import Address Table (IAT). Khi Windows nạp PE vào RAM, trình nạp sẽ giải mã địa chỉ hàm thực tế trong các DLL và ghi đè thẳng vào các ô nhớ của IAT. Việc can thiệp ghi đè con trỏ trong IAT chính là kỹ thuật Hooking (IAT Hooking) kinh điển mà các mã độc và phần mềm bảo mật thường xuyên sử dụng."
+          ]
+        },
+        {
+          "title": "Định Dạng Mach-O: Mach Header, Load Commands và Phân Vùng Phức Hợp",
+          "paragraphs": [
+            "Định dạng Mach-O (Mach Object) là kiến trúc nhị phân thực thi độc quyền trên hệ sinh thái của Apple, bao gồm macOS, iOS, iPadOS, watchOS và tvOS. Cấu trúc tệp Mach-O 64-bit bắt đầu bằng Tiêu đề Mach Header (`mach_header_64`) gồm 32 bytes. Trường đầu tiên là Magic Bytes 4 bytes: `0xFEEDFACF` (`MH_MAGIC_64` - cho Little-Endian 64-bit) hoặc `0xFEEDFACE` (cho 32-bit). Tiếp theo là `cputype` (ví dụ `CPU_TYPE_ARM64` = `0x0100000C` trên chip Apple Silicon M1/M2/M3, hoặc `CPU_TYPE_X86_64` = `0x01000007` trên máy tính Mac Intel), `cpusubtype`, `filetype` (`MH_EXECUTE` = tệp thực thi, `MH_DYLIB` = thư viện động, `MH_BUNDLE` = plugin nhúng), `ncmds` (tổng số lượng lệnh nạp), `sizeofcmds` (kích thước tính bằng byte của toàn bộ các lệnh nạp), và `flags` (chứa các cờ như `MH_PIE` hỗ trợ ASLR và `MH_TWOLEVEL` quy định không gian tên phân giải ký hiệu hai cấp).",
+            "Một nét đặc thù mang tính biểu tượng của macOS là tệp nhị phân phổ quát (Universal Binary hay Fat Binary). Một tệp Fat Binary cho phép đóng gói nhiều kiến trúc phần cứng khác nhau (ví dụ: một lát cắt x86-64 cho Mac Intel và một lát cắt ARM64 cho Mac Apple Silicon) vào bên trong duy nhất một tệp tin trên đĩa. Tệp Fat Binary bắt đầu bằng Magic Bytes `0xCAFEBABE` (Fat Magic 32-bit) hoặc `0xCAFEBABF` (Fat Magic 64-bit), theo sau là cấu trúc `fat_header` và danh sách các cấu trúc `fat_arch`. Mỗi cấu trúc `fat_arch` chỉ định rõ kiến trúc CPU, độ lệch offset byte trên đĩa cứng trỏ tới nơi bắt đầu của lát cắt Mach-O tương ứng, và kích thước của lát cắt đó. Khi người dùng khởi chạy ứng dụng, nhân XNU sẽ tự động chọn lát cắt khớp tối ưu nhất với vi xử lý của máy để nạp vào bộ nhớ.",
+            "Ngay sau Mach Header trong tệp Mach-O là chuỗi các Lệnh Nạp (Load Commands). Không giống như bảng phân đoạn cứng nhắc của ELF hay PE, Load Commands là một chuỗi các khối dữ liệu biến thiên có cấu trúc thống nhất: 4 byte đầu là mã lệnh `cmd` và 4 byte tiếp theo là kích thước lệnh `cmdsize`. Các lệnh nạp quan trọng nhất bao gồm: `LC_SEGMENT_64` (định nghĩa các phân đoạn bộ nhớ lớn), `LC_LOAD_DYLINKER` (chỉ định đường dẫn tới dynamic linker `/usr/lib/dyld`), `LC_LOAD_DYLIB` (khai báo các thư viện chia sẻ phụ thuộc), `LC_MAIN` (thay thế cho lệnh cổ xưa `LC_UNIXTHREAD`, cung cấp offset điểm nhập hàm main và kích thước stack), và `LC_CODE_SIGNATURE` (chứa chữ ký số nhúng bảo đảm tính toàn vẹn và chứng thực quyền hạn Entitlements).",
+            "Mỗi lệnh nạp `LC_SEGMENT_64` định nghĩa một phân đoạn (Segment) có thể chứa nhiều phân vùng con (Sections). Theo quy ước của Apple, tên Segment luôn được viết hoa với hai dấu gạch dưới ở đầu (ví dụ `__TEXT`), trong khi tên Section viết thường (ví dụ `__text`). Bốn Segment nền tảng của một tệp Mach-O bao gồm: `__PAGEZERO` (phân đoạn ảo 4GB đầu tiên không có quyền R, W, X, dùng để bắt giữ các lỗi giải mã con trỏ NULL); `__TEXT` (chứa mã thực thi và dữ liệu chỉ đọc như `__text`, `__cstring`, có quyền R-X); `__DATA` (chứa dữ liệu đọc ghi như `__data`, `__bss`, `__la_symbol_ptr`, có quyền RW-); và `__LINKEDIT` (chứa siêu dữ liệu thô phục vụ dyld như bảng ký hiệu, bảng chuỗi, thông tin chuyển vị). Từ phiên bản macOS 12 Monterey và iOS 15, Apple đã thay thế hoàn toàn cơ chế liên kết trễ (Lazy Binding) truyền thống bằng cơ chế Dyld Chained Fixups: toàn bộ các vị trí cần chuyển vị địa chỉ hoặc liên kết import được xâu chuỗi thành một danh sách liên kết nhúng trực tiếp ngay trong các con trỏ của phân đoạn dữ liệu, giúp tăng tốc vượt bậc thời gian khởi động ứng dụng và giảm thiểu dung lượng tệp nhị phân."
+          ]
+        },
+        {
+          "title": "Bảng Ký Hiệu (Symbol Tables), Kỹ Thuật Stripping và Định Dạng Dữ Liệu Gỡ Lỗi (DWARF vs PDB)",
+          "paragraphs": [
+            "Bảng ký hiệu (Symbol Table) là cuốn từ điển dịch thuật gắn kết giữa địa chỉ bộ nhớ thô và các tên định danh có ý nghĩa do lập trình viên đặt ra (tên hàm, tên biến toàn cục, tên lớp). Trong định dạng ELF, hệ thống phân tách rõ rệt giữa hai bảng ký hiệu: Bảng ký hiệu đầy đủ `.symtab` (kèm bảng chuỗi `.strtab`) chứa toàn bộ ký hiệu nội bộ của chương trình, bao gồm cả các hàm static và biến cục bộ dùng cho mục đích gỡ lỗi; và Bảng ký hiệu động `.dynsym` (kèm bảng chuỗi `.dynstr`) chỉ chứa các ký hiệu thực sự cần thiết cho quá trình liên kết động lúc chạy (Dynamic Linking) như các hàm nhập từ libc hoặc các hàm xuất ra ngoài thư viện chia sẻ.",
+            "Trong ngôn ngữ C++, cơ chế nạp chồng hàm (Function Overloading), không gian tên (Namespaces) và khuôn mẫu (Templates) đòi hỏi trình biên dịch phải mã hóa chữ ký tham số vào tên hàm nhị phân thông qua kỹ thuật Làm Méo Tên (Name Mangling). Trên hệ sinh thái GCC/Clang/Linux/macOS tuân thủ Itanium C++ ABI, một hàm như `Graphics::Renderer::DrawBox(int, float)` sẽ bị biến đổi thành `_ZN8Graphics8Renderer7DrawBoxEif`. Trong khi đó, trình biên dịch Microsoft Visual C++ (MSVC) trên Windows sử dụng chuẩn mã hóa riêng biệt bắt đầu bằng dấu chấm hỏi, ví dụ `?DrawBox@Renderer@Graphics@@QEAAXHM@Z`. Chuyên viên dịch ngược sử dụng các công cụ như `c++filt` (trên Linux) hoặc `undname` (trên Windows) để giải mã (Demangle) các chuỗi ký hiệu này trở lại nguyên bản mã nguồn C++.",
+            "Khi một phần mềm thương mại hoặc mã độc được phát hành ra môi trường thực tế, nhà phát triển hầu như luôn thực hiện thao tác Loại Bỏ Ký Hiệu (Symbol Stripping) bằng tiện ích `strip --strip-all`. Lệnh này sẽ xóa sạch hoàn toàn phân vùng `.symtab`, `.strtab` và toàn bộ các phân vùng gỡ lỗi khỏi tệp nhị phân, làm giảm đáng kể kích thước tệp và khiến các công cụ dịch ngược (Ghidra, IDA Pro) chỉ còn hiển thị các tên hàm vô danh dạng `sub_401120`. Tuy nhiên, một bất biến kỹ thuật cốt lõi là: trình nạp hệ điều hành KHÔNG THỂ xóa bỏ bảng ký hiệu động `.dynsym` và `.dynstr` trong các tệp nhị phân liên kết động, bởi vì nếu không có chúng, Dynamic Linker sẽ không thể phân giải được các hàm API của hệ thống (như `malloc`, `connect`, `CreateFileW`). Do đó, các hàm nhập xuất API ngoại vi luôn lộ diện rõ ràng trước chuyên viên phân tích.",
+            "Để phục vụ việc gỡ lỗi trong nội bộ nhóm phát triển mà không để lộ mã nguồn ra bên ngoài, các định dạng tệp gỡ lỗi tách rời (Separate Debug Files) được áp dụng. Trên Linux và macOS, chuẩn DWARF (Debugging With Attributed Record Formats) lưu trữ cấu trúc dòng mã, kiểu dữ liệu và vị trí biến trong các phân vùng `.debug_*` (như `.debug_info`, `.debug_line`), có thể được tách thành tệp `.debug` riêng biệt thông qua `objcopy --only-keep-debug`. Trên nền tảng Windows, trình liên kết MSVC sinh ra tệp Program Database (.pdb) hoàn toàn tách rời. Tệp PE chỉ lưu giữ một cấu trúc `IMAGE_DEBUG_DIRECTORY` loại CodeView (RSDS) chứa định danh duy nhất GUID và đường dẫn cục bộ trên máy lập trình viên trỏ tới tệp PDB tương ứng (ví dụ: `C:\\Build\\Project\\x64\\Release\\target.pdb`), cung cấp manh mối pháp y vô giá về cấu trúc thư mục và danh tính của tác giả mã nguồn."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Giải Phẫu Định Dạng Nhị Phân, Phân Giải Bảng GOT/IAT & Phân Tích Chữ Ký Mach-O",
+        "objective": "Thực hành phân tích cấu trúc tiêu đề ELF, PE và Mach-O, chứng minh cơ chế tấn công bảng GOT Overwrite, phát hiện can thiệp IAT Hooking và trích xuất lát cắt Universal Binary.",
+        "scenario": "Trung tâm Ứng cứu Sự cố An ninh Mạng phát hiện một chuỗi công cụ tấn công độc hại đa nền tảng gồm 3 tệp tin nhị phân: một tệp Linux ELF 64-bit có dấu hiệu can thiệp bảng GOT, một tệp Windows PE 64-bit bị chèn mã độc vào bảng IAT, và một tệp Mach-O Universal Binary dành cho máy chủ macOS. Bạn được giao nhiệm vụ giải phẫu cấu trúc định dạng tệp, xác minh tính hợp lệ của các bảng nhập xuất và khôi phục các thông tin ký hiệu bị che giấu.",
+        "constraints": [
+          "Mọi phân tích cấu trúc nhị phân phải dựa trên các công cụ chuẩn quy (readelf, objdump, dumpbin, otool, llvm-objdump).",
+          "Chứng minh kỹ thuật can thiệp GOT Overwrite và IAT Hooking phải chỉ ra rõ ràng sự sai lệch giữa địa chỉ trên đĩa và địa chỉ thực thi trong bộ nhớ.",
+          "Phân tích chữ ký và lát cắt Mach-O phải bảo đảm tính toàn vẹn cấu trúc của các Load Commands."
+        ],
+        "cases": [
+          {
+            "id": "case-132-01",
+            "title": "Khai Thác Lỗ Hổng GOT Overwrite Trên Nhị Phân ELF Có Cấu Hình Partial RELRO",
+            "context": "Một tệp nhị phân ELF x86-64 trên máy chủ Linux bị khai thác thông qua lỗ hổng Arbitrary Memory Write. Công cụ kiểm tra an ninh `checksec` báo cáo cấu hình bảo vệ: `RELRO: Partial RELRO, Canary: No, NX: Yes, PIE: No`. Kẻ tấn công đã thực hiện ghi đè 8 bytes địa chỉ của hàm `win_shell()` vào ô nhớ `puts@got.plt`. Tại lần gọi hàm `puts(\"Goodbye\")` tiếp theo trong mã nguồn, thay vì in chuỗi ký tự, tiến trình lập tức sinh ra một shell dòng lệnh tương tác với đặc quyền root.",
+            "prompt": "Tại sao kỹ thuật GOT Overwrite có thể thực thi thành công dưới cấu hình Partial RELRO và cơ chế Full RELRO sẽ ngăn chặn cuộc tấn công này như thế nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Partial RELRO cho phép thực thi mã độc trực tiếp trên ngăn xếp; Full RELRO sẽ mã hóa toàn bộ dữ liệu trên ngăn xếp bằng thuật toán RSA.",
+                "correct": false,
+                "rationale": "Cấu hình RELRO kiểm soát quyền truy cập của bảng GOT, không liên quan đến quyền thực thi ngăn xếp (vốn do cờ NX/DEP quản lý)."
+              },
+              {
+                "id": "B",
+                "label": "Dưới cấu hình Partial RELRO, phân vùng `.got.plt` bắt buộc phải duy trì quyền Ghi (Read-Write) để hỗ trợ cơ chế Lazy Binding phân giải địa chỉ hàm khi chạy; điều này cho phép kẻ tấn công ghi đè địa chỉ hàm thư viện thành địa chỉ mã độc; ngược lại, Full RELRO buộc Dynamic Linker phân giải toàn bộ hàm ngay khi nạp tệp (`-z now`) và gọi `mprotect()` đặt toàn bộ phân vùng GOT thành Chỉ Đọc (Read-Only), khiến mọi thao tác ghi đè vào GOT đều kích hoạt lỗi SIGSEGV sụp đổ tiến trình.",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối: Partial RELRO để ngỏ `.got.plt` có quyền ghi để phục vụ lazy binding, tạo điều kiện cho kỹ thuật tấn công kinh điển GOT Overwrite. Khi bật Full RELRO, toàn bộ bảng GOT được khóa thành Read-Only trước khi mã người dùng bắt đầu chạy, vô hiệu hóa hoàn toàn hướng tấn công này."
+              },
+              {
+                "id": "C",
+                "label": "Partial RELRO vô hiệu hóa cơ chế kiểm tra chữ ký số của kernel Linux; giải pháp là kích hoạt lại cờ secure boot trong BIOS.",
+                "correct": false,
+                "rationale": "RELRO là cơ chế bảo vệ không gian người dùng của trình liên kết động glibc/ld.so, không liên quan đến secure boot của BIOS."
+              },
+              {
+                "id": "D",
+                "label": "Kỹ thuật GOT Overwrite thành công do tệp bị strip bảng ký hiệu .symtab; chỉ cần biên dịch lại kèm cờ -g thì cuộc tấn công sẽ tự động thất bại.",
+                "correct": false,
+                "rationale": "Thêm thông tin gỡ lỗi `-g` không thay đổi quyền ghi của bảng GOT và không có tác dụng ngăn chặn khai thác bộ nhớ."
+              }
+            ]
+          },
+          {
+            "id": "case-132-02",
+            "title": "Phát Hiện Hành Vi IAT Hooking Bằng Cách So Sánh Bảng ILT Và IAT Trong Tệp PE Windows",
+            "context": "Trong quá trình điều tra mã độc trên máy tính nạn nhân, chuyên viên an ninh phân tích bộ nhớ của tiến trình `svchost.exe`. Khi kiểm tra Import Directory của mô-đun chính, công cụ gỡ lỗi phát hiện: ô nhớ của hàm `CreateProcessW` trong Import Address Table (IAT / FirstThunk) trỏ tới địa chỉ `0x000001B200401000` nằm trong một vùng nhớ riêng tư (Private Memory Allocation) có quyền R-X không có tệp nhúng trên đĩa, trong khi cấu trúc Import Lookup Table (ILT / OriginalFirstThunk) vẫn lưu tên gốc của hàm và hàm này đúng ra phải nằm trong dải địa chỉ của thư viện chuẩn `kernelbase.dll`.",
+            "prompt": "Hiện tượng này khẳng định kỹ thuật can thiệp nào và phương pháp nhận diện sai lệch nhị phân được thực hiện ra sao?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đây là kỹ thuật IAT Hooking: mã độc đã can thiệp vào bộ nhớ tiến trình, thay đổi con trỏ hàm trong bảng IAT để chuyển hướng mọi lời gọi CreateProcessW sang hàm hook độc hại của nó trước khi gọi tới API gốc; phát hiện được bằng cách đối chiếu địa chỉ con trỏ trong IAT với khoảng địa chỉ module hợp lệ của kernelbase.dll hoặc so sánh với bảng ILT nguyên bản.",
+                "correct": true,
+                "rationale": "Đây là nhận định pháp y nhị phân chuẩn mực: IAT Hooking thay đổi con trỏ hàm API đích trong bảng Import Address Table. Một con trỏ IAT hợp lệ phải trỏ vào không gian địa chỉ phân vùng Text của DLL hệ thống (như kernelbase.dll), nếu trỏ vào trang nhớ ẩn danh private memory thì chắc chắn đã bị mã độc chèn hook."
+              },
+              {
+                "id": "B",
+                "label": "Đây là tính năng tối ưu hóa luồng của hệ điều hành Windows Update tự động biên dịch lại API hệ thống thành vi mã nhị phân mới.",
+                "correct": false,
+                "rationale": "Windows Update không bao giờ sửa đổi con trỏ IAT của tiến trình đang chạy trỏ vào bộ nhớ riêng tư không tên."
+              },
+              {
+                "id": "C",
+                "label": "Hiện tượng này chứng minh máy tính bị hỏng thanh RAM phần cứng làm đảo lộn các bit địa chỉ trong bảng phân vùng COFF.",
+                "correct": false,
+                "rationale": "Lỗi phần cứng bit-flip mang tính ngẫu nhiên, không thể tạo ra một con trỏ có chủ đích trỏ vào vùng nhớ có mã thực thi độc hại."
+              },
+              {
+                "id": "D",
+                "label": "Tiến trình svchost.exe đã bị chuyển đổi tự động sang định dạng Mach-O của macOS khiến cấu trúc bảng IAT bị mất dữ liệu.",
+                "correct": false,
+                "rationale": "Windows chỉ chạy định dạng PE/COFF, không thể tự động chuyển đổi sang Mach-O."
+              }
+            ]
+          },
+          {
+            "id": "case-132-03",
+            "title": "Phân Tích Mach-O Universal Binary (Fat Binary) Và Bóc Tách Phân Đoạn Code Signing LC_CODE_SIGNATURE",
+            "context": "Một chuyên viên phân tích mã độc macOS nhận được một tệp tin đáng ngờ có tiêu đề bắt đầu bằng 4 bytes `0xCAFEBABE`. Khi chạy lệnh `file` trên terminal, hệ thống báo cáo tệp là 'Mach-O universal binary with 2 architectures: [x86_64] [arm64]'. Nhóm ứng cứu sự cố cần xác minh xem lát cắt ARM64 có bị can thiệp chèn backdoor hay không và kiểm tra chữ ký số của từng phân đoạn.",
+            "prompt": "Quy trình kỹ thuật nào sau đây là chuẩn xác nhất để bóc tách và giám định tệp nhị phân Mach-O này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đổi đuôi tệp tin thành .zip và dùng phần mềm WinRAR để giải nén hai lát cắt mã nguồn C nguyên bản ra ổ cứng.",
+                "correct": false,
+                "rationale": "Fat Binary là cấu trúc nhị phân đóng gói theo chuẩn Mach-O của Apple, không phải tệp nén ZIP và không chứa mã nguồn C."
+              },
+              {
+                "id": "B",
+                "label": "Sử dụng công cụ `lipo -thin arm64 target_app -output target_arm64` để trích xuất độc lập lát cắt ARM64; sau đó dùng `otool -l target_arm64` hoặc `llvm-objdump` để kiểm tra các lệnh nạp `LC_SEGMENT_64` và xác thực chữ ký số bằng lệnh `codesign -dvvv --verbose=4 target_arm64` để phân tích lệnh nạp `LC_CODE_SIGNATURE` cùng các quyền hạn Entitlements.",
+                "correct": true,
+                "rationale": "Quy trình giám định Mach-O chuẩn mực của Apple: Tiện ích lipo phân tách lát cắt kiến trúc mong muốn từ Universal Binary; otool/llvm-objdump hiển thị chi tiết các Load Commands; và codesign phân tích chữ ký số được định nghĩa bởi lệnh LC_CODE_SIGNATURE trong phân đoạn __LINKEDIT."
+              },
+              {
+                "id": "C",
+                "label": "Chạy lệnh strip --strip-all để xóa toàn bộ các Load Commands khỏi tệp Mach-O trước khi đưa vào phần mềm diệt virus.",
+                "correct": false,
+                "rationale": "Xóa Load Commands sẽ làm hỏng hoàn toàn cấu trúc tệp Mach-O khiến tệp không thể phân tích hoặc thực thi được."
+              },
+              {
+                "id": "D",
+                "label": "Nạp trực tiếp tệp tin vào bộ gỡ lỗi x64dbg trên Windows để tự động phân giải cấu trúc dyld của macOS.",
+                "correct": false,
+                "rationale": "Trình gỡ lỗi x64dbg chỉ hỗ trợ định dạng PE trên Windows, hoàn toàn không hỗ trợ định dạng Mach-O hay nhân XNU của macOS."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Bóc tách cấu trúc Header và đối chiếu chính xác giữa Sections (Linker view) và Segments (Loader view) trên ELF 64-bit.",
+          "Phân tích cơ chế hoạt động của Import Address Table (IAT) trên PE và chứng minh dấu vết kỹ thuật của IAT Hooking.",
+          "Thao tác thuần thục việc phân tách các lát cắt kiến trúc trong Mach-O Fat Binary và kiểm tra phân đoạn chữ ký số LC_CODE_SIGNATURE."
+        ],
+        "evidenceTemplate": [
+          "Bản kết xuất phân tích tiêu đề nhị phân bằng readelf -l / dumpbin /headers / otool -l",
+          "Tài liệu so sánh địa chỉ IAT trước và sau khi bị can thiệp hooking kèm chỉ số RVA tương ứng",
+          "Bản ghi xác thực chữ ký số codesign và danh sách Load Commands trích xuất từ lát cắt ARM64 Mach-O"
+        ],
+        "reset": "Khôi phục lại các tệp nhị phân mẫu ELF, PE và Mach-O về trạng thái sạch ban đầu trong môi trường thử nghiệm cô lập.",
+        "cleanup": "Xóa các lát cắt nhị phân trích xuất tạm thời, các tệp phân tích IDA/Ghidra và nhật ký kiểm tra chữ ký số."
+      },
+      "governance": {
+        "prevent": [
+          "Biên dịch mã nguồn với đầy đủ các cơ chế gia cố nhị phân hiện đại: Full RELRO (-Wl,-z,relro,-z,now) trên Linux, Control Flow Guard (/guard:cf) và Dynamic Base trên Windows, và Hardened Runtime kèm Library Validation trên macOS.",
+          "Ký số mã nguồn (Code Signing) bắt buộc bằng chứng chỉ số uy tín và kiểm tra tính toàn vẹn chữ ký trước khi thực thi nhằm ngăn chặn can thiệp sửa đổi nhị phân trên đĩa.",
+          "Áp dụng quy trình Stripping có kiểm soát: loại bỏ ký hiệu nội bộ (.symtab) trong bản phát hành nhưng lưu trữ an toàn các tệp biểu tượng gỡ lỗi (DWARF/PDB) trên máy chủ Symbol Server nội bộ."
+        ],
+        "observe": [
+          "Giám sát tính toàn vẹn của các bảng điều hướng nhị phân trong bộ nhớ (như GOT và IAT) bằng các giải pháp EDR để phát hiện kỹ thuật Hooking thời gian thực.",
+          "Theo dõi nhật ký nạp thư viện động của hệ điều hành (thông qua ETW trên Windows hoặc auditd trên Linux) để phát hiện các hành vi DLL Search Order Hijacking hoặc LD_PRELOAD Injection.",
+          "Kiểm toán định kỳ các tệp thực thi phân phối cho khách hàng để đảm bảo các cờ bảo vệ nhị phân (NX, PIE, ASLR, RELRO) không bị vô tình tắt đi trong quá trình build."
+        ],
+        "respond": [
+          "Khi phát hiện hành vi ghi đè bảng GOT hoặc IAT Hooking, lập tức cô lập máy trạm bị xâm nhập và trích xuất toàn bộ bộ nhớ tiến trình (Process Memory Dump).",
+          "Sử dụng công cụ phân tích nhị phân để so sánh tệp trên đĩa với hình ảnh trong bộ nhớ (Memory-to-Disk Binary Diffing) nhằm cô lập mã độc chèn thêm.",
+          "Thu hồi các chứng chỉ ký số bị lộ hoặc bị lạm dụng và cập nhật danh sách đen (Certificate Revocation List - CRL) trên toàn bộ hạ tầng doanh nghiệp."
+        ],
+        "residualRisk": [
+          "Một số kỹ thuật Inline Hooking tinh vi ghi đè trực tiếp các byte đầu hàm API (Trampoline Hook) thay vì sửa IAT/GOT có thể qua mặt một số cơ chế quét bảng đơn giản.",
+          "Các kỹ thuật Reflective DLL Loading hoặc Mach-O In-Memory Loading không thông qua trình nạp chuẩn của hệ điều hành có thể che giấu hoàn toàn sự hiện diện của tệp nhị phân trên đĩa.",
+          "Cơ chế Dynamic Linker của bên thứ ba trong các ứng dụng đóng gói độc lập (như PyInstaller hoặc Electron) có thể có các điểm yếu phân giải đường dẫn ngoài tầm kiểm soát của hệ thống."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Khi một tệp thực thi ELF bị loại bỏ biểu tượng bằng lệnh strip, toàn bộ tên hàm và thông tin nhập xuất API đều biến mất hoàn toàn khiến tệp không thể phân tích được.",
+          "correction": "Hoàn toàn ngộ nhận. Lệnh strip chỉ loại bỏ bảng ký hiệu nội bộ `.symtab` và `.strtab`. Bảng ký hiệu động `.dynsym` và `.dynstr` bắt buộc phải được giữ lại để Dynamic Linker phân giải các hàm thư viện lúc chạy. Do đó chuyên viên dịch ngược vẫn luôn nhìn thấy danh sách các hàm API hệ thống được nhập vào."
+        },
+        {
+          "claim": "Địa chỉ Virtual Address (VA) và Relative Virtual Address (RVA) trong tệp PE Windows là hai khái niệm hoàn toàn đồng nhất.",
+          "correction": "Không chính xác. RVA là độ lệch byte tương đối so với địa chỉ cơ sở (ImageBase) khi tệp được nạp vào bộ nhớ ảo. VA là địa chỉ tuyệt đối thực tế trong không gian địa chỉ ảo, được tính theo công thức: `VA = ImageBase + RVA`. Khi ASLR làm thay đổi ImageBase, các giá trị RVA vẫn giữ nguyên không đổi."
+        },
+        {
+          "claim": "Tệp Mach-O Universal Binary (Fat Binary) có thể thực thi đồng thời cả hai lát cắt kiến trúc x86-64 và ARM64 trong cùng một tiến trình.",
+          "correction": "Sai nguyên lý. Universal Binary chỉ là một tệp lưu trữ đóng gói chứa hai lát cắt nhị phân độc lập. Khi chạy, nhân hệ điều hành XNU sẽ chỉ chọn đúng một lát cắt phù hợp nhất với kiến trúc CPU hiện hành để nạp thành tiến trình sống, lát cắt còn lại hoàn toàn không được nạp vào RAM."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os14-l132-q1",
+          "difficulty": "easy",
+          "question": "Chuỗi 4 Magic Bytes nào sau đây định danh một tệp thực thi định dạng ELF trên hệ điều hành Linux?",
+          "options": [
+            {
+              "id": "A",
+              "label": "0x4D 0x5A ('M' 'Z')"
+            },
+            {
+              "id": "B",
+              "label": "0x7F 0x45 0x4C 0x46 (0x7F 'E' 'L' 'F')"
+            },
+            {
+              "id": "C",
+              "label": "0xFE 0xED 0xFA 0xCF"
+            },
+            {
+              "id": "D",
+              "label": "0xCA 0xFE 0xBA 0xBE"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Tệp ELF luôn bắt đầu bằng 4 Magic Bytes: 0x7F theo sau bởi 3 ký tự ASCII 'E', 'L', 'F' (0x7F 0x45 0x4C 0x46)."
+        },
+        {
+          "id": "os14-l132-q2",
+          "difficulty": "medium",
+          "question": "Trong tệp PE Windows, điểm khác biệt then chốt giữa bảng Import Lookup Table (ILT / OriginalFirstThunk) và Import Address Table (IAT / FirstThunk) sau khi tệp đã được nạp vào bộ nhớ bởi trình nạp của hệ điều hành là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Bảng ILT bị xóa sạch khỏi bộ nhớ, trong khi bảng IAT được chuyển sang phân vùng ngăn xếp."
+            },
+            {
+              "id": "B",
+              "label": "Bảng ILT vẫn giữ nguyên các con trỏ trỏ tới tên hàm nhập ban đầu, trong khi các mục trong bảng IAT bị ghi đè hoàn toàn bằng địa chỉ ảo thực tế của các hàm API trong các DLL tương ứng."
+            },
+            {
+              "id": "C",
+              "label": "Bảng IAT chứa mã máy thực thi của hàm, trong khi bảng ILT chứa mã băm chữ ký số."
+            },
+            {
+              "id": "D",
+              "label": "Cả hai bảng đều được đặt quyền thực thi Execute để ngăn chặn tấn công tràn bộ đệm."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Khi nạp PE vào bộ nhớ, trình nạp Windows phân giải địa chỉ ảo của các hàm API được nhập từ DLL và ghi đè trực tiếp các địa chỉ này vào bảng IAT (FirstThunk). Bảng ILT (OriginalFirstThunk) được giữ nguyên vẹn để phục vụ tra cứu lại khi cần thiết."
+        },
+        {
+          "id": "os14-l132-q3",
+          "difficulty": "hard",
+          "question": "Tại sao cơ chế Full RELRO lại có thể ngăn chặn triệt để kỹ thuật tấn công GOT Overwrite trong các tệp nhị phân ELF Linux, trong khi Partial RELRO lại không làm được điều này?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì Full RELRO mã hóa toàn bộ tệp nhị phân bằng chứng chỉ số của nhân Linux."
+            },
+            {
+              "id": "B",
+              "label": "Vì trong Full RELRO, trình liên kết động phân giải toàn bộ các ký hiệu hàm ngay khi tệp khởi động và thiết lập quyền của toàn bộ phân vùng GOT thành Chỉ Đọc (Read-Only) trước khi chuyển quyền điều khiển cho mã người dùng."
+            },
+            {
+              "id": "C",
+              "label": "Vì Full RELRO vô hiệu hóa toàn bộ các thư viện chia sẻ và bắt buộc ứng dụng phải liên kết tĩnh hoàn toàn."
+            },
+            {
+              "id": "D",
+              "label": "Vì Full RELRO chuyển toàn bộ bảng GOT sang phân vùng bộ nhớ của nhân hệ điều hành kernel space."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Dưới cấu hình Full RELRO, trình liên kết động áp dụng cờ NOW để giải mã toàn bộ địa chỉ hàm trong GOT ngay lúc nạp tiến trình, sau đó gọi mprotect() đặt toàn bộ vùng nhớ GOT thành Read-Only (chỉ đọc) trước khi hàm main bắt đầu chạy, khiến kẻ tấn công không thể ghi đè vào GOT."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một mẫu phần mềm gián điệp tinh vi được phát hiện trên máy chủ ứng dụng tài chính đa nền tảng. Mã độc nhúng một thư viện chia sẻ độc hại can thiệp vào bảng IAT trên Windows và bảng GOT trên Linux để chặn bắt các thông tin giao dịch trước khi mã hóa. Ngoài ra, tệp cài đặt cho macOS được đóng gói dưới dạng Universal Binary có dấu hiệu bị giả mạo lệnh nạp. Bạn được giao nhiệm vụ phân tích cấu trúc nhị phân của cả 3 mẫu, bóc tách cơ chế hook bảng nhập xuất và xác thực tính toàn vẹn của chữ ký số.",
+        "tasks": [
+          "Phân tích tệp ELF trên Linux bằng readelf và GDB, xác định xem tệp sử dụng cấu hình Partial hay Full RELRO và trích xuất địa chỉ thực tế của các ô nhớ trong bảng GOT trước và sau khi bị can thiệp.",
+          "Phân tích tệp PE trên Windows bằng dumpbin hoặc CFF Explorer, đối chiếu cấu trúc ILT và IAT để phát hiện các hàm API bị chuyển hướng sang vùng nhớ lạ.",
+          "Sử dụng lipo và otool trên macOS để bóc tách lát cắt ARM64 từ Universal Binary, kiểm tra danh sách Load Commands và phân tích chữ ký số nhúng trong `LC_CODE_SIGNATURE`."
+        ],
+        "requiredEvidence": [
+          "Bản kết xuất trích đoạn Program Headers và Section Headers của ELF chứng minh thuộc tính quyền của phân vùng .got và .got.plt",
+          "Bảng so sánh RVA giữa Import Lookup Table và Import Address Table trên tệp PE chỉ rõ API bị hook",
+          "Báo cáo phân tích cấu trúc Load Commands Mach-O kèm chứng thư xác thực trích xuất từ lệnh codesign"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Tool Interface Standard (TIS) Executable and Linking Format (ELF) Specification Version 1.2",
+          "url": "https://refspecs.linuxfoundation.org/elf/elf.pdf",
+          "publisher": "TIS Committee / Linux Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả cấu trúc tiêu đề ELF Header, Program Header Table và Section Header Table",
+            "Cơ chế phân giải ký hiệu động thông qua bảng PLT và GOT cùng các quy tắc chuyển vị relocation"
+          ]
+        },
+        {
+          "title": "Microsoft Portable Executable and Common Object File Format Specification",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/debug/pe-format",
+          "publisher": "Microsoft Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả cấu trúc DOS Header, PE Header, Optional Header và 16 Data Directories",
+            "Cơ chế hoạt động của Import Table, Import Lookup Table (ILT) và Import Address Table (IAT)"
+          ]
+        },
+        {
+          "title": "Apple Developer Documentation: Mach-O Runtime Architecture and Dynamic Linker Specifications",
+          "url": "https://developer.apple.com/documentation/kernel",
+          "publisher": "Apple Inc.",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả cấu trúc Mach Header, Fat Binary và các Load Commands (LC_SEGMENT_64, LC_MAIN)",
+            "Kiến trúc phân đoạn bộ nhớ macOS (__PAGEZERO, __TEXT, __DATA, __LINKEDIT) và Dyld Chained Fixups"
+          ]
+        }
+      ]
+    }
+  ]
+}

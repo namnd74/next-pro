@@ -18,6 +18,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
+import { DevProLogo } from './devpro-logo';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLearningStore } from '@/features/learning/stores/use-learning-store';
@@ -77,19 +78,15 @@ export function Header() {
       <div className="glass flex h-16 items-center justify-between rounded-2xl px-4 shadow-lg shadow-black/5 sm:px-6">
         {/* Brand Logo */}
         <div className="flex items-center gap-3">
-          <Link href="/" className="group flex items-center gap-2.5">
-            <div className="to-primary flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 text-white shadow-md shadow-indigo-500/25 transition-transform group-hover:scale-105">
-              <Layers className="h-5 w-5" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-foreground flex items-center gap-1.5 text-base font-bold tracking-tight">
-                NextPro
-                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-              </span>
-              <span className="text-muted-foreground -mt-1 text-[10px] font-medium tracking-widest uppercase">
-                React 19 & Next 16
-              </span>
-            </div>
+          <Link href="/" className="focus:outline-hidden">
+            <DevProLogo
+              concept="bolt"
+              variant="horizontal"
+              size="sm"
+              glow
+              animated
+              transparent
+            />
           </Link>
         </div>
 

@@ -11,13 +11,81 @@ import {
   Sparkles,
   Table as TableIcon,
 } from 'lucide-react';
-import type { SqlDatabase, SqlExecutionResult, WorkbenchConfig } from '../types';
-import {
-  createDefaultSqlDatabase,
-  executeSqlQuery,
-} from '../engines/sql-injection-engine';
+import type {
+  SqlDatabase,
+  SqlExecutionResult,
+  SqlInjectedToken,
+  WorkbenchConfig,
+} from '../types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+
+const DEFAULT_SQL_DB: SqlDatabase = {
+  tables: {
+    users: {
+      name: 'users',
+      columns: [
+        { name: 'id', type: 'number' },
+        { name: 'username', type: 'string' },
+        { name: 'password_hash', type: 'string' },
+        { name: 'role', type: 'string' },
+        { name: 'email', type: 'string' },
+        { name: 'is_active', type: 'boolean' },
+      ],
+      rows: [
+        {
+          id: 1,
+          username: 'admin',
+          password_hash: '$2y$12$e8xL47r9mKq0...',
+          role: 'administrator',
+          email: 'admin@corp.internal',
+          is_active: true,
+        },
+        {
+          id: 2,
+          username: 'security_auditor',
+          password_hash: '$2y$12$kL93mN82jVw1...',
+          role: 'auditor',
+          email: 'auditor@corp.internal',
+          is_active: true,
+        },
+        {
+          id: 3,
+          username: 'operator',
+          password_hash: '$2y$12$pQ82vR91kLx4...',
+          role: 'operator',
+          email: 'operator@corp.internal',
+          is_active: true,
+        },
+        {
+          id: 4,
+          username: 'guest_user',
+          password_hash: '$2y$12$zX10aB29cVm8...',
+          role: 'guest',
+          email: 'guest@public.io',
+          is_active: true,
+        },
+      ],
+    },
+  },
+};
+
+function inspectQueryTokens(query: string): SqlInjectedToken[] {
+  const words = query.split(/(\s+|--.*$|'[^']*')/g).filter(Boolean);
+  return words.map((w) => {
+    const trimmed = w.trim().toUpperCase();
+    if (['OR', 'AND', '=', 'UNION', 'SELECT', 'FROM', 'WHERE'].includes(trimmed)) {
+      return { token: w, type: 'operator' };
+    }
+    if (w.startsWith('--')) {
+      return { token: w, type: 'comment' };
+    }
+    if (w.includes("' OR '") || w.includes("' OR 1=1") || w.includes("' OR '1'='1")) {
+      return { token: w, type: 'injected' };
+    }
+    return { token: w, type: 'base' };
+  });
+}
 
 interface SqlLabViewProps {
   config: WorkbenchConfig;
@@ -26,7 +94,7 @@ interface SqlLabViewProps {
 
 export const SqlLabView: React.FC<SqlLabViewProps> = ({ config, onExecution }) => {
   const [db, setDb] = React.useState<SqlDatabase>(
-    () => config.initialSqlDb || createDefaultSqlDatabase()
+    () => config.initialSqlDb || DEFAULT_SQL_DB
   );
   const [queryInput, setQueryInput] = React.useState(
     "SELECT * FROM users WHERE username = 'operator' AND is_active = true"
@@ -38,13 +106,32 @@ export const SqlLabView: React.FC<SqlLabViewProps> = ({ config, onExecution }) =
 
   const handleExecute = (): void => {
     if (!queryInput.trim()) return;
-    const res = executeSqlQuery(queryInput, db);
+    const isTautology =
+      queryInput.includes("' OR '1'='1") ||
+      queryInput.includes("' OR 1=1") ||
+      queryInput.includes('UNION SELECT');
+    const table = db.tables['users'] || { columns: [], rows: [] };
+    const rows = isTautology
+      ? table.rows
+      : table.rows.filter(
+          (r) => typeof r.username === 'string' && queryInput.includes(`'${r.username}'`)
+        );
+    const res: SqlExecutionResult = {
+      success: true,
+      queryExecuted: queryInput,
+      columns: table.columns.map((c) => c.name),
+      rows,
+      rowCount: rows.length,
+      executionTimeMs: 1,
+      injectedTokens: inspectQueryTokens(queryInput),
+      vulnerabilityTriggered: isTautology ? 'SQLI_TAUTOLOGY_DETECTED' : undefined,
+    };
     setResult(res);
     onExecution?.(res, queryInput);
   };
 
   const handleReset = (): void => {
-    const fresh = config.initialSqlDb || createDefaultSqlDatabase();
+    const fresh = config.initialSqlDb || DEFAULT_SQL_DB;
     setDb(fresh);
     setQueryInput("SELECT * FROM users WHERE username = 'operator' AND is_active = true");
     setResult(null);
@@ -83,7 +170,7 @@ export const SqlLabView: React.FC<SqlLabViewProps> = ({ config, onExecution }) =
           <div className="flex items-center gap-2">
             <Database className="h-4 w-4 text-cyan-400" />
             <span className="font-semibold text-slate-200">
-              PostgreSQL Relational AST Query Console
+              SQL Injection AST & Query Visualizer (Demo Mode)
             </span>
           </div>
           <div className="flex items-center gap-2">

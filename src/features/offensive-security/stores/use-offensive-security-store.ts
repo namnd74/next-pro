@@ -1,41 +1,31 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+export interface LastVisitedLesson {
+  trackSlug: string;
+  moduleSlug: string;
+  lessonSlug: string;
+  title: string;
+  updatedAt: number;
+}
+
 interface OffensiveSecurityState {
-  /** Vector đã được "launch attack" (đã thấy hậu quả) */
-  launchedVectorIds: string[];
-  /** Vector đã được vá thành công bằng defense patch */
-  patchedVectorIds: string[];
-  /** Academy lesson chỉ hoàn thành sau khi pass decision lab + quiz */
+  /** Academy lesson IDs completed after passing decision lab + quiz or objectives */
   completedAcademyLessonIds: string[];
+  /** Last visited lesson for Smart Resume Banner */
+  lastVisitedLesson?: LastVisitedLesson;
 
   // Actions
-  launchVector: (vectorId: string) => void;
-  patchVector: (vectorId: string) => void;
   completeAcademyLesson: (lessonId: string) => void;
+  setLastVisitedLesson: (lesson: Omit<LastVisitedLesson, 'updatedAt'>) => void;
   resetOffensiveSecurityProgress: () => void;
 }
 
 export const useOffensiveSecurityStore = create<OffensiveSecurityState>()(
   persist(
     (set) => ({
-      launchedVectorIds: [],
-      patchedVectorIds: [],
       completedAcademyLessonIds: [],
-
-      launchVector: (vectorId) =>
-        set((state) => ({
-          launchedVectorIds: state.launchedVectorIds.includes(vectorId)
-            ? state.launchedVectorIds
-            : [...state.launchedVectorIds, vectorId],
-        })),
-
-      patchVector: (vectorId) =>
-        set((state) => ({
-          patchedVectorIds: state.patchedVectorIds.includes(vectorId)
-            ? state.patchedVectorIds
-            : [...state.patchedVectorIds, vectorId],
-        })),
+      lastVisitedLesson: undefined,
 
       completeAcademyLesson: (lessonId) =>
         set((state) => ({
@@ -44,11 +34,18 @@ export const useOffensiveSecurityStore = create<OffensiveSecurityState>()(
             : [...state.completedAcademyLessonIds, lessonId],
         })),
 
+      setLastVisitedLesson: (lesson) =>
+        set({
+          lastVisitedLesson: {
+            ...lesson,
+            updatedAt: Date.now(),
+          },
+        }),
+
       resetOffensiveSecurityProgress: () =>
         set({
-          launchedVectorIds: [],
-          patchedVectorIds: [],
           completedAcademyLessonIds: [],
+          lastVisitedLesson: undefined,
         }),
     }),
     {
