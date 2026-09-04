@@ -43,3 +43,9 @@ Standards for plan lifecycle, bounded execution loops, and topology routing.
 
 - **Default to Loop** for feature builds, bug fixes, refactoring, and UI/UX changes.
 - **Use Subagent** only for wide read-only research or independent parallel tasks with clear output contracts.
+
+## 3. Anti-Hardcode & Runtime Grounding Invariant
+
+- **No Synthetic Truth**: Never declare hardcoded response objects in a harness claiming `AUTHENTIC_EXECUTION`.
+- **Live Coupling**: Competency contracts must evaluate data emitted from live sockets, child processes, or SQLite connections.
+- **Dynamic Receipts**: Receipt SHA-256 must bind to process stdout or network buffer bytes, not static variables.

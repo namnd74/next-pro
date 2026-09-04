@@ -53,6 +53,10 @@ test.describe('Offensive Security - Adaptive Cockpit Pro Max E2E', () => {
       '/offensive-security/academy/os02-linux-foundations/files-identity-permissions/permission-bits-and-special-modes'
     );
 
+    // Wait for client hydration (terminal input mounts after hydration)
+    const terminalInput = page.getByTestId('terminal-input');
+    await expect(terminalInput).toBeVisible({ timeout: 10000 });
+
     const zenBtn = page.getByTestId('toggle-zen-mode');
     await expect(zenBtn).toBeVisible();
     await expect(zenBtn).toContainText('ZEN MODE');
@@ -62,7 +66,6 @@ test.describe('Offensive Security - Adaptive Cockpit Pro Max E2E', () => {
     await expect(zenBtn).toContainText('EXIT ZEN');
 
     // Terminal input remains fully interactive in Zen Mode
-    const terminalInput = page.getByTestId('terminal-input');
     await expect(terminalInput).toBeVisible();
 
     // Exit Zen Mode using keyboard Escape

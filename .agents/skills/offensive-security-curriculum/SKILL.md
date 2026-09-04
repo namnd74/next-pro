@@ -51,6 +51,7 @@ crash-to-root-cause flow, and availability lessons need load and recovery metric
   - `telemetry-inspector`: Structured log, configuration, and diff reviews via CodeMirror.
   - `decision-lab`: Authentic professional decision scenarios with comprehensive rationale.
 - Prohibited: Never generate custom regex SQL parsers, POSIX kernels, or mock AD KDCs.
+- Prohibited in Verification: Never hardcode mock HTTP responses or synthetic database objects in contract harnesses. All runtime competency tests must bind to real network sockets, SQLite processes, or OS filesystem calls.
 
 ## Non-negotiable distinctions
 

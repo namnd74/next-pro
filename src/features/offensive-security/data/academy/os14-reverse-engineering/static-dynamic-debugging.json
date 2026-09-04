@@ -1,0 +1,1184 @@
+{
+  "id": "os14-m02-static-dynamic-debugging",
+  "slug": "static-dynamic-debugging",
+  "trackId": "os14-reverse-engineering",
+  "title": "Tháo Gỡ Hợp Ngữ Tĩnh, Dịch Ngược Decompilation, Tracing Động & Gỡ Lỗi Debugging",
+  "summary": "Phân tích kỹ thuật dịch ngược nhị phân với Ghidra và IDA Pro (Control Flow Graph CFG, Function Signatures, Type Recovery), kỹ thuật gỡ lỗi động với GDB/PEDA/GEF và x64dbg, tracing tiến trình bằng eBPF/Frida hook, và phân tích các kỹ thuật chống gỡ lỗi (Anti-Debugging: IsDebuggerPresent, ptrace detection, Timing checks).",
+  "difficulty": "advanced",
+  "estimatedMinutes": 480,
+  "careerPaths": [
+    "reverse-engineering",
+    "vulnerability-research",
+    "malware-analysis",
+    "exploit-development",
+    "penetration-test"
+  ],
+  "domains": ["reverse-engineering", "ghidra", "debugging", "frida"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os14-l133-disassembly-and-decompilation-with-ghidra-and-ida",
+      "slug": "disassembly-and-decompilation-with-ghidra-and-ida",
+      "title": "Tháo Gỡ Hợp Ngữ Tĩnh & Dịch Ngược Decompilation Chuyên Sâu với Ghidra và IDA Pro",
+      "summary": "Làm chủ kỹ thuật phân tích tĩnh nhị phân x86/x64 và ARM, dựng đồ thị luồng điều khiển (Control Flow Graph - CFG), phục hồi chữ ký hàm (Function Signatures), phục dựng cấu trúc dữ liệu và kiểu dữ liệu (Type Recovery/Struct Reconstruction), và phân giải tham chiếu chéo (Cross-References - XREFs) bằng Ghidra Decompiler và IDA Pro Hex-Rays.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân biệt bản chất giải thuật giữa Linear Sweep Disassembly và Recursive Descent Disassembly, nhận diện các điểm mù khi dữ liệu bị chèn lẫn vào luồng lệnh thực thi.",
+        "Làm chủ quy trình chuyển đổi từ mã máy hợp ngữ sang dạng trung gian Intermediate Representation (Ghidra P-Code và IDA Microcode), ứng dụng dạng gán tĩnh duy nhất (SSA Form) để phân tích dòng dữ liệu.",
+        "Thực hiện phục hồi cấu trúc dữ liệu phức tạp (C++ Structs, Unions, Arrays) và tái tạo con trỏ hàm ảo trong bảng Virtual Method Table (Vtable) trên các tệp nhị phân đã bị lược bỏ biểu tượng (stripped binaries).",
+        "Khai thác ma trận tham chiếu chéo (Cross-References - XREFs) và phân tích hằng số ma thuật (Magic Constants) để định vị nhanh chóng các thuật toán mã hóa tùy biến hoặc luồng xử lý xác thực bảo mật."
+      ],
+      "careerPaths": [
+        "reverse-engineering",
+        "vulnerability-research",
+        "malware-analysis",
+        "exploit-development"
+      ],
+      "domains": ["reverse-engineering", "ghidra", "disassembly", "decompilation"],
+      "attackTactics": ["discovery", "defense-evasion"],
+      "keywords": [
+        "ghidra-decompiler",
+        "ida-pro",
+        "control-flow-graph",
+        "type-recovery",
+        "function-signature",
+        "cross-references",
+        "intermediate-representation",
+        "p-code"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Quá trình disassembly là bài toán không quyết định được (undecidable problem) tương đương với Halting Problem khi mã máy và dữ liệu tĩnh đan xen trong cùng một không gian bộ nhớ. Thuật toán Linear Sweep phân tích tuần tự từng byte nhưng dễ sập bẫy trước các byte rác chèn sau lệnh nhảy không điều kiện; trong khi Recursive Descent bám sát luồng thực thi nhưng gặp rào cản lớn trước các lệnh nhảy gián tiếp (Indirect Jumps). Bộ dịch ngược Decompiler không dịch thẳng hợp ngữ sang C mà hạ cấp mã máy về ngôn ngữ trung gian IR (như Ghidra P-Code hay Hex-Rays Microcode), biến đổi sang dạng Single Static Assignment (SSA) để tối ưu hóa khử dead code và lan truyền kiểu dữ liệu (Type Propagation) nhằm tái dựng cấu trúc mã nguồn gốc.",
+      "visual": {
+        "title": "Pipeline Dịch Ngược Tĩnh: Từ Bytecode Nhị Phân đến Mã Tái Cấu Trúc C",
+        "caption": "Quy trình 4 giai đoạn xử lý từ phân tích mã máy nhị phân thô, dựng đồ thị luồng điều khiển, hạ cấp về ngôn ngữ trung gian IR đến phục hồi cấu trúc dữ liệu hoàn chỉnh.",
+        "steps": [
+          {
+            "label": "Quét Luồng Điều Khiển & Phân Giải Nhãn (Recursive Descent Parsing)",
+            "detail": "Bộ phân tách bám theo các nhánh lệnh rẽ nhánh điều kiện và gọi hàm (call/jmp) để dựng Control Flow Graph (CFG), phân tách ranh giới giữa lệnh thực thi và hằng số nhúng.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Chuyển Đổi Sang Dạng Trung Gian (P-Code / Microcode Generation)",
+            "detail": "Ánh xạ tập lệnh hợp ngữ kiến trúc cụ thể (x86/x64/ARM) về tập vi lệnh trừu tượng (Intermediate Representation) chuẩn hóa không phụ thuộc phần hardware.",
+            "tone": "allow"
+          },
+          {
+            "label": "Tối Ưu Hóa Dòng Dữ Liệu & SSA Form (Data Flow & Type Recovery)",
+            "detail": "Áp dụng Single Static Assignment, khử bỏ biến tạm thời thanh ghi, lan truyền hằng số và suy luận kiểu dữ liệu (Data Type Propagation) trên ngăn xếp và heap.",
+            "tone": "caution"
+          },
+          {
+            "label": "Tái Dựng Cấu Trúc Bậc Cao & Xuất Mã Nguồn Giả (AST to Pseudo-C)",
+            "detail": "Chuyển đổi đồ thị luồng điều khiển thành các cấu trúc điều khiển bậc cao (if-else, while, for, switch-case) và xuất mã nguồn giả (decompiled pseudo-code) trực quan.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Thuật Toán Disassembly: Linear Sweep Đối Đầu Recursive Descent và Bẫy Mã Dữ Liệu Lẫn Lộn",
+          "paragraphs": [
+            "Kỹ thuật tháo gỡ hợp ngữ (Disassembly) là nền tảng khởi đầu của mọi hoạt động dịch ngược nhị phân. Về mặt lý thuyết khoa học máy tính, việc phân định chính xác tuyệt đối giữa lệnh thực thi (instructions) và dữ liệu (data) trong kiến trúc Von Neumann là bài toán không thể giải quyết trọn vẹn (undecidable). Hai thuật toán phân tách hợp ngữ phổ biến nhất hiện nay là Linear Sweep và Recursive Descent Traversal, mỗi phương pháp sở hữu những ưu thế và điểm mù kỹ thuật riêng biệt.",
+            "Thuật toán Linear Sweep (được sử dụng bởi các công cụ như objdump hoặc WinDbg ban đầu) tiến hành giải mã tuần tự từng byte bắt đầu từ điểm vào (entry point) cho đến hết phân vùng mã .text. Điểm yếu chết người của Linear Sweep là nó mặc định mọi byte đều là lệnh thực thi. Kẻ phát triển phần mềm bảo vệ hoặc tác giả mã độc có thể dễ dàng đánh lừa thuật toán này bằng cách chèn các byte dữ liệu ngẫu nhiên ngay sau một lệnh nhảy không điều kiện (unconditional jump - jmp). Khi Linear Sweep cố gắng giải mã các byte dữ liệu rác này thành lệnh hợp ngữ, hiện tượng lệch đồng bộ byte (instruction desynchronization) xảy ra, làm sai lệch toàn bộ các lệnh hợp ngữ hợp lệ phía sau.",
+            "Ngược lại, thuật toán Recursive Descent (được Ghidra và IDA Pro áp dụng làm thuật toán cốt lõi) khắc phục nhược điểm trên bằng cách lần theo luồng thực thi logic của chương trình. Thuật toán bắt đầu từ entry point, phân tích lệnh hiện tại và xác định tất cả các đích đến tiềm năng của các lệnh rẽ nhánh (conditional branches, unconditional jumps, call instructions). Mỗi nhánh được đưa vào hàng đợi xử lý đệ quy. Tuy nhiên, Recursive Descent đối mặt với thách thức nghiêm trọng khi gặp các lệnh nhảy gián tiếp (Indirect Jumps như jmp rax, call qword ptr [rbx + rdx*8]). Khi đích đến là một thanh ghi hoặc ô nhớ được tính toán động tại thời điểm runtime, thuật toán tĩnh không thể tự động xác định được tất cả các nhánh rẽ nếu không có sự can thiệp phân tích bảng nhảy (Jump Table) hoặc dữ liệu định vị con trỏ."
+          ],
+          "points": [
+            "Linear Sweep: Quét tuần tự từng byte, tốc độ cực nhanh nhưng dễ bị đánh lừa bởi dữ liệu rác xen kẽ sau lệnh jmp.",
+            "Recursive Descent: Bám sát đồ thị luồng điều khiển thực tế, an toàn trước dữ liệu rác nhưng gặp khó khăn tại các điểm nhảy gián tiếp (Indirect Branches).",
+            "Bẫy đồng bộ byte (Desynchronization): Kỹ thuật chèn byte 0xE8 (mã opcode của call) hoặc dữ liệu nội suy vào giữa dòng lệnh nhằm làm mù công cụ tháo gỡ hợp ngữ cổ điển."
+          ]
+        },
+        {
+          "title": "Ngôn Ngữ Trung Gian IR: Ghidra P-Code và Hex-Rays Microcode trong Xây Dựng SSA",
+          "paragraphs": [
+            "Các bộ dịch ngược hiện đại không chuyển đổi trực tiếp mã hợp ngữ hợp lệ sang ngôn ngữ C bậc cao. Khác biệt lớn về mặt ngữ nghĩa giữa các kiến trúc phần cứng (như hàng trăm cờ trạng thái EFLAGS trong x86, thanh ghi điều kiện CPSR trong ARM, hoặc các lệnh SIMD/AVX phức tạp) đòi hỏi phải có một bước trừu tượng hóa trung gian. Ghidra sử dụng ngôn ngữ vi lệnh mang tên P-Code (ngắn gọn của Pseudo-Code hoặc Processor-Independent Code), trong khi IDA Pro Hex-Rays sử dụng hệ thống Microcode phân tầng nhiều cấp độ.",
+            "P-Code trong Ghidra mô hình hóa mọi thao tác của CPU thông qua một tập hợp hữu hạn chỉ khoảng vài chục phép toán nguyên tử (opcodes) như INT_ADD, INT_SUB, INT_AND, LOAD, STORE, BRANCH, và CBRANCH. Mọi thanh ghi phần cứng (như EAX, RSP, XMM0), vị trí bộ nhớ RAM và các biến tạm thời đều được trừu tượng hóa thành các khối địa chỉ Varnode (gồm ba thành phần: Không gian địa chỉ Address Space, Độ lệch Offset, và Kích thước Size tính bằng byte). Nhờ thiết kế này, một lệnh phức tạp trên x86 như 'push eax' được phân rã thành hai vi lệnh P-Code nguyên tử: giảm giá trị Varnode đại diện cho ESP và thực hiện STORE giá trị Varnode EAX vào ô nhớ mới.",
+            "Sau khi hợp ngữ được chuyển đổi thành P-Code hoặc Microcode, decompiler xây dựng dạng gán tĩnh duy nhất (Single Static Assignment - SSA Form). Trong dạng SSA, mỗi biến ảo chỉ được gán giá trị duy nhất một lần. Tại các điểm hội tụ luồng điều khiển (như sau khối if-else), decompiler chèn hàm Phi (Phi-function: ϕ) để chọn giá trị biến dựa trên đường đi luồng điều khiển trước đó. Dạng SSA cho phép bộ dịch ngược áp dụng các giải thuật tối ưu hóa mã kinh điển trong lý thuyết biên dịch: Khử mã chết (Dead Code Elimination), Lan truyền bản sao và hằng số (Constant and Copy Propagation), và Thu gọn biểu thức số học (Expression Folding). Kết quả là hàng chục dòng lệnh hợp ngữ quản lý thanh ghi vụn vặt được rút gọn thành một dòng biểu thức toán học hoặc logic trong sáng."
+          ],
+          "points": [
+            "P-Code & Microcode: Cầu nối chuẩn hóa trừu tượng hóa toàn bộ phần cứng x86, x64, ARM, MIPS về tập vi lệnh đồng nhất.",
+            "Cấu trúc Varnode trong Ghidra: Định danh mọi thực thể dữ liệu bằng bộ ba (Address Space, Offset, Size), loại bỏ sự phụ thuộc tên thanh ghi vật lý.",
+            "Single Static Assignment (SSA): Nền tảng cốt lõi giúp decompiler thực hiện thu gọn biểu thức và loại bỏ các biến thanh ghi trung gian không cần thiết."
+          ]
+        },
+        {
+          "title": "Phục Hồi Cấu Trúc Dữ Liệu (Struct Reconstruction), Kiểu Dữ Liệu và Bảng Hàm Ảo (Vtable)",
+          "paragraphs": [
+            "Một trong những khác biệt lớn nhất giữa một dịch ngược viên trung cấp và một chuyên gia dịch ngược cao cấp nằm ở khả năng phục hồi cấu trúc dữ liệu (Data Structure & Type Recovery). Khi mã nguồn C/C++ được biên dịch thành nhị phân đã lược bỏ biểu tượng (stripped binary), toàn bộ tên biến, định nghĩa cấu trúc (struct), lớp (class) và kiểu dữ liệu trừu tượng đều bị xóa sạch khỏi bảng biểu tượng. Decompiler ban đầu chỉ thấy các con trỏ trỏ vào vùng nhớ không định kiểu (undefined4, undefined8, hoặc void*).",
+            "Để phục hồi một struct trong Ghidra hoặc IDA Pro, nhà phân tích phải quan sát kỹ lưỡng các mẫu truy cập bộ nhớ dựa trên thanh ghi cơ sở cộng độ lệch (Base Pointer + Offset Addressing Mode), ví dụ: 'mov eax, dword ptr [rcx + 0x18]' hay 'mov rdx, qword ptr [rcx + 0x20]'. Bằng cách đối chiếu tất cả các vị trí truy cập thông qua cùng một con trỏ cơ sở (thường là con trỏ 'this' trong calling convention Microsoft x64 hoặc System V AMD64 ABI), nhà phân tích có thể tính toán kích thước từng trường dữ liệu, ranh giới đệm căn lề (alignment padding) và dựng lại cấu trúc Struct hoàn chỉnh trong Data Type Manager.",
+            "Đối với các ứng dụng hướng đối tượng C++, việc nhận diện và phân giải bảng hàm ảo (Virtual Method Table - Vtable) đóng vai trò then chốt để phục hồi luồng thực thi. Khi một đối tượng C++ có chứa các phương thức ảo (virtual functions), trình biên dịch đặt một con trỏ ẩn (vptr) tại offset 0x00 của struct đối tượng. Con trỏ này trỏ tới một mảng chứa các địa chỉ hàm nằm trong phân vùng chỉ đọc .rdata. Trong hợp ngữ, các lời gọi hàm ảo xuất hiện dưới dạng lệnh gọi gián tiếp: 'mov rax, [rcx]; call qword ptr [rax + 0x10]'. Nếu không dựng struct và gán đúng kiểu Vtable, decompiler sẽ chỉ hiển thị lời gọi con trỏ hàm vô danh (*(code *)(*param1 + 0x10))(), khiến việc theo dõi logic phân quyền hoặc xử lý nghiệp vụ bị đứt đoạn hoàn toàn."
+          ],
+          "points": [
+            "Phân tích Base + Offset: Cơ sở toán học để phục hồi các trường thành viên của struct và kích thước ô nhớ.",
+            "Con trỏ ẩn Vptr và Bảng Vtable: Nằm tại offset 0x0 của cấu trúc C++, chứa mảng con trỏ hàm dẫn tới các phương thức ảo thực tế.",
+            "Type Propagation trong Ghidra: Cơ chế tự động suy luận và lan truyền kiểu dữ liệu cho toàn bộ các hàm nhận struct làm tham số."
+          ]
+        },
+        {
+          "title": "Phân Tích Đồ Thị Luồng Điều Khiển (CFG), Cross-References (XREFs) và Nhận Diện Thuật Toán Mật Mã",
+          "paragraphs": [
+            "Đồ thị luồng điều khiển (Control Flow Graph - CFG) là biểu diễn hình học của cấu trúc hàm, trong đó mỗi nút (node) là một khối cơ bản (Basic Block - chuỗi lệnh thực thi liên tục có đúng một điểm vào và một điểm ra), và các cạnh (edges) đại diện cho các nhánh rẽ điều kiện (nhánh xanh/nhánh đỏ) hoặc nhảy vô điều kiện. Nhận diện hình thái của CFG giúp chuyên gia nhanh chóng xác định cấu trúc vòng lặp lồng nhau (nested loops), cấu trúc phân nhánh switch-case lớn, hoặc phát hiện các khối mã làm rối (obfuscated code) có đồ thị dạng máy trạng thái phức tạp.",
+            "Hệ thống tham chiếu chéo (Cross-References - XREFs) là vũ khí tối thượng giúp định vị nguồn gốc và đích đến của mọi thông tin trong nhị phân. XREFs được chia thành hai loại chính: Code XREFs (nơi gọi đến một hàm hoặc nơi một lệnh nhảy trỏ tới) và Data XREFs (nơi một biến toàn cục, một chuỗi ký tự, hoặc một hằng số được đọc hoặc ghi). Khi phân tích một tệp nhị phân đồ sộ lên tới hàng trăm nghìn hàm, phương pháp hiệu quả nhất không phải là đọc tuần tự từ đầu đến cuối mà là 'Neo điểm tựa' (Anchor Points) bằng cách tìm kiếm chuỗi ký tự thông báo lỗi, chuỗi URL kết nối, hoặc các chuỗi định dạng logging, sau đó tra cứu Data XREFs để nhảy thẳng vào hàm xử lý nghiệp vụ cốt lõi.",
+            "Đặc biệt, trong quá trình thẩm định an ninh và phân tích mã độc, việc nhận diện các thuật toán mật mã (như AES, DES, MD5, SHA-256, RC4, ChaCha20) thường được thực hiện thông qua nhận diện Hằng số Ma thuật (Magic Constants / S-Boxes). Ví dụ, thuật toán MD5 luôn khởi tạo 4 biến trạng thái bằng các giá trị hex cố định (0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476); bảng Rijndael S-Box của AES bắt đầu bằng chuỗi byte 0x63, 0x7c, 0x77, 0x7b... Ghidra và IDA Pro tích hợp các công cụ quét chữ ký byte như Ghidra Signatures / IDA FindCrypt / SigKit giúp tự động gắn nhãn các hằng số này. Khi đã nhận diện được vị trí S-Box hoặc Magic Constant, chỉ cần truy vết Data XREFs ngược về nơi truy xuất bảng là ta lập tức tìm ra hàm mã hóa/giải mã của chương trình."
+          ],
+          "points": [
+            "Basic Block & CFG: Khối đơn vị cơ bản cấu thành logic hàm, trực quan hóa nhánh rẽ và vòng lặp thuật toán.",
+            "Data & Code XREFs: Bản đồ liên kết hai chiều giữa lệnh thực thi và tài nguyên dữ liệu, cho phép truy vết ngược từ triệu chứng tới nguyên nhân.",
+            "Magic Constants & S-Box Detection: Phương pháp chuẩn mực quốc tế để nhận diện thuật toán mã hóa tiêu chuẩn và tùy biến trong nhị phân."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Ghidra & IDA Pro Disassembly and Decompilation Decision Lab",
+        "objective": "Áp dụng kỹ thuật phân tích tĩnh nâng cao để xử lý lệnh nhảy gián tiếp bị đứt đoạn, phục hồi bảng hàm ảo C++ Vtable, và định danh chính xác thuật toán mật mã tùy biến từ các hằng số ma thuật.",
+        "scenario": "Bạn là Chuyên viên Dịch ngược Cao cấp (Senior Reverse Engineer) đang thẩm định một thành phần nhị phân lõi (x86-64 ELF/PE) đã bị strip toàn bộ biểu tượng. Chương trình chứa cơ chế bảo vệ giấy phép và xử lý dữ liệu nhạy cảm được bảo vệ bằng cấu trúc C++ và các bảng nhảy bị làm mờ.",
+        "constraints": [
+          "Bắt buộc tuân thủ nguyên tắc phân tích tĩnh: Không thực thi tệp nhị phân trên môi trường live để tránh kích hoạt cơ chế xóa dấu vết.",
+          "Phục hồi chính xác cấu trúc kiểu dữ liệu C++ Struct / Vtable trong Ghidra Data Type Manager mà không được đoán mò kích thước ô nhớ.",
+          "Phân giải các điểm nhảy gián tiếp (Indirect Jumps) dựa trên ranh giới thực tế của mảng địa chỉ Jump Table trong phân vùng .rodata/.rdata."
+        ],
+        "cases": [
+          {
+            "id": "ghidra-decomp-case-01",
+            "title": "Phục hồi Lệnh Nhảy Gián Tiếp (Indirect Jump / Jump Table) Bị Đứt Đoạn trong CFG",
+            "context": "Khi dịch ngược một hàm kiểm tra giấy phép phần mềm trên nền tảng x86-64, Ghidra Decompiler đột ngột dừng phân tích tại lệnh 'jmp qword ptr [rax*8 + 0x140082040]' và hiển thị cảnh báo 'Low-level Error: Bad jump table target'. Đồ thị CFG của hàm bị cắt cụt, khiến decompiler chỉ hiển thị được 15 dòng mã đầu tiên và bỏ sót toàn bộ các nhánh xử lý phía sau. Kiểm tra vùng nhớ tại địa chỉ 0x140082040 trong phân vùng .rdata cho thấy một mảng gồm 8 giá trị qword liên tiếp là các địa chỉ hợp lệ nằm trong phân vùng .text, ngay sau một lệnh kiểm tra giới hạn 'cmp eax, 7; ja default_handler'.",
+            "prompt": "Giải pháp kỹ thuật chuẩn xác nhất để chỉ đạo Ghidra tái dựng toàn bộ Control Flow Graph và xuất mã nguồn giả đầy đủ cho cấu trúc switch-case này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉnh sửa trực tiếp byte nhị phân bằng cách thay thế lệnh jmp gián tiếp bằng 8 lệnh jmp trực tiếp nối tiếp nhau trong phân vùng .text.",
+                "correct": false,
+                "rationale": "Việc patch nhị phân trực tiếp làm sai lệch kích thước opcode, phá vỡ cấu trúc offset của hàm và gây lỗi phân giải tham chiếu chéo XREFs trên toàn bộ file."
+              },
+              {
+                "id": "B",
+                "label": "Định nghĩa mảng 8 con trỏ tại địa chỉ 0x140082040 thành kiểu dữ liệu 'pointer', sau đó áp dụng script 'SwitchOverride' hoặc cấu hình Jump Table Reference trong Ghidra bằng cách chỉ định Base Address 0x140082040, Table Size là 8, và liên kết gián tiếp tới lệnh jmp.",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối. Ghidra cần được cung cấp thông tin tường minh về ranh giới mảng (8 phần tử) và địa chỉ cơ sở của bảng nhảy để giải thuật Recursive Descent có thể đưa tất cả các địa chỉ đích vào hàng đợi phân tích, từ đó tái dựng cấu trúc switch-case hoàn chỉnh."
+              },
+              {
+                "id": "C",
+                "label": "Chuyển chế độ dịch ngược từ x86-64 sang x86-32 để Ghidra bỏ qua các con trỏ 64-bit và tự động nội suy luồng điều khiển.",
+                "correct": false,
+                "rationale": "Chuyển sang kiến trúc x86-32 sẽ làm hỏng toàn bộ quy tắc phân giải thanh ghi và calling convention, khiến toàn bộ mã nguồn giả trở nên vô nghĩa."
+              },
+              {
+                "id": "D",
+                "label": "Xóa bỏ lệnh 'ja default_handler' để decompiler mặc định rằng giá trị RAX luôn bằng 0 và chỉ đi theo nhánh đầu tiên.",
+                "correct": false,
+                "rationale": "Thao tác này chỉ phân tích được một nhánh duy nhất và loại bỏ hoàn toàn 7 nhánh logic nghiệp vụ còn lại của switch-case."
+              }
+            ]
+          },
+          {
+            "id": "ghidra-decomp-case-02",
+            "title": "Phục Hồi Cấu Trúc Đối Tượng C++ và Phân Giải Lời Gọi Hàm Ảo (Vtable Method Call)",
+            "context": "Trong một tệp nhị phân quản lý mạng viết bằng C++, hàm xác thực kết nối nhận tham số con trỏ rcx (param_1). Decompiler hiển thị dòng lệnh: 'iVar1 = (**(code **)(*param_1 + 0x28))(param_1, 0x10)'. Trong phân vùng .rdata, bạn xác định được mảng các con trỏ hàm bắt đầu tại 0x1400A3100, trong đó phần tử tại offset 0x28 trỏ tới hàm 'AuthManager::ValidateSessionToken(void* this, int flags)'. Ngoài ra, hàm khởi tạo (Constructor) của đối tượng này gán giá trị 0x1400A3100 vào ô nhớ [rcx], gán 0 vào [rcx + 0x08], và cấp phát bộ đệm tại [rcx + 0x10].",
+            "prompt": "Quy trình chuẩn hóa kiểu dữ liệu nào sau đây trong Ghidra sẽ biến dòng lệnh khó hiểu trên thành lời gọi phương thức hướng đối tượng rõ ràng 'iVar1 = param_1->vptr->ValidateSessionToken(param_1, 0x10)'?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tạo một Struct mới 'AuthManager_Vtable' chứa các con trỏ hàm (hàm tại offset 0x28 là ValidateSessionToken). Sau đó tạo Struct 'AuthManager' với trường đầu tiên 'vptr' kiểu 'AuthManager_Vtable*', rồi gán kiểu dữ liệu của param_1 trong chữ ký hàm thành 'AuthManager*'.",
+                "correct": true,
+                "rationale": "Chính xác theo chuẩn mực kỹ thuật dịch ngược C++. Bằng cách định nghĩa cấu trúc bảng hàm ảo (Vtable Struct) và lồng con trỏ vptr vào struct đối tượng chính (Object Struct), Ghidra Decompiler sẽ tự động phân giải độ lệch 0x28 thành tên hàm tường minh và hiển thị cú pháp gọi phương thức C++ chuẩn."
+              },
+              {
+                "id": "B",
+                "label": "Đổi tên tham số param_1 thành 'AuthManager' và thêm ghi chú (comment) thủ công tại dòng lệnh gọi hàm.",
+                "correct": false,
+                "rationale": "Chỉ đổi tên tham số không thay đổi kiểu dữ liệu cơ sở; decompiler vẫn sẽ hiển thị phép ép kiểu con trỏ thô ráp mà không liên kết được với chữ ký hàm đích."
+              },
+              {
+                "id": "C",
+                "label": "Gán kiểu dữ liệu của param_1 thành mảng byte 'char[64]' để Ghidra tính toán kích thước tổng thể của đối tượng.",
+                "correct": false,
+                "rationale": "Mảng ký tự 'char[]' không hỗ trợ con trỏ hàm và sẽ biến dòng lệnh thành một chuỗi các phép tính chỉ mục mảng sai lệch hoàn toàn về mặt ngữ nghĩa."
+              },
+              {
+                "id": "D",
+                "label": "Ép kiểu dữ liệu của hằng số 0x28 thành kiểu số nguyên 'unsigned int' trong thanh ghi RDX.",
+                "correct": false,
+                "rationale": "0x28 là độ lệch ô nhớ trong mảng con trỏ Vtable chứ không phải giá trị tham số nằm trong thanh ghi RDX."
+              }
+            ]
+          },
+          {
+            "id": "ghidra-decomp-case-03",
+            "title": "Nhận Diện Thuật Toán Mật Mã Tùy Biến Qua Hằng Số Ma Thuật và Ma Trận XREFs",
+            "context": "Khi phân tích một đoạn mã nghi vấn mã hóa dữ liệu truyền thông, bạn bắt gặp một hàm lặp duyệt mảng 256 phần tử. Trước vòng lặp, hàm đọc một bảng hằng số tại địa chỉ 0x140095000 có 256 bytes. Bốn bytes đầu tiên của bảng là 0x63, 0x7C, 0x77, 0x7B và byte cuối cùng là 0x16. Trong thân vòng lặp, biến trạng thái được biến đổi qua các phép ShiftRows, MixColumns (nhân với ma trận đa thức trong trường Galois GF(2^8)) và AddRoundKey với các khóa mở rộng 128-bit. Tuy nhiên, lập trình viên đã sửa đổi hằng số Rcon (Round Constant) thành một dãy số nguyên tố tùy biến để ngăn chặn các công cụ quét tự động.",
+            "prompt": "Kết luận phân tích và phương pháp giải mã chính xác nhất cho cơ chế mật mã này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đây là thuật toán mã hóa cổ điển DES vì nó sử dụng bảng hoán vị 256 bytes.",
+                "correct": false,
+                "rationale": "DES sử dụng các hộp S-Box 6-bit vào 4-bit ra (64 phần tử) và mạng Feistel, hoàn toàn khác với cấu trúc của đoạn mã này."
+              },
+              {
+                "id": "B",
+                "label": "Đây là thuật toán dòng RC4 với mảng hoán vị S-Box 256 bytes khởi tạo theo thuật toán KSA.",
+                "correct": false,
+                "rationale": "RC4 không có các phép toán MixColumns, ShiftRows hay nhân trường Galois GF(2^8)."
+              },
+              {
+                "id": "C",
+                "label": "Đây là biến thể của chuẩn mã hóa AES (Rijndael) sử dụng bảng S-Box chuẩn nhưng tùy biến bảng hằng số vòng (Custom Rcon). Để giải mã dữ liệu, nhà phân tích cần trích xuất bảng khóa mở rộng từ bộ nhớ hoặc sử dụng đúng bảng Rcon tùy biến đó trong script giải mã.",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối. Bảng bắt đầu bằng 0x63, 0x7C, 0x77, 0x7B chính là bảng Rijndael Forward S-Box kinh điển của AES. Sự hiện diện của MixColumns và ShiftRows khẳng định kiến trúc SPN (Substitution-Permutation Network) của AES. Việc tác giả thay đổi bảng Rcon làm lệch thuật toán sinh khóa (Key Schedule), đòi hỏi phải dùng đúng bảng Rcon đó để phục hồi khóa giải mã."
+              },
+              {
+                "id": "D",
+                "label": "Đây là hàm băm mật mã SHA-256 vì nó sử dụng các phép toán xoay bit và mảng hằng số mở rộng.",
+                "correct": false,
+                "rationale": "SHA-256 là hàm băm một chiều không có bảng S-Box 256 bytes và không có phép giải mã MixColumns."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định đúng nguyên nhân đứt đoạn CFG và cấu hình phục hồi Jump Table chính xác theo ranh giới bộ nhớ.",
+          "Thiết lập thành công cấu trúc Struct và Vtable C++ để chuyển đổi mã giả con trỏ thô thành phương thức hướng đối tượng.",
+          "Nhận diện chính xác thuật toán mật mã lõi và các điểm tùy biến dựa trên hằng số ma thuật và đặc trưng toán học."
+        ],
+        "evidenceTemplate": [
+          "Ảnh chụp màn hình hoặc log cấu hình Jump Table trong Ghidra Decompiler kèm CFG đã được nối liền",
+          "Khai báo cấu trúc Struct và Vtable trong Ghidra Data Type Manager (.h / C header format)",
+          "Đoạn mã C Decompiled trước và sau khi thực hiện Type Recovery",
+          "Bảng phân tích đối chiếu hằng số ma thuật (Magic Constants) và tham số thuật toán mật mã tùy biến"
+        ],
+        "reset": "Khôi phục lại cơ sở dữ liệu Ghidra (.gpr/.rep) về trạng thái phân tích tự động ban đầu.",
+        "cleanup": "Xóa bỏ các kiểu dữ liệu tạm thời và script override đã tạo trong quá trình thực hành trên môi trường lab."
+      },
+      "governance": {
+        "prevent": [
+          "Áp dụng quy chuẩn bảo vệ sở hữu trí tuệ và chống dịch ngược hợp pháp: Thực hiện stripped symbols và loại bỏ thông tin RTTI trên các bản phát hành nhị phân thương mại.",
+          "Sử dụng các thuật toán mã hóa tiêu chuẩn đã qua kiểm định (FIPS 140-3) thay vì tự chế các biến thể mật mã tùy biến (Security through Obscurity).",
+          "Tích hợp công cụ phân tích tĩnh mã nguồn (SAST) trong quy trình CI/CD để phát hiện sớm các cấu trúc gọi hàm gián tiếp không an toàn hoặc rò rỉ bộ nhớ."
+        ],
+        "observe": [
+          "Giám sát độ tương đồng mã nguồn nhị phân (Binary Code Similarity / BinDiff) giữa các phiên bản phần mềm để phát hiện mã độc nhúng lén.",
+          "Theo dõi các hằng số mật mã và bảng tra cứu S-Box trong các thư viện bên thứ ba tích hợp vào ứng dụng.",
+          "Ghi nhận nhật ký phân tích dịch ngược bao gồm danh sách các hàm được giải mã, con trỏ vtable và các struct đã phục hồi để phục vụ kiểm toán bảo mật."
+        ],
+        "respond": [
+          "Kịp thời vá lỗi rò rỉ logic nghiệp vụ khi phát hiện các thuật toán bảo vệ giấy phép bị bẻ khóa qua phân tích tĩnh.",
+          "Tái cấu trúc các hàm nhạy cảm bằng kỹ thuật tái cấu trúc mã nguồn (Refactoring) và phân tách thẩm quyền nếu phát hiện cấu trúc dữ liệu bị lộ lọt.",
+          "Cập nhật chữ ký nhận diện trong cơ sở dữ liệu phân tích mã độc của tổ chức đối với các mẫu nhị phân bị can thiệp."
+        ],
+        "residualRisk": [
+          "Kỹ thuật phân tích tĩnh có thể tốn rất nhiều thời gian và nguồn lực chuyên gia đối với các tệp nhị phân có kích thước hàng chục megabytes.",
+          "Các kỹ thuật làm rối mã nguồn hiện đại có thể làm tê liệt khả năng tự động hóa của decompiler, đòi hỏi phải kết hợp với phân tích động."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Mã giả C do Decompiler xuất ra là mã nguồn gốc chính xác 100% của lập trình viên ban đầu.",
+          "correction": "Decompiler chỉ tái tạo lại một biểu diễn logic bậc cao tương đương về mặt ngữ nghĩa (Semantically Equivalent) dựa trên ngôn ngữ trung gian IR. Tên biến gốc, tên hàm cục bộ, cấu trúc struct nguyên thủy và các chú thích mã nguồn đều bị mất trong quá trình biên dịch và phải do chuyên gia dịch ngược suy luận phục hồi."
+        },
+        {
+          "claim": "Thuật toán Linear Sweep luôn vượt trội hơn Recursive Descent vì nó quét được toàn bộ các byte trong tệp thực thi.",
+          "correction": "Linear Sweep rất dễ bị đánh lừa bởi dữ liệu rác chèn sau lệnh nhảy không điều kiện, dẫn đến việc giải mã sai lệch toàn bộ các lệnh hợp ngữ hợp lệ tiếp theo (Desynchronization). Recursive Descent bám theo luồng thực thi thực tế nên tạo ra kết quả phân tích đáng tin cậy hơn nhiều."
+        },
+        {
+          "claim": "Tệp nhị phân đã bị strip hoàn toàn biểu tượng thì không thể nào phục hồi lại được cấu trúc C++ và các phương thức gọi hàm.",
+          "correction": "Thông qua phân tích quy luật truy cập ô nhớ cơ sở cộng độ lệch (Base + Offset), calling convention (truyền con trỏ this qua RCX/RDI) và bảng hàm ảo Vtable trong phân vùng chỉ đọc .rdata, chuyên gia hoàn toàn có thể tái tạo lại 100% cấu trúc struct và cây kế thừa C++."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os14-l133-q1",
+          "difficulty": "easy",
+          "question": "Thuật toán tháo gỡ hợp ngữ nào sau đây bám theo các lệnh rẽ nhánh và gọi hàm logic của chương trình để xây dựng đồ thị luồng điều khiển (CFG)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Linear Sweep Disassembly"
+            },
+            {
+              "id": "B",
+              "label": "Recursive Descent Disassembly"
+            },
+            {
+              "id": "C",
+              "label": "Static Pattern Matching"
+            },
+            {
+              "id": "D",
+              "label": "Heuristic Entropy Scanning"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Recursive Descent Disassembly là thuật toán phân tích đệ quy bám theo luồng thực thi logic (conditional branches, jumps, calls) để dựng nên CFG và tránh được việc giải mã nhầm các byte dữ liệu rác xen kẽ."
+        },
+        {
+          "id": "os14-l133-q2",
+          "difficulty": "medium",
+          "question": "Trong kiến trúc bộ dịch ngược Ghidra, thực thể nào đại diện cho một vị trí dữ liệu đồng nhất được xác định bởi bộ ba (Address Space, Offset, Size)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Basic Block"
+            },
+            {
+              "id": "B",
+              "label": "Varnode"
+            },
+            {
+              "id": "C",
+              "label": "P-Code Op"
+            },
+            {
+              "id": "D",
+              "label": "Stack Frame"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trong Ghidra P-Code, Varnode là khối xây dựng cơ bản đại diện cho mọi thanh ghi, ô nhớ hoặc biến tạm thời, được định nghĩa duy nhất bằng ba thuộc tính: Không gian địa chỉ (Address Space), Độ lệch (Offset), và Kích thước byte (Size)."
+        },
+        {
+          "id": "os14-l133-q3",
+          "difficulty": "hard",
+          "question": "Khi phân tích một tệp nhị phân x86-64 C++ bị strip, bạn gặp chuỗi lệnh: 'mov rax, [rcx]; call qword ptr [rax + 0x18]'. Cơ chế hướng đối tượng nào đang được thực thi tại đây và vị trí của con trỏ phương thức nằm ở đâu?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Gọi hàm tĩnh thông qua con trỏ toàn cục; con trỏ nằm trên đỉnh ngăn xếp RSP."
+            },
+            {
+              "id": "B",
+              "label": "Gọi hàm khởi tạo Constructor; địa chỉ hàm nằm tại tham số thứ tư trong thanh ghi R9."
+            },
+            {
+              "id": "C",
+              "label": "Gọi phương thức ảo thông qua bảng Vtable; [rcx] chứa con trỏ vptr trỏ tới Vtable, và [rax + 0x18] là con trỏ tới phương thức ảo thứ 4 trong mảng."
+            },
+            {
+              "id": "D",
+              "label": "Giải phóng bộ nhớ Destructor thông qua toán tử delete cục bộ."
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Trong C++ ABI, [rcx] là con trỏ 'this', trỏ tới vptr tại offset 0 của struct. Lệnh 'mov rax, [rcx]' nạp địa chỉ bảng Vtable vào RAX. Lệnh 'call qword ptr [rax + 0x18]' gọi phương thức ảo nằm tại offset 0x18 (phần tử thứ 4 trong mảng con trỏ 64-bit: 0x0, 0x8, 0x10, 0x18)."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một thiết bị cổng bảo mật mạng chạy hệ điều hành Linux x86-64 chứa một tiến trình dịch vụ độc quyền 'secgate-authd' bị lược bỏ hoàn toàn symbol. Tiến trình này sử dụng cơ chế kiểm tra token cấp quyền qua giao thức nhị phân nội bộ. Bạn được giao nhiệm vụ dịch ngược tĩnh nhị phân này bằng Ghidra để tìm ra cấu trúc gói tin xác thực, nhận diện thuật toán mã hóa payload, và phục hồi chữ ký của hàm kiểm tra bản quyền.",
+        "tasks": [
+          "Xác định điểm vào phân tích thông qua việc tra cứu chuỗi ký tự thông báo lỗi và chuỗi định dạng logging trong phân vùng .rodata, thiết lập Data XREFs để định vị hàm phân giải gói tin.",
+          "Phục hồi toàn bộ cấu trúc Struct của tiêu đề gói tin (Packet Header) bao gồm Magic Bytes, Message Type, Payload Length và Checksum từ các mẫu truy cập bộ nhớ Base + Offset.",
+          "Phân tích hàm giải mã payload, xác định thuật toán mật mã (dựa trên hằng số ma thuật) và trích xuất quy tắc sinh khóa giải mã tĩnh được nhúng trong nhị phân."
+        ],
+        "requiredEvidence": [
+          "Bản định nghĩa cấu trúc C Header của Packet Header và Session Context Struct đã được import thành công vào Ghidra Data Type Manager.",
+          "Mã giả C (Decompiled Code) hoàn chỉnh của hàm xác thực bản quyền với đầy đủ tên biến, kiểu dữ liệu và chữ ký hàm đã được phục hồi.",
+          "Báo cáo giải trình kỹ thuật chứng minh thuật toán mật mã được sử dụng kèm giá trị hằng số ma thuật và bảng tra cứu tương ứng."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Ghidra Software Reverse Engineering Framework Documentation",
+          "url": "https://ghidra-sre.org",
+          "publisher": "National Security Agency (NSA)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Tài liệu chi tiết về kiến trúc P-Code và mô hình máy ảo trừu tượng Varnode",
+            "Hướng dẫn phục hồi cấu trúc dữ liệu và lan truyền kiểu dữ liệu (Type Propagation)",
+            "Giải thuật xây dựng SSA Form và khử tối ưu hóa mã giả Decompiler"
+          ]
+        },
+        {
+          "title": "Hex-Rays IDA Pro Decompiler User Manual and Microcode Architecture",
+          "url": "https://hex-rays.com/products/ida/support/idadoc/",
+          "publisher": "Hex-Rays SA",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Đặc tả cấu trúc Microcode phân tầng trong Hex-Rays Decompiler",
+            "Quy trình phân giải bảng hàm ảo C++ Virtual Method Table (Vtable)",
+            "Kỹ thuật xử lý cấu trúc switch-case và Jump Table gián tiếp"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os14-l134-dynamic-analysis-and-tracing-with-gdb-and-frida",
+      "slug": "dynamic-analysis-and-tracing-with-gdb-and-frida",
+      "title": "Gỡ Lỗi Động & Tracing Tiến Trình Runtime với GDB/GEF và Frida Instrumentation",
+      "summary": "Làm chủ kỹ thuật gỡ lỗi động nhị phân thực thi với GDB (kết hợp plugin GEF/PEDA) và x64dbg, kiểm soát thanh ghi và bộ nhớ runtime, thiết lập điểm dừng phần cứng/phần mềm (Hardware/Software Breakpoints), và tiêm mã hooking động qua Frida JavaScript API để cô lập và can thiệp hàm mục tiêu theo thời gian thực.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": ["os14-l133-disassembly-and-decompilation-with-ghidra-and-ida"],
+      "outcomes": [
+        "Làm chủ cơ chế hoạt động của ptrace syscall và phân biệt sự khác biệt bản chất giữa Software Breakpoint (0xCC/INT3) và Hardware Breakpoints (Debug Registers DR0-DR7).",
+        "Sử dụng thành thạo GDB kết hợp plugin GEF để thực hiện Memory Telescoping, kiểm tra cấu trúc Stack Frame, phân tích Heap Layout và kiểm soát con trỏ lệnh RIP/EIP.",
+        "Thiết lập môi trường Dynamic Binary Instrumentation (DBI) với Frida: Tiêm V8 Engine vào không gian địa chỉ của tiến trình đích mà không cần dừng dịch vụ.",
+        "Xây dựng Frida Hooking Script chuyên sâu để can thiệp Interceptor API: Đọc tham số hàm, trích xuất khóa giải mã runtime trong bộ nhớ, và sửa đổi giá trị trả về để bypass cơ chế bảo mật."
+      ],
+      "careerPaths": [
+        "reverse-engineering",
+        "vulnerability-research",
+        "malware-analysis",
+        "exploit-development"
+      ],
+      "domains": ["reverse-engineering", "debugging", "gdb", "frida"],
+      "attackTactics": ["discovery", "defense-evasion", "execution"],
+      "keywords": [
+        "gdb-gef",
+        "dynamic-analysis",
+        "hardware-breakpoints",
+        "frida-hooking",
+        "intercept-api",
+        "memory-inspection",
+        "call-stack-trace",
+        "runtime-manipulation"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Phân tích tĩnh cho ta bức tranh về mọi con đường có thể xảy ra trong chương trình, nhưng phân tích động (Dynamic Analysis) cho biết con đường thực sự đang được thực thi cùng trạng thái bộ nhớ chính xác tại từng chu kỳ CPU. Khi gỡ lỗi cấp thấp với GDB/x64dbg, ta tương tác với hệ điều hành thông qua syscall ptrace hoặc Win32 Debug API để đặt bẫy INT 3 (thay thế opcode bằng byte 0xCC) hoặc cấu hình thanh ghi gỡ lỗi phần cứng DR0-DR3 (bắt truy cập đọc/ghi/thực thi mà không làm biến đổi mã). Khi chuyển sang Dynamic Binary Instrumentation (DBI) với Frida, ta không tạm dừng tiến trình qua tín hiệu OS mà tiêm trực tiếp động cơ Google V8 vào không gian địa chỉ tiến trình, thực hiện ghi đè phần đầu hàm (inline hook / trampoline) để chuyển hướng luồng điều khiển qua mã JavaScript kiểm soát toàn diện ngữ cảnh CPU.",
+      "visual": {
+        "title": "Pipeline Gỡ Lỗi Động & Dynamic Instrumentation Runtime",
+        "caption": "Quy trình 4 giai đoạn từ đính kèm tiến trình, thiết lập điểm dừng phần cứng, tiêm động cơ DBI đến can thiệp trạng thái bộ nhớ thời gian thực.",
+        "steps": [
+          {
+            "label": "Đính Kèm & Kiểm Soát Tiến Trình (Process Attachment & ptrace Handshake)",
+            "detail": "Bộ gỡ lỗi đính kèm vào tiến trình qua ptrace(PTRACE_ATTACH), tạm dừng luồng và thu thập trạng thái thanh ghi CPU ban đầu.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Đặt Điểm Dừng Phần Cứng & Quan Sát Bộ Nhớ (Hardware Breakpoints & Telescoping)",
+            "detail": "Cấu hình thanh ghi điều khiển DR7 để bắt sự kiện đọc/ghi trên biến mục tiêu, sử dụng GEF để phân giải chuỗi con trỏ nhiều tầng (Telescoping).",
+            "tone": "caution"
+          },
+          {
+            "label": "Tiêm Động Cơ DBI & Chèn Inline Hook (Frida V8 Injection & Trampoline)",
+            "detail": "Frida tiêm thư viện frida-agent vào không gian địa chỉ ảo, ghi đè 5-14 bytes đầu của hàm mục tiêu bằng lệnh jmp chuyển hướng tới Hook Handler.",
+            "tone": "allow"
+          },
+          {
+            "label": "Can Thiệp Dữ Liệu Runtime & Bypass Logic (Runtime Argument/Return Mutation)",
+            "detail": "Mã JavaScript đánh chặn onEnter để trích xuất khóa mật mã và sửa đổi retval trong onLeave để vô hiệu hóa kiểm tra bảo mật.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cơ Chế Gỡ Lỗi Hệ Thống: ptrace Syscall, Software Breakpoint INT3 vs Hardware Breakpoints (DR0-DR7)",
+          "paragraphs": [
+            "Để gỡ lỗi một chương trình nhị phân trên Linux, công cụ gỡ lỗi (như GDB) phải dựa vào lời gọi hệ thống ptrace (Process Trace). Syscall này cho phép tiến trình cha (tracer) quan sát và kiểm soát quá trình thực thi của tiến trình con (tracee), bao gồm khả năng đọc/ghi bộ nhớ (PTRACE_PEEKTEXT / PTRACE_POKETEXT), đọc/ghi thanh ghi CPU (PTRACE_GETREGS / PTRACE_SETREGS), tiếp tục thực thi (PTRACE_CONT), hoặc thực thi từng lệnh đơn lẻ (PTRACE_SINGLESTEP). Khi một sự kiện gỡ lỗi xảy ra, kernel gửi tín hiệu SIGTRAP tới tracee và tạm dừng nó, chuyển quyền điều khiển cho tracer.",
+            "Điểm dừng phần mềm (Software Breakpoint) là cơ chế phổ biến nhất: Khi người dùng đặt breakpoint tại địa chỉ 0x401200, GDB đọc byte gốc tại địa chỉ đó lưu vào bảng nội bộ, sau đó ghi đè byte đầu tiên bằng opcode 0xCC (lệnh INT 3 trên kiến trúc x86/x64). Khi CPU thực thi tới byte 0xCC, nó phát sinh ngắt phần mềm số 3, kernel tạm dừng tiến trình và báo cho GDB. Để tiếp tục thực thi, GDB phải khôi phục lại byte gốc, lùi con trỏ lệnh RIP về 1 byte, thực thi lệnh đó ở chế độ single-step, rồi lại ghi đè lại 0xCC nếu muốn duy trì breakpoint. Nhược điểm chí mạng của Software Breakpoint là nó làm thay đổi nội dung trang nhớ trong phân vùng mã, dễ bị phát hiện bởi các cơ chế tự kiểm tra tính toàn vẹn (Integrity Check / Hash Verification).",
+            "Ngược lại, Điểm dừng phần cứng (Hardware Breakpoint / Watchpoint) sử dụng các thanh ghi gỡ lỗi chuyên dụng được tích hợp sẵn trong CPU x86/x64: từ DR0 đến DR3 lưu trữ 4 địa chỉ bộ nhớ cần theo dõi; DR6 là thanh ghi trạng thái (Debug Status Register) báo hiệu thanh ghi nào vừa kích hoạt sự kiện; và DR7 là thanh ghi điều khiển (Debug Control Register) quy định điều kiện kích hoạt (thực thi lệnh, ghi dữ liệu, hoặc đọc/ghi dữ liệu) và kích thước vùng nhớ theo dõi (1, 2, 4 hoặc 8 bytes). Hardware Breakpoints hoàn toàn không sửa đổi dù chỉ 1 bit trong phân vùng mã, khiến chúng tàng hình trước các phép kiểm tra hash bộ nhớ. Tuy nhiên, giới hạn vật lý của CPU chỉ cho phép đặt tối đa 4 hardware breakpoints đồng thời."
+          ],
+          "points": [
+            "ptrace Syscall: Giao diện cốt lõi giữa debugger và Linux kernel, sử dụng tín hiệu SIGTRAP để kiểm soát tiến trình mục tiêu.",
+            "Software Breakpoint (0xCC): Ghi đè opcode bằng ngắt INT 3, chi phí thấp, số lượng không giới hạn nhưng làm thay đổi mã bộ nhớ.",
+            "Hardware Breakpoints (DR0-DR7): Sử dụng thanh ghi CPU, bắt chính xác sự kiện đọc/ghi dữ liệu (Watchpoint) mà không làm biến đổi nhị phân, nhưng bị giới hạn số lượng (tối đa 4 điểm)."
+          ]
+        },
+        {
+          "title": "Kỹ Thuật Khảo Sát Tiến Trình Với GDB-GEF: Memory Telescoping, Stack Unwinding và Heap Analysis",
+          "paragraphs": [
+            "GDB thuần túy (vanilla GDB) cung cấp giao diện dòng lệnh tương đối thô sơ, khiến việc theo dõi trạng thái CPU đòi hỏi người dùng phải gõ hàng chục lệnh liên tục. Tiện ích mở rộng GEF (GDB Enhanced Features) hoặc PEDA biến GDB thành một môi trường phân tích trực quan hiện đại, tự động hiển thị bảng điều khiển ngữ cảnh (Context Dashboard) sau mỗi bước dừng: Các thanh ghi CPU, dòng lệnh hợp ngữ kế tiếp (Disassembly), đỉnh ngăn xếp (Stack), và chuỗi liên kết con trỏ (Telescoping).",
+            "Tính năng Memory Telescoping trong GEF là một bước đột phá trong việc khảo sát bộ nhớ. Khi kiểm tra một thanh ghi hoặc một vùng nhớ, GEF không chỉ in giá trị thô (raw hex) mà tự động giải mã đệ quy con trỏ: Nếu giá trị là một địa chỉ bộ nhớ trỏ tới một địa chỉ khác, GEF sẽ lần theo chuỗi con trỏ đó qua 4-5 tầng liên kết cho đến khi gặp một giá trị dữ liệu cụ thể (như một chuỗi ASCII, một con trỏ hàm trong libc, hoặc một cấu trúc heap chunk). Điều này giúp nhà nghiên cứu lập tức nhận ra các cấu trúc phức tạp như mảng con trỏ hàm, bảng Vtable, hoặc danh sách liên kết kép mà không cần tra cứu thủ công từng bước.",
+            "Ngoài ra, GEF cung cấp các lệnh chuyên dụng để phân tích cấu trúc bộ nhớ sâu: Lệnh 'telescope $rsp 20' cho phép xem toàn bộ Stack Frame và phát hiện vị trí lưu giá trị Stack Canary (bảo vệ chống tràn bộ đệm); lệnh 'vmmap' hiển thị chi tiết quyền hạn thực thi (rwxp) của từng phân vùng bộ nhớ ảo, giúp xác định địa chỉ cơ sở của thư viện chia sẻ để tính toán độ lệch ASLR; và lệnh 'heap bins' / 'heap chunks' phân tích cấu trúc nội bộ của glibc ptmalloc (fastbins, tcache, unsorted bin), hỗ trợ đắc lực cho việc phát hiện các lỗ hổng quản lý bộ nhớ heap như Use-After-Free hay Double Free."
+          ],
+          "points": [
+            "GEF Context Dashboard: Tự động cập nhật trạng thái thanh ghi, cờ EFLAGS, mã hợp ngữ và stack sau mỗi bước thực thi.",
+            "Memory Telescoping: Giải mã đệ quy chuỗi con trỏ nhiều tầng, lập tức nhận diện kiểu dữ liệu và đích đến của con trỏ.",
+            "Phân tích Cấu Trúc Runtime: Tra cứu quyền hạn bộ nhớ ảo (vmmap), kiểm tra Stack Canary và kiểm toán cấu trúc glibc heap."
+          ]
+        },
+        {
+          "title": "Kiến Trúc Dynamic Binary Instrumentation (DBI): Frida Runtime, V8 Engine và Inline Trampoline Hooking",
+          "paragraphs": [
+            "Dynamic Binary Instrumentation (DBI) là công nghệ cho phép chèn mã tùy biến vào một tệp nhị phân đang thực thi mà không cần biên dịch lại hay sửa đổi tệp gốc trên đĩa. Trong khi các framework DBI truyền thống như Intel PIN hay Valgrind hoạt động theo cơ chế JIT Compiler (biên dịch lại toàn bộ basic block trước khi chạy, làm giảm hiệu năng đáng kể), Frida áp dụng một kiến trúc lai cực kỳ linh hoạt và nhẹ nhàng: Tiêm trực tiếp một máy ảo JavaScript (Google V8 hoặc QuickJS) vào không gian địa chỉ của tiến trình đích.",
+            "Cơ chế cốt lõi của Frida là Inline Hooking (thường được gọi là Trampoline Hooking). Khi nhà nghiên cứu gọi 'Interceptor.attach(targetAddress, ...)', Frida Agent thực hiện các thao tác nguyên tử sau: 1. Đọc và lưu lại vài chỉ lệnh hợp ngữ đầu tiên của hàm mục tiêu (thường từ 5 bytes trên x86 hoặc 14 bytes trên x64 để đủ chỗ cho một lệnh jmp tuyệt đối); 2. Cấp phát một vùng nhớ trung gian gọi là Trampoline; 3. Ghi đè phần đầu của hàm mục tiêu bằng một lệnh nhảy không điều kiện (jmp) trỏ tới Frida Dispatcher; 4. Sao chép các lệnh hợp ngữ ban đầu vào Trampoline và nối thêm một lệnh jmp quay trở lại phần thân tiếp theo của hàm gốc.",
+            "Khi luồng thực thi của chương trình chạm vào hàm mục tiêu, lệnh jmp lập tức chuyển hướng CPU vào Frida Dispatcher. Dispatcher thiết lập ngữ cảnh JavaScript, đóng gói các thanh ghi CPU thành đối tượng 'InvocationContext' (chứa 'this.context.rdi', 'this.context.rsi', v.v.) và gọi callback 'onEnter'. Nhà nghiên cứu có thể đọc, ghi bộ nhớ, in tham số hoặc thay đổi luồng logic. Sau khi onEnter hoàn tất, Dispatcher thực thi khối mã gốc trong Trampoline để hoàn thành nhiệm vụ của hàm ban đầu, sau đó kích hoạt callback 'onLeave' trước khi trả kết quả về cho hàm gọi. Toàn bộ quy trình diễn ra trơn tru mà ứng dụng đích không hề hay biết."
+          ],
+          "points": [
+            "Kiến trúc Frida DBI: Nhúng động cơ V8/QuickJS trực tiếp vào tiến trình đích, cho phép lập trình điều khiển nhị phân bằng JavaScript.",
+            "Inline Trampoline Hooking: Kỹ thuật ghi đè đầu hàm bằng lệnh jmp để chuyển hướng luồng điều khiển vào Dispatcher an toàn.",
+            "InvocationContext: Đối tượng cung cấp quyền truy cập hai chiều vào thanh ghi CPU, con trỏ ngăn xếp và trạng thái bộ nhớ tại thời điểm vào (onEnter) và ra (onLeave)."
+          ]
+        },
+        {
+          "title": "Tracing API Mạng/Mật Mã, Trích Xuất Payload Runtime và Kỹ Thuật Bypass Bằng Hooking",
+          "paragraphs": [
+            "Một ứng dụng thực tế phổ biến của Frida trong nghiên cứu bảo mật và dịch ngược là trích xuất dữ liệu nhạy cảm trước khi nó bị mã hóa hoặc sau khi nó vừa được giải mã. Nhiều ứng dụng hiện đại sử dụng các thư viện mật mã tiêu chuẩn như OpenSSL (libcrypto), WolfSSL, hoặc các hàm Windows CryptoAPI. Thay vì phải tốn hàng tuần để dịch ngược các thuật toán toán học phức tạp, chuyên gia chỉ cần hook vào các hàm API biên giới (Border APIs) như SSL_read, SSL_write, hoặc EVP_EncryptInit_ex.",
+            "Ví dụ, hàm 'SSL_write(SSL *ssl, const void *buf, int num)' nhận con trỏ bộ đệm dữ liệu 'buf' tại thanh ghi RSI (theo System V AMD64 ABI) và kích thước 'num' tại RDX. Bằng cách viết một script Frida Interceptor đơn giản gắn vào địa chỉ của SSL_write, ta có thể in toàn bộ nội dung gói tin HTTP/2 hoặc gRPC thuần túy (Plaintext) bằng lệnh 'console.log(hexdump(this.context.rsi, { length: this.context.rdx.toInt32() }))' ngay trước khi dữ liệu được đóng gói TLS và gửi qua card mạng.",
+            "Bên cạnh việc theo dõi dữ liệu (Observability), Frida còn là công cụ tối thượng để thực hiện can thiệp và sửa đổi logic runtime (Runtime Mutation). Giả sử một hàm kiểm tra giấy phép 'int CheckLicenseValidity(const char* key)' trả về giá trị 0 nếu khóa không hợp lệ và 1 nếu hợp lệ. Bằng cách can thiệp vào callback 'onLeave(retval)', chuyên gia có thể thực thi lệnh 'retval.replace(1);'. Lúc này, bất kể người dùng nhập khóa gì, hàm luôn trả về giá trị thành công, cho phép vượt qua cơ chế kiểm tra bản quyền mà không cần phải thực hiện bất kỳ thao tác patch nhị phân vĩnh viễn nào trên tệp thực thi."
+          ],
+          "points": [
+            "Hooking Border APIs: Đánh chặn tại các giao diện API tiêu chuẩn (OpenSSL, Libcrypto) để đọc dữ liệu bản rõ trước mã hóa.",
+            "Trích xuất Khóa Runtime: Lấy trực tiếp Symmetric Key và IV trong bộ nhớ heap ngay khi hàm khởi tạo mã hóa được gọi.",
+            "Runtime Logic Mutation: Thay thế giá trị trả về (retval.replace) hoặc thay đổi cờ trạng thái để vô hiệu hóa các rào cản bảo vệ tức thì."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Dynamic Debugging & Frida Runtime Instrumentation Lab",
+        "objective": "Áp dụng phối hợp GDB-GEF và Frida để cô lập điểm lỗi bộ nhớ, thiết lập Hardware Watchpoint bắt race condition, và trích xuất khóa mật mã AES-GCM thời gian thực.",
+        "scenario": "Bạn đang phân tích một dịch vụ giao tiếp nội bộ chạy ngầm (Linux ELF x86-64 Daemon). Dịch vụ này nhận lệnh điều khiển từ xa qua socket mã hóa, giải mã gói tin bằng OpenSSL EVP API và xử lý quyền hạn. Tiến trình có cơ chế bảo vệ crash khi bị ghi đè bộ nhớ bất thường và bạn cần trích xuất khóa AES-GCM 256-bit mà nó sử dụng.",
+        "constraints": [
+          "Môi trường thực hành là sandbox Linux cô lập hoàn toàn; không kết nối ra Internet công cộng.",
+          "Không được phép sửa đổi tệp nhị phân trên đĩa (Zero Disk Patching) để đảm bảo tính nguyên vẹn của bằng chứng pháp y.",
+          "Frida hook script phải xử lý an toàn kiểu dữ liệu và giới hạn tần số ghi log để không làm sập tiến trình dịch vụ đang chạy."
+        ],
+        "cases": [
+          {
+            "id": "gdb-frida-case-01",
+            "title": "Bắt Biến Đổi Vùng Nhớ Bất Thường Bằng Hardware Watchpoint Trong GDB-GEF",
+            "context": "Một daemon bảo mật lưu trữ cờ xác thực 'is_admin' tại địa chỉ biến toàn cục 0x604080 trong phân vùng .data (mặc định giá trị là 0). Trong quá trình xử lý các gói tin mạng song song đa luồng, đôi khi biến này bị ghi đè thành 1 do lỗi bộ nhớ (race condition/heap overflow), nhưng lập trình viên đã đặt một hàm quét liên tục kiểm tra tính toàn vẹn của mã trong phân vùng .text. Nếu đặt Software Breakpoint (0xCC) để bắt hàm ghi, cơ chế kiểm tra mã sẽ phát hiện byte 0xCC bị lệch checksum và lập tức gọi exit(1).",
+            "prompt": "Phương pháp thiết lập điểm dừng nào trong GDB-GEF sẽ bắt chính xác chỉ lệnh ghi đè ô nhớ 0x604080 mà hoàn toàn không kích hoạt cơ chế phát hiện sửa đổi mã?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đặt Software Breakpoint tại hàm 'malloc' và 'free' bằng lệnh 'break malloc'.",
+                "correct": false,
+                "rationale": "0x604080 là biến toàn cục nằm trong phân vùng .data, hoàn toàn không liên quan trực tiếp đến các lượt gọi cấp phát heap của malloc/free."
+              },
+              {
+                "id": "B",
+                "label": "Sử dụng lệnh 'watch *(int*)0x604080' trong GDB để thiết lập Hardware Watchpoint thông qua thanh ghi CPU DR0-DR3.",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối. Hardware Watchpoint ghi địa chỉ 0x604080 vào thanh ghi gỡ lỗi phần cứng DR0-DR3 và cấu hình DR7 bắt sự kiện ghi dữ liệu (write). Thao tác này không sửa đổi bất kỳ byte nào trong phân vùng .text, do đó hoàn toàn vô hiệu hóa cơ chế kiểm tra checksum bộ nhớ và sẽ dừng CPU chính xác ngay sau lệnh ghi đè."
+              },
+              {
+                "id": "C",
+                "label": "Sử dụng lệnh 'catch syscall write' để chặn toàn bộ các cuộc gọi hệ thống ghi dữ liệu ra socket.",
+                "correct": false,
+                "rationale": "Syscall write dùng để xuất dữ liệu ra file descriptor, không thể bắt được hành vi ghi đè biến nội bộ trong không gian bộ nhớ ảo của tiến trình."
+              },
+              {
+                "id": "D",
+                "label": "Đặt quyền truy cập trang nhớ chứa 0x604080 thành thực thi duy nhất (chmod +x) bằng lệnh OS.",
+                "correct": false,
+                "rationale": "Phân vùng .data cần quyền đọc/ghi (rw-); nếu bỏ quyền ghi, chương trình sẽ crash ngay lập tức với lỗi Segmentation Fault khi cố gắng cập nhật dữ liệu bình thường."
+              }
+            ]
+          },
+          {
+            "id": "gdb-frida-case-02",
+            "title": "Trích Xuất Khóa và IV AES-256-GCM Runtime Bằng Frida Interceptor",
+            "context": "Dịch vụ mạng sử dụng thư viện OpenSSL để giải mã các gói tin điều khiển từ xa. Qua phân tích tĩnh, bạn xác định chương trình gọi hàm tiêu chuẩn 'EVP_DecryptInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, ENGINE *impl, const unsigned char *key, const unsigned char *iv)'. Theo System V AMD64 ABI, tham số con trỏ khóa 'key' được truyền qua thanh ghi RCX (tham số thứ 4) và 'iv' được truyền qua thanh ghi R8 (tham số thứ 5). Khóa này được giải mã động trong bộ nhớ trước khi gọi hàm và bị xóa ngay sau đó bằng OPENSSL_cleanse.",
+            "prompt": "Đoạn mã JavaScript Frida Interceptor nào sau đây sẽ trích xuất và hiển thị chính xác toàn bộ 32 bytes của Key và 12 bytes của IV dưới dạng Hexdump khi hàm được gọi?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Interceptor.attach(Module.getExportByName('libcrypto.so', 'EVP_DecryptInit_ex'), { onEnter: function(args) { console.log('Key: ' + hexdump(args[3], { length: 32 })); console.log('IV: ' + hexdump(args[4], { length: 12 })); } });",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối. Trong Frida Interceptor, mảng 'args' ánh xạ chuẩn xác các tham số của hàm (args[0] = ctx, args[1] = type, args[2] = impl, args[3] = key, args[4] = iv). Việc sử dụng hexdump trên args[3] (32 bytes cho AES-256) và args[4] (12 bytes cho GCM IV) tại thời điểm onEnter sẽ bắt trọn dữ liệu trước khi hàm thực thi và giải phóng bộ nhớ."
+              },
+              {
+                "id": "B",
+                "label": "Interceptor.attach(Module.getExportByName('libcrypto.so', 'EVP_DecryptInit_ex'), { onLeave: function(retval) { console.log('Result: ' + retval.readCString()); } });",
+                "correct": false,
+                "rationale": "Tại thời điểm onLeave, giá trị trả về retval chỉ là mã trạng thái nguyên (1 cho thành công, 0 cho lỗi), và bộ nhớ chứa khóa có thể đã bị hàm xóa sạch."
+              },
+              {
+                "id": "C",
+                "label": "Memory.scanSync(Process.enumerateModules()[0].base, 1024, 'AES', { onMatch: function(addr) { console.log(addr); } });",
+                "correct": false,
+                "rationale": "Memory.scanSync quét chuỗi ASCII tĩnh, không thể bắt được khóa bí mật ngẫu nhiên được sinh ra động trong runtime."
+              },
+              {
+                "id": "D",
+                "label": "Interceptor.replace(Module.getExportByName('libcrypto.so', 'EVP_DecryptInit_ex'), new NativeCallback(function() { return 1; }, 'int', []));",
+                "correct": false,
+                "rationale": "Thao tác này thay thế hoàn toàn hàm giải mã bằng một hàm rỗng trả về 1, khiến dữ liệu gói tin không bao giờ được giải mã thực tế."
+              }
+            ]
+          },
+          {
+            "id": "gdb-frida-case-03",
+            "title": "Tối Ưu Hiệu Năng và Chống Crash Khi Hook Hàm Tần Số Cao Bằng Frida CModule",
+            "context": "Bạn cần theo dõi một hàm xử lý toán học nội bộ 'ProcessPacketChecksum(void* buffer, int len)' được gọi liên tục hơn 500.000 lần mỗi giây trong một vòng lặp xử lý stream dữ liệu cao tốc. Khi sử dụng script JavaScript thông thường với 'Interceptor.attach' và ghi log qua 'console.log', tiến trình bị nghẽn nghiêm trọng (overhead độ trễ tăng vọt từ micro-giây lên milli-giây), hàng đợi IPC giữa Frida Agent và máy chủ Node.js bị tràn bộ đệm (Out of Memory), dẫn đến crash ứng dụng.",
+            "prompt": "Giải pháp kỹ thuật chuẩn xác nhất của Frida để giải quyết triệt để vấn đề thắt cổ chai hiệu năng này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Sử dụng 'Thread.sleep(1)' bên trong hàm onEnter để giảm tần số thực thi của luồng CPU.",
+                "correct": false,
+                "rationale": "Bắt luồng xử lý ngủ sẽ làm đình trệ toàn bộ đường truyền dữ liệu mạng, gây timeout kết nối và làm hỏng logic hoạt động của daemon."
+              },
+              {
+                "id": "B",
+                "label": "Biên dịch logic đánh chặn trực tiếp thành mã máy C nguyên bản bằng cách sử dụng 'CModule' trong Frida để thực hiện kiểm tra và đếm gói tin nội bộ trong bộ nhớ mà không cần chuyển ngữ cảnh về JavaScript runtime.",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối. Frida CModule cho phép biên dịch mã nguồn C bằng trình biên dịch TCC (Tiny C Compiler) tích hợp sẵn trực tiếp trong không gian tiến trình mục tiêu. Hook handler chạy bằng mã máy nguyên bản với độ trễ cực thấp (near-zero overhead), loại bỏ hoàn toàn chi phí chuyển đổi ngữ cảnh (Context Switching) giữa V8 Engine và native code."
+              },
+              {
+                "id": "C",
+                "label": "Chuyển từ Frida sang sử dụng lệnh GDB 'continue' lặp lại trong vòng lặp bash script vô tận.",
+                "correct": false,
+                "rationale": "GDB thông qua syscall ptrace có độ trễ còn lớn hơn hàng trăm lần so với Frida JS, hoàn toàn bất khả thi cho hàm chạy 500.000 lần/giây."
+              },
+              {
+                "id": "D",
+                "label": "Xóa bỏ toàn bộ bộ nhớ swap của hệ điều hành Linux để ép CPU chạy nhanh hơn.",
+                "correct": false,
+                "rationale": "Xóa swap không giải quyết được vấn đề overhead chuyển đổi ngữ cảnh của động cơ JavaScript và có nguy cơ khiến hệ điều hành OOM-killer tắt tiến trình."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Thiết lập thành công Hardware Watchpoint trong GDB-GEF để bắt chính xác chỉ lệnh ghi đè dữ liệu mà không làm thay đổi phân vùng mã.",
+          "Xây dựng script Frida Interceptor trích xuất toàn vẹn khóa đối xứng và vector khởi tạo IV từ các tham số hàm tại thời điểm runtime.",
+          "Áp dụng giải pháp CModule hoặc lọc có điều kiện để duy trì độ ổn định của tiến trình khi hook vào các hàm có tần suất thực thi cực cao."
+        ],
+        "evidenceTemplate": [
+          "Log phiên gỡ lỗi GDB-GEF hiển thị trạng thái thanh ghi DR0-DR7 và câu lệnh kích hoạt Watchpoint",
+          "Mã nguồn Frida JavaScript script (.js) hoàn chỉnh xử lý Interceptor.attach",
+          "Kết quả Hexdump trích xuất Khóa và IV đối xứng được ghi nhận trong console",
+          "Bảng đo lường độ trễ (Latency/Overhead Metrics) trước và sau khi tối ưu hóa hook"
+        ],
+        "reset": "Khởi động lại tiến trình daemon và ngắt toàn bộ các phiên đính kèm của GDB và Frida.",
+        "cleanup": "Xóa bỏ các file socket tạm, tệp kịch bản hook và giải phóng các vùng nhớ đã cấp phát trong môi trường lab."
+      },
+      "governance": {
+        "prevent": [
+          "Vô hiệu hóa quyền ptrace đối với người dùng thông thường bằng cách thiết lập 'sysctl -w kernel.yama.ptrace_scope=2' hoặc 3 trên môi trường production.",
+          "Áp dụng cơ chế biên dịch bảo vệ (Compiler Hardening: -fstack-protector-strong, -D_FORTIFY_SOURCE=2, Full RELRO) để hạn chế khả năng can thiệp bộ nhớ.",
+          "Xóa bỏ hoàn toàn các khóa mật mã nhạy cảm khỏi bộ nhớ RAM ngay sau khi sử dụng bằng các hàm xóa an toàn như OPENSSL_cleanse hoặc SecureZeroMemory."
+        ],
+        "observe": [
+          "Giám sát các sự kiện syscall ptrace và các lệnh gọi đính kèm tiến trình thông qua Auditd hoặc eBPF giám sát bảo mật.",
+          "Phát hiện các thư viện lạ hoặc động cơ V8/Frida-agent được nạp vào không gian bộ nhớ của các tiến trình trọng yếu qua /proc/[pid]/maps.",
+          "Theo dõi biến động độ trễ bất thường tại các hàm API mật mã để phát hiện sự hiện diện của các đoạn mã hook can thiệp trái phép."
+        ],
+        "respond": [
+          "Chấm dứt ngay lập tức các tiến trình có dấu hiệu bị đính kèm bởi debugger lạ hoặc phát hiện thư viện hooking trong không gian nhớ.",
+          "Thu hồi và xoay vòng (Rotate) toàn bộ khóa mật mã phiên làm việc nếu nghi ngờ bộ nhớ tiến trình đã bị trích xuất runtime.",
+          "Kích hoạt quy trình cách ly máy chủ bị xâm nhập để thu thập bộ nhớ (RAM Dump) phục vụ điều tra nguyên nhân gốc rễ."
+        ],
+        "residualRisk": [
+          "Các chuyên gia phân tích tấn công có quyền root vẫn có thể vô hiệu hóa Yama ptrace_scope hoặc sử dụng kernel driver để vượt qua rào cản kiểm soát.",
+          "Kỹ thuật hook cấp thấp (eBPF hoặc hypervisor-level debugging) có thể quan sát tiến trình mà hoàn toàn không để lại dấu vết trong user-space."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Điểm dừng phần mềm (Software Breakpoint) và điểm dừng phần cứng (Hardware Breakpoint) hoạt động hoàn toàn giống nhau về mặt kỹ thuật.",
+          "correction": "Software Breakpoint ghi đè mã nhị phân bằng byte 0xCC (ngắt INT 3), làm thay đổi nội dung bộ nhớ và có thể bị phát hiện bởi các cơ chế kiểm tra toàn vẹn hash. Hardware Breakpoint sử dụng thanh ghi CPU chuyên dụng (DR0-DR7) để bắt sự kiện mà không hề làm biến đổi dù chỉ một byte trong tệp thực thi."
+        },
+        {
+          "claim": "Frida chỉ có thể sử dụng để phân tích ứng dụng di động Android/iOS chứ không dùng được cho các tiến trình Linux/Windows x64.",
+          "correction": "Frida là một nền tảng DBI đa nền tảng hoàn chỉnh, hỗ trợ toàn diện Windows, Linux, macOS, Android, iOS và QNX trên mọi kiến trúc CPU (x86, x64, ARM, ARM64, MIPS), là công cụ tiêu chuẩn công nghiệp cho dịch ngược nhị phân máy tính."
+        },
+        {
+          "claim": "Khi một ứng dụng sử dụng giao thức HTTPS/TLS, không thể nào đọc được dữ liệu truyền tải của nó trên máy trạm cục bộ.",
+          "correction": "Mã hóa TLS chỉ bảo vệ dữ liệu trên đường truyền mạng giữa hai đầu mút. Trên máy trạm cục bộ, thông qua việc hook vào các hàm API của thư viện SSL (như SSL_write / SSL_read), chuyên gia có thể trích xuất 100% dữ liệu bản rõ trước khi nó được mã hóa."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os14-l134-q1",
+          "difficulty": "easy",
+          "question": "Opcode byte nào sau đây được GDB ghi đè vào địa chỉ bộ nhớ của tiến trình mục tiêu khi thiết lập một Software Breakpoint trên kiến trúc x86/x64?",
+          "options": [
+            {
+              "id": "A",
+              "label": "0x90 (NOP)"
+            },
+            {
+              "id": "B",
+              "label": "0xCC (INT 3)"
+            },
+            {
+              "id": "C",
+              "label": "0xC3 (RET)"
+            },
+            {
+              "id": "D",
+              "label": "0xCD 0x80 (INT 0x80)"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Byte 0xCC đại diện cho lệnh ngắt một byte INT 3 trên kiến trúc x86/x64, được trình gỡ lỗi ghi đè vào vị trí đặt điểm dừng phần mềm để kích hoạt tín hiệu SIGTRAP khi CPU thực thi đến."
+        },
+        {
+          "id": "os14-l134-q2",
+          "difficulty": "medium",
+          "question": "Số lượng điểm dừng phần cứng (Hardware Breakpoints / Watchpoints) tối đa có thể thiết lập đồng thời trên một lõi CPU kiến trúc x86/x64 là bao nhiêu và do yếu tố nào quyết định?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Không giới hạn; do dung lượng bộ nhớ RAM quyết định."
+            },
+            {
+              "id": "B",
+              "label": "Tối đa 4 điểm; do số lượng thanh ghi gỡ lỗi phần cứng từ DR0 đến DR3 của CPU quy định."
+            },
+            {
+              "id": "C",
+              "label": "Tối đa 16 điểm; do kích thước của Stack Frame."
+            },
+            {
+              "id": "D",
+              "label": "Tối đa 1 điểm duy nhất; do thanh ghi cờ EFLAGS điều khiển."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Kiến trúc x86/x64 chỉ trang bị 4 thanh ghi địa chỉ gỡ lỗi chuyên dụng là DR0, DR1, DR2, và DR3, do đó số lượng Hardware Breakpoint hoặc Watchpoint hoạt động đồng thời bị giới hạn vật lý ở con số 4."
+        },
+        {
+          "id": "os14-l134-q3",
+          "difficulty": "hard",
+          "question": "Trong Frida Dynamic Binary Instrumentation, cơ chế Trampoline Inline Hooking cho phép Interceptor can thiệp vào hàm mục tiêu bằng cách nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Sửa đổi trực tiếp mã nguồn trên đĩa cứng và khởi động lại dịch vụ hệ thống."
+            },
+            {
+              "id": "B",
+              "label": "Ghi đè vài byte đầu tiên của hàm mục tiêu bằng một lệnh nhảy không điều kiện (jmp) dẫn tới vùng nhớ điều phối (Dispatcher) của Frida, đồng thời lưu các lệnh gốc trong một vùng nhớ đệm Trampoline để thực thi sau đó."
+            },
+            {
+              "id": "C",
+              "label": "Chặn toàn bộ các ngắt phần cứng của card mạng trước khi CPU nhận dữ liệu."
+            },
+            {
+              "id": "D",
+              "label": "Tạm dừng toàn bộ hệ điều hành thông qua Hypervisor và dịch ngược mã bằng Ghidra trên đám mây."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Inline Trampoline Hooking hoạt động bằng cách thay thế các lệnh mở đầu của hàm đích bằng lệnh nhảy (jmp) tới Frida Dispatcher, lưu lại các lệnh bị ghi đè trong vùng đệm Trampoline để tiếp tục thực thi logic gốc sau khi các callback onEnter/onLeave hoàn tất."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một ứng dụng microservice viết bằng Go kết hợp thư viện C++ (CGO) xử lý dữ liệu giao dịch tài chính. Nhị phân này giao tiếp qua kênh gRPC có mã hóa mTLS và kiểm tra chứng chỉ nghiêm ngặt. Phân tích tĩnh cho thấy các chứng chỉ và khóa riêng tư được nạp trực tiếp từ một phân vùng bộ nhớ được bảo vệ. Bạn được giao nhiệm vụ viết một Frida Script toàn diện để trích xuất payload JSON của các giao dịch trước khi nó được đóng gói vào protobuf và gửi qua mạng.",
+        "tasks": [
+          "Xác định địa chỉ hàm hoặc tên biểu tượng xuất khẩu (Exported Symbol) chịu trách nhiệm nhận chuỗi JSON trước khi mã hóa (thông qua phân tích tĩnh kết hợp Frida Module.enumerateExports).",
+          "Viết script Frida JavaScript sử dụng Interceptor API để đọc con trỏ tham số, tự động chuyển đổi chuỗi bộ nhớ UTF-8 sang văn bản và ghi nhật ký vào file định dạng JSONL.",
+          "Thực hiện kỹ thuật thay thế tham số (Parameter Tampering) trong runtime để thử nghiệm phản ứng của hệ thống khi trường số tiền 'amount' bị can thiệp thành giá trị âm."
+        ],
+        "requiredEvidence": [
+          "Mã nguồn hoàn chỉnh của Frida Hooking Script (.js) kèm cơ chế lọc và bắt ngoại lệ an toàn.",
+          "Bản ghi dữ liệu (Data Log) trích xuất được từ các giao dịch trực tiếp chứng minh payload JSON rõ ràng trước mã hóa.",
+          "Ảnh chụp màn hình phiên thực thi Frida đính kèm vào tiến trình đang chạy và phản hồi của hệ thống khi tham số bị sửa đổi."
+        ]
+      },
+      "sources": [
+        {
+          "title": "GDB Internals and Architecture Manual",
+          "url": "https://sourceware.org/gdb/current/onlinedocs/gdbint/",
+          "publisher": "Free Software Foundation (FSU)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Đặc tả kỹ thuật của ptrace interface và xử lý tín hiệu SIGTRAP",
+            "Cơ chế quản lý Software Breakpoint và khôi phục byte lệnh nguyên thủy",
+            "Kiến trúc thanh ghi gỡ lỗi phần cứng x86 Debug Registers DR0-DR7"
+          ]
+        },
+        {
+          "title": "Frida Dynamic Binary Instrumentation Documentation & JavaScript API",
+          "url": "https://frida.re/docs/home/",
+          "publisher": "Frida Project Contributors",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Nguyên lý tiêm động cơ V8 và kỹ thuật Inline Trampoline Hooking",
+            "Đặc tả Interceptor API (onEnter, onLeave, InvocationContext)",
+            "Tối ưu hóa hiệu năng hook thời gian thực bằng CModule"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os14-l135-anti-debugging-obfuscation-and-binary-unpacking",
+      "slug": "anti-debugging-obfuscation-and-binary-unpacking",
+      "title": "Nhận Diện Kỹ Thuật Chống Gỡ Lỗi (Anti-Debugging), Làm Rối Mã & Unpacking Nhị Phân",
+      "summary": "Phân tích toàn diện các kỹ thuật bảo vệ nhị phân chuyên sâu: phát hiện trình gỡ lỗi (PEB BeingDebugged, CheckRemoteDebuggerPresent, ptrace PTRACE_TRACEME, exception-based SEH/VEH), kiểm tra sai lệch thời gian (RDTSC, NtQueryPerformanceCounter), làm rối luồng điều khiển (Control Flow Flattening, Opaque Predicates), và kỹ thuật giải mã bóc vỏ nhị phân (Unpacking / Rebuilding IAT via Scylla).",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [
+        "os14-l133-disassembly-and-decompilation-with-ghidra-and-ida",
+        "os14-l134-dynamic-analysis-and-tracing-with-gdb-and-frida"
+      ],
+      "outcomes": [
+        "Nhận diện và hóa giải các cơ chế phát hiện trình gỡ lỗi cấp cấu trúc hệ điều hành: Cờ PEB.BeingDebugged, NtGlobalFlag, NtQueryInformationProcess (ProcessDebugPort) trên Windows và ptrace(PTRACE_TRACEME) trên Linux.",
+        "Phân tích cơ chế bẫy ngoại lệ (SEH/VEH Traps, INT 3, INT 2D) và kỹ thuật phát hiện gỡ lỗi dựa trên độ trễ thời gian chu kỳ CPU (RDTSC/RDTSCP Timing Checks).",
+        "Làm chủ phương pháp tháo gỡ mã làm rối: Nhận diện kiến trúc Control Flow Flattening (CFF), loại bỏ biểu thức điều kiện mờ (Opaque Predicates) và khôi phục đồ thị CFG sạch.",
+        "Thực hiện quy trình bóc vỏ nhị phân (Binary Unpacking): Định vị Tail Jump, bắt điểm vào gốc Original Entry Point (OEP), dump bộ nhớ tiến trình và tái thiết lập bảng nhập khẩu Import Address Table (IAT)."
+      ],
+      "careerPaths": [
+        "reverse-engineering",
+        "malware-analysis",
+        "vulnerability-research",
+        "exploit-development"
+      ],
+      "domains": ["reverse-engineering", "anti-debugging", "obfuscation", "unpacking"],
+      "attackTactics": ["defense-evasion", "execution"],
+      "keywords": [
+        "anti-debugging",
+        "peb-beingdebugged",
+        "ptrace-traceme",
+        "rdtsc-timing-check",
+        "control-flow-flattening",
+        "opaque-predicates",
+        "binary-unpacking",
+        "iat-reconstruction"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Cuộc đối đầu giữa tác giả cơ chế bảo vệ nhị phân (Packer/Protector/Malware Author) và chuyên gia dịch ngược là trò chơi mèo vờn chuột ở ranh giới giữa User-mode và Kernel-mode. Anti-debugging khai thác sự bất đối xứng về thông tin: sự hiện diện của trình gỡ lỗi luôn để lại dấu vết rõ rệt trong các cấu trúc nội bộ OS (cờ BeingDebugged trong PEB, ProcessDebugPort, heap flags), trong hành vi ngắt tín hiệu, và đặc biệt là sự sai lệch thời gian thực thi (lệnh RDTSC đo độ trễ tăng vọt từ vài nano-giây lên hàng nghìn chu kỳ khi có con người thao tác). Song song đó, kỹ thuật Obfuscation (như Control Flow Flattening) biến đồ thị hàm thành một máy trạng thái khổng lồ nhằm làm tê liệt decompiler, trong khi Packers mã hóa toàn bộ payload trên đĩa và chỉ giải nén vào RAM trước khi chuyển quyền điều khiển qua một lệnh Tail Jump tới Original Entry Point (OEP).",
+      "visual": {
+        "title": "Pipeline Vượt Rào Bảo Vệ: Anti-Debug Bypass, Deobfuscation & Unpacking",
+        "caption": "Quy trình 4 giai đoạn từ vô hiệu hóa các bẫy phát hiện gỡ lỗi, chuẩn hóa sai lệch thời gian, tháo gỡ máy trạng thái CFF đến bắt OEP và tái thiết bảng IAT.",
+        "steps": [
+          {
+            "label": "Vô Hiệu Hóa Bẫy Cấu Trúc & API (PEB & Debug Port Neutralization)",
+            "detail": "Patch cờ BeingDebugged trong Process Environment Block về 0 và hook NtQueryInformationProcess để che giấu cổng gỡ lỗi.",
+            "tone": "caution"
+          },
+          {
+            "label": "Chuẩn Hóa Sai Lệch Thời Gian (RDTSC & Timing Emulation)",
+            "detail": "Đánh chặn lệnh đo chu kỳ CPU RDTSC để trả về khoảng thời gian giả định cố định, ngăn chặn phát hiện gỡ lỗi từng bước.",
+            "tone": "allow"
+          },
+          {
+            "label": "Tháo Gỡ Luồng Điều Khiển Bị Làm Rối (CFF Deobfuscation & Symbolic Execution)",
+            "detail": "Phân tích biến trạng thái của vòng lặp máy trạng thái, cắt bỏ dispatcher trung gian và nối trực tiếp các khối cơ bản hợp lệ.",
+            "tone": "allow"
+          },
+          {
+            "label": "Bắt Tail Jump & Tái Thiết Bảng IAT (OEP Snapping & IAT Rebuilding)",
+            "detail": "Đặt điểm dừng phần cứng tại vùng nhớ payload, phát hiện lệnh jmp/call tới OEP, dump bộ nhớ và dùng Scylla sửa lại bảng IAT.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Dấu Vết Gỡ Lỗi Cấu Trúc: PEB Flags, ProcessDebugPort, ptrace PTRACE_TRACEME và ThreadHideFromDebugger",
+          "paragraphs": [
+            "Mỗi hệ điều hành đều phải duy trì các cấu trúc dữ liệu nội bộ để theo dõi trạng thái tiến trình. Trên Windows, cấu trúc PEB (Process Environment Block) nằm trong không gian người dùng và có thể truy cập trực tiếp thông qua thanh ghi phân đoạn FS:[0x30] (trên x86-32) hoặc GS:[0x60] (trên x86-64) mà không cần gọi syscall. Byte tại offset 0x02 của PEB là cờ 'BeingDebugged' – được kernel tự động bật lên 1 nếu tiến trình đang bị gỡ lỗi. Hàm Win32 API 'IsDebuggerPresent()' thực chất chỉ là một lệnh đọc byte này. Ngoài ra, trường 'NtGlobalFlag' tại offset 0x68 (x86) hoặc 0xBC (x64) sẽ được gắn cờ 0x70 (kết hợp của FLG_HEAP_ENABLE_TAIL_CHECK, FLG_HEAP_ENABLE_FREE_CHECK, và FLG_HEAP_VALIDATE_PARAMETERS) nếu tiến trình được khởi chạy bởi một debugger.",
+            "Để ngăn chặn việc người dùng bypass bằng cách patch PEB trong user-mode, các nhà phát triển bảo vệ nhị phân gọi các API cấp thấp của kernel như 'NtQueryInformationProcess'. Bằng cách truy vấn lớp thông tin 'ProcessDebugPort' (Class 7), hàm sẽ trả về giá trị 0xFFFFFFFF (-1) nếu tiến trình có debugger đính kèm. Một kỹ thuật khác là gọi 'NtSetInformationThread' với tham số 'ThreadHideFromDebugger' (0x11): Khi luồng này gặp điểm dừng hoặc sự kiện ngắt, kernel sẽ không chuyển tiếp sự kiện cho debugger mà âm thầm kết thúc tiến trình ngay lập tức.",
+            "Trên hệ điều hành Linux, cơ chế phòng vệ đơn giản và phổ biến nhất là tự gọi 'ptrace(PTRACE_TRACEME, 0, 1, 0)'. Kiến trúc Linux kernel quy định tại một thời điểm, một tiến trình chỉ có thể được đính kèm bởi duy nhất MỘT tiến trình tracer. Nếu một chương trình tự gọi PTRACE_TRACEME thành công, điều đó có nghĩa là hiện tại chưa có debugger nào đính kèm. Nếu lệnh gọi thất bại và trả về -1 (với biến errno là EPERM), chương trình biết chắc chắn nó đang chạy dưới sự kiểm soát của GDB hoặc một công cụ phân tích động, từ đó kích hoạt hành vi tự hủy hoặc chuyển hướng luồng sang mã giả vô hại."
+          ],
+          "points": [
+            "PEB.BeingDebugged & NtGlobalFlag: Các cờ trạng thái user-mode kinh điển trên Windows, dễ dàng bị truy cập qua FS/GS segment registers.",
+            "NtQueryInformationProcess (ProcessDebugPort): Cơ chế kiểm tra kernel-mode đáng tin cậy hơn, trả về cổng debug thực tế.",
+            "ptrace(PTRACE_TRACEME): Kỹ thuật chống gỡ lỗi chuẩn mực trên Linux dựa trên nguyên tắc độc quyền một tracer duy nhất của hệ điều hành."
+          ]
+        },
+        {
+          "title": "Bẫy Ngoại Lệ (SEH/VEH) và Kỹ Thuật Đo Sai Lệch Thời Gian Chu Kỳ Lệnh (RDTSC/RDTSCP Timing Checks)",
+          "paragraphs": [
+            "Hệ thống xử lý ngoại lệ có cấu trúc (Structured Exception Handling - SEH) và Vectored Exception Handling (VEH) trên Windows thường bị biến tướng thành các bẫy chống gỡ lỗi tinh vi. Chương trình cố tình chèn các lệnh gây lỗi như chia cho 0 (Division by Zero), truy cập trang nhớ không hợp lệ (Access Violation), hoặc tự thực thi lệnh INT 3 (0xCC) hay INT 2D. Trong điều kiện hoạt động bình thường không có debugger, Exception Handler đã đăng ký sẽ bắt lấy sự kiện này và điều hướng chương trình tiếp tục chạy trơn tru.",
+            "Tuy nhiên, khi có trình gỡ lỗi đính kèm, debugger thường tự động can thiệp và dừng lại ở 'First-Chance Exception' để thông báo cho người dùng. Nếu chuyên gia dịch ngược không hiểu ý đồ và vô tình bấm bỏ qua hoặc xử lý sai tín hiệu ngắt, luồng điều khiển sẽ không bao giờ được chuyển về Exception Handler của chương trình, dẫn đến việc ứng dụng bị treo hoặc thoát đột ngột. Đặc biệt, lệnh INT 2D trên x86 được Windows coi là một lệnh ngắt dịch vụ gỡ lỗi đặc biệt: Sau khi kích hoạt, kernel sẽ bỏ qua 1 byte tiếp theo ngay sau INT 2D. Tác giả mã độc thường đặt một byte rác ngay sau INT 2D; nếu debugger không bỏ qua byte rác này, tiến trình sẽ giải mã sai lệnh và sập đổ.",
+            "Một khía cạnh khác cực kỳ khó chống đỡ là Kỹ thuật Kiểm tra Độ lệch Thời gian (Timing Checks). Lệnh CPU 'RDTSC' (Read Time-Stamp Counter) đọc số lượng chu kỳ xung nhịp CPU kể từ thời điểm hệ thống khởi động và lưu kết quả vào cặp thanh ghi EDX:EAX. Một đoạn mã thông thường chỉ mất vài nano-giây (khoảng 50-200 chu kỳ CPU) để thực thi. Nhưng nếu đoạn mã đó nằm dưới quyền kiểm soát của một người đang gỡ lỗi từng bước (Single-stepping), khoảng thời gian giữa hai lần gọi RDTSC sẽ kéo dài hàng triệu chu kỳ xung nhịp. Bằng cách tính hiệu số delta: (RDTSC_sau - RDTSC_truoc), nếu giá trị vượt quá một ngưỡng nhất định (ví dụ 0xFFFFF chu kỳ), chương trình sẽ xác định ngay lập tức rằng nó đang bị theo dõi và kích hoạt cơ chế phòng thủ."
+          ],
+          "points": [
+            "SEH/VEH Exception Traps: Cố tình tạo ngoại lệ phần cứng để phân biệt giữa hành vi của OS Exception Handler và Debugger First-chance handler.",
+            "Bẫy ngắt INT 2D: Khai thác cơ chế bỏ qua byte lệnh của kernel Windows để làm lệch con trỏ lệnh của trình gỡ lỗi.",
+            "RDTSC Timing Checks: Đo lường chênh lệch chu kỳ xung nhịp CPU, biến độ trễ tương tác của con người thành dấu hiệu nhận diện gỡ lỗi hoàn hảo."
+          ]
+        },
+        {
+          "title": "Phá Bỏ Kỹ Thuật Làm Rối Mã Nguồn: Control Flow Flattening, Opaque Predicates và Dead Code Insertion",
+          "paragraphs": [
+            "Làm rối mã nguồn (Code Obfuscation) là kỹ thuật biến đổi cấu trúc mã hợp ngữ để làm cho nó trở nên cực kỳ khó hiểu đối với con người và làm tê liệt các thuật toán tối ưu hóa của Decompiler, trong khi vẫn bảo toàn 100% ngữ nghĩa chức năng gốc. Một trong những kỹ thuật làm rối mạnh mẽ nhất là Làm phẳng Luồng Điều khiển (Control Flow Flattening - CFF), được phổ biến bởi các bộ công cụ bảo vệ như OLLVM (Obfuscator-LLVM) hay Tigress.",
+            "Trong cấu trúc CFF, toàn bộ các cấu trúc rẽ nhánh tự nhiên (if-else, while, for) của một hàm đều bị phá hủy hoàn toàn. Đồ thị CFG nguyên thủy bị 'san phẳng' thành một cấu trúc đồng nhất gồm: Một biến trạng thái (State Variable), một vòng lặp vô hạn (Dispatcher Loop), và một khối switch-case khổng lồ. Mỗi khối cơ bản (Basic Block) ban đầu trở thành một 'case' độc lập. Khi một khối cơ bản thực thi xong, thay vì nhảy trực tiếp sang khối kế tiếp, nó cập nhật biến trạng thái thành một giá trị mới và nhảy ngược về Dispatcher. Kết quả là đồ thị CFG biến thành một hình học 'chiếc ô' (umbrella shape) hoặc hình nan quạt, khiến decompiler không thể nhận diện được cấu trúc lặp và xuất ra hàng nghìn dòng mã giả vô nghĩa.",
+            "Để giải quyết Control Flow Flattening, chuyên gia dịch ngược hiện đại sử dụng kỹ thuật Thực thi Biểu tượng (Symbolic Execution) kết hợp với các framework như Triton hoặc angr. Bằng cách coi biến trạng thái là một biểu tượng (Symbolic Variable), công cụ có thể tính toán chính xác giá trị trạng thái kế tiếp cho từng nhánh rẽ của khối cơ bản, từ đó xác định được đích đến thực tế và cắt bỏ hoàn toàn Dispatcher trung gian. Ngoài ra, kỹ thuật Opaque Predicates (các biểu thức điều kiện luôn đúng hoặc luôn sai dựa trên các định lý toán học phức tạp, ví dụ x^2 >= 0 với mọi số thực) cũng được phát hiện và loại bỏ dễ dàng thông qua các bộ giải ràng buộc SMT (như Z3 Solver)."
+          ],
+          "points": [
+            "Control Flow Flattening (CFF): Phá vỡ cấu trúc nhánh tự nhiên, biến hàm thành máy trạng thái lặp vô hạn điều phối bởi switch-case.",
+            "Hình thái Đồ thị Nan Quạt: Đặc trưng nhận diện trực quan của CFF trên IDA Pro và Ghidra với hàng chục cạnh nhảy ngược về Dispatcher.",
+            "Deobfuscation qua Symbolic Execution: Sử dụng công cụ thực thi biểu tượng (angr/Triton) để giải mã biến trạng thái và tái cấu trúc đồ thị luồng điều khiển sạch."
+          ]
+        },
+        {
+          "title": "Kỹ Thuật Bóc Vỏ Nhị Phân (Binary Unpacking): Định Vị Tail Jump, Bắt OEP và Tái Thiết Lập IAT (Import Address Table)",
+          "paragraphs": [
+            "Các phần mềm bảo vệ nhị phân (Packers / Protectors như UPX, ASPack, Themida, VMProtect) nén hoặc mã hóa toàn bộ các phân vùng thực thi (.text, .data) của tệp nhị phân gốc và nhúng vào đó một đoạn mã giải nén gọi là 'Unpacking Stub'. Khi tệp được thực thi, hệ điều hành nạp Unpacking Stub vào bộ nhớ. Stub này thực hiện: 1. Cấp phát vùng nhớ mới (thường qua VirtualAlloc hoặc mmap) với quyền RWX; 2. Giải mã hoặc giải nén mã nhị phân gốc vào vùng nhớ đó; 3. Nạp các thư viện DLL và giải quyết các địa chỉ hàm trong bảng Import Address Table (IAT); 4. Chuyển quyền điều khiển tới điểm vào gốc của chương trình ban đầu (Original Entry Point - OEP).",
+            "Lệnh chuyển quyền điều khiển cuối cùng từ Unpacking Stub tới OEP được gọi là 'Tail Jump'. Đây là bước ngoặt sống còn trong kỹ thuật bóc vỏ nhị phân (Unpacking). Do Stub và chương trình gốc thường nằm ở hai vùng nhớ hoặc hai phân vùng hoàn toàn tách biệt, Tail Jump thường là một lệnh nhảy xa (Far Jump), ví dụ: 'jmp 0x00401000' hoặc 'push 0x00401000; ret'. Để tìm Tail Jump, chuyên gia thường áp dụng kỹ thuật 'ESP Trick': Đặt điểm dừng phần cứng (Hardware Breakpoint on Access) tại ô nhớ ngăn xếp được thanh ghi ESP trỏ tới ngay sau lệnh 'pushad' (lưu toàn bộ thanh ghi) đầu tiên của Stub. Khi Stub hoàn tất việc giải nén và gọi 'popad' để khôi phục thanh ghi, điểm dừng sẽ kích hoạt ngay trước Tail Jump.",
+            "Khi chương trình vừa nhảy tới OEP, toàn bộ mã nhị phân gốc đã tồn tại dưới dạng bản rõ hoàn chỉnh trong bộ nhớ RAM. Tuy nhiên, nếu chỉ thực hiện 'Memory Dump' (chụp ảnh bộ nhớ ra file đĩa), tệp nhị phân mới sẽ không thể chạy được vì bảng Import Address Table (IAT) đã bị xáo trộn hoặc trỏ vào các địa chỉ ảo tạm thời. Chuyên gia phải sử dụng các công cụ tái thiết lập IAT chuyên dụng (như Scylla hoặc ImpREC): Công cụ quét toàn bộ phân vùng .text đã dump, tìm các lệnh gọi hàm API gián tiếp ('call dword ptr [offset]'), đối chiếu địa chỉ ô nhớ với bảng xuất khẩu của các DLL hệ điều hành đã nạp, xác định đúng tên hàm API, và ghi đè lại cấu trúc IMAGE_IMPORT_DESCRIPTOR hoàn chỉnh vào header của tệp PE."
+          ],
+          "points": [
+            "Unpacking Stub: Khối mã tiền trạm chịu trách nhiệm giải mã payload gốc vào RAM và giải quyết phụ thuộc thư viện.",
+            "Tail Jump & ESP Trick: Lệnh nhảy chuyển giao quyền điều khiển từ Stub tới OEP, được định vị nhanh chóng bằng điểm dừng phần cứng trên Stack.",
+            "IAT Reconstruction: Tái thiết lập bảng địa chỉ nhập khẩu bằng công cụ Scylla để biến Memory Dump thành tệp thực thi độc lập có thể chạy lại."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Anti-Debugging Bypass, Deobfuscation & Binary Unpacking Lab",
+        "objective": "Áp dụng kỹ thuật phân tích vượt qua cơ chế chống gỡ lỗi đa tầng (PEB + ProcessDebugPort + RDTSC), tháo gỡ máy trạng thái Control Flow Flattening, và bắt OEP để tái thiết bảng IAT cho nhị phân nén.",
+        "scenario": "Bạn đang xử lý một mẫu nhị phân Windows PE x86-64 độc quyền bị bảo vệ bởi một Custom Packer kết hợp kỹ thuật làm rối mã nguồn OLLVM và chuỗi kiểm tra anti-debugging nghiêm ngặt. Nhiệm vụ của bạn là cô lập các bẫy gỡ lỗi, bắt Tail Jump để dump mã sạch tại OEP, và sửa lại bảng IAT để tiến hành dịch ngược tĩnh.",
+        "constraints": [
+          "Bắt buộc thực thi trong máy ảo phân tích Windows biệt lập (Isolated Windows VM); ngắt toàn bộ kết nối mạng nội bộ.",
+          "Vượt qua các kiểm tra Anti-Debugging bằng kỹ thuật ScyllaHide hoặc viết script x64dbg plugin mà không làm sập tiến trình.",
+          "Tệp nhị phân sau khi unpack và rebuild IAT phải có thể mở được trong Ghidra và hiển thị đầy đủ tên các API nhập khẩu."
+        ],
+        "cases": [
+          {
+            "id": "antidebug-unpack-case-01",
+            "title": "Vượt Qua Chuỗi Kiểm Tra Anti-Debugging Đa Tầng (PEB, NtQuery, RDTSC)",
+            "context": "Khi đính kèm x64dbg vào tệp nhị phân mục tiêu, tiến trình lập tức tắt ngấm mà không để lại bất kỳ thông báo nào. Phân tích tĩnh trước điểm vào cho thấy 3 tầng bảo vệ liên tiếp: 1. Đọc byte GS:[0x60] + 0x02 (PEB.BeingDebugged); 2. Gọi NtQueryInformationProcess với ProcessInformationClass = 7 (ProcessDebugPort); 3. Thực thi cặp lệnh RDTSC trước và sau một vòng lặp tính toán để đo chu kỳ CPU delta. Nếu phát hiện bất kỳ dấu hiệu nào, hàm gọi trực tiếp 'ExitProcess(0xDEAD)'.",
+            "prompt": "Chiến lược cấu hình và can thiệp bộ gỡ lỗi x64dbg chuẩn xác nhất để vượt qua cả 3 lớp bảo vệ này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Thay đổi ngày giờ của hệ điều hành Windows lùi về năm 2000 để đánh lừa hàm tính toán thời gian RDTSC.",
+                "correct": false,
+                "rationale": "Lệnh RDTSC đo số lượng chu kỳ xung nhịp CPU nội bộ kể từ khi bật máy, hoàn toàn không phụ thuộc vào đồng hồ hệ thống (System Wall Clock)."
+              },
+              {
+                "id": "B",
+                "label": "Kích hoạt plugin ScyllaHide trong x64dbg với cấu hình hook PEB (BeingDebugged=0), hook NtQueryInformationProcess (trả về ProcessDebugPort=0), và bật tính năng 'Hook RDTSC' để chuẩn hóa độ trễ thời gian trả về một hằng số nhỏ cố định.",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối. ScyllaHide là plugin tiêu chuẩn công nghiệp cho x64dbg. Nó can thiệp ở tầng user-mode hook và exception filtering để xóa sạch cờ BeingDebugged trong PEB, đánh chặn syscall NtQueryInformationProcess trả về giá trị an toàn, và ảo hóa kết quả của lệnh RDTSC để vô hiệu hóa hoàn toàn cơ chế đo chênh lệch thời gian."
+              },
+              {
+                "id": "C",
+                "label": "Chạy chương trình trong môi trường DOSBox 16-bit để các hàm Win64 API không thể kích hoạt.",
+                "correct": false,
+                "rationale": "Đây là tệp nhị phân PE x86-64, hoàn toàn không thể thực thi trong môi trường giả lập DOSBox 16-bit."
+              },
+              {
+                "id": "D",
+                "label": "Xóa bỏ toàn bộ phân vùng .rdata của tệp nhị phân trên đĩa trước khi khởi chạy x64dbg.",
+                "correct": false,
+                "rationale": "Xóa phân vùng .rdata sẽ làm hỏng cấu trúc PE Header và bảng Import Table, khiến hệ điều hành từ chối nạp chương trình vào bộ nhớ."
+              }
+            ]
+          },
+          {
+            "id": "antidebug-unpack-case-02",
+            "title": "Hóa Giải Máy Trạng Thái Control Flow Flattening (CFF) Bằng Thực Thi Biểu Tượng",
+            "context": "Sau khi vượt qua anti-debug, bạn tiếp cận hàm xác thực thuật toán chính. Hàm này có đồ thị CFG dạng nan quạt điển hình của Control Flow Flattening: Chứa 42 khối cơ bản cùng nhảy về một Dispatcher Block trung tâm. Tại Dispatcher, biến trạng thái 'state_var' được so sánh qua một loạt lệnh rẽ nhánh để quyết định khối tiếp theo. Phân tích thủ công từng khối tốn quá nhiều thời gian do các phép tính toán trạng thái bị mã hóa số học.",
+            "prompt": "Quy trình giải mã tự động (Deobfuscation) tối ưu nhất để khôi phục lại đồ thị luồng điều khiển sạch cho hàm này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Sử dụng script Python kết hợp framework thực thi biểu tượng angr: Định nghĩa biến 'state_var' làm biểu tượng, thực thi từng khối cơ bản qua Dispatcher để tìm giá trị trạng thái kế tiếp cụ thể cho mỗi nhánh, sau đó tự động patch các lệnh jmp trực tiếp giữa các khối hợp lệ và cắt bỏ Dispatcher.",
+                "correct": true,
+                "rationale": "Chính xác theo phương pháp luận hiện đại. Framework angr sử dụng Symbolic Execution và bộ giải Z3 để giải quyết mối quan hệ chuyển dịch trạng thái của máy trạng thái CFF. Sau khi xác định được khối nguồn và khối đích thực tế, ta có thể patch lại các lệnh jmp để tái cấu trúc đồ thị CFG nguyên thủy."
+              },
+              {
+                "id": "B",
+                "label": "Tăng kích thước thanh ghi RSP lên gấp đôi để decompiler tự động bỏ qua vòng lặp Dispatcher.",
+                "correct": false,
+                "rationale": "Sửa đổi thanh ghi RSP làm hỏng Stack Pointer và gây sập tiến trình, hoàn toàn không có khả năng thay đổi cấu trúc đồ thị luồng điều khiển."
+              },
+              {
+                "id": "C",
+                "label": "Gán tất cả các nhánh trong khối switch-case thành lệnh NOP (0x90).",
+                "correct": false,
+                "rationale": "Điền NOP vào các khối cơ bản sẽ xóa sạch toàn bộ mã nghiệp vụ của chương trình, phá hủy hoàn toàn logic cần phân tích."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển mã hợp ngữ sang dạng ảnh nhị phân Bitmap để dùng thuật toán OCR nhận diện đường đi.",
+                "correct": false,
+                "rationale": "Thuật toán OCR chỉ nhận diện văn bản hình ảnh, không có khả năng phân tích logic ngữ nghĩa và dòng dữ liệu của mã máy."
+              }
+            ]
+          },
+          {
+            "id": "antidebug-unpack-case-03",
+            "title": "Bắt Tail Jump, Dump Bộ Nhớ Tại OEP và Tái Thiết Bảng IAT Bằng Scylla",
+            "context": "Nhị phân được đóng gói bởi một Custom Packer. Điểm vào ban đầu (EP) nằm tại 0x140085000 trong một phân vùng kỳ lạ tên là '.pack0'. Lệnh đầu tiên là 'pushfq; push rax; ... push r15' (lưu ngữ cảnh). Sau đó là một vòng lặp giải mã XOR phức tạp ghi đè dữ liệu vào phân vùng .text gốc tại 0x140001000. Bạn cần bắt thời điểm giải nén kết thúc để tìm Original Entry Point (OEP), dump tiến trình và phục hồi bảng IAT.",
+            "prompt": "Các bước thao tác chuẩn xác nhất trên x64dbg và Scylla để hoàn thành việc Unpacking là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chờ chương trình chạy xong và thoát, sau đó mở file crash dump trong Task Manager.",
+                "correct": false,
+                "rationale": "Khi chương trình đã thoát, không gian bộ nhớ đã bị giải phóng hoàn toàn và không thể thu được trạng thái nhị phân đã giải mã."
+              },
+              {
+                "id": "B",
+                "label": "Đặt Hardware Breakpoint on Execution trên phân vùng '.text' (hoặc áp dụng ESP trick tại lệnh push ngữ cảnh). Khi breakpoint kích hoạt tại lệnh nhảy xa 'jmp 0x140001240', đây chính là OEP. Dừng tại đây, mở công cụ Scylla, chọn tiến trình, nhấn 'IAT Autosearch' -> 'Get Imports', sau đó 'Dump' tiến trình và 'Fix Dump' để hoàn thiện file nhị phân sạch.",
+                "correct": true,
+                "rationale": "Chính xác tuyệt đối. Đặt Hardware Breakpoint trên phân vùng mã gốc .text sẽ bắt trọn khoảnh khắc Unpacking Stub vừa hoàn tất việc giải mã và thực hiện lệnh Tail Jump nhảy vào OEP. Tại OEP, toàn bộ mã và dữ liệu gốc đã nguyên vẹn trong RAM. Sử dụng Scylla để tự động tìm kiếm IAT, liên kết lại các hàm API và sửa chữa PE Header là quy trình chuẩn mực quốc tế."
+              },
+              {
+                "id": "C",
+                "label": "Xóa sạch toàn bộ thư viện ntdll.dll để buộc Packer phải giải nén trực tiếp vào ổ cứng.",
+                "correct": false,
+                "rationale": "ntdll.dll là thư viện cốt lõi của hệ điều hành Windows; xóa bỏ nó sẽ làm sập toàn bộ hệ thống ngay lập tức."
+              },
+              {
+                "id": "D",
+                "label": "Sử dụng công cụ WinRAR để giải nén trực tiếp tệp .exe thành các file C nguồn.",
+                "correct": false,
+                "rationale": "Tệp thực thi nhị phân nén bằng binary packer không phải là file nén lưu trữ (archive) và không thể mở hay giải nén bằng WinRAR."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Cấu hình và khai thác thành công ScyllaHide để vô hiệu hóa toàn bộ chuỗi kiểm tra Anti-Debugging đa tầng.",
+          "Phục hồi thành công cấu trúc luồng điều khiển sạch từ mã nguồn bị làm phẳng bằng Control Flow Flattening.",
+          "Xác định chính xác địa chỉ OEP thông qua Tail Jump, dump bộ nhớ thành công và tái thiết lập trọn vẹn bảng IAT bằng Scylla."
+        ],
+        "evidenceTemplate": [
+          "Bảng cấu hình các cờ Anti-Debugging và danh sách API đã hook trong ScyllaHide",
+          "Đồ thị CFG của hàm mục tiêu trước và sau khi thực hiện Deobfuscation",
+          "Địa chỉ OEP đã bắt được và câu lệnh Tail Jump tương ứng trong log của x64dbg",
+          "Tệp nhị phân đã unpacked (.dump_SCY.exe) được import thành công vào Ghidra với bảng IAT hoàn chỉnh"
+        ],
+        "reset": "Khởi động lại máy ảo phân tích từ snapshot sạch ban đầu để xóa bỏ các hook và tiến trình rác.",
+        "cleanup": "Xóa toàn bộ các bản dump bộ nhớ tạm thời và tệp cấu hình plugin trong môi trường lab."
+      },
+      "governance": {
+        "prevent": [
+          "Tích hợp các kỹ thuật bảo vệ mã nguồn nhị phân hợp pháp (như LLVM Control Flow Integrity - CFI và Obfuscation có kiểm soát) cho các module thanh toán hoặc bảo vệ bản quyền.",
+          "Triển khai cơ chế chữ ký số Authenticode và kiểm tra tính toàn vẹn nhị phân khi khởi chạy ứng dụng thương mại.",
+          "Tránh phụ thuộc hoàn toàn vào các kỹ thuật chống gỡ lỗi user-mode đơn giản (như PEB check) vì chúng rất dễ bị vượt qua bởi các công cụ DBI hiện đại."
+        ],
+        "observe": [
+          "Giám sát việc sử dụng các API nhạy cảm (NtQueryInformationProcess, NtSetInformationThread) thông qua EDR và Microsoft-Windows-Kernel-Process telemetry.",
+          "Phát hiện các tệp nhị phân có độ biến thiên entropy bất thường (high entropy > 7.2) báo hiệu khả năng bị đóng gói bởi packer độc hại.",
+          "Theo dõi các hành vi tự sửa đổi bộ nhớ (Self-modifying code / VirtualProtect RWX) tại các tiến trình người dùng."
+        ],
+        "respond": [
+          "Nhanh chóng cập nhật chữ ký YARA và chỉ số IoC khi phát hiện mẫu nhị phân độc hại mới đã bị bóc vỏ thành công.",
+          "Thu hồi chứng thư số đã ký nếu phát hiện tệp thực thi bị can thiệp chèn mã độc hại hoặc bẻ khóa bản quyền.",
+          "Báo cáo các mẫu phần mềm độc hại có kỹ thuật chống phân tích phức tạp cho đội ngũ Threat Intelligence để chia sẻ cộng đồng."
+        ],
+        "residualRisk": [
+          "Các kỹ thuật ảo hóa mã nguồn (Code Virtualization / VMProtect) tạo ra kiến trúc tập lệnh tùy biến hoàn toàn có thể làm tăng thời gian dịch ngược lên gấp hàng trăm lần.",
+          "Kỹ thuật chống gỡ lỗi tầng kernel driver có thể làm sập máy ảo phân tích nếu môi trường lab không được cô lập chặt chẽ."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Một khi đã bật cờ PEB.BeingDebugged = 0 thì không có cách nào khác để chương trình phát hiện ra trình gỡ lỗi.",
+          "correction": "PEB chỉ là cấu trúc user-mode đơn giản nhất. Các cơ chế bảo vệ nâng cao sử dụng syscall kernel (NtQueryInformationProcess để kiểm tra ProcessDebugPort), kiểm tra cờ NtGlobalFlag, thăm dò thanh ghi gỡ lỗi phần cứng (DR0-DR3), hoặc sử dụng bẫy ngoại lệ và đo chu kỳ CPU (RDTSC) để phát hiện sự can thiệp."
+        },
+        {
+          "claim": "Chỉ cần chụp ảnh bộ nhớ (Memory Dump) của tiến trình khi đang chạy là có thể thu được một file thực thi hoàn chỉnh có thể chạy độc lập.",
+          "correction": "Memory Dump chỉ chụp lại các trang nhớ thô. Bảng Import Address Table (IAT) của tệp thực thi lúc này chứa các con trỏ tuyệt đối trong bộ nhớ ảo của phiên làm việc đó. Nếu không sử dụng công cụ như Scylla để tái thiết lập (Rebuild IAT), file dump sẽ không thể chạy lại trên một máy khác hoặc phiên khởi động mới."
+        },
+        {
+          "claim": "Kỹ thuật làm phẳng luồng điều khiển Control Flow Flattening (CFF) là không thể bẻ khóa và giải mã được.",
+          "correction": "CFF chỉ gây khó khăn cho việc đọc thủ công bằng mắt. Bằng cách áp dụng kỹ thuật Thực thi Biểu tượng (Symbolic Execution) với các framework như angr hoặc Triton, chuyên gia có thể tự động giải mã biến trạng thái và tái cấu trúc lại 100% đồ thị luồng điều khiển ban đầu."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os14-l135-q1",
+          "difficulty": "easy",
+          "question": "Trên hệ điều hành Windows x86-64, cờ BeingDebugged nằm trong cấu trúc Process Environment Block (PEB) có thể được truy cập nhanh thông qua thanh ghi phân đoạn nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "FS:[0x30]"
+            },
+            {
+              "id": "B",
+              "label": "GS:[0x60]"
+            },
+            {
+              "id": "C",
+              "label": "ES:[0x00]"
+            },
+            {
+              "id": "D",
+              "label": "CS:[0x10]"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trên Windows x86-64, thanh ghi GS trỏ tới Thread Information Block (TEB), và địa chỉ cấu trúc PEB nằm tại offset 0x60 của GS (GS:[0x60]). Trên Windows x86-32, địa chỉ này nằm tại FS:[0x30]."
+        },
+        {
+          "id": "os14-l135-q2",
+          "difficulty": "medium",
+          "question": "Kỹ thuật chống gỡ lỗi dựa trên lệnh CPU 'RDTSC' phát hiện sự hiện diện của chuyên gia phân tích thông qua dấu hiệu vật lý nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Nhiệt độ của CPU tăng vọt khi bật trình gỡ lỗi."
+            },
+            {
+              "id": "B",
+              "label": "Chênh lệch số lượng chu kỳ xung nhịp CPU (Cycle Delta) giữa hai lần đo tăng vọt bất thường do thao tác gỡ lỗi từng bước của con người."
+            },
+            {
+              "id": "C",
+              "label": "Số lượng tiến trình chạy ngầm trong Task Manager giảm đột ngột."
+            },
+            {
+              "id": "D",
+              "label": "Địa chỉ IP của card mạng bị thay đổi về dải localhost."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Lệnh RDTSC đọc số chu kỳ xung nhịp CPU. Khi bị phân tích từng bước (single-stepping) hoặc dừng tại breakpoint, thời gian trôi qua giữa hai lệnh RDTSC tăng từ vài trăm chu kỳ lên hàng triệu chu kỳ xung nhịp, giúp mã độc nhận diện chính xác sự hiện diện của debugger."
+        },
+        {
+          "id": "os14-l135-q3",
+          "difficulty": "hard",
+          "question": "Trong quy trình bóc vỏ nhị phân (Unpacking), mục đích sống còn của việc sử dụng công cụ Scylla sau khi đã dump bộ nhớ tại điểm vào gốc (OEP) là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Biên dịch lại mã máy hợp ngữ thành mã nguồn C++ nguyên bản."
+            },
+            {
+              "id": "B",
+              "label": "Quét các lệnh gọi API gián tiếp, phân giải lại địa chỉ hàm nhập khẩu và tái thiết lập bảng Import Address Table (IAT) hoàn chỉnh trong PE Header."
+            },
+            {
+              "id": "C",
+              "label": "Tạo ra chứng chỉ số giả mạo để bypass Windows Defender."
+            },
+            {
+              "id": "D",
+              "label": "Nén tệp nhị phân thành định dạng zip để giảm dung lượng đĩa."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Sau khi dump bộ nhớ tại OEP, các con trỏ API trong IAT bị trỏ vào địa chỉ ảo cục bộ. Scylla có nhiệm vụ tìm kiếm IAT, phân giải tên hàm và thư viện DLL tương ứng, sau đó tái thiết cấu trúc Import Table trong PE Header để file thực thi dump có thể nạp và chạy lại bình thường."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một biến thể phần mềm tống tiền (Ransomware) mới xuất hiện được bảo vệ bởi kỹ thuật nhồi mã làm rối Control Flow Flattening và đóng gói bằng Custom Packer có khả năng phát hiện gỡ lỗi qua cả PEB, NtQueryInformationProcess và chuỗi ngoại lệ INT 2D. Tệp nhị phân từ chối giải nén payload nếu phát hiện bất kỳ công cụ phân tích nào. Bạn được giao nhiệm vụ vô hiệu hóa lớp vỏ bảo vệ, dump payload giải mã tại OEP, tái tạo bảng IAT và cung cấp tệp thực thi sạch cho đội ngũ Incident Response.",
+        "tasks": [
+          "Cấu hình môi trường x64dbg biệt lập kết hợp ScyllaHide để vô hiệu hóa toàn bộ các kỹ thuật anti-debugging (PEB flags, ProcessDebugPort, bẫy ngắt INT 2D).",
+          "Thiết lập điểm dừng phần cứng để bắt lệnh Tail Jump, xác định chính xác địa chỉ OEP và thực hiện Memory Dump của tiến trình.",
+          "Sử dụng Scylla để phân tích vùng nhớ IAT, giải quyết các hàm API bị lỗi (Invalid Thunks), rebuild IAT và xác minh tính toàn vẹn của tệp sau khi unpack."
+        ],
+        "requiredEvidence": [
+          "Ảnh chụp màn hình x64dbg dừng chính xác tại lệnh Tail Jump chuyển giao quyền điều khiển tới OEP.",
+          "Báo cáo phân tích cấu trúc IAT từ Scylla hiển thị 100% các hàm API đã được phục hồi thành công (không có Unresolved Thunks).",
+          "Tệp nhị phân đã unpacked có thể mở và hiển thị đồ thị hàm sạch trong Ghidra mà không còn dấu vết của Unpacking Stub."
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Windows Debugging Architecture and PE Format Specifications",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/debug/pe-format",
+          "publisher": "Microsoft Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Đặc tả cấu trúc PE Header, Data Directories và Import Address Table (IAT)",
+            "Tài liệu cơ chế cấu trúc tiến trình PEB, TEB và Win32 Debug APIs",
+            "Nguyên lý xử lý ngoại lệ có cấu trúc SEH và Vectored Exception Handling"
+          ]
+        },
+        {
+          "title": "Check Point Research: Anti-Analysis and Anti-Debugging Compendium",
+          "url": "https://research.checkpoint.com",
+          "publisher": "Check Point Software Technologies",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-08-26",
+          "supports": [
+            "Bách khoa toàn thư về các kỹ thuật Anti-Debugging (PEB, NtQuery, ptrace, Timing)",
+            "Phân tích kỹ thuật làm rối mã nguồn Control Flow Flattening (CFF)",
+            "Phương pháp luận bắt OEP và tái thiết lập bảng nhập khẩu IAT"
+          ]
+        }
+      ]
+    }
+  ]
+}

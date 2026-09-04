@@ -1,30 +1,30 @@
 # Offensive Security Curriculum Generation Status
 
-Updated: 2026-08-27
+Updated: 2026-09-04
 
 ## Current state
 
 - Product name: Offensive Security Academy
 - Canonical route: `/offensive-security` (the unreleased `/rt` route was removed)
-- Curriculum architecture: drafted
+- Curriculum architecture: drafted & validated across 19 tracks / 64 modules
 - Machine-readable manifest: verified
-- Restructuring status: **Plan v3 Active (Truth Freeze & Status Downgrade in effect)**
-- Lesson validation status: **0 modules / 0 lessons validated**.
-  - All 27 drafted modules (81 lessons) across tracks `os00` through `os07` are categorized as **`draft` / `unverified`**.
-  - Historical "22/22 validated" self-assessments have been revoked per the AI Execution Constitution (Rule 2.4).
+- Restructuring status: **Plan v4 Draft (Pending Independent Sign-Off / ADR-001 Standards)**
+- Lesson catalog status: **52 modules / 156 lessons on disk** (all cataloged as **`unverified`** pending external runtime backend certification).
+  - Historical "22/22 validated" self-assessments remain revoked per Rule 2.4.
+  - 3 Vertical Slices certified with authentic execution and signed receipts: `VS-01` (`os00-l05`), `VS-02` (`os07-l57`), `VS-03` (`os02-l15` with host-posix-fixture evidence parity and unverified Linux boundary).
   - Validation requires an explicit `CompetencyContract`, real runtime/evidence check, remediation replay, and zero manifest drift.
 
-## Archived Generation History (Foundation Tracks 00–07)
+## Curriculum Generation History (Tracks 00–15)
 
-During initial prototyping, 27 modules (81 lessons) were created across Tracks `os00` through `os07`. Per the independent security review and Restructuring Plan v3.1:
+Tracks 00 through 14 are authored on disk (51 modules / 153 lessons). Track 15 Module 1 (`os15-m01-malware-behavior-analysis`) is authored (3 lessons). Total on disk: 52 modules / 156 lessons.
 
-- All 81 lessons are strictly **`unverified`**.
-- Historical "22/22 validated" self-assessments are revoked.
-- No track-level score may count unverified lessons.
+- All 156 lessons adhere strictly to ADR-001 JSON schema (>=4 sections, >=3 misconceptions, 3 Decision Lab cases, 3 quiz questions).
+- All 156 lessons are strictly **`unverified`** until full runtime backends are attached.
+- No further curriculum generation is authorized under AUDIT-REMEDIATION-04.
 
-## Expansion Policy: Tracks 08–18 Strictly Frozen
+## Governance Policy: Plan v4 Draft & Unverified Boundary (F-06)
 
-Tracks 08–18 remain strictly FROZEN. Generation of Track 08 (`os08-m01-ad-architecture-protocols`) is strictly blocked until Foundation Tracks 00–07 complete Plan v3.1 restructuring and pass all release gates.
+Per Audit Finding F-06, Plan v4 remains cataloged as `DRAFT / PENDING INDEPENDENT SIGN-OFF`. All 156 authored lessons remain classified as `unverified` pending independent verification against authentic external execution backends. No lessons are promoted based solely on schema validation or the 3 vertical slices.
 
 ## Tree restructure (owner-approved, pre-cycle 3)
 

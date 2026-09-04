@@ -21,3 +21,8 @@ description: Expert guidelines for Vitest, Jest, React Testing Library, and E2E 
 - Never delete or comment out failing tests to bypass errors. Fix the underlying implementation or contract.
 - Clean up mocks (`vi.clearAllMocks()`/`jest.clearAllMocks()`), timers, DOM, and network handlers between test cases.
 - Keep E2E tests focused on critical user journeys; avoid brittle selectors when accessible roles/text are available.
+
+## 3. Anti-Tautology & Grounding Standards
+
+- Never write tautological unit tests where the expected result is hardcoded directly to match the validator without exercising a dynamic boundary.
+- Integration tests must bind to real network sockets, ephemeral ports, or memory-mapped files rather than in-memory mock responses.
