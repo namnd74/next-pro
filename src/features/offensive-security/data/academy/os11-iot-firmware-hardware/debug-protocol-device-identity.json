@@ -1,0 +1,1118 @@
+{
+  "id": "os11-m02-debug-protocol-device-identity",
+  "slug": "debug-protocol-device-identity",
+  "trackId": "os11-iot-firmware-hardware",
+  "title": "Giao Diện Gỡ Lỗi Phần Cứng, Giao Thức Nối Tiếp, Định Danh Thiết Bị & IoT Cloud",
+  "summary": "Phân tích và kiểm toán giao tiếp phần cứng (UART pinout identification, JTAG TAP controller, ARM SWD với OpenOCD), đánh chặn bus giao tiếp giữa các chip (I2C, SPI flash dumping bằng flashrom), và phân tích ranh giới an ninh định danh thiết bị IoT (Secure Elements ATECC608, TPM 2.0, mTLS kết nối IoT Cloud).",
+  "difficulty": "advanced",
+  "estimatedMinutes": 480,
+  "careerPaths": ["penetration-test", "vulnerability-research"],
+  "domains": ["iot", "hardware", "protocols", "cloud"],
+  "safetyLevel": "instructor-controlled",
+  "lessons": [
+    {
+      "id": "os11-l103-hardware-debug-interfaces-uart-jtag-and-swd",
+      "slug": "hardware-debug-interfaces-uart-jtag-and-swd",
+      "title": "Giao Diện Gỡ Lỗi Phần Cứng: Nhận Diện Pinout UART, JTAG TAP Controller & ARM SWD Với OpenOCD",
+      "summary": "Phương pháp dò tìm và kiểm toán các giao diện gỡ lỗi vật lý trên mạch in (PCB): kỹ thuật xác định chân tín hiệu UART (TX, RX, GND, VCC) bằng đồng hồ vạn năng DMM và máy phân tích logic, cấu hình baud rate chuẩn; kiến trúc chuẩn IEEE 1149.1 (JTAG) bao gồm máy trạng thái TAP Controller (Test Access Port), các thanh ghi Instruction Register (IR) và Data Register (DR), lệnh bypass và đọc IDCODE; giao thức ARM Serial Wire Debug (SWD) qua hai dây SWDIO/SWCLK; và kỹ thuật khai thác kết hợp OpenOCD với GDB để can thiệp bộ nhớ SRAM, dump firmware và trích xuất thanh ghi CPU khi debug port không bị khóa bằng eFuse.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [],
+      "outcomes": [
+        "Sử dụng đồng hồ vạn năng (DMM) và máy phân tích logic (Logic Analyzer) để dò tìm, nhận diện chính xác các điểm kiểm tra (Test Points/Pads) của giao diện UART, xác định mức điện áp logic (1.8V, 3.3V, 5V) và tính toán Baud Rate chính xác từ chuỗi xung khởi động.",
+        "Phân tích nguyên lý hoạt động của máy trạng thái TAP Controller theo chuẩn IEEE 1149.1 (JTAG), giải mã chuỗi quét thanh ghi IR/DR và trích xuất IDCODE 32-bit để định danh chính xác mã nhà sản xuất và part number của chip xử lý.",
+        "Thiết lập kết nối giao thức ARM Serial Wire Debug (SWD) qua hai chân tín hiệu SWDIO/SWCLK, điều hướng các thanh ghi Debug Port (DP) và Memory Access Port (MEM-AP) để truy cập trực tiếp vào không gian địa chỉ bộ nhớ hệ thống.",
+        "Triển khai công cụ OpenOCD kết hợp GDB để dừng luồng CPU (halt), trích xuất tệp nhị phân firmware từ Flash/SRAM, kiểm tra trạng thái khóa bảo vệ phần cứng (STM32 RDP, nRF APPROTECT) và đánh giá khả năng vô hiệu hóa cơ chế khóa qua kỹ thuật Fault Injection."
+      ],
+      "careerPaths": ["penetration-test", "vulnerability-research"],
+      "domains": ["iot", "hardware", "protocols"],
+      "attackTactics": ["initial-access", "execution", "discovery", "collection"],
+      "keywords": [
+        "uart",
+        "jtag",
+        "swd",
+        "openocd",
+        "tap-controller",
+        "idcode",
+        "gdb-hardware-debugging",
+        "efuse-debug-lock"
+      ],
+      "safetyLevel": "instructor-controlled",
+      "mentalModel": "Các nhà sản xuất phần cứng nhúng bắt buộc phải tích hợp các giao diện gỡ lỗi vật lý (UART, JTAG, SWD) trên bo mạch PCB nhằm phục vụ quy trình nạp firmware hàng loạt tại nhà máy và kiểm thử chức năng sau hàn (Boundary Scan Test). Nếu các giao diện này không bị vô hiệu hóa vật lý (cắt mạch, gỡ điện trở pull-up), không bị khóa bằng cầu chì điện tử (eFuses/Silicon Lock Bits) hoặc không yêu cầu mật khẩu xác thực phần cứng, chúng sẽ trở thành một cánh cổng đặc quyền tối cao cho phép kiểm toán viên truy cập trực tiếp vào nhân CPU, đọc toàn bộ không gian RAM tĩnh và trích xuất firmware độc quyền bất chấp mọi cơ chế bảo mật phần mềm.",
+      "visual": {
+        "title": "Quy Trình Dò Tìm Pinout Và Kết Nối Gỡ Lỗi Phần Cứng OpenOCD",
+        "caption": "Trình tự 4 giai đoạn từ khảo sát thụ động trên bo mạch PCB đến can thiệp nhân CPU qua giao diện phần cứng.",
+        "steps": [
+          {
+            "label": "Đo Kiểm Vật Lý & Nhận Diện Pinout (DMM & Scope)",
+            "detail": "Sử dụng đồng hồ vạn năng kiểm tra thông mạch tìm chân GND (vỏ kim loại/Ground Plane), đo điện áp tĩnh tìm VCC, và dùng máy hiện sóng/logic analyzer nhận diện chân TX (dao động dữ liệu khi boot) và RX.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Đánh Giá Giao Tiếp Nối Tiếp UART & Ngắt Bootloader",
+            "detail": "Kết nối bộ chuyển đổi USB-UART với mức logic điện áp tương thích (thường 3.3V LVTTL); gửi tín hiệu ngắt chuỗi bootloader (phím Space/Enter trong U-Boot) để truy cập interactive shell đặc quyền.",
+            "tone": "allow"
+          },
+          {
+            "label": "Khảo Sát Chuỗi Quét JTAG TAP & Đọc IDCODE",
+            "detail": "Dò tìm 4 chân JTAG (TCK, TMS, TDI, TDO); đưa TAP Controller về trạng thái Shift-DR để đọc thanh ghi IDCODE 32-bit nhằm định danh chính xác kiến trúc CPU và cấu trúc chuỗi daisy-chain.",
+            "tone": "caution"
+          },
+          {
+            "label": "Gắn Kết OpenOCD/GDB & Kiểm Tra Khóa APPROTECT",
+            "detail": "Khởi chạy OpenOCD qua adapter SWD/JTAG (J-Link, FT2232H); gắn kết GDB để dừng CPU và kiểm tra cờ bảo vệ bộ nhớ; nếu cổng bị khóa bởi eFuse, ghi nhận ranh giới phòng thủ phần cứng.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Giao Diện Nối Tiếp UART: Nguyên Lý Hoạt Động, Kỹ Thuật Dò Chân (Pinout Hunting) & Khai Thác Interactive Boot Shell",
+          "paragraphs": [
+            "Giao diện truyền thông nối tiếp bất đồng bộ (Universal Asynchronous Receiver-Transmitter - UART) là kênh giao tiếp cơ bản và phổ biến nhất trên hầu hết các bo mạch nhúng và thiết bị IoT. Do không sử dụng đường xung nhịp chia sẻ (clock line), UART yêu cầu cả hai đầu truyền (TX) và nhận (RX) phải thống nhất trước về tốc độ baud (Baud Rate), số bit dữ liệu (thường là 8-bit), tính chẵn lẻ (Parity - thường là None) và số bit dừng (Stop bit - thường là 1), tạo thành cấu hình tiêu chuẩn 8N1. Mức điện áp logic của UART nhúng thường tuân theo chuẩn TTL (Transistor-Transistor Logic), phổ biến nhất là 3.3V hoặc 1.8V đối với vi xử lý hiện đại, và 5V đối với vi điều khiển thế hệ cũ. Tuyệt đối không được cắm trực tiếp cổng RS-232 máy tính cổ điển (mức điện áp từ -12V đến +12V) vào các chân UART nhúng vì sự chênh lệch điện áp sẽ phá hủy ngay lập tức vi mạch SoC.",
+            "Khi tiếp cận một bo mạch không có nhãn in lụa (silkscreen) đánh dấu cổng UART, kỹ sư an ninh áp dụng phương pháp dò chân tuần tự bằng đồng hồ vạn năng số (Digital Multimeter - DMM). Đầu tiên, chuyển đồng hồ sang chế độ đo thông mạch (Continuity Mode) để tìm chân Đất (GND): một que đo chạm vào lớp giáp kim loại của cổng Ethernet, cổng USB hoặc mặt phẳng đồng mass (Ground Plane), que còn lại chạm vào các lỗ mạ (vias) hoặc hàng chân chờ (headers); chân nào phát ra tiếng bíp liên tục với điện trở gần bằng 0 Ohm chính là GND. Tiếp theo, cấp nguồn cho thiết bị và chuyển đồng hồ sang chế độ đo điện áp một chiều (DC Voltage): chân Nguồn (VCC) sẽ duy trì mức điện áp không đổi (thường là 3.3V hoặc 5.0V). Chân Truyền (TX) của thiết bị thường có điện áp kéo lên mức cao (~3.3V) và sẽ dao động điện áp nhẹ trong vài giây đầu tiên khi thiết bị khởi động do dữ liệu log bootloader được phát ra liên tục. Chân Nhận (RX) của thiết bị thường có điện áp ổn định (được kéo lên qua trở pull-up nội) hoặc thả nổi (floating).",
+            "Để xác định tốc độ baud chính xác mà không cần thử mò (brute-force), kỹ sư kết nối chân TX và GND vào một máy phân tích logic (Logic Analyzer) và mở phần mềm phân tích dạng sóng (PulseView/Saleae Logic). Khi thiết bị khởi động, ta đo độ rộng thời gian của xung hẹp nhất (shortest bit width, $T_{bit}$). Tốc độ baud được tính theo công thức: $\\text{Baud Rate} = 1 / T_{bit}$. Ví dụ, nếu xung hẹp nhất có độ rộng xấp xỉ 8.68 microgiây, tốc độ baud sẽ là $1 / (8.68 \\times 10^{-6}) \\approx 115200$ baud. Khi kết nối qua cáp chuyển đổi USB-to-UART (sử dụng chip FTDI FT232R, Silicon Labs CP2102 hoặc CH340), chân TX của bo mạch phải được nối chéo với chân RX của bộ chuyển đổi, và chân RX của bo mạch nối với chân TX của bộ chuyển đổi.",
+            "Bề mặt tấn công nguy hiểm nhất qua UART là Interactive Bootloader Shell. Trong giai đoạn nạp khởi động ban đầu (U-Boot, RedBoot hoặc Barebox), bootloader thường phát ra thông báo đếm ngược 'Hit any key to stop autoboot' và chờ tín hiệu ngắt từ người dùng qua UART. Bằng cách gửi liên tục ký tự ngắt (Space, Enter hoặc chuỗi Ctrl+C) trong cửa sổ thời gian từ 1 đến 3 giây này, kẻ tấn công có thể dừng chuỗi khởi động tự động và bước vào shell tương tác của U-Boot. Từ shell này, kẻ tấn công có thể chạy lệnh `printenv` để đọc các biến môi trường, chỉnh sửa tham số dòng lệnh nhân Linux `bootargs` (ví dụ gán `bootargs=init=/bin/sh console=ttyS0,115200` để ép nhân Linux bỏ qua quy trình xác thực mật khẩu `/bin/login` và nạp thẳng root shell), hoặc sử dụng các lệnh đọc bộ nhớ như `md` (memory display) và `sf read` để dump trực tiếp nội dung chip Flash ra giao diện nối tiếp."
+          ]
+        },
+        {
+          "title": "Kiến Trúc Chuẩn IEEE 1149.1 (JTAG): TAP Controller, Quét Biên (Boundary Scan) & Chuỗi Quét TAP",
+          "paragraphs": [
+            "Chuẩn IEEE 1149.1 (thường được biết đến với tên gọi JTAG - Joint Test Action Group) ban đầu được phát triển để kiểm tra lỗi hở mạch, chập chân sau quá trình hàn vi mạch trên bảng mạch in (PCB) mà không cần dùng đến các đầu dò cơ học phức tạp. Hệ thống JTAG hoạt động dựa trên kỹ thuật quét biên (Boundary Scan): mỗi chân I/O vật lý của vi mạch được tích hợp một tế bào quét biên (Boundary Scan Cell). Các tế bào này được mắc nối tiếp với nhau thành một thanh ghi dịch dài (Boundary Scan Register - BSR) bao bọc quanh lõi logic của chip, cho phép kỹ sư quan sát và điều khiển trạng thái logic của từng chân linh kiện từ xa.",
+            "Giao tiếp JTAG tiêu chuẩn yêu cầu tối thiểu 4 đường tín hiệu chuyên dụng: TCK (Test Clock - cung cấp xung nhịp đồng bộ), TMS (Test Mode Select - điều khiển chuyển đổi trạng thái của máy trạng thái TAP), TDI (Test Data In - dữ liệu nối tiếp đi vào chip), và TDO (Test Data Out - dữ liệu nối tiếp đi ra từ chip). Một số thiết bị có thêm chân thứ năm là TRST (Test Reset - reset không đồng bộ cho logic JTAG). Trái tim của kiến trúc JTAG là bộ điều khiển cổng truy cập kiểm thử (TAP Controller - Test Access Port Controller), một máy trạng thái hữu hạn gồm đúng 16 trạng thái logic được chuyển đổi hoàn toàn dựa trên mức tín hiệu của chân TMS tại mỗi sườn lên của xung nhịp TCK.",
+            "Máy trạng thái TAP Controller được chia thành hai nhánh hoạt động song song có cấu trúc đối xứng: nhánh quét thanh ghi chỉ lệnh (Instruction Register - IR Scan) và nhánh quét thanh ghi dữ liệu (Data Register - DR Scan). Mỗi nhánh bao gồm các trạng thái cốt lõi: Capture (chụp dữ liệu logic vào thanh ghi dịch), Shift (dịch dữ liệu tuần tự theo từng bit qua chân TDI/TDO), và Update (chốt dữ liệu từ thanh ghi dịch sang thanh ghi đầu ra chức năng). Bất kể TAP Controller đang ở trạng thái nào, việc giữ chân TMS ở mức logic cao (1) trong liên tiếp 5 chu kỳ xung TCK sẽ luôn đưa máy trạng thái quay trở về trạng thái an toàn Test-Logic-Reset, đưa toàn bộ logic kiểm thử về chế độ không hoạt động để tránh ảnh hưởng đến chức năng thông thường của chip.",
+            "Thanh ghi Instruction Register (IR) lưu trữ mã lệnh kiểm thử đang hoạt động. Chuẩn IEEE 1149.1 quy định một số lệnh bắt buộc: lệnh BYPASS (mã hóa toàn bit 1, nối tắt TDI sang TDO qua một thanh ghi 1-bit Bypass Register để bỏ qua chip hiện tại trong chuỗi ghép tầng daisy-chain); lệnh SAMPLE/PRELOAD (chụp trạng thái các chân chân I/O mà không làm gián đoạn chip); và lệnh IDCODE (nối thanh ghi nhận dạng thiết bị Device Identification Register vào chuỗi quét). Thanh ghi IDCODE có độ dài cố định 32-bit, bao gồm 4-bit phiên bản (Version), 16-bit mã linh kiện của nhà sản xuất (Part Number), 11-bit mã định danh nhà sản xuất theo chuẩn JEDEC (Manufacturer ID), và 1-bit cố định luôn bằng 1 ở vị trí LSB. Việc đọc được IDCODE hợp lệ là bằng chứng xác thực tuyệt đối rằng cổng JTAG đang hoạt động và không bị vô hiệu hóa."
+          ]
+        },
+        {
+          "title": "Giao Thức ARM Serial Wire Debug (SWD) & Kiến Trúc ARM Debug Interface (ADI v5/v6)",
+          "paragraphs": [
+            "Để tiết kiệm diện tích chân linh kiện trên các vi điều khiển nhỏ gọn (ví dụ họ Cortex-M0/M3/M4/M7 trong các gói đóng gói QFN hoặc BGA ít chân), tập đoàn ARM đã phát triển giao thức gỡ lỗi hai dây Serial Wire Debug (SWD) như một giải pháp thay thế hiệu quả cho chuẩn JTAG 4-5 dây truyền thống. Giao thức SWD chỉ sử dụng đúng hai đường tín hiệu: SWCLK (Serial Wire Clock - xung nhịp đồng bộ do debug host phát ra) và SWDIO (Serial Wire Debug Data Input/Output - đường dữ liệu hai chiều dạng nửa song công half-duplex). Mặc dù giảm thiểu số lượng chân kết nối, SWD vẫn bảo lưu toàn bộ các tính năng gỡ lỗi nâng cao của kiến trúc ARM CoreSight, bao gồm can thiệp thanh ghi, đặt điểm dừng phần cứng (Hardware Breakpoints) và giám sát bộ nhớ theo thời gian thực.",
+            "Kiến trúc gỡ lỗi ARM Debug Interface (ADI v5 và v6) phân tách việc giao tiếp thành hai tầng độc lập: Cổng gỡ lỗi (Debug Port - DP) và Cổng truy cập (Access Port - AP). Debug Port chịu trách nhiệm quản lý kết nối vật lý với debug probe bên ngoài (có thể là SW-DP cho giao thức SWD hoặc JTAG-DP cho giao thức JTAG). Do nhiều vi điều khiển ARM tích hợp cả chân JTAG và SWD trên cùng các pad vật lý (chia sẻ chân SWDIO với TMS, và SWCLK với TCK), ARM định nghĩa một chuỗi chuyển mạch đặc biệt (Switch Sequence) được phát trên đường SWDIO: host gửi ít nhất 50 xung clock mức cao, theo sau bởi chuỗi 16-bit ma thuật `0x79E7` (hoặc `0xE79E` tùy phiên bản), sau đó thêm 50 xung clock mức cao để ép phần cứng CoreSight chuyển từ chế độ JTAG sang SWD.",
+            "Tầng Access Port (AP) nằm phía sau Debug Port và kết nối trực tiếp vào các bus nội bộ của vi xử lý. Phổ biến nhất là MEM-AP (Memory Access Port), một bộ điều khiển bus chủ cho phép truy cập trực tiếp vào không gian địa chỉ bộ nhớ hệ thống (AHB hoặc AXI bus) mà không cần sự can thiệp hay hợp tác của lõi CPU (Core). Thông qua MEM-AP, công cụ gỡ lỗi có thể đọc hoặc ghi trực tiếp vào bất kỳ địa chỉ nào trong bộ nhớ Flash, SRAM tĩnh nội vi và các thanh ghi ngoại vi ánh xạ bộ nhớ (MMIO) ngay cả khi CPU đang chạy ở tốc độ tối đa hoặc đang bị treo trong một vòng lặp lỗi phần cứng (HardFault).",
+            "Giao dịch dữ liệu trên đường SWDIO tuân theo cấu trúc gói tin nghiêm ngặt bắt đầu bằng bit Start (1), bit APnDP (chọn truy cập thanh ghi DP hay AP), bit RnW (chọn thao tác Đọc hay Ghi), 2-bit địa chỉ thanh ghi A[2:3], bit Parity (kiểm tra chẵn lẻ), bit Stop (0) và bit Park (1). Tiếp theo là chu kỳ đổi chiều đường truyền (Turnaround - Trn) nơi debug probe nhả đường truyền để vi điều khiển phản hồi gói tin ACK 3-bit: `100` (OK), `010` (WAIT - yêu cầu chờ do bus bận), hoặc `001` (FAULT - xảy ra lỗi truy cập). Sau giai đoạn ACK, dữ liệu 32-bit kèm 1-bit parity sẽ được truyền nối tiếp (từ LSB đến MSB)."
+          ]
+        },
+        {
+          "title": "Khai Thác Gỡ Lỗi Bằng OpenOCD, GDB & Cơ Chế Khóa Cổng Debug Phần Cứng (eFuse / APPROTECT)",
+          "paragraphs": [
+            "OpenOCD (Open On-Chip Debugger) là phần mềm nguồn mở tiêu chuẩn công nghiệp phục vụ việc gỡ lỗi, nạp phần mềm và kiểm thử ranh giới cho các hệ thống nhúng. OpenOCD hoạt động như một cầu nối trừu tượng hóa phần cứng giữa các thiết bị debug adapter (như FTDI FT2232H, J-Link, ST-Link, CMSIS-DAP, Raspberry Pi GPIO) và các trình gỡ lỗi cấp cao như GNU Debugger (GDB). Kiến trúc cấu hình của OpenOCD được xây dựng dựa trên ngôn ngữ kịch bản JimTcl, chia thành hai tệp cấu hình cốt lõi: tệp giao diện phần cứng (Interface Script, ví dụ `interface/ftdi/jtag-lock-pick.cfg`) chỉ định cách giao tiếp với adapter, và tệp vi xử lý mục tiêu (Target Script, ví dụ `target/stm32f4x.cfg`) định nghĩa kiến trúc CPU, bản đồ bộ nhớ Flash, vùng làm việc SRAM và chuỗi lệnh reset.",
+            "Khi khởi chạy thành công, OpenOCD mở các cổng dịch vụ mạng trên máy tính kiểm toán: cổng 4444 cho Telnet interactive shell và cổng 3333 cho GDB Server. Thông qua phiên Telnet hoặc kết nối từ trình gỡ lỗi cross-compile `arm-none-eabi-gdb`, kiểm toán viên có thể thực thi các lệnh can thiệp sâu vào phần cứng: lệnh `reset halt` để cưỡng bức CPU khởi động lại và dừng ngay tại con trỏ lệnh Reset Vector đầu tiên; lệnh `dump_image flash_dump.bin 0x08000000 0x100000` để trích xuất 1MB bộ nhớ Flash chứa toàn bộ mã nguồn firmware và các chuỗi ký tự bí mật; và lệnh `dump_image ram_dump.bin 0x20000000 0x20000` để đọc không gian SRAM chứa các khóa mã hóa phiên, bảng định tuyến và dữ liệu nhạy cảm chưa được xóa.",
+            "Trước nguy cơ trích xuất firmware qua cổng gỡ lỗi, các nhà sản xuất bán dẫn hiện đại tích hợp các cơ chế khóa bảo vệ truy cập bộ nhớ ở cấp độ phần cứng silicon. Trên dòng vi điều khiển STM32 của STMicroelectronics, cơ chế này có tên là Readout Protection (RDP) với 3 cấp độ: RDP Level 0 (mở khóa hoàn toàn), RDP Level 1 (khóa truy cập đọc bộ nhớ Flash qua JTAG/SWD, nhưng cho phép thực hiện thao tác xóa trắng toàn bộ chip Mass Erase để đưa về Level 0), và RDP Level 2 (khóa vĩnh viễn cổng gỡ lỗi bằng cách nung đứt cầu chì eFuse trong chip, không thể đảo ngược ngay cả khi xóa chip). Tương tự, hãng Nordic Semiconductor triển khai tính năng Access Port Protection (APPROTECT) trên các dòng SoC nRF52/nRF53, vô hiệu hóa hoàn toàn khối MEM-AP ngoại trừ thanh ghi lệnh ERASEALL.",
+            "Mặc dù các cơ chế khóa silicon được thiết kế để bảo vệ tài sản trí tuệ và khóa mật mã, chúng vẫn có thể tồn tại các điểm yếu phần cứng vật lý. Điển hình là các lỗ hổng chèn lỗi điện áp (Voltage Glitching / Fault Injection): khi vi điều khiển vừa được cấp nguồn, lõi bảo mật bên trong BootROM sẽ đọc trạng thái các bit khóa từ bộ nhớ không khả biến (Flash Option Bytes hoặc eFuse) và nạp vào thanh ghi kiểm soát truy cập cổng gỡ lỗi. Nếu kẻ tấn công tạo một xung sụt áp cực ngắn (khoảng vài chục nano-giây) trên đường cấp nguồn lõi (VDD Core) đúng vào thời điểm lệnh kiểm tra rẽ nhánh điều kiện này được thực thi, transistor bên trong CPU sẽ đọc sai giá trị logic hoặc bỏ qua lệnh kiểm tra, khiến thanh ghi APPROTECT hoặc RDP vẫn duy trì ở trạng thái mở khóa mở đường cho việc dump firmware qua SWD."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Dò Tìm Pinout Phần Cứng, Tương Tác U-Boot Qua UART Và Khai Thác JTAG/SWD Bằng OpenOCD",
+        "objective": "Áp dụng kỹ thuật đo kiểm vật lý để xác định chính xác các chân tín hiệu UART, ngắt chuỗi khởi động bootloader U-Boot để chiếm root shell, và cấu hình OpenOCD tương tác với cổng SWD/JTAG để đánh giá trạng thái khóa bảo vệ bộ nhớ.",
+        "scenario": "Trong một đợt kiểm thử xâm nhập phần cứng thiết bị gateway công nghiệp điều khiển trạm biến áp, nhà sản xuất đã mài mòn tên các con chip trên bo mạch và không cung cấp tài liệu sơ đồ nguyên lý mạch. Thiết bị có hai cụm chân chờ không được hàn header: một cụm 4 lỗ thẳng hàng (J1) và một cụm 10 lỗ xếp thành hai hàng (J2). Bạn được trang bị đồng hồ vạn năng DMM, máy phân tích logic USB Logic 16 kênh, cáp chuyển đổi FTDI FT2232H và máy trạm Linux cài đặt OpenOCD/GDB.",
+        "constraints": [
+          "Tuân thủ nghiêm ngặt quy tắc bảo vệ tĩnh điện (ESD) và chỉ kết nối các probe đo kiểm khi thiết bị đã được ngắt nguồn.",
+          "Kiểm tra mức điện áp logic trước khi kết nối adapter để tránh làm cháy cổng I/O của bộ chuyển đổi hoặc chân SoC.",
+          "Không thực hiện các thao tác xóa trắng bộ nhớ chip (Mass Erase) nếu chưa hoàn thành việc xác định trạng thái các bit khóa bảo vệ."
+        ],
+        "cases": [
+          {
+            "id": "case-103-01",
+            "title": "Dò Tìm Pinout Cụm Chân UART Và Xác Định Tốc Độ Baud Khởi Động",
+            "context": "Tại cụm chân 4 lỗ J1 (ký hiệu chân từ 1 đến 4), bạn sử dụng đồng hồ vạn năng đo thông mạch với vỏ cổng USB và xác định chân 1 thông mạch hoàn toàn (0.1 Ohm). Sau khi bật nguồn thiết bị, bạn đo điện áp DC giữa chân 1 (GND) và các chân còn lại: Chân 2 đo được 3.31V cố định; Chân 3 đo được 3.28V và sụt áp dao động nhẹ xuống 2.8V trong 2 giây đầu; Chân 4 đo được 3.30V ổn định. Khi đưa tín hiệu Chân 3 vào máy phân tích logic trong lúc khởi động, xung hẹp nhất đo được có độ rộng 8.68 microgiây.",
+            "prompt": "Thứ tự chức năng của các chân từ 1 đến 4 trên cụm J1 là gì và cấu hình tham số cổng nối tiếp nào cần thiết lập trên máy tính kiểm toán?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chân 1: GND, Chân 2: VCC (3.3V), Chân 3: TX, Chân 4: RX. Cấu hình cổng nối tiếp: Baud Rate 115200, 8 bit dữ liệu, không kiểm tra chẵn lẻ, 1 bit dừng (115200 8N1).",
+                "correct": true,
+                "rationale": "Chân 1 thông mạch với vỏ USB là GND; Chân 2 giữ 3.3V ổn định là VCC; Chân 3 dao động điện áp khi khởi động là chân TX phát dữ liệu log; Chân 4 là RX. Tốc độ baud tính từ độ rộng xung nhỏ nhất: 1 / 8.68us = 115207 baud, tương ứng với chuẩn 115200 baud."
+              },
+              {
+                "id": "B",
+                "label": "Chân 1: VCC, Chân 2: GND, Chân 3: RX, Chân 4: TX. Cấu hình cổng nối tiếp: Baud Rate 9600, 7 bit dữ liệu, có kiểm tra chẵn lẻ (9600 7E1).",
+                "correct": false,
+                "rationale": "Chân 1 thông mạch với vỏ cổng USB (ground plane) bắt buộc phải là chân GND chứ không thể là VCC; xung hẹp nhất 8.68us hoàn toàn không tương thích với tốc độ 9600 baud (xung hẹp 9600 baud là ~104us)."
+              },
+              {
+                "id": "C",
+                "label": "Chân 1: GND, Chân 2: TX, Chân 3: VCC, Chân 4: RX. Cấu hình cổng nối tiếp: Baud Rate 57600, 8N1.",
+                "correct": false,
+                "rationale": "Chân 2 giữ 3.31V phẳng không hề có dao động dữ liệu, trong khi Chân 3 mới là chân phát xung dữ liệu nhấp nháy trong giai đoạn boot, do đó Chân 3 là TX chứ không phải VCC."
+              },
+              {
+                "id": "D",
+                "label": "Chân 1: CTS, Chân 2: RTS, Chân 3: TXD, Chân 4: RXD thuộc chuẩn RS-232 mức điện áp âm.",
+                "correct": false,
+                "rationale": "Mức điện áp đo được là 3.3V DC dương (LVTTL 3.3V), hoàn toàn không phải chuẩn RS-232 sử dụng dải điện áp âm từ -12V đến +12V."
+              }
+            ]
+          },
+          {
+            "id": "case-103-02",
+            "title": "Ngắt Chuỗi Bootloader U-Boot Và Leo Thang Đặc Quyền Khởi Động Nhân Linux",
+            "context": "Kết nối thành công vào giao diện UART tại baud 115200, màn hình hiển thị log khởi động của U-Boot 2021.04 kèm thông báo: 'Hit any key to stop autoboot: 2'. Bạn nhanh chóng nhấn phím Space và nhận được dấu nhắc lệnh `gateway_boot#`. Bạn chạy lệnh `printenv bootargs` và nhận được giá trị: `bootargs=console=ttyS0,115200 root=/dev/mtdblock3 rootfstype=squashfs ro init=/sbin/init`.",
+            "prompt": "Để khởi động vào hệ điều hành Linux nhúng với đặc quyền root shell mà không bị yêu cầu nhập thông tin đăng nhập mật khẩu tại `/sbin/init`, câu lệnh U-Boot nào sau đây là chính xác và hiệu quả nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chạy lệnh `setenv bootargs console=ttyS0,115200 root=/dev/mtdblock3 rootfstype=squashfs rw init=/bin/sh` sau đó thực thi lệnh `boot`.",
+                "correct": true,
+                "rationale": "Bằng cách ghi đè tham số dòng lệnh nhân `init=/bin/sh`, nhân Linux sau khi nạp xong sẽ khởi chạy trực tiếp trình thông dịch lệnh Bourne Shell thay vì chạy daemon `/sbin/init` và `/bin/login`, cấp ngay lập tức interactive root shell cho kiểm toán viên qua console UART."
+              },
+              {
+                "id": "B",
+                "label": "Chạy lệnh `erase 0x08000000 +0x100000` để xóa phân vùng chứa mật khẩu và khởi động lại.",
+                "correct": false,
+                "rationale": "Lệnh này sẽ xóa trắng phân vùng Flash bootloader hoặc nhân kernel, làm thiết bị rơi vào tình trạng bị 'brick' (chết phần mềm hoàn toàn) và không thể khởi động được."
+              },
+              {
+                "id": "C",
+                "label": "Chạy lệnh `md.b 0x0 100` để giải mã mật khẩu root lưu trong bảng vector ngắt của vi xử lý.",
+                "correct": false,
+                "rationale": "Lệnh `md.b` chỉ hiển thị byte bộ nhớ tại offset 0x0 (bảng vector ngắt), không chứa mật khẩu người dùng Linux vốn được mã hóa băm trong phân vùng tệp `/etc/shadow`."
+              },
+              {
+                "id": "D",
+                "label": "Chạy lệnh `setenv autologin=admin` và chạy `saveenv`.",
+                "correct": false,
+                "rationale": "U-Boot không có biến môi trường chuẩn mang tên `autologin` để can thiệp vào quy trình xác thực người dùng của hệ thống tệp Linux rootfs."
+              }
+            ]
+          },
+          {
+            "id": "case-103-03",
+            "title": "Gắn Kết OpenOCD Qua Giao Tiếp SWD Và Thẩm Định Trạng Thái Khóa APPROTECT",
+            "context": "Tại cụm chân J2, bạn xác định được vi điều khiển quản lý giao tiếp mạng là họ vi điều khiển ARM Cortex-M4. Bạn kết nối probe FT2232H với hai chân SWDIO và SWCLK kèm chân GND. Khi khởi chạy OpenOCD với lệnh `openocd -f interface/ftdi/ft2232h.cfg -f target/nrf52.cfg`, màn hình xuất hiện thông báo: 'Error: Could not find MEM-AP to control the core... Target nRF52: Non-recoverable error! Access Port Protection (APPROTECT) enabled'.",
+            "prompt": "Thông báo trên phản ánh cơ chế bảo mật phần cứng nào đang hoạt động và phương án đánh giá tiếp theo của kiểm toán viên là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cơ chế bảo vệ cổng truy cập APPROTECT đang được kích hoạt ở cấp độ phần cứng, chặn hoàn toàn kết nối của MEM-AP vào bus nội bộ để chống đọc trích xuất bộ nhớ Flash/RAM. Kiểm toán viên cần lập biên bản ghi nhận ranh giới kiểm soát silicon vững chắc, và chỉ có thể đánh giá tiếp thông qua kiểm thử chèn lỗi điện áp (Voltage Glitching) hoặc xóa toàn bộ chip (Mass Erase qua nRF ERASEALL) trong môi trường thử nghiệm cho phép.",
+                "correct": true,
+                "rationale": "APPROTECT khóa tầng MEM-AP không cho probe truy cập vào không gian địa chỉ bộ nhớ; đây là ranh giới phòng thủ silicon tiêu chuẩn. Muốn mở khóa kiểm toán viên phải chứng minh lỗ hổng bypass qua Fault Injection hoặc chấp nhận lệnh xóa chip toàn bộ làm mất firmware cũ."
+              },
+              {
+                "id": "B",
+                "label": "Dây kết nối SWDIO bị đứt ngầm; chỉ cần đảo vị trí giữa chân SWDIO và SWCLK là OpenOCD sẽ vượt qua cơ chế APPROTECT mà không cần xử lý thêm.",
+                "correct": false,
+                "rationale": "OpenOCD đã giao tiếp thành công với Debug Port (DP) và nhận diện đúng SoC nRF52; việc đảo chân SWDIO và SWCLK sẽ làm mất hoàn toàn đồng bộ xung nhịp và gây lỗi tín hiệu vật lý."
+              },
+              {
+                "id": "C",
+                "label": "SoC đã bị hỏng hoàn toàn phần cứng do chập điện; cần thay thế bo mạch mới trước khi tiếp tục.",
+                "correct": false,
+                "rationale": "Phản hồi APPROTECT enabled là hành vi thiết kế bảo mật chuẩn của chip nRF52 xuất xưởng thương mại, hoàn toàn không phải dấu hiệu hỏng hóc vật lý."
+              },
+              {
+                "id": "D",
+                "label": "OpenOCD có thể bỏ qua APPROTECT bằng cách bổ sung cờ `-c 'force_bypass_protection'` trong dòng lệnh khởi chạy.",
+                "correct": false,
+                "rationale": "APPROTECT được thực thi ở tầng mạch logic phần cứng silicon bên trong chip; không có cờ phần mềm nào trong OpenOCD có thể ghi đè logic phần cứng nếu không có sự can thiệp vật lý hoặc lệnh xóa chip."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Dò tìm và phân định chính xác chân GND, VCC, TX, RX của cổng UART và cấu hình đúng baud rate 115200 8N1.",
+          "Thực hiện thành công việc ngắt autoboot của U-Boot và nạp tham số dòng lệnh `init=/bin/sh` để giành root shell.",
+          "Phân tích chính xác cơ chế khóa silicon APPROTECT/RDP qua log giao dịch OpenOCD và đánh giá ranh giới bảo mật phần cứng."
+        ],
+        "evidenceTemplate": [
+          "Biên bản đo đạc điện áp tĩnh và điện trở thông mạch của từng pinout trên cụm chân kiểm thử",
+          "Ảnh chụp màn hình dạng sóng máy phân tích logic đo độ rộng xung ngắn nhất để suy luận tốc độ baud",
+          "Nhật ký phiên dòng lệnh U-Boot ghi nhận quá trình chỉnh sửa biến môi trường bootargs",
+          "Log đầu ra OpenOCD xác định mã IDCODE của vi xử lý và cảnh báo trạng thái khóa APPROTECT"
+        ],
+        "reset": "Rút cáp nạp FTDI, ngắt nguồn thiết bị và đưa các chân test point về trạng thái cách điện ban đầu.",
+        "cleanup": "Xóa bỏ các tệp kịch bản cấu hình OpenOCD tạm thời và các tệp dump nhị phân khỏi máy trạm kiểm toán."
+      },
+      "governance": {
+        "prevent": [
+          "Vô hiệu hóa vĩnh viễn các cổng gỡ lỗi JTAG/SWD trên các thiết bị xuất xưởng thương mại (production build) bằng cách lập trình đốt cầu chì điện tử eFuse hoặc kích hoạt chế độ RDP Level 2 / APPROTECT.",
+          "Vô hiệu hóa tính năng autoboot countdown prompt trong cấu hình mã nguồn U-Boot (`CONFIG_BOOTDELAY=-2` hoặc `CONFIG_AUTOBOOT_KEYED`) để ngăn chặn việc ngắt bootloader trái phép qua UART.",
+          "Cấu hình hệ thống Linux nhúng chỉ chấp nhận xác thực đăng nhập qua console bằng mật khẩu mã hóa mạnh, không bao giờ cấu hình dịch vụ tty tự động đăng nhập (autologin) với quyền root."
+        ],
+        "observe": [
+          "Giám sát thanh ghi phần cứng Debug Status and Control Register (DHCSR trên ARM CoreSight) để phát hiện sự kiện debug probe gắn kết (bit C_DEBUGEN được bật).",
+          "Ghi nhận nhật ký các lần khởi động bất thường hoặc chu kỳ reset liên tục gây ra bởi kỹ thuật chèn lỗi điện áp (Fault Injection / Glitch Detection).",
+          "Kiểm tra tính toàn vẹn của chuỗi biến môi trường bootloader U-Boot trong phân vùng bộ nhớ không khả biến thông qua chữ ký số hoặc mã kiểm tra CRC32."
+        ],
+        "respond": [
+          "Khi phát hiện tín hiệu gỡ lỗi trái phép gắn vào cổng phần cứng, kích hoạt cơ chế xóa trắng khẩn cấp các khóa mật mã lưu trong RAM tĩnh (Zeroize on Tamper).",
+          "Thiết lập cơ chế khóa cứng thiết bị và phát tín hiệu cảnh báo bảo mật về máy chủ trung tâm giám sát khi phát hiện chuỗi khởi động bị can thiệp dòng lệnh init.",
+          "Thu hồi chứng chỉ số của thiết bị trên hệ sinh thái đám mây nếu phát hiện thiết bị vật lý đã bị trích xuất nội dung bộ nhớ qua giao diện gỡ lỗi."
+        ],
+        "residualRisk": [
+          "Các kỹ thuật tấn công chèn lỗi vật lý tinh vi (Electromagnetic Fault Injection hoặc Focused Ion Beam - FIB) có thể vượt qua khóa eFuse trên một số dòng chip giá rẻ.",
+          "Cổng giao tiếp UART log đọc được thông điệp gỡ lỗi (read-only logging) vẫn có thể làm rò rỉ các thông tin kiến trúc nhạy cảm cho kẻ tấn công phân tích ngoại tuyến."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Nếu nhà sản xuất không hàn hàng cọc chân (header pins) trên bo mạch, kẻ tấn công sẽ hoàn toàn không thể kết nối vào giao diện gỡ lỗi UART hoặc JTAG.",
+          "correction": "Kiểm toán viên và kẻ tấn công có thể dễ dàng hàn dây nối siêu nhỏ vào các điểm kiểm tra bằng đồng (Test Pads) hoặc sử dụng các đầu dò kẹp chân lò xo (Pogo Pins) để thiết lập kết nối tín hiệu ổn định mà không cần header cắm."
+        },
+        {
+          "claim": "Tốc độ baud của cổng nối tiếp UART luôn luôn cố định ở giá trị 9600 hoặc 115200 trên mọi thiết bị nhúng.",
+          "correction": "Tốc độ baud do phần mềm vi điều khiển quy định hoàn toàn tự do; nhiều thiết bị sử dụng các tốc độ phi chuẩn như 57600, 230400, 460800 hoặc thậm chí 1500000 baud; việc đo độ rộng xung bằng máy phân tích logic là cách duy nhất xác định chính xác baud rate."
+        },
+        {
+          "claim": "Lệnh 'reset halt' trong OpenOCD có thể vượt qua mọi cơ chế khóa bảo mật phần cứng và dump được firmware của bất kỳ con chip ARM nào.",
+          "correction": "Khi các tính năng bảo vệ silicon như STM32 RDP Level 2 hoặc nRF APPROTECT được kích hoạt, phần cứng bên trong chip ngắt hoàn toàn kết nối giữa Debug Port và bus bộ nhớ hệ thống; OpenOCD sẽ nhận phản hồi lỗi truy cập và không thể đọc hay dừng CPU."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os11-l103-q1",
+          "difficulty": "easy",
+          "question": "Trong giao tiếp nối tiếp UART, công thức nào sau đây được sử dụng để xác định tốc độ Baud Rate dựa trên độ rộng xung hẹp nhất (T_bit) đo được trên máy phân tích logic?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Baud Rate = 1 / T_bit"
+            },
+            {
+              "id": "B",
+              "label": "Baud Rate = T_bit * 8"
+            },
+            {
+              "id": "C",
+              "label": "Baud Rate = 1000000 / (T_bit * 2)"
+            },
+            {
+              "id": "D",
+              "label": "Baud Rate = T_bit / 115200"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Tốc độ Baud Rate biểu thị số bit truyền đi trong một giây. Do đó, Baud Rate chính là nghịch đảo của thời gian truyền một bit dữ liệu đơn lẻ (độ rộng xung ngắn nhất T_bit): Baud Rate = 1 / T_bit."
+        },
+        {
+          "id": "os11-l103-q2",
+          "difficulty": "medium",
+          "question": "Trong kiến trúc chuẩn kiểm thử quét biên IEEE 1149.1 (JTAG), thanh ghi dữ liệu nào có độ dài 32-bit cho phép xác định mã nhận dạng nhà sản xuất, part number và phiên bản silicon của vi xử lý?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Bypass Register"
+            },
+            {
+              "id": "B",
+              "label": "Device Identification Register (IDCODE)"
+            },
+            {
+              "id": "C",
+              "label": "Boundary Scan Register (BSR)"
+            },
+            {
+              "id": "D",
+              "label": "Instruction Register (IR)"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Thanh ghi IDCODE (Device Identification Register) theo chuẩn IEEE 1149.1 có độ dài cố định 32-bit chứa mã JEDEC của nhà sản xuất, part number của vi xử lý và phiên bản silicon của chip."
+        },
+        {
+          "id": "os11-l103-q3",
+          "difficulty": "hard",
+          "question": "Khi kiểm toán vi điều khiển ARM Cortex-M sử dụng giao diện Serial Wire Debug (SWD), thành phần kiến trúc nào cho phép debug probe đọc và ghi trực tiếp vào không gian địa chỉ bộ nhớ hệ thống (Flash, SRAM, MMIO) mà không cần lõi CPU thực thi bất kỳ mã lệnh nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Instrumentation Trace Macrocell (ITM)"
+            },
+            {
+              "id": "B",
+              "label": "Memory Access Port (MEM-AP) kết nối qua Debug Port (DP)"
+            },
+            {
+              "id": "C",
+              "label": "Flash Patch and Breakpoint Unit (FPB)"
+            },
+            {
+              "id": "D",
+              "label": "Nested Vectored Interrupt Controller (NVIC)"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trong kiến trúc ARM CoreSight ADI, Memory Access Port (MEM-AP) đóng vai trò là một master bus độc lập kết nối trực tiếp vào ma trận bus nội bộ của chip (AHB/AXI), cho phép truy cập đọc/ghi trực tiếp vào toàn bộ không gian địa chỉ vật lý mà không cần CPU can thiệp."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một thiết bị công tơ điện thông minh (Smart Electric Meter) được triển khai trên lưới điện công nghiệp. Khi tháo nắp bảo vệ, đội ngũ kiểm toán phát hiện một cổng kết nối 6-pin không có nhãn silkscreen. Thiết bị sử dụng vi điều khiển STM32F4. Bạn được giao nhiệm vụ xác định pinout cổng này, kiểm tra xem giao diện SWD có bị khóa bằng cơ chế RDP Level 1 hay Level 2, và chứng minh khả năng trích xuất dữ liệu nhạy cảm lưu trong SRAM.",
+        "tasks": [
+          "Sử dụng đồng hồ vạn năng và máy phân tích logic để nhận diện các chân GND, VCC, SWDIO, SWCLK và chân NRST trên cụm cổng 6-pin.",
+          "Cấu hình OpenOCD kết nối qua adapter FT2232H, truy vấn trạng thái Option Bytes trong thanh ghi FLASH_OBR của chip để xác định cấp độ bảo vệ RDP.",
+          "Thực hiện trích xuất dữ liệu không gian SRAM tại địa chỉ 0x20000000 và phân tích xem các khóa mã hóa phiên DLMS/COSEM có bị xóa sau khi khởi động hay không."
+        ],
+        "requiredEvidence": [
+          "Sơ đồ chân pinout chi tiết của cụm kết nối 6-pin kèm chỉ số điện áp đo được",
+          "Nhật ký phiên làm việc OpenOCD hiển thị giá trị thanh ghi Flash Option Bytes chứng minh cấp độ RDP hiện tại",
+          "Báo cáo phân tích tệp dump nhị phân SRAM chỉ ra vị trí các cấu trúc khóa mạng hoặc token xác thực"
+        ]
+      },
+      "sources": [
+        {
+          "title": "IEEE Standard for Test Access Port and Boundary-Scan Architecture (IEEE Std 1149.1-2013)",
+          "url": "https://standards.ieee.org/ieee/1149.1/4374/",
+          "publisher": "IEEE Computer Society",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc Test Access Port (TAP) Controller và máy trạng thái 16 trạng thái",
+            "Cấu trúc thanh ghi quét biên Boundary Scan Register và thanh ghi định danh IDCODE 32-bit"
+          ]
+        },
+        {
+          "title": "Arm Debug Interface Architecture Specification ADIv5.0 to ADIv5.2",
+          "url": "https://developer.arm.com/documentation/ihi0031/latest/",
+          "publisher": "Arm Limited",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Giao thức truyền dữ liệu hai dây Serial Wire Debug (SWD) qua SWDIO/SWCLK",
+            "Cơ chế truy cập bộ nhớ trực tiếp không qua CPU của Memory Access Port (MEM-AP)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os11-l104-serial-buses-and-chip-communications-i2c-spi",
+      "slug": "serial-buses-and-chip-communications-i2c-spi",
+      "title": "Đánh Chặn & Thao Túng Bus Giao Tiếp Nối Tiếp: I2C Sniffing, SPI Flash Dumping Với Flashrom & Bus Pirate",
+      "summary": "Phân tích tín hiệu và đánh giá an ninh các bus truyền thông đồng bộ giữa các vi mạch trên bo mạch phần cứng: giao thức I2C (SDA, SCL, địa chỉ 7-bit/10-bit, ACK/NACK, clock stretching) và SPI (MOSI, MISO, SCK, CS#, SPI modes 0-3); kỹ thuật trích xuất bộ nhớ không khả biến (Non-volatile SPI Flash) sử dụng kẹp kiểm tra SOIC-8/WSON-8, Bus Pirate, CH341A và công cụ flashrom; phương pháp đánh chặn thụ động (Passive Sniffing) và chèn dữ liệu chủ động (Active Injection/Man-in-the-Middle) giữa SoC chính và chip nhớ hoặc cảm biến ngoại vi; cùng các biện pháp mã hóa bus phần cứng (Encrypted SPI/Bus Encryption) và xác thực tính toàn vẹn.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": ["os11-l103-hardware-debug-interfaces-uart-jtag-and-swd"],
+      "outcomes": [
+        "Giải mã cấu trúc khung truyền thông giao thức I2C (START/STOP conditions, địa chỉ 7-bit/10-bit, bit R/W và phản hồi ACK/NACK) bằng máy phân tích logic và trích xuất dữ liệu cấu hình nhạy cảm từ các chip EEPROM ngoại vi.",
+        "Phân tích đặc tính kỹ thuật của giao thức SPI (SCK, MOSI, MISO, CS#) qua 4 chế độ xung nhịp (SPI Modes 0-3) và giải mã tập lệnh chuẩn JEDEC SPI NOR Flash (Read JEDEC ID 0x9F, Read Data 0x03, Fast Read 0x0B).",
+        "Thực hiện kỹ thuật trích xuất bộ nhớ trong mạch (In-Circuit Flash Dumping) sử dụng kẹp kiểm tra SOIC-8/WSON-8 kết hợp công cụ flashrom, giải quyết triệt để vấn đề xung đột bus (bus contention) và hiện tượng cấp nguồn ký sinh (parasitic powering).",
+        "Đánh giá rủi ro an ninh của việc truyền bản rõ trên bus liên chip (Inter-chip plaintext communications) và thiết kế giải pháp bảo vệ bằng công nghệ mã hóa bus phần cứng (Hardware Bus Encryption AES-XTS/AES-CTR)."
+      ],
+      "careerPaths": ["penetration-test", "vulnerability-research"],
+      "domains": ["iot", "hardware", "protocols"],
+      "attackTactics": [
+        "initial-access",
+        "collection",
+        "defense-evasion",
+        "credential-access"
+      ],
+      "keywords": [
+        "i2c-sniffing",
+        "spi-flash-dumping",
+        "flashrom",
+        "bus-pirate",
+        "ch341a",
+        "soic8-clip",
+        "in-circuit-programming",
+        "bus-encryption"
+      ],
+      "safetyLevel": "instructor-controlled",
+      "mentalModel": "Trong kiến trúc hệ thống nhúng phân tán, các vi mạch (SoC, vi điều khiển phụ, chip nhớ SPI Flash, EEPROM lưu cấu hình, cảm biến sinh trắc học) bắt buộc phải trao đổi thông tin với nhau qua các đường bus nối tiếp đồng bộ trên bo mạch PCB (chủ yếu là SPI và I2C). Do các kỹ sư phần cứng thường mặc định rằng môi trường vật lý bên trong vỏ thiết bị là an toàn tuyệt đối, phần lớn dữ liệu trên các bus này được truyền hoàn toàn dưới dạng bản rõ (plaintext). Việc gắn đầu dò logic analyzer hoặc kẹp kiểm tra phần cứng lên các đường mạch này cho phép kiểm toán viên vượt qua mọi cơ chế kiểm soát truy cập ở tầng phần mềm để dump toàn bộ firmware gốc hoặc đánh chặn khóa mật mã ngay khi thiết bị vừa khởi động.",
+      "visual": {
+        "title": "Quy Trình Đánh Chặn Bus Liên Chip Và Trích Xuất SPI Flash",
+        "caption": "Trình tự 4 giai đoạn đánh chặn thụ động và trích xuất bộ nhớ Flash trong mạch vật lý.",
+        "steps": [
+          {
+            "label": "Nhận Diện Vỏ Linh Kiện & Tra Cứu Datasheet (Pinout)",
+            "detail": "Kiểm tra ký hiệu mã chip trên mặt lưng vỏ linh kiện SOIC-8 hoặc WSON-8 (như Winbond W25Q64, Microchip 24LC256) để xác định sơ đồ chân VCC, GND, CS#, SCK, MOSI, MISO (hoặc SDA, SCL).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Gắn Kẹp Kiểm Tra & Cô Lập Xung Đột Bus (Bus Contention)",
+            "detail": "Kẹp SOIC-8 clip lên chip Flash; nối chân Reset của SoC chính xuống GND nhằm giữ SoC ở trạng thái câm (Tristate/High-Z), ngăn ngừa hiện tượng SoC tranh chấp tín hiệu bus SPI.",
+            "tone": "allow"
+          },
+          {
+            "label": "Trích Xuất Bộ Nhớ Trong Mạch Bằng Flashrom",
+            "detail": "Kết nối adapter USB-SPI (CH341A, Bus Pirate, FT2232H); thực thi lệnh flashrom đọc hai lần liên tiếp và đối chiếu mã băm SHA-256 để đảm bảo tính toàn vẹn của tệp dump.",
+            "tone": "caution"
+          },
+          {
+            "label": "Đánh Chặn Tín Hiệu Thời Gian Thực & Kiểm Tra Mã Hóa Bus",
+            "detail": "Sử dụng máy phân tích logic bắt gói tin runtime trong quá trình khởi động; thẩm định xem dữ liệu có được mã hóa bằng cơ chế Hardware Bus Encryption hay đang truyền bản rõ.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Giao Thức I2C (Inter-Integrated Circuit): Khung Bản Tin, Đánh Địa Chỉ & Kỹ Thuật Sniffing Dữ Liệu EEPROM",
+          "paragraphs": [
+            "Giao thức I2C (Inter-Integrated Circuit), được phát minh bởi Philips Semiconductor (nay là NXP), là chuẩn truyền thông nối tiếp đồng bộ hai dây được sử dụng rộng rãi để kết nối các vi điều khiển với các linh kiện ngoại vi tốc độ thấp trên cùng một bo mạch. Hai đường tín hiệu duy nhất của I2C là SDA (Serial Data - truyền nhận dữ liệu nối tiếp) và SCL (Serial Clock - xung nhịp đồng bộ do Master phát ra). Cả hai đường này đều được thiết kế theo cấu trúc cực thu hở (Open-Drain / Open-Collector) và bắt buộc phải có các điện trở kéo lên nguồn (Pull-up Resistors, thường có giá trị từ 2.2 kOhm đến 10 kOhm). Cấu trúc này cho phép nhiều thiết bị cùng chia sẻ một bus chung mà không gây hiện tượng đoản mạch khi có xung đột tín hiệu.",
+            "Giao thức I2C định nghĩa các điều kiện biên tín hiệu rất chặt chẽ: trong khi đường xung nhịp SCL đang ở mức CAO (1), đường dữ liệu SDA bắt buộc phải giữ ổn định; mọi sự thay đổi trạng thái của SDA chỉ được phép diễn ra khi SCL đang ở mức THẤP (0). Hai ngoại lệ duy nhất đối với quy tắc này chính là điều kiện Bắt đầu (START Condition: SDA chuyển từ mức CAO xuống THẤP trong khi SCL vẫn ở mức CAO) và điều kiện Kết thúc (STOP Condition: SDA chuyển từ mức THẤP lên CAO trong khi SCL vẫn ở mức CAO). Sau điều kiện START, Master gửi đi 1 byte đầu tiên bao gồm 7-bit địa chỉ của Slave đích (Slave Address) và 1-bit chỉ định hướng truyền dữ liệu R/W (bit 0 là Master Ghi dữ liệu vào Slave; bit 1 là Master Đọc dữ liệu từ Slave). Tại chu kỳ xung nhịp thứ 9, thiết bị nhận bắt buộc phải phản hồi bằng một bit xác nhận (ACK - kéo SDA xuống mức THẤP) hoặc không xác nhận (NACK - thả nổi SDA ở mức CAO).",
+            "Một đặc tính quan trọng của I2C mà kiểm toán viên cần nắm vững là cơ chế 'Kéo dãn xung nhịp' (Clock Stretching): nếu một thiết bị Slave tốc độ chậm chưa kịp chuẩn bị dữ liệu cho byte tiếp theo, nó có thể giữ đường SCL ở mức THẤP để ép Master phải tạm dừng phát xung clock cho đến khi Slave hoàn tất xử lý. Tốc độ truyền I2C tiêu chuẩn bao gồm Standard Mode (100 kbps), Fast Mode (400 kbps), Fast Mode Plus (1 Mbps) và High-Speed Mode (3.4 Mbps). Trên các thiết bị nhúng, I2C thường được dùng để giao tiếp với các chip nhớ EEPROM (như họ 24Cxx: 24LC02, 24LC256), chip đồng hồ thời gian thực (RTC DS3231), và các bộ đồng xử lý mật mã (như Microchip ATECC608).",
+            "Kỹ thuật đánh chặn thụ động (Passive Sniffing) bus I2C được thực hiện bằng cách gắn hai kênh của máy phân tích logic vào chân SDA và SCL kèm theo dây nối đất chung (GND). Do I2C hoạt động ở tốc độ tương đối thấp, hầu hết các logic analyzer giá rẻ đều có thể bắt trọn vẹn mọi giao dịch. Trong nhiều thiết bị IoT, các nhà phát triển thường lưu trữ mật khẩu Wi-Fi, khóa API đám mây hoặc thông tin chứng thực quản trị trong chip nhớ I2C EEPROM. Khi thiết bị khởi động, SoC chính sẽ phát lệnh I2C Read tuần tự qua toàn bộ không gian địa chỉ của EEPROM. Bằng cách sử dụng trình giải mã giao thức (Protocol Decoder) trong phần mềm PulseView hoặc Saleae Logic, kiểm toán viên có thể dễ dàng khôi phục toàn bộ nội dung EEPROM dưới dạng chuỗi ASCII bản rõ mà không cần can thiệp vật lý vào chip."
+          ]
+        },
+        {
+          "title": "Giao Thức SPI (Serial Peripheral Interface): Tín Hiệu, Chế Độ Xung Nhịp (SPI Modes) & Giao Tiếp Bộ Nhớ Flash",
+          "paragraphs": [
+            "Giao thức giao tiếp ngoại vi nối tiếp (Serial Peripheral Interface - SPI), do Motorola khởi xướng, là chuẩn truyền thông đồng bộ bốn dây hoạt động ở chế độ song công toàn phần (Full-Duplex) với tốc độ cao hơn rất nhiều so với I2C (thường từ vài MHz lên đến hơn 100 MHz). Bốn đường tín hiệu tiêu chuẩn của SPI bao gồm: SCK (Serial Clock - xung nhịp đồng bộ từ Master), MOSI (Master Out Slave In - dữ liệu từ Master gửi tới Slave), MISO (Master In Slave Out - dữ liệu từ Slave phản hồi về Master), và CS# hoặc SS# (Chip Select / Slave Select - tín hiệu chọn chip, tích cực ở mức logic THẤP 0). Mỗi khi Master muốn giao tiếp với một Slave cụ thể, nó sẽ kéo chân CS# tương ứng của Slave đó xuống mức THẤP; các Slave khác có chân CS# ở mức CAO sẽ đưa chân MISO của chúng về trạng thái trở kháng cao (High-Z) để không can thiệp vào đường truyền.",
+            "Giao thức SPI không có cơ chế bắt tay bằng phần cứng (như bit ACK/NACK của I2C) mà đồng bộ dữ liệu hoàn toàn dựa trên sườn xung nhịp. Chuẩn SPI định nghĩa 4 chế độ hoạt động (SPI Modes 0, 1, 2, 3) dựa trên sự kết hợp của hai thông số: Phân cực xung nhịp (Clock Polarity - CPOL, xác định trạng thái logic của SCK khi bus rảnh rỗi) và Pha xung nhịp (Clock Phase - CPHA, xác định sườn xung nào của SCK sẽ được sử dụng để lấy mẫu dữ liệu). Trong chế độ SPI Mode 0 (CPOL=0, CPHA=0), xung SCK ở mức THẤP khi rảnh rỗi và dữ liệu được lấy mẫu tại sườn lên (rising edge) đầu tiên. Trong chế độ SPI Mode 3 (CPOL=1, CPHA=1), xung SCK ở mức CAO khi rảnh rỗi và dữ liệu được lấy mẫu tại sườn lên thứ hai. Đa số các chip nhớ SPI Flash thương mại đều hỗ trợ linh hoạt cả hai chế độ Mode 0 và Mode 3.",
+            "Nhằm tăng cường băng thông cho quá trình thực thi mã trực tiếp tại chỗ (Execute-in-Place - XIP) từ Flash, ngành công nghiệp đã mở rộng chuẩn SPI truyền thống thành Dual-SPI và Quad-SPI (QSPI). Trong cấu hình Quad-SPI, các chân MOSI, MISO và hai chân chức năng khác (thường là WP# - Write Protect và HOLD#) được tái định nghĩa thành 4 đường dữ liệu hai chiều song song (IO0, IO1, IO2, IO3). Điều này cho phép truyền 4 bit dữ liệu trong mỗi chu kỳ xung nhịp SCK, nâng tốc độ truyền tải lên gấp 4 lần so với SPI truyền thống.",
+            "Hầu hết các chip nhớ SPI NOR Flash hiện đại (như Winbond họ W25Qxx, Macronix MX25Lxx, GigaDevice GD25Qxx) đều tuân theo tập lệnh chuẩn hóa theo thông số kỹ thuật JEDEC JESD216 (Serial Flash Discoverable Parameters - SFDP). Một số mã lệnh (Opcodes) cơ bản nhất bao gồm: lệnh `0x9F` (Read JEDEC ID - yêu cầu chip phản hồi 3 byte nhận dạng: Manufacturer ID, Memory Type, và Capacity); lệnh `0x03` (Read Data - đọc dữ liệu tuần tự bắt đầu từ địa chỉ 24-bit hoặc 32-bit với tốc độ xung nhịp chuẩn); lệnh `0x0B` (Fast Read - đọc dữ liệu tốc độ cao kèm các chu kỳ chờ dummy cycles); lệnh `0x06` (Write Enable - mở khóa ghi trước khi lập trình hoặc xóa); và lệnh `0x20` / `0xD8` (Erase Sector / Block - xóa dữ liệu theo khối ô nhớ)."
+          ]
+        },
+        {
+          "title": "Kỹ Thuật Trích Xuất Bộ Nhớ Trong Mạch (In-Circuit SPI Flash Dumping) Với Flashrom, CH341A & Bus Pirate",
+          "paragraphs": [
+            "Trích xuất bộ nhớ SPI Flash là một trong những kỹ thuật cơ bản nhất của quy trình kiểm toán phần cứng IoT để thu thập toàn bộ firmware nhị phân của thiết bị. Trong quy trình kiểm toán không phá hủy (Non-destructive testing), thay vì sử dụng máy khò nhiệt (Hot Air Rework Station) để nhổ chip Flash ra khỏi bo mạch, kiểm toán viên áp dụng kỹ thuật trích xuất trong mạch (In-Circuit Dumping) bằng cách sử dụng kẹp kiểm tra vi mạch SOIC-8 (như kẹp Pomona 5250) hoặc đầu dò pogo pin bấm trực tiếp lên 8 chân của chip Flash trên bo mạch PCB.",
+            "Thách thức kỹ thuật lớn nhất khi thực hiện In-Circuit Dumping là hiện tượng Cấp nguồn ký sinh (Parasitic Powering) và Xung đột bus (Bus Contention). Khi kiểm toán viên cấp nguồn 3.3V từ bộ nạp USB (như CH341A, Bus Pirate, hoặc FTDI FT2232H) vào chân VCC của chip Flash, dòng điện sẽ chạy ngược qua các diode bảo vệ ESD nội vi và đường mạch nguồn của bo mạch để cấp điện cho vi xử lý chính (SoC). Khi được cấp nguồn ngoài ý muốn, SoC sẽ tự động khởi động và cũng tìm cách điều khiển các đường tín hiệu SPI (đặc biệt là xung SCK và chân Chip Select CS#). Khi cả bộ nạp USB và SoC cùng phát tín hiệu logic trái ngược nhau trên cùng một đường mạch (một bên kéo lên 3.3V, một bên kéo xuống 0V), hiện tượng xung đột bus xảy ra khiến dữ liệu đọc ra bị sai lệch hoàn toàn (toàn byte `0xFF` hoặc `0x00`) và thậm chí có thể làm cháy chân I/O của chip.",
+            "Để giải quyết triệt để vấn đề xung đột bus, kiểm toán viên áp dụng các giải pháp kỹ thuật: Phương án 1 (thông dụng nhất): Xác định chân Reset (NRST/RESET#) của SoC chính và sử dụng một dây kẹp nối chân này trực tiếp xuống Đất (GND). Thao tác này giữ SoC ở trạng thái cưỡng bức Reset liên tục; ở trạng thái này, toàn bộ các chân I/O của SoC sẽ được đưa về trạng thái trở kháng cao (High-Z / Tristate), giải phóng hoàn toàn các đường bus SPI cho bộ nạp ngoài điều khiển. Phương án 2: Sử dụng nguồn điện ngoài có giới hạn dòng điện khắt khe và kết nối chân CS# thông qua một điện trở cách ly. Nếu mạch điện quá phức tạp hoặc SoC không có chân Reset lộ ra ngoài, việc khò nhổ chip khỏi bo mạch và đặt vào đế nạp ZIF socket là giải pháp bắt buộc để bảo toàn dữ liệu.",
+            "Công cụ phần mềm tiêu chuẩn công nghiệp để thực hiện trích xuất là `flashrom`. Sau khi kết nối bộ nạp (ví dụ bộ nạp USB FTDI FT2232H), kiểm toán viên chạy lệnh nhận diện: `flashrom -p ft2232_spi:type=232H`. Lệnh này gửi opcode JEDEC `0x9F` để truy vấn ID chip; khi chip phản hồi chính xác (ví dụ `Found Winbond flash chip 'W25Q64.V' (8192 kB, SPI)`), kiểm toán viên tiến hành đọc toàn bộ nội dung bộ nhớ bằng lệnh: `flashrom -p ft2232_spi:type=232H -r dump1.bin`. Quy tắc an toàn bắt buộc là phải thực hiện đọc ít nhất hai lần liên tiếp tạo ra hai tệp riêng biệt (`dump1.bin` và `dump2.bin`), sau đó so sánh mã băm mật mã của chúng: `sha256sum dump1.bin dump2.bin`. Chỉ khi hai mã băm SHA-256 hoàn toàn trùng khớp nhau từng bit, kiểm toán viên mới được phép khẳng định tệp firmware dump là toàn vẹn và không bị nhiễu tín hiệu."
+          ]
+        },
+        {
+          "title": "Đánh Chặn Bus Thời Gian Thực (Active Interception), Replay Attack & Giải Pháp Mã Hóa Bus Phần Cứng",
+          "paragraphs": [
+            "Bên cạnh việc trích xuất bộ nhớ tĩnh, việc đánh chặn tín hiệu trên bus SPI và I2C trong khi thiết bị đang vận hành bình thường (Runtime Bus Interception) mở ra một bề mặt tấn công cực kỳ nghiêm trọng. Trong nhiều thiết bị IoT, hệ thống sử dụng một chip phần cứng chuyên dụng để lưu trữ khóa bí mật (Secure Element) hoặc lưu trữ cấu hình mạng, nhưng lại kết nối với SoC chính qua bus I2C hoặc SPI không mã hóa. Kẻ tấn công có thể gắn kẹp logic analyzer hoặc thiết bị cắm xen giữa (Interposer Board / Man-in-the-Middle) để ghi lại toàn bộ các giao dịch trao đổi dữ liệu trong quá trình khởi động.",
+            "Một mối đe dọa điển hình là tấn công phát lại (Replay Attack) hoặc chèn dữ liệu giả mạo (Data Injection). Ví dụ, nếu chip bảo mật gửi phản hồi xác thực sinh trắc học hoặc tín hiệu mở khóa qua bus I2C dưới dạng một bản tin cố định (ví dụ chuỗi byte `0xAA 0x01 0x55`), kẻ tấn công có thể ngắt kết nối vật lý chân SDA của chip bảo mật và sử dụng một vi điều khiển giá rẻ (như Raspberry Pi Pico hoặc ESP32) để tiêm chuỗi byte này vào chân RX của SoC chính, đánh lừa hệ điều hành rằng quá trình xác thực đã thành công. Trên bus SPI, kẻ tấn công có thể thực hiện kỹ thuật can thiệp sụt áp (Bus Glitching): bằng cách nối chân MISO xuống GND đúng vào chu kỳ xung nhịp kiểm tra chữ ký số của bootloader, kẻ tấn công có thể ép CPU đọc toàn bộ giá trị băm thành các số 0, vượt qua cơ chế kiểm tra tính toàn vẹn nếu mã nguồn kiểm tra bị lỗi lỏng lẻo.",
+            "Để phòng chống các cuộc tấn công đánh chặn vật lý trên bus, các kiến trúc phần cứng hiện đại bắt buộc phải triển khai giải pháp Mã hóa Bus Phần Cứng (Hardware Bus Encryption). Điển hình là công nghệ mã hóa bộ nhớ ngoài theo thời gian thực (On-The-Fly Flash Decryption Engine) được tích hợp trong bộ điều khiển bộ nhớ của các SoC hiện đại (như bộ điều khiển SPI Flash Controller của NXP i.MX RT hoặc ESP32 Flash Encryption). Toàn bộ nội dung ghi trên chip SPI Flash bên ngoài được mã hóa bằng thuật toán AES-XTS-128 hoặc AES-CTR với khóa mã hóa duy nhất được đốt kín trong cầu chì phần cứng eFuse của SoC. Khi CPU nạp lệnh từ Flash để thực thi, bộ giải mã phần cứng nội vi sẽ giải mã dòng dữ liệu ngay trên đường truyền mà không làm giảm đáng kể hiệu năng.",
+            "Nếu kẻ tấn công dùng kẹp SOIC-8 để dump chip SPI Flash được bảo vệ bởi Flash Encryption, tệp nhị phân thu được sẽ là một khối dữ liệu có chỉ số Shannon Entropy cực cao (~7.99/8.0) hoàn toàn không thể phân tích hay dịch ngược được vì thiếu khóa AES nằm trong silicon SoC. Tương tự, đối với bus I2C kết nối với các chip Secure Element (như Microchip ATECC608), nhà sản xuất cấu hình cơ chế Khóa bảo vệ I/O (IO Protection Key): trước khi truyền các tham số nhạy cảm qua bus I2C, SoC và Secure Element thiết lập một phiên mã hóa dữ liệu cục bộ bằng thuật toán AES-GCM hoặc HMAC, biến toàn bộ dữ liệu đi qua đường mạch đồng PCB thành bản mã vô nghĩa đối với bất kỳ thiết bị sniffing nào."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Bus Nối Tiếp I2C, Trích Xuất In-Circuit SPI Flash Bằng Flashrom Và Chống Đột Nhập Tín Hiệu",
+        "objective": "Áp dụng máy phân tích logic để đánh chặn và giải mã gói tin bản rõ trên bus I2C EEPROM, thực hiện trích xuất trong mạch bộ nhớ SPI Flash 8MB bằng công cụ flashrom, và phân tích ranh giới an ninh của cơ chế Hardware Bus Encryption.",
+        "scenario": "Một thiết bị camera an ninh thông minh (IP Camera) sử dụng vi điều khiển chính kết nối với một chip nhớ EEPROM I2C (Microchip 24LC64 vỏ SOIC-8) và một chip nhớ SPI NOR Flash 8MB (Winbond W25Q64FV vỏ SOIC-8). Bạn được yêu cầu trích xuất toàn bộ cấu hình mạng nhạy cảm lưu trong EEPROM qua kỹ thuật passive sniffing, sau đó thực hiện in-circuit dumping bộ nhớ Flash bằng kẹp SOIC-8 kết hợp công cụ flashrom mà không làm hỏng bo mạch của khách hàng.",
+        "constraints": [
+          "Bắt buộc gắn dây kẹp giữ chân Reset của vi xử lý chính xuống GND trước khi cấp nguồn cho bộ nạp SPI ngoài.",
+          "Phải thực hiện đối chiếu mã băm SHA-256 giữa hai lần dump liên tiếp để đảm bảo tính toàn vẹn trước khi phân tích nhị phân.",
+          "Điện áp cấp từ bộ nạp vào chip Flash không được vượt quá mức định mức 3.3V DC (nguy cơ cháy chip nếu bộ nạp để nhầm jumper 5V)."
+        ],
+        "cases": [
+          {
+            "id": "case-104-01",
+            "title": "Đánh Chặn Thụ Động Giao Tiếp I2C Và Trích Xuất Khóa Bí Mật Từ EEPROM",
+            "context": "Bạn gắn 2 kênh của máy phân tích logic vào chân 5 (SDA) và chân 6 (SCL) của chip EEPROM 24LC64. Bật nguồn thiết bị, phần mềm logic analyzer ghi nhận được chuỗi bản tin I2C: Master gửi START, theo sau là byte `0xA0` (phản hồi ACK), gửi tiếp 2 byte địa chỉ bộ nhớ `0x00 0x10` (ACK), sau đó phát lại Repeated START, gửi byte `0xA1` (ACK), và nhận về 16 byte dữ liệu kết thúc bằng NACK và STOP.",
+            "prompt": "Giải mã giao dịch I2C trên phản ánh thao tác gì và giá trị byte `0xA0` và `0xA1` đại diện cho điều gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "SoC chính đang đọc dữ liệu từ EEPROM tại địa chỉ offset 0x0010. Byte `0xA0` biểu thị 7-bit địa chỉ Slave `0b1010000` (0x50) với bit R/W = 0 (Ghi địa chỉ con trỏ), và byte `0xA1` biểu thị địa chỉ Slave 0x50 với bit R/W = 1 (Bắt đầu đọc dữ liệu).",
+                "correct": true,
+                "rationale": "Chuẩn I2C EEPROM sử dụng địa chỉ cơ sở 0b1010 (0x50). Byte đầu tiên 0xA0 là `(0x50 << 1) | 0` để nạp con trỏ địa chỉ thanh ghi (0x0010); sau đó Repeated START phát 0xA1 là `(0x50 << 1) | 1` để chuyển sang chế độ đọc dữ liệu tuần tự từ EEPROM."
+              },
+              {
+                "id": "B",
+                "label": "SoC chính đang xóa toàn bộ chip EEPROM và ghi đè dữ liệu ngẫu nhiên vào địa chỉ 0xA0A1.",
+                "correct": false,
+                "rationale": "Giao thức I2C không xóa chip bằng lệnh 0xA0; chuỗi bản tin chứa Repeated START và bit R/W=1 rõ ràng là chuỗi lệnh đọc dữ liệu chuẩn (Random Read)."
+              },
+              {
+                "id": "C",
+                "label": "Đây là giao dịch SPI Mode 0 bị nhận diện nhầm thành I2C do thiếu chân Chip Select.",
+                "correct": false,
+                "rationale": "Tín hiệu có điều kiện START (SDA tụt khi SCL cao) và bit phản hồi ACK/NACK tại chu kỳ thứ 9, hoàn toàn khớp với đặc tả kỹ thuật I2C, không phải SPI."
+              },
+              {
+                "id": "D",
+                "label": "Chip EEPROM đang từ chối giao tiếp (NACK) do xung đột địa chỉ với cảm biến nhiệt độ.",
+                "correct": false,
+                "rationale": "Mọi byte địa chỉ và con trỏ đều nhận được phản hồi ACK (SDA kéo xuống thấp); bit NACK ở byte cuối cùng là hành vi bắt buộc của Master để báo hiệu kết thúc chuỗi đọc trước lệnh STOP."
+              }
+            ]
+          },
+          {
+            "id": "case-104-02",
+            "title": "Xử Lý Xung Đột Bus (Bus Contention) Khi Dump Chip SPI Flash Bằng Flashrom",
+            "context": "Bạn gắn kẹp kiểm tra SOIC-8 vào chip SPI Flash W25Q64FV trên bo mạch và cắm bộ nạp USB FTDI FT2232H vào máy tính. Khi chạy lệnh `flashrom -p ft2232_spi:type=232H`, công cụ báo lỗi: `No EEPROM/flash device found. Generic SPI chip: 0x00 0x00 0x00`. Đèn LED trạng thái trên bo mạch camera sáng mờ mờ mặc dù bạn chưa hề cắm nguồn chính cho camera.",
+            "prompt": "Hiện tượng kỹ thuật gì đang xảy ra và biện pháp can thiệp nào là chuẩn xác để flashrom có thể đọc được chip?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đang xảy ra hiện tượng cấp nguồn ký sinh (parasitic powering) từ chân 3.3V của bộ nạp sang vi xử lý chính của camera, khiến SoC tự khởi động và tranh chấp tín hiệu bus SPI. Giải pháp: Kẹp nối chân Reset của SoC chính xuống GND để ép SoC vào trạng thái câm (High-Z), sau đó thực hiện lại lệnh flashrom.",
+                "correct": true,
+                "rationale": "Đèn LED sáng mờ chứng minh nguồn 3.3V của programmer đang rò qua diode bảo vệ nuôi SoC; SoC thức dậy và lái các đường SPI gây xung đột khiến phản hồi ID toàn số 0x00. Giữ chân Reset của SoC xuống GND sẽ thả nổi bus I/O và giải quyết triệt để vấn đề."
+              },
+              {
+                "id": "B",
+                "label": "Chip Flash đã bị hỏng bộ nhớ vĩnh viễn; cần nạp điện áp 12V vào chân VCC để phục hồi các ô nhớ Flash bị khóa.",
+                "correct": false,
+                "rationale": "Nạp điện áp 12V vào chip Flash 3.3V sẽ phá hủy hoàn toàn cấu trúc silicon của linh kiện ngay tức khắc."
+              },
+              {
+                "id": "C",
+                "label": "Bộ chuyển đổi FTDI FT2232H không hỗ trợ chip Winbond; bắt buộc phải mua máy nạp chuyên dụng của nhà sản xuất Winbond.",
+                "correct": false,
+                "rationale": "Flashrom hỗ trợ đầy đủ giao thức SPI chuẩn JEDEC cho toàn bộ họ chip Winbond thông qua phần cứng FT2232H."
+              },
+              {
+                "id": "D",
+                "label": "Tốc độ xung nhịp SPI quá chậm; cần tăng xung nhịp SCK lên 150MHz để vượt qua tín hiệu nhiễu từ bo mạch.",
+                "correct": false,
+                "rationale": "Tăng xung nhịp trên đường dây kẹp SOIC-8 dài sẽ càng làm tăng điện dung ký sinh và méo dạng sóng, khiến việc đọc dữ liệu hoàn toàn bất khả thi; trong in-circuit dumping, giảm xung nhịp mới là cách tăng độ ổn định."
+              }
+            ]
+          },
+          {
+            "id": "case-104-03",
+            "title": "Đánh Giá Tính Toàn Vẹn Của Tệp Dump Và Nhận Diện Cơ Chế Mã Hóa Bus Phần Cứng",
+            "context": "Sau khi nối chân Reset của SoC xuống GND, bạn chạy flashrom hai lần thành công và thu được hai tệp nhị phân `fw_dump1.bin` và `fw_dump2.bin` (dung lượng đúng 8,388,608 bytes). Lệnh `sha256sum fw_dump1.bin fw_dump2.bin` cho ra cùng một mã băm duy nhất. Tuy nhiên, khi phân tích tệp dump bằng công cụ `binwalk -E fw_dump1.bin`, biểu đồ entropy cho thấy toàn bộ tệp từ byte 0x00000000 đến cuối đều có chỉ số Shannon Entropy xấp xỉ 7.998, và lệnh `strings` không tìm thấy bất kỳ chuỗi văn bản ASCII có nghĩa nào.",
+            "prompt": "Kết quả phân tích entropy và strings trên chỉ ra điều gì về kiến trúc bảo mật của thiết bị này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Thiết bị triển khai cơ chế Mã hóa Bus Flash phần cứng (On-The-Fly Flash Encryption, ví dụ AES-XTS-128); toàn bộ dữ liệu lưu trên chip Flash bên ngoài đã được mã hóa bằng khóa bảo mật nằm trong eFuse của SoC. Tệp dump nhị phân không thể giải mã hay dịch ngược ngoại tuyến nếu không trích xuất được khóa phần cứng này từ bên trong silicon của SoC.",
+                "correct": true,
+                "rationale": "Chỉ số Shannon Entropy gần tuyệt đối (7.998/8.0) trải dài liên tục từ đầu đến cuối tệp kết hợp với việc không có chuỗi ASCII nào chứng minh firmware đã được mã hóa bằng thuật toán mật mã khối đối xứng ở tầng phần cứng (Flash Encryption), đây là ranh giới phòng vệ phần cứng hiệu quả cao."
+              },
+              {
+                "id": "B",
+                "label": "Tệp dump đã bị hỏng hoàn toàn trong quá trình đọc do kẹp SOIC-8 tiếp xúc lỏng lẻo; cần hàn lại chân chip để đọc lại.",
+                "correct": false,
+                "rationale": "Hai lần dump liên tiếp cho ra mã băm SHA-256 hoàn toàn trùng khớp từng bit, chứng minh đường truyền dữ liệu hoàn hảo và không hề có lỗi tiếp xúc vật lý."
+              },
+              {
+                "id": "C",
+                "label": "Chip nhớ SPI Flash này bị lỗi bad blocks khiến dữ liệu bị biến đổi thành mã ngẫu nhiên.",
+                "correct": false,
+                "rationale": "Chip SPI NOR Flash (như W25Q64) có độ tin cậy cực cao và không có khái niệm bad block như NAND Flash; entropy đồng nhất là dấu hiệu đặc trưng của mã hóa mật mã."
+              },
+              {
+                "id": "D",
+                "label": "Firmware được nén bằng thuật toán GZIP thông thường; chỉ cần đổi tên tệp thành `.tar.gz` là có thể giải nén bằng lệnh tar.",
+                "correct": false,
+                "rationale": "Dữ liệu nén GZIP luôn có các byte magic header đặc trưng (`1F 8B`) tại đầu tệp với entropy ban đầu thấp hơn; entropy 7.998 ngay từ byte đầu tiên chứng minh dữ liệu bị mã hóa chứ không đơn thuần là nén dữ liệu."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Bắt gói tin và giải mã chính xác địa chỉ Slave, bit R/W và dữ liệu bản rõ trên bus nối tiếp I2C EEPROM.",
+          "Chẩn đoán và khắc phục thành công hiện tượng cấp nguồn ký sinh và xung đột bus SPI bằng phương pháp tiếp đất chân Reset của SoC.",
+          "Thực hiện quy trình đọc kiểm chứng hai lần đối chiếu mã băm SHA-256 trên flashrom và nhận diện đúng cơ chế On-The-Fly Flash Encryption qua biểu đồ entropy."
+        ],
+        "evidenceTemplate": [
+          "Biên bản giải mã gói tin I2C trích xuất từ phần mềm máy phân tích logic kèm bảng đối chiếu địa chỉ thanh ghi",
+          "Ảnh chụp hiện trường gắn kẹp SOIC-8 và dây nối đất chân Reset của SoC chính trên bo mạch",
+          "Nhật ký dòng lệnh flashrom hiển thị mã JEDEC ID của chip Flash và bảng kiểm tra mã băm sha256sum trùng khớp",
+          "Đồ thị phân tích Shannon Entropy của tệp dump nhị phân chứng minh trạng thái mã hóa bus phần cứng"
+        ],
+        "reset": "Tháo gỡ kẹp SOIC-8 và các dây tiếp đất chân Reset, lau sạch bề mặt tiếp xúc của chip bằng cồn Isopropyl Alcohol (IPA).",
+        "cleanup": "Lưu trữ các tệp dump nhị phân vào thư mục bằng chứng được mã hóa và xóa sạch các tệp nhị phân tạm trên máy trạm."
+      },
+      "governance": {
+        "prevent": [
+          "Kích hoạt tính năng Mã hóa Flash phần cứng (Hardware Flash Encryption) với khóa mật mã duy nhất được đốt vào cầu chì eFuse của SoC để vô hiệu hóa khả năng đọc trích xuất trực tiếp từ chip Flash ngoại vi.",
+          "Không lưu trữ các thông tin định danh nhạy cảm, mật khẩu hoặc khóa mật mã dưới dạng bản rõ (plaintext) trong các chip nhớ EEPROM hoặc SPI Flash ngoài.",
+          "Áp dụng công nghệ đóng gói Hệ thống trong Gói (System-in-Package - SiP) tích hợp chip Flash và RAM trực tiếp bên trong vỏ bọc silicon của SoC nhằm loại bỏ các đường mạch tín hiệu lộ ra ngoài bo mạch PCB."
+        ],
+        "observe": [
+          "Giám sát tính toàn vẹn của dữ liệu nạp từ Flash trong chuỗi khởi động thông qua bộ kiểm tra băm phần cứng (Hardware Cryptographic Hash Accelerator).",
+          "Theo dõi các sự kiện sụt áp hoặc nhiễu xung bất thường trên đường xung nhịp bus SPI/I2C để phát hiện các hành vi chèn lỗi tín hiệu vật lý (Glitch Detection).",
+          "Kiểm tra định kỳ cấu hình các bit khóa bảo vệ ghi (Write Protect - WP#) của chip SPI Flash để ngăn ngừa việc ghi đè mã độc vào bootloader."
+        ],
+        "respond": [
+          "Khi phát hiện lỗi sai lệch chữ ký số của phân vùng nạp từ Flash ngoài, lập tức đình chỉ chuỗi khởi động và ngắt nguồn các linh kiện ngoại vi.",
+          "Cấu hình SoC tự động chuyển sang chế độ phục hồi an toàn (Secure Recovery Mode) thông qua phân vùng Flash dự phòng bất biến.",
+          "Thu hồi và cập nhật lại toàn bộ khóa mã hóa bus hoặc chứng chỉ thiết bị nếu bo mạch vật lý có dấu hiệu bị can thiệp mối hàn hoặc kẹp probe."
+        ],
+        "residualRisk": [
+          "Các kỹ thuật tấn công vật lý bóc tách vỏ vi mạch (Decapping) và đọc trạng thái ô nhớ Flash bằng kính hiển vi quang học hoặc đầu dò vi mô vẫn có thể trích xuất dữ liệu không được mã hóa tầng silicon.",
+          "Tấn công ghi đè Flash qua việc thao tác chân nạp khi thiết bị không khóa bit Write Protect vẫn là nguy cơ hiện hữu trên các thiết bị giá rẻ."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Chỉ cần tắt các cổng gỡ lỗi UART và JTAG là kẻ tấn công sẽ không thể nào trích xuất được firmware từ bo mạch thiết bị IoT.",
+          "correction": "Firmware thường được lưu trữ trên các chip nhớ rời như SPI NOR Flash hoặc eMMC; kẻ tấn công hoàn toàn có thể sử dụng kẹp kiểm tra SOIC-8 hoặc khò nhổ chip nhớ ra ngoài để đọc trực tiếp toàn bộ dữ liệu mà không cần bất kỳ cổng gỡ lỗi nào."
+        },
+        {
+          "claim": "Khi kẹp bộ nạp vào chip Flash trên bo mạch, nếu đèn LED của thiết bị sáng lên thì đó là dấu hiệu tốt cho thấy bo mạch đã được cấp nguồn đầy đủ để đọc chip.",
+          "correction": "Đèn LED sáng lên là chỉ dấu nguy hiểm của hiện tượng cấp nguồn ký sinh (parasitic powering); dòng điện nuôi ngược SoC sẽ khiến SoC thức dậy và tranh chấp đường truyền bus SPI, gây lỗi đọc dữ liệu hoặc phá hủy cổng I/O."
+        },
+        {
+          "claim": "Mọi tệp nhị phân có dung lượng đúng bằng dung lượng vật lý của chip Flash (ví dụ đúng 8MB) đều là tệp dump hoàn hảo và chính xác.",
+          "correction": "Một tệp dump chứa toàn byte 0x00 hoặc 0xFF do tiếp xúc lỏng lẻo vẫn có dung lượng đúng 8MB; quy tắc vàng là phải dump hai lần liên tiếp và so sánh mã băm SHA-256 để đảm bảo tính toàn vẹn từng bit."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os11-l104-q1",
+          "difficulty": "easy",
+          "question": "Trong giao thức truyền thông nối tiếp I2C, điều kiện Bắt đầu (START Condition) được định nghĩa chính xác bởi sự thay đổi trạng thái tín hiệu nào sau đây?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Đường dữ liệu SDA chuyển từ mức CAO xuống mức THẤP trong khi đường xung nhịp SCL đang ở mức CAO."
+            },
+            {
+              "id": "B",
+              "label": "Đường xung nhịp SCL chuyển từ mức THẤP lên mức CAO trong khi đường dữ liệu SDA đang ở mức THẤP."
+            },
+            {
+              "id": "C",
+              "label": "Đường dữ liệu SDA chuyển từ mức THẤP lên mức CAO trong khi đường xung nhịp SCL đang ở mức CAO."
+            },
+            {
+              "id": "D",
+              "label": "Cả hai đường SDA và SCL cùng đồng thời chuyển từ mức CAO xuống mức THẤP."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Theo chuẩn giao thức I2C, điều kiện START được kích hoạt khi đường dữ liệu SDA chuyển từ mức CAO xuống mức THẤP trong lúc đường xung nhịp SCL đang được giữ ở mức logic CAO."
+        },
+        {
+          "id": "os11-l104-q2",
+          "difficulty": "medium",
+          "question": "Khi thực hiện trích xuất bộ nhớ SPI Flash trong mạch (In-Circuit Dumping) bằng kẹp SOIC-8, biện pháp kỹ thuật nào là hiệu quả nhất để ngăn chặn vi xử lý chính (SoC) thức dậy và gây ra hiện tượng xung đột bus (Bus Contention)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tăng điện áp cấp cho chip Flash từ 3.3V lên 5.0V để lấn át tín hiệu của SoC."
+            },
+            {
+              "id": "B",
+              "label": "Kẹp nối chân Reset (NRST/RESET#) của SoC chính trực tiếp xuống Đất (GND) để giữ SoC ở trạng thái câm (High-Z)."
+            },
+            {
+              "id": "C",
+              "label": "Ngắt kết nối chân xung nhịp SCK của bộ nạp và chỉ đọc dữ liệu qua chân MISO."
+            },
+            {
+              "id": "D",
+              "label": "Chạy lệnh flashrom với tốc độ xung nhịp cực đại 100MHz."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Kẹp giữ chân Reset của SoC xuống GND sẽ đưa SoC vào trạng thái cưỡng bức Reset; ở trạng thái này toàn bộ các chân GPIO/SPI của SoC sẽ được đưa về chế độ trở kháng cao (High-Z/Tristate), giải phóng hoàn toàn bus SPI cho bộ nạp ngoài điều khiển mà không lo xung đột."
+        },
+        {
+          "id": "os11-l104-q3",
+          "difficulty": "hard",
+          "question": "Mã opcode JEDEC chuẩn nào được công cụ flashrom gửi qua giao tiếp SPI để truy vấn Manufacturer ID, Memory Type và Capacity của một chip nhớ SPI NOR Flash?",
+          "options": [
+            {
+              "id": "A",
+              "label": "0x03 (Read Data)"
+            },
+            {
+              "id": "B",
+              "label": "0x06 (Write Enable)"
+            },
+            {
+              "id": "C",
+              "label": "0x9F (Read JEDEC ID)"
+            },
+            {
+              "id": "D",
+              "label": "0x20 (Sector Erase)"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Opcode 0x9F là mã lệnh tiêu chuẩn theo đặc tả JEDEC JESD216 SFDP (Serial Flash Discoverable Parameters); khi nhận được byte 0x9F, chip Flash sẽ lập tức phản hồi 3 byte nhận dạng định danh nhà sản xuất và dung lượng chip."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một thiết bị máy truyền dịch y tế thông minh (Connected Infusion Pump) kết nối Wi-Fi trong bệnh viện bị nghi ngờ lưu trữ mật khẩu mạng bệnh viện và chứng chỉ máy khách trong một chip SPI Flash 4MB (Macronix MX25L3206E). Khách hàng yêu cầu kiểm toán viên trích xuất firmware mà không được tháo hàn linh kiện ra khỏi bo mạch vì thiết bị cần được trả lại nguyên trạng sau khi đánh giá.",
+        "tasks": [
+          "Khảo sát sơ đồ mạch PCB, xác định vị trí chip MX25L3206E và dò tìm điểm kiểm tra (test pad) của chân NRST trên vi điều khiển chính.",
+          "Thiết lập kẹp đo kiểm SOIC-8, nối đất chân NRST và sử dụng flashrom trích xuất hai bản sao độc lập của bộ nhớ Flash.",
+          "Thẩm định tính toàn vẹn bằng SHA-256, sử dụng Binwalk bóc tách phân vùng SquashFS và kiểm toán các tệp cấu hình mạng trong thư mục `/etc/wpa_supplicant.conf`."
+        ],
+        "requiredEvidence": [
+          "Bảng kết quả so sánh mã băm SHA-256 của hai lần đọc firmware độc lập từ flashrom",
+          "Ảnh chụp kết nối phần cứng với kẹp SOIC-8 và dây tiếp đất chân Reset của vi xử lý",
+          "Báo cáo thẩm tra an ninh chỉ ra nội dung trích xuất được từ tệp cấu hình Wi-Fi kèm khuyến nghị mã hóa bus Flash"
+        ]
+      },
+      "sources": [
+        {
+          "title": "JEDEC Standard: Serial Flash Discoverable Parameters (SFDP) JESD216D",
+          "url": "https://www.jedec.org/standards-documents/docs/jesd216d",
+          "publisher": "JEDEC Solid State Technology Association",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả tập lệnh chuẩn cho bộ nhớ nối tiếp JEDEC SPI NOR Flash (lệnh 0x9F, 0x03, 0x0B)",
+            "Cấu trúc bảng tham số SFDP và quy chuẩn nhận dạng dung lượng bộ nhớ"
+          ]
+        },
+        {
+          "title": "I2C-bus specification and user manual (UM10204)",
+          "url": "https://www.nxp.com/docs/en/user-guide/UM10204.pdf",
+          "publisher": "NXP Semiconductors",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Định nghĩa vật lý đường truyền cực thu hở (Open-Drain) và điện trở kéo lên của bus I2C",
+            "Cấu trúc điều kiện START/STOP, địa chỉ 7-bit/10-bit và cơ chế Clock Stretching"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os11-l105-device-identity-cryptographic-coprocessors-and-iot-cloud",
+      "slug": "device-identity-cryptographic-coprocessors-and-iot-cloud",
+      "title": "Ranh Giới An Ninh Định Danh Thiết Bị, Bộ Đồng Xử Lý Mật Mã (ATECC608, TPM 2.0) & Xác Thực mTLS IoT Cloud",
+      "summary": "Phân tích kiến trúc định danh thiết bị IoT (Hardware Root of Trust) và cơ chế bảo vệ khóa riêng tư thông qua các bộ đồng xử lý mật mã chuyên dụng (Microchip ATECC608A/B Secure Element, Trusted Platform Module - TPM 2.0, ARM TrustZone-M CryptoCell); cơ chế trao đổi khóa mật và chữ ký số nội suy (on-chip ECDSA sign) không để lộ private key ra ngoài bus; giao thức xác thực hai chiều mTLS (Mutual TLS) kết nối với hạ tầng điện toán đám mây IoT (AWS IoT Core, Azure IoT Hub, Google Cloud IoT); cùng các bề mặt tấn công nâng cao: trích xuất khóa qua kênh kề (Side-Channel Power Analysis DPA/CPA), tấn công Replay lệnh giao tiếp I2C/SPI Crypto IC, tấn công chuỗi cung ứng provisioning và phân quyền định danh đám mây.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [
+        "os11-l103-hardware-debug-interfaces-uart-jtag-and-swd",
+        "os11-l104-serial-buses-and-chip-communications-i2c-spi"
+      ],
+      "outcomes": [
+        "Phân tích kiến trúc Gốc Tin Cậy Phần Cứng (Hardware Root of Trust) và cấu trúc phân vùng khóa bảo mật trong các chip Secure Element (như Microchip ATECC608) và vi mạch TPM 2.0 (TCG TPM 2.0 Architecture).",
+        "Giải mã cơ chế ký số nội suy (On-chip ECDSA/RSA Signature) và chứng minh tính bảo toàn của khóa riêng tư (Private Key) không bao giờ bị lộ ra ngoài bus I2C/SPI trong quy trình bắt tay xác thực.",
+        "Kiểm toán cấu hình giao thức xác thực hai chiều mTLS (Mutual TLS) kết nối giữa thiết bị IoT và cổng đám mây (AWS IoT Core, Azure IoT Hub), phát hiện các lỗi ủy thác chứng chỉ số X.509 và cấu hình chính sách phân quyền IAM/IoT Policy lỏng lẻo.",
+        "Đánh giá các bề mặt tấn công nâng cao nhắm vào bộ đồng xử lý mật mã: kỹ thuật phân tích kênh kề tiêu thụ năng lượng (DPA/CPA), tấn công phát lại lệnh I2C (Replay Attack) và phương pháp phòng vệ bằng cơ chế IO Protection Key."
+      ],
+      "careerPaths": ["penetration-test", "vulnerability-research"],
+      "domains": ["iot", "hardware", "cloud", "protocols"],
+      "attackTactics": [
+        "initial-access",
+        "credential-access",
+        "defense-evasion",
+        "lateral-movement"
+      ],
+      "keywords": [
+        "device-identity",
+        "secure-element",
+        "atecc608",
+        "tpm-2.0",
+        "hardware-root-of-trust",
+        "mtls-iot",
+        "aws-iot-core",
+        "side-channel-analysis"
+      ],
+      "safetyLevel": "instructor-controlled",
+      "mentalModel": "Trong mô hình bảo mật IoT hiện đại kết nối điện toán đám mây, danh tính của thiết bị (Device Identity) không thể chỉ dựa vào địa chỉ MAC hay một chuỗi số serial phần mềm vốn rất dễ bị giả mạo. Danh tính thực sự phải được neo giữ vào một 'Gốc tin cậy phần cứng' (Hardware Root of Trust) – một vi mạch mật mã chuyên dụng (Secure Element hoặc TPM 2.0) có khả năng sinh và lưu trữ khóa riêng tư trong vùng nhớ vật lý được gia cố chống xâm nhập (tamper-resistant). Khi thiết bị kết nối vào đám mây qua giao thức mTLS, việc ký số thách thức xác thực được thực hiện hoàn toàn bên trong con chip mật mã này mà khóa riêng tư không bao giờ được phép xuất hiện trên đường bus hay trong bộ nhớ RAM của vi xử lý chính.",
+      "visual": {
+        "title": "Quy Trình Xác Thực mTLS IoT Cloud Với Secure Element Phần Cứng",
+        "caption": "Trình tự 4 giai đoạn xác thực danh tính thiết bị qua Secure Element và đám mây IoT.",
+        "steps": [
+          {
+            "label": "Khởi Tạo Kết Nối TLS & Nhận Thách Thức Từ Cổng Đám Mây",
+            "detail": "Thiết bị IoT thiết lập kết nối TCP tới AWS IoT Core (Port 8883); máy chủ gửi chứng chỉ Server Certificate và gửi yêu cầu xác thực thiết bị (CertificateRequest).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Chuyển Bản Băm Thách Thức Vào Secure Element Qua I2C",
+            "detail": "SoC chính tính toán mã băm SHA-256 của chuỗi thông điệp bắt tay và chuyển bản băm này sang chip bảo mật ATECC608 qua lệnh mã hóa I2C được bảo vệ bởi IO Protection Key.",
+            "tone": "allow"
+          },
+          {
+            "label": "Ký Số Nội Suy Bằng Khóa Riêng Tư (On-Chip ECDSA Sign)",
+            "detail": "ATECC608 sử dụng khóa riêng tư ECC P-256 lưu trong Slot 0 để tính toán chữ ký số (R, S) bên trong nhân mật mã; khóa riêng tư không bao giờ rời khỏi vùng bảo mật silicon.",
+            "tone": "caution"
+          },
+          {
+            "label": "Đám Mây Thẩm Định Chữ Ký & Áp Đặt Chính Sách IoT Policy",
+            "detail": "AWS IoT Core đối chiếu chữ ký với chứng chỉ X.509 của thiết bị đã đăng ký; cấp quyền truy cập vào các topic MQTT tương ứng theo nguyên tắc đặc quyền tối thiểu (Least Privilege).",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cơ Sở Định Danh Phần Cứng (Hardware Root of Trust): Secure Element (ATECC608) & Cấu Trúc Khóa Bí Mật Không Thể Xuất",
+          "paragraphs": [
+            "Khái niệm 'Gốc tin cậy phần cứng' (Hardware Root of Trust - RoT) là nền tảng cốt lõi cho mọi kiến trúc bảo mật thiết bị thông minh hiện đại. Một phần mềm dù được lập trình an toàn đến đâu cũng không thể tự bảo vệ chính nó nếu môi trường phần cứng bên dưới bị thao túng hoặc nếu khóa mật mã được lưu trữ trong bộ nhớ Flash thông thường vốn có thể bị trích xuất dễ dàng qua các công cụ kẹp chip như đã phân tích. Do đó, các nhà sản xuất tích hợp các bộ đồng xử lý mật mã chuyên dụng (Cryptographic Coprocessors), thường được gọi là Secure Elements (SE), điển hình là dòng chip Microchip ATECC508A và ATECC608A/B.",
+            "Kiến trúc của ATECC608 bao gồm một bộ nhớ EEPROM bảo mật được chia thành 16 khe lưu trữ (Slots) độc lập, một bộ tạo số ngẫu nhiên thực bằng phần cứng (Hardware True Random Number Generator - TRNG), và các bộ tăng tốc thuật toán mật mã phần cứng hỗ trợ đường cong elip ECC (tiêu chuẩn NIST P-256), băm SHA-256 và mã hóa đối xứng AES-128. Mỗi khe lưu trữ (Slot) được kiểm soát bởi các thanh ghi cấu hình chính sách truy cập cực kỳ nghiêm ngặt (Slot Configuration và Key Configuration). Các thanh ghi này quy định rõ: khóa trong slot được dùng cho mục đích gì (Ký số ECDSA, Trao đổi khóa ECDH, hay Xác thực HMAC), có yêu cầu xác thực trước khi sử dụng hay không, và quan trọng nhất là cờ cấm đọc (IsSecret / ReadKey).",
+            "Cơ chế then chốt bảo vệ danh tính thiết bị của ATECC608 là nguyên lý 'Khóa riêng tư không bao giờ xuất xưởng' (Never-Exported Private Key). Khóa riêng tư ECC có thể được sinh trực tiếp bên trong con chip thông qua lệnh `GenKey`. Khi lệnh này được thực thi, bộ sinh số ngẫu nhiên phần cứng TRNG sẽ tạo ra một khóa riêng tư mới và ghi thẳng vào Slot được chỉ định (thường là Slot 0); chip chỉ xuất ra ngoài duy nhất Khóa công khai (Public Key) tương ứng. Khi vi điều khiển chính cần ký một thông điệp (ví dụ gói tin bắt tay mTLS), nó không bao giờ đọc khóa riêng tư ra RAM; thay vào đó, vi điều khiển gửi lệnh `Sign` kèm theo bản băm SHA-256 của thông điệp vào ATECC608. Bộ vi xử lý mật mã bên trong con chip sẽ tự thực hiện phép nhân điểm trên đường cong elip và chỉ trả về chữ ký số gồm hai thành phần (R, S) qua bus I2C.",
+            "Để bảo vệ vật lý trước các cuộc tấn công bóc tách chip (Decapping) trong phòng thí nghiệm, silicon của ATECC608 được bọc một lớp lưới kim loại chủ động (Active Metal Shield). Nếu kẻ tấn công sử dụng axit để hòa tan lớp vỏ nhựa epoxy bên ngoài và dùng đầu dò vi mô (Microprobing) chạm vào các đường dẫn tín hiệu nội vi, lưới kim loại sẽ phát hiện sự thay đổi điện dung hoặc đứt mạch và kích hoạt cơ chế xóa trắng toàn bộ các ô nhớ EEPROM ngay lập tức. Ngoài ra, chip còn tích hợp các cảm biến điện áp, cảm biến tần số xung nhịp và cảm biến nhiệt độ để chống lại các kỹ thuật chèn lỗi (Fault Injection)."
+          ]
+        },
+        {
+          "title": "Kiến Trúc Trusted Platform Module (TPM 2.0): Phân Vùng Khóa, Đo Lường Khởi Động & PCR Quoting",
+          "paragraphs": [
+            "Đối với các cổng kết nối IoT công nghiệp phức tạp hơn (Edge Gateways), thiết bị tự động hóa tòa nhà và máy tính trên xe ô tô chạy Linux nhúng, tiêu chuẩn bảo mật phần cứng thống trị là Trusted Platform Module (TPM 2.0) do tổ chức Trusted Computing Group (TCG) chuẩn hóa. Khác với Secure Element thường giao tiếp qua I2C đơn giản, TPM 2.0 là một hệ thống mật mã toàn diện có thể tồn tại dưới dạng chip phần cứng độc lập (Discrete TPM - dTPM nối qua bus SPI hoặc LPC), vi mạch tích hợp (Integrated TPM), hoặc phần mềm chạy trong môi trường thực thi tin cậy (Firmware TPM - fTPM chạy trong ARM TrustZone).",
+            "Kiến trúc TPM 2.0 phân chia không gian quản lý thành 4 phân vùng phân cấp (Hierarchies) độc lập: Phân cấp Chứng thực (Endorsement Hierarchy - EH, do nhà sản xuất chip kiểm soát với khóa gốc Endorsement Key EK bất biến đại diện cho danh tính vật lý của silicon); Phân cấp Nền tảng (Platform Hierarchy - PH, do nhà sản xuất thiết bị/OEM kiểm soát để bảo vệ chuỗi khởi động); Phân cấp Lưu trữ (Storage Hierarchy - SH, do chủ sở hữu thiết bị kiểm soát với khóa gốc Storage Root Key SRK dùng để mã hóa dữ liệu người dùng); và Phân cấp Rỗng (Null Hierarchy - dùng cho các khóa tạm thời bị xóa sau mỗi lần khởi động).",
+            "Trụ cột bảo mật quan trọng nhất của TPM 2.0 là các Thanh ghi Cấu hình Nền tảng (Platform Configuration Registers - PCRs). Các thanh ghi PCR không cho phép ghi đè giá trị trực tiếp bằng lệnh phần mềm thông thường; thao tác duy nhất được phép thực hiện trên PCR là thao tác 'Nối dài' (Extend). Phép toán Extend được định nghĩa theo công thức băm mật mã: $\\text{PCR}_{\\text{mới}} = \\text{SHA256}(\\text{PCR}_{\\text{cũ}} \\parallel \\text{Giá trị đo lường mới})$. Trong quy trình Khởi động đo lường (Measured Boot), trước khi bất kỳ thành phần phần mềm nào (BootROM, U-Boot, Linux Kernel, Initramfs, cấu hình dịch vụ) được thực thi, thành phần đứng trước nó bắt buộc phải tính mã băm của đoạn mã sắp chạy và gửi lệnh Extend vào thanh ghi PCR tương ứng (ví dụ PCR[0] đo lường mã khởi động cơ sở, PCR[4] đo lường bootloader, PCR[9] đo lường kernel).",
+            "Tính năng này cho phép triển khai cơ chế 'Lưu trữ niêm phong' (Sealed Storage) và 'Chứng thực từ xa' (Remote Attestation). Với Sealed Storage, một khóa mã hóa dữ liệu chỉ có thể được TPM giải mã (Unseal) khi và chỉ khi các thanh ghi PCR có giá trị băm trùng khớp hoàn toàn với trạng thái hệ thống nguyên bản không bị sửa đổi; nếu kẻ tấn công can thiệp vào kernel hoặc nạp firmware độc hại, giá trị PCR sẽ bị sai lệch và TPM sẽ từ chối giải mã khóa. Với Remote Attestation, máy chủ đám mây có thể gửi một thách thức ngẫu nhiên (nonce) và yêu cầu thiết bị chạy lệnh `TPM2_Quote`. TPM sẽ tạo ra một bản báo cáo chứa giá trị hiện tại của các PCR được ký số bởi Khóa định danh chứng thực (Attestation Identity Key - AIK), chứng minh cho máy chủ đám mây thấy thiết bị đang ở trạng thái phần mềm toàn vẹn và an toàn."
+          ]
+        },
+        {
+          "title": "Giao Thức Xác Thực Hai Chiều mTLS (Mutual TLS) & Tích Hợp Đám Mây IoT (AWS IoT Core / Azure IoT Hub)",
+          "paragraphs": [
+            "Để kết nối hàng triệu thiết bị IoT phân tán trên toàn cầu về hệ thống máy chủ điện toán đám mây trung tâm một cách an toàn, các nhà cung cấp dịch vụ đám mây lớn (như AWS IoT Core, Microsoft Azure IoT Hub, Google Cloud IoT) sử dụng giao thức xác thực hai chiều mTLS (Mutual Transport Layer Security) trên nền giao thức truyền tin gọn nhẹ MQTT (thường chạy qua cổng TCP 8883). Trong kết nối HTTPS web thông thường, chỉ có máy chủ chứng minh danh tính với trình duyệt (One-Way TLS); ngược lại, trong mTLS, cả máy chủ đám mây và thiết bị IoT đều bắt buộc phải xuất trình chứng chỉ số X.509 hợp lệ và chứng minh quyền sở hữu khóa riêng tư tương ứng trong quá trình bắt tay (TLS Handshake).",
+            "Quy trình bắt tay mTLS diễn ra tuần tự: Sau khi thiết lập kết nối TCP, máy chủ đám mây gửi chứng chỉ Server Certificate; thiết bị IoT sử dụng chứng chỉ gốc (Root CA) đã được lưu sẵn trong firmware để kiểm tra tính hợp lệ của máy chủ. Tiếp theo, máy chủ gửi thông điệp `CertificateRequest` yêu cầu thiết bị chứng minh danh tính. Thiết bị gửi chứng chỉ số của mình (Client Certificate chứa Public Key). Để chứng minh thiết bị thực sự nắm giữ Private Key tương ứng mà không cần gửi Private Key qua mạng, máy chủ gửi một chuỗi thách thức ngẫu nhiên; thiết bị sử dụng Private Key để ký lên chuỗi này và gửi lại thông điệp `CertificateVerify`. Máy chủ sử dụng Public Key trong Client Certificate để xác thực chữ ký; nếu chữ ký hợp lệ, kênh truyền thông mã hóa TLS được thiết lập thành công.",
+            "Để kết nối bộ đồng xử lý mật mã phần cứng (ATECC608 hoặc TPM 2.0) với ngăn xếp mạng mTLS (mbedTLS, OpenSSL hoặc wolfSSL) trên hệ điều hành Linux nhúng hoặc RTOS, các kỹ sư sử dụng chuẩn giao diện PKCS#11 (Cryptographic Token Interface Standard) hoặc cơ chế OpenSSL ENGINE / OpenSSL 3.0 Provider. Thay vì cấu hình đường dẫn tệp khóa riêng tư dạng bản rõ trên đĩa (`private_key.pem`), ứng dụng IoT chỉ định một URI PKCS#11 (ví dụ `pkcs11:token=atecc608;object=device-key`). Khi thư viện TLS cần thực hiện phép ký `CertificateVerify`, nó sẽ chuyển yêu cầu qua giao diện PKCS#11 xuống thư viện điều khiển phần cứng (`cryptoauthlib` cho Microchip hoặc `tpm2-pkcs11` cho TPM), kích hoạt phép ký số trực tiếp bên trong silicon của chip bảo mật.",
+            "Một khía cạnh quản trị sống còn trong định danh đám mây là quy trình Cấp phát danh tính hàng loạt (Fleet Provisioning) và Kiểm soát truy cập theo vai trò (Access Control). Trong các nhà máy sản xuất quy mô lớn, việc nạp thủ công chứng chỉ riêng lẻ cho từng thiết bị là không khả thi; các nhà sản xuất áp dụng phương thức 'Đăng ký theo yêu cầu' (Just-In-Time Registration - JITR) hoặc 'Cấp phát theo thông tin yêu cầu' (Fleet Provisioning by Claim). Khi thiết bị xuất xưởng lần đầu tiên kết nối vào mạng, nó sử dụng một chứng chỉ yêu cầu tạm thời (Claim Certificate) để xác thực với AWS IoT Core, sau đó yêu cầu Secure Element sinh một cặp khóa mới vĩnh viễn và tạo một yêu cầu ký chứng chỉ (Certificate Signing Request - CSR). AWS IoT Core sẽ ký chứng chỉ thiết bị mới, gán thiết bị vào một định danh duy nhất (Thing Name) và gắn kèm một chính sách bảo mật (AWS IoT Policy) giới hạn thiết bị chỉ được phép gửi/nhận dữ liệu trên các topic MQTT dành riêng cho chính nó."
+          ]
+        },
+        {
+          "title": "Bề Mặt Tấn Công Vật Lý & Lô-gích Vào Định Danh Thiết Bị: Side-Channel, Replay & Giả Mạo Chính Sách Đám Mây",
+          "paragraphs": [
+            "Mặc dù các bộ đồng xử lý mật mã được thiết kế với độ an toàn rất cao, một hệ thống IoT hoàn chỉnh vẫn có thể bị xâm phạm nếu tồn tại các lỗ hổng ở tầng tích hợp phần cứng, tầng giao thức truyền thông hoặc tầng cấu hình chính sách đám mây. Một bề mặt tấn công vật lý kinh điển là Tấn công kênh kề (Side-Channel Attacks - SCA), cụ thể là kỹ thuật Phân tích năng lượng vi sai (Differential Power Analysis - DPA) và Phân tích tương quan năng lượng (Correlation Power Analysis - CPA). Khi vi mạch mật mã thực hiện phép nhân vô hướng trên đường cong elip ($k \\cdot P$) để tạo chữ ký ECDSA, dòng điện tiêu thụ của các cổng logic bên trong silicon sẽ dao động phụ thuộc trực tiếp vào giá trị của từng bit trong khóa bí mật $k$.",
+            "Bằng cách hàn một điện trở đo dòng nhỏ (Shunt Resistor khoảng 1 Ohm) trên đường cấp nguồn VCC của chip mật mã và sử dụng máy hiện sóng kỹ thuật số tốc độ cao (Digital Storage Oscilloscope - DSO với băng thông trên 1 GHz) để ghi lại hàng nghìn dạng sóng tiêu thụ năng lượng khi chip đang ký các thông điệp khác nhau, kẻ tấn công có thể áp dụng các thuật toán phân tích thống kê để khôi phục lại toàn bộ 256-bit của khóa riêng tư ECC. Để chống lại nguy cơ này, các chip bảo mật tiên tiến như ATECC608 tích hợp các cơ chế che giấu phần cứng: làm mù dữ liệu (Scalar Blinding), ngẫu nhiên hóa tọa độ xạ ảnh (Projective Coordinate Randomization) và chèn các chu kỳ xung nhịp giả (Dummy Clock Cycles) nhằm triệt tiêu mối tương quan giữa mức tiêu thụ điện và dữ liệu mật.",
+            "Một bề mặt tấn công phổ biến hơn ở cấp độ hệ thống là Tấn công đánh chặn và phát lại trên bus I2C (I2C Bus Interception and Replay). Trong nhiều thiết kế phần cứng cẩu thả, nhà sản xuất đặt chip ATECC608 trên bus I2C chia sẻ chung và không kích hoạt tính năng Mã hóa kênh I/O. Khi SoC gửi bản băm thông điệp sang ATECC608, kẻ tấn công có thể cắt đường mạch SDA và chèn một vi điều khiển Man-in-the-Middle vào giữa. Kẻ tấn công có thể gửi các bản băm tùy ý để ép chip ký số cho các giao dịch giả mạo, hoặc ghi lại chữ ký hợp lệ để phát lại. Để triệt tiêu rủi ro này, Microchip cung cấp tính năng Khóa bảo vệ I/O (IO Protection Key): trong giai đoạn sản xuất (Provisioning), một khóa bí mật đối xứng AES-128 được nạp đồng thời vào SoC và ATECC608; mọi gói tin truyền qua bus I2C giữa hai chip bắt buộc phải được mã hóa và xác thực tính toàn vẹn bằng thuật toán AES-GCM hoặc HMAC.",
+            "Cuối cùng là bề mặt tấn công cấu hình chính sách đám mây (Cloud Policy Misconfiguration). Rất nhiều sự cố bảo mật IoT quy mô lớn không xuất phát từ việc bẻ khóa phần cứng mà do các kỹ sư đám mây cấu hình chính sách AWS IoT Policy quá lỏng lẻo. Ví dụ, một chính sách IoT gán cho thiết bị quyền `iot:Publish` và `iot:Subscribe` với tài nguyên là dấu hoa thị `\"Resource\": \"*\"` (thay vì giới hạn trong `\"arn:aws:iot:...:topic/devices/${iot:Connection.Thing.ThingName}/*\"`). Trong trường hợp này, nếu một thiết bị IoT duy nhất trong mạng lưới hàng trăm nghìn thiết bị bị kẻ tấn công chiếm quyền kiểm soát (ví dụ qua lỗi tràn bộ đệm phần mềm), kẻ tấn công có thể sử dụng chứng chỉ mTLS hợp lệ của thiết bị đó để phát tán lệnh điều khiển độc hại trên toàn bộ hạ tầng đám mây, can thiệp vào luồng dữ liệu của các thiết bị khác hoặc thực hiện tấn công từ chối dịch vụ diện rộng."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Ranh Giới Định Danh Phần Cứng ATECC608, Cấu Hình TPM 2.0 PCR Quoting Và Đánh Giá Xác Thực mTLS IoT Cloud",
+        "objective": "Thẩm định tính toàn vẹn của khóa mật mã trong chip Secure Element ATECC608, kiểm toán cấu hình PCR trong chuỗi khởi động TPM 2.0, và phát hiện lỗ hổng phân quyền chính sách AWS IoT Core Policy cho phép leo thang đặc quyền trong mạng lưới thiết bị.",
+        "scenario": "Một doanh nghiệp năng lượng triển khai 50.000 thiết bị biến tần năng lượng mặt trời (Solar Inverter Gateway) kết nối về hệ thống điều hành trung tâm trên AWS IoT Core qua giao thức MQTT mTLS. Mỗi gateway sử dụng vi điều khiển ARM Cortex-M7 kết hợp chip bảo mật ATECC608A qua bus I2C để lưu trữ khóa định danh thiết bị. Bạn được giao nhiệm vụ đánh giá an ninh toàn diện: kiểm tra cấu hình khe khóa ATECC608, đánh giá khả năng trích xuất khóa qua bus I2C, và rà soát chính sách phân quyền trên cổng đám mây AWS IoT Core.",
+        "constraints": [
+          "Không thực hiện các thao tác ghi dữ liệu vào các Slot đã bị khóa vĩnh viễn (Locked Zones) trên chip ATECC608 để tránh làm hỏng thiết bị thử nghiệm.",
+          "Chỉ thực hiện các yêu cầu ký số thử nghiệm trong phạm vi môi trường kiểm thử (Staging AWS IoT Endpoint) được cấp phép.",
+          "Mọi bằng chứng trích xuất cấu hình chính sách đám mây phải được che mờ (redact) các thông tin Account ID và định danh khách hàng nhạy cảm."
+        ],
+        "cases": [
+          {
+            "id": "case-105-01",
+            "title": "Kiểm Toán Cấu Hình Slot Và Đánh Giá Khả Năng Đọc Khóa Riêng Tư Từ ATECC608",
+            "context": "Sử dụng công cụ `i2ctools` và thư viện `cryptoauthlib` trên bo mạch thử nghiệm, bạn gửi lệnh `ReadConfig` tới địa chỉ I2C `0x60` của chip ATECC608A. Dữ liệu thanh ghi cấu hình trả về cho thấy: Vùng Configuration Zone có giá trị `0x55` (đã khóa - Locked); Vùng Data Zone có giá trị `0x55` (đã khóa - Locked); Tại Slot 0, thanh ghi `SlotConfig[0]` có giá trị `0x8320` và `KeyConfig[0]` có giá trị `0x0033` (IsSecret = 1, WriteConfig = Never, ReadKey = 0). Khi bạn thử gửi lệnh đọc trực tiếp `atcab_read_zone(TAG_ZONE_DATA, 0, 0, 0, buffer, 32)`, chip trả về mã lỗi `0x03` (Execution Error / Access Denied).",
+            "prompt": "Trạng thái cấu hình trên của chip ATECC608A thể hiện điều gì và khóa riêng tư lưu trong Slot 0 có thể bị trích xuất qua bus I2C hay không?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cấu hình chuẩn xác và cực kỳ an toàn. Cả hai vùng Configuration Zone và Data Zone đều đã được khóa vĩnh viễn (Locked = 0x55); cờ `IsSecret = 1` kết hợp chính sách cấm đọc phần cứng ngăn chặn tuyệt đối mọi lệnh đọc trực tiếp nội dung Slot 0 qua bus I2C. Khóa riêng tư ECC P-256 hoàn toàn được bảo vệ bên trong silicon và chỉ có thể được sử dụng nội suy thông qua lệnh Sign hoặc ECDH.",
+                "correct": true,
+                "rationale": "Khi ATECC608 đã khóa Data Zone và Slot được cấu hình IsSecret=1, logic phần cứng bên trong chip chặn hoàn toàn opcode Read đối với slot đó; mã lỗi 0x03 chứng minh cơ chế bảo vệ silicon đang hoạt động hoàn hảo."
+              },
+              {
+                "id": "B",
+                "label": "Chip đang bị lỗi giao tiếp phần cứng I2C do thiếu điện trở kéo lên; nếu gắn thêm điện trở 4.7kOhm thì lệnh đọc trực tiếp Slot 0 sẽ thành công.",
+                "correct": false,
+                "rationale": "Lệnh đọc thanh ghi Configuration Zone đã thành công và chip đã phản hồi mã lỗi 0x03, chứng minh bus I2C hoạt động hoàn hảo; lỗi phát sinh là do logic bảo mật phần cứng từ chối lệnh đọc chứ không phải lỗi vật lý."
+              },
+              {
+                "id": "C",
+                "label": "Khóa riêng tư có thể đọc được bằng cách nạp lại firmware cho vi điều khiển chính để chạy lệnh `dump_slot0()`.",
+                "correct": false,
+                "rationale": "Cơ chế bảo vệ nằm bên trong phần cứng của chính con chip ATECC608, không phụ thuộc vào quyền hạn của vi điều khiển chính; không có lệnh nào tên là `dump_slot0` có thể vượt qua logic khóa phần cứng silicon."
+              },
+              {
+                "id": "D",
+                "label": "Chip chưa được khóa (Unlocked); kẻ tấn công có thể ghi đè khóa mới vào Slot 0 bất kỳ lúc nào.",
+                "correct": false,
+                "rationale": "Giá trị byte 0x55 trong thanh ghi trạng thái chứng minh rõ ràng cả Configuration Zone và Data Zone đã bị khóa cứng (Locked); giá trị chưa khóa là 0x01."
+              }
+            ]
+          },
+          {
+            "id": "case-105-02",
+            "title": "Kiểm Toán Chuỗi Khởi Động Đo Lường TPM 2.0 Và Chính Sách Sealed Storage",
+            "context": "Trên một Gateway IoT công nghiệp chạy nhân Linux bảo vệ bởi chip Infineon OPTIGA TPM 2.0, hệ thống sử dụng cơ chế Sealed Storage để niêm phong khóa giải mã phân vùng dữ liệu `/var/secure_data` vào giá trị của thanh ghi `PCR[0]` (đo lường BootROM) và `PCR[4]` (đo lường nhân Linux). Trong một bài kiểm thử, bạn can thiệp vào tệp nhị phân kernel `zImage` trên thẻ nhớ SD để chèn một module giám sát mạng độc hại và khởi động lại gateway.",
+            "prompt": "Hành vi phản ứng nào sau đây của TPM 2.0 và hệ điều hành là đúng chuẩn mực bảo mật khi phát hiện sự thay đổi này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Trong quá trình khởi động, bootloader tính toán mã băm SHA-256 mới của `zImage` bị chỉnh sửa và thực hiện lệnh `TPM2_PCR_Extend` vào `PCR[4]`. Do mã băm thay đổi, giá trị tích lũy cuối cùng của `PCR[4]` bị sai lệch so với trạng thái niêm phong ban đầu. Khi hệ thống gọi lệnh `TPM2_Unseal` để lấy khóa giải mã phân vùng, TPM 2.0 từ chối giải mã và trả về mã lỗi `TPM_RC_PCR_CHANGED`, khiến phân vùng dữ liệu không thể giải mã và hệ thống dừng khởi động an toàn.",
+                "correct": true,
+                "rationale": "Đây là cơ chế vận hành cốt lõi của Measured Boot và Sealed Storage trong TPM 2.0: tính chất toán học của phép nối dài băm (Extend) đảm bảo rằng bất kỳ thay đổi nào trong mã kernel đều làm sai lệch giá trị PCR, ngăn chặn TPM giải mã khóa bảo vệ."
+              },
+              {
+                "id": "B",
+                "label": "TPM 2.0 sẽ tự động xóa sạch toàn bộ mã nguồn của kernel bị sửa đổi trên thẻ nhớ SD và tải lại bản kernel chuẩn từ máy chủ đám mây.",
+                "correct": false,
+                "rationale": "TPM 2.0 là một bộ đồng xử lý mật mã thụ động (Passive Coprocessor); nó không có quyền điều khiển hệ thống tệp trên thẻ nhớ SD hay tự kết nối mạng để tải lại phần mềm."
+              },
+              {
+                "id": "C",
+                "label": "Hệ điều hành vẫn giải mã bình thường vì TPM 2.0 chỉ kiểm tra kích thước tệp kernel tính bằng byte chứ không kiểm tra mã băm mật mã.",
+                "correct": false,
+                "rationale": "TPM 2.0 sử dụng các thuật toán băm mật mã mạnh mẽ (SHA-256) để đo lường tính toàn vẹn từng bit dữ liệu, hoàn toàn không dựa vào kích thước tệp đơn thuần."
+              },
+              {
+                "id": "D",
+                "label": "Kẻ tấn công có thể vượt qua kiểm soát bằng cách gửi lệnh `TPM2_PCR_Reset` để đặt giá trị `PCR[4]` về 0 trước khi gọi lệnh Unseal.",
+                "correct": false,
+                "rationale": "Theo đặc tả chuẩn TCG TPM 2.0, các thanh ghi PCR thuộc dải đo lường khởi động nền tảng (PCR[0-15]) bị cấm hoàn toàn lệnh PCR_Reset trong phiên người dùng để ngăn chặn hành vi giả mạo trạng thái khởi động."
+              }
+            ]
+          },
+          {
+            "id": "case-105-03",
+            "title": "Phát Hiện Lỗ Hổng Phân Quyền AWS IoT Core Policy Cho Phép Giả Mạo Điều Khiển Mạng Lưới",
+            "context": "Kiểm tra chứng chỉ số X.509 trích xuất từ cấu hình kết nối mTLS của một thiết bị Inverter Gateway mang Thing Name `Inverter_Gateway_HN01`, bạn truy vấn chính sách bảo mật AWS IoT Policy tương ứng được gán trên AWS Console. Chính sách có nội dung JSON như sau:\n```json\n{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\"iot:Connect\"],\n      \"Resource\": [\"*\"]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\"iot:Publish\", \"iot:Subscribe\", \"iot:Receive\"],\n      \"Resource\": [\"arn:aws:iot:ap-southeast-1:123456789012:topic/inverters/*\"]\n    }\n  ]\n}\n```",
+            "prompt": "Lỗ hổng phân quyền nghiêm trọng nào tồn tại trong chính sách AWS IoT Policy trên và kẻ tấn công có thể khai thác nó như thế nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chính sách sử dụng ký tự đại diện wildcard `inverters/*` thay vì cô lập theo định danh thiết bị biến số `${iot:Connection.Thing.ThingName}`. Một kẻ tấn công chiếm quyền điều khiển gateway `Inverter_Gateway_HN01` có thể sử dụng chứng chỉ mTLS hợp lệ của nó để phát tán lệnh điều khiển độc hại tới topic của bất kỳ gateway nào khác (ví dụ `inverters/HN02/control`), làm sập hoặc phá hoại hệ thống điện của toàn bộ mạng lưới 50.000 thiết bị.",
+                "correct": true,
+                "rationale": "Chính sách vi phạm nghiêm trọng nguyên tắc đặc quyền tối thiểu (Least Privilege). Resource phải được giới hạn chặt chẽ: `arn:aws:iot:...:topic/inverters/${iot:Connection.Thing.ThingName}/*` để đảm bảo mỗi thiết bị chỉ có quyền giao tiếp trên topic riêng của chính nó."
+              },
+              {
+                "id": "B",
+                "label": "Chính sách không cho phép thiết bị kết nối vì thiếu quyền `iot:AssumeRole` dành cho dịch vụ MQTT.",
+                "correct": false,
+                "rationale": "Giao thức MQTT mTLS trên AWS IoT Core chỉ sử dụng các quyền `iot:Connect`, `iot:Publish`, `iot:Subscribe`, `iot:Receive`; quyền `iot:AssumeRole` là quyền IAM của người dùng/vai trò, không dùng trong IoT Policy thiết bị."
+              },
+              {
+                "id": "C",
+                "label": "Chính sách hoàn toàn an toàn vì giao thức mTLS đã mã hóa toàn bộ đường truyền bằng chứng chỉ X.509 của ATECC608.",
+                "correct": false,
+                "rationale": "mTLS chỉ đảm bảo xác thực danh tính thiết bị ở tầng mạng (Authentication); nó không thể bảo vệ hệ thống nếu tầng phân quyền truy cập (Authorization/Policy) trên đám mây cấp quyền quá mức cho phép (Over-privileged)."
+              },
+              {
+                "id": "D",
+                "label": "Lỗi nằm ở phiên bản chính sách `2012-10-17` đã lỗi thời và không còn được AWS hỗ trợ cho kết nối IoT năm 2026.",
+                "correct": false,
+                "rationale": "Phiên bản cú pháp JSON `2012-10-17` là tiêu chuẩn hiện hành và duy nhất của toàn bộ hạ tầng IAM và IoT Policy của Amazon Web Services."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân tích đúng cấu hình các thanh ghi SlotConfig/KeyConfig và trạng thái khóa của các vùng nhớ trên chip ATECC608.",
+          "Giải thích chính xác cơ chế bảo vệ của chuỗi khởi động đo lường TPM 2.0 PCR và phản ứng của lệnh Sealed Storage khi kernel bị sửa đổi.",
+          "Phát hiện chính xác lỗ hổng phạm vi phân quyền wildcard trong chính sách AWS IoT Policy và đề xuất chính sách thay thế theo nguyên tắc đặc quyền tối thiểu."
+        ],
+        "evidenceTemplate": [
+          "Bảng xuất cấu hình 128-byte Configuration Zone của chip ATECC608 giải mã từng cờ thuộc tính bảo mật",
+          "Nhật ký bảng mã băm PCR đo lường trước và sau khi chỉnh sửa tệp nhân Linux kèm mã lỗi trả về của TPM2_Unseal",
+          "Tệp định dạng chính sách AWS IoT Policy ban đầu bị lỗi kèm phiên bản chính sách vá lỗi sử dụng biến ThingName"
+        ],
+        "reset": "Đặt lại cấu hình mô phỏng TPM về trạng thái ban đầu và khôi phục tệp nhân Linux zImage chuẩn.",
+        "cleanup": "Xóa bỏ các khóa phiên PKCS#11 tạm thời, thu hồi chứng chỉ thử nghiệm trên AWS IoT Core Staging."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc khóa vĩnh viễn (Lock Configuration & Data Zones) trên chip Secure Element trước khi xuất xưởng thiết bị thương mại để ngăn ngừa việc ghi đè cấu hình.",
+          "Kích hoạt tính năng Mã hóa kênh truyền I/O (IO Protection Key) giữa SoC chính và Secure Element để bảo vệ các giao dịch nhạy cảm trước nguy cơ sniffing/replay.",
+          "Áp dụng nguyên tắc đặc quyền tối thiểu (Least Privilege) trong chính sách đám mây AWS IoT Policy, bắt buộc ràng buộc topic MQTT với định danh `${iot:Connection.Thing.ThingName}`."
+        ],
+        "observe": [
+          "Giám sát các nỗ lực gửi thông điệp MQTT bất thường hoặc cố gắng đăng ký lắng nghe (Subscribe) vào các topic của thiết bị khác thông qua dịch vụ AWS IoT Device Defender.",
+          "Kiểm toán nhật ký đo lường khởi động TPM PCR thông qua dịch vụ Remote Attestation trước khi cấp quyền truy cập vào mạng lưới vận hành SCADA.",
+          "Theo dõi tần suất các lỗi xác thực mTLS (TLS Handshake Failures) trên cổng gateway đám mây để phát hiện sớm các chiến dịch giả mạo chứng chỉ hàng loạt."
+        ],
+        "respond": [
+          "Khi một thiết bị bị nghi ngờ lộ thông tin hoặc bị can thiệp phần cứng, lập tức thu hồi chứng chỉ số X.509 của thiết bị trên Certificate Revocation List (CRL) hoặc vô hiệu hóa trạng thái thiết bị trên đám mây.",
+          "Cách ly tự động thiết bị khỏi mạng lưới IoT thông qua chính sách chặn động (Dynamic Quarantine Policy) khi phát hiện báo cáo TPM Quote không hợp lệ.",
+          "Thực hiện quy trình cập nhật firmware an toàn có ký số (Signed FOTA) để vá các lỗ hổng phần mềm trước khi kẻ tấn công có thể lạm dụng giao tiếp phần cứng."
+        ],
+        "residualRisk": [
+          "Các cuộc tấn công vật lý chuyên sâu sử dụng thiết bị đo kênh kề (Side-Channel DPA) trong phòng thí nghiệm chuyên nghiệp vẫn có thể khai thác được các điểm yếu vi kiến trúc của một số dòng chip bảo mật thế hệ cũ.",
+          "Rủi ro thỏa hiệp chuỗi cung ứng (Supply Chain Compromise) nếu khóa gốc của nhà sản xuất (CA Private Key) bị rò rỉ tại các cơ sở gia công nạp chip bên thứ ba."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Việc sử dụng chip bảo mật ATECC608 hoặc TPM 2.0 đảm bảo hệ thống an toàn tuyệt đối 100% trước mọi cuộc tấn công mạng.",
+          "correction": "Chip bảo mật chỉ bảo vệ an toàn cho các khóa mật mã và chữ ký số; nếu mã nguồn phần mềm trên vi xử lý chính bị lỗi tràn bộ đệm hoặc chính sách phân quyền trên đám mây cấu hình sai, kẻ tấn công vẫn có thể chiếm quyền điều khiển thiết bị hoặc ra lệnh cho chip bảo mật ký số thay cho chúng."
+        },
+        {
+          "claim": "Khóa riêng tư (Private Key) lưu trong chip ATECC608 sẽ được CPU đọc ra bộ nhớ RAM mỗi khi thiết bị cần thực hiện kết nối TLS với đám mây.",
+          "correction": "Khóa riêng tư không bao giờ được phép xuất hiện ra ngoài con chip bảo mật; toàn bộ quá trình tạo chữ ký số được thực thi nội suy (On-chip ECDSA sign) bên trong silicon của Secure Element và chỉ có kết quả chữ ký (R, S) được trả về."
+        },
+        {
+          "claim": "Xác thực mTLS đảm bảo mọi thiết bị trong mạng lưới IoT đều có cùng mức độ tin cậy và có thể trao đổi dữ liệu tự do với nhau trên cùng một topic MQTT.",
+          "correction": "mTLS chỉ cung cấp tính năng xác thực danh tính (Authentication); tầng phân quyền (Authorization) bắt buộc phải do chính sách IoT Policy trên máy chủ đám mây kiểm soát chặt chẽ để cô lập luồng dữ liệu của từng thiết bị riêng biệt."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os11-l105-q1",
+          "difficulty": "easy",
+          "question": "Trong kiến trúc xác thực hai chiều mTLS (Mutual TLS) giữa thiết bị IoT và máy chủ đám mây, điểm khác biệt cốt lõi so với giao thức TLS thông thường trên web (One-Way TLS) là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cả máy chủ đám mây và thiết bị IoT đều bắt buộc phải xuất trình chứng chỉ số X.509 và chứng minh quyền sở hữu khóa riêng tư tương ứng."
+            },
+            {
+              "id": "B",
+              "label": "Giao thức mTLS không sử dụng thuật toán mã hóa đối xứng để truyền dữ liệu mà dùng hoàn toàn RSA."
+            },
+            {
+              "id": "C",
+              "label": "mTLS chỉ hoạt động qua cổng mạng UDP thay vì TCP."
+            },
+            {
+              "id": "D",
+              "label": "Thiết bị IoT không cần lưu trữ bất kỳ chứng chỉ Root CA nào của máy chủ."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Trong mTLS (Mutual TLS), ngoài việc máy chủ gửi chứng chỉ Server Certificate cho client kiểm tra, máy chủ còn gửi yêu cầu CertificateRequest bắt buộc thiết bị IoT phải xuất trình Client Certificate và ký số xác nhận danh tính bằng Private Key của chính nó."
+        },
+        {
+          "id": "os11-l105-q2",
+          "difficulty": "medium",
+          "question": "Trong kiến trúc TPM 2.0, công thức toán học nào sau đây mô tả chính xác thao tác nối dài (Extend) một giá trị đo lường phần mềm mới vào thanh ghi Platform Configuration Register (PCR)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "PCR_mới = SHA256(PCR_cũ || Giá trị đo lường mới)"
+            },
+            {
+              "id": "B",
+              "label": "PCR_mới = PCR_cũ XOR Giá trị đo lường mới"
+            },
+            {
+              "id": "C",
+              "label": "PCR_mới = Giá trị đo lường mới + 1"
+            },
+            {
+              "id": "D",
+              "label": "PCR_mới = AES_Encrypt(PCR_cũ, Giá trị đo lường mới)"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Chuẩn TCG TPM 2.0 quy định thao tác Extend thanh ghi PCR được thực hiện bằng cách ghép chuỗi giá trị PCR hiện tại với dữ liệu đo lường mới rồi tính mã băm mật mã: PCR_mới = Hash(PCR_cũ || Measurement), đảm bảo tính tích lũy không thể đảo ngược."
+        },
+        {
+          "id": "os11-l105-q3",
+          "difficulty": "hard",
+          "question": "Khi kết nối chip Microchip ATECC608 với vi điều khiển chính qua bus I2C, giải pháp kỹ thuật nào sau đây được thiết kế chuyên biệt để ngăn chặn kẻ tấn công gắn kẹp logic analyzer đánh chặn và phát lại (Sniffing & Replay Attack) các bản băm lệnh ký số trên đường mạch PCB?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Kích hoạt cơ chế IO Protection Key mã hóa dữ liệu truyền thông giữa SoC và ATECC608 bằng thuật toán đối xứng."
+            },
+            {
+              "id": "B",
+              "label": "Tăng tốc độ xung nhịp I2C lên 10MHz để logic analyzer không bắt kịp tín hiệu."
+            },
+            {
+              "id": "C",
+              "label": "Đặt địa chỉ I2C của ATECC608 ở chế độ ngẫu nhiên sau mỗi lần khởi động."
+            },
+            {
+              "id": "D",
+              "label": "Chuyển toàn bộ chân tín hiệu I2C sang chế độ kéo xuống (Pull-down)."
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Tính năng IO Protection Key của Microchip sử dụng một khóa đối xứng bí mật được nạp sẵn vào cả SoC và ATECC608 để mã hóa và xác thực toàn bộ các tham số truyền qua bus I2C, ngăn chặn hoàn toàn việc nghe lén hoặc chèn lệnh giả mạo trên đường mạch PCB."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một hệ thống trạm biến áp số thuộc lưới điện thông minh (Smart Grid) triển khai các thiết bị đầu cuối điều khiển bảo vệ (IED) kết nối về đám mây điều hành SCADA Cloud qua giao thức MQTT mTLS. Mỗi IED sử dụng chip TPM 2.0 để bảo vệ chứng chỉ client và niêm phong khóa phiên mã hóa đường truyền. Bạn được yêu cầu thẩm định chuỗi khởi động đo lường TPM 2.0, đánh giá chính sách phân quyền AWS IoT Core Policy, và kiểm tra tính an toàn của quy trình xác thực mTLS.",
+        "tasks": [
+          "Sử dụng bộ công cụ `tpm2-tools` trên Linux nhúng để truy vấn danh sách PCRs và trích xuất chứng nhận đo lường khởi động bằng lệnh `tpm2_quote`.",
+          "Đánh giá cấu hình tệp chính sách AWS IoT Policy của trạm biến áp, xác định xem chính sách có cho phép IED gửi thông điệp điều khiển sang các thiết bị IED khác hay không.",
+          "Thực hiện kiểm thử tiêm mã độc vào nhân hệ điều hành, chứng minh rằng cơ chế Sealed Storage của TPM 2.0 sẽ ngăn chặn việc nạp khóa chứng chỉ mTLS khi tính toàn vẹn của hệ thống bị phá vỡ."
+        ],
+        "requiredEvidence": [
+          "Báo cáo tệp xuất cấu trúc PCR từ công cụ `tpm2_pcrread` kèm chứng nhận chữ ký `tpm2_quote` hợp lệ",
+          "Biên bản đánh giá chính sách AWS IoT Policy chỉ ra điểm vi phạm nguyên tắc đặc quyền tối thiểu kèm mẫu cấu hình vá lỗi",
+          "Nhật ký lỗi hệ thống chứng minh TPM 2.0 từ chối lệnh `tpm2_unseal` khi nhân hệ điều hành bị can thiệp"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Trusted Platform Module Library Specification, Family 2.0, Level 00, Revision 01.59",
+          "url": "https://trustedcomputinggroup.org/resource/tpm-library-specification/",
+          "publisher": "Trusted Computing Group (TCG)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc phân cấp khóa Endorsement, Platform, Storage và Null Hierarchies",
+            "Cơ chế vận hành của thanh ghi Platform Configuration Registers (PCRs) và giao thức chứng thực từ xa TPM2_Quote"
+          ]
+        },
+        {
+          "title": "Microchip ATECC608A CryptoAuthentication Device Summary",
+          "url": "https://www.microchip.com/en-us/product/atecc608a",
+          "publisher": "Microchip Technology Inc.",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu trúc phân vùng bộ nhớ bảo mật EEPROM và cấu hình chính sách truy cập SlotConfig/KeyConfig",
+            "Cơ chế ký số nội suy On-chip ECDSA sign và giải pháp mã hóa bus IO Protection Key"
+          ]
+        }
+      ]
+    }
+  ]
+}

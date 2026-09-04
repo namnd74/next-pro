@@ -1,0 +1,1198 @@
+{
+  "id": "os09-m03-containers-kubernetes",
+  "slug": "containers-kubernetes",
+  "trackId": "os09-cloud-container-supply-chain",
+  "title": "Vùng Chứa Containers, Cụm Kubernetes & Kiểm Soát Truy Cập RBAC",
+  "summary": "Phân tích an ninh kiến trúc container (Linux Namespaces, cgroups, Capabilities, Breakout vectors), giải phẫu bề mặt tấn công Kubernetes Control Plane (kube-apiserver, etcd, kubelet), và thiết lập kiểm soát truy cập nghiêm ngặt qua Kubernetes RBAC, Workload Identity và Admission Controllers (OPA/Kyverno, Pod Security Standards).",
+  "difficulty": "advanced",
+  "estimatedMinutes": 480,
+  "careerPaths": ["penetration-test", "red-team", "purple-team"],
+  "domains": ["container", "kubernetes", "rbac"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os09-l85-container-runtimes-namespaces-and-breakouts",
+      "slug": "container-runtimes-namespaces-and-breakouts",
+      "title": "Kiến Trúc Container Runtime, Linux Namespaces, cgroups & Kỹ Thuật Container Breakout",
+      "summary": "Phân tích bản chất cốt lõi của công nghệ container hóa trên nhân Linux: cơ chế cô lập của 8 loại Linux Namespaces, kiểm soát tài nguyên qua cgroups v1/v2, thu hẹp đặc quyền root qua Linux POSIX Capabilities và Seccomp BPF filters; giải phẫu các cơ chế và kỹ thuật thoát khỏi vùng chứa (Container Breakout) qua cgroup release_agent, lạm dụng Docker socket (/var/run/docker.sock), mount nhạy cảm từ host (/proc, /sys), lỗi cấu hình --privileged / --net=host, và khai thác lỗ hổng runtime (runC CVE-2019-5736, CVE-2024-21626).",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân tích nguyên lý vận hành tầng thấp của 8 loại Linux Namespaces và cgroups v1/v2 trong việc tạo ra ảo ảnh cô lập không gian người dùng, phân biệt rõ ranh giới an ninh giữa kernel containerization và hypervisor virtualization.",
+        "Bóc tách ma trận Linux POSIX Capabilities (CAP_SYS_ADMIN, CAP_SYS_PTRACE, CAP_DAC_OVERRIDE, CAP_NET_ADMIN) và vai trò của Seccomp BPF profiles, AppArmor/SELinux trong việc triệt tiêu bề mặt tấn công syscall.",
+        "Kiểm toán và khai thác các vector Container Breakout kinh điển và hiện đại: cgroup v1 release_agent injection, lạm dụng Docker daemon socket (/var/run/docker.sock), duyệt procfs/sysfs nhạy cảm (/proc/sys/kernel/core_pattern, /proc/kcore), và lỗ hổng fd leak trong runC (CVE-2024-21626).",
+        "Thiết lập ranh giới phòng thủ vững chắc: kích hoạt User Namespaces (userns-remap), áp dụng Rootless Containers (Rootless Docker/Podman), và triển khai gVisor/Kata Containers cho mô hình multi-tenant untrusted workloads."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["container", "kubernetes", "rbac"],
+      "attackTactics": [
+        "initial-access",
+        "execution",
+        "privilege-escalation",
+        "defense-evasion"
+      ],
+      "keywords": [
+        "linux-namespaces",
+        "cgroups",
+        "posix-capabilities",
+        "seccomp-bpf",
+        "container-breakout",
+        "docker-socket",
+        "runc",
+        "cve-2024-21626",
+        "user-namespaces",
+        "rootless-containers"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Container không phải là một máy ảo phần cứng mà chỉ là một tiến trình Linux thông thường (ordinary process) bị giới hạn tầm nhìn không gian tên bởi Namespaces, bị bóp băng thông tài nguyên bởi cgroups và bị tước bớt quyền kernel qua POSIX Capabilities. Mọi container trên cùng một máy chủ đều chia sẻ chung một nhân Linux duy nhất (Shared Linux Kernel). Do đó, ranh giới container bản chất là một 'ảo ảnh cô lập' (isolation construct) ở tầng người dùng chứ không phải là ranh giới an ninh vật lý kiên cố (hard security boundary). Bất kỳ cấu hình lỏng lẻo nào cho phép container giữ quyền CAP_SYS_ADMIN, mount trực tiếp Docker socket hay thư mục /proc từ máy chủ vật lý đều lập tức phá vỡ ảo ảnh này, biến quyền root trong container thành quyền root thực tế trên máy chủ chủ (host system).",
+      "visual": {
+        "title": "Chuỗi Khai Thác Thoát Vùng Chứa (Container Breakout) Qua cgroup v1 release_agent",
+        "caption": "Luồng tấn công lợi dụng quyền CAP_SYS_ADMIN và cơ chế thông báo cgroup rỗng của nhân Linux để thực thi mã độc với UID 0 trên Host.",
+        "steps": [
+          {
+            "label": "Trinh Sát Ngữ Cảnh Quyền Hạn & cgroup",
+            "detail": "Kẻ tấn công kiểm tra CapEff qua /proc/1/status (phát hiện CAP_SYS_ADMIN), kiểm tra mount points thấy cgroup v1 và xác nhận container đang chạy ở chế độ privileged.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Tạo Cgroup Con & Ghi release_agent",
+            "detail": "Mount hệ thống tệp cgroup v1 kiểu rdma/memory, tạo cgroup con x, bật notify_on_release = 1 và ghi đường dẫn mã độc trên host vào tệp release_agent của cgroup cha.",
+            "tone": "caution"
+          },
+          {
+            "label": "Định Vị Đường Dẫn Host Qua OverlayFS",
+            "detail": "Đọc /etc/mtab hoặc /proc/self/mountinfo để tìm đường dẫn tuyệt đối của thư mục container trên host (/var/lib/docker/overlay2/<hash>/merged/cmd.sh).",
+            "tone": "caution"
+          },
+          {
+            "label": "Kích Hoạt Kernel Callback & Chiếm Đoạt Host Root",
+            "detail": "Ghi một PID ngắn hạn vào cgroup.procs rồi để tiến trình kết thúc; kernel phát hiện cgroup rỗng lập tức kích hoạt release_agent thực thi cmd.sh trên host với quyền UID 0.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Bản Chất Kiến Trúc Container: Linux Namespaces, Control Groups (cgroups v1/v2) & Ảo Ảnh Cô Lập",
+          "paragraphs": [
+            "Để hiểu sâu sắc về an ninh container, kỹ sư bảo mật bắt buộc phải giải trừ ngộ nhận phổ biến rằng 'container là một máy ảo nhẹ'. Trong kiến trúc ảo hóa phần cứng (Type-1/Type-2 Hypervisor như KVM, ESXi), mỗi máy ảo sở hữu một nhân hệ điều hành (Kernel) riêng biệt chạy trên phần cứng ảo hóa do Hypervisor cung cấp, tạo ra một ranh giới cách ly vật lý rất mạnh dựa trên hỗ trợ phần cứng (Intel VT-x, AMD-V). Ngược lại, container là mô hình ảo hóa ở tầng hệ điều hành (Operating System-level Virtualization). Tất cả các container chạy trên cùng một máy chủ đều dùng chung một nhân Linux duy nhất (Shared Linux Kernel).",
+            "Sự cô lập của container được cấu thành từ hai trụ cột nền tảng của nhân Linux: Linux Namespaces và Control Groups (cgroups). Linux Namespaces chịu trách nhiệm giới hạn 'tầm nhìn' của tiến trình, quy định tiến trình có thể nhìn thấy những tài nguyên nào trong hệ thống. Có 8 loại Linux Namespaces chính: (1) PID Namespace (cô lập cây tiến trình, biến tiến trình chính của container thành PID 1 trong namespace cục bộ trong khi vẫn có một PID thực tế khác trên host); (2) Mount Namespace (CLONE_NEWNS, cô lập danh sách các điểm gắn kết file system); (3) Network Namespace (cô lập giao diện mạng, bảng định tuyến và cổng lắng nghe); (4) IPC Namespace (cô lập hàng đợi thông điệp, shared memory System V/POSIX); (5) UTS Namespace (cô lập hostname và domain name); (6) User Namespace (CLONE_NEWUSER, ánh xạ UID/GID bên trong container với một dải UID/GID không đặc quyền trên host); (7) Cgroup Namespace (cô lập góc nhìn về thư mục cgroup); và (8) Time Namespace (cô lập đồng hồ hệ thống CLOCK_MONOTONIC và CLOCK_BOOTTIME).",
+            "Trong khi Namespaces quyết định những gì một tiến trình có thể nhìn thấy, Control Groups (cgroups) quy định lượng tài nguyên mà tiến trình đó được phép sử dụng. cgroups ngăn chặn các cuộc tấn công từ chối dịch vụ tài nguyên (Resource Starvation / DoS) bằng cách đặt ngưỡng giới hạn (limits) và hạn ngạch (quotas) về CPU, bộ nhớ RAM, I/O ổ đĩa, số lượng tiến trình tối đa (pids limit), và băng thông mạng. Kiến trúc cgroups v1 sử dụng các hệ thống phân cấp độc lập cho từng hệ thống con (subsystem), trong khi cgroups v2 hợp nhất tất cả bộ điều khiển thành một cây phân cấp duy nhất, loại bỏ hiện tượng tranh chấp tài nguyên và các lỗ hổng rò rỉ bảo mật vốn tồn tại trong cgroups v1.",
+            "Do bản chất chia sẻ chung một nhân Linux duy nhất, ranh giới giữa container và máy chủ chủ chỉ là một 'ảo ảnh cô lập' logic. Nếu kẻ tấn công tìm thấy một lỗ hổng trong mã nguồn của nhân Linux (Kernel Exploitation như Dirty COW, Dirty Pipe, hoặc lỗi eBPF verifier) hoặc khai thác các cấu hình phân quyền lỏng lẻo giữa container và host, ranh giới Namespaces sẽ lập tức bị xuyên thủng mà không có bất kỳ lớp bảo vệ phần cứng nào cản trở."
+          ]
+        },
+        {
+          "title": "Phân Rã Đặc Quyền Root: Linux POSIX Capabilities, Seccomp BPF Filters & AppArmor/SELinux",
+          "paragraphs": [
+            "Trong hệ điều hành Linux truyền thống, hệ thống phân quyền vận hành theo mô hình nhị phân: UID 0 (root) sở hữu toàn năng tuyệt đối, còn UID khác 0 là người dùng bình thường chịu mọi sự ràng buộc. Mô hình này cực kỳ nguy hiểm cho container vì nếu một tiến trình chạy với UID 0 bên trong container, nó có tiềm năng thao túng toàn bộ hệ điều hành nếu thoát ra ngoài. Để giải quyết vấn đề này, nhân Linux đã chia nhỏ quyền lực tuyệt đối của root thành các đơn vị đặc quyền độc lập gọi là Linux Capabilities (POSIX Capabilities).",
+            "Có khoảng 40 Capabilities trong nhân Linux hiện đại. Container runtime mặc định (như containerd, Docker, CRI-O) áp dụng nguyên tắc đặc quyền tối thiểu bằng cách loại bỏ hầu hết các Capabilities nguy hiểm và chỉ giữ lại một tập hợp tối thiểu cần thiết để ứng dụng hoạt động (chẳng hạn CAP_CHOWN, CAP_NET_BIND_SERVICE, CAP_SETUID, CAP_SETGID). Tuy nhiên, nếu một container được cấp các Capabilities đặc thù sau đây, kẻ tấn công có thể dễ dàng leo thang đặc quyền và thoát khỏi container: (1) CAP_SYS_ADMIN: 'ông vua' của các capabilities, cho phép mount hệ thống tệp, tải module kernel, thao túng cgroups, gọi nhiều lệnh unshare; (2) CAP_SYS_PTRACE: cho phép gắn trình gỡ lỗi ptrace vào các tiến trình khác, trích xuất bộ nhớ hoặc tiêm shellcode vào tiến trình host nếu dùng chung PID namespace; (3) CAP_DAC_OVERRIDE: cho phép bỏ qua toàn bộ việc kiểm tra quyền đọc/ghi/thực thi file trên hệ thống; (4) CAP_NET_ADMIN: cho phép thao túng bảng định tuyến iptables, cấu hình interface mạng và nghe lén lưu lượng nếu dùng host network.",
+            "Lớp phòng thủ tiếp theo là Seccomp (Secure Computing Mode) kết hợp Berkeley Packet Filter (seccomp-bpf). Seccomp hoạt động như một tường lửa cho các lời gọi hệ thống (System Calls - syscalls). Nhân Linux có hơn 400 syscalls, nhưng một ứng dụng web thông thường chỉ cần khoảng 40-70 syscalls để vận hành. Cấu hình Seccomp mặc định của Docker/containerd chặn khoảng hơn 40 syscalls nguy hiểm, bao gồm keyctl, add_key, bpf, ptrace, reboot, swapoff, sys_chroot, và mount. Nhờ Seccomp, ngay cả khi một tiến trình có quyền root, nó vẫn bị nhân Linux chặn đứng khi cố gắng gọi syscall nằm ngoài danh mục cho phép.",
+            "Cuối cùng, các hệ thống Mandatory Access Control (MAC) như AppArmor (trên Debian/Ubuntu) và SELinux (trên RHEL/CentOS/Fedora) cung cấp lớp kiểm soát ngữ cảnh truy cập. AppArmor sử dụng các profile dựa trên đường dẫn tệp (path-based) để cấm container ghi đè vào các đường dẫn nhạy cảm như /proc/sysrq-trigger, /proc/kcore hay /sys/firmware. SELinux sử dụng nhãn bảo mật (type enforcement labels như container_t) để cô lập dữ liệu container, ngăn chặn tiến trình container dù có quyền root cũng không thể đọc/ghi vào các tệp tin có nhãn svirt_sandbox_file_t của container khác hoặc nhãn unconfined_t của host."
+          ]
+        },
+        {
+          "title": "Giải Phẫu Bề Mặt Tấn Công & Các Vector Container Breakout Điển Hình",
+          "paragraphs": [
+            "Container Breakout (thoát khỏi vùng chứa) là hành vi một tiến trình thực thi bên trong container phá vỡ ranh giới cô lập Namespaces và cgroups để thực thi mã hoặc truy cập tài nguyên trực tiếp trên máy chủ chủ (Host Node) với đặc quyền cao. Các vector thoát vùng chứa chủ yếu bắt nguồn từ 4 nhóm nguyên nhân: cấu hình runtime sai lầm, mount hệ thống tệp nguy hiểm, lạm dụng socket của daemon quản lý, và lỗi nhân Linux.",
+            "Vector 1: Lạm dụng Cờ `--privileged` và cgroup v1 release_agent. Khi một container khởi chạy với cờ `--privileged`, container runtime sẽ tắt bỏ toàn bộ Seccomp profile, gỡ bỏ AppArmor/SELinux profile, thêm toàn bộ 40 Linux Capabilities và mount toàn bộ các thiết bị phần cứng từ `/dev` của host vào container. Khi có đặc quyền `CAP_SYS_ADMIN`, kẻ tấn công có thể mount hệ số phân cấp cgroup v1 (như cgroup rdma hoặc memory), tạo một cgroup con, kích hoạt cờ `notify_on_release = 1` và trỏ tệp `release_agent` của cgroup cha tới một đoạn script độc hại nằm trong thư mục của container. Sau đó, kẻ tấn công xác định đường dẫn tuyệt đối của script này trên host thông qua việc đọc `/proc/self/mountinfo` hoặc `/etc/mtab` (nơi OverlayFS hiển thị thư mục merged tại `/var/lib/docker/overlay2/<id>/merged`). Khi một tiến trình ngắn hạn trong cgroup con kết thúc, cgroup trở nên rỗng; nhân Linux lập tức kích hoạt `release_agent` để dọn dẹp, và thực thi script độc hại với quyền UID 0 (root thực sự của host).",
+            "Vector 2: Lạm dụng Docker Socket Mount (`/var/run/docker.sock`). Trong nhiều môi trường CI/CD (Docker-in-Docker sai cách), kỹ sư thường mount trực tiếp `/var/run/docker.sock` từ host vào trong container để cho phép container tạo ra các container con. Docker socket là một Unix Domain Socket không có cơ chế phân quyền hạt mịn (fine-grained authorization): bất kỳ ai có quyền ghi vào socket này đều tương đương với việc nắm quyền root trên host. Kẻ tấn công trong container chỉ cần tải tiện ích docker client hoặc gửi trực tiếp lệnh gọi REST API qua cURL tới Unix socket để ra lệnh cho Docker daemon trên host khởi chạy một container mới với cờ `--privileged -v /:/host-root`, sau đó thực thi `chroot /host-root` để chiếm quyền điều khiển hoàn toàn máy chủ.",
+            "Vector 3: Mount Nhạy Cảm Từ procfs và sysfs. Việc mount các thư mục nhạy cảm như `/proc` hoặc `/sys` từ host vào container mà không đặt cờ read-only mở ra các vector khai thác cực kỳ nguy hiểm. Điển hình là tệp `/proc/sys/kernel/core_pattern`, nơi quy định chương trình nào sẽ được nhân Linux gọi khi có một tiến trình gặp lỗi crash (segfault) để tạo core dump. Nếu kẻ tấn công có thể ghi đè vào `/proc/sys/kernel/core_pattern` giá trị `|/var/lib/docker/overlay2/.../exploit.sh`, sau đó cố tình kích hoạt lỗi phân đoạn bộ nhớ (kill -SIGSEGV), nhân Linux của host sẽ thực thi file `exploit.sh` trực tiếp trên host với đặc quyền root tối cao."
+          ]
+        },
+        {
+          "title": "Lỗ Hổng Container Runtime: Từ runC Binary Overwrite (CVE-2019-5736) Đến File Descriptor Leaks (CVE-2024-21626) & Phòng Thủ Chuyên Sâu",
+          "paragraphs": [
+            "Bên cạnh các sai sót về mặt cấu hình, các lỗ hổng thực thi trong chính các thành phần Container Runtime tầng thấp (Low-level Runtimes như runC, crun) đại diện cho mối đe dọa nghiêm trọng nhất vì chúng cho phép thoát vùng chứa ngay cả khi container không chạy ở chế độ privileged.",
+            "Lỗ hổng kinh điển runC Binary Overwrite (CVE-2019-5736): Khi một quản trị viên sử dụng lệnh `docker exec` để gắn một shell vào container đang chạy, runC khởi tạo một tiến trình mới (`runc init`) bên trong Mount Namespace của container. Do `runc init` được thực thi từ tệp nhị phân `/usr/bin/runc` của host, tiến trình này giữ một file descriptor mở trỏ về chính tệp nhị phân runC trên host. Kẻ tấn công kiểm soát container có thể ghi đè tệp nhị phân `/bin/sh` bên trong container bằng một chương trình độc hại. Khi quản trị viên gõ `docker exec -it <container> /bin/sh`, chương trình độc hại sẽ đọc liên kết tượng trưng `/proc/self/exe` trỏ ngược lại binary runC của host và mở nó với quyền ghi (`O_WRONLY | O_APPEND`), ghi đè payload độc hại vào binary runC. Lần tiếp theo bất kỳ ai khởi chạy hoặc exec vào container, payload sẽ được thực thi trên host với quyền root.",
+            "Lỗ hổng rò rỉ File Descriptor runC (CVE-2024-21626): Được phát hiện vào đầu năm 2024, lỗ hổng này xuất phát từ việc runC trong quá trình thiết lập môi trường container đã vô tình để rò rỉ các file descriptors mở của hệ thống tệp host (thông qua lệnh gọi `setns` hoặc `open` trên `/sys/fs/cgroup`) mà không gắn cờ `O_CLOEXEC`. Kẻ tấn công có thể tạo một container image chứa chỉ thị `WORKDIR` trỏ vào đường dẫn `/proc/self/fd/<leaked-fd>`, nơi leaked file descriptor đang trỏ về một thư mục trên host filesystem. Khi container khởi động hoặc lệnh `docker exec` được kích hoạt, tiến trình sẽ bắt đầu với thư mục làm việc (working directory) nằm trực tiếp trên host filesystem, cho phép kẻ tấn công duyệt ngược lại thư mục gốc `/` của host và ghi đè các tệp hệ thống quan trọng (như `/etc/shadow`, `/etc/cron.d/backdoor`) mà không cần cờ privileged.",
+            "Chiến Lược Phòng Thủ Chuyên Sâu (Defense-in-Depth): Để triệt tiêu hoàn toàn nguy cơ Container Breakout, kiến trúc sư an ninh cần áp dụng đồng thời các biện pháp: (1) Bật User Namespaces (`userns-remap`): ánh xạ UID 0 trong container thành UID 100000+ trên host, khiến cho kẻ tấn công dù có breakout ra ngoài cũng chỉ mang quyền hạn của một người dùng vô danh không có quyền ghi; (2) Triển khai Rootless Docker/Podman: toàn bộ daemon và runtime đều chạy ở không gian người dùng không đặc quyền; (3) Sử dụng Sandboxed Container Runtimes như gVisor (chạy một kernel giả lập bằng Go chặn đứng toàn bộ syscalls tới host) hoặc Kata Containers (bọc mỗi container trong một MicroVM siêu nhẹ sử dụng KVM phần cứng) cho các workload đa người dùng không đáng tin cậy."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Vùng Quyền Hạn Container, Khai Thác Thoát Vùng Chứa (Breakout) & Gia Cố Runtime",
+        "objective": "Đánh giá các điều kiện phân quyền runtime, phân tích vector breakout qua Capabilities và mounts nhạy cảm, đưa ra quyết định kiến trúc chuẩn mực để triệt tiêu bề mặt tấn công trên host.",
+        "scenario": "Doanh nghiệp công nghệ tài chính của bạn đang vận hành một nền tảng chấm điểm rủi ro tín dụng và hệ thống CI/CD tự động trên cụm hạ tầng containerized. Đội ngũ kiểm toán an ninh phát hiện một số container runner và microservice phân tích dữ liệu đang được cấu hình với các đặc quyền mở rộng, tiềm ẩn nguy cơ bị chiếm quyền máy chủ vật lý nếu mã nguồn bị tấn công.",
+        "constraints": [
+          "Tuyệt đối tuân thủ ADR-001: Mọi quyết định kiến trúc phải dựa trên cơ chế phân tích rủi ro thực tế, không sử dụng các mock simulator giả tạo.",
+          "Phải đảm bảo tính sẵn sàng của quy trình CI/CD và nghiệp vụ xử lý dữ liệu mà không làm suy giảm hiệu năng quá 10%.",
+          "Mọi giải pháp khắc phục phải tuân thủ nguyên tắc Least Privilege, CIS Docker Benchmark và NIST SP 800-190."
+        ],
+        "cases": [
+          {
+            "id": "case-85-01",
+            "title": "Xử Lý Rủi Ro Lạm Dụng Docker Socket Trong Container CI/CD Runner",
+            "context": "Đội ngũ DevOps triển khai GitLab CI/CD Runner bằng cách mount trực tiếp file `/var/run/docker.sock` từ host vào runner container để thực hiện việc build Docker images cho ứng dụng. Đội An ninh cảnh báo rằng các lập trình viên có thể vô tình hoặc cố ý đẩy mã độc trong file `.gitlab-ci.yml` để chạy container privileged và chiếm toàn bộ máy chủ build server.",
+            "prompt": "Lựa chọn kiến trúc nào sau đây triệt tiêu hoàn toàn nguy cơ Container Breakout từ Docker socket mà vẫn cho phép quy trình CI/CD đóng gói container images tự động?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Giữ nguyên cấu hình mount `/var/run/docker.sock` nhưng sử dụng AppArmor profile cấm người dùng gõ lệnh `docker run -v /:/host` trong runner script.",
+                "correct": false,
+                "rationale": "AppArmor profile dựa trên đường dẫn tệp không thể kiểm soát các lệnh gọi API nhị phân được gửi trực tiếp qua Unix Domain Socket tới Docker daemon; kẻ tấn công có thể dùng cURL hoặc Python socket client để bỏ qua bộ lọc shell."
+              },
+              {
+                "id": "B",
+                "label": "Loại bỏ hoàn toàn việc mount `/var/run/docker.sock`; chuyển đổi quy trình build container sang các công cụ daemonless không đặc quyền như Kaniko hoặc Podman Rootless, hoặc sử dụng cơ chế Kubernetes Ephemeral Build Pods với User Namespaces cô lập.",
+                "correct": true,
+                "rationale": "Kaniko và Podman Rootless thực hiện đóng gói image hoàn toàn trong userspace mà không cần giao tiếp với daemon root hay socket của host, triệt tiêu 100% vector breakout qua Docker socket."
+              },
+              {
+                "id": "C",
+                "label": "Đổi tên file socket từ `/var/run/docker.sock` thành `/var/run/docker-hidden.sock` để kẻ tấn công không tìm thấy vị trí socket mặc định.",
+                "correct": false,
+                "rationale": "Security through obscurity hoàn toàn vô giá trị; kẻ tấn công dễ dàng phát hiện đường dẫn socket mới qua `/proc/net/unix` hoặc danh sách file descriptor mở."
+              },
+              {
+                "id": "D",
+                "label": "Cấp thêm quyền `CAP_SYS_ADMIN` cho runner container và chuyển sang chạy chế độ `--privileged` để Docker daemon chạy độc lập bên trong.",
+                "correct": false,
+                "rationale": "Đây là hành động tự sát về mặt an ninh; cấp cờ privileged và CAP_SYS_ADMIN khiến runner container có thể trực tiếp tấn công kernel và thoát ra host qua hàng chục vector khác nhau."
+              }
+            ]
+          },
+          {
+            "id": "case-85-02",
+            "title": "Phân Tích Nguy Cơ Breakout Qua cgroup v1 release_agent & CAP_SYS_ADMIN",
+            "context": "Một container phục vụ công tác giám sát hệ thống mạng được cấp cờ `--cap-add=SYS_ADMIN` và mount hệ thống tệp cgroups từ host. Một lỗ hổng RCE trong thư viện xử lý gói tin của container bị khai thác, kẻ tấn công chiếm được shell root (UID 0) bên trong container.",
+            "prompt": "Biện pháp kỹ thuật nào sau đây giải thích chính xác cách thức kẻ tấn công thoát khỏi container và phương án ngăn chặn triệt để nhất ở tầng runtime?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công không thể thoát ra host vì UID 0 trong container hoàn toàn khác biệt với UID 0 trên host trong mọi trường hợp; chỉ cần đổi mật khẩu tài khoản root trong container là an toàn.",
+                "correct": false,
+                "rationale": "Nếu không kích hoạt User Namespaces, UID 0 trong container chính là UID 0 (root) trên host; kẻ tấn công chia sẻ chung kernel và có đầy đủ quyền thao túng host qua CAP_SYS_ADMIN."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công khai thác quyền `CAP_SYS_ADMIN` để mount cgroup v1, kích hoạt `notify_on_release` và cấu hình `release_agent` trỏ tới script độc hại trên OverlayFS host. Để ngăn chặn triệt để: Nâng cấp hệ thống lên cgroups v2 (loại bỏ hoàn toàn cơ chế release_agent kế thừa), tước bỏ `CAP_SYS_ADMIN`, và bật Seccomp profile mặc định chặn lệnh gọi `mount`.",
+                "correct": true,
+                "rationale": "cgroups v2 thay thế release_agent bằng cgroup.events file descriptor notification, vô hiệu hóa hoàn toàn vector tấn công kinh điển này; kết hợp tước CAP_SYS_ADMIN và chặn mount syscall đảm bảo an toàn tuyệt đối."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần gắn nhãn SELinux `container_t` là đủ để ngăn chặn cgroup release_agent mà không cần nâng cấp cgroups v1.",
+                "correct": false,
+                "rationale": "Khi container có cờ SYS_ADMIN hoặc privileged, SELinux thường bị nới lỏng hoặc vô hiệu hóa một phần; ngoài ra kernel execution callback từ release_agent diễn ra trong ngữ cảnh kernel thread chứ không phải tiến trình container, dễ dẫn đến bypass SELinux."
+              },
+              {
+                "id": "D",
+                "label": "Cấu hình xóa file `/sys/fs/cgroup` định kỳ mỗi phút bằng cronjob trên host.",
+                "correct": false,
+                "rationale": "Xóa điểm gắn kết cgroup sẽ phá vỡ hoàn toàn hoạt động của hệ điều hành và container runtime, đồng thời không ngăn được việc kẻ tấn công mount lại cgroup mới bằng quyền CAP_SYS_ADMIN."
+              }
+            ]
+          },
+          {
+            "id": "case-85-03",
+            "title": "Phòng Chống Khai Thác Lỗ Hổng File Descriptor Leak (CVE-2024-21626) Trong runC",
+            "context": "Một dịch vụ SaaS cho phép khách hàng tải lên các Dockerfile tùy chỉnh để hệ thống tự động build và chạy thử nghiệm. Sau khi lỗ hổng nghiêm trọng CVE-2024-21626 trong runC được công bố (cho phép thoát container thông qua leaked file descriptors trỏ về host filesystem), đội ngũ kỹ thuật cần thiết lập phương án phòng vệ khẩn cấp.",
+            "prompt": "Hành động khắc phục và phòng thủ chuyên sâu nào sau đây bảo vệ hệ thống trước lỗ hổng CVE-2024-21626 và các rủi ro tương tự đối với untrusted container workloads?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cần lọc bỏ từ khóa `WORKDIR` trong file Dockerfile của khách hàng bằng regex trước khi build.",
+                "correct": false,
+                "rationale": "Lọc regex rất dễ bị vượt qua bằng nhiều kỹ thuật bypass ký tự hoặc chỉ thị WORKDIR được kế thừa ngầm định từ base images bên ngoài."
+              },
+              {
+                "id": "B",
+                "label": "Nâng cấp runC lên phiên bản >= 1.1.12 (đã đóng toàn bộ leaked file descriptors với cờ O_CLOEXEC trước khi exec), đồng thời cô lập toàn bộ các untrusted workloads của khách hàng bằng Sandboxed Runtimes như gVisor (runsc) hoặc Kata Containers, và kích hoạt User Namespaces.",
+                "correct": true,
+                "rationale": "Cập nhật bản vá runC vá triệt để lỗi logic rò rỉ fd; việc sử dụng gVisor/Kata Containers cung cấp ranh giới cách ly nhân ảo hóa bổ sung, đảm bảo nếu runtime bên dưới bị tổn thương thì kẻ tấn công vẫn bị giam giữ trong sandbox."
+              },
+              {
+                "id": "C",
+                "label": "Giới hạn dung lượng RAM của container xuống 128MB để kẻ tấn công không đủ bộ nhớ thực thi mã khai thác.",
+                "correct": false,
+                "rationale": "Lỗ hổng CVE-2024-21626 liên quan đến logic rò rỉ file descriptor chứ không phải tràn bộ nhớ; payload khai thác chỉ cần vài kilobyte để thực thi."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển toàn bộ ứng dụng sang chạy trên nền tảng Windows Server Containers.",
+                "correct": false,
+                "rationale": "Thay đổi toàn bộ kiến trúc nền tảng không khả thi, tốn kém chi phí và Windows Containers cũng sở hữu các bề mặt tấn công riêng biệt."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác nguyên nhân gốc rễ và cơ chế kỹ thuật của các vector Container Breakout (Docker socket, cgroup release_agent, CVE-2024-21626).",
+          "Phân tích đúng ranh giới rủi ro giữa chia sẻ nhân Linux (Shared Kernel) và môi trường ảo hóa phần cứng.",
+          "Đưa ra các giải pháp kiến trúc phòng thủ vững chắc: Podman rootless, cgroups v2, cập nhật runC và sandboxed runtimes (gVisor/Kata Containers)."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo phân tích ma trận Linux Capabilities (CapEff) và các cờ runtime của container bị thỏa hiệp",
+          "Bản kiểm toán cấu hình mount points (/proc, /sys, /var/run/docker.sock) và đánh giá mức độ phơi nhiễm",
+          "Kế hoạch nâng cấp runC và chuyển đổi cgroups v1 sang cgroups v2 trên toàn bộ hạ tầng node",
+          "Tài liệu kiến trúc triển khai Sandboxed Runtime gVisor (runsc) cho các nhóm ứng dụng untrusted workloads"
+        ],
+        "reset": "Khôi phục cấu hình container runtime, cgroup parameters và mount namespaces về trạng thái ban đầu của hệ thống kiểm thử.",
+        "cleanup": "Xóa bỏ toàn bộ các container thử nghiệm, các tệp cgroup con tạm thời và gỡ bỏ các script kiểm tra an ninh khỏi thư mục /tmp của host."
+      },
+      "governance": {
+        "prevent": [
+          "Nghiêm cấm tuyệt đối việc sử dụng cờ `--privileged`, `--net=host`, `--pid=host` và việc mount `/var/run/docker.sock` trong môi trường sản xuất thông qua chính sách CI/CD linter.",
+          "Cấu hình Docker daemon và containerd luôn chạy với Seccomp profile mặc định, kích hoạt User Namespaces (`userns-remap`) và gỡ bỏ toàn bộ Capabilities không cần thiết (`--cap-drop=ALL`).",
+          "Thực thi quét lỗ hổng định kỳ đối với Container Runtimes (runC, containerd, CRI-O) và kernel Linux của máy chủ chủ, tự động áp dụng các bản vá bảo mật khẩn cấp."
+        ],
+        "observe": [
+          "Triển khai Falco hoặc eBPF-based runtime security agent (Tetragon, Tracee) để giám sát các hành vi bất thường: gọi syscall mount từ trong container, truy cập file `/proc/kcore` hoặc ghi đè `/proc/sys/kernel/core_pattern`.",
+          "Giám sát nhật ký Docker daemon và auditd trên host đối với các sự kiện kết nối tới Unix socket `/var/run/docker.sock` từ các tiến trình con không xác định.",
+          "Theo dõi các sự kiện thay đổi cấu hình cgroup trong thư mục `/sys/fs/cgroup` và phát hiện các tiến trình ghi vào tệp `release_agent`."
+        ],
+        "respond": [
+          "Khi phát hiện dấu hiệu Container Breakout, lập tức cô lập node vật lý khỏi mạng bằng Network Security Group (NSG) hoặc iptables để ngăn chặn tấn công lan ngang (Lateral Movement).",
+          "Dừng ngay lập tức (docker pause / kill) container có hành vi bất thường và trích xuất bộ nhớ RAM của node để phục vụ điều tra số pháp y (Memory Forensics).",
+          "Rà soát toàn bộ các node khác trong cụm để xác định xem có container nào khác sử dụng chung image độc hại hoặc chia sẻ cùng cấu hình mount nguy hiểm hay không."
+        ],
+        "residualRisk": [
+          "Các lỗ hổng 0-day trong nhân Linux (Linux Kernel Zero-days) tác động trực tiếp vào các syscalls thiết yếu không thể bị chặn bởi Seccomp vẫn tiềm ẩn rủi ro phá vỡ ranh giới container.",
+          "Độ phức tạp trong việc tương thích ứng dụng khi bật User Namespaces hoặc Seccomp quá nghiêm ngặt có thể dẫn đến việc các nhóm phát triển tìm cách vô hiệu hóa các rào chắn bảo vệ."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Container cung cấp ranh giới bảo mật độc lập và kiên cố tương đương với máy ảo phần cứng (Virtual Machine).",
+          "correction": "Hoàn toàn sai lầm. Container chia sẻ chung một nhân Linux duy nhất với máy chủ chủ. Bất kỳ lỗ hổng nhân (kernel exploit) hoặc cấu hình trao quyền lỏng lẻo nào cũng có thể dẫn đến việc kiểm soát toàn bộ máy chủ chủ, điều không thể xảy ra đối với các máy ảo KVM/ESXi chuẩn mực."
+        },
+        {
+          "claim": "Người dùng chạy với quyền root (UID 0) bên trong container chỉ có quyền quản trị đối với các tệp tin trong container đó và không thể làm hại hệ thống máy chủ bên ngoài.",
+          "correction": "Sai lầm nguy hiểm. Nếu không bật User Namespaces (userns-remap), UID 0 trong container chính là UID 0 (root) trên máy chủ chủ. Nếu container có quyền truy cập vào các tệp tin hoặc socket của host, quyền root này có hiệu lực thực tế tương đương trên máy chủ."
+        },
+        {
+          "claim": "Chỉ cần không sử dụng cờ `--privileged` là container hoàn toàn an toàn trước các cuộc tấn công thoát vùng chứa (Container Breakout).",
+          "correction": "Không chính xác. Kẻ tấn công vẫn có thể thoát khỏi container không privileged nếu container được cấp các Capabilities nguy hiểm (như CAP_SYS_PTRACE, CAP_DAC_OVERRIDE), mount các tệp nhạy cảm (/proc/sys, docker socket), hoặc khai thác các lỗ hổng runtime như CVE-2024-21626 trong runC."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os09-l85-q1",
+          "difficulty": "easy",
+          "question": "Thành phần cốt lõi nào của nhân Linux chịu trách nhiệm giới hạn tầm nhìn không gian tên (như cây tiến trình, giao diện mạng, điểm gắn ổ đĩa) của một container?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Control Groups (cgroups)"
+            },
+            {
+              "id": "B",
+              "label": "Linux Namespaces"
+            },
+            {
+              "id": "C",
+              "label": "Seccomp BPF"
+            },
+            {
+              "id": "D",
+              "label": "AppArmor Profiles"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Linux Namespaces là cơ chế của nhân Linux giới hạn phạm vi tài nguyên mà một tiến trình có thể nhìn thấy (PID, Mount, Network, IPC, UTS, User, Cgroup, Time). cgroups chịu trách nhiệm giới hạn định lượng tài nguyên (CPU, RAM), trong khi Seccomp và AppArmor giới hạn syscalls và kiểm soát quyền truy cập."
+        },
+        {
+          "id": "os09-l85-q2",
+          "difficulty": "medium",
+          "question": "Hành vi mount socket `/var/run/docker.sock` từ host vào trong một container tiềm ẩn rủi ro an ninh mạng nào sau đây?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Làm container bị tiêu tốn quá nhiều băng thông mạng do Docker daemon gửi nhật ký liên tục"
+            },
+            {
+              "id": "B",
+              "label": "Cho phép bất kỳ ai kiểm soát container có thể tương tác trực tiếp với Docker daemon trên host để tạo container mới có đặc quyền cao và kiểm soát hoàn toàn máy chủ"
+            },
+            {
+              "id": "C",
+              "label": "Chỉ làm lộ thông tin các biến môi trường của container khác chứ không thể thực thi mã ngoài ranh giới container"
+            },
+            {
+              "id": "D",
+              "label": "Vô hiệu hóa tính năng mã hóa TLS của các container đang chạy trong cùng mạng nội bộ"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Docker socket là API quản trị trực tiếp của Docker daemon chạy với quyền root trên host. Khi được mount vào container, kẻ tấn công có thể ra lệnh cho daemon tạo một container mới với cờ `--privileged` và mount thư mục gốc `/` của host, từ đó chiếm quyền điều khiển toàn bộ máy chủ."
+        },
+        {
+          "id": "os09-l85-q3",
+          "difficulty": "hard",
+          "question": "Cơ chế nào của nhân Linux trong cgroups v1 thường bị lạm dụng để thực hiện Container Breakout khi container sở hữu quyền `CAP_SYS_ADMIN` và cờ privileged?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Tính năng hoán đổi bộ nhớ (memory.swap) gây tràn bộ đệm kernel"
+            },
+            {
+              "id": "B",
+              "label": "Cơ chế `notify_on_release` kết hợp với tệp cấu hình `release_agent` thực thi script trên host khi cgroup con trở nên rỗng"
+            },
+            {
+              "id": "C",
+              "label": "Bộ lập lịch hoàn toàn công bằng (Completely Fair Scheduler - CFS) trong cpu.cfs_quota_us"
+            },
+            {
+              "id": "D",
+              "label": "Tính năng giới hạn số lượng tiến trình tối đa (pids.max)"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Trong cgroups v1, khi một cgroup có `notify_on_release = 1` và tiến trình cuối cùng trong cgroup đó kết thúc, kernel sẽ thực thi lệnh được chỉ định trong tệp `release_agent`. Với quyền CAP_SYS_ADMIN, kẻ tấn công có thể ghi đường dẫn mã độc vào tệp này để kernel thực thi nó trực tiếp trên host với đặc quyền UID 0."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một công ty công nghệ vừa trải qua một cuộc kiểm toán an ninh độc lập và bị đánh giá 'Báo động Đỏ' do 40 máy chủ chạy Docker sản phẩm đều mount `/var/run/docker.sock` vào các container xử lý webhook của bên thứ ba, đồng thời nhiều container phân tích dữ liệu đang chạy với cờ `--privileged`. Bạn được chỉ định làm Trưởng nhóm Tác chiến An ninh Vùng chứa để tái cấu trúc và triệt tiêu toàn bộ các vector Container Breakout trên toàn hệ thống.",
+        "tasks": [
+          "Rà soát và loại bỏ toàn bộ việc mount `/var/run/docker.sock` trên 40 máy chủ; xây dựng kiến trúc build ảnh container thay thế sử dụng Podman Rootless và Kaniko kết hợp với kho lưu trữ container nội bộ.",
+          "Xóa bỏ hoàn toàn cờ `--privileged` trên tất cả các dịch vụ; thiết kế ma trận Linux POSIX Capabilities tối thiểu (chỉ cấp phép những quyền thực sự cần thiết theo chuẩn PoLP) và xây dựng bộ lọc Seccomp BPF profile tùy chỉnh.",
+          "Triển khai giải pháp giám sát runtime an ninh chuyên sâu bằng eBPF (Tetragon hoặc Falco) trên toàn bộ máy chủ chủ để phát hiện và tự động chặn đứng ngay lập tức các hành vi cố gắng thao túng cgroup, mount procfs/sysfs hoặc rò rỉ file descriptors."
+        ],
+        "requiredEvidence": [
+          "Tài liệu kiến trúc thay thế Docker socket bằng quy trình đóng gói container Rootless/Kaniko kèm biểu đồ luồng dữ liệu",
+          "Tệp manifest cấu hình Seccomp BPF profile và bảng ma trận ánh xạ Capabilities của từng nhóm microservice",
+          "Bộ quy tắc giám sát Falco/Tetragon (YAML) phát hiện Container Breakout và ảnh chụp log cảnh báo trong môi trường thử nghiệm"
+        ]
+      },
+      "sources": [
+        {
+          "title": "NIST SP 800-190 — Application Container Security Guide",
+          "url": "https://csrc.nist.gov/publications/detail/sp/800-190/final",
+          "publisher": "National Institute of Standards and Technology (NIST)",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Các rủi ro an ninh đối với Container Runtimes và Shared Kernel",
+            "Nguyên tắc cô lập đặc quyền tối thiểu cho container workloads"
+          ]
+        },
+        {
+          "title": "CNCF Container Security Whitepaper",
+          "url": "https://www.cncf.io/reports/container-security-whitepaper/",
+          "publisher": "Cloud Native Computing Foundation (CNCF)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc Linux Namespaces, cgroups v1/v2 và POSIX Capabilities",
+            "Mô hình phòng thủ chuyên sâu với Seccomp, AppArmor và Sandboxed Runtimes"
+          ]
+        },
+        {
+          "title": "Linux Kernel Documentation — Namespaces and Control Groups",
+          "url": "https://docs.kernel.org/admin-guide/cgroup-v2.html",
+          "publisher": "The Linux Kernel Organization",
+          "sourceType": "official-definition",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế cgroups v2 và thay thế notify_on_release",
+            "Nguyên lý vận hành các tầng cô lập của hệ điều hành Linux"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK Matrix for Containers",
+          "url": "https://attack.mitre.org/matrices/enterprise/containers/",
+          "publisher": "MITRE Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kỹ thuật Escape to Host (T1611)",
+            "Lạm dụng Privileged Container và Access Docker Socket (T1609)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os09-l86-kubernetes-architecture-and-api-server-threats",
+      "slug": "kubernetes-architecture-and-api-server-threats",
+      "title": "Kiến Trúc Kubernetes, Bề Mặt Tấn Công API Server & Hiểm Họa Control Plane",
+      "summary": "Giải phẫu kiến trúc thành phần Kubernetes Control Plane và Data Plane: cơ chế chứng thực/ủy quyền của kube-apiserver, vai trò lưu trữ trạng thái của etcd, và giao tiếp nút qua kubelet API; phân tích các hiểm họa bảo mật nghiêm trọng: rò rỉ kube-apiserver ra Internet không xác thực (anonymous-auth), khai thác etcd không mã hóa/không mTLS, lạm dụng Kubelet 10250 API không bảo vệ để thực thi mã từ xa (RCE), và kỹ thuật leo thang đặc quyền từ một Pod bị chiếm quyền lên toàn bộ cụm Kubernetes (Cluster Compromise).",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": ["os09-l85-container-runtimes-namespaces-and-breakouts"],
+      "outcomes": [
+        "Giải mã luồng dữ liệu và ranh giới tin cậy giữa các thành phần Control Plane (kube-apiserver, etcd, kube-controller-manager, kube-scheduler) và Worker Nodes (kubelet, kube-proxy, CRI runtime).",
+        "Kiểm toán và phát hiện các sai sót bảo mật nghiêm trọng trên Kubelet API (port 10250/10255), kube-apiserver anonymous authentication, và cổng unauthenticated etcd (port 2379).",
+        "Bóc tách kỹ thuật tấn công Server-Side Request Forgery (SSRF) từ Pod nội bộ đến Kubelet API hoặc Cloud Metadata Service (IMDSv1/v2) để chiếm đoạt Node Kubeconfig và ServiceAccount tokens.",
+        "Thiết lập kiến trúc mạng và chứng thực Control Plane theo mô hình Zero Trust: kích hoạt mTLS bắt buộc, mã hóa etcd at-rest qua KMS provider, khóa chặt Kubelet authentication (Webhook mode), và cách ly hoàn toàn Control Plane khỏi mạng công cộng."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["container", "kubernetes", "rbac"],
+      "attackTactics": [
+        "initial-access",
+        "execution",
+        "privilege-escalation",
+        "credential-access",
+        "lateral-movement"
+      ],
+      "keywords": [
+        "kubernetes-architecture",
+        "kube-apiserver",
+        "etcd-security",
+        "kubelet-api",
+        "anonymous-auth",
+        "mtls",
+        "cluster-takeover",
+        "ssrf-imds",
+        "kms-encryption",
+        "cis-kubernetes-benchmark"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Kubernetes Control Plane là 'bộ não điều phối' của toàn bộ hệ thống phân tán, nơi kube-apiserver đóng vai trò là cửa ngõ giao tiếp duy nhất (Single Point of Contact) và etcd là 'kho lưu trữ sự thật tuyệt đối' (Source of Truth) chứa toàn bộ cấu hình, trạng thái cụm và Secrets nhạy cảm. Trong một cụm Kubernetes mặc định hoặc cấu hình lỏng lẻo, ranh giới giữa Worker Node và Control Plane rất mỏng manh: nếu kẻ tấn công chiếm được chứng thư Kubelet hoặc tiếp cận được cổng etcd không mTLS, chúng có thể tạo Pod tùy ý, trích xuất tất cả Secrets của mọi namespace, biến một cuộc tấn công cục bộ trên Pod thành thảm họa chiếm toàn quyền điều khiển hạ tầng cụm (Full Cluster Takeover).",
+      "visual": {
+        "title": "Ma Trận Bề Mặt Tấn Công Kubernetes Control Plane & Kubelet API",
+        "caption": "Chuỗi leo thang từ việc khai thác cổng dịch vụ không an toàn (Kubelet 10250 / etcd 2379) đến việc chiếm toàn quyền cụm.",
+        "steps": [
+          {
+            "label": "Trinh Sát Cổng Dịch Vụ Control Plane & Node",
+            "detail": "Kẻ tấn công quét dải mạng nội bộ hoặc qua SSRF phát hiện cổng 10250 (Kubelet API), 6443 (kube-apiserver) hoặc 2379 (etcd) đang lắng nghe.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Khai Thác Kubelet RCE Qua Endpoint /run",
+            "detail": "Do Kubelet bật anonymous-auth=true và authorization-mode=AlwaysAllow, kẻ tấn công gửi POST request tới /run/{ns}/{pod}/{container} để thực thi lệnh trực tiếp.",
+            "tone": "caution"
+          },
+          {
+            "label": "Thâm Nhập etcd & Chiếm Đoạt cluster-admin Token",
+            "detail": "Truy cập cổng etcd 2379 thiếu mTLS, dùng etcdctl dump toàn bộ khóa /registry/secrets/kube-system để lấy token tài khoản quản trị cụm cao nhất.",
+            "tone": "stop"
+          },
+          {
+            "label": "Chiếm Quyền Điều Khiển Toàn Cụm (Cluster Takeover)",
+            "detail": "Gửi API request tới kube-apiserver với token cluster-admin vừa chiếm được, triển khai DaemonSet độc hại trên toàn bộ worker nodes và vô hiệu hóa audit log.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Phân Tán Kubernetes: Luồng Vận Hành Giữa Control Plane và Worker Nodes",
+          "paragraphs": [
+            "Kubernetes là một nền tảng điều phối container phân tán mã nguồn mở với kiến trúc phân tách rành mạch giữa hai khối chức năng: Control Plane (mặt phẳng điều khiển) và Data Plane / Worker Nodes (mặt phẳng dữ liệu). Việc thấu hiểu sự tương tác giữa hai mặt phẳng này là điều kiện tiên quyết để nắm vững bề mặt tấn công của cụm.",
+            "Control Plane bao gồm 4 thành phần nòng cốt: (1) `kube-apiserver`: Trung tâm đầu não và là thành phần duy nhất giao tiếp trực tiếp với cơ sở dữ liệu etcd. Mọi yêu cầu từ quản trị viên (kubectl), từ worker nodes (kubelet), và từ các dịch vụ bên trong cụm đều phải đi qua kube-apiserver qua giao thức HTTPS REST API; (2) `etcd`: Kho lưu trữ phân tán dạng key-value nhất quán và có tính sẵn sàng cao, lưu giữ toàn bộ trạng thái của cụm, bao gồm Pod specs, ConfigMaps, Secrets, RBAC roles; (3) `kube-scheduler`: Bộ lập lịch theo dõi các Pod mới tạo chưa được gán node và chọn lựa worker node tối ưu nhất dựa trên tài nguyên yêu cầu và các ràng buộc affinity/taints; (4) `kube-controller-manager`: Tiến trình chạy các bộ điều khiển cốt lõi (Node Controller, Replication Controller, Endpoints Controller, ServiceAccount Controller) để liên tục đồng bộ trạng thái thực tế của cụm về trạng thái mong muốn (Desired State).",
+            "Worker Nodes chịu trách nhiệm thực thi các container workloads thực tế, bao gồm: (1) `kubelet`: Daemon đại lý chạy trên mỗi node, định kỳ giao tiếp với kube-apiserver để nhận danh sách Pod được phân công cho node đó, tương tác với Container Runtime Interface (CRI) để khởi chạy container, và liên tục báo cáo trạng thái node/pod; (2) `kube-proxy`: Quản lý các quy tắc mạng (iptables hoặc IPVS) trên node để thực hiện cân bằng tải cho các Kubernetes Services; (3) `Container Runtime`: Phần mềm tầng thấp (containerd, CRI-O) thực hiện việc kéo image và vận hành container.",
+            "Ranh giới an ninh trong Kubernetes được định hình bởi nguyên tắc: Worker Node không được phép tin cậy tuyệt đối Control Plane, và ngược lại, Control Plane phải áp dụng mô hình Zero Trust đối với các Worker Nodes. Tuy nhiên, nếu cấu hình không chuẩn mực, kẻ tấn công chiếm được một Worker Node có thể lạm dụng quyền hạn của Kubelet để đánh cắp Secrets của các Pod khác hoặc thao túng Control Plane."
+          ]
+        },
+        {
+          "title": "Bề Mặt Tấn Công kube-apiserver: Cơ Chế Xác Thực, Ủy Quyền & Nguy Cơ Anonymous Auth",
+          "paragraphs": [
+            "kube-apiserver là điểm tiếp nhận và xử lý mọi tương tác trong cụm. Khi một yêu cầu HTTP được gửi đến kube-apiserver, nó phải trải qua tuần tự 3 giai đoạn kiểm soát nghiêm ngặt trước khi được xử lý: Xác thực (Authentication) -> Ủy quyền (Authorization) -> Kiểm soát nhập cảnh (Admission Control).",
+            "Giai đoạn Xác thực (Authentication): kube-apiserver hỗ trợ nhiều phương thức xác thực danh tính: Chứng chỉ số X.509 Client Certificates (thường dùng cho các thành phần nội bộ và quản trị viên cụm), Static Token File (đã bị coi là không an toàn), OpenID Connect (OIDC) Tokens (tích hợp với IdP doanh nghiệp như Okta, Azure AD, Keycloak), và ServiceAccount Tokens (JSON Web Tokens có chữ ký số gắn với từng Pod). Điểm mù bảo mật nguy hiểm nhất ở tầng này là tham số `--anonymous-auth`. Nếu được đặt thành `true` (mặc định trong nhiều bản phân phối cũ), bất kỳ yêu cầu nào không kèm thông tin định danh sẽ được gán danh tính `system:anonymous` thuộc nhóm `system:unauthenticated`. Nếu quản trị viên lỡ gán quyền cho nhóm này hoặc có cấu hình RBAC sai lầm, kẻ tấn công từ Internet có thể gọi API mà không cần bất kỳ mật khẩu hay chứng chỉ nào.",
+            "Giai đoạn Ủy quyền (Authorization): Sau khi danh tính được xác thực, kube-apiserver chuyển ngữ cảnh cho bộ máy ủy quyền. Các chế độ ủy quyền phổ biến bao gồm Node (ủy quyền đặc thù cho các lệnh gọi từ kubelet), RBAC (Role-Based Access Control dựa trên Role/ClusterRole), Webhook (chuyển tiếp việc kiểm tra quyền cho dịch vụ bên ngoài), và AlwaysAllow (cực kỳ nguy hiểm, cho phép mọi yêu cầu mà không kiểm tra). Thứ tự đánh giá diễn ra theo chuỗi: nếu một module cho phép (Allow), yêu cầu được thông qua; nếu không, chuyển sang module tiếp theo. Nếu tất cả module đều không đưa ra quyết định, kết quả cuối cùng là Deny.",
+            "Các lỗ hổng phổ biến của kube-apiserver: Bên cạnh cấu hình sai, kube-apiserver từng đối mặt với các lỗ hổng nghiêm trọng ở tầng ứng dụng như CVE-2018-1002105 (Kubernetes API Server Privilege Escalation / Connection Hijacking), nơi kẻ tấn công gửi một yêu cầu WebSocket/HTTP proxy tới backend server (như Kubelet API) rồi tái sử dụng kết nối TCP đã xác thực đó để gửi các lệnh API quản trị viên trực tiếp tới kube-apiserver."
+          ]
+        },
+        {
+          "title": "Lỗ Hổng & Điểm Mù Trên Kubelet API: RCE Qua Port 10250 và Lạm Dụng Giao Tiếp Node",
+          "paragraphs": [
+            "Kubelet không chỉ là một client gọi API tới kube-apiserver; bản thân Kubelet cũng là một máy chủ web HTTPS lắng nghe trên cổng 10250 (cổng chính) và đôi khi mở thêm cổng 10255 (cổng Read-Only không xác thực phục vụ metrics, đã bị loại bỏ dần). Kubelet API trên cổng 10250 cung cấp các endpoint cực kỳ mạnh mẽ để điều khiển container: `/pods` (liệt kê danh sách pods trên node), `/run/{pod}/{container}` và `/exec/{pod}/{container}` (thực thi shell command trong container), `/attach/{pod}/{container}` (gắn stdin/stdout), và `/logs` (đọc nhật ký).",
+            "Mặc định trong một số bản cài đặt không chuẩn (như các cụm on-premises tự dựng hoặc script tự động hóa cẩu thả), Kubelet được cấu hình với hai tham số chết người: `--anonymous-auth=true` và `--authorization-mode=AlwaysAllow`. Khi cấu hình này tồn tại, Kubelet cho phép bất kỳ ai có thể kết nối mạng tới cổng 10250 thực thi mã lệnh từ xa (Remote Code Execution - RCE) bên trong bất kỳ container nào đang chạy trên node đó mà không cần bất kỳ thông tin đăng nhập nào. Kẻ tấn công chỉ cần gửi một lệnh HTTP POST tới endpoint `/run` kèm tham số command là mã độc sẽ được thực thi ngay lập tức.",
+            "Ngay cả khi Kubelet API không mở ra mạng ngoài, nó vẫn có thể bị tấn công từ bên trong cụm: Một container bình thường trong cụm có thể quét mạng nội bộ để tìm cổng 10250 của Node IP (thường chính là Gateway IP trong container Network Namespace). Hơn nữa, lỗ hổng Server-Side Request Forgery (SSRF) trên các ứng dụng web chạy trong Pod có thể bị lợi dụng làm bàn đạp để gửi lệnh POST tới Kubelet API, dẫn đến việc thỏa hiệp toàn bộ các Pod khác chạy chung node.",
+            "Để bảo vệ Kubelet API, kiến trúc Zero Trust bắt buộc phải cấu hình: (1) `--anonymous-auth=false` (từ chối hoàn toàn các kết nối không danh tính); (2) `--authorization-mode=Webhook` (bắt buộc Kubelet phải hỏi ý kiến kube-apiserver qua SubjectAccessReview API để xác nhận xem client có quyền thực hiện hành động trên Pod hay không); (3) `--client-ca-file` (bắt buộc client phải xuất trình chứng chỉ mTLS được cấp bởi CA nội bộ của cụm)."
+          ]
+        },
+        {
+          "title": "Hiểm Họa Tấn Công etcd & Bảo Mật Kho Dữ Liệu Cốt Lõi Của Cụm",
+          "paragraphs": [
+            "etcd là cơ sở dữ liệu phân tán lưu trữ toàn bộ 'bí mật' của Kubernetes. Mọi thông tin định nghĩa cụm, manifest tài nguyên, và đặc biệt là toàn bộ `Secrets` (bao gồm mật khẩu cơ sở dữ liệu, API keys, chứng chỉ TLS, và token của ServiceAccount) đều được lưu trữ dưới các khóa phân cấp trong etcd (ví dụ `/registry/secrets/<namespace>/<secret-name>`). Do đó, nếu etcd bị xâm phạm, toàn bộ cụm Kubernetes bị coi là thất thủ hoàn toàn.",
+            "Nguy cơ rò rỉ cổng 2379: etcd giao tiếp với kube-apiserver và giữa các thành viên etcd cluster qua cổng TCP 2379 (client port) và 2380 (peer port). Trong nhiều sự cố bảo mật thực tế, quản trị viên vô tình để cổng 2379 mở công cộng ra Internet hoặc mở trong mạng nội bộ mà không bật xác thực mTLS hai chiều (`--client-cert-auth=false`). Khi đó, bất kỳ ai cũng có thể sử dụng công cụ dòng lệnh `etcdctl` để kết nối vào etcd: `etcdctl --endpoints=https://<ip>:2379 get \"\" --prefix --keys-only` và trích xuất toàn bộ dữ liệu bí mật của cụm.",
+            "Nguy cơ thiếu mã hóa dữ liệu khi lưu trữ (Encryption at Rest): Mặc định trong Kubernetes thuần gốc, etcd lưu trữ dữ liệu dạng văn bản thuần (plaintext) hoặc chỉ mã hóa Base64 cho các Secrets. Nếu một kẻ tấn công chiếm được quyền truy cập vào ổ đĩa lưu trữ của máy chủ Control Plane (thông qua snapshot ổ đĩa bị lộ, backup etcd không mã hóa trên cloud storage, hoặc lạm dụng quyền đọc phân vùng `/var/lib/etcd`), chúng có thể đọc toàn bộ Secrets mà không cần tương tác với kube-apiserver.",
+            "Giải pháp gia cố etcd chuẩn mực: (1) Bắt buộc thiết lập mTLS 2 chiều riêng biệt cho etcd với Certificate Authority (CA) chuyên dụng, tách biệt hoàn toàn với CA của kube-apiserver; (2) Cách ly hoàn toàn etcd ở tầng mạng, chỉ cho phép các gói tin từ địa chỉ IP tĩnh của kube-apiserver kết nối tới cổng 2379; (3) Kích hoạt tính năng `EncryptionConfiguration` trên kube-apiserver với nhà cung cấp KMS Provider (như AWS KMS, HashiCorp Vault, Azure Key Vault) để mã hóa toàn bộ Secrets bằng thuật toán AES-CBC hoặc AES-GCM trước khi ghi vào etcd; (4) Mã hóa toàn bộ các bản sao lưu etcd (etcd snapshots) và quản lý khóa mã hóa theo tiêu chuẩn nghiêm ngặt."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Thẩm Định Ranh Giới Bảo Mật Kubernetes Control Plane & Khắc Phục Lỗ Hổng API",
+        "objective": "Kiểm toán bề mặt tấn công của kube-apiserver, kubelet và etcd; phát hiện các sai sót cấu hình phân quyền; đưa ra quyết định phòng thủ chuẩn mực để ngăn chặn nguy cơ cluster takeover.",
+        "scenario": "Doanh nghiệp bạn đang vận hành một cụm Kubernetes tự dựng (Self-hosted Kubernetes) trên hạ tầng Private Cloud phục vụ hệ thống ngân hàng số. Đội ngũ Red Team vừa thực hiện kiểm thử xâm nhập nội bộ từ một Pod phân tích nghiệp vụ và phát hiện nhiều điểm yếu chết người liên quan đến cấu hình Kubelet API và lưu trữ etcd.",
+        "constraints": [
+          "Tuyệt đối tuân thủ ADR-001: Mọi kịch bản quyết định phải dựa trên cấu hình thực tế của Kubernetes v1.28+, không dùng mock simulator.",
+          "Phải đảm bảo không làm gián đoạn liên lạc nội bộ giữa kube-apiserver và các Kubelet daemon trên worker nodes.",
+          "Mọi cấu hình đề xuất phải tuân thủ nghiêm ngặt chuẩn CIS Kubernetes Benchmark."
+        ],
+        "cases": [
+          {
+            "id": "case-86-01",
+            "title": "Xử Lý Lỗ Hổng RCE Trên Kubelet API Cổng 10250",
+            "context": "Kiểm tra cấu hình Kubelet trên 100 worker nodes, chuyên gia bảo mật phát hiện file `/var/lib/kubelet/config.yaml` đang chứa cấu hình: `authentication: { anonymous: { enabled: true } }` và `authorization: { mode: AlwaysAllow }`. Một Pod nội bộ bị chiếm quyền có thể gửi HTTP POST tới `https://<Node-IP>:10250/run/kube-system/etcd-.../etcd` để thực thi lệnh tùy ý.",
+            "prompt": "Phương án kỹ thuật nào sau đây khắc phục triệt để lỗ hổng này theo khuyến nghị của CIS Kubernetes Benchmark?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Đổi cổng Kubelet từ 10250 sang cổng 20250 và chặn cổng 10250 bằng tường lửa.",
+                "correct": false,
+                "rationale": "Thay đổi số cổng chỉ là giải pháp che giấu tạm thời, không giải quyết được lỗ hổng gốc rễ về thiếu xác thực và ủy quyền trên Kubelet API."
+              },
+              {
+                "id": "B",
+                "label": "Cập nhật `/var/lib/kubelet/config.yaml`: Đặt `authentication: { anonymous: { enabled: false } }`, cấu hình `x509: { clientCAFile: /etc/kubernetes/pki/ca.crt }`, và chuyển `authorization: { mode: Webhook }`, đồng thời cấu hình tường lửa chỉ cho phép kube-apiserver kết nối tới cổng 10250.",
+                "correct": true,
+                "rationale": "Đây là cấu hình chuẩn mực của CIS Benchmark: Tắt hoàn toàn truy cập nặc danh, bắt buộc xác thực qua CA và ủy quyền qua kube-apiserver bằng Webhook mode (SubjectAccessReview), chặn đứng mọi nỗ lực gọi trực tiếp từ Pod."
+              },
+              {
+                "id": "C",
+                "label": "Tắt hoàn toàn Kubelet API bằng cách thêm tham số `--port=0` vào cờ khởi động kubelet.",
+                "correct": false,
+                "rationale": "Tắt hoàn toàn Kubelet API sẽ làm tê liệt các tính năng cốt lõi của Kubernetes như `kubectl logs`, `kubectl exec` và các cơ chế kiểm tra liveness/readiness probes của cụm."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần cài đặt antivirus trên worker node để quét tiến trình con của Kubelet.",
+                "correct": false,
+                "rationale": "Antivirus truyền thống không thể ngăn chặn các yêu cầu hợp lệ được gửi tới Kubelet API và không giải quyết được cấu hình mở AlwaysAllow."
+              }
+            ]
+          },
+          {
+            "id": "case-86-02",
+            "title": "Bảo Mật Cơ Sở Dữ Liệu etcd & Mã Hóa Dữ Liệu Secrets At-Rest",
+            "context": "Đội ngũ bảo mật phát hiện ổ đĩa `/var/lib/etcd` trên máy chủ Master Node chứa toàn bộ thông tin Secrets ở dạng plaintext. Ngoài ra, tệp cấu hình etcd không bật mTLS mà cho phép các kết nối HTTP không mã hóa từ toàn bộ dải mạng quản trị nội bộ.",
+            "prompt": "Gói giải pháp nào sau đây thiết lập ranh giới phòng thủ toàn diện cho etcd?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tạo một Cronjob mã hóa thư mục `/var/lib/etcd` bằng zip có đặt mật khẩu mỗi đêm.",
+                "correct": false,
+                "rationale": "Mã hóa bằng zip không có tác dụng bảo vệ khi hệ thống đang chạy thời gian thực (runtime) và làm hỏng tính toàn vẹn của cơ sở dữ liệu etcd."
+              },
+              {
+                "id": "B",
+                "label": "Cấu hình etcd bắt buộc mTLS hai chiều (`--client-cert-auth=true`, `--trusted-ca-file=etcd-ca.crt`), cách ly mạng cổng 2379 chỉ cho phép IP của kube-apiserver, đồng thời triển khai `EncryptionConfiguration` trên kube-apiserver sử dụng KMS Plugin để mã hóa toàn bộ Secrets trước khi ghi vào etcd.",
+                "correct": true,
+                "rationale": "Cấu hình này bảo vệ etcd trên cả hai mặt trận: Chặn đứng truy cập mạng trái phép qua mTLS và firewall, đồng thời bảo vệ dữ liệu at-rest bằng mã hóa phong bì (envelope encryption) thông qua KMS Provider."
+              },
+              {
+                "id": "C",
+                "label": "Chuyển toàn bộ Secrets sang lưu trữ dưới dạng ConfigMap để không phải bảo mật etcd.",
+                "correct": false,
+                "rationale": "ConfigMap hoàn toàn không được mã hóa và không được thiết kế để chứa dữ liệu nhạy cảm; hành động này làm tăng nghiêm trọng nguy cơ lộ lọt thông tin."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cho phép tài khoản root của Linux đăng nhập vào máy chủ Master.",
+                "correct": false,
+                "rationale": "Không giải quyết được nguy cơ tấn công qua mạng tới cổng 2379 và không mã hóa được dữ liệu lưu trên ổ đĩa."
+              }
+            ]
+          },
+          {
+            "id": "case-86-03",
+            "title": "Chống Tấn Công SSRF Nhắm Vào Cloud Metadata Service (IMDS) Từ Pod",
+            "context": "Một cụm Kubernetes chạy trên AWS EKS. Một microservice cổng thanh toán có tính năng tải ảnh biên lai bị dính lỗi SSRF. Kẻ tấn công gửi yêu cầu tới địa chỉ `http://169.254.169.254/latest/meta-data/iam/security-credentials/` để lấy cắp IAM Role của Node (Node Instance Profile), từ đó kiểm soát tài khoản đám mây.",
+            "prompt": "Giải pháp phòng thủ nhiều lớp nào sau đây triệt tiêu hoàn toàn vector tấn công này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cập nhật ứng dụng bằng cách thêm bộ lọc blacklist cấm chuỗi ký tự '169.254.169.254' trong URL tải ảnh.",
+                "correct": false,
+                "rationale": "Bộ lọc blacklist URL rất dễ bị vượt qua bằng cách biểu diễn IP dưới dạng thập lục phân (hex), bát phân (octal), decimal, hoặc sử dụng DNS Rebinding."
+              },
+              {
+                "id": "B",
+                "label": "Cưỡng chế sử dụng AWS IMDSv2 (yêu cầu PUT token session với header `X-aws-ec2-metadata-token`), cấu hình giới hạn bước nhảy mạng (Hop Limit) của IMDSv2 bằng 1 trên EC2 instance, đồng thời triển khai Kubernetes NetworkPolicy hoặc Calico/Cilium GlobalNetworkPolicy chặn toàn bộ lưu lượng egress từ Pod tới dải IP 169.254.169.254.",
+                "correct": true,
+                "rationale": "IMDSv2 Hop Limit = 1 ngăn chặn gói tin từ container vượt qua network bridge/veth interface của host; kết hợp NetworkPolicy chặn egress triệt tiêu hoàn toàn khả năng ứng dụng gửi gói tin tới metadata service."
+              },
+              {
+                "id": "C",
+                "label": "Xóa bỏ hoàn toàn IAM Role gắn vào EC2 Node và thay bằng tài khoản root AWS trong file cấu hình pod.",
+                "correct": false,
+                "rationale": "Đưa tài khoản root vào file cấu hình pod là lỗi bảo mật nghiêm trọng hơn gấp bội, phá vỡ mọi tiêu chuẩn an toàn thông tin."
+              },
+              {
+                "id": "D",
+                "label": "Cấu hình tăng thời gian timeout của kết nối HTTP trong ứng dụng lên 60 giây.",
+                "correct": false,
+                "rationale": "Tăng timeout không có tác dụng ngăn chặn SSRF mà còn khiến tài nguyên máy chủ bị treo lâu hơn khi bị tấn công."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác các điểm yếu chí tử trong cấu hình mặc định của Kubelet API và etcd.",
+          "Áp dụng cấu hình chuẩn mực CIS Kubernetes Benchmark cho Kubelet (Webhook mode, mTLS, No Anonymous).",
+          "Thiết kế kiến trúc phòng thủ SSRF tới Cloud IMDS kết hợp chính sách mạng NetworkPolicy và IMDSv2 hop limit."
+        ],
+        "evidenceTemplate": [
+          "Bản phân tích kết quả quét cổng Nmap và đánh giá rủi ro trên cổng 10250 Kubelet và cổng 2379 etcd",
+          "Tệp cấu hình kubelet-config.yaml chuẩn hóa tuân thủ khuyến nghị CIS Benchmark",
+          "Tài liệu định nghĩa Kubernetes EncryptionConfiguration (YAML) tích hợp với AWS KMS / HashiCorp Vault",
+          "Chính sách mạng Calico/Cilium NetworkPolicy chặn dải địa chỉ Link-local 169.254.169.254"
+        ],
+        "reset": "Khôi phục toàn bộ cấu hình Kubelet, thông số etcd và quy tắc NetworkPolicy về trạng thái thử nghiệm ban đầu.",
+        "cleanup": "Xóa các khóa mã hóa tạm thời, gỡ bỏ các pod kiểm thử SSRF và thu hồi các token thử nghiệm khỏi cụm."
+      },
+      "governance": {
+        "prevent": [
+          "Bắt buộc cấu hình kube-apiserver với `--anonymous-auth=false` và Kubelet với `--anonymous-auth=false` cùng `--authorization-mode=Webhook` trên toàn bộ các node.",
+          "Triển khai mTLS bắt buộc với CA độc lập cho etcd và kích hoạt `EncryptionConfiguration` mã hóa Secrets at-rest bằng KMS Provider.",
+          "Áp dụng chính sách mạng (NetworkPolicy) mặc định chặn toàn bộ lưu lượng Pod đi tới Cloud Metadata IP (169.254.169.254) và các dải mạng quản trị của cụm."
+        ],
+        "observe": [
+          "Bật và lưu trữ tập trung toàn bộ Kubernetes API Server Audit Logs (chế độ Metadata hoặc RequestResponse) để phân tích các lệnh gọi bất thường.",
+          "Giám sát các nỗ lực kết nối bất thường tới cổng 10250 của Kubelet từ các địa chỉ IP nội bộ không phải là kube-apiserver.",
+          "Thiết lập cảnh báo tự động khi xuất hiện các sự kiện truy vấn khóa bí mật hàng loạt trong etcd hoặc gọi lệnh `kubectl exec` vào các pod trong namespace `kube-system`."
+        ],
+        "respond": [
+          "Khi phát hiện nghi vấn Kubelet bị khai thác RCE, lập tức cô lập worker node bị ảnh hưởng (cordon & drain) và thu hồi chứng chỉ Node Kubeconfig.",
+          "Trong trường hợp etcd bị rò rỉ dữ liệu, kích hoạt quy trình xoay vòng khẩn cấp (Emergency Secret Rotation) toàn bộ chứng chỉ, API keys và tokens trên toàn cụm.",
+          "Tiến hành kiểm tra tính toàn vẹn của các pod hệ thống (CoreDNS, kube-proxy, CNI plugins) để đảm bảo không bị kẻ tấn công thay thế bằng hình ảnh độc hại."
+        ],
+        "residualRisk": [
+          "Độ trễ trong việc cập nhật các bản vá bảo mật hạt nhân (Kernel patches) và Kubernetes Control Plane có thể tạo ra cửa sổ rủi ro trước các lỗ hổng zero-day API server.",
+          "Việc mã hóa etcd bằng KMS Provider phụ thuộc vào tính sẵn sàng của dịch vụ KMS đám mây; sự cố mạng giữa cụm và KMS có thể làm đình trệ hoạt động khởi tạo Pod."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Kubernetes Secrets được lưu trữ mặc định trong etcd là dữ liệu đã được mã hóa an toàn.",
+          "correction": "Hoàn toàn sai lầm. Mặc định trong Kubernetes, Secrets chỉ được mã hóa dạng Base64 (một thuật toán mã hóa định dạng chứ không phải mã hóa bảo mật). Bất kỳ ai đọc được tệp etcd hoặc gọi lệnh API đều có thể giải mã Base64 sang văn bản gốc trong tích tắc nếu chưa cấu hình EncryptionConfiguration."
+        },
+        {
+          "claim": "Kubelet trên Worker Node chỉ là client thụ động nhận lệnh nên không có bề mặt tấn công nào đáng lo ngại.",
+          "correction": "Sai lầm nghiêm trọng. Kubelet vận hành một HTTPS web server đầy đủ trên cổng 10250 với các API có thể thực thi mã tùy ý (RCE). Nếu không bật xác thực mTLS và Webhook authorization, Kubelet là một trong những mục tiêu tấn công nguy hiểm nhất trong cụm."
+        },
+        {
+          "claim": "Chỉ cần đặt kube-apiserver phía sau một tường lửa mạng là cụm đã an toàn trước các cuộc tấn công chiếm quyền điều khiển.",
+          "correction": "Không đủ. Phần lớn các cuộc tấn công hiện đại bắt nguồn từ bên trong cụm (In-Cluster Threats): một container bị thỏa hiệp qua lỗ hổng ứng dụng web (RCE/SSRF) có thể tấn công API server hoặc Kubelet từ mạng nội bộ nếu không có các chính sách kiểm soát truy cập Zero Trust."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os09-l86-q1",
+          "difficulty": "easy",
+          "question": "Thành phần nào trong kiến trúc Kubernetes đóng vai trò là kho lưu trữ dữ liệu trạng thái và cấu hình duy nhất của toàn bộ cụm?",
+          "options": [
+            {
+              "id": "A",
+              "label": "kube-scheduler"
+            },
+            {
+              "id": "B",
+              "label": "kube-controller-manager"
+            },
+            {
+              "id": "C",
+              "label": "etcd"
+            },
+            {
+              "id": "D",
+              "label": "kubelet"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "etcd là cơ sở dữ liệu phân tán dạng key-value chịu trách nhiệm lưu trữ toàn bộ trạng thái mong muốn và trạng thái thực tế của cụm Kubernetes, bao gồm cấu hình tài nguyên và Secrets."
+        },
+        {
+          "id": "os09-l86-q2",
+          "difficulty": "medium",
+          "question": "Cặp cấu hình nào sau đây trên Kubelet khiến cổng 10250 bị phơi nhiễm lỗ hổng thực thi mã từ xa (RCE) nghiêm trọng nhất?",
+          "options": [
+            {
+              "id": "A",
+              "label": "--anonymous-auth=true và --authorization-mode=AlwaysAllow"
+            },
+            {
+              "id": "B",
+              "label": "--anonymous-auth=false và --authorization-mode=Webhook"
+            },
+            {
+              "id": "C",
+              "label": "--read-only-port=0 và --client-ca-file=/etc/ca.crt"
+            },
+            {
+              "id": "D",
+              "label": "--tls-cipher-suites=ECDHE-RSA-AES128-GCM-SHA256"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Khi `--anonymous-auth=true`, Kubelet cho phép các kết nối không cần đăng nhập; kết hợp với `--authorization-mode=AlwaysAllow`, Kubelet bỏ qua việc kiểm tra quyền hạn, cho phép bất kỳ ai gửi lệnh POST tới `/run` hoặc `/exec` để chạy mã tùy ý trên container."
+        },
+        {
+          "id": "os09-l86-q3",
+          "difficulty": "hard",
+          "question": "Để bảo vệ Kubernetes Secrets khi lưu trữ trong etcd (Data at-rest) chống lại việc trích xuất trực tiếp từ ổ đĩa máy chủ Master, quản trị viên bắt buộc phải cấu hình tính năng nào trên kube-apiserver?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Bật xác thực đa yếu tố (MFA) cho tài khoản admin của kubectl"
+            },
+            {
+              "id": "B",
+              "label": "Cấu hình tham số `--encryption-provider-config` trỏ tới tệp EncryptionConfiguration sử dụng nhà cung cấp KMS Provider hoặc aescbc/aesgcm key"
+            },
+            {
+              "id": "C",
+              "label": "Đổi định dạng lưu trữ Secrets từ YAML sang JSON trong etcd"
+            },
+            {
+              "id": "D",
+              "label": "Tăng độ dài của ServiceAccount Token lên 2048 ký tự"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Tính năng EncryptionConfiguration (thông qua cờ `--encryption-provider-config`) cho phép kube-apiserver mã hóa dữ liệu Secrets bằng các thuật toán mã hóa đối xứng mạnh hoặc thông qua KMS Provider trước khi lưu trữ vào cơ sở dữ liệu etcd."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một tập đoàn viễn thông đang vận hành 15 cụm Kubernetes on-premises tự xây dựng phục vụ mạng lõi 5G. Trong đợt kiểm tra an ninh định kỳ, chuyên gia phát hiện các cổng 10250 của Kubelet đang mở cho toàn bộ dải mạng nội bộ mà không có xác thực mTLS, và cơ sở dữ liệu etcd không hề được mã hóa at-rest. Bạn được giao trách nhiệm xây dựng chiến lược gia cố an ninh Control Plane toàn diện theo chuẩn CIS Kubernetes Benchmark.",
+        "tasks": [
+          "Soạn thảo tệp cấu hình chuẩn hóa Kubelet (`kubelet-config.yaml`) vô hiệu hóa hoàn toàn truy cập nặc danh, kích hoạt Webhook authorization và cấu hình mTLS certs; lập kế hoạch áp dụng tuần tự (Rolling Update) không làm gián đoạn các Pod viễn thông đang hoạt động.",
+          "Thiết kế kiến trúc mã hóa dữ liệu etcd at-rest sử dụng `EncryptionConfiguration` tích hợp với hệ thống HashiCorp Vault của tập đoàn; viết quy trình mã hóa lại (Re-encryption) toàn bộ các Secrets hiện có trong cụm.",
+          "Xây dựng chính sách mạng Kubernetes NetworkPolicy áp dụng ở cấp độ Cluster để chặn toàn bộ kết nối từ ứng dụng tới các cổng quản trị Kubelet (10250) và etcd (2379), đồng thời cấu hình bảo vệ Cloud Metadata Endpoint."
+        ],
+        "requiredEvidence": [
+          "Tệp cấu hình Kubelet và kube-apiserver chuẩn hóa kèm tài liệu đánh giá tác động dịch vụ",
+          "Tệp EncryptionConfiguration (YAML) hoàn chỉnh kèm script tự động kích hoạt re-encrypt secrets: `kubectl get secrets -A -o json | kubectl replace -f -`",
+          "Mẫu chính sách Calico/Cilium GlobalNetworkPolicy kiểm thử thành công việc chặn lưu lượng trái phép tới Control Plane"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Kubernetes Official Documentation — Securing a Cluster",
+          "url": "https://kubernetes.io/docs/concepts/security/securing-a-cluster/",
+          "publisher": "The Kubernetes Authors",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc an ninh Control Plane và Worker Node",
+            "Mô hình xác thực, ủy quyền và phòng thủ API Server"
+          ]
+        },
+        {
+          "title": "CIS Kubernetes Benchmark v1.8.0",
+          "url": "https://www.cisecurity.org/benchmark/kubernetes",
+          "publisher": "Center for Internet Security (CIS)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Khuyến nghị cấu hình an toàn cho Master Node, kube-apiserver, etcd và Kubelet",
+            "Quy tắc kiểm soát Kubelet Authentication và Authorization"
+          ]
+        },
+        {
+          "title": "Kubernetes Documentation — Encrypting Confidential Data at Rest",
+          "url": "https://kubernetes.io/docs/tasks/administer-cluster/encrypt-data/",
+          "publisher": "The Kubernetes Authors",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu hình EncryptionConfiguration cho etcd",
+            "Tích hợp KMS v2 provider mã hóa phong bì (Envelope Encryption)"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK Matrix for Kubernetes",
+          "url": "https://attack.mitre.org/matrices/enterprise/containers/kubernetes/",
+          "publisher": "MITRE Corporation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kỹ thuật Access Kubelet API (T1613)",
+            "Kỹ thuật Steal Application Access Token (T1528)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os09-l87-kubernetes-rbac-workload-identity-and-admission-control",
+      "slug": "kubernetes-rbac-workload-identity-and-admission-control",
+      "title": "Kubernetes RBAC, Workload Identity Đám Mây & Cơ Chế Kiểm Soát Nhập Cảnh Admission Control",
+      "summary": "Phân tích chuyên sâu cơ chế phân quyền dựa trên vai trò (Kubernetes RBAC) và 14 vector leo thang đặc quyền phổ biến (create pods, bind/escalate roles, impersonation); liên kết định danh workload giữa Kubernetes ServiceAccount và Cloud IAM Roles qua OIDC Workload Identity Federation; thiết lập các rào chắn chính sách tự động thông qua Kubernetes Admission Controllers (Validating/Mutating Webhooks), Pod Security Standards (PSS/PSA - Privileged, Baseline, Restricted), và Policy Engines hiện đại (Kyverno, Open Policy Agent / Gatekeeper).",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [
+        "os09-l85-container-runtimes-namespaces-and-breakouts",
+        "os09-l86-kubernetes-architecture-and-api-server-threats"
+      ],
+      "outcomes": [
+        "Phân tích ngữ nghĩa mô hình RBAC trong Kubernetes (Role, ClusterRole, RoleBinding, ClusterRoleBinding), bóc tách ma trận API groups, resources, verbs và sub-resources (pods/exec, pods/ephemeralcontainers).",
+        "Kiểm toán và khai thác các vector leo thang đặc quyền RBAC nguy hiểm: verbs wildcard, quyền tạo Pods gắn hostPath/hostPID/privileged, quyền bind/escalate trên Roles, và quyền impersonate trên Users/Groups.",
+        "Cấu hình và bảo mật Workload Identity Federation (AWS IRSA, GCP Workload Identity, Azure Workload Identity) sử dụng OIDC token projection, triệt tiêu việc lưu trữ secret tĩnh trong container.",
+        "Xây dựng rào chắn quản trị tự động: triển khai Pod Security Admission (PSA) ở mức 'Restricted', áp dụng quy tắc Kyverno/OPA Gatekeeper chặn đứng các Pod thiếu an toàn trước khi được lưu vào etcd."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["container", "kubernetes", "rbac"],
+      "attackTactics": [
+        "initial-access",
+        "privilege-escalation",
+        "defense-evasion",
+        "credential-access"
+      ],
+      "keywords": [
+        "kubernetes-rbac",
+        "privilege-escalation-vectors",
+        "workload-identity",
+        "aws-irsa",
+        "oidc-token-projection",
+        "admission-controllers",
+        "pod-security-standards",
+        "pod-security-admission",
+        "kyverno",
+        "opa-gatekeeper"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Kubernetes RBAC không hoạt động như danh sách kiểm soát truy cập (ACL) tĩnh thông thường mà là một ma trận quyền hạn động dựa trên các bộ ba (Verb + Resource + API Group). Trong Kubernetes, một quyền hạn tưởng chừng bình thường như 'create pods' hoặc 'update nodes' trong thực tế tương đương hoàn toàn với quyền 'cluster-admin', bởi vì kẻ tấn công có thể tạo một Pod mount thư mục gốc của host ('/') hoặc gán ServiceAccount đặc quyền cao. Để bảo vệ cụm, phòng tuyến không thể chỉ dựa duy nhất vào RBAC mà bắt buộc phải triển khai lớp 'phòng thủ kép' (Defense-in-Depth) với Admission Controllers (Kyverno / OPA Gatekeeper / Pod Security Admission) đóng vai trò như chốt kiểm soát cổng biên (Gatekeeper) kiểm tra và từ chối các manifest chứa thuộc tính nguy hiểm trước khi chúng kịp ghi vào etcd.",
+      "visual": {
+        "title": "Vòng Đời Thẩm Định Yêu Cầu API Qua Authentication, RBAC & Dynamic Admission Control",
+        "caption": "Luồng kiểm tra 4 giai đoạn bảo mật nghiêm ngặt trước khi một Pod manifest được lưu vào etcd.",
+        "steps": [
+          {
+            "label": "Xác Thực Danh Tính & Khởi Tạo Ngữ Cảnh",
+            "detail": "Yêu cầu API mang Token OIDC hoặc ServiceAccount JWT; kube-apiserver xác thực chữ ký số và gán danh tính Subject (User, Groups).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Thẩm Định Phân Quyền RBAC Engine",
+            "detail": "RBAC engine kiểm tra RoleBindings xem Subject có quyền Verb trên Resource đang yêu cầu hay không. Nếu không có rule khớp -> 403 Forbidden.",
+            "tone": "caution"
+          },
+          {
+            "label": "Kiểm Soát Nhập Cảnh (Mutating & Validating Webhooks)",
+            "detail": "Yêu cầu đi qua Mutating Webhook (tự động tiêm sidecar/token) và Validating Webhook (OPA/Kyverno/PSA kiểm tra tuân thủ Restricted: cấm hostPath, cấm privileged).",
+            "tone": "stop"
+          },
+          {
+            "label": "Ghi Nhận etcd & Lập Lịch Khởi Chạy",
+            "detail": "Chỉ khi vượt qua toàn bộ chính sách Admission Control, manifest mới được ghi vào etcd; Scheduler và Kubelet tiến hành khởi chạy workload an toàn.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Mô Hình Kubernetes RBAC Chuyên Sâu: Cấu Trúc Vai Trò & Thuật Toán Đánh Giá Quyền Hạn",
+          "paragraphs": [
+            "Kubernetes Role-Based Access Control (RBAC) là cơ chế cốt lõi để quy định ai (Subject) được phép làm gì (Verb) trên đối tượng nào (Resource) trong phạm vi không gian tên nào (Namespace hoặc Cluster-wide). Cơ chế RBAC bao gồm 4 khối xây dựng chính: (1) `Role`: Tập hợp các quy tắc quyền hạn áp dụng bên trong một Namespace cụ thể; (2) `ClusterRole`: Tập hợp các quy tắc quyền hạn áp dụng trên toàn bộ cụm (không bị giới hạn bởi Namespace), hoặc áp dụng cho các tài nguyên cấp cụm (như Nodes, PersistentVolumes, Namespaces); (3) `RoleBinding`: Liên kết một Role hoặc ClusterRole với một hoặc nhiều Subjects bên trong một Namespace nhất định; (4) `ClusterRoleBinding`: Liên kết một ClusterRole với các Subjects trên toàn bộ phạm vi cụm.",
+            "Một quy tắc phân quyền (Policy Rule) trong RBAC được định nghĩa bởi 3 yếu tố: (1) `apiGroups`: Nhóm API chứa tài nguyên (ví dụ: \"\" cho Core API group, \"apps\" cho Deployments, \"rbac.authorization.k8s.io\" cho Roles); (2) `resources`: Loại tài nguyên được thao tác (ví dụ: \"pods\", \"services\", \"secrets\"), bao gồm cả các tài nguyên con (sub-resources) như \"pods/exec\", \"pods/portforward\", \"pods/log\"; (3) `verbs`: Các hành động được phép thực hiện (ví dụ: \"get\", \"list\", \"watch\", \"create\", \"update\", \"patch\", \"delete\").",
+            "Thuật toán đánh giá RBAC tuân thủ nguyên tắc: Mặc định từ chối (Default Deny) và Hoàn toàn cộng dồn (Strictly Additive). Không có quy tắc phủ định (Deny Rule) tường minh trong Kubernetes RBAC thuần gốc. Một yêu cầu được cho phép nếu và chỉ nếu có ít nhất một quy tắc trong bất kỳ RoleBinding/ClusterRoleBinding nào gắn với Subject thỏa mãn đồng thời Verb, Resource, và apiGroup của yêu cầu. Nếu không có quy tắc nào khớp, yêu cầu lập tức bị từ chối với mã lỗi 403 Forbidden.",
+            "Sự nguy hiểm tiềm tàng nằm ở việc sử dụng các ký tự đại diện (Wildcards `*`) trong verbs hoặc resources. Việc cấu hình `verbs: [\"*\"]` trên `resources: [\"*\"]` chính là việc trao quyền tương đương với `cluster-admin` (siêu người dùng tối cao), tạo ra nguy cơ kiểm soát toàn bộ hạ tầng nếu danh tính đó bị lộ lọt."
+          ]
+        },
+        {
+          "title": "Ma Trận Leo Thang Đặc Quyền Kubernetes RBAC: 14 Vector Tấn Công Khai Thác Cấu Hình Thừa",
+          "paragraphs": [
+            "Trong kiểm thử xâm nhập Kubernetes, leo thang đặc quyền nội bộ (Privilege Escalation) từ một ServiceAccount có quyền hạn giới hạn lên quyền `cluster-admin` là mục tiêu hàng đầu của Red Team. Các nhà nghiên cứu bảo mật đã phân loại 14 vector leo thang đặc quyền RBAC kinh điển thường xuất hiện trong các cụm doanh nghiệp.",
+            "Vector 1: Quyền Tạo Pod (`create pods`). Đây là vector phổ biến nhất. Một tài khoản chỉ có quyền `create pods` trong một namespace có thể tạo một Pod với cấu hình nguy hiểm: mount thư mục gốc của host (`hostPath: /`), chia sẻ không gian mạng (`hostNetwork: true`), hoặc gắn cờ `privileged: true`. Sau khi Pod khởi chạy, kẻ tấn công thực hiện `exec` vào Pod hoặc đặt cronjob trên host để chiếm toàn bộ Node và trích xuất token `cluster-admin` từ etcd/kube-apiserver.",
+            "Vector 2: Quyền Trên Tài Nguyên Con `pods/exec`. Nếu một Subject có quyền `create` trên tài nguyên con `pods/exec`, kẻ tấn công có thể tương tác trực tiếp với bất kỳ Pod nào đang chạy trong namespace đó. Nếu trong namespace có một Pod chạy với ServiceAccount đặc quyền cao hoặc chứa biến môi trường nhạy cảm, kẻ tấn công chỉ cần exec vào Pod đó để chiếm đoạt token và thông tin xác thực.",
+            "Vector 3: Quyền Gán/Nâng Quyền Role (`bind` hoặc `escalate` trên roles/clusterroles). Kubernetes có cơ chế tích hợp chống leo thang đặc quyền: một người dùng không thể gán một Role cho người khác nếu chính họ không sở hữu toàn bộ các quyền có trong Role đó. Tuy nhiên, nếu Subject vô tình được cấp quyền verb `bind` trên ClusterRoles, họ có thể bỏ qua rào cản này và liên kết vai trò `cluster-admin` với ServiceAccount của chính mình. Tương tự, quyền verb `escalate` cho phép chỉnh sửa một Role để thêm vào các quyền mới vượt quá quyền hiện tại của người dùng.",
+            "Vector 4: Quyền Mạo Danh (`impersonate`). Tính năng Impersonation cho phép một người dùng thực hiện yêu cầu API dưới danh nghĩa của một người dùng, nhóm hoặc ServiceAccount khác. Nếu một ServiceAccount được cấp quyền verb `impersonate` trên `resources: [\"users\", \"groups\", \"serviceaccounts\"]`, kẻ tấn công chỉ cần thêm header HTTP `Impersonate-User: system:admin` hoặc `Impersonate-Group: system:masters` vào lệnh gọi API để ngay lập tức biến yêu cầu thành lệnh của quản trị viên tối cao."
+          ]
+        },
+        {
+          "title": "Tích Hợp Định Danh Workload Đám Mây: Từ Khóa Tĩnh Đến OIDC Workload Identity Federation",
+          "paragraphs": [
+            "Trong kiến trúc hiện đại, các ứng dụng chạy trong Kubernetes thường xuyên cần tương tác với các dịch vụ đám mây bên ngoài (như AWS S3, Google Cloud Storage, Azure Key Vault). Phương pháp truyền thống cực kỳ nguy hiểm là tạo các khóa truy cập tĩnh dài hạn (như AWS Access Key ID / Secret Access Key) rồi lưu trữ chúng dưới dạng Kubernetes Secret và mount vào container qua biến môi trường. Cách làm này tiềm ẩn rủi ro lộ lọt khóa qua nhật ký ứng dụng, mã nguồn hoặc khi container bị xâm nhập.",
+            "Giải pháp chuẩn mực hiện nay là Workload Identity Federation (AWS IAM Roles for Service Accounts - IRSA, GCP Workload Identity, Azure Workload Identity). Cơ chế này kết hợp giữa giao thức OpenID Connect (OIDC) và cơ chế Kubernetes Projected ServiceAccount Tokens (`serviceAccountToken` volume projection).",
+            "Luồng vận hành của OIDC Workload Identity: (1) kube-apiserver đóng vai trò là một OIDC Identity Provider (IdP), cung cấp endpoint tài liệu khám phá OIDC công khai (`/.well-known/openid-configuration`) và tập hợp khóa công khai JWKS (`/openid/v1/jwks`); (2) Nhà cung cấp đám mây (AWS/GCP/Azure) thiết lập một OIDC Trust Relationship với OIDC Issuer URL của cụm Kubernetes; (3) Khi Pod khởi chạy, Kubelet tự động tạo và đưa vào container một token JWT ngắn hạn có chữ ký số (thời hạn sống thường là 1 giờ) với Audience (aud) khớp với định danh của nhà cung cấp đám mây (ví dụ: `sts.amazonaws.com`); (4) Ứng dụng sử dụng Cloud SDK gửi token JWT này tới dịch vụ Security Token Service (AWS STS / GCP STS) thông qua lệnh gọi `AssumeRoleWithWebIdentity`; (5) Cloud STS xác thực chữ ký số của token thông qua JWKS của Kubernetes, kiểm tra điều kiện Subject Claim (ví dụ: `sub: system:serviceaccount:payment:payment-sa`), và trả về một bộ chứng thư tạm thời ngắn hạn (Temporary Credentials).",
+            "Mô hình Workload Identity loại bỏ 100% việc lưu trữ khóa tĩnh trong cụm, thu hẹp phạm vi tin cậy tới từng ServiceAccount cụ thể và tự động xoay vòng chứng thư mỗi giờ, triệt tiêu nguy cơ rò rỉ thông tin xác thực đám mây dài hạn."
+          ]
+        },
+        {
+          "title": "Cơ Chế Kiểm Soát Nhập Cảnh (Admission Controllers), Pod Security Standards & Kyverno/OPA Gatekeeper",
+          "paragraphs": [
+            "Như đã phân tích, một mình RBAC không đủ để ngăn chặn các cấu hình nguy hiểm bên trong Pod manifest (ví dụ: RBAC cho phép tạo Pod, nhưng không thể quy định Pod đó có được bật cờ `privileged` hay không). Để lấp đầy khoảng trống này, Kubernetes cung cấp cơ chế Kiểm soát nhập cảnh (Admission Controllers).",
+            "Admission Controllers hoạt động theo hai giai đoạn tuần tự sau khi yêu cầu API đã vượt qua Authentication và Authorization: (1) `Mutating Admission`: Có khả năng sửa đổi nội dung của object (ví dụ: tự động chèn sidecar proxy của Istio, tiêm các biến môi trường OIDC token); (2) `Validating Admission`: Có quyền chấp thuận hoặc từ chối dứt khoát yêu cầu dựa trên các quy tắc nghiệp vụ. Nếu bất kỳ Validating Webhook nào từ chối, yêu cầu API sẽ bị hủy bỏ ngay lập tức và không được ghi vào etcd.",
+            "Pod Security Standards (PSS) & Pod Security Admission (PSA): Kể từ Kubernetes v1.25, tính năng PodSecurityPolicy (PSP) lỗi thời đã bị loại bỏ hoàn toàn và được thay thế bằng Pod Security Admission (PSA). PSS định nghĩa 3 mức độ bảo mật rõ ràng cho Pods: (1) `Privileged`: Không áp dụng bất kỳ hạn chế nào, cho phép container chạy với toàn quyền (dành cho CNI, storage daemons); (2) `Baseline`: Ngăn chặn các đặc quyền leo thang nghiêm trọng đã biết, cấm cờ `privileged`, cấm `hostNetwork`, `hostPID`, `hostIPC`, nhưng vẫn cho phép sử dụng quyền root mặc định của container; (3) `Restricted`: Cực kỳ nghiêm ngặt, bắt buộc container phải chạy với người dùng không đặc quyền (`runAsNonRoot: true`), cấm leo thang quyền hạn (`allowPrivilegeEscalation: false`), tước bỏ toàn bộ Capabilities ngoại trừ `NET_BIND_SERVICE`, và bắt buộc root filesystem là read-only.",
+            "Quản Trị Chính Sách Nâng Cao Với Kyverno & OPA Gatekeeper: Đối với các yêu cầu kiểm soát phức tạp ngoài phạm vi của PSA (chẳng hạn: bắt buộc mọi Pod phải có nhãn `cost-center`, cấm kéo image sử dụng tag `latest`, bắt buộc image phải được ký số bởi Sigstore/Cosign), các Policy Engines đám mây như Kyverno hoặc Open Policy Agent (OPA) Gatekeeper được triển khai. Kyverno cho phép định nghĩa chính sách hoàn toàn bằng Kubernetes Custom Resource Definitions (CRDs) dạng YAML quen thuộc, hỗ trợ cả 3 tính năng Validate, Mutate và Generate tài nguyên tự động, giúp thiết lập các rào chắn kỹ thuật (Guardrails) bất khả xâm phạm trên toàn cụm."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Ma Trận RBAC, Chặn Đứng Leo Thang Đặc Quyền & Thiết Lập Policy Engine",
+        "objective": "Kiểm toán ma trận phân quyền Kubernetes RBAC, bóc tách các vector leo thang đặc quyền từ ServiceAccount, chuyển đổi định danh sang OIDC Workload Identity và triển khai chính sách Admission Control tự động.",
+        "scenario": "Sàn giao dịch tài sản số của bạn đang chuẩn bị phát hành ứng dụng thanh toán mới trên cụm Kubernetes sản phẩm. Báo cáo kiểm toán bảo mật nội bộ cảnh báo rằng các ServiceAccounts của nhóm phát triển đang sở hữu quyền 'create pods' và 'bind' quá mức, đồng thời các Pod microservice vẫn đang dùng Access Keys tĩnh của AWS IAM và chưa áp dụng bất kỳ cơ chế kiểm soát nhập cảnh nào.",
+        "constraints": [
+          "Tuyệt đối tuân thủ ADR-001: Sử dụng phương pháp đánh giá rủi ro chuyên sâu và cấu hình chuẩn mực, không dùng mock runtime giả lập.",
+          "Mọi thay đổi phân quyền phải đảm bảo các microservice thanh toán không bị gián đoạn kết nối tới dịch vụ lưu trữ AWS S3.",
+          "Toàn bộ chính sách Admission Control phải tuân thủ chuẩn Pod Security Standards cấp độ 'Restricted' của Kubernetes."
+        ],
+        "cases": [
+          {
+            "id": "case-87-01",
+            "title": "Khắc Phục Vector Leo Thang Đặc Quyền Qua Quyền 'create pods'",
+            "context": "Một ServiceAccount có tên `deployer-sa` trong namespace `staging` được gán Role cho phép: `apiGroups: [\"\"]`, `resources: [\"pods\"]`, `verbs: [\"create\", \"get\", \"list\"]`. Kẻ tấn công khai thác được một lỗ hổng web injection và trích xuất token của ServiceAccount này.",
+            "prompt": "Kẻ tấn công có thể lợi dụng quyền hạn này như thế nào để chiếm quyền điều khiển Worker Node và biện pháp khắc phục triệt để nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công không thể làm gì vì quyền này chỉ giới hạn trong namespace `staging`. Biện pháp khắc phục là đổi tên namespace thành `staging-secure`.",
+                "correct": false,
+                "rationale": "Namespace chỉ là ranh giới logic; một Pod chạy trên node có thể mount hostPath '/' và kiểm soát toàn bộ node vật lý bất kể nó nằm trong namespace nào."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công tạo một Pod mới có cấu hình `hostPath: /` và `hostPID: true`, sau đó chroot vào thư mục host để chiếm máy chủ. Khắc phục: Thu hồi quyền `create pods` trực tiếp của `deployer-sa` và chỉ cho phép quản lý `deployments` trong apiGroup `apps`; đồng thời kích hoạt Pod Security Admission ở mức `Restricted` trên namespace để từ chối các Pod yêu cầu hostPath/hostPID.",
+                "correct": true,
+                "rationale": "Đây là giải pháp toàn diện: Loại bỏ quyền tạo pod trần (naked pods) và cưỡng chế rào chắn Admission Control ngăn chặn triệt để mọi manifest chứa thuộc tính nguy hiểm."
+              },
+              {
+                "id": "C",
+                "label": "Chỉ cần cấm quyền verb `list` là kẻ tấn công sẽ không tìm thấy các Pod khác để tấn công.",
+                "correct": false,
+                "rationale": "Kẻ tấn công không cần list pod; chỉ với verb `create` họ đã có thể tạo Pod độc hại mới để tấn công trực tiếp vào host."
+              },
+              {
+                "id": "D",
+                "label": "Tăng thời gian hết hạn của token ServiceAccount lên 30 ngày để giảm tần suất cấp phát.",
+                "correct": false,
+                "rationale": "Tăng thời hạn sống của token làm tăng nghiêm trọng nguy cơ bị lạm dụng khi token bị lộ lọt."
+              }
+            ]
+          },
+          {
+            "id": "case-87-02",
+            "title": "Chuyển Đổi Định Danh Workload Sang OIDC Workload Identity (AWS IRSA)",
+            "context": "Ứng dụng thanh toán cần ghi log giao dịch vào một AWS S3 Bucket bảo mật. Hiện tại, ứng dụng đang đọc hai biến môi trường `AWS_ACCESS_KEY_ID` và `AWS_SECRET_ACCESS_KEY` từ một Kubernetes Secret tĩnh trong cụm. Đội An ninh yêu cầu loại bỏ hoàn toàn các khóa tĩnh này.",
+            "prompt": "Kiến trúc triển khai nào sau đây thực hiện chuẩn mực mô hình AWS IRSA (IAM Roles for Service Accounts) sử dụng OIDC Federation?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Lưu Access Key trong ConfigMap và mount vào container dưới dạng file nhị phân.",
+                "correct": false,
+                "rationale": "Vẫn là giải pháp lưu khóa tĩnh, thậm chí ConfigMap còn không được mã hóa mặc định như Secret."
+              },
+              {
+                "id": "B",
+                "label": "Cấu hình OIDC Provider của EKS cluster trên AWS IAM; tạo IAM Role với Trust Policy kiểm tra điều kiện `StringEquals` trên OIDC sub claim `system:serviceaccount:payment:payment-sa`; gán annotation `eks.amazonaws.com/role-arn` vào ServiceAccount; Pod sử dụng token chiếu tự động (projected token) để gọi AWS STS `AssumeRoleWithWebIdentity` lấy chứng thư tạm thời.",
+                "correct": true,
+                "rationale": "Đây là quy trình chuẩn mực của AWS IRSA: Sử dụng OIDC token chiếu ngắn hạn, xác thực tự động qua STS và hoàn toàn không lưu trữ bất kỳ khóa tĩnh dài hạn nào trong cụm."
+              },
+              {
+                "id": "C",
+                "label": "Gán quyền AdministratorAccess cho toàn bộ EC2 Worker Nodes để Pod tự động thừa hưởng quyền mà không cần cấu hình ServiceAccount.",
+                "correct": false,
+                "rationale": "Vi phạm nghiêm trọng nguyên tắc Least Privilege; mọi Pod khác trên cùng node đều có thể lạm dụng quyền Administrator này."
+              },
+              {
+                "id": "D",
+                "label": "Viết một script tự động xóa Secret sau khi Pod khởi động 5 phút.",
+                "correct": false,
+                "rationale": "Biện pháp thủ công dễ lỗi; khi Pod cần khởi động lại hoặc scale up sẽ bị sập vì không còn Secret để đọc."
+              }
+            ]
+          },
+          {
+            "id": "case-87-03",
+            "title": "Triển Khai Rào Chắn Quản Trị Tự Động Bằng Kyverno & Pod Security Admission",
+            "context": "Nhóm DevOps thường xuyên quên cấu hình `runAsNonRoot: true` và `readOnlyRootFilesystem: true` trong các Pod manifest, dẫn đến việc các container vẫn chạy với người dùng root mặc định của image. Bạn cần thiết lập cơ chế tự động từ chối mọi manifest vi phạm trên toàn cụm.",
+            "prompt": "Phương án triển khai nào sau đây thiết lập rào chắn tự động và chuẩn mực nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Yêu cầu các kỹ sư DevOps tự kiểm tra bằng mắt (code review) các file YAML trước khi gõ lệnh kubectl apply.",
+                "correct": false,
+                "rationale": "Quy trình thủ công bằng mắt luôn tồn tại sai sót con người và không thể ngăn chặn các thao tác gọi API trực tiếp."
+              },
+              {
+                "id": "B",
+                "label": "Gán nhãn namespace với Pod Security Admission: `pod-security.kubernetes.io/enforce: restricted`; đồng thời triển khai Kyverno ClusterPolicy ở chế độ `validationFailureAction: Enforce` để kiểm tra và chặn đứng mọi Pod thiếu `runAsNonRoot: true`, cấm image sử dụng tag `latest` và cấm các volume kiểu `hostPath`.",
+                "correct": true,
+                "rationale": "Sự kết hợp giữa PSA cấp độ Restricted và Kyverno Policy Engine tạo ra rào chắn tự động kép ở tầng Admission Control, từ chối dứt khoát mọi yêu cầu không tuân thủ từ cấp độ API server."
+              },
+              {
+                "id": "C",
+                "label": "Cài đặt một tiện ích trên máy tính cá nhân của lập trình viên để tự động sửa file YAML khi lưu.",
+                "correct": false,
+                "rationale": "Client-side tooling có thể bị lập trình viên tắt bỏ hoặc vượt qua dễ dàng; nguyên tắc bảo mật bắt buộc phải kiểm soát tại Server-side Admission Control."
+              },
+              {
+                "id": "D",
+                "label": "Chuyển toàn bộ cụm Kubernetes về phiên bản cũ v1.20 để sử dụng lại PodSecurityPolicy.",
+                "correct": false,
+                "rationale": "Hạ cấp phiên bản Kubernetes làm mất các bản vá bảo mật quan trọng và PSP đã bị chính thức khai tử trong các phiên bản mới."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân tích chính xác các vector leo thang đặc quyền tiềm ẩn trong ma trận Kubernetes RBAC.",
+          "Thiết kế thành công kiến trúc Workload Identity Federation OIDC loại bỏ hoàn toàn khóa tĩnh trên đám mây.",
+          "Triển khai chuẩn mực rào chắn Pod Security Admission (Restricted) và chính sách Kyverno Policy Engine."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo kiểm toán RBAC sử dụng công cụ rbac-lookup hoặc rbac-police chỉ ra các đường dẫn leo thang đặc quyền",
+          "Tệp định nghĩa ServiceAccount và Trust Policy JSON của AWS IAM Role chứng minh tích hợp OIDC IRSA thành công",
+          "Tệp Kyverno ClusterPolicy (YAML) kiểm soát chữ ký số image và nhật ký audit log chứng minh các manifest vi phạm bị từ chối nhập cảnh",
+          "Ảnh chụp màn hình lệnh `kubectl apply` bị chặn đứng bởi Pod Security Admission với thông báo vi phạm chuẩn Restricted"
+        ],
+        "reset": "Khôi phục cấu hình RBAC Roles, RoleBindings và các nhãn namespace về trạng thái mặc định của phòng lab.",
+        "cleanup": "Xóa bỏ các chính sách Kyverno thử nghiệm, thu hồi IAM Roles liên kết OIDC và dọn dẹp các ServiceAccount tạm thời."
+      },
+      "governance": {
+        "prevent": [
+          "Thực thi nguyên tắc Least Privilege trong RBAC: Nghiêm cấm tuyệt đối việc sử dụng wildcard '*' trong verbs và resources; cấm cấp quyền 'create pods' và 'impersonate' cho các tài khoản không phải quản trị viên.",
+          "Bắt buộc triển khai OIDC Workload Identity Federation cho toàn bộ các workload cần giao tiếp với dịch vụ đám mây, loại bỏ 100% việc lưu trữ API keys tĩnh trong cụm.",
+          "Áp dụng Pod Security Admission ở mức độ 'Restricted' trên tất cả các application namespaces và sử dụng Kyverno để thực thi các quy tắc kiểm soát nhập cảnh bắt buộc."
+        ],
+        "observe": [
+          "Kích hoạt kiểm toán liên tục ma trận RBAC bằng các công cụ tự động (như Krane, Popeye, Kube-bench) trong pipeline CI/CD để phát hiện sớm các quyền hạn bị dư thừa.",
+          "Theo dõi sát sao Kubernetes Audit Logs đối với các sự kiện gọi API nhạy cảm: `create pods/exec`, `bind`, `escalate`, và các yêu cầu có header `Impersonate-User`.",
+          "Giám sát các cảnh báo từ Kyverno/Gatekeeper về số lượng manifest bị từ chối nhập cảnh để kịp thời hướng dẫn các nhóm phát triển điều chỉnh cấu hình."
+        ],
+        "respond": [
+          "Khi phát hiện ServiceAccount có dấu hiệu bị lạm dụng, lập tức thu hồi RoleBinding tương ứng và vô hiệu hóa hoặc xóa bỏ ServiceAccount đó khỏi namespace.",
+          "Nếu phát hiện Pod độc hại được tạo thành công với quyền `hostPath` hoặc `privileged`, lập tức cô lập node (cordon & drain) và xóa bỏ Pod ngay lập tức.",
+          "Tiến hành rà soát toàn diện nhật ký OIDC STS trên nền tảng đám mây để phát hiện xem token bị lộ đã thực hiện những thao tác nào trên tài nguyên đám mây bên ngoài."
+        ],
+        "residualRisk": [
+          "Sự bùng nổ số lượng microservices có thể dẫn đến việc kiểm soát phân quyền RBAC trở nên quá phức tạp (RBAC Sprawl), đòi hỏi công cụ tự động hóa liên tục.",
+          "Các lỗ hổng tiềm ẩn trong chính phần mềm Policy Engine (như lỗi xử lý regex hoặc webhook timeout của Kyverno/Gatekeeper) có thể tạo ra rủi ro cho phép yêu cầu lọt qua nếu cấu hình fail-open."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Một ServiceAccount chỉ có quyền bên trong một Namespace nhất định nên không thể gây nguy hiểm cho các Namespace khác hoặc toàn bộ cụm.",
+          "correction": "Sai lầm nguy hiểm. Nếu ServiceAccount đó có quyền tạo Pod (`create pods`) trong namespace của nó, kẻ tấn công có thể tạo Pod mount thư mục hostPath của node. Từ node vật lý, kẻ tấn công có thể truy cập etcd, đánh cắp token của kubelet hoặc token của các Pod khác thuộc mọi namespace chạy trên node đó."
+        },
+        {
+          "claim": "Kubernetes RBAC có hỗ trợ các quy tắc Deny để cấm rõ ràng một người dùng không được thực hiện một hành động cụ thể.",
+          "correction": "Hoàn toàn sai. Kubernetes RBAC thuần gốc là mô hình 'Strictly Additive' (hoàn toàn cộng dồn) và chỉ hỗ trợ các câu lệnh Allow. Cách duy nhất để cấm một quyền là không cấp quyền đó, hoặc phải sử dụng Admission Controller (như Kyverno hoặc OPA Gatekeeper) để chặn yêu cầu."
+        },
+        {
+          "claim": "Lưu trữ Access Key trong Kubernetes Secret an toàn hơn nhiều so với việc lưu trong mã nguồn, do đó không cần thiết phải chuyển sang Workload Identity.",
+          "correction": "Sai lầm lớn. Kubernetes Secret mặc định chỉ mã hóa Base64 và bất kỳ ai có quyền đọc Secret hoặc exec vào Pod đều có thể trích xuất khóa tĩnh dài hạn. Workload Identity sử dụng token JWT ngắn hạn tự xoay vòng mỗi giờ và liên kết trực tiếp với chữ ký số của cụm, an toàn vượt trội so với khóa tĩnh."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os09-l87-q1",
+          "difficulty": "easy",
+          "question": "Trong mô hình phân quyền Kubernetes RBAC, đối tượng nào được sử dụng để liên kết một ClusterRole với một người dùng trên phạm vi toàn bộ cụm?",
+          "options": [
+            {
+              "id": "A",
+              "label": "RoleBinding"
+            },
+            {
+              "id": "B",
+              "label": "ClusterRoleBinding"
+            },
+            {
+              "id": "C",
+              "label": "ServiceAccountToken"
+            },
+            {
+              "id": "D",
+              "label": "NamespaceBinding"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "ClusterRoleBinding là tài nguyên dùng để liên kết một ClusterRole với một danh tính (User, Group, hoặc ServiceAccount) trên phạm vi toàn cụm (Cluster-wide), không bị giới hạn bởi bất kỳ namespace nào."
+        },
+        {
+          "id": "os09-l87-q2",
+          "difficulty": "medium",
+          "question": "Một người dùng sở hữu quyền verb 'bind' trên một ClusterRole có thể thực hiện hành vi nào sau đây?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Chỉ có thể xem danh sách các vai trò trong cụm"
+            },
+            {
+              "id": "B",
+              "label": "Gán ClusterRole đó cho bất kỳ người dùng hoặc ServiceAccount nào khác, kể cả khi chính người dùng đó không sở hữu toàn bộ các quyền có trong ClusterRole"
+            },
+            {
+              "id": "C",
+              "label": "Tự động xóa bỏ toàn bộ các RoleBinding hiện có trong cụm"
+            },
+            {
+              "id": "D",
+              "label": "Khởi động lại tiến trình kube-apiserver từ xa"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Quyền verb `bind` trên ClusterRole cho phép đối tượng gán vai trò đó cho người khác hoặc chính mình mà không chịu sự ràng buộc của cơ chế kiểm tra chống leo thang đặc quyền thông thường, từ đó có thể tự gán vai trò `cluster-admin` để leo thang toàn quyền."
+        },
+        {
+          "id": "os09-l87-q3",
+          "difficulty": "hard",
+          "question": "Mức độ bảo mật nào trong Pod Security Standards (PSS) bắt buộc container phải chạy với người dùng không đặc quyền (`runAsNonRoot: true`), cấm cờ `allowPrivilegeEscalation: false`, và tước bỏ hầu hết các Linux Capabilities?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Privileged"
+            },
+            {
+              "id": "B",
+              "label": "Baseline"
+            },
+            {
+              "id": "C",
+              "label": "Restricted"
+            },
+            {
+              "id": "D",
+              "label": "Strict-Isolated"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Mức độ `Restricted` là mức độ bảo mật cao nhất và nghiêm ngặt nhất trong Pod Security Standards của Kubernetes, bắt buộc tuân thủ các thực hành tốt nhất về gia cố vùng chứa: không chạy root, cấm leo thang đặc quyền, tước bỏ Capabilities và hạn chế tối đa các volume types."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một ngân hàng số chuẩn bị đưa cụm Kubernetes phục vụ hệ thống giao dịch thanh toán vào vận hành chính thức. Đội ngũ kiểm toán an ninh phát hiện hệ thống phân quyền RBAC hiện tại đang cấp quyền 'cluster-admin' cho nhóm CI/CD, nhiều microservice đang lưu trữ Access Keys của AWS S3 trong file cấu hình pod, và chưa hề có cơ chế Admission Control nào để ngăn chặn các pod chạy privileged. Bạn được bổ nhiệm làm Trưởng Kiến trúc An ninh Kubernetes để tái thiết toàn diện.",
+        "tasks": [
+          "Tái cấu trúc toàn bộ hệ thống phân quyền Kubernetes RBAC: Xây dựng ma trận phân quyền tối thiểu (Least Privilege Roles) riêng biệt cho từng nhóm ứng dụng; loại bỏ toàn bộ các quyền wildcard '*' và thu hồi quyền `create pods` trần trên các tài khoản tự động.",
+          "Triển khai giải pháp OIDC Workload Identity Federation (AWS IRSA) thay thế 100% các khóa tĩnh dài hạn của AWS S3; xây dựng mẫu tài liệu Trust Policy và hướng dẫn tích hợp SDK cho các lập trình viên microservice.",
+          "Cấu hình Pod Security Admission (PSA) ở mức `Restricted` cho toàn bộ các production namespaces; đồng thời viết bộ quy tắc Kyverno ClusterPolicies tùy chỉnh để từ chối các image không rõ nguồn gốc (bắt buộc image phải đến từ kho lưu trữ nội bộ ECR) và kiểm tra chữ ký số Cosign trước khi cho phép triển khai."
+        ],
+        "requiredEvidence": [
+          "Tệp ma trận RBAC (Roles & RoleBindings YAML) hoàn chỉnh đã được kiểm tra tính tối thiểu",
+          "Tệp manifest ServiceAccount tích hợp OIDC annotation và IAM Trust Policy JSON thử nghiệm thành công kết nối tới S3",
+          "Bộ quy tắc Kyverno ClusterPolicy (YAML) kiểm soát chữ ký số image và nhật ký audit log chứng minh các manifest vi phạm bị từ chối nhập cảnh"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Kubernetes Official Documentation — Using RBAC Authorization",
+          "url": "https://kubernetes.io/docs/reference/access-authn-authz/rbac/",
+          "publisher": "The Kubernetes Authors",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu trúc Role, ClusterRole, RoleBinding và ClusterRoleBinding",
+            "Thuật toán đánh giá quyền hạn và cơ chế chống leo thang đặc quyền"
+          ]
+        },
+        {
+          "title": "Kubernetes Official Documentation — Pod Security Standards",
+          "url": "https://kubernetes.io/docs/concepts/security/pod-security-standards/",
+          "publisher": "The Kubernetes Authors",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Định nghĩa 3 mức độ bảo mật: Privileged, Baseline, Restricted",
+            "Cơ chế Pod Security Admission (PSA) kiểm soát nhập cảnh"
+          ]
+        },
+        {
+          "title": "CNCF Kyverno Documentation — Policy Management for Kubernetes",
+          "url": "https://kyverno.io/docs/",
+          "publisher": "Cloud Native Computing Foundation (CNCF)",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc Admission Controller và Mutating/Validating Webhooks",
+            "Định nghĩa chính sách kiểm soát an ninh bằng Custom Resources"
+          ]
+        },
+        {
+          "title": "AWS Documentation — IAM Roles for Service Accounts (IRSA)",
+          "url": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html",
+          "publisher": "Amazon Web Services",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế OIDC Workload Identity Federation",
+            "Sử dụng Projected ServiceAccount Tokens xác thực đám mây"
+          ]
+        }
+      ]
+    }
+  ]
+}

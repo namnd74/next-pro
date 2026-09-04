@@ -1,0 +1,1112 @@
+{
+  "id": "os10-m02-mobile-ipc-runtime-api",
+  "slug": "mobile-ipc-runtime-api",
+  "trackId": "os10-mobile-wireless",
+  "title": "Giao Tiếp Tiến Trình Di Động IPC, Deep Links, WebView & Mobile API",
+  "summary": "Phân tích an ninh cơ chế giao tiếp liên tiến trình Android (Intents, Broadcasts, Content Providers, Binder) và iOS (Custom Schemes, Universal Links, XPC), khai thác các lỗ hổng WebView nhúng (JS Interface, File Scheme Traversal), và kỹ thuật can thiệp thời gian thực (Runtime Hooking qua Frida, SSL Pinning Bypass).",
+  "difficulty": "advanced",
+  "estimatedMinutes": 420,
+  "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+  "domains": ["mobile", "ipc", "webview", "runtime"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os10-l94-android-ipc-intents-broadcasts-and-content-providers",
+      "slug": "android-ipc-intents-broadcasts-and-content-providers",
+      "title": "Giao Tiếp Liên Tiến Trình Android: Khai Thác Intents, Broadcast Receivers, Content Providers & Binder IPC",
+      "summary": "Phân tích sâu ranh giới giao tiếp liên tiến trình Android IPC: cơ chế hoạt động của Linux kernel Binder driver (/dev/binder), lỗ hổng trúng độc Intent (Explicit/Implicit Intent Spoofing, Intent Redirection), nghe lén và giả mạo Broadcast (Sticky, Unordered, Protected Broadcasts), khai thác Provider nhạy cảm (SQL Injection, Path Traversal qua openFile, Custom URI permissions grantUriPermissions), và kỹ thuật kiểm toán các thành phần Exported thiếu quyền hạn kiểm soát.",
+      "difficulty": "advanced",
+      "durationMinutes": 140,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân tích nguyên lý giao tiếp liên tiến trình Android qua nhân Linux Binder driver (/dev/binder), cấu trúc bộ đệm giao dịch Binder transaction buffer và cơ chế xác thực định danh tiến trình qua getCallingUid()/getCallingPid().",
+        "Phát hiện và khai thác lỗ hổng Intent Redirection, Intent Spoofing và các điểm mù trong việc ủy quyền truy cập thành phần không xuất khẩu (unexported components) qua PendingIntent có cờ FLAG_MUTABLE.",
+        "Đánh giá rủi ro an ninh của Broadcast Receivers: kỹ thuật nghe lén phát sóng không bảo vệ, tiêm broadcast giả mạo, chiếm quyền ưu tiên qua Ordered Broadcasts và kiểm toán cờ đăng ký động RECEIVER_EXPORTED / RECEIVER_NOT_EXPORTED trên Android 13+.",
+        "Kiểm toán và khai thác các điểm yếu trong Content Providers: tấn công SQL Injection trên truy vấn cơ sở dữ liệu nội bộ SQLite, Path Traversal qua hàm openFile() và lạm dụng cờ cấp quyền tạm thời grantUriPermissions."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+      "domains": ["mobile", "android", "ipc"],
+      "attackTactics": [
+        "initial-access",
+        "privilege-escalation",
+        "defense-evasion",
+        "lateral-movement"
+      ],
+      "keywords": [
+        "android-ipc",
+        "binder-driver",
+        "intent-redirection",
+        "pending-intent-mutability",
+        "broadcast-theft",
+        "content-provider-sqli",
+        "path-traversal-openfile",
+        "granturipermissions"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Cơ chế bảo mật IPC của Android dựa trên kiến trúc chuyển tiếp thông điệp qua nhân Linux thông qua thiết bị Binder driver (/dev/binder). Ranh giới bảo mật giữa các ứng dụng phụ thuộc hoàn toàn vào việc thẩm định Intent tại tầng người dùng và phân quyền khai báo trong AndroidManifest.xml. Khi một thành phần xuất khẩu (exported=true) nhận Intent từ bên ngoài và chuyển tiếp mù quáng (blind forwarding) tới các thành phần nội bộ hoặc cấp quyền URI tạm thời (FLAG_GRANT_READ_URI_PERMISSION), toàn bộ ranh giới cô lập sandbox của ứng dụng bị phá vỡ, cho phép ứng dụng bên thứ ba không có đặc quyền thực thi mã hoặc truy xuất dữ liệu nội bộ được bảo vệ.",
+      "visual": {
+        "title": "Mô Hình Luồng Dữ Liệu Android IPC: Từ Binder Driver Tới Lỗ Hổng Intent Redirection",
+        "caption": "Quy trình chuyển tiếp thông điệp IPC qua kernel Binder và điểm đứt gãy bảo mật khi thành phần trung gian chuyển tiếp Intent tùy ý.",
+        "steps": [
+          {
+            "label": "Khởi Tạo Giao Dịch Binder IPC",
+            "detail": "Ứng dụng gọi startActivity/startService; Parcel dữ liệu được tuần tự hóa và chuyển qua /dev/binder bằng lệnh gọi hệ thống ioctl BINDER_WRITE_READ.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Kiểm Tra Quyền Hạn tại SystemServer",
+            "detail": "ActivityManagerService xác thực danh tính UID gửi yêu cầu; nếu Intent hướng tới một Exported Component không có permission bảo vệ, IPC được cho phép đi qua.",
+            "tone": "allow"
+          },
+          {
+            "label": "Phát Hiện Lỗ Hổng Intent Redirection",
+            "detail": "Exported RouterActivity bóc tách ParcelableExtra('target_intent') và gọi startActivity() mà không thẩm định ComponentName, dẫn đến bypass cờ exported=false của thành phần đích.",
+            "tone": "stop"
+          },
+          {
+            "label": "Thực Thi Thành Phần Nội Bộ Không Xuất Khẩu",
+            "detail": "Private AdminActivity được kích hoạt dưới danh nghĩa nội bộ của chính ứng dụng mục tiêu, dẫn đến leo thang đặc quyền hoàn toàn.",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Nhân Linux Binder Driver và Cơ Chế Phân Định Quyền Hạn IPC",
+          "paragraphs": [
+            "Hệ thống Android không sử dụng các cơ chế IPC truyền thống của Linux như Unix Domain Sockets hay System V IPC cho giao tiếp tầng ứng dụng vì chi phí sao chép bộ nhớ cao và thiếu cơ chế định danh tiến trình tin cậy. Thay vào đó, Android triển khai Binder IPC — một kiến trúc client-server dựa trên trình điều khiển nhân Linux `/dev/binder`. Khi một tiến trình client gửi yêu cầu gọi phương thức từ xa (Remote Procedure Call - RPC) tới tiến trình server, nó đóng gói dữ liệu vào cấu trúc `Parcel` và thực hiện lệnh gọi hệ thống `ioctl(binder_fd, BINDER_WRITE_READ, &bwr)`. Binder driver trong nhân chịu trách nhiệm ánh xạ trực tiếp không gian bộ nhớ giữa hai tiến trình thông qua bộ nhớ chia sẻ, giúp giảm thiểu số lần copy dữ liệu xuống chỉ còn đúng 1 lần.",
+            "Tại tầng nhân, Binder driver tự động đính kèm thông tin định danh không thể làm giả của tiến trình gọi: User ID (`callingUid`) và Process ID (`callingPid`). Khi tiến trình server nhận được transaction thông qua lớp AIDL (Android Interface Definition Language), nó có thể gọi `Binder.getCallingUid()` và `Binder.getCallingPid()` để thẩm định quyền hạn. Các phương thức kiểm tra quyền hệ thống như `checkCallingPermission()` hoặc `enforceCallingPermission()` đều dựa hoàn toàn vào giá trị `callingUid` được nhân cung cấp. Tuy nhiên, nếu một tiến trình server thực hiện một cuộc gọi IPC tiếp theo tới một dịch vụ khác mà không sử dụng `Binder.clearCallingIdentity()`, danh tính của client ban đầu vẫn có thể bị áp đặt sai lệch, dẫn đến lỗ hổng ủy quyền nhầm lẫn (confused deputy).",
+            "Một giới hạn vật lý quan trọng của Binder IPC là kích thước bộ đệm giao dịch (Binder Transaction Buffer), được cố định ở mức 1MB (chia sẻ cho tất cả các transaction đang hoạt động trong tiến trình). Nếu ứng dụng gửi dữ liệu quá lớn (như hình ảnh bitmap độ phân giải cao hoặc mảng byte khổng lồ) qua Intent extras hoặc AIDL, hệ thống sẽ ném ngoại lệ `TransactionTooLargeException`. Kẻ tấn công cục bộ có thể lợi dụng đặc tính này để gây từ chối dịch vụ (DoS) bằng cách gửi liên tục các transaction chạm ngưỡng giới hạn, làm cạn kiệt bộ đệm của SystemServer hoặc ứng dụng đích."
+          ]
+        },
+        {
+          "title": "Lỗ Hổng Intent Redirection, Intent Spoofing và PendingIntent Mutability",
+          "paragraphs": [
+            "Intent là đối tượng thông điệp truyền thông chính trong Android, chia thành hai loại: Explicit Intent (chỉ định rõ tên lớp `ComponentName` hoặc `Class`) và Implicit Intent (chỉ định Action, Data URI, Category và phụ thuộc vào Intent Filters để hệ thống tìm kiếm thành phần phù hợp). Trong tệp `AndroidManifest.xml`, thuộc tính `android:exported` quy định thành phần có thể được kích hoạt bởi các ứng dụng khác hay không. Kể từ Android 12 (API 31), mọi thành phần có khai báo `<intent-filter>` bắt buộc phải khai báo tường minh `android:exported=\"true\"` hoặc `\"false\"`. Nếu một thành phần nội bộ được đặt `exported=\"false\"`, hệ điều hành sẽ từ chối mọi yêu cầu IPC từ các UID khác muốn gọi trực tiếp vào thành phần đó.",
+            "Lỗ Hổng Chuyển Tiếp Intent (Intent Redirection) phát sinh khi một thành phần xuất khẩu (Exported Activity/Service) nhận một Intent từ bên ngoài (untrusted input), trích xuất một Intent con nằm bên trong extras (thường qua `getParcelableExtra(\"target_intent\")`), rồi sau đó gọi `startActivity(nestedIntent)` hoặc `startService(nestedIntent)` mà không kiểm tra tính hợp lệ của đích đến. Vì cuộc gọi `startActivity` thứ hai được thực thi bởi chính ứng dụng mục tiêu (với UID của nó), hệ thống Android coi đây là một cuộc gọi nội bộ (in-app call). Do đó, kẻ tấn công có thể cấu hình `nestedIntent` trỏ thẳng tới một Unexported Activity (ví dụ: màn hình chuyển tiền hoặc đổi mật khẩu), phá vỡ hoàn toàn rào cản `exported=\"false\"` và chiếm quyền kiểm soát các luồng xử lý nhạy cảm.",
+            "Một vector tấn công nguy hiểm khác liên quan đến `PendingIntent`. PendingIntent là một token tham chiếu được cấp bởi ứng dụng tạo ra nó, cho phép ứng dụng khác (hoặc NotificationManager) thực thi một Intent được định sẵn với danh tính và quyền hạn của ứng dụng cấp token. Trước Android 12, cờ mặc định của PendingIntent là khả biến (Mutable). Kẻ tấn công nhận được một Mutable PendingIntent có thể sử dụng phương thức `Intent.fillIn()` để ghi đè các tham số nhạy cảm như Action, Data URI, hoặc Extra flags, biến một PendingIntent vô hại thành một cuộc gọi độc hại thực thi dưới quyền hạn của ứng dụng nạn nhân (CVE-2020-0423). Từ Android 12, nhà phát triển bắt buộc phải khai báo cờ `FLAG_IMMUTABLE` hoặc `FLAG_MUTABLE` một cách tường minh."
+          ]
+        },
+        {
+          "title": "Nghe Lén và Giả Mạo Thông Điệp Qua Broadcast Receivers Trên Android",
+          "paragraphs": [
+            "Broadcast Receiver là thành phần cho phép ứng dụng đăng ký lắng nghe và phản hồi các thông điệp phát thanh (Broadcasts) từ hệ thống hoặc các ứng dụng khác. Có hai phương thức đăng ký: Tĩnh (Static Registration trong `AndroidManifest.xml`) và Động (Dynamic Registration trong mã nguồn qua `registerReceiver()`). Broadcasts có thể là Unordered (phát đồng thời tới tất cả receivers), Ordered (phát tuần tự theo thứ tự ưu tiên `android:priority`), hoặc Sticky (tồn tại trong bộ nhớ cache của hệ thống sau khi phát sóng, hiện đã bị Google loại bỏ vì nguy cơ bảo mật nghiêm trọng).",
+            "Nguy cơ rò rỉ dữ liệu qua Broadcast phát sinh khi ứng dụng gửi thông điệp nhạy cảm (như mã xác thực OTP, Session Token, hoặc vị trí GPS) bằng `sendBroadcast(intent)` thông thường mà không chỉ định quyền hạn bảo vệ (permission). Bất kỳ ứng dụng độc hại nào cài đặt trên thiết bị cũng có thể đăng ký một Broadcast Receiver với Intent Filter tương ứng để nghe lén và trích xuất toàn bộ dữ liệu này. Ngược lại, nếu một Broadcast Receiver được xuất khẩu mà không kiểm tra chữ ký hoặc quyền hạn của bên phát sóng, kẻ tấn công có thể gọi `am broadcast` hoặc gửi Intent giả mạo để kích hoạt các hành động phá hoại (như ép buộc logout, kích hoạt đồng bộ hóa dữ liệu trái phép, hoặc làm sai lệch trạng thái logic của ứng dụng).",
+            "Trong mô hình Ordered Broadcasts, ứng dụng độc hại có thể khai báo mức ưu tiên tối đa (`android:priority=\"999\"`) để nhận thông điệp trước các ứng dụng hợp lệ khác. Tại thời điểm nhận, nó có thể gọi `abortBroadcast()` để triệt tiêu thông điệp, ngăn chặn không cho thông điệp đến được người nhận đích (tấn công từ chối dịch vụ SMS OTP), hoặc gọi `setResultData()` để can thiệp làm sai lệch dữ liệu trước khi chuyển tiếp. Để khắc phục, Android 13 (API 33) bắt buộc mọi receiver đăng ký động phải chỉ định cờ `RECEIVER_EXPORTED` hoặc `RECEIVER_NOT_EXPORTED`, đồng thời khuyến nghị sử dụng quyền hạn tùy chỉnh cấp độ chữ ký (`android:protectionLevel=\"signature\"`) cho các phát sóng nội bộ."
+          ]
+        },
+        {
+          "title": "Kiểm Toán và Khai Thác Content Providers: Lỗ Hổng SQL Injection và File Path Traversal",
+          "paragraphs": [
+            "Content Provider là cơ chế chuẩn hóa của Android để quản lý và chia sẻ dữ liệu có cấu trúc giữa các ứng dụng khác nhau. Dữ liệu được truy cập thông qua các định danh tài nguyên URI theo định dạng `content://<authority>/<path>/<id>`. Khi một ứng dụng bên ngoài thực hiện truy vấn qua `ContentResolver.query()`, `insert()`, `update()`, hoặc `delete()`, hệ thống kích hoạt Content Provider tương ứng. Nếu Content Provider được cấu hình `android:exported=\"true\"` mà thiếu các thuộc tính bảo vệ như `android:readPermission` hoặc `android:writePermission`, bất kỳ ứng dụng nào cũng có thể đọc hoặc sửa đổi dữ liệu.",
+            "Tấn công SQL Injection trên Content Provider xảy ra khi nhà phát triển nhận các tham số từ URI hoặc đối số truy vấn (`projection`, `selection`, `selectionArgs`, `sortOrder`) và ghép nối trực tiếp vào câu lệnh SQL mà không sử dụng tham số hóa (Parameterized Queries). Ví dụ: việc truyền chuỗi `selection` do người dùng kiểm soát vào `db.query(\"users\", projection, selection, null, null, null, sortOrder)` cho phép kẻ tấn công inject các mệnh đề như `' OR 1=1 --` hoặc sử dụng kỹ thuật UNION SELECT để trích xuất toàn bộ bảng dữ liệu nhạy cảm trong cơ sở dữ liệu SQLite của ứng dụng.",
+            "Ngoài dữ liệu bảng, Content Provider còn hỗ trợ chia sẻ tệp tin thông qua phương thức `openFile(Uri uri, String mode)` hoặc `openAssetFile()`. Nếu phương thức này nhận một đường dẫn tệp tin từ URI mà không chuẩn hóa và kiểm tra ranh giới thư mục, nó sẽ dẫn đến lỗ hổng Path Traversal (Directory Traversal). Kẻ tấn công có thể cung cấp URI dạng `content://com.victim.provider/../../shared_prefs/auth.xml` để đọc trích xuất tệp cấu hình chứa khóa bí mật hoặc ghi đè tệp cơ sở dữ liệu. Hơn nữa, việc lạm dụng cờ cấp quyền tạm thời (`android:grantUriPermissions=\"true\"` kết hợp với `FLAG_GRANT_READ_URI_PERMISSION`) có thể bị kẻ tấn công lợi dụng để lừa ứng dụng nạn nhân cấp quyền truy cập vĩnh viễn vào các tệp tin hệ thống bí mật."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán và Khai Thác Ranh Giới Giao Tiếp Liên Tiến Trình (Android IPC Auditing Lab)",
+        "objective": "Thực hiện kiểm toán tĩnh và động các thành phần IPC của ứng dụng Android: bóc tách manifest, phát hiện lỗ hổng Intent Redirection trên Exported Activity, khai thác SQLi/Path Traversal trên Content Provider và chặn bắt Broadcast nhạy cảm.",
+        "scenario": "Bạn được giao kiểm toán an ninh gói APK của một ứng dụng ngân hàng số (FinSecure Mobile). Ứng dụng này cung cấp các tiện ích liên kết thanh toán cho đối tác nhưng chứa nhiều thành phần giao tiếp IPC mở: một RouterActivity xử lý deep link nội bộ, một DocumentProvider phục vụ chia sẻ hóa đơn PDF, và một AuthStateReceiver nhận thông báo đăng nhập.",
+        "constraints": [
+          "Tuân thủ nghiêm ngặt tiêu chuẩn kiểm thử OWASP MASTG-PLATFORM (Inter-Process Communication Security).",
+          "Mọi khai thác phải được thực hiện trên môi trường giả lập Android VM cô lập qua ADB và công cụ drozer/frida an toàn.",
+          "Phân tích rõ ranh giới giữa quyền hạn của ứng dụng thứ ba không đặc quyền và đặc quyền của tiến trình mục tiêu."
+        ],
+        "cases": [
+          {
+            "id": "case-94-01",
+            "title": "Khai Thác Lỗ Hổng Intent Redirection Vượt Qua Rào Cản Unexported Activity",
+            "context": "Trong AndroidManifest.xml, bạn phát hiện `com.finsecure.RouterActivity` có thuộc tính `android:exported=\"true\"`. Dịch ngược mã nguồn cho thấy RouterActivity nhận Intent từ bên ngoài, lấy extra `Intent target = getIntent().getParcelableExtra(\"next_intent\");` và lập tức gọi `startActivity(target)`. Mặt khác, `com.finsecure.AdminPinResetActivity` là một thành phần có thuộc tính `android:exported=\"false\"`, chứa logic cho phép thiết lập lại mã PIN mà không yêu cầu xác thực lại nếu được gọi từ nội bộ.",
+            "prompt": "Đâu là kỹ thuật tấn công chính xác nhất để một ứng dụng độc hại không có quyền đặc biệt có thể kích hoạt AdminPinResetActivity?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tạo một Explicit Intent hướng tới exported com.finsecure.RouterActivity, đính kèm một nested Intent có ComponentName trỏ tới com.finsecure.AdminPinResetActivity trong ParcelableExtra 'next_intent'. Khi RouterActivity thực thi startActivity(target), lệnh gọi được thực hiện dưới danh nghĩa của FinSecure, vượt qua hoàn toàn rào cản exported=false.",
+                "correct": true,
+                "rationale": "Lỗ hổng Intent Redirection biến RouterActivity thành proxy confused deputy; vì cuộc gọi startActivity thứ hai xuất phát từ chính tiến trình FinSecure, hệ điều hành cho phép truy cập Activity không xuất khẩu."
+              },
+              {
+                "id": "B",
+                "label": "Gọi trực tiếp lệnh `am start -n com.finsecure/.AdminPinResetActivity` từ ứng dụng bên thứ ba với cờ FLAG_ACTIVITY_NEW_TASK.",
+                "correct": false,
+                "rationale": "Lệnh gọi trực tiếp từ bên thứ ba sẽ bị ActivityManagerService chặn ngay lập tức với lỗi SecurityException do thành phần có exported=false."
+              },
+              {
+                "id": "C",
+                "label": "Gửi một Broadcast Intent với Action 'android.intent.action.BOOT_COMPLETED' để ép buộc hệ thống nạp lại manifest.",
+                "correct": false,
+                "rationale": "Broadcast BOOT_COMPLETED không thay đổi trạng thái exported của Activity và chỉ có thể phát ra bởi hệ điều hành với quyền hệ thống."
+              },
+              {
+                "id": "D",
+                "label": "Sửa đổi cờ android:debuggable thành true trong bộ nhớ Binder driver để bỏ qua kiểm tra ComponentName.",
+                "correct": false,
+                "rationale": "Bộ nhớ Binder driver không quản lý cờ debuggable và một ứng dụng không có quyền root không thể ghi đè bộ nhớ của kernel driver."
+              }
+            ]
+          },
+          {
+            "id": "case-94-02",
+            "title": "Khai Thác Lỗ Hổng Path Traversal và SQLi Trên Content Provider Để Đánh Cắp Dữ Liệu Nội Bộ",
+            "context": "Ứng dụng FinSecure khai báo Content Provider `com.finsecure.DocumentProvider` với authority `com.finsecure.docprovider` và `android:exported=\"true\"` không có permission bảo vệ. Trong hàm `openFile(Uri uri, String mode)`, mã nguồn thực thi: `File file = new File(getContext().getFilesDir(), uri.getLastPathSegment()); return ParcelFileDescriptor.open(file, mode);`. Tuy nhiên, `uri.getPath()` lại được chuyển qua một bộ giải mã tùy chỉnh cho phép truyền chuỗi đường dẫn tương đối.",
+            "prompt": "Hậu quả an ninh nghiêm trọng nhất mà kẻ tấn công có thể thực hiện thông qua URI của Provider này là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công chỉ có thể đọc được các tệp tài nguyên nằm trong thư mục res/values/strings.xml của ứng dụng.",
+                "correct": false,
+                "rationale": "Tài nguyên trong res/values được biên dịch vào resources.arsc, không nằm trong đường dẫn tệp tin hệ thống getFilesDir()."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công có thể chế tạo một Content URI chứa ký tự directory traversal (ví dụ: `content://com.finsecure.docprovider/..%2F..%2Fdatabases%2Ffinsecure_credentials.db`) để thoát khỏi thư mục files/ và đọc trực tiếp cơ sở dữ liệu SQLite chứa thông tin xác thực, token và lịch sử giao dịch của nạn nhân.",
+                "correct": true,
+                "rationale": "Hàm openFile thiếu chuẩn hóa đường dẫn chuẩn tắc (canonical path checking); việc giải mã URI chứa dấu ../ cho phép kẻ tấn công vượt qua thư mục chỉ định và đọc tệp bất kỳ trong sandbox của ứng dụng."
+              },
+              {
+                "id": "C",
+                "label": "Kẻ tấn công có thể ép buộc hệ điều hành xóa phân vùng /system của thiết bị di động.",
+                "correct": false,
+                "rationale": "Ứng dụng bị giam giữ trong sandbox Linux UID và SEAndroid untrusted_app; nó không có quyền ghi lên phân vùng hệ thống /system dạng read-only."
+              },
+              {
+                "id": "D",
+                "label": "Content Provider sẽ tự động mã hóa toàn bộ dữ liệu trả về bằng thuật toán RSA-4096 khi phát hiện ký tự đặc biệt.",
+                "correct": false,
+                "rationale": "Content Provider không có cơ chế tự động mã hóa dữ liệu trả về; dữ liệu được truyền dạng raw stream qua file descriptor."
+              }
+            ]
+          },
+          {
+            "id": "case-94-03",
+            "title": "Nghe Lén Token Xác Thực Qua Broadcast Thiếu Phân Quyền Bảo Vệ",
+            "context": "Mỗi khi người dùng hoàn tất đăng nhập thành công, FinSecure thực thi đoạn mã: `Intent intent = new Intent(\"com.finsecure.AUTH_SUCCESS\"); intent.putExtra(\"auth_token\", token); sendBroadcast(intent);`. Đồng thời, ứng dụng không đăng ký bất kỳ Custom Permission nào và không sử dụng cờ giới hạn.",
+            "prompt": "Đâu là biện pháp phòng thủ đúng đắn và triệt để nhất để ngăn chặn ứng dụng độc hại nghe lén được auth_token?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tăng độ phức tạp của chuỗi token ngẫu nhiên lên 256 ký tự và tiếp tục phát sóng broadcast thông thường.",
+                "correct": false,
+                "rationale": "Độ dài của token không ngăn chặn được việc Intent broadcast bị nghe lén bởi bất kỳ receiver nào đã đăng ký intent-filter phù hợp."
+              },
+              {
+                "id": "B",
+                "label": "Đổi tên Action từ com.finsecure.AUTH_SUCCESS thành một chuỗi MD5 bí mật không công bố.",
+                "correct": false,
+                "rationale": "Bảo mật bằng sự che giấu (Security through Obscurity) hoàn toàn vô hiệu vì kẻ tấn công có thể dễ dàng dịch ngược APK để tìm Action string."
+              },
+              {
+                "id": "C",
+                "label": "Chuyển sang sử dụng Explicit Intent chỉ định rõ ComponentName của receiver nội bộ, hoặc khai báo Custom Permission với protectionLevel='signature' trong AndroidManifest và truyền quyền này vào lệnh `sendBroadcast(intent, \"com.finsecure.permission.RECEIVE_AUTH\")` để chỉ các ứng dụng cùng chữ ký số mới nhận được.",
+                "correct": true,
+                "rationale": "Sử dụng Explicit Intent hoặc Broadcast Permission mức signature đảm bảo thông điệp chỉ được chuyển tiếp tới các thành phần tin cậy cùng chữ ký của nhà phát triển."
+              },
+              {
+                "id": "D",
+                "label": "Gọi hàm abortBroadcast() ngay trước khi gọi sendBroadcast().",
+                "correct": false,
+                "rationale": "abortBroadcast() chỉ có tác dụng bên trong onReceive của Ordered Broadcast, không thể gọi trước khi phát sóng và không áp dụng cho standard broadcast."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác cơ chế hoạt động của lỗ hổng Intent Redirection và phương thức chế tạo nested intent để bypass cờ exported=false.",
+          "Phân tích thành công điểm yếu Path Traversal trên Content Provider openFile() và đề xuất giải pháp kiểm tra canonical path.",
+          "Đánh giá đúng nguy cơ rò rỉ dữ liệu qua Broadcast Receivers và cấu hình đúng quyền hạn bảo vệ signature-level."
+        ],
+        "evidenceTemplate": [
+          "Lệnh adb shell am start khai thác Intent Redirection thành công kèm ảnh chụp màn hình AdminPinResetActivity",
+          "Mã khai thác PoC bằng Java/Kotlin chứng minh việc đọc trích xuất tệp SQLite qua Content Provider DocumentProvider",
+          "Logcat output ghi lại sự kiện chặn bắt auth_token từ Broadcast phát ra bởi com.finsecure.AUTH_SUCCESS",
+          "Tài liệu khuyến nghị khắc phục cấu hình AndroidManifest.xml và mã nguồn kiểm tra ComponentName / Canonical Path"
+        ],
+        "reset": "Khôi phục gói APK FinSecure về phiên bản gốc chưa vá lỗi và xóa toàn bộ dữ liệu ứng dụng kiểm thử trên thiết bị giả lập.",
+        "cleanup": "Xóa các tệp SQLite trích xuất, gỡ cài đặt ứng dụng độc hại PoC và giải phóng các port chuyển tiếp ADB."
+      },
+      "governance": {
+        "prevent": [
+          "Thiết lập `android:exported=\"false\"` cho tất cả các thành phần Activity, Service, Receiver, Provider trừ khi thực sự cần giao tiếp với ứng dụng bên ngoài.",
+          "Đối với các Exported Component bắt buộc phải nhận Intent từ bên ngoài, tuyệt đối không chuyển tiếp Intent con nhận được từ Extras tới `startActivity()` mà không kiểm tra tính hợp lệ của `ComponentName` qua danh sách trắng (whitelist).",
+          "Bắt buộc khai báo cờ `FLAG_IMMUTABLE` khi khởi tạo `PendingIntent` trừ trường hợp bắt buộc phải biến đổi, và kiểm tra tính chuẩn tắc (`getCanonicalPath()`) khi xử lý đường dẫn trong `openFile()` của Content Provider."
+        ],
+        "observe": [
+          "Giám sát log hệ thống `ActivityManager` và `PackageManager` để phát hiện các cuộc gọi IPC bất thường giữa các UID khác nhau.",
+          "Thiết lập cơ chế kiểm toán tĩnh mã nguồn (SAST) trong quy trình CI/CD để quét các mẫu code gọi `startActivity` với đối tượng `Intent` lấy từ `getParcelableExtra`.",
+          "Kiểm toán cấu hình AndroidManifest tự động nhằm cảnh báo bất kỳ thành phần nào có `exported=\"true\"` mà thiếu khai báo thuộc tính `permission` bảo vệ."
+        ],
+        "respond": [
+          "Khi phát hiện lỗ hổng Intent Redirection trên bản phát hành production, phát hành bản vá khẩn cấp bổ sung hàm kiểm tra `intent.getComponent().getPackageName().equals(getPackageName())` trước khi kích hoạt.",
+          "Vô hiệu hóa tạm thời các endpoint Content Provider bị ảnh hưởng thông qua tính năng cấu hình từ xa (Remote Feature Flag) nếu có thể.",
+          "Thu hồi và hủy bỏ các phiên đăng nhập hoặc mã token bị nghi ngờ đã rò rỉ qua các kênh Broadcast không an toàn."
+        ],
+        "residualRisk": [
+          "Các thiết bị Android cũ dưới Android 12 không thực thi nghiêm ngặt cờ FLAG_IMMUTABLE, tạo điều kiện cho các vector tấn công PendingIntent trên các phiên bản OS lỗi thời.",
+          "Lỗ hổng zero-day trong chính nhân Linux Binder driver (như use-after-free trong binder_transaction) có thể cho phép mã độc cục bộ thoát sandbox mà không phụ thuộc vào lỗi mã nguồn ứng dụng."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Đặt thuộc tính android:exported=\"false\" cho một Activity đảm bảo 100% Activity đó không bao giờ có thể bị kích hoạt bởi ứng dụng khác.",
+          "correction": "Nếu ứng dụng tồn tại một Exported Activity khác có lỗ hổng Intent Redirection hoặc cấp quyền qua PendingIntent, ứng dụng bên ngoài vẫn có thể kích hoạt Activity nội bộ gián tiếp thông qua vai trò ủy quyền nhầm lẫn (Confused Deputy)."
+        },
+        {
+          "claim": "Việc sử dụng cờ android:protectionLevel=\"dangerous\" cho Custom Permission là đủ để ngăn chặn các ứng dụng độc hại nhận dữ liệu từ Broadcast.",
+          "correction": "Quyền hạn dangerous chỉ yêu cầu người dùng chấp thuận tại thời điểm runtime; nếu người dùng bị lừa bấm đồng ý cấp quyền, ứng dụng độc hại vẫn có thể nhận dữ liệu broadcast. Chỉ có mức protectionLevel=\"signature\" mới đảm bảo chỉ các ứng dụng ký cùng khóa của nhà phát triển mới được truy cập."
+        },
+        {
+          "claim": "Sử dụng SQLiteQueryBuilder trong Content Provider sẽ tự động chống lại 100% các cuộc tấn công SQL Injection.",
+          "correction": "SQLiteQueryBuilder chỉ an toàn nếu nhà phát triển thiết lập Projection Map nghiêm ngặt (setProjectionMap) và bật cờ setStrict(true). Nếu tham số selection hoặc sortOrder vẫn bị ghép chuỗi hoặc không có projection map, kẻ tấn công vẫn có thể thực thi SQLi."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os10-l94-q1",
+          "difficulty": "easy",
+          "question": "Thành phần nào trong nhân hệ điều hành Android chịu trách nhiệm trực tiếp điều phối thông điệp giao tiếp liên tiến trình (IPC) và cấp phát bộ đệm giao dịch giữa các tiến trình?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Trình điều khiển thiết bị /dev/binder"
+            },
+            {
+              "id": "B",
+              "label": "Tiến trình quản lý đồ họa SurfaceFlinger"
+            },
+            {
+              "id": "C",
+              "label": "Dịch vụ hệ thống Vold (Volume Daemon)"
+            },
+            {
+              "id": "D",
+              "label": "Hệ thống quản lý gói PackageManagerService"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Trình điều khiển /dev/binder trong nhân Linux là xương sống của kiến trúc Android IPC, quản lý các giao dịch gọi thủ tục từ xa (RPC), sao chép bộ nhớ và xác thực callingUid/callingPid."
+        },
+        {
+          "id": "os10-l94-q2",
+          "difficulty": "medium",
+          "question": "Bản chất kỹ thuật cốt lõi của lỗ hổng Intent Redirection trong ứng dụng Android là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Ứng dụng bị tràn bộ đệm heap khi phân tích cú pháp chuỗi XML trong AndroidManifest nhị phân."
+            },
+            {
+              "id": "B",
+              "label": "Một thành phần Exported nhận đối tượng Intent do người dùng bên ngoài kiểm soát từ extras và gọi startActivity/startService trên đối tượng đó mà không xác thực ComponentName đích, cho phép vượt qua rào cản exported=false của các thành phần nội bộ."
+            },
+            {
+              "id": "C",
+              "label": "Do bộ nhớ cache DNS của thiết bị di động bị trúng độc dẫn đến chuyển hướng gói tin mạng."
+            },
+            {
+              "id": "D",
+              "label": "Do hệ thống Android tự động dịch ngược mã DEX sang mã Java khi phát hiện Intent lạ."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Intent Redirection xảy ra khi một thành phần xuất khẩu đóng vai trò trung gian chuyển tiếp mù quáng một Intent con từ caller bên ngoài tới các thành phần nội bộ không xuất khẩu, biến ứng dụng thành confused deputy."
+        },
+        {
+          "id": "os10-l94-q3",
+          "difficulty": "hard",
+          "question": "Trong phương thức openFile(Uri uri, String mode) của một Exported Content Provider, biện pháp nào sau đây là chuẩn mực nhất để phòng chống triệt để lỗ hổng Path Traversal?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Chỉ kiểm tra xem chuỗi URI có bắt đầu bằng ký tự 'content://' hay không."
+            },
+            {
+              "id": "B",
+              "label": "Mã hóa URI bằng giải thuật Base64 trước khi chuyển cho lớp File."
+            },
+            {
+              "id": "C",
+              "label": "Khởi tạo đối tượng File mục tiêu, gọi phương thức getCanonicalPath() và xác minh rằng chuỗi đường dẫn chuẩn tắc đó bắt đầu chính xác bằng đường dẫn chuẩn tắc của thư mục lưu trữ an toàn được chỉ định trước."
+            },
+            {
+              "id": "D",
+              "label": "Thay thế tất cả ký tự '../' bằng chuỗi rỗng một lần duy nhất bằng hàm String.replace()."
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Sử dụng getCanonicalPath() để giải quyết triệt để tất cả các liên kết mềm (symlinks) và đường dẫn tương đối (../), sau đó dùng startsWith() để kiểm tra đường dẫn chuẩn tắc của thư mục gốc là phương pháp an toàn duy nhất chống Path Traversal."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một ứng dụng ví điện tử Android phổ biến (SmartWallet) nhận được cảnh báo bảo mật nghiêm trọng từ chương trình Bug Bounty: Kẻ tấn công có thể cài đặt một ứng dụng độc hại không có quyền trên cùng thiết bị để ép SmartWallet thực hiện giao dịch chuyển tiền tự động thông qua việc kích hoạt unexported TransferExecutionActivity.",
+        "tasks": [
+          "Phân tích tệp AndroidManifest.xml đã dịch ngược và các lớp Java/Kotlin để xác định chính xác thành phần xuất khẩu nào đang đóng vai trò trung gian Intent Redirection.",
+          "Viết mã kiểm thử PoC (Proof of Concept) dưới dạng một ứng dụng Android độc lập hoặc script adb shell để kích hoạt thành công TransferExecutionActivity thông qua trung gian.",
+          "Tái cấu trúc mã nguồn ứng dụng SmartWallet: triển khai cơ chế kiểm tra ComponentName chặt chẽ, áp dụng cờ FLAG_IMMUTABLE cho PendingIntent và bổ sung xác thực chữ ký signature-level."
+        ],
+        "requiredEvidence": [
+          "Báo cáo phân tích luồng thực thi ngược (Call Graph) từ Exported Activity trung gian tới Unexported TransferExecutionActivity",
+          "Mã nguồn ứng dụng PoC độc lập chứng minh việc kích hoạt thành công luồng chuyển tiền mà không gặp lỗi SecurityException",
+          "Mã nguồn bản vá hoàn chỉnh trong SmartWallet kèm kết quả kiểm thử hồi quy chứng minh các Intent lạ bị từ chối an toàn"
+        ]
+      },
+      "sources": [
+        {
+          "title": "OWASP Mobile Application Security Testing Guide (MASTG) — Testing Android IPC",
+          "url": "https://mas.owasp.org/MASTG/tests/android/MASVS-PLATFORM/MASTG-TEST-0027/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiểm toán cấu hình các thành phần IPC: Intents, Broadcast Receivers, Content Providers",
+            "Kỹ thuật phát hiện và khai thác lỗ hổng Intent Redirection và URI Permission Granting"
+          ]
+        },
+        {
+          "title": "Android Developers Security Best Practices — Securing Services, Content Providers and Intents",
+          "url": "https://developer.android.com/privacy-and-security/security-best-practices",
+          "publisher": "Google",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Nguyên tắc cấu hình cờ android:exported và bảo vệ thành phần bằng Custom Permissions",
+            "Hướng dẫn thực thi PendingIntent an toàn với FLAG_IMMUTABLE và phòng chống Path Traversal"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os10-l95-ios-ipc-url-schemes-and-universal-links",
+      "slug": "ios-ipc-url-schemes-and-universal-links",
+      "title": "Giao Tiếp Liên Tiến Trình iOS: Khai Thác Custom URL Schemes, Universal Links & XPC Services",
+      "summary": "Phân tích kiến trúc IPC và deep linking trên iOS: cơ chế đăng ký và chiếm quyền Custom URL Schemes (URL Scheme Hijacking), cấu trúc xác thực hai chiều Universal Links (Apple App Site Association - AASA), khai thác các lỗ hổng Injection/CSRF qua tham số Deep Link, kỹ thuật chia sẻ dữ liệu qua App Groups / Keychain Sharing, và mô hình giao tiếp an toàn đa tiến trình XPC Services qua Mach Ports kèm kiểm toán Entitlements.",
+      "difficulty": "advanced",
+      "durationMinutes": 140,
+      "prerequisites": ["os10-l94-android-ipc-intents-broadcasts-and-content-providers"],
+      "outcomes": [
+        "Phân tích cơ chế đăng ký và định tuyến Custom URL Schemes trên iOS, phát hiện và khai thác lỗ hổng URL Scheme Hijacking để đánh cắp mã ủy quyền OAuth 2.0 PKCE và dữ liệu nhạy cảm.",
+        "Đánh giá cấu trúc xác thực hai chiều của Universal Links thông qua tệp apple-app-site-association (AASA) và phát hiện các lỗ hổng Parameter Pollution, Open Redirect và CSRF nội bộ trong bộ xử lý deep link.",
+        "Kiểm toán ranh giới bảo mật chia sẻ dữ liệu liên tiến trình qua App Groups (com.apple.security.application-groups) và Keychain Sharing Groups giữa ứng dụng chính và các App Extensions.",
+        "Bóc tách kiến trúc giao tiếp Mach Ports và XPC Services trên iOS/macOS, phân tích kỹ thuật thẩm định Entitlements dựa trên Mach audit_token_t và nhận diện lỗ hổng leo thang đặc quyền do PID reuse race condition."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+      "domains": ["mobile", "ios", "ipc"],
+      "attackTactics": [
+        "initial-access",
+        "privilege-escalation",
+        "defense-evasion",
+        "credential-access"
+      ],
+      "keywords": [
+        "ios-ipc",
+        "custom-url-scheme",
+        "url-scheme-hijacking",
+        "universal-links",
+        "aasa-apple-app-site-association",
+        "app-groups",
+        "xpc-services",
+        "mach-audit-token"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Trên iOS, các ứng dụng chạy trong sandbox nghiêm ngặt và không có hệ thống Intent/Binder như Android. Thay vào đó, giao tiếp giữa các ứng dụng độc lập chủ yếu dựa trên URI Deep Linking. Custom URL Schemes không có cơ chế xác thực quyền sở hữu độc quyền tại cấp độ hệ điều hành; bất kỳ ứng dụng độc hại nào cũng có thể đăng ký cùng scheme để đánh chặn dữ liệu (Scheme Hijacking). Universal Links giải quyết vấn đề này bằng cách liên kết chữ ký số miền thông qua tệp AASA và Apple CDN, nhưng tầng logic ứng dụng vẫn dễ bị tấn công nếu xử lý tham số deep link mà thiếu xác thực nguồn gốc hoặc thiếu bước tái xác thực sinh trắc học cho các hành động trọng yếu.",
+      "visual": {
+        "title": "Kiến Trúc Deep Linking iOS: So Sánh Custom Schemes, Universal Links và XPC IPC",
+        "caption": "Mô hình định tuyến cuộc gọi deep link và ranh giới bảo mật giữa các ứng dụng và daemon dịch vụ iOS.",
+        "steps": [
+          {
+            "label": "Đăng Ký Custom URL Scheme Trong Info.plist",
+            "detail": "Ứng dụng đăng ký CFBundleURLName và CFBundleURLSchemes (ví dụ: myapp://); hệ thống iOS lưu trữ scheme vào registry toàn cục mà không kiểm tra tính duy nhất.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Phát Hiện Tranh Chấp URL Scheme Hijacking",
+            "detail": "Ứng dụng độc hại cài đặt trên máy và khai báo cùng scheme myapp://; khi người dùng hoàn tất OAuth, iOS định tuyến callback tới ứng dụng độc hại một cách ngẫu nhiên.",
+            "tone": "stop"
+          },
+          {
+            "label": "Xác Thực Hai Chiều Bằng Universal Links (AASA)",
+            "detail": "Hệ điều hành tải tệp apple-app-site-association từ domain HTTPS và ánh xạ trực tiếp appID của nhà phát triển, ngăn chặn triệt để hành vi mạo danh scheme.",
+            "tone": "allow"
+          },
+          {
+            "label": "Kiểm Tra Tham Số và Thẩm Định XPC Audit Token",
+            "detail": "Bộ xử lý openURL hoặc XPC listener phải xác thực toàn bộ query parameters và thẩm định audit_token_t thay vì tin tưởng mù quáng vào PID của caller.",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cơ Chế Custom URL Schemes và Kỹ Thuật Tấn Công URL Scheme Hijacking",
+          "paragraphs": [
+            "Trên hệ điều hành iOS, để cho phép các ứng dụng khác hoặc trình duyệt web kích hoạt và truyền dữ liệu vào ứng dụng của mình, nhà phát triển cấu hình các Custom URL Schemes trong tệp `Info.plist` thông qua khóa `CFBundleURLTypes` (chứa `CFBundleURLSchemes` như `myapp://`, `paygate://`). Khi người dùng nhấn vào một liên kết có scheme tương ứng hoặc một ứng dụng khác gọi `UIApplication.shared.open(url)`, hệ điều hành iOS kích hoạt ứng dụng đăng ký và chuyển URL đó vào phương thức ủy quyền `application(_:open:options:)` (UIKit) hoặc modifier `.onOpenURL` (SwiftUI).",
+            "Điểm yếu kiến trúc căn bản của Custom URL Schemes là hệ điều hành iOS không áp dụng bất kỳ cơ chế xác thực quyền sở hữu độc quyền (Ownership Claim) nào. Nếu có hai hoặc nhiều ứng dụng cài đặt trên cùng một thiết bị cùng khai báo chung một scheme (ví dụ: cả ứng dụng ngân hàng hợp lệ và một ứng dụng độc hại cùng khai báo `payapp://`), cơ chế giải quyết xung đột của iOS là không xác định (non-deterministic). Thông thường, ứng dụng được cài đặt sau hoặc ứng dụng có phiên bản build gần nhất sẽ chiếm quyền ưu tiên xử lý scheme.",
+            "Lỗ hổng chiếm quyền định tuyến scheme (URL Scheme Hijacking) gây ra những hệ quả nghiêm trọng đối với các luồng xác thực OAuth 2.0 / OpenID Connect. Khi ứng dụng hợp lệ khởi chạy trình duyệt Safari (`ASWebAuthenticationSession` hoặc `SFSafariViewController`) để xác thực với Identity Provider, URL chuyển hướng sau khi đăng nhập thành công thường có dạng `payapp://oauth-callback?code=AUTH_CODE`. Ứng dụng độc hại đã chiếm quyền scheme sẽ nhận được URL callback này, trích xuất mã `code`, và kết hợp với việc thiếu bảo mật PKCE (Proof Key for Code Exchange) để đổi lấy access token của người dùng, dẫn đến chiếm đoạt tài khoản toàn diện."
+          ]
+        },
+        {
+          "title": "Universal Links: Cấu Trúc Tệp AASA và Rủi Ro Khai Thác Tham Số Deep Link",
+          "paragraphs": [
+            "Để khắc phục triệt để điểm yếu không thể xác minh danh tính của Custom URL Schemes, Apple giới thiệu Universal Links từ iOS 9. Thay vì sử dụng scheme tùy biến, Universal Links sử dụng chuẩn URL HTTP/HTTPS thông thường (ví dụ: `https://bank.example.com/transfer`). Cơ chế này thiết lập mối quan hệ tin cậy hai chiều thông qua tệp liên kết trang web ứng dụng `apple-app-site-association` (AASA). Tệp AASA là một tệp định dạng JSON không có phần mở rộng, được lưu trữ bắt buộc tại `https://<domain>/.well-known/apple-app-site-association` trên máy chủ web của nhà phát triển.",
+            "Cấu trúc tệp AASA chứa từ khóa `applinks` với danh sách `details` định nghĩa mảng `appIDs` (định dạng `<ApplicationIdentifierPrefix/TeamID>.<BundleID>`, ví dụ `ABCDE12345.com.example.bank`) và các đường dẫn `components` hợp lệ. Khi người dùng cài đặt ứng dụng, hệ thống iOS (thông qua Apple CDN proxy) sẽ tự động tải tệp AASA về để xác minh. Khi người dùng nhấn vào liên kết thuộc miền này, hệ điều hành SpringBoard kiểm tra cơ sở dữ liệu liên kết cục bộ và mở trực tiếp ứng dụng thông qua phương thức `application(_:continue:restorationHandler:)` mà không bao giờ kích hoạt trình duyệt Safari, loại bỏ hoàn toàn khả năng bị ứng dụng bên thứ ba đánh cắp liên kết.",
+            "Mặc dù Universal Links giải quyết được bài toán giả mạo quyền sở hữu scheme, nó không tự động đảm bảo tính an toàn cho logic xử lý dữ liệu bên trong ứng dụng. Nếu ứng dụng tin tưởng mù quáng vào các tham số truy vấn (query parameters) truyền qua deep link, nó sẽ mở ra bề mặt tấn công rộng lớn: Client-Side CSRF (thực thi giao dịch chuyển tiền hoặc đổi thông tin cá nhân ngay khi mở link mà không yêu cầu xác nhận mật khẩu hoặc sinh trắc học FaceID), Open Redirect nội bộ (chuyển hướng người dùng tới các webview độc hại), và Parameter Pollution làm sai lệch luồng điều khiển của ứng dụng."
+          ]
+        },
+        {
+          "title": "Kiểm Toán Cơ Chế Chia Sẻ Dữ Liệu Qua App Groups và Shared Keychain",
+          "paragraphs": [
+            "Kiến trúc sandbox iOS mặc định giam giữ mỗi ứng dụng trong một thư mục Container riêng biệt (`/var/mobile/Containers/Data/Application/<UUID>`), ngăn chặn mọi truy cập tệp chéo. Tuy nhiên, các ứng dụng hiện đại thường bao gồm nhiều thành phần mở rộng (App Extensions) chạy trên các tiến trình độc lập như Today Widgets, Share Extensions, hoặc Notification Service Extensions. Để các tiến trình này có thể chia sẻ tệp tin, cơ sở dữ liệu và phiên làm việc với ứng dụng chính, Apple cung cấp tính năng App Groups.",
+            "Khi kích hoạt App Groups thông qua entitlement `com.apple.security.application-groups`, hệ điều hành cấp phát một thư mục dùng chung đặc biệt tại `/var/mobile/Containers/Shared/AppGroup/<UUID>`. Ứng dụng truy cập đường dẫn này qua API `FileManager.default.containerURL(forSecurityApplicationGroupIdentifier:)`. Kiểm toán an ninh cho thấy nhiều ứng dụng lưu trữ cơ sở dữ liệu SQLite nhạy cảm, tệp CoreData, hoặc `UserDefaults` chia sẻ bên trong thư mục App Group mà không mã hóa dữ liệu ở tầng ứng dụng (Application-level encryption), dựa dẫm hoàn toàn vào cơ chế bảo vệ mặc định của iOS Data Protection.",
+            "Bên cạnh hệ thống tệp, Keychain Access Groups (`keychain-access-groups`) cho phép chia sẻ các mục khóa bí mật, token xác thực giữa các ứng dụng được ký bởi cùng một Apple Developer Team ID. Nguy cơ phát sinh khi nhà phát triển cấp quyền quá rộng (wildcard hoặc dùng chung entitlement giữa ứng dụng tài chính bảo mật cao và một ứng dụng tiện ích ít bảo mật hơn trong cùng công ty). Nếu tiện ích bị khai thác lỗi thực thi mã (RCE qua thư viện bên thứ ba), kẻ tấn công có thể truy cập vào Shared Keychain và lấy cắp toàn bộ private keys và thông tin thẻ tín dụng của ứng dụng chính."
+          ]
+        },
+        {
+          "title": "Kiến Trúc XPC Services, Mach Ports và Thẩm Định Entitlements Qua Audit Token",
+          "paragraphs": [
+            "Tại tầng thấp nhất của hệ điều hành Darwin/XNU, cơ chế IPC cốt lõi được xây dựng trên Mach Messages và Mach Ports. Một Mach Port là một kênh liên lạc đơn hướng được quản lý bởi nhân kernel, hỗ trợ các quyền truy cập cổng (Port Rights) như Send Rights và Receive Rights. Nhằm đơn giản hóa việc lập trình giao tiếp đa tiến trình an toàn, Apple xây dựng tầng trừu tượng XPC Services trên nền Mach Ports. XPC hỗ trợ quản lý vòng đời tiến trình, serialization dữ liệu tự động và kiểm soát phân quyền chặt chẽ.",
+            "Các ứng dụng phức tạp (hoặc ứng dụng macOS/iOS hệ thống) phân tách các tác vụ đặc quyền cao thành một tiến trình nền riêng biệt (XPC Helper Tool hoặc XPC Service). Tiến trình client giao tiếp với server thông qua đối tượng `NSXPCConnection` và `NSXPCListener`. Điểm mấu chốt quyết định an ninh của một dịch vụ XPC nằm ở delegate method `listener(_:shouldAcceptNewConnection:)`. Tại đây, dịch vụ server bắt buộc phải thẩm định danh tính và quyền hạn của client trước khi chấp thuận kết nối.",
+            "Sai lầm bảo mật kinh điển trong triển khai XPC là việc kiểm tra quyền dựa trên mã định danh tiến trình `connection.processIdentifier` (PID). Trong hệ điều hành Unix/Darwin, PID có thể bị tái sử dụng (PID Reuse). Kẻ tấn công có thể kích hoạt một tiến trình client hợp lệ để gửi yêu cầu, sau đó nhanh chóng kết thúc tiến trình đó và spawn một tiến trình độc hại chiếm lại đúng giá trị PID cũ (Race Condition), đánh lừa server. Giải pháp an toàn bắt buộc là sử dụng Mach Audit Token (`audit_token_t`) thông qua `connection.auditToken` và gọi API bảo mật `SecTaskCreateWithAuditToken` để truy vấn danh sách Entitlements đã được Apple ký số bất biến của client, triệt tiêu hoàn toàn nguy cơ giả mạo tiến trình."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Cơ Chế Deep Linking, Universal Links và XPC IPC Trên Nền Tảng iOS",
+        "objective": "Đánh giá an ninh cơ chế deep linking iOS: phát hiện nguy cơ URL Scheme Hijacking, kiểm toán tệp AASA và khai thác tham số Universal Links, kiểm tra tính an toàn của thư mục App Groups và xác thực XPC Audit Token.",
+        "scenario": "Một tập đoàn tài chính (GlobalFinTech) phát triển hệ sinh thái ứng dụng trên iOS gồm ứng dụng chính GlobalPay và ứng dụng tiện ích GlobalRewards. Bạn được chỉ định thực hiện đánh giá độc lập về các kênh IPC giữa hai ứng dụng và giao tiếp với bên ngoài: quy trình ủy quyền OAuth qua deep link, xử lý Universal Links và kết nối dịch vụ XPC nền.",
+        "constraints": [
+          "Tuân thủ tiêu chuẩn đánh giá an ninh di động OWASP MASTG-PLATFORM (iOS IPC & Deep Linking).",
+          "Mọi phân tích cấu trúc nhị phân và entitlements phải dựa trên công cụ jtool2/ldid/codesign và môi trường giả lập iOS/Corellium cô lập.",
+          "Phải chứng minh được chuỗi khai thác (Exploit Chain) từ điểm yếu tham số deep link tới hành vi gian lận tài chính."
+        ],
+        "cases": [
+          {
+            "id": "case-95-01",
+            "title": "Khai Thác Chiếm Quyền Custom URL Scheme Để Đánh Cắp OAuth 2.0 Authorization Code",
+            "context": "Ứng dụng GlobalPay sử dụng Custom URL Scheme `globalpay://oauth-callback` để nhận kết quả xác thực từ cổng thanh toán đối tác qua ASWebAuthenticationSession. Tuy nhiên, luồng OAuth 2.0 này không áp dụng PKCE (Proof Key for Code Exchange) và GlobalPay không cấu hình Universal Links. Bạn cài đặt một ứng dụng thử nghiệm (RogueApp) khai báo cùng scheme `globalpay` trong Info.plist.",
+            "prompt": "Phương thức tấn công nào mô tả chính xác nhất cách RogueApp có thể đánh cắp tài khoản của người dùng GlobalPay?",
+            "options": [
+              {
+                "id": "A",
+                "label": "RogueApp thực hiện brute-force khóa mã hóa của tệp Keychain để lấy private key của GlobalPay.",
+                "correct": false,
+                "rationale": "Keychain được bảo vệ bởi hardware Secure Enclave và sandbox; việc đăng ký chung scheme không liên quan đến việc brute-force Keychain."
+              },
+              {
+                "id": "B",
+                "label": "Do iOS không thực thi tính độc quyền của Custom URL Scheme, RogueApp có thể chiếm quyền xử lý scheme `globalpay://`. Khi người dùng đăng nhập thành công trên trình duyệt, hệ điều hành định tuyến URL callback chứa `code=AUTH_CODE` tới RogueApp; do thiếu PKCE, RogueApp gửi authorization code này lên máy chủ để đổi lấy OAuth Access Token mà không cần code_verifier.",
+                "correct": true,
+                "rationale": "URL Scheme Hijacking kết hợp với việc thiếu PKCE cho phép bất kỳ ứng dụng nào đăng ký cùng scheme đánh chặn mã xác thực và hoàn tất quá trình đổi token."
+              },
+              {
+                "id": "C",
+                "label": "RogueApp gửi tín hiệu Unix SIGKILL tới tiến trình SpringBoard để buộc iOS khởi động lại ở chế độ DFU.",
+                "correct": false,
+                "rationale": "Ứng dụng sandbox của bên thứ ba không có quyền gửi signal tới các tiến trình hệ thống như SpringBoard."
+              },
+              {
+                "id": "D",
+                "label": "RogueApp ghi đè tệp /etc/hosts trên iOS để điều hướng tên miền OAuth về máy chủ nội bộ.",
+                "correct": false,
+                "rationale": "Hệ thống tệp gốc của iOS là read-only và được bảo vệ bởi SIP/SSV; ứng dụng không thể sửa đổi tệp /etc/hosts."
+              }
+            ]
+          },
+          {
+            "id": "case-95-02",
+            "title": "Khai Thác Lỗ Hổng Client-Side CSRF Qua Universal Link Chuyển Tiền Tự Động",
+            "context": "GlobalPay triển khai Universal Link với cấu hình AASA hợp lệ tại `https://pay.globalfin.com`. Tuy nhiên, trong phương thức xử lý deep link `application(_:continue:restorationHandler:)`, khi nhận đường dẫn `/quicktransfer?recipient=NAME&amount=NUM`, ứng dụng lập tức khởi tạo API gọi lên máy chủ chuyển tiền mà không yêu cầu người dùng xác nhận lại bằng TouchID/FaceID hoặc mã PIN.",
+            "prompt": "Đánh giá rủi ro an ninh và kịch bản khai thác tối ưu nhất từ góc độ kẻ tấn công là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công không thể khai thác vì Universal Links được mã hóa hoàn toàn bởi chứng chỉ SSL của Apple CDN.",
+                "correct": false,
+                "rationale": "Chứng chỉ SSL chỉ bảo vệ kênh truyền tải giữa Apple CDN và thiết bị; nội dung URL sau khi phân giải vẫn được chuyển nguyên vẹn vào logic ứng dụng."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công chỉ cần gửi một tin nhắn SMS/iMessage hoặc email chứa liên kết `https://pay.globalfin.com/quicktransfer?recipient=Attacker&amount=5000`. Khi nạn nhân nhấn vào liên kết, Universal Link kích hoạt GlobalPay và ứng dụng tự động thực hiện lệnh chuyển 5000 USD sang tài khoản kẻ tấn công dưới phiên đăng nhập hiện tại mà nạn nhân không kịp ngăn chặn (Client-Side CSRF).",
+                "correct": true,
+                "rationale": "Lỗ hổng xử lý hành vi nhạy cảm tự động thông qua tham số deep link mà thiếu bước tái xác thực sinh trắc học hoặc hộp thoại xác nhận dẫn đến Client-Side CSRF nghiêm trọng."
+              },
+              {
+                "id": "C",
+                "label": "Ứng dụng sẽ tự động từ chối liên kết nếu thiết bị đang kết nối qua mạng Wi-Fi công cộng.",
+                "correct": false,
+                "rationale": "Universal Links xử lý độc lập với loại kết nối mạng (Wi-Fi hay Cellular), không có cơ chế tự động từ chối theo mạng."
+              },
+              {
+                "id": "D",
+                "label": "Kẻ tấn công có thể chèn shellcode ARM64 vào chuỗi tham số recipient để khai thác tràn bộ đệm nhân XNU.",
+                "correct": false,
+                "rationale": "Chuỗi query được phân tích cú pháp bằng lớp Foundation cấp cao (URLComponents); nó không gây tràn bộ đệm nhân kernel."
+              }
+            ]
+          },
+          {
+            "id": "case-95-03",
+            "title": "Kiểm Toán Dịch Vụ XPC Helper Tool và Lỗ Hổng PID Reuse Race Condition",
+            "context": "Dịch vụ nền GlobalPayHelperTool lắng nghe kết nối XPC từ ứng dụng chính. Trong hàm `shouldAcceptNewConnection`, server thực hiện kiểm tra bảo mật bằng cách lấy `pid_t clientPid = newConnection.processIdentifier;` và gọi `proc_pidpath(clientPid, ...)` để kiểm tra xem đường dẫn tệp thực thi có thuộc về GlobalPay hay không trước khi chấp thuận cuộc gọi gọi các API đặc quyền.",
+            "prompt": "Lỗ hổng kỹ thuật trong cơ chế kiểm tra này là gì và giải pháp khắc phục chuẩn mực của Apple là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cơ chế này hoàn toàn an toàn vì hệ điều hành Unix không bao giờ cấp phát lại cùng một số PID cho tới khi khởi động lại máy.",
+                "correct": false,
+                "rationale": "PID trong Unix/Darwin được tái sử dụng liên tục khi tiến trình kết thúc; kẻ tấn công có thể ép tái sử dụng PID rất nhanh."
+              },
+              {
+                "id": "B",
+                "label": "Hàm proc_pidpath sẽ gây crash hệ thống nếu đường dẫn chứa dấu gạch chéo ngược.",
+                "correct": false,
+                "rationale": "proc_pidpath là API nhân chuẩn, xử lý chuỗi đường dẫn POSIX an toàn và không gây crash hệ thống."
+              },
+              {
+                "id": "C",
+                "label": "Server kiểm tra PID nên đối mặt với lỗ hổng PID Reuse Race Condition: kẻ tấn công có thể làm cho client hợp lệ thoát và lập tức spawn tiến trình độc hại chiếm đúng PID đó. Giải pháp khắc phục là sử dụng `newConnection.auditToken` và thẩm định entitlements bằng `SecTaskCreateWithAuditToken` để xác minh chữ ký số bất biến do kernel bảo đảm.",
+                "correct": true,
+                "rationale": "Kiểm tra quyền trên XPC bắt buộc phải sử dụng Mach audit token; audit token chứa generation count và không thể bị giả mạo qua kỹ thuật tái sử dụng PID."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần chuyển đổi dịch vụ XPC sang sử dụng cổng TCP socket cục bộ 127.0.0.1 là giải quyết được vấn đề phân quyền.",
+                "correct": false,
+                "rationale": "TCP socket cục bộ không có cơ chế định danh tiến trình tin cậy của kernel, khiến việc phân quyền còn lỏng lẻo hơn XPC."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Chỉ ra được lỗ hổng URL Scheme Hijacking khi ứng dụng sử dụng Custom Schemes cho luồng xác thực OAuth 2.0 mà thiếu PKCE.",
+          "Phân tích đúng tác động của Client-Side CSRF thông qua Universal Links và đề xuất cơ chế bắt buộc xác thực sinh trắc học cho giao dịch nhạy cảm.",
+          "Nhận diện chính xác rủi ro PID Reuse trong XPC Services và xây dựng mã thẩm định quyền hạn chuẩn mực dựa trên Mach audit_token_t."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo phân tích cấu trúc Info.plist chỉ ra các CFBundleURLSchemes bị trùng lặp và thiếu bảo vệ",
+          "Mã khai thác PoC của ứng dụng RogueApp chặn bắt thành công OAuth Authorization Code trên môi trường lab iOS",
+          "Tệp AASA mẫu chuẩn hóa kèm mã nguồn Swift xử lý Universal Link an toàn có bước kiểm tra sinh trắc học",
+          "Đoạn mã Objective-C/Swift triển khai kiểm tra `SecTaskCopyValueForEntitlement` sử dụng `audit_token_t` cho XPC Service"
+        ],
+        "reset": "Đặt lại cấu hình URL schemes trên simulator và xóa sạch chứng chỉ AASA đã cache trên môi trường kiểm thử.",
+        "cleanup": "Gỡ cài đặt RogueApp thử nghiệm, xóa các tệp dữ liệu tạo ra trong thư mục App Groups và đóng các kết nối XPC giả lập."
+      },
+      "governance": {
+        "prevent": [
+          "Thay thế hoàn toàn Custom URL Schemes bằng Universal Links cho tất cả các luồng xác thực, chia sẻ dữ liệu và tích hợp đối tác nhạy cảm.",
+          "Luôn triển khai chuẩn OAuth 2.0 PKCE (Proof Key for Code Exchange với `code_challenge` mã hóa S256) cho tất cả các ứng dụng di động để vô hiệu hóa nguy cơ đánh cắp authorization code.",
+          "Bắt buộc triển khai bước xác nhận tường minh từ người dùng (User Confirmation Dialog hoặc Biometric Re-authentication qua LocalAuthentication framework) trước khi thực thi bất kỳ hành động tài chính hoặc thay đổi cấu hình nào nhận từ Deep Link."
+        ],
+        "observe": [
+          "Theo dõi lưu lượng tải tệp AASA từ Apple CDN trên máy chủ web để phát hiện các bất thường về chứng chỉ hoặc lỗi phân giải tên miền.",
+          "Giám sát các crash log liên quan đến xử lý URL schemes thông qua hệ thống phân tích sự cố để nhận diện sớm các nỗ lực chèn chuỗi dị dạng.",
+          "Kiểm tra định kỳ các entitlements được khai báo trong build provisioning profile để đảm bảo nguyên tắc đặc quyền tối thiểu (Least Privilege)."
+        ],
+        "respond": [
+          "Khi phát hiện Custom URL Scheme bị mạo danh hoặc tấn công hijacking trên App Store, cập nhật ngay quy trình OAuth sang Universal Links và thông báo cho Identity Provider vô hiệu hóa redirect_uri cũ.",
+          "Thu hồi ngay lập tức các OAuth Refresh Tokens và Access Tokens được cấp phát qua các phiên đăng nhập bị nghi ngờ.",
+          "Phát hành bản cập nhật nóng (hotfix) qua App Store yêu cầu xác thực FaceID/TouchID cho toàn bộ các handler tiếp nhận deep link."
+        ],
+        "residualRisk": [
+          "Người dùng trên các phiên bản iOS cũ (hoặc khi kết nối mạng chập chờn khiến hệ thống không tải được AASA) có thể bị hệ điều hành tự động fallback về Custom URL Schemes không an toàn.",
+          "Nếu tên miền lưu trữ tệp AASA bị chiếm quyền quản trị (Subdomain Takeover hoặc DNS Hijacking), kẻ tấn công có thể sửa đổi AASA để liên kết Universal Link của doanh nghiệp với ứng dụng độc hại."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Đăng ký Custom URL Scheme với tên định danh độc nhất (ví dụ: mycompany-secret-bank://) là đủ an toàn vì không ai có thể đoán được scheme đó.",
+          "correction": "Bảo mật bằng sự che giấu không có giá trị trong an ninh di động; bất kỳ ai tải tệp IPA về đều có thể giải nén và đọc rõ toàn bộ các scheme đã khai báo trong Info.plist trong vài giây."
+        },
+        {
+          "claim": "Universal Links đảm bảo an toàn tuyệt đối và ngăn chặn mọi hành vi gian lận qua liên kết.",
+          "correction": "Universal Links chỉ đảm bảo ứng dụng nào được quyền mở liên kết; nếu logic bên trong ứng dụng thực thi chuyển tiền hoặc thay đổi mật khẩu tự động dựa trên tham số query mà không hỏi lại người dùng, ứng dụng vẫn bị tấn công Client-Side CSRF."
+        },
+        {
+          "claim": "Trong lập trình XPC trên iOS/macOS, kiểm tra thuộc tính connection.processIdentifier là cách thuận tiện và an toàn nhất để xác định nguồn gốc của caller.",
+          "correction": "Kiểm tra PID là một lỗ hổng nghiêm trọng vì PID có thể bị tái sử dụng (PID reuse race condition); phương thức duy nhất an toàn được Apple khuyến nghị là thẩm định Mach audit_token_t."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os10-l95-q1",
+          "difficulty": "easy",
+          "question": "Cơ chế nào trên hệ điều hành iOS giúp liên kết tên miền web HTTPS với ứng dụng di động thông qua tệp cấu hình apple-app-site-association (AASA) để ngăn chặn lỗ hổng URL Scheme Hijacking?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Universal Links"
+            },
+            {
+              "id": "B",
+              "label": "Mach Port Messages"
+            },
+            {
+              "id": "C",
+              "label": "AirDrop Framework"
+            },
+            {
+              "id": "D",
+              "label": "Custom URL Schemes"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Universal Links thiết lập mối liên kết hai chiều giữa domain HTTPS và App ID qua tệp AASA, loại bỏ hoàn toàn việc tranh chấp scheme của Custom URL Schemes."
+        },
+        {
+          "id": "os10-l95-q2",
+          "difficulty": "medium",
+          "question": "Tại sao giao thức OAuth 2.0 PKCE (Proof Key for Code Exchange) lại đặc biệt quan trọng đối với các ứng dụng di động sử dụng Custom URL Schemes để nhận callback?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì PKCE tự động nén dung lượng gói tin mạng để tăng tốc độ tải trang."
+            },
+            {
+              "id": "B",
+              "label": "Vì PKCE liên kết mã authorization code với một giá trị bí mật code_verifier chỉ ứng dụng hợp lệ khởi tạo mới biết; ngay cả khi ứng dụng độc hại đánh chặn được callback URL qua Scheme Hijacking, nó cũng không thể đổi code lấy token nếu thiếu code_verifier."
+            },
+            {
+              "id": "C",
+              "label": "Vì PKCE ngăn chặn hoàn toàn việc người dùng chụp ảnh màn hình ứng dụng."
+            },
+            {
+              "id": "D",
+              "label": "Vì PKCE bắt buộc thiết bị di động phải kết nối qua mạng VPN của doanh nghiệp."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "PKCE bảo vệ luồng xác thực trên public client: dù kẻ tấn công chặn được authorization code qua URL Scheme Hijacking, việc không sở hữu mã code_verifier ban đầu khiến chúng không thể hoàn tất bước lấy token từ Identity Provider."
+        },
+        {
+          "id": "os10-l95-q3",
+          "difficulty": "hard",
+          "question": "Khi xây dựng một dịch vụ XPC Listener trên iOS/macOS, tại sao việc kiểm tra quyền hạn của client bằng `connection.processIdentifier` (PID) lại bị coi là một lỗ hổng bảo mật nghiêm trọng?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì PID trên hệ điều hành 64-bit có thể bị tràn số nguyên âm."
+            },
+            {
+              "id": "B",
+              "label": "Vì hàm lấy PID sẽ làm rò rỉ địa chỉ con trỏ của kernel ASLR."
+            },
+            {
+              "id": "C",
+              "label": "Do nhân Darwin có thể tái sử dụng PID rất nhanh sau khi tiến trình client hợp lệ thoát; kẻ tấn công có thể tạo điều kiện race condition để tiến trình độc hại nhận cùng PID và đánh lừa server. Thay vào đó, server phải sử dụng Mach audit_token_t để thẩm định entitlements."
+            },
+            {
+              "id": "D",
+              "label": "Vì nhân XNU không lưu trữ thông tin PID trong cấu trúc task_struct."
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Lỗ hổng PID reuse race condition xuất phát từ việc PID không phải là định danh bất biến theo thời gian; Mach audit token chứa số chu kỳ thế hệ (generation count) và do kernel quản lý, đảm bảo xác thực danh tính client chính xác tuyệt đối."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một ứng dụng ngân hàng thương mại điện tử trên iOS (iBank Mobile) đang chuẩn bị phát hành phiên bản mới hỗ trợ thanh toán qua các đối tác thứ ba bằng Universal Links và liên kết với Widget tiện ích qua App Groups. Bạn được mời kiểm toán mã nguồn và thiết kế quy trình xác thực an toàn.",
+        "tasks": [
+          "Đánh giá cấu hình tệp apple-app-site-association và mã nguồn Swift trong phương thức continueUserActivity để phát hiện các lỗ hổng Client-Side CSRF và Parameter Injection.",
+          "Kiểm tra cấu hình App Groups và Keychain Sharing trong tệp entitlements, phân tích nguy cơ rò rỉ dữ liệu phiên giữa ứng dụng chính và widget mở rộng.",
+          "Thiết kế kiến trúc xác thực hai lớp (Biometric Authentication Challenge + PKCE S256) cho tất cả các luồng tiếp nhận deep link và xây dựng mô hình kiểm tra XPC Audit Token an toàn."
+        ],
+        "requiredEvidence": [
+          "Báo cáo thẩm định cú pháp và bảo mật của tệp apple-app-site-association trên domain production",
+          "Đoạn mã kiểm thử mô phỏng kịch bản tấn công CSRF qua Universal Link kích hoạt giao dịch trái phép trên môi trường test",
+          "Đoạn mã nguồn Swift hoàn chỉnh triển khai kiểm tra sinh trắc học FaceID/TouchID bắt buộc trước khi chuyển tiền và mã xác thực audit_token_t"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Apple Developer Documentation — Supporting Universal Links in Your App",
+          "url": "https://developer.apple.com/documentation/xcode/supporting-universal-links",
+          "publisher": "Apple Inc.",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu trúc và định dạng chuẩn của tệp cấu hình apple-app-site-association (AASA)",
+            "Quy trình xử lý liên kết an toàn qua User Activity và loại bỏ xung đột Custom URL Schemes"
+          ]
+        },
+        {
+          "title": "OWASP Mobile Application Security Testing Guide (MASTG) — iOS Inter-Process Communication",
+          "url": "https://mas.owasp.org/MASTG/tests/ios/MASVS-PLATFORM/MASTG-TEST-0071/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Phương pháp kiểm thử và khai thác Custom URL Schemes và Universal Links trên iOS",
+            "Kiểm toán an ninh XPC Services, App Groups và chia sẻ Keychain giữa các tiến trình"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os10-l96-mobile-webview-attacks-and-runtime-hooking",
+      "slug": "mobile-webview-attacks-and-runtime-hooking",
+      "title": "Khai Thác Lỗ Hổng WebView Nhúng & Can Thiệp Thời Gian Thực Qua Frida Runtime Hooking",
+      "summary": "Chuyên sâu về an ninh các thành phần hiển thị web nhúng (Android WebView, iOS WKWebView) và kỹ thuật can thiệp bộ nhớ runtime: khai thác lỗ hổng JavaScript Interface Bridge (addJavascriptInterface, evaluateJavaScript), File Scheme Traversal và SOP Bypass (setAllowFileAccessFromFileURLs), phân tích luồng thực thi động qua Frida/DBI, bẻ khóa cơ chế ghim chứng chỉ số SSL/TLS Pinning (TrustManager, NetworkSecurityConfig, SecTrustEvaluateWithError), và vượt qua các tầng phòng thủ Root/Jailbreak Detection.",
+      "difficulty": "advanced",
+      "durationMinutes": 140,
+      "prerequisites": [
+        "os10-l94-android-ipc-intents-broadcasts-and-content-providers",
+        "os10-l95-ios-ipc-url-schemes-and-universal-links"
+      ],
+      "outcomes": [
+        "Phân tích cơ chế hoạt động của cầu nối JavaScript-Native (addJavascriptInterface, WKScriptMessageHandler) và khai thác các điểm yếu cho phép thực thi mã hoặc gọi phương thức native trái phép.",
+        "Khai thác các cấu hình sai lầm trong xử lý giao thức file:// trên WebView (setAllowFileAccessFromFileURLs, setAllowUniversalAccessFromFileURLs) để phá vỡ chính sách Same-Origin Policy và đánh cắp dữ liệu nhạy cảm cục bộ.",
+        "Sử dụng framework Dynamic Binary Instrumentation (Frida) để can thiệp bộ nhớ tiến trình, hook các phương thức Java/ObjC/C++ và phân tích luồng thực thi thời gian thực của ứng dụng di động.",
+        "Vượt qua các cơ chế kiểm soát an ninh tại client: bẻ khóa ghim chứng chỉ số SSL Pinning (OkHttp CertificatePinner, Custom TrustManager, SecTrustEvaluate) và vô hiệu hóa các hàm kiểm tra Root/Jailbreak Detection."
+      ],
+      "careerPaths": ["penetration-test", "bug-bounty", "vulnerability-research"],
+      "domains": ["mobile", "webview", "runtime"],
+      "attackTactics": [
+        "initial-access",
+        "privilege-escalation",
+        "defense-evasion",
+        "credential-access"
+      ],
+      "keywords": [
+        "webview-security",
+        "javascript-interface",
+        "wkwebview",
+        "file-scheme-sop-bypass",
+        "frida-hooking",
+        "dynamic-binary-instrumentation",
+        "ssl-pinning-bypass",
+        "root-jailbreak-bypass"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "WebView đóng vai trò một trình duyệt thu nhỏ nằm ngay trong tiến trình ứng dụng native. Khi một ứng dụng nạp nội dung web không đáng tin cậy hoặc thiết lập cầu nối native-to-JS thiếu kiểm soát, ranh giới giữa sandbox web và quyền hạn hệ điều hành của ứng dụng bị xóa bỏ, biến lỗi XSS thông thường thành tấn công chiếm đoạt thiết bị. Đồng thời, mọi cơ chế phòng thủ thực thi cục bộ tại client (như SSL Pinning hay phát hiện Root/Jailbreak) chỉ là các rào cản làm chậm; thông qua Dynamic Binary Instrumentation (Frida), kiểm toán viên và kẻ tấn công có thể ghi đè bộ nhớ, sửa đổi logic rẽ nhánh và chuyển hướng luồng điều khiển tùy ý trong không gian bộ nhớ của tiến trình.",
+      "visual": {
+        "title": "Kiến Trúc Tấn Công WebView Nhúng và Can Thiệp Runtime Bằng Frida DBI",
+        "caption": "Mô hình tương tác giữa JavaScript bridge, bộ đệm bộ nhớ tiến trình và kỹ thuật hook động qua Frida.",
+        "steps": [
+          {
+            "label": "Nạp Nội Dung Web Vào WebView Native",
+            "detail": "Ứng dụng khởi tạo WebView với JavaScriptEnabled=true và nạp trang web từ Internet hoặc bộ nhớ cache cục bộ qua loadUrl().",
+            "tone": "neutral"
+          },
+          {
+            "label": "Phát Hiện Lỗ Hổng Cầu Nối JS Interface & SOP Bypass",
+            "detail": "Cấu hình setAllowUniversalAccessFromFileURLs=true hoặc phơi bày JS interface không giới hạn domain, cho phép script độc hại đọc trộm SQLite và token qua file://.",
+            "tone": "stop"
+          },
+          {
+            "label": "Đính Kèm Frida Server Vào Tiến Trình Runtime",
+            "detail": "Frida inject engine V8 vào tiến trình qua ptrace/Mach task port, thiết lập Interceptor trên các API mạng và chứng thực.",
+            "tone": "allow"
+          },
+          {
+            "label": "Vô Hiệu Hóa SSL Pinning và Root Detection",
+            "detail": "Script Frida ghi đè hàm checkServerTrusted và bypass hàm kiểm tra su binary, cho phép Burp Suite giải mã toàn bộ lưu lượng TLS.",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc WebView Nhúng và Rủi Ro An Ninh Của Cầu Nối JavaScript-Native",
+          "paragraphs": [
+            "Để kết hợp tính linh hoạt của công nghệ web với các tính năng phần cứng của thiết bị di động, hầu hết các ứng dụng lai (Hybrid Apps) đều sử dụng thành phần hiển thị web nhúng: `android.webkit.WebView` trên Android và `WKWebView` trên iOS. Bản chất của WebView là một phiên bản rút gọn của trình duyệt (dựa trên Chromium trên Android và WebKit trên iOS) chạy trực tiếp bên trong không gian địa chỉ và quyền hạn của tiến trình ứng dụng native. Bất kỳ mã JavaScript nào thực thi trong WebView đều chia sẻ ngữ cảnh bộ nhớ và quyền tài nguyên của chính ứng dụng đó.",
+            "Để cho phép trang web gọi các hàm native của thiết bị (như mở camera, lấy vị trí GPS, hoặc đọc danh bạ), Android cung cấp phương thức `addJavascriptInterface(Object object, String name)`. Trong các phiên bản Android cũ (dưới Android 4.2 / API 17), lỗ hổng chấn động CVE-2012-6636 cho phép mã JavaScript trong WebView sử dụng Java Reflection (`getClass().forName(\"java.lang.Runtime\").getMethod(\"getRuntime\",null)...`) để thực thi mã tùy ý (RCE) trên hệ thống với quyền hạn của ứng dụng. Mặc dù từ Android 4.2 trở đi Google yêu cầu phải có annotation `@JavascriptInterface` trên các phương thức public được phép gọi, nguy cơ logic vẫn vô cùng nghiêm trọng nếu nhà phát triển phơi bày các phương thức nhạy cảm (như `sendPayment()`, `getAuthToken()`, `saveCredentials()`).",
+            "Trên iOS, `WKWebView` thay thế `UIWebView` lỗi thời và cung cấp cơ chế giao tiếp an toàn hơn qua `WKScriptMessageHandler` (đối tượng `window.webkit.messageHandlers.<name>.postMessage(...)`). Tuy nhiên, trên cả hai nền tảng, nếu ứng dụng cho phép WebView nạp các URL không đáng tin cậy từ Internet (thiếu danh sách trắng domain hoặc bị lỗi Open Redirect / XSS), kẻ tấn công trên trang web có thể gọi trực tiếp các hàm bridge native được phơi bày để chiếm đoạt tài khoản hoặc kích hoạt các hành vi phá hoại trên thiết bị."
+          ]
+        },
+        {
+          "title": "Khai Thác Giao Thức File Scheme và Phá Vỡ Same-Origin Policy Trong WebView",
+          "paragraphs": [
+            "Mặc định, các trình duyệt hiện đại áp dụng chính sách Same-Origin Policy (SOP) nghiêm ngặt để ngăn chặn một trang web từ nguồn gốc này truy cập tài nguyên của nguồn gốc khác. Tuy nhiên, khi các ứng dụng di động nạp các tệp tin HTML/JS cục bộ từ bộ nhớ thông qua giao thức `file://` (ví dụ: `file:///android_asset/index.html` hoặc `file:///data/data/<package>/cache/temp.html`), các thiết lập cấu hình của WebView có thể làm sụp đổ hoàn toàn rào cản SOP.",
+            "Trên Android WebView, lớp `WebSettings` cung cấp các phương thức cấu hình quyền truy cập tệp nguy hiểm: `setAllowFileAccess(true)`, `setAllowContentAccess(true)`, `setAllowFileAccessFromFileURLs(true)`, và đặc biệt là `setAllowUniversalAccessFromFileURLs(true)`. Nếu `setAllowUniversalAccessFromFileURLs` được đặt là `true`, mã JavaScript chạy từ một tệp HTML cục bộ có thể gửi yêu cầu `XMLHttpRequest` hoặc `fetch()` tới BẤT KỲ nguồn gốc nào, bao gồm cả các trang web trên Internet và các tệp tin cục bộ khác trong hệ thống tệp.",
+            "Kịch bản tấn công kinh điển diễn ra như sau: Kẻ tấn công lợi dụng một lỗ hổng trong ứng dụng (như tải tệp đính kèm không an toàn hoặc ghi dữ liệu cache) để thả một tệp tin HTML độc hại vào thư mục lưu trữ cục bộ của ứng dụng. Sau đó, thông qua một Intent hoặc deep link, kẻ tấn công kích hoạt WebView mở tệp đó qua URL `file:///data/data/<pkg>/cache/exploit.html`. Vì cờ universal access được bật, mã độc JavaScript trong file HTML lập tức đọc toàn bộ nội dung của tệp cấu hình `shared_prefs/user_session.xml` và cơ sở dữ liệu `databases/banking.db`, sau đó gửi dữ liệu này ra máy chủ của kẻ tấn công thông qua một HTTP POST request."
+          ]
+        },
+        {
+          "title": "Nguyên Lý Dynamic Binary Instrumentation và Kỹ Thuật Runtime Hooking Với Frida",
+          "paragraphs": [
+            "Dynamic Binary Instrumentation (DBI) là kỹ thuật phân tích và can thiệp vào hành vi của một chương trình nhị phân đang thực thi mà không cần biên dịch lại mã nguồn hay chỉnh sửa tệp tin trên đĩa. Frida là framework DBI tiêu chuẩn công nghiệp mạnh mẽ nhất hiện nay trong lĩnh vực kiểm toán an ninh ứng dụng di động. Frida hoạt động dựa trên mô hình Client-Server: `frida-server` chạy dưới quyền root trên thiết bị Android hoặc jailbroken iOS (hoặc `frida-gadget` được tiêm trực tiếp vào gói APK/IPA đã repackage thông qua chèn thư viện native `.so` / `.dylib`).",
+            "Khi kiểm toán viên kết nối tới tiến trình mục tiêu thông qua Frida client trên máy tính, frida-core sẽ sử dụng lệnh gọi hệ thống `ptrace` (trên Linux/Android) hoặc Mach task ports `task_for_pid` (trên Darwin/iOS) để đính kèm vào tiến trình và tiêm (inject) máy ảo JavaScript Google V8 (hoặc QuickJS) vào không gian bộ nhớ của ứng dụng. Từ thời điểm này, kiểm toán viên có thể viết các đoạn mã JavaScript để tương tác trực tiếp với bộ nhớ, các lớp đối tượng và các luồng thực thi của tiến trình.",
+            "Trọng tâm sức mạnh của Frida nằm ở `Interceptor API` và các bridge tương ứng (`Java` bridge trên Android và `ObjC` bridge trên iOS). Thông qua `Interceptor.attach(targetAddress, { onEnter, onLeave })`, Frida có thể hook vào các hàm native C/C++ (định vị qua `Module.findExportByName`), đọc và sửa đổi tham số đầu vào trong thanh ghi CPU (như R0-R7 trên ARM32, X0-X7 trên ARM64), hoặc thay đổi giá trị trả về trước khi hàm trả điều khiển về caller. Với các ứng dụng Java/Kotlin, `Java.perform()` cho phép `Java.use()` tham chiếu tới bất kỳ lớp Java nào, ghi đè implementation của phương thức (`targetClass.targetMethod.implementation = function(...)`), bẻ cong hoàn toàn logic rẽ nhánh của ứng dụng tại thời điểm thực thi."
+          ]
+        },
+        {
+          "title": "Bẻ Khóa Ghim Chứng Chỉ SSL Pinning và Vượt Qua Cơ Chế Root/Jailbreak Detection",
+          "paragraphs": [
+            "Ghim chứng chỉ số SSL/TLS (SSL/TLS Certificate Pinning) là cơ chế bảo vệ trong đó ứng dụng di động không chỉ tin tưởng vào các Certificate Authorities (CA) mặc định của hệ thống mà còn so khớp cứng mã băm khóa công khai (SubjectPublicKeyInfo - SPKI) hoặc chứng chỉ số của máy chủ đích. Kỹ thuật này giúp ngăn chặn các cuộc tấn công Man-in-the-Middle (MitM) ngay cả khi kẻ tấn công đã cài đặt chứng chỉ root giả mạo (như PortSwigger CA của Burp Suite) vào kho chứng chỉ của thiết bị. Trên Android, ghim chứng chỉ có thể được cấu hình qua `network_security_config.xml`, thư viện `OkHttp` (`CertificatePinner`), hoặc các lớp tùy biến `X509TrustManager`. Trên iOS, nó được triển khai qua `NSURLSessionDelegate` (`SecTrustEvaluateWithError`) hoặc thư viện `TrustKit`.",
+            "Tuy nhiên, do các kiểm tra SSL Pinning diễn ra tại tầng mã nguồn client, chúng hoàn toàn có thể bị vô hiệu hóa thông qua Frida Runtime Hooking. Trên Android, một Frida script có thể hook vào phương thức `X509TrustManager.checkServerTrusted()` và ghi đè nội dung hàm bằng một hàm rỗng (`{ return; }`), khiến ứng dụng luôn coi bất kỳ chứng chỉ nào cũng là hợp lệ mà không ném ra ngoại lệ `CertificateException`. Đối với thư viện OkHttp, kiểm toán viên hook phương thức `CertificatePinner.check(String hostname, List peerCertificates)` để bỏ qua bước so khớp chuỗi băm pin, cho phép Burp Suite giải mã toàn bộ lưu lượng HTTPS trong vài giây.",
+            "Để tự bảo vệ trước các công cụ phân tích động, nhiều ứng dụng triển khai cơ chế phát hiện Root (Android) hoặc Jailbreak (iOS), cùng với các kiểm tra chống Frida (Anti-Frida checks). Các cơ chế này kiểm tra sự tồn tại của tệp nhị phân `su`, `busybox`, `Cydia.app`, kiểm tra thuộc tính `/system` có được mount read-write hay không, kiểm tra cổng TCP 27042 của frida-server, hoặc quét tệp `/proc/self/status` để tìm giá trị `TracerPid != 0`. Bằng cách hook các lệnh gọi hệ thống cấp thấp như `open()`, `access()`, `stat()`, và `read()`, Frida script có thể đánh lừa các hàm kiểm tra này, trả về kết quả giả định thiết bị hoàn toàn nguyên bản (unrooted), giúp kiểm toán viên duy trì quyền kiểm soát toàn diện môi trường kiểm thử."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Lỗ Hổng WebView Nhúng, Phá Vỡ SOP và Vượt Qua Cơ Chế SSL Pinning Bằng Frida",
+        "objective": "Đánh giá an ninh thành phần WebView: khai thác lỗ hổng JavaScript Interface không an toàn, phá vỡ Same-Origin Policy bằng cấu hình file scheme nguy hiểm, và phát triển Frida script để bẻ khóa SSL Pinning và Root Detection.",
+        "scenario": "Một ứng dụng ngân hàng số thế hệ mới (NeoBank Mobile) sử dụng kiến trúc lai (Hybrid) nạp trang web dashboard nội bộ qua WebView và áp dụng cơ chế bảo vệ nghiêm ngặt chống can thiệp: cấu hình OkHttp CertificatePinner và kiểm tra thiết bị Root/Jailbreak khi khởi động. Bạn được giao nhiệm vụ thực hiện kiểm thử xâm nhập chuyên sâu vào tầng WebView và thiết lập môi trường phân tích API bằng Frida.",
+        "constraints": [
+          "Tuân thủ nghiêm ngặt tiêu chuẩn OWASP MASTG (Testing Network Communication & Dynamic Analysis).",
+          "Thực hiện can thiệp thời gian thực trên môi trường Android x86_64 / ARM giả lập có cài đặt frida-server cô lập.",
+          "Mọi Frida script phải được giải thích rõ ràng cơ chế can thiệp bộ nhớ và tên hàm mục tiêu bị hook."
+        ],
+        "cases": [
+          {
+            "id": "case-96-01",
+            "title": "Khai Thác Lỗ Hổng JavaScript Interface Thiếu Kiểm Tra Nguồn Gốc (Origin Validation)",
+            "context": "Ứng dụng NeoBank khởi tạo WebView với mã: `webView.getSettings().setJavaScriptEnabled(true); webView.addJavascriptInterface(new BankingBridge(), \"NeoBridge\"); webView.loadUrl(getIntent().getStringExtra(\"url\"));`. Lớp `BankingBridge` chứa phương thức `@JavascriptInterface public String getAuthToken() { return this.mSessionToken; }`. Tuy nhiên, ứng dụng không triển khai `WebViewClient.shouldOverrideUrlLoading` để giới hạn các domain được phép nạp.",
+            "prompt": "Kịch bản tấn công khả thi nhất để kẻ tấn công đánh cắp token phiên mSessionToken của người dùng là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công gửi cho nạn nhân một deep link chứa URL trỏ tới trang web độc hại của kẻ tấn công: `https://attacker.com/malicious.html`. Khi NeoBank mở URL này trong WebView, mã JavaScript trên trang web của kẻ tấn công gọi trực tiếp `window.NeoBridge.getAuthToken()` và gửi token phiên đánh cắp được về máy chủ thu thập.",
+                "correct": true,
+                "rationale": "Vì addJavascriptInterface phơi bày đối tượng NeoBridge cho toàn bộ các trang web nạp vào WebView mà không kiểm tra origin, trang web độc hại của kẻ tấn công có thể truy cập trực tiếp phương thức getAuthToken()."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công phải chiếm quyền root trên thiết bị của nạn nhân trước mới có thể gọi được đối tượng window.NeoBridge.",
+                "correct": false,
+                "rationale": "addJavascriptInterface đưa đối tượng vào môi trường DOM JavaScript của trang web; bất kỳ script nào chạy trong trang web đều gọi được mà không cần root."
+              },
+              {
+                "id": "C",
+                "label": "Phương thức getAuthToken() sẽ tự động mã hóa token bằng khóa phần cứng nếu URL không thuộc miền Google.",
+                "correct": false,
+                "rationale": "Mã nguồn trả về chuỗi String mSessionToken trực tiếp; không có cơ chế tự động mã hóa nào được kích hoạt."
+              },
+              {
+                "id": "D",
+                "label": "Trình duyệt sẽ từ chối thực thi JavaScript vì targetSdkVersion mặc định vô hiệu hóa addJavascriptInterface.",
+                "correct": false,
+                "rationale": "addJavascriptInterface vẫn là API hợp lệ và hoạt động bình thường trên mọi phiên bản Android nếu có annotation @JavascriptInterface."
+              }
+            ]
+          },
+          {
+            "id": "case-96-02",
+            "title": "Phá Vỡ Same-Origin Policy Bằng File Scheme Traversal Để Trích Xuất Cơ Sở Dữ Liệu Nội Bộ",
+            "context": "Trong cấu hình WebView của tính năng đọc báo cáo ngoại tuyến, nhà phát triển thiết lập: `webSettings.setAllowFileAccess(true); webSettings.setAllowUniversalAccessFromFileURLs(true);`. Ứng dụng tải các báo cáo HTML từ mạng về lưu vào thư mục `/sdcard/Download/report.html` và hiển thị bằng `webView.loadUrl(\"file:///sdcard/Download/report.html\");`.",
+            "prompt": "Cơ chế khai thác nào cho phép kẻ tấn công đọc được tệp SQLite nhạy cảm `/data/data/com.neobank.app/databases/neobank.db`?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Không thể khai thác được vì nhân Linux chặn hoàn toàn giao thức file:// trên các thiết bị chạy Android 10 trở lên.",
+                "correct": false,
+                "rationale": "Giao thức file:// vẫn hoạt động trong WebView nếu được cấu hình tường minh bằng các hàm setAllowFileAccess."
+              },
+              {
+                "id": "B",
+                "label": "Do cờ setAllowUniversalAccessFromFileURLs được bật, bất kỳ mã JavaScript nào thực thi trong ngữ cảnh file:// đều được miễn trừ chính sách SOP; kẻ tấn công có thể ghi đè tệp report.html trên thẻ nhớ công cộng với script sử dụng XMLHttpRequest để đọc `file:///data/data/com.neobank.app/databases/neobank.db` và gửi nội dung ra ngoài.",
+                "correct": true,
+                "rationale": "setAllowUniversalAccessFromFileURLs loại bỏ ranh giới Same-Origin Policy đối với các tệp file://, cho phép mã JS trong tệp HTML cục bộ truy xuất bất kỳ tệp tin nào trong sandbox nội bộ của ứng dụng."
+              },
+              {
+                "id": "C",
+                "label": "Kẻ tấn công phải thực hiện tấn công tràn bộ đệm stack trong thư viện libc.so để thay đổi con trỏ tệp.",
+                "correct": false,
+                "rationale": "Lỗ hổng này là cấu hình sai logic ở tầng WebSettings, không liên quan đến tràn bộ đệm mã máy."
+              },
+              {
+                "id": "D",
+                "label": "Cơ sở dữ liệu SQLite sẽ tự động kích hoạt tính năng tự hủy khi bị đọc bởi XMLHttpRequest.",
+                "correct": false,
+                "rationale": "SQLite là một thư viện nhị phân quản lý tệp tảng; nó không có tính năng tự hủy khi có tiến trình đọc tệp."
+              }
+            ]
+          },
+          {
+            "id": "case-96-03",
+            "title": "Phát Triển Frida Script Đa Nền Tảng Bẻ Khóa SSL Pinning và Đánh Lừa Anti-Root Detection",
+            "context": "Khi bạn cấu hình Burp Suite làm proxy cho ứng dụng NeoBank, ứng dụng báo lỗi mất kết nối mạng và thoát ngay lập tức do kích hoạt `OkHttp CertificatePinner` và hàm kiểm tra root `checkRootMethod()` (kiểm tra sự tồn tại của `/system/bin/su`).",
+            "prompt": "Đoạn mã Frida hook nào sau đây là giải pháp kỹ thuật chính xác và hiệu quả nhất để vô hiệu hóa đồng thời cả hai cơ chế phòng vệ này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Java.perform(function() { var pinner = Java.use('okhttp3.CertificatePinner'); pinner.check.overload('java.lang.String', 'java.util.List').implementation = function(a, b) { return; }; var File = Java.use('java.io.File'); File.exists.implementation = function() { var name = this.getAbsolutePath(); if (name.indexOf('su') !== -1) return false; return this.exists(); }; });",
+                "correct": true,
+                "rationale": "Đoạn script này ghi đè hàm check của CertificatePinner để trả về thành công mà không kiểm tra hash, đồng thời hook File.exists để báo sai khi ứng dụng quét tệp nhị phân su."
+              },
+              {
+                "id": "B",
+                "label": "Chạy lệnh adb unroot trên thiết bị và khởi động lại ứng dụng.",
+                "correct": false,
+                "rationale": "Lệnh adb unroot chỉ tắt quyền root của adb daemon, không giải quyết được vấn đề SSL Pinning của OkHttp."
+              },
+              {
+                "id": "C",
+                "label": "Gửi một gói tin TCP RST tới cổng 443 của máy chủ ngân hàng để ép buộc máy chủ chuyển sang giao thức HTTP thuần.",
+                "correct": false,
+                "rationale": "Gửi gói tin TCP RST sẽ làm đứt kết nối mạng hoàn toàn chứ không thể hạ cấp kết nối HTTPS sang HTTP."
+              },
+              {
+                "id": "D",
+                "label": "Xóa chứng chỉ số của Burp Suite khỏi kho lưu trữ chứng chỉ của hệ điều hành Android.",
+                "correct": false,
+                "rationale": "Xóa chứng chỉ Burp Suite sẽ khiến Burp Suite không thể giải mã lưu lượng, hoàn toàn trái ngược với mục tiêu kiểm thử."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân tích đúng cơ chế hoạt động của JavaScript Interface và khai thác thành công lỗi thiếu Origin Validation để đánh cắp token.",
+          "Chứng minh việc vượt qua Same-Origin Policy bằng cấu hình setAllowUniversalAccessFromFileURLs và trích xuất tệp nội bộ.",
+          "Xây dựng và thực thi thành công kịch bản Frida hook bẻ khóa OkHttp CertificatePinner và qua mặt cơ chế kiểm tra Root."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo PoC chứng minh gọi hàm Java Bridge từ trang web độc hại kèm chuỗi session token trích xuất",
+          "Mã nguồn tệp HTML khai thác SOP Bypass đọc tệp SQLite nội bộ qua giao thức file://",
+          "Mã nguồn Frida script (.js) hoàn chỉnh bẻ khóa SSL Pinning và Root Detection kèm log console của Frida",
+          "Ảnh chụp màn hình Burp Suite HTTP History bắt được các gói tin API ngân hàng sau khi bẻ khóa SSL Pinning thành công"
+        ],
+        "reset": "Đặt lại cấu hình WebView về mặc định an toàn và khởi động lại frida-server trên thiết bị giả lập.",
+        "cleanup": "Xóa các tệp PoC HTML trên thẻ nhớ thiết bị, tắt script Frida và gỡ bỏ chứng chỉ Burp Suite khỏi thiết bị kiểm thử."
+      },
+      "governance": {
+        "prevent": [
+          "Không bao giờ sử dụng `setAllowUniversalAccessFromFileURLs(true)` hoặc `setAllowFileAccessFromFileURLs(true)`; sử dụng `androidx.webkit.WebViewAssetLoader` để nạp tệp nội bộ an toàn dưới miền ảo HTTPS.",
+          "Bắt buộc kiểm tra nguồn gốc URL (`Uri.parse(url).getHost()`) trong `shouldOverrideUrlLoading` trước khi nạp trang, và chỉ phơi bày các phương thức bridge thực sự cần thiết theo nguyên tắc đặc quyền tối thiểu.",
+          "Tuyệt đối không lưu trữ bí mật mã hóa hoặc token dài hạn trong mã nguồn client; triển khai cơ chế kiểm tra tính toàn vẹn từ xa (Remote Attestation qua SafetyNet/Play Integrity API) để phát hiện môi trường can thiệp runtime."
+        ],
+        "observe": [
+          "Giám sát các lỗi điều hướng và từ chối tải trang trong WebView thông qua callback `onReceivedError` và `onReceivedHttpError`.",
+          "Thiết lập cơ chế phát hiện can thiệp bộ nhớ (Memory Tampering) hoặc sự hiện diện của luồng phân tích động (pTrace / Frida threads) trong mã native C++.",
+          "Theo dõi tỷ lệ lỗi TLS handshake bất thường trên API Gateway để nhận diện các chiến dịch kiểm thử bẻ khóa SSL Pinning hàng loạt."
+        ],
+        "respond": [
+          "Khi phát hiện lỗ hổng rò rỉ token qua WebView Bridge, lập tức thu hồi toàn bộ token phiên của người dùng bị ảnh hưởng từ máy chủ backend.",
+          "Phát hành bản cập nhật ứng dụng tắt cờ JavaScript hoặc giới hạn chặt chẽ danh sách domain được phép nạp thông qua hệ thống cấu hình từ xa.",
+          "Chặn địa chỉ IP và tài khoản người dùng có dấu hiệu can thiệp runtime hoặc gửi các payload bất thường lên API hệ thống."
+        ],
+        "residualRisk": [
+          "Mọi cơ chế phòng thủ thực thi tại client (chống root, chống hook, ghim chứng chỉ) đều có thể bị vô hiệu hóa bởi một kiểm toán viên hoặc kẻ tấn công có tay nghề cao với đủ thời gian và quyền truy cập vật lý/root vào thiết bị.",
+          "Các lỗ hổng zero-day trong chính nhân trình duyệt Chromium/WebKit nhúng có thể bị khai thác để thực thi mã từ xa trước khi Google/Apple kịp phát hành bản vá cập nhật cho WebView."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Từ Android 4.2 trở đi, chỉ cần thêm annotation @JavascriptInterface vào các phương thức Java là ứng dụng đã hoàn toàn an toàn trước các cuộc tấn công qua WebView.",
+          "correction": "Annotation @JavascriptInterface chỉ ngăn chặn việc sử dụng Java Reflection để thực thi mã tùy ý (RCE); nếu bản thân phương thức được chú thích thực hiện các hành động nhạy cảm (như gửi SMS, trả về auth token, hoặc ghi file) và WebView nạp phải một trang web độc hại, kẻ tấn công vẫn có thể lạm dụng phương thức đó dễ dàng."
+        },
+        {
+          "claim": "Ghim chứng chỉ số SSL Pinning là giải pháp bảo mật tuyệt đối, đảm bảo rằng không ai có thể xem hoặc can thiệp vào dữ liệu mạng của ứng dụng.",
+          "correction": "SSL Pinning chỉ bảo vệ lưu lượng mạng trước các cuộc tấn công MitM thông thường trên đường truyền; đối với thiết bị do kiểm toán viên hoặc kẻ tấn công kiểm soát, họ có thể sử dụng Frida hoặc xPosed để hook bộ nhớ và vô hiệu hóa hoàn toàn bước kiểm tra chứng chỉ tại client."
+        },
+        {
+          "claim": "Chỉ các ứng dụng nạp trang web từ giao thức HTTP không mã hóa mới đối mặt với nguy cơ bị tấn công qua WebView.",
+          "correction": "Các ứng dụng nạp trang web qua HTTPS vẫn có thể bị tấn công nếu trang web đích dính lỗi XSS hoặc Open Redirect, hoặc nếu ứng dụng nạp các tệp tin cục bộ qua giao thức file:// với cấu hình universal access không an toàn."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os10-l96-q1",
+          "difficulty": "easy",
+          "question": "Thuộc tính cấu hình nào trong lớp WebSettings của Android WebView nếu bị đặt là true sẽ phá vỡ hoàn toàn chính sách Same-Origin Policy (SOP), cho phép mã JavaScript từ một tệp HTML cục bộ đọc được tệp tin từ bất kỳ nguồn gốc nào?",
+          "options": [
+            {
+              "id": "A",
+              "label": "setAllowUniversalAccessFromFileURLs(true)"
+            },
+            {
+              "id": "B",
+              "label": "setSupportZoom(true)"
+            },
+            {
+              "id": "C",
+              "label": "setSaveFormData(true)"
+            },
+            {
+              "id": "D",
+              "label": "setCacheMode(LOAD_DEFAULT)"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "setAllowUniversalAccessFromFileURLs(true) cho phép mã JavaScript chạy trong ngữ cảnh giao thức file:// truy cập tài nguyên từ bất kỳ origin nào, xóa bỏ ranh giới Same-Origin Policy."
+        },
+        {
+          "id": "os10-l96-q2",
+          "difficulty": "medium",
+          "question": "Cơ chế hoạt động kỹ thuật cốt lõi của công cụ Frida khi can thiệp vào một tiến trình ứng dụng di động đang chạy là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Biên dịch lại toàn bộ gói tin APK sang ngôn ngữ Rust trước khi cài đặt lên máy."
+            },
+            {
+              "id": "B",
+              "label": "Sử dụng lệnh gọi hệ thống ptrace hoặc Mach task port để đính kèm vào tiến trình mục tiêu, tiêm (inject) máy ảo JavaScript V8 vào không gian bộ nhớ của ứng dụng và cho phép hook các hàm native hoặc Java/ObjC thông qua Interceptor API."
+            },
+            {
+              "id": "C",
+              "label": "Mô phỏng sóng vô tuyến di động 4G/5G để đánh lừa modem mạng của thiết bị."
+            },
+            {
+              "id": "D",
+              "label": "Quét virus ngoại tuyến trên tệp tin nhị phân của ứng dụng."
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Frida hoạt động bằng cách inject runtime V8 vào không gian bộ nhớ của tiến trình mục tiêu qua ptrace hoặc Mach ports, từ đó cung cấp API can thiệp động vào luồng thực thi và bộ nhớ của ứng dụng."
+        },
+        {
+          "id": "os10-l96-q3",
+          "difficulty": "hard",
+          "question": "Khi kiểm toán một ứng dụng Android sử dụng OkHttp có triển khai CertificatePinner và mã hóa native C++, tại sao việc chỉ cài đặt chứng chỉ CA của Burp Suite vào System Trust Store của thiết bị đã root vẫn KHÔNG THỂ bắt được gói tin HTTPS?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì Burp Suite không hỗ trợ giải mã các kết nối mạng sử dụng giao thức HTTP/2."
+            },
+            {
+              "id": "B",
+              "label": "Vì nhân Linux tự động ngắt kết nối mạng khi phát hiện thiết bị đang chạy dưới quyền root."
+            },
+            {
+              "id": "C",
+              "label": "Vì OkHttp CertificatePinner thực hiện so khớp trực tiếp mã băm khóa công khai (Public Key Pin) của máy chủ với danh sách băm được nhúng sẵn trong mã nguồn; việc tin tưởng CA ở cấp hệ điều hành không thể vượt qua bước so khớp chuỗi băm cứng này nếu không hook can thiệp logic kiểm tra của OkHttp."
+            },
+            {
+              "id": "D",
+              "label": "Vì thiết bị di động sẽ tự động chuyển sang sử dụng mạng vệ tinh Starlink khi phát hiện proxy."
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "SSL Pinning là một lớp bảo vệ độc lập với kho CA của hệ thống; CertificatePinner kiểm tra trực tiếp mã hash của chứng chỉ máy chủ trả về với danh sách hash mã hóa cứng trong ứng dụng, do đó bắt buộc phải can thiệp runtime qua Frida để bypass."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một ứng dụng ví điện tử tài chính (AlphaWallet) sử dụng WebView để hiển thị trang nạp tiền và tích hợp cơ chế chống can thiệp runtime đa tầng: ghim chứng chỉ SSL Pinning bằng thư viện TrustKit, phát hiện thiết bị đã Root qua thư viện RootBeer, và phát hiện Frida thông qua quét port 27042. Bạn cần xây dựng chiến lược kiểm thử xâm nhập động toàn diện.",
+        "tasks": [
+          "Phân tích cấu hình WebView trong AlphaWallet: kiểm tra các cờ WebSettings và rà soát các đối tượng JavascriptInterface được phơi bày để xác định nguy cơ rò rỉ dữ liệu hoặc thực thi hàm nhạy cảm.",
+          "Phát triển một script Frida toàn diện (Bypass Suite) có khả năng vô hiệu hóa đồng thời: kiểm tra cổng và chuỗi tiến trình của frida-server, hàm kiểm tra su binary của RootBeer, và hàm thẩm định chứng chỉ của TrustKit.",
+          "Cấu hình proxy Burp Suite chặn bắt thành công toàn bộ lưu lượng API của AlphaWallet và lập báo cáo kỹ thuật chi tiết về các điểm yếu của kiến trúc bảo mật chỉ dựa vào client-side defense."
+        ],
+        "requiredEvidence": [
+          "Báo cáo kiểm toán cấu hình bảo mật của WebView và danh sách các hàm JavascriptInterface được phơi bày",
+          "Mã nguồn Frida script hoàn chỉnh (.js) với các hook Interceptor được giải thích chi tiết",
+          "Bằng chứng lưu lượng mạng (HTTP Request/Response) bắt được qua Burp Suite sau khi vượt qua SSL Pinning thành công"
+        ]
+      },
+      "sources": [
+        {
+          "title": "OWASP Mobile Application Security Testing Guide (MASTG) — Testing WebViews & Dynamic Analysis",
+          "url": "https://mas.owasp.org/MASTG/tests/android/MASVS-PLATFORM/MASTG-TEST-0028/",
+          "publisher": "OWASP Foundation",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiểm toán cấu hình bảo mật WebView: JavaScript Interface, SOP bypass và File Scheme Access",
+            "Kỹ thuật phân tích động và runtime hooking với Frida trên ứng dụng di động"
+          ]
+        },
+        {
+          "title": "Google Android Developers — Web-based Content Security Guidelines",
+          "url": "https://developer.android.com/privacy-and-security/security-best-practices#web-based-content",
+          "publisher": "Google",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Hướng dẫn cấu hình an toàn cho Android WebView và WebSettings",
+            "Sử dụng WebViewAssetLoader để thay thế giao thức file:// và cô lập Same-Origin Policy"
+          ]
+        }
+      ]
+    }
+  ]
+}

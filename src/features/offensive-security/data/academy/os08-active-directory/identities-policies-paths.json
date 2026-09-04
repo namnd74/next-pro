@@ -1,0 +1,1149 @@
+{
+  "id": "os08-m02-identities-policies-paths",
+  "slug": "identities-policies-paths",
+  "trackId": "os08-active-directory",
+  "title": "Định Danh AD, Chính Sách GPO, Ủy Quyền & Đồ Thị Đường Đi Tấn Công (Attack Paths)",
+  "summary": "Phân tích sâu kiến trúc đặc quyền Active Directory: quản trị nhóm đặc quyền qua AdminSDHolder, rủi ro cấu hình GPO lỏng lẻo, kỹ thuật ủy thác Kerberos (Unconstrained, Constrained, RBCD), và sử dụng đồ thị định danh BloodHound để triệt tiêu các chuỗi lây lan đặc quyền (transitive attack paths).",
+  "difficulty": "advanced",
+  "estimatedMinutes": 480,
+  "careerPaths": ["penetration-test", "red-team", "purple-team"],
+  "domains": ["windows", "active-directory"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os08-l70-ad-principals-groups-and-privileged-access",
+      "slug": "ad-principals-groups-and-privileged-access",
+      "title": "Thực Thể Định Danh AD (Principals), Quản Trị Nhóm Đặc Quyền & Cơ Chế AdminSDHolder / SDProp",
+      "summary": "Phân tích sâu cấu trúc Security Principals trong Active Directory: tài khoản người dùng, máy tính, tài khoản dịch vụ gMSA, nguyên tắc lồng nhóm AGDLP/AGUDLP, kiến trúc phân tầng Enterprise Access Model (Tier 0/1/2), cùng cơ chế bảo vệ AdminSDHolder, thuộc tính adminCount, tiến trình SDProp và kỹ thuật thiết lập persistence ngầm thông qua thao túng DACL.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân tích cấu trúc phân loại và đặc tính bảo mật của các Security Principals trong Active Directory: User Accounts, Computer Accounts, Managed Service Accounts (MSA) và Group Managed Service Accounts (gMSA).",
+        "Áp dụng chiến lược lồng ghép nhóm AGDLP/AGUDLP (Account -> Global -> Universal -> Domain Local -> Permission) để tối ưu hoá quản trị phân quyền và kiểm toán ranh giới bảo mật.",
+        "Bóc tách nguyên lý hoạt động của tiến trình SDProp và container AdminSDHolder, giải thích cơ chế cưỡng chế DACL bảo vệ các nhóm đặc quyền cao (Protected Groups) và cách phát hiện persistence thông qua AdminSDHolder ACL tampering.",
+        "Thiết kế kiến trúc quản trị phân tầng đặc quyền (Enterprise Access Model / Tiered Administrative Model) nhằm cô lập thông tin xác thực Tier 0 và ngăn chặn lây nhiễm chéo giữa các tầng kiểm soát."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["windows", "active-directory"],
+      "attackTactics": [
+        "privilege-escalation",
+        "persistence",
+        "defense-evasion",
+        "credential-access"
+      ],
+      "keywords": [
+        "adminsdholder",
+        "sdprop",
+        "admincount",
+        "gmsa",
+        "tier-model",
+        "enterprise-access-model",
+        "agdlp",
+        "protected-groups",
+        "stealth-persistence"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Active Directory xem mọi tài khoản quản trị nhạy cảm là đối tượng được bảo vệ (Protected Object). AdminSDHolder đóng vai trò như một bản mẫu DACL chuẩn; mỗi 60 phút, tiến trình SDProp quét toàn bộ các thành viên của Protected Groups, thiết lập cờ adminCount=1, ngắt tính năng kế thừa quyền (broken inheritance), và ghi đè DACL bằng quyền từ AdminSDHolder. Kẻ tấn công khai thác cơ chế này bằng cách chèn một ACE độc hại trực tiếp vào AdminSDHolder, biến nó thành một cơ chế duy trì quyền truy cập (persistence) tàng hình và tự động tái sinh liên tục ngay cả khi quản trị viên khôi phục quyền thủ công.",
+      "visual": {
+        "title": "Tiến Trình SDProp và Cơ Chế Ghi Đè DACL Tự Động từ AdminSDHolder",
+        "caption": "Chu kỳ 60 phút của tiến trình Security Descriptor Propagator (SDProp) trên PDC Emulator và tác động lên các đối tượng đặc quyền.",
+        "steps": [
+          {
+            "label": "Khởi động Chu kỳ SDProp",
+            "detail": "Tiến trình SDProp thức dậy định kỳ mỗi 60 phút trên Domain Controller nắm giữ FSMO role PDC Emulator để rà soát các nhóm được bảo vệ.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Quét Thành viên Protected Groups",
+            "detail": "SDProp duyệt đệ quy các thành viên của Domain Admins, Enterprise Admins, Schema Admins, Backup Operators... và kiểm tra thuộc tính adminCount.",
+            "tone": "caution"
+          },
+          {
+            "label": "Ngắt Kế thừa & Cưỡng chế DACL",
+            "detail": "SDProp gán cờ adminCount=1, tắt cờ kế thừa DACL (Disable Inheritance) và áp dụng bản mẫu Security Descriptor từ CN=AdminSDHolder,CN=System,DC=domain,DC=local.",
+            "tone": "allow"
+          },
+          {
+            "label": "Rủi ro Stealth Persistence",
+            "detail": "Nếu AdminSDHolder bị chèn một ACE độc hại (ví dụ GenericAll cho user thường), SDProp sẽ tự động nhân bản quyền kiểm soát đó lên toàn bộ tài khoản đặc quyền.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Phân Loại Security Principals và Quản Lý Danh Tính Dịch Vụ Hiện Đại (gMSA / MSA / Computer Accounts)",
+          "paragraphs": [
+            "Trong Active Directory Domain Services (AD DS), Security Principal là bất kỳ thực thể nào có thể được gán một Security Identifier (SID) duy nhất và được cấp quyền truy cập tài nguyên thông qua Access Control Lists (ACLs). Ba nhóm Principal cơ bản bao gồm User Accounts (đại diện người dùng tương tác), Computer Accounts (đại diện máy trạm và máy chủ thành viên trong domain), và Service Accounts (chạy các tiến trình dịch vụ nền như MSSQL, IIS, hoặc các daemon sao lưu). Mỗi tài khoản máy tính (Machine Account, kết thúc bằng ký tự '$') về bản chất hoạt động như một user đặc biệt, sở hữu mật khẩu ngẫu nhiên 120 ký tự được hệ điều hành Windows tự động xoay vòng định kỳ mỗi 30 ngày qua giao thức Netlogon.",
+            "Điểm yếu bảo mật cố hữu của các Service Accounts truyền thống là việc người quản trị thường cấu hình mật khẩu tĩnh không bao giờ hết hạn (Password Never Expires), đồng thời gán SPN để hỗ trợ xác thực Kerberos, biến chúng thành mục tiêu hàng đầu của tấn công Kerberoasting. Để khắc phục rủi ro này, Microsoft giới thiệu Group Managed Service Accounts (gMSA) từ Windows Server 2012. Khác với MSA đơn lẻ chỉ gắn với một máy chủ, gMSA cho phép nhiều máy chủ trong một farm hoặc cluster dùng chung một danh tính dịch vụ mà không cần bất kỳ con người nào biết hay quản lý mật khẩu.",
+            "Cơ chế mật mã học của gMSA dựa trên Key Distribution Services (KDS) root key lưu trữ trong phân vùng cấu hình AD. Cứ mỗi chu kỳ xoay vòng (mặc định 30 ngày), máy chủ thành viên gửi yêu cầu RPC tới Domain Controller; DC sử dụng KDS root key kết hợp với thuộc tính chu kỳ thời gian để tạo ra mật khẩu ngẫu nhiên 240 byte có độ phức tạp cực cao và chuyển về cho máy chủ cục bộ qua kênh an toàn. Tuy nhiên, về mặt an ninh, bất kỳ principal nào có quyền đọc thuộc tính `msDS-ManagedPassword` trên đối tượng gMSA (thông qua DACL lỏng lẻo trong thuộc tính `msDS-GroupMSAMembership`) đều có thể giải mã được mật khẩu gMSA và thực hiện mạo danh dịch vụ bất hợp pháp."
+          ]
+        },
+        {
+          "title": "Kiến Trúc Phạm Vi Nhóm (Group Scopes), Chiến Lược AGDLP và Mô Hình Phân Tầng Quản Trị (Enterprise Access Model)",
+          "paragraphs": [
+            "Nhóm bảo mật (Security Groups) trong Active Directory được phân loại theo ba phạm vi chính: Domain Local, Global, và Universal. Nhóm Domain Local chỉ có hiệu lực phân quyền trên các tài nguyên nằm trong chính domain đó, nhưng có thể chứa thành viên từ bất kỳ domain nào trong cùng forest hoặc các domain được ủy thác. Ngược lại, nhóm Global chỉ có thể chứa thành viên thuộc chính domain của nó, nhưng có thể được đưa vào danh sách phân quyền (ACL) của tài nguyên tại các domain khác. Nhóm Universal có thể chứa thành viên từ mọi domain và được phân quyền ở mọi domain trong forest; danh sách thành viên của nhóm Universal được đồng bộ và lưu trữ trong Global Catalog.",
+            "Để tránh tình trạng phân quyền hỗn loạn và bùng nổ quyền hạn kế thừa (permission sprawl), kiến trúc bảo mật chuẩn mực của Microsoft khuyến nghị áp dụng nguyên lý AGDLP (Accounts -> Global Groups -> Domain Local Groups -> Permissions) cho đơn miền hoặc AGUDLP cho đa miền. Theo mô hình này, người dùng (Accounts) được đưa vào các nhóm Global theo vai trò nghiệp vụ (Role Groups), các nhóm Global được lồng vào nhóm Domain Local đại diện cho quyền truy cập tài nguyên cụ thể (Resource Access Groups), và quyền hạn (Permissions) chỉ được gán duy nhất cho nhóm Domain Local. Vi phạm quy tắc này—chẳng hạn như gán tài khoản cá nhân trực tiếp vào DACL của tệp tin hoặc chia sẻ—khiến việc kiểm toán và thu hồi quyền hạn khi nhân sự chuyển đổi vị trí trở nên bất khả thi.",
+            "Trên bình diện kiến trúc tổng thể, mô hình phân tầng quản trị cổ điển (Tiered Administrative Model - Tier 0/1/2) và mô hình hiện đại Enterprise Access Model đóng vai trò sống còn trong việc ngăn chặn lây lan đặc quyền (Privileged Identity Isolation). Tier 0 bao gồm Domain Controllers, PKI/ADCS, ADFS, Azure AD Connect, và toàn bộ tài khoản có quyền kiểm soát tuyệt đối miền. Tier 1 quản lý các máy chủ ứng dụng doanh nghiệp (Exchange, SQL, Web servers). Tier 2 quản lý các máy trạm người dùng (Workstations) và thiết bị đầu cuối. Nguyên tắc bất di bất dịch của mô hình này là: Thông tin xác thực của tầng cao hơn TUYỆT ĐỐI KHÔNG BAO GIỜ được phép đăng nhập hoặc lưu trữ dấu vết xác thực (LSASS cache, Token, NTLM hash) trên các thiết bị thuộc tầng thấp hơn."
+          ]
+        },
+        {
+          "title": "Cơ Chế Bảo Vệ AdminSDHolder, Thuộc Tính adminCount và Tiến Trình SDProp Cốt Lõi",
+          "paragraphs": [
+            "Để ngăn chặn các quản trị viên phân quyền cấp dưới (như Helpdesk hoặc OU Admins) vô tình hoặc cố ý can thiệp vào quyền hạn của các tài khoản nhạy cảm, Active Directory trang bị một cơ chế bảo vệ cốt lõi mang tên AdminSDHolder. Đối tượng này nằm tại phân vùng thư mục `CN=AdminSDHolder,CN=System,DC=domain,DC=local`. AdminSDHolder hoạt động như một bản mẫu an ninh (Security Template) lưu trữ một Discretionary Access Control List (DACL) chuẩn mực, được bảo vệ nghiêm ngặt chỉ dành cho các quản trị viên cao cấp nhất.",
+            "Tiến trình đồng bộ Security Descriptor Propagator (SDProp) là một tiến trình nội bộ chạy ngầm định kỳ mỗi 60 phút trên Domain Controller nắm giữ FSMO role PDC Emulator. Khi kích hoạt, SDProp duyệt đệ quy toàn bộ danh sách các nhóm được bảo vệ (Protected Groups) và tất cả các thành viên (Users/Computers) trực tiếp hoặc gián tiếp thuộc các nhóm này. Danh sách các nhóm được bảo vệ bao gồm: Enterprise Admins, Domain Admins, Schema Admins, Administrators, Account Operators, Backup Operators, Server Operators, Print Operators, và Cert Publishers.",
+            "Đối với mỗi đối tượng nằm trong diện bảo vệ, SDProp thực hiện ba thao tác cưỡng chế: (1) Thiết lập thuộc tính `adminCount = 1` trên đối tượng; (2) Vô hiệu hóa cờ kế thừa quyền (Disable Inheritance) bằng cách bật bit SE_DACL_PROTECTED trong Security Descriptor, ngăn chặn mọi quyền cấp phát từ các Organizational Unit (OU) cha áp đặt xuống đối tượng; (3) Sao chép đè toàn bộ DACL từ đối tượng `CN=AdminSDHolder` lên DACL của đối tượng đó. Nhờ vậy, ngay cả khi một tài khoản Domain Admin bị di chuyển vào một OU có quyền phân cấp lỏng lẻo, các quyền thừa kế đó sẽ lập tức bị triệt tiêu sau chu kỳ quét của SDProp."
+          ]
+        },
+        {
+          "title": "Kỹ Thuật Duy Trì Quyền Truy Cập Ngầm (Persistence) qua AdminSDHolder và Quy Trình Rà Soát Khắc Phục",
+          "paragraphs": [
+            "Mặc dù AdminSDHolder được thiết kế như một cơ chế phòng thủ vững chắc, kẻ tấn công khi đã chiếm được quyền Domain Admin có thể biến chính cơ chế này thành một phương thức duy trì quyền truy cập (Persistence) tàng hình và tự động phục hồi cực kỳ nguy hiểm. Bằng cách chèn thêm một Access Control Entry (ACE) cấp quyền độc hại—chẳng hạn như `GenericAll` hoặc quyền mở rộng `ExtendedRight: Reset Password` kết hợp `WriteDacl`—vào DACL của đối tượng `CN=AdminSDHolder` cho một tài khoản người dùng bình thường dường như vô hại, kẻ tấn công đã đặt một quả bom nổ chậm trong cấu trúc thư mục.",
+            "Trong vòng 60 phút tiếp theo, khi tiến trình SDProp thức dậy trên PDC Emulator, nó sẽ tự động đọc DACL đã bị nhiễm độc từ AdminSDHolder và nhân bản quyền `GenericAll` này sang TẤT CẢ các tài khoản và nhóm thuộc Protected Groups trong toàn bộ miền. Khi đội ngũ ứng cứu sự cố (Incident Response) phát hiện và thu hồi các tài khoản Domain Admin lộ diện, họ thường bỏ quên container AdminSDHolder. Kết quả là chỉ sau 60 phút, SDProp lại tự động cấp lại toàn quyền kiểm soát cho tài khoản dự phòng của kẻ tấn công, tạo ra hiện tượng backdoor 'tự chữa lành' (Self-Healing Persistence).",
+            "Bên cạnh đó, hiện tượng 'Orphaned adminCount' (adminCount mồ côi) là một lỗ hổng vận hành phổ biến: Khi một người dùng được rút khỏi nhóm Domain Admins, Active Directory KHÔNG tự động xóa thuộc tính `adminCount = 1` và cũng KHÔNG tự động bật lại tính năng kế thừa quyền (Inheritance). Tài khoản đó vĩnh viễn bị 'mồ côi' khỏi chính sách phân quyền của OU, khiến các thay đổi cấu hình bảo mật thông thường không thể áp dụng. Quy trình khắc phục chuẩn mực đòi hỏi kỹ sư an ninh phải: (1) Kiểm toán DACL của AdminSDHolder bằng PowerShell so với template chuẩn; (2) Truy vấn toàn bộ đối tượng có `adminCount = 1` không còn nằm trong Protected Groups; (3) Xóa cờ `adminCount` và kích hoạt lại quyền thừa kế bằng cách dỡ bỏ cờ SE_DACL_PROTECTED."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Security Principals, Cấu Trúc Nhóm Đặc Quyền và Triệt Tiêu Persistence Trên AdminSDHolder",
+        "objective": "Phân tích kiến trúc định danh AD, chẩn đoán lỗi ngắt kế thừa quyền do adminCount = 1 mồ côi, phát hiện mã độc persistence trên AdminSDHolder và xây dựng mô hình phân tầng Tier 0/1/2 bảo vệ gMSA.",
+        "scenario": "Bạn đang thực hiện kiểm toán bảo mật chuyên sâu cho hạ tầng Active Directory của một tổ chức tài chính lớn. Đội ngũ an ninh nghi ngờ hệ thống từng bị xâm nhập vài tháng trước và kẻ tấn công có thể đã cài cắm cơ chế duy trì quyền truy cập ngầm trong AD schema hoặc system containers.",
+        "constraints": [
+          "Không làm gián đoạn quyền quản trị hợp lệ của đội ngũ Domain Admins đang vận hành hệ thống ngân hàng lõi.",
+          "Mọi thay đổi trên container AdminSDHolder phải được kiểm tra tính hợp lệ của Security Descriptor trước khi áp dụng.",
+          "Phải cô lập triệt để quyền đọc mật khẩu tài khoản dịch vụ gMSA theo đúng ranh giới máy chủ được ủy quyền."
+        ],
+        "cases": [
+          {
+            "id": "case-70-01",
+            "title": "Khắc Phục Sự Cố Quyền Kế Thừa Bị Ngắt và Hiện Tượng adminCount = 1 Mồ Côi",
+            "context": "Một nhân sự nguyên là Trưởng nhóm Hạ tầng được điều chuyển sang bộ phận Hỗ trợ Kỹ thuật cấp 1. Đội ngũ IT đã xóa tài khoản này khỏi nhóm Domain Admins và chuyển tài khoản sang OU Helpdesk. Tuy nhiên, các chính sách phân quyền áp dụng trên OU Helpdesk (như hạn chế đăng nhập máy chủ) hoàn toàn không có tác dụng trên tài khoản này.",
+            "prompt": "Nguyên nhân kỹ thuật sâu xa nào giải thích hiện tượng trên và biện pháp xử lý chuẩn xác nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Do tài khoản chưa khởi động lại máy trạm nên Access Token vẫn còn lưu giữ SID của nhóm Domain Admins trong bộ nhớ đệm Kerberos; cần yêu cầu người dùng đăng xuất và đăng nhập lại.",
+                "correct": false,
+                "rationale": "Access Token được làm mới sau mỗi phiên đăng nhập; nếu tài khoản đã bị xóa khỏi nhóm trên DC thì token mới sẽ không còn chứa SID đó."
+              },
+              {
+                "id": "B",
+                "label": "Do tiến trình SDProp đã đặt thuộc tính adminCount = 1 và ngắt tính năng kế thừa quyền (Disable Inheritance) khi tài khoản còn là Domain Admin; khi rút khỏi nhóm, AD không tự động hoàn tác. Cần can thiệp xóa thuộc tính adminCount về null hoặc 0 và bật lại kế thừa quyền (Enable Inheritance) trên đối tượng.",
+                "correct": true,
+                "rationale": "Đây là hiện tượng Orphaned adminCount kinh điển của AD DS: SDProp chỉ bảo vệ một chiều, không tự động phục hồi kế thừa khi rời khỏi Protected Groups."
+              },
+              {
+                "id": "C",
+                "label": "Do dịch vụ Netlogon trên Domain Controller chưa đồng bộ tệp NTDS.dit sang Global Catalog; cần chạy lệnh repadmin /syncall để ép buộc sao chép dữ liệu.",
+                "correct": false,
+                "rationale": "Vấn đề nằm ở DACL và cờ bảo vệ SE_DACL_PROTECTED trên chính đối tượng người dùng, không phải do trễ sao chép NTDS.dit."
+              },
+              {
+                "id": "D",
+                "label": "Do tài khoản bị kẹt cờ UserAccountControl DONT_EXPIRE_PASSWORD; cần dùng PowerShell bật lại cơ chế hết hạn mật khẩu định kỳ.",
+                "correct": false,
+                "rationale": "Cờ DONT_EXPIRE_PASSWORD chỉ kiểm soát chính sách mật khẩu, không can thiệp vào quyền kế thừa DACL từ OU cha."
+              }
+            ]
+          },
+          {
+            "id": "case-70-02",
+            "title": "Phát Hiện và Vô Hiệu Hóa Stealth Persistence thông qua DACL Tampering trên AdminSDHolder",
+            "context": "Trong quá trình rà soát định kỳ bằng script kiểm toán an ninh, bạn phát hiện một tài khoản người dùng bình thường tên 'svc-printer-audit' thuộc phòng Hành chính lại có quyền GenericAll xuất hiện trên tài khoản Domain Admin 'da-superadmin'. Quản trị viên đã xóa quyền này bằng tay, nhưng đúng 60 phút sau, quyền GenericAll lại tự động tái xuất hiện một cách bí ẩn.",
+            "prompt": "Cơ chế duy trì quyền truy cập ngầm (persistence) nào đang được kích hoạt và quy trình xử lý triệt để bao gồm những bước nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công đã cài đặt một Scheduled Task trên tất cả máy trạm của nhân viên để định kỳ 60 phút chạy lệnh cấp quyền qua PowerShell. Khắc phục: Quét toàn bộ máy trạm bằng phần mềm diệt virus.",
+                "correct": false,
+                "rationale": "Quyền hạn trong AD được kiểm soát trên DC; máy trạm của nhân viên không có quyền cấp phát GenericAll lên Domain Admin trừ khi chính tài khoản đó đã là Domain Admin."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công đã chỉnh sửa DACL của container CN=AdminSDHolder,CN=System,DC=... để cấp quyền GenericAll cho svc-printer-audit; mỗi 60 phút tiến trình SDProp trên PDC Emulator lại tự động ghi đè quyền này lên toàn bộ Protected Groups. Khắc phục: Kiểm tra và xóa bỏ ACE độc hại trên AdminSDHolder, thu hồi quyền của svc-printer-audit, và cưỡng chế chạy SDProp để chuẩn hóa lại DACL.",
+                "correct": true,
+                "rationale": "AdminSDHolder persistence hoạt động bằng cách chèn ACE vào template container, khiến tiến trình SDProp tự động lan truyền quyền độc hại định kỳ 60 phút."
+              },
+              {
+                "id": "C",
+                "label": "Hệ thống bị tấn công Golden Ticket khiến kẻ tấn công có thể giả mạo vé TGT vĩnh viễn. Khắc phục: Đổi mật khẩu tài khoản krbtgt hai lần liên tiếp trong vòng 24 giờ.",
+                "correct": false,
+                "rationale": "Golden Ticket dùng để xác thực và tạo ticket mạo danh, không tự động sửa đổi DACL của đối tượng định kỳ mỗi 60 phút trên cơ sở dữ liệu NTDS.dit."
+              },
+              {
+                "id": "D",
+                "label": "Do thuộc tính msDS-Behavior-Version của Forest bị hạ cấp về Windows Server 2003 khiến các quyền truy cập bị lỗi đồng bộ hóa. Khắc phục: Nâng cấp Domain Functional Level.",
+                "correct": false,
+                "rationale": "Functional Level không liên quan đến việc một ACE cụ thể tự động được cấp đè định kỳ mỗi giờ bởi SDProp."
+              }
+            ]
+          },
+          {
+            "id": "case-70-03",
+            "title": "Thiết Kế và Thực Thi Mô Hình Phân Tầng Tier 0 / Tier 1 / Tier 2 Để Bảo Vệ Dịch Vụ gMSA",
+            "context": "Ngân hàng chuẩn bị triển khai cụm dịch vụ giao dịch trực tuyến mới kết nối cơ sở dữ liệu SQL Server. Đội ngũ phát triển đề xuất sử dụng tài khoản gMSA chạy trên các máy chủ Web (Tier 1), nhưng yêu cầu tài khoản gMSA này phải là thành viên của nhóm Domain Admins (Tier 0) để có quyền tự động tạo các bản ghi DNS và đọc cấu hình AD khi cần thiết.",
+            "prompt": "Theo kiến trúc Enterprise Access Model và nguyên tắc bảo mật Active Directory, bạn cần đưa ra quyết định kỹ thuật và kiến trúc thay thế nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chấp thuận đề xuất vì tài khoản gMSA có mật khẩu 120 ký tự tự động xoay vòng nên không thể bị tấn công bẻ khóa mật khẩu, do đó việc cấp quyền Domain Admin là hoàn toàn an toàn.",
+                "correct": false,
+                "rationale": "Mặc dù mật khẩu gMSA an toàn trước bruteforce, việc đưa gMSA vào Domain Admins phá vỡ ranh giới Tier 0. Nếu máy chủ Web Tier 1 bị chiếm quyền (RCE), kẻ tấn công có thể giải mã msDS-ManagedPassword và chiếm toàn bộ domain."
+              },
+              {
+                "id": "B",
+                "label": "Từ chối phân quyền Domain Admins; áp dụng nguyên tắc phân tầng nghiêm ngặt: gMSA trên máy chủ Tier 1 chỉ được cấp các quyền tối thiểu cục bộ (Least Privilege), ủy quyền riêng quyền tạo bản ghi DNS trên phân vùng DNS cụ thể qua ACL; đồng thời cấu hình thuộc tính msDS-GroupMSAMembership để chỉ duy nhất các máy chủ Web Tier 1 được phép truy xuất mật khẩu của gMSA.",
+                "correct": true,
+                "rationale": "Tuyệt đối không cấp quyền Tier 0 cho dịch vụ chạy ở Tier 1. Cần ủy quyền cụ thể (DACL delegation) và hạn chế danh sách máy chủ được phép đọc msDS-ManagedPassword."
+              },
+              {
+                "id": "C",
+                "label": "Chuyển đổi tài khoản gMSA thành tài khoản người dùng thông thường và đặt cờ 'Password Never Expires' để dễ dàng quản lý và giám sát đăng nhập.",
+                "correct": false,
+                "rationale": "Dùng tài khoản thường với mật khẩu tĩnh làm tăng nguy cơ Kerberoasting và lộ lọt thông tin xác thực, đi ngược lại các thông lệ bảo mật danh tính hiện đại."
+              },
+              {
+                "id": "D",
+                "label": "Cho phép cấp quyền Domain Admins nhưng yêu cầu cấu hình thêm tính năng Smart Card Authentication trên đối tượng gMSA để ngăn chặn việc đăng nhập bằng mật khẩu.",
+                "correct": false,
+                "rationale": "gMSA là tài khoản phi tương tác dành cho dịch vụ hệ thống, không hỗ trợ xác thực bằng thẻ thông minh vật lý (Smart Card)."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Nhận diện chính xác nguyên nhân kỹ thuật của hiện tượng Orphaned adminCount và quy trình phục hồi quyền kế thừa (Inheritance).",
+          "Phân tích đúng cơ chế persistence ngầm thông qua thao túng DACL trên container AdminSDHolder và chu kỳ 60 phút của tiến trình SDProp.",
+          "Thiết kế cấu hình bảo vệ tài khoản gMSA theo đúng mô hình phân tầng Enterprise Access Model và nguyên tắc đặc quyền tối thiểu (Least Privilege)."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo kiểm toán danh sách các tài khoản có adminCount = 1 không thuộc Protected Groups và log phục hồi quyền kế thừa",
+          "Bản so sánh Security Descriptor (DACL) của AdminSDHolder trước và sau khi thanh trừng các ACE độc hại",
+          "Cấu hình phân quyền chi tiết cho tài khoản gMSA bao gồm danh sách máy chủ được đọc msDS-ManagedPassword và ủy quyền DNS",
+          "Sơ đồ phân tầng kiến trúc Enterprise Access Model thể hiện ranh giới cô lập giữa Tier 0, Tier 1 và Tier 2"
+        ],
+        "reset": "Khôi phục toàn bộ cấu hình DACL của container AdminSDHolder và trạng thái các nhóm đặc quyền về baseline ban đầu.",
+        "cleanup": "Xóa bỏ các tài khoản kiểm thử và nhật ký can thiệp tạm thời khỏi phân vùng Active Directory Domain Services."
+      },
+      "governance": {
+        "prevent": [
+          "Áp dụng nguyên tắc phân tầng Enterprise Access Model, cấm tuyệt đối việc sử dụng tài khoản thuộc Tier 0 (Domain Admins) để đăng nhập hoặc quản trị các máy chủ Tier 1 và máy trạm Tier 2.",
+          "Khóa chặt DACL trên container CN=AdminSDHolder, đảm bảo chỉ có nhóm Domain Admins và Enterprise Admins mới có quyền chỉnh sửa thuộc tính nTSecurityDescriptor.",
+          "Thay thế toàn bộ tài khoản dịch vụ truyền thống dùng mật khẩu tĩnh bằng Group Managed Service Accounts (gMSA) với phạm vi máy chủ truy xuất msDS-GroupMSAMembership được giới hạn nghiêm ngặt."
+        ],
+        "observe": [
+          "Giám sát Windows Event ID 5136 (Directory Service Object Modified) đối với đối tượng CN=AdminSDHolder để phát hiện ngay lập tức bất kỳ hành vi chèn ACE lạ nào vào DACL.",
+          "Theo dõi định kỳ các tài khoản có thuộc tính adminCount = 1 nhưng không nằm trong danh sách Protected Groups để phát hiện tình trạng broken inheritance.",
+          "Thiết lập cảnh báo đối với các truy vấn LDAP đọc thuộc tính nhạy cảm msDS-ManagedPassword phát xuất từ các địa chỉ IP hoặc tài khoản không nằm trong danh sách máy chủ dịch vụ hợp lệ."
+        ],
+        "respond": [
+          "Khi phát hiện AdminSDHolder bị chỉnh sửa trái phép, lập tức cô lập tài khoản được cấp quyền, khôi phục Security Descriptor mặc định của AdminSDHolder từ bản sao lưu sạch hoặc tài liệu chuẩn của Microsoft.",
+          "Ép buộc kích hoạt tiến trình SDProp chạy ngay lập tức bằng cách ghi giá trị 1 vào thuộc tính fixUpInheritance trên RootDSE của PDC Emulator để đồng bộ lại toàn bộ Protected Objects.",
+          "Rà soát và xoay vòng thông tin xác thực của toàn bộ thành viên thuộc các nhóm đặc quyền (Domain Admins, Enterprise Admins, Administrators) có nguy cơ bị thỏa hiệp."
+        ],
+        "residualRisk": [
+          "Độ trễ tối đa 60 phút của chu kỳ SDProp mặc định có thể tạo ra cửa sổ thời gian ngắn cho phép các quyền gán sai lệch tạm thời tồn tại trước khi bị cơ chế bảo vệ ghi đè.",
+          "Việc thanh trừng adminCount = 1 đòi hỏi can thiệp thủ công hoặc script tự động, tiềm ẩn nguy cơ bỏ sót các tài khoản dịch vụ cũ bị ngắt kế thừa trong thời gian dài."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Khi một tài khoản người dùng được xóa khỏi nhóm Domain Admins, Active Directory sẽ tự động phục hồi lại tính năng kế thừa quyền (Inheritance) từ OU cha cho tài khoản đó.",
+          "correction": "Active Directory không tự động hoàn tác. Thuộc tính adminCount vẫn giữ nguyên giá trị 1 và cờ ngắt kế thừa (SE_DACL_PROTECTED) vẫn được duy trì, biến tài khoản thành một 'orphaned adminCount' đòi hỏi quản trị viên phải can thiệp thủ công để xóa cờ và bật lại kế thừa."
+        },
+        {
+          "claim": "Mật khẩu của Group Managed Service Accounts (gMSA) không thể bị lộ lọt vì nó có độ dài 120-240 ký tự và được xoay vòng tự động bởi Domain Controller.",
+          "correction": "Độ dài mật khẩu ngăn chặn tấn công bruteforce, nhưng nếu một tài khoản bất kỳ có quyền đọc thuộc tính msDS-ManagedPassword trên đối tượng gMSA trong LDAP, tài khoản đó hoàn toàn có thể tính toán và trích xuất mật khẩu dạng rõ để mạo danh dịch vụ."
+        },
+        {
+          "claim": "Container AdminSDHolder chỉ là một thư mục chứa danh sách các tài khoản quản trị viên và không có tác động an ninh chủ động nào lên hệ điều hành.",
+          "correction": "AdminSDHolder là một Security Template cốt lõi. Mỗi 60 phút, tiến trình SDProp trên PDC Emulator sử dụng DACL của AdminSDHolder để ghi đè và cưỡng chế tính nhất quán bảo mật lên toàn bộ các tài khoản và nhóm thuộc diện Protected Groups trong Active Directory."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os08-l70-q1",
+          "difficulty": "easy",
+          "question": "Tiến trình nào trong Active Directory chịu trách nhiệm định kỳ quét các nhóm được bảo vệ (Protected Groups), gán cờ adminCount = 1 và ghi đè DACL từ AdminSDHolder?",
+          "options": [
+            {
+              "id": "A",
+              "label": "KDS Root Service (KDSSvc)"
+            },
+            {
+              "id": "B",
+              "label": "Security Descriptor Propagator (SDProp)"
+            },
+            {
+              "id": "C",
+              "label": "Directory Replication Service (DRSSvc)"
+            },
+            {
+              "id": "D",
+              "label": "Local Security Authority Subsystem (LSASS)"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Security Descriptor Propagator (SDProp) là tiến trình chạy ngầm định kỳ mỗi 60 phút trên FSMO PDC Emulator để bảo vệ các đối tượng đặc quyền bằng cách áp dụng DACL từ AdminSDHolder."
+        },
+        {
+          "id": "os08-l70-q2",
+          "difficulty": "medium",
+          "question": "Kỹ thuật duy trì quyền truy cập ngầm (Stealth Persistence) thông qua thao túng AdminSDHolder mang lại ưu thế vượt trội nào cho kẻ tấn công so với việc chỉ thêm người dùng vào nhóm Domain Admins?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Giúp mật khẩu của kẻ tấn công không bao giờ hết hạn ngay cả khi Domain Controller bị khởi động lại"
+            },
+            {
+              "id": "B",
+              "label": "Tự động tái cấp quyền kiểm soát đặc quyền cho tài khoản dự phòng mỗi 60 phút qua tiến trình SDProp ngay cả khi quản trị viên đã gỡ bỏ quyền thủ công"
+            },
+            {
+              "id": "C",
+              "label": "Vô hiệu hóa hoàn toàn khả năng ghi nhật ký Windows Security Event Log trên tất cả Domain Controllers"
+            },
+            {
+              "id": "D",
+              "label": "Cho phép tài khoản người dùng đăng nhập vào hệ thống mà không cần gửi gói tin Kerberos AS-REQ"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Khi chèn một ACE độc hại vào AdminSDHolder, tiến trình SDProp sẽ định kỳ sao chép quyền đó lên mọi Protected Objects. Nếu đội phòng thủ chỉ xóa quyền trên đối tượng đích mà quên làm sạch AdminSDHolder, quyền kiểm soát sẽ tự động phục hồi sau tối đa 60 phút."
+        },
+        {
+          "id": "os08-l70-q3",
+          "difficulty": "hard",
+          "question": "Trong kiến trúc Enterprise Access Model (Tiered Administration), hành vi nào sau đây vi phạm nghiêm trọng nhất nguyên tắc cô lập ranh giới bảo mật?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Một máy chủ Web Tier 1 kết nối truy vấn cơ sở dữ liệu trên máy chủ SQL Tier 1 thông qua tài khoản gMSA"
+            },
+            {
+              "id": "B",
+              "label": "Quản trị viên sử dụng máy trạm Workstation thuộc Tier 2 đăng nhập trực tiếp phiên RDP bằng tài khoản Domain Admin (Tier 0) để xử lý sự cố máy chủ Domain Controller"
+            },
+            {
+              "id": "C",
+              "label": "Máy chủ Domain Controller gửi gói tin sao chép dữ liệu NTDS.dit tới một Domain Controller khác trong cùng Site qua cổng RPC 135/49152+"
+            },
+            {
+              "id": "D",
+              "label": "Nhân viên Helpdesk thuộc Tier 2 sử dụng công cụ Remote Assistance để hỗ trợ người dùng cuối tại trạm làm việc"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Nguyên tắc cốt lõi của Tiered Model là 'No Down-Tier Logons'. Khi tài khoản Tier 0 (Domain Admin) đăng nhập vào máy trạm Tier 2, thông tin xác thực (vé Kerberos TGT, NTLM hash, mã token) sẽ lưu trong LSASS của máy trạm đó. Nếu máy trạm Tier 2 bị kiểm soát, kẻ tấn công có thể dump LSASS và chiếm quyền Tier 0 ngay lập tức."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Bạn được chỉ định làm chuyên gia đánh giá an ninh định danh cho một tập đoàn đa quốc gia vừa hoàn tất sáp nhập. Hệ thống tồn tại hơn 10,000 tài khoản và nhiều dấu hiệu phân quyền chéo giữa các phòng ban. Bạn cần tiến hành rà soát toàn diện cơ chế bảo vệ AdminSDHolder, kiểm toán các tài khoản bị ngắt quyền thừa kế (broken inheritance), và thiết lập kiến trúc gMSA an toàn theo mô hình phân tầng.",
+        "tasks": [
+          "Viết script PowerShell rà soát đối tượng CN=AdminSDHolder, trích xuất toàn bộ DACL và phát hiện bất kỳ Access Control Entry (ACE) nào cấp quyền GenericAll, WriteDacl hoặc ExtendedRights cho các đối tượng phi quản trị.",
+          "Xây dựng danh sách toàn bộ các tài khoản người dùng có thuộc tính adminCount = 1 nhưng hiện tại không còn là thành viên của bất kỳ nhóm nào trong Protected Groups; lập quy trình tự động xóa cờ adminCount và bật lại tính năng thừa kế quyền từ OU cha.",
+          "Thiết kế tài liệu kiến trúc triển khai gMSA cho cụm máy chủ ứng dụng tài chính nội bộ, định nghĩa chính xác thuộc tính msDS-GroupMSAMembership và danh sách phân quyền ủy thác tối thiểu trên phân vùng DNS/AD."
+        ],
+        "requiredEvidence": [
+          "Báo cáo kiểm toán bảo mật chi tiết về cấu trúc DACL của AdminSDHolder kèm mã băm SHA-256 xác thực tính toàn vẹn của Security Descriptor",
+          "Bảng danh mục các tài khoản mồ côi (orphaned adminCount) kèm nhật ký thực thi script hoàn tác quyền kế thừa an toàn",
+          "Kế hoạch triển khai kỹ thuật cho kiến trúc phân tầng Enterprise Access Model và chính sách cấu hình dịch vụ gMSA"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — AdminSDHolder, Protected Groups and Security Descriptor Propagator",
+          "url": "https://learn.microsoft.com/en-us/windows-server/identity/ad-ds/plan/security-best-practices/appendix-c--protected-accounts-and-groups-in-active-directory",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Nguyên lý hoạt động của AdminSDHolder và tiến trình SDProp",
+            "Danh sách các nhóm được bảo vệ (Protected Groups) và thuộc tính adminCount"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — Enterprise Access Model & Privileged Access Strategy",
+          "url": "https://learn.microsoft.com/en-us/security/privileged-access-workstations/privileged-access-access-model",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Mô hình phân tầng bảo vệ định danh Tier 0, Tier 1, Tier 2",
+            "Nguyên tắc cô lập ranh giới bảo mật thông tin xác thực quản trị"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Technique T1078.002: Valid Accounts - Domain Accounts",
+          "url": "https://attack.mitre.org/techniques/T1078/002/",
+          "publisher": "MITRE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kỹ thuật lạm dụng tài khoản hợp lệ để duy trì đặc quyền trong Active Directory",
+            "Chiến thuật phòng thủ và giám sát truy cập đặc quyền trái phép"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os08-l71-group-policy-objects-and-delegation-mechanics",
+      "slug": "group-policy-objects-and-delegation-mechanics",
+      "title": "Group Policy Objects (GPO), Quyền Phân Phối SYSVOL & Kỹ Thuật Ủy Thác Kerberos (Delegation Mechanics)",
+      "summary": "Khám phá hạ tầng Group Policy và các biến thể ủy thác Kerberos: cấu trúc kép GPC (LDAP) và GPT (SYSVOL), vector khai thác GPO Abuse qua Scheduled Tasks/Startup Scripts, cơ chế Unconstrained Delegation và bẫy SpoolSample/PetitPotam, Constrained Delegation với phần mở rộng S4U2Self/S4U2Proxy, và Resource-Based Constrained Delegation (RBCD) qua thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": ["os08-l70-ad-principals-groups-and-privileged-access"],
+      "outcomes": [
+        "Phân tích cấu trúc phân tách giữa Group Policy Container (GPC trong LDAP) và Group Policy Template (GPT trong SMB SYSVOL), giải thích cơ chế đồng bộ DFS-R và Client-Side Extensions (CSE).",
+        "Thẩm định các vector tấn công lạm dụng chính sách nhóm (GPO Abuse): phân tích quyền Write/CreateChild trên GPO để tiêm nhiễm Scheduled Tasks, Startup Scripts, và Immediate Task nhằm thực thi mã đặc quyền trên máy trạm/máy chủ miền.",
+        "So sánh bản chất mật mã học và nguy cơ bảo mật giữa ba hình thức ủy thác Kerberos: Unconstrained Delegation, Constrained Delegation (S4U2Self, S4U2Proxy), và Resource-Based Constrained Delegation (RBCD).",
+        "Xây dựng chiến lược phòng thủ chiều sâu: hạn chế MachineAccountQuota, triển khai nhóm Protected Users, gán thuộc tính NOT_DELEGATED, và cấu hình kiểm toán định kỳ thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["windows", "active-directory"],
+      "attackTactics": [
+        "privilege-escalation",
+        "lateral-movement",
+        "persistence",
+        "execution"
+      ],
+      "keywords": [
+        "gpo-abuse",
+        "sysvol",
+        "unconstrained-delegation",
+        "constrained-delegation",
+        "rbcd",
+        "s4u2self",
+        "s4u2proxy",
+        "msds-allowedtoactonbehalfofotheridentity",
+        "protected-users"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Group Policy thực chất là một hệ thống phân phối mã tự động trên toàn miền thông qua giao thức SMB SYSVOL; bất kỳ ai có quyền Write trên một GPO đều nắm giữ quyền thực thi mã với tư cách NT AUTHORITY\\SYSTEM trên toàn bộ máy tính chịu ảnh hưởng bởi GPO đó. Song song đó, ủy thác Kerberos (Delegation) giải quyết bài toán ứng dụng đa tầng (multi-tier application) mạo danh người dùng: nếu Unconstrained Delegation lưu trữ bừa bãi vé TGT trong LSASS của máy chủ dịch vụ, thì Constrained Delegation giới hạn theo SPN đích qua S4U, và RBCD trao quyền quyết định về chính đối tượng tài nguyên đích thông qua thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity.",
+      "visual": {
+        "title": "Tiến Trình Ủy Thác Kerberos: Từ Unconstrained, Constrained Đến Resource-Based Constrained Delegation",
+        "caption": "Sự dịch chuyển quyền kiểm soát ủy thác từ Domain Admins sang tài nguyên cục bộ qua ba thế hệ Kerberos Delegation.",
+        "steps": [
+          {
+            "label": "Unconstrained Delegation (Cũ)",
+            "detail": "Người dùng gửi TGT vào vé dịch vụ; máy chủ đích lưu TGT vào bộ nhớ LSASS, mở ra nguy cơ bị đánh cắp vé qua các kỹ thuật ép buộc xác thực (SpoolSample).",
+            "tone": "stop"
+          },
+          {
+            "label": "Constrained Delegation (S4U)",
+            "detail": "Dịch vụ dùng S4U2Self xin vé mạo danh user và S4U2Proxy xin vé đến SPN đích được cấu hình trước trong thuộc tính msDS-AllowedToDelegateTo bởi Domain Admin.",
+            "tone": "caution"
+          },
+          {
+            "label": "Resource-Based Constrained Delegation",
+            "detail": "Tài nguyên đích tự xác định ai được ủy thác thông qua thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity (chứa Security Descriptor bảo mật).",
+            "tone": "allow"
+          },
+          {
+            "label": "Vector RBCD Takeover",
+            "detail": "Nếu kẻ tấn công có quyền GenericWrite trên tài khoản máy tính đích, họ có thể ghi SID của máy tính do họ kiểm soát vào msDS-AllowedToActOnBehalfOfOtherIdentity để chiếm quyền SYSTEM.",
+            "tone": "caution"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cấu Trúc Lưu Trữ GPO: GPC trong LDAP, GPT trong SYSVOL và Cơ Chế Thực Thi Mã Client-Side Extensions (CSE)",
+          "paragraphs": [
+            "Group Policy Object (GPO) là hạ tầng quản trị tập trung mạnh mẽ nhất trong môi trường Windows Domain, nhưng cũng là một trong những vector phát tán mã độc diện rộng nguy hiểm nhất nếu không được kiểm soát chặt chẽ. Mỗi GPO không tồn tại như một thực thể đơn lẻ mà bao gồm hai thành phần vật lý phân tách hoàn toàn: Group Policy Container (GPC) và Group Policy Template (GPT). GPC là một đối tượng thuộc lớp `groupPolicyContainer` nằm trong phân vùng thư mục Active Directory tại `CN={GPO-GUID},CN=Policies,CN=System,DC=domain,DC=local`, lưu trữ các thuộc tính metadata như tên hiển thị (`displayName`), trạng thái kích hoạt (`flags`), và số phiên bản (`versionNumber`).",
+            "Thành phần thứ hai là Group Policy Template (GPT), được lưu trữ trên chia sẻ tệp tin SMB SYSVOL tại đường dẫn `\\\\domain\\SYSVOL\\domain\\Policies\\{GPO-GUID}`. Thư mục này chứa toàn bộ các tệp tin cấu hình thực tế, bao gồm các script khởi động (`Machine\\Scripts\\Startup`), chính sách bảo mật (`Machine\\Microsoft\\Windows NT\\SecEdit\\GptTmpl.inf`), và các tệp XML của Group Policy Preferences (GPP). SYSVOL được đồng bộ hóa liên tục giữa tất cả các Domain Controller trong domain thông qua dịch vụ Distributed File System Replication (DFS-R).",
+            "Quy trình áp dụng GPO trên máy trạm diễn ra như sau: Định kỳ (mặc định mỗi 90 phút với độ lệch ngẫu nhiên 30 phút), tiến trình Group Policy Client Service (`gpsvc`) trên máy trạm truy vấn LDAP để đọc GPC, xác định danh sách GPO được liên kết (linked) tới Domain, Site hoặc Organizational Unit (OU) chứa máy trạm. Sau đó, nó so sánh số phiên bản giữa GPC và tệp `GPT.ini` trên SYSVOL. Nếu có sự thay đổi, các Client-Side Extensions (CSE)—là các thư viện DLL động chuyên biệt như Task Scheduler CSE hay Scripts CSE—sẽ đọc tệp cấu hình qua SMB và thực thi trực tiếp trên hệ điều hành cục bộ dưới đặc quyền tối cao `NT AUTHORITY\\SYSTEM`."
+          ]
+        },
+        {
+          "title": "Kỹ Thuật GPO Abuse: Khai Thác Quyền Chỉnh Sửa Chính Sách để Chiếm Quyền Điều Khiển Hệ Thống Toàn Miền",
+          "paragraphs": [
+            "Do tính chất phân tán của GPO, quyền kiểm soát an ninh phụ thuộc vào cả hai bề mặt: DACL trên đối tượng LDAP GPC và DACL trên thư mục chia sẻ SMB GPT trong SYSVOL. Nếu một tài khoản người dùng hoặc nhóm không thuộc Tier 0 được cấp bất kỳ quyền nào trong số các quyền: `GenericAll`, `GenericWrite`, `WriteProperty` (đặc biệt là thuộc tính `gPCFileSysPath`), `WriteDacl`, hoặc quyền ghi tệp tin (`Write / Modify`) trên thư mục SYSVOL tương ứng, tài khoản đó hoàn toàn có khả năng chiếm quyền điều khiển toàn bộ các máy trạm hoặc máy chủ chịu ảnh hưởng bởi GPO đó.",
+            "Kỹ thuật khai thác phổ biến và hiệu quả nhất là chèn một Immediate Scheduled Task (Tác vụ Lập lịch Khẩn cấp) thông qua Group Policy Preferences. Kẻ tấn công có quyền ghi sẽ tạo hoặc chỉnh sửa tệp `Machine\\Preferences\\ScheduledTasks\\ScheduledTasks.xml` trong thư mục GPT của GPO. Bằng cách định nghĩa một tác vụ loại 'Immediate Task' cấu hình chạy dưới danh tính `NT AUTHORITY\\SYSTEM`, payload độc hại (chẳng hạn như một lệnh PowerShell tải và thực thi mã bộ nhớ) sẽ được kích hoạt ngay lập tức trên máy đích ngay khi GPO được làm mới (`gpupdate`), mà không cần chờ người dùng đăng nhập hay máy tính khởi động lại.",
+            "Các vector lạm dụng GPO khác bao gồm: (1) Sửa đổi tệp `scripts.ini` trong thư mục Startup Scripts để cài cắm mã thực thi mỗi khi máy chủ khởi động lại; (2) Can thiệp vào tệp `GptTmpl.inf` để phân bổ các đặc quyền nhạy cảm (User Rights Assignment) như `SeDebugPrivilege` hay `SeImpersonatePrivilege` cho tài khoản người dùng thông thường; (3) Lạm dụng Restricted Groups để tự thêm tài khoản của kẻ tấn công vào nhóm `Administrators` cục bộ trên toàn bộ máy chủ trong phạm vi OU."
+          ]
+        },
+        {
+          "title": "Kerberos Unconstrained & Constrained Delegation: S4U2Self, S4U2Proxy và Các Kịch Bản Ép Buộc Xác Thực (Coerced Auth)",
+          "paragraphs": [
+            "Ủy thác Kerberos (Kerberos Delegation) là cơ chế cho phép một dịch vụ mạng (ví dụ: máy chủ Web IIS) mạo danh (impersonate) người dùng để truy cập vào một dịch vụ ở tầng phía sau (ví dụ: máy chủ cơ sở dữ liệu Microsoft SQL Server). Thế hệ đầu tiên là Unconstrained Delegation (Ủy thác Vô điều kiện), được kích hoạt bằng cờ `TRUSTED_FOR_DELEGATION` trên tài khoản máy tính hoặc tài khoản dịch vụ. Khi người dùng xác thực tới một máy chủ có Unconstrained Delegation, KDC sẽ đính kèm một bản sao vé Ticket Granting Ticket (TGT) của người dùng đó vào phần Authenticator của vé dịch vụ. Dịch vụ tiếp nhận sẽ trích xuất và lưu giữ vé TGT này vào bộ nhớ của tiến trình LSASS để sử dụng bất cứ khi nào cần mạo danh người dùng.",
+            "Rủi ro an ninh của Unconstrained Delegation là cực kỳ nghiêm trọng: Nếu kẻ tấn công chiếm được quyền quản trị cục bộ trên máy chủ có Unconstrained Delegation, họ chỉ cần chờ đợi hoặc dụ dỗ một quản trị viên Domain Admin xác thực tới máy chủ đó để trích xuất vé TGT của Domain Admin từ LSASS, qua đó chiếm quyền toàn bộ Active Directory. Nguy hiểm hơn, kẻ tấn công có thể chủ động kích hoạt các giao thức RPC ép buộc xác thực (Coerced Authentication)—chẳng hạn như Print Spooler Bug (MS-RPRN `RpcRemoteFindFirstPrinterChangeNotificationEx` / SpoolSample) hoặc PetitPotam (MS-EFSR)—để ra lệnh cho Domain Controller gửi yêu cầu xác thực Kerberos tới máy chủ Unconstrained Delegation, lập tức chiếm đoạt vé TGT của chính tài khoản máy tính Domain Controller (`DC$`) và thực hiện DCSync.",
+            "Để khắc phục điểm yếu trên, Microsoft giới thiệu Constrained Delegation (Ủy thác Có điều kiện) trong Kerberos v5 mở rộng (RFC 4120 extensions: MS-SFU). Cơ chế này giới hạn dịch vụ chỉ được phép mạo danh người dùng tới một danh sách dịch vụ đích xác định trước thông qua thuộc tính `msDS-AllowedToDelegateTo` (chứa danh sách các Service Principal Names - SPNs). Cơ chế này hoạt động qua hai phần mở rộng: Service-for-User-to-Self (S4U2Self), cho phép dịch vụ xin vé dịch vụ cho chính nó thay mặt cho một người dùng mà không cần người dùng nhập mật khẩu; và Service-for-User-to-Proxy (S4U2Proxy), cho phép dịch vụ mang vé nhận được từ S4U2Self gửi lên KDC để xin vé truy cập tới dịch vụ đích nằm trong danh sách SPN được phép. Tuy nhiên, nếu cấu hình bật tùy chọn 'Use any authentication protocol' (Protocol Transition), dịch vụ vẫn có thể mạo danh bất kỳ người dùng nào ngay cả khi người dùng ban đầu chỉ xác thực qua NTLM hoặc Forms."
+          ]
+        },
+        {
+          "title": "Resource-Based Constrained Delegation (RBCD): Nguyên Lý msDS-AllowedToActOnBehalfOfOtherIdentity và Lạm Dụng MachineAccountQuota",
+          "paragraphs": [
+            "Hạn chế lớn của Constrained Delegation truyền thống là quyền kiểm soát hoàn toàn nằm ở phía tài khoản dịch vụ nguồn (Front-end Service) và bắt buộc phải có quyền Domain Admins để cấu hình thuộc tính `msDS-AllowedToDelegateTo`. Từ Windows Server 2012, Microsoft ra mắt Resource-Based Constrained Delegation (RBCD), đảo ngược hoàn toàn quyền quyết định về phía tài nguyên đích (Back-end Resource). Với RBCD, tài nguyên đích tự định nghĩa danh sách các thực thể nào được phép ủy thác mạo danh người dùng tới nó thông qua thuộc tính nhị phân `msDS-AllowedToActOnBehalfOfOtherIdentity`.",
+            "Thuộc tính `msDS-AllowedToActOnBehalfOfOtherIdentity` thực chất chứa một Security Descriptor (DACL nhị phân) hoàn chỉnh. Bất kỳ thực thể nào được cấp quyền trong DACL này đều có thể sử dụng S4U2Proxy để lấy vé truy cập tới tài nguyên đích dưới danh nghĩa của bất kỳ tài khoản nào trong domain. Điểm mấu chốt về mặt an ninh là: Để chỉnh sửa thuộc tính này trên một tài khoản máy tính, người dùng KHÔNG CẦN quyền Domain Admins; chỉ cần có quyền sở hữu (Owner) hoặc quyền ghi (`GenericWrite` / `WriteProperty`) trên đối tượng tài khoản máy tính đó trong Active Directory.",
+            "Kẻ tấn công khai thác chuỗi tấn công RBCD Takeover kinh điển như sau: Giả sử kẻ tấn công có quyền ghi trên tài khoản máy tính của một máy chủ thành viên `FILESRV01$`. (1) Kẻ tấn công lợi dụng thuộc tính mặc định của miền `ms-DS-MachineAccountQuota` (mặc định = 10) cho phép bất kỳ tài khoản người dùng bình thường nào cũng có thể tự tạo tối đa 10 tài khoản máy tính mới trên domain để tạo ra một máy tính giả lập `ATTACK-PC$`; (2) Lấy SID của `ATTACK-PC$` và ghi vào thuộc tính `msDS-AllowedToActOnBehalfOfOtherIdentity` của `FILESRV01$`; (3) Sử dụng tài khoản `ATTACK-PC$` kích hoạt tiến trình S4U2Self và S4U2Proxy để xin vé Kerberos TGS mạo danh người dùng quản trị tối cao (`Administrator` RID 500) truy cập dịch vụ CIFS hoặc HOST trên `FILESRV01$`; (4) Sử dụng vé TGS này để chiếm toàn quyền điều khiển cục bộ (SYSTEM / Local Admin) trên `FILESRV01$` mà không hề tạo ra bất kỳ cảnh báo leo thang đặc quyền Domain Admin nào."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán GPO Permissions, Triệt Tiêu Unconstrained Delegation và Phòng Ngừa Khai Thác RBCD",
+        "objective": "Phân tích rủi ro DACL trên SYSVOL, phát hiện và vô hiệu hóa bẫy SpoolSample trên máy chủ Unconstrained Delegation, và ngăn chặn kỹ thuật RBCD kết hợp MachineAccountQuota.",
+        "scenario": "Bạn đang thực hiện kiểm thử xâm nhập nội bộ (Assumed Breach) và kiểm toán hạ tầng cho một mạng doanh nghiệp lớn gồm 2,000 endpoints và nhiều máy chủ IIS/SQL đa tầng.",
+        "constraints": [
+          "Không xóa bỏ các GPO đang áp dụng chính sách bảo mật cho người dùng sản xuất.",
+          "Chuyển đổi các dịch vụ Unconstrained Delegation sang giải pháp thay thế an toàn mà không làm gián đoạn ứng dụng nghiệp vụ.",
+          "Khóa chặt thuộc tính MachineAccountQuota về 0 và rà soát triệt để các thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity trên toàn miền."
+        ],
+        "cases": [
+          {
+            "id": "case-71-01",
+            "title": "Phát Hiện và Triệt Tiêu Nguy Cơ GPO Abuse Do Cấu Hình DACL Lỏng Lẻo Trên SYSVOL",
+            "context": "Trong quá trình audit quyền hạn đối tượng GPO, bạn phát hiện một GPO mang tên 'Default Workstation Settings' được liên kết với OU chứa 1,500 máy trạm. Trên đối tượng GPC (LDAP) và thư mục GPT trong SYSVOL của GPO này, nhóm 'Desktop-Supporters' (chứa các nhân viên Helpdesk) lại có quyền Write và Modify.",
+            "prompt": "Kẻ tấn công chiếm được một tài khoản Helpdesk có thể leo thang quyền hạn như thế nào và biện pháp khắc phục triệt để là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công chỉ có thể thay đổi hình nền máy trạm; không thể leo thang quyền vì GPO được ký số bởi Microsoft. Khắc phục: Không cần thay đổi cấu hình.",
+                "correct": false,
+                "rationale": "GPO không được ký số bởi Microsoft; tệp cấu hình trong GPT hoàn toàn có thể bị chỉnh sửa để thực thi mã tùy ý dưới quyền NT AUTHORITY\\SYSTEM."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công có thể sửa đổi tệp ScheduledTasks.xml trong thư mục GPT của GPO để chèn một Immediate Task chạy dưới quyền NT AUTHORITY\\SYSTEM trên toàn bộ 1,500 máy trạm. Khắc phục: Thu hồi toàn bộ quyền Write/Modify của nhóm Desktop-Supporters trên cả GPC và SYSVOL; chỉ duy trì quyền Read cho máy trạm và ủy quyền quản trị GPO thông qua nhóm chuyên trách thuộc Tier 1.",
+                "correct": true,
+                "rationale": "Quyền Write trên GPO cho phép kẻ tấn công chèn Scheduled Tasks hoặc Startup Scripts để đạt được quyền SYSTEM trên toàn bộ máy trạm thuộc phạm vi áp dụng."
+              },
+              {
+                "id": "C",
+                "label": "Kẻ tấn công có thể xóa tệp NTDS.dit trên Domain Controller thông qua giao thức DFS-R. Khắc phục: Vô hiệu hóa tính năng đồng bộ DFS-R trên SYSVOL.",
+                "correct": false,
+                "rationale": "GPO trong SYSVOL không chứa tệp NTDS.dit và DFS-R chỉ đồng bộ nội dung thư mục Policies, không liên quan đến cơ sở dữ liệu NTDS.dit."
+              },
+              {
+                "id": "D",
+                "label": "Kẻ tấn công có thể trích xuất mật khẩu rõ của Domain Admin lưu trong tệp GPT.ini. Khắc phục: Bật mã hóa BitLocker trên ổ đĩa chứa SYSVOL.",
+                "correct": false,
+                "rationale": "Tệp GPT.ini chỉ chứa số hiệu phiên bản của GPO (Version Number), không bao giờ lưu trữ mật khẩu của người dùng hay quản trị viên."
+              }
+            ]
+          },
+          {
+            "id": "case-71-02",
+            "title": "Cách Ly và Triệt Tiêu Máy Chủ Unconstrained Delegation Đứng Trước Nguy Cơ Bị Ép Buộc Xác Thực (MS-RPRN Abuse)",
+            "context": "Một máy chủ ứng dụng cũ tên 'APP-SRV01' trong mạng nội bộ đang được cấu hình thuộc tính 'Trust this computer for delegation to any service (Kerberos only)' (Unconstrained Delegation). Nhóm Red Team đã chiếm được quyền Local Admin trên máy chủ này và chuẩn bị sử dụng công cụ SpoolSample gọi hàm RPC tới Domain Controller DC01.",
+            "prompt": "Kịch bản tấn công nào sẽ diễn ra nếu lệnh SpoolSample được thực thi thành công và giải pháp khắc phục khẩn cấp là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "DC01 sẽ bị từ chối dịch vụ (DDoS) và khởi động lại. Khắc phục: Khởi động lại dịch vụ Print Spooler trên máy trạm.",
+                "correct": false,
+                "rationale": "SpoolSample không gây từ chối dịch vụ mà kích hoạt DC01 gửi yêu cầu xác thực Kerberos ngược lại máy chủ chỉ định."
+              },
+              {
+                "id": "B",
+                "label": "DC01 sẽ gửi yêu cầu xác thực Kerberos chứa vé TGT của tài khoản máy tính DC01$ tới APP-SRV01; vé TGT này sẽ bị lưu vào bộ nhớ LSASS của APP-SRV01, cho phép kẻ tấn công trích xuất vé và thực hiện tấn công DCSync để chiếm toàn bộ domain. Khắc phục: Vô hiệu hóa dịch vụ Print Spooler trên tất cả Domain Controllers, đồng thời gỡ bỏ cờ Unconstrained Delegation trên APP-SRV01 và chuyển đổi sang Constrained Delegation hoặc RBCD.",
+                "correct": true,
+                "rationale": "Đây là chuỗi tấn công kinh điển kết hợp Unconstrained Delegation với MS-RPRN SpoolSample để thu thập TGT của Domain Controller."
+              },
+              {
+                "id": "C",
+                "label": "APP-SRV01 sẽ tự động bị giáng cấp thành máy trạm thông thường và bị loại khỏi domain. Khắc phục: Chạy lệnh netdom join để gia nhập lại domain.",
+                "correct": false,
+                "rationale": "Hành vi xác thực Kerberos không làm thay đổi trạng thái gia nhập miền (Domain Membership) của máy chủ."
+              },
+              {
+                "id": "D",
+                "label": "Mọi tài khoản trong nhóm Protected Users sẽ bị mất mật khẩu. Khắc phục: Xóa nhóm Protected Users khỏi Active Directory.",
+                "correct": false,
+                "rationale": "Nhóm Protected Users được thiết kế đặc biệt để ngăn chặn việc vé TGT bị ủy thác, là biện pháp bảo vệ chứ không phải mục tiêu bị tổn thương."
+              }
+            ]
+          },
+          {
+            "id": "case-71-03",
+            "title": "Kiểm Toán và Ngăn Chặn Leo Thang Đặc Quyền Máy Trạm Qua Resource-Based Constrained Delegation (RBCD)",
+            "context": "Kẻ tấn công chiếm được một tài khoản người dùng bình thường và phát hiện rằng thuộc tính ms-DS-MachineAccountQuota của domain đang có giá trị mặc định là 10. Đồng thời, tài khoản này có quyền GenericWrite trên đối tượng tài khoản máy tính của máy chủ cơ sở dữ liệu nhạy cảm 'DB-SRV01$'.",
+            "prompt": "Chuỗi kỹ thuật tấn công nào cho phép kẻ tấn công chiếm toàn quyền kiểm soát trên DB-SRV01 và biện pháp phòng ngừa triệt để là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công không thể làm gì vì GenericWrite chỉ cho phép đọc thông tin cấu hình phần cứng của máy chủ. Khắc phục: Không cần xử lý.",
+                "correct": false,
+                "rationale": "GenericWrite trên Computer Object cho phép ghi đè thuộc tính nhạy cảm msDS-AllowedToActOnBehalfOfOtherIdentity, mở đường cho RBCD takeover."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công tạo một tài khoản máy tính mới (lợi dụng MachineAccountQuota = 10), sau đó ghi SID của máy tính mới này vào thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity của DB-SRV01$; tiếp theo dùng S4U2Self/S4U2Proxy để xin vé TGS mạo danh Domain Admin truy cập DB-SRV01$ và chiếm quyền SYSTEM. Khắc phục: Thiết lập ms-DS-MachineAccountQuota = 0, xóa bỏ cấu hình lạ trên msDS-AllowedToActOnBehalfOfOtherIdentity, và thu hồi quyền GenericWrite của người dùng thường trên các tài khoản máy tính.",
+                "correct": true,
+                "rationale": "Đây là vector tấn công RBCD Takeover hoàn chỉnh. Khắc phục bằng cách triệt tiêu khả năng tự tạo computer account (quota = 0) và khóa chặt ACL trên computer objects."
+              },
+              {
+                "id": "C",
+                "label": "Kẻ tấn công dùng giao thức Telnet để đăng nhập trực tiếp vào cổng 23 của DB-SRV01. Khắc phục: Đóng cổng 23 trên tường lửa mạng.",
+                "correct": false,
+                "rationale": "Môi trường Windows Server hiện đại không kích hoạt Telnet mặc định và vấn đề cốt lõi nằm ở cơ chế ủy thác Kerberos trong Active Directory."
+              },
+              {
+                "id": "D",
+                "label": "Kẻ tấn công thực hiện tấn công LLMNR Poisoning để thu thập hash NTLMv2 của DB-SRV01. Khắc phục: Đổi mật khẩu của DB-SRV01 sang 8 ký tự.",
+                "correct": false,
+                "rationale": "Mật khẩu computer account dài 120 ký tự ngẫu nhiên nên không thể bẻ khóa từ NTLMv2 hash, và LLMNR không phải là phương thức khai thác quyền GenericWrite."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác lỗ hổng GPO Abuse do quyền ghi lỏng lẻo trên SYSVOL và phương pháp tiêm nhiễm Immediate Scheduled Task.",
+          "Bóc tách đúng cơ chế lưu giữ vé TGT trong LSASS của Unconstrained Delegation và kịch bản ép buộc xác thực qua Print Spooler (MS-RPRN).",
+          "Mô hình hóa hoàn chỉnh chuỗi tấn công RBCD kết hợp MachineAccountQuota và đề xuất chính sách khóa chặn hiệu quả."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo thẩm tra quyền hạn DACL trên tất cả GPC trong Active Directory và thư mục GPT tương ứng trên chia sẻ SMB SYSVOL",
+          "Danh sách các máy chủ đang kích hoạt Unconstrained Delegation (TRUSTED_FOR_DELEGATION) và kế hoạch chuyển đổi",
+          "Kết quả kiểm tra thuộc tính ms-DS-MachineAccountQuota và nhật ký rà soát thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity",
+          "Cấu hình triển khai nhóm Protected Users và chính sách gán cờ NOT_DELEGATED cho toàn bộ tài khoản nhạy cảm"
+        ],
+        "reset": "Đặt lại toàn bộ cấu hình ủy thác Kerberos và quyền hạn GPO về trạng thái mặc định an toàn.",
+        "cleanup": "Xóa các tài khoản máy tính giả lập và các tác vụ lập lịch kiểm thử khỏi hệ thống Active Directory."
+      },
+      "governance": {
+        "prevent": [
+          "Thiết lập thuộc tính ms-DS-MachineAccountQuota trên Domain Root về giá trị 0, ngăn chặn hoàn toàn người dùng thông thường tự tạo tài khoản máy tính trong domain.",
+          "Tuyệt đối loại bỏ Unconstrained Delegation trên toàn bộ máy chủ thành viên; chỉ sử dụng Resource-Based Constrained Delegation (RBCD) hoặc Constrained Delegation với danh sách SPN tối thiểu.",
+          "Đưa tất cả tài khoản quản trị đặc quyền cao vào nhóm bảo mật 'Protected Users' và đánh dấu thuộc tính 'Account is sensitive and cannot be delegated' để ngăn KDC cấp vé ủy thác."
+        ],
+        "observe": [
+          "Giám sát Event ID 5136 khi có sự thay đổi trên thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity của bất kỳ tài khoản máy tính nào.",
+          "Theo dõi Event ID 4741 (A computer account was created) để phát hiện các tài khoản máy tính mới được tạo bởi người dùng không thuộc đội ngũ IT vận hành.",
+          "Giám sát các thao tác chỉnh sửa tệp tin trong thư mục SYSVOL (\\Policies) thông qua File System Auditing và Event ID 4663 (An attempt was made to access an object)."
+        ],
+        "respond": [
+          "Khi phát hiện GPO bị chỉnh sửa trái phép, lập tức ngắt liên kết (Unlink) GPO khỏi các OU chịu ảnh hưởng để ngăn chặn lệnh thực thi lan rộng.",
+          "Nếu phát hiện máy chủ Unconstrained Delegation bị xâm nhập, cô lập máy chủ khỏi mạng, khởi động lại dịch vụ KDC và đổi mật khẩu tài khoản krbtgt để vô hiệu hóa toàn bộ TGT đang bị chiếm đoạt.",
+          "Xóa ngay lập tức các giá trị nhị phân lạ trong thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity trên các máy chủ tài nguyên bị can thiệp."
+        ],
+        "residualRisk": [
+          "Một số ứng dụng doanh nghiệp cổ điển (Legacy ERP/CRM) có thể yêu cầu Unconstrained Delegation để hoạt động đa miền, tạo ra ngoại lệ an ninh khó loại bỏ hoàn toàn.",
+          "Độ trễ đồng bộ DFS-R giữa các Domain Controller ở các chi nhánh xa có thể khiến việc thu hồi một GPO độc hại mất từ vài phút đến vài chục phút."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Group Policy Objects được bảo vệ chống giả mạo bằng cơ chế chữ ký số mật mã từ Microsoft nên không thể bị can thiệp bởi kẻ tấn công có quyền ghi trên SYSVOL.",
+          "correction": "GPO không được ký số mật mã. Các Client-Side Extensions (CSE) trên máy trạm đọc trực tiếp các tệp tin văn bản (INI, XML, INF) từ chia sẻ SMB SYSVOL; bất kỳ ai có quyền Write trên thư mục GPT đều có thể thay đổi nội dung và điều khiển luồng thực thi của máy trạm."
+        },
+        {
+          "claim": "Ủy thác Kerberos (Delegation) chỉ cho phép dịch vụ mạo danh người dùng để thực hiện các thao tác chỉ đọc (Read-only) trên cơ sở dữ liệu phía sau.",
+          "correction": "Ủy thác Kerberos chuyển giao toàn bộ ngữ cảnh bảo mật và quyền hạn của người dùng cho dịch vụ đích. Dịch vụ tiếp nhận có thể thực hiện mọi thao tác ghi, sửa, xóa, hoặc thậm chí thực thi mã từ xa với đầy đủ đặc quyền của người dùng bị mạo danh."
+        },
+        {
+          "claim": "Để thiết lập Resource-Based Constrained Delegation (RBCD) trên một máy chủ, kẻ tấn công bắt buộc phải có đặc quyền cao nhất là Domain Admins.",
+          "correction": "RBCD đảo ngược quyền kiểm soát về phía tài nguyên đích. Bất kỳ người dùng nào có quyền GenericWrite hoặc WriteProperty trên thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity của đối tượng máy tính đích đều có thể tự cấu hình RBCD mà không cần bất kỳ quyền quản trị domain nào."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os08-l71-q1",
+          "difficulty": "easy",
+          "question": "Thuộc tính nào trên tài khoản người dùng hoặc máy tính trong Active Directory khi được kích hoạt sẽ cho phép máy chủ lưu trữ toàn bộ vé TGT của người dùng xác thực vào bộ nhớ LSASS?",
+          "options": [
+            {
+              "id": "A",
+              "label": "DONT_REQ_PREAUTH"
+            },
+            {
+              "id": "B",
+              "label": "TRUSTED_FOR_DELEGATION (Unconstrained Delegation)"
+            },
+            {
+              "id": "C",
+              "label": "ACCOUNTDISABLE"
+            },
+            {
+              "id": "D",
+              "label": "ENCRYPTED_TEXT_PWD_ALLOWED"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Cờ TRUSTED_FOR_DELEGATION kích hoạt Unconstrained Delegation, khiến KDC tự động đính kèm bản sao vé TGT của client vào vé dịch vụ và lưu vào bộ nhớ LSASS của máy chủ tiếp nhận."
+        },
+        {
+          "id": "os08-l71-q2",
+          "difficulty": "medium",
+          "question": "Trong kịch bản tấn công Resource-Based Constrained Delegation (RBCD Takeover), kẻ tấn công ghi giá trị gì vào thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity của máy chủ mục tiêu?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Mật khẩu bản rõ của tài khoản Administrator cục bộ"
+            },
+            {
+              "id": "B",
+              "label": "Một Security Descriptor chứa SID của tài khoản máy tính mà kẻ tấn công đang kiểm soát"
+            },
+            {
+              "id": "C",
+              "label": "Địa chỉ IP của máy chủ Command and Control (C2)"
+            },
+            {
+              "id": "D",
+              "label": "Bản mã băm NTLM hash của tài khoản krbtgt"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity lưu trữ một nhị phân Security Descriptor (DACL). Bằng cách ghi SID của máy tính do kẻ tấn công kiểm soát vào DACL này, kẻ tấn công trao quyền cho máy tính đó được phép mạo danh người dùng truy cập máy chủ mục tiêu qua S4U2Proxy."
+        },
+        {
+          "id": "os08-l71-q3",
+          "difficulty": "hard",
+          "question": "Biện pháp phòng thủ nào sau đây có khả năng ngăn chặn TRIỆT ĐỂ cả hai kỹ thuật tấn công: Kerberos Unconstrained Delegation abuse và bẫy vé TGT từ Domain Controller qua SpoolSample?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Nâng cấp dung lượng RAM của Domain Controller lên tối thiểu 64GB"
+            },
+            {
+              "id": "B",
+              "label": "Vô hiệu hóa dịch vụ Print Spooler trên tất cả Domain Controllers và đưa các tài khoản quản trị vào nhóm Protected Users"
+            },
+            {
+              "id": "C",
+              "label": "Chuyển toàn bộ máy trạm trong mạng sang sử dụng địa chỉ IPv6 tĩnh"
+            },
+            {
+              "id": "D",
+              "label": "Bật tính năng File and Printer Sharing trên tất cả máy trạm của người dùng cuối"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Vô hiệu hóa Print Spooler (Spoolsv.exe) trên DC triệt tiêu hoàn toàn khả năng ép buộc DC xác thực qua MS-RPRN RPC call. Đồng thời, đưa tài khoản nhạy cảm vào nhóm Protected Users đảm bảo KDC không bao giờ cấp vé TGT ủy thác cho các tài khoản này."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một tổ chức tài chính đang vận hành hơn 50 chính sách GPO và nhiều máy chủ ứng dụng kế thừa từ hệ thống cũ. Bạn được giao nhiệm vụ thực hiện kiểm toán rà soát nguy cơ GPO Abuse trên chia sẻ SYSVOL, thẩm tra toàn bộ các cấu hình Kerberos Delegation trong thư mục, và thiết lập cấu hình phòng thủ triệt tiêu chuỗi tấn công RBCD.",
+        "tasks": [
+          "Sử dụng script PowerShell kiểm toán quyền hạn của toàn bộ GPO trong domain; phát hiện các tài khoản hoặc nhóm phi quản trị có quyền Write, WriteProperty hoặc Modify trên các thư mục GPT trong SYSVOL.",
+          "Truy vấn Active Directory để liệt kê tất cả các tài khoản máy tính và dịch vụ đang bật Unconstrained Delegation (TRUSTED_FOR_DELEGATION) hoặc Constrained Delegation với cờ Protocol Transition; xây dựng lộ trình loại bỏ hoặc chuyển đổi sang RBCD.",
+          "Xây dựng chính sách Group Policy Hardening: cấu hình đặt thuộc tính ms-DS-MachineAccountQuota về 0 trên Domain Root và triển khai cấu hình nhóm Protected Users cho toàn bộ nhân sự quản trị hệ thống."
+        ],
+        "requiredEvidence": [
+          "Bảng ma trận kiểm toán quyền hạn GPO thể hiện danh sách GPO, OU liên kết, và các quyền hạn bất thường trên SYSVOL",
+          "Danh mục toàn bộ các tài khoản đang sử dụng cơ chế ủy thác Kerberos kèm đánh giá mức độ rủi ro kỹ thuật",
+          "Kịch bản PowerShell tự động hóa việc phát hiện và dọn dẹp các giá trị trái phép trong thuộc tính msDS-AllowedToActOnBehalfOfOtherIdentity"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Group Policy Architecture and Processing Overview",
+          "url": "https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/hh831791(v=ws.11)",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc phân tách giữa GPC (LDAP) và GPT (SYSVOL)",
+            "Cơ chế Client-Side Extensions (CSE) và quy trình xử lý chính sách"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — Kerberos Protocol Extensions: Service for User and Constrained Delegation Protocol",
+          "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-sfu/3bff5864-8136-4aa5-bdd6-7142c33a9071",
+          "publisher": "Microsoft",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả kỹ thuật phần mở rộng S4U2Self và S4U2Proxy",
+            "Nguyên lý hoạt động của Resource-Based Constrained Delegation"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Sub-technique T1484.001: Group Policy Modification",
+          "url": "https://attack.mitre.org/techniques/T1484/001/",
+          "publisher": "MITRE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kỹ thuật lạm dụng chính sách nhóm để thực thi mã và leo thang đặc quyền",
+            "Phương pháp phát hiện và giảm thiểu nguy cơ can thiệp GPO"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os08-l72-active-directory-access-control-lists-and-attack-path-graphs",
+      "slug": "active-directory-access-control-lists-and-attack-path-graphs",
+      "title": "Active Directory Access Control Lists (DACLs), Kỹ Thuật DCSync & Đồ Thị Đường Đi Tấn Công (Attack Path Analysis)",
+      "summary": "Làm chủ cơ chế điều khiển truy cập trong Active Directory: cấu trúc Security Descriptor, các ACE nguy hiểm (GenericAll, WriteDacl, WriteOwner, GenericWrite), giao thức MS-DRSR và kỹ thuật DCSync trích xuất NTDS.dit không cần chạy mã trên DC, ứng dụng lý thuyết đồ thị định danh BloodHound để phân tích các chuỗi tấn công bắc cầu và chiến lược triệt tiêu nút thắt chokepoints.",
+      "difficulty": "advanced",
+      "durationMinutes": 160,
+      "prerequisites": [
+        "os08-l70-ad-principals-groups-and-privileged-access",
+        "os08-l71-group-policy-objects-and-delegation-mechanics"
+      ],
+      "outcomes": [
+        "Phân tích cấu trúc dữ liệu Security Descriptor của Active Directory: Discretionary ACL (DACL), System ACL (SACL), Object ACEs và nguyên lý thừa kế (Inheritance Flags).",
+        "Thẩm định tác động bảo mật của các quyền điều khiển nguy hiểm: GenericAll, WriteDacl, WriteOwner, GenericWrite, ForceChangePassword và Self-Membership trên đối tượng người dùng, nhóm, OU và Domain Root.",
+        "Giải mã giao thức Directory Replication Service Remote Protocol (MS-DRSR) và kỹ thuật DCSync dựa trên cặp quyền DS-Replication-Get-Changes và DS-Replication-Get-Changes-All.",
+        "Áp dụng lý thuyết đồ thị định danh (BloodHound / SharpHound / Cypher Queries) để ánh xạ toàn bộ các đường đi tấn công bắc cầu (transitive attack paths) và thực thi chiến lược khắc phục tại các nút thắt (chokepoints)."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["windows", "active-directory"],
+      "attackTactics": [
+        "privilege-escalation",
+        "credential-access",
+        "discovery",
+        "lateral-movement"
+      ],
+      "keywords": [
+        "dacl",
+        "genericall",
+        "writedacl",
+        "writeowner",
+        "dcsync",
+        "ms-drsr",
+        "bloodhound",
+        "attack-path-graph",
+        "chokepoint",
+        "cypher-query"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Active Directory về bản chất là một đồ thị có hướng (directed graph), trong đó các đỉnh (nodes) là tài khoản định danh/đối tượng máy tính/nhóm, còn các cạnh (edges) là các quyền truy cập ACEs (WriteDacl, MemberOf, GenericAll, DCSync). Trong khi quản trị viên con người thường nhìn hệ thống qua các danh sách phẳng (lists) và cây thư mục tổ chức (OU hierarchies), kẻ tấn công lại khai thác đồ thị bằng thuật toán tìm đường đi ngắn nhất (Shortest Path traversal). Chiến lược phòng thủ hiệu quả nhất không phải là sửa đổi hàng ngàn quyền riêng lẻ mà là nhận diện và triệt tiêu các nút thắt tập trung (chokepoints) trên đồ thị.",
+      "visual": {
+        "title": "Đồ Thị Đường Đi Tấn Công Định Danh Active Directory và Chiến Lược Triệt Tiêu Điểm Nghẽn",
+        "caption": "Mô hình hóa chuỗi lây lan đặc quyền bắc cầu từ tài khoản thường đến Domain Admin thông qua BloodHound và điểm cắt Chokepoint.",
+        "steps": [
+          {
+            "label": "Điểm Xâm Nhập Ban Đầu",
+            "detail": "Kẻ tấn công chiếm được tài khoản người dùng bình thường (User A) không có quyền quản trị trực tiếp trên máy chủ.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Duyệt Đồ Thị Bắc Cầu (Transitive Graph)",
+            "detail": "User A có quyền GenericWrite trên Helpdesk_Group -> Helpdesk_Group có WriteDacl trên ServerAdmin -> ServerAdmin có GenericAll trên Domain Controller.",
+            "tone": "caution"
+          },
+          {
+            "label": "Thực Thi Kỹ Thuật DCSync",
+            "detail": "Với quyền kiểm soát Domain Root hoặc DC, kẻ tấn công kích hoạt MS-DRSR DCSync để giả lập DC và kéo hash mật khẩu của krbtgt.",
+            "tone": "stop"
+          },
+          {
+            "label": "Cắt Bỏ Điểm Nghẽn (Chokepoint)",
+            "detail": "Bảo mật triệt tiêu quyền GenericWrite giữa User A và Helpdesk_Group, làm sụp đổ toàn bộ 48 đường đi tấn công tiềm năng mà không ảnh hưởng vận hành.",
+            "tone": "allow"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Cấu Trúc Security Descriptor trong Active Directory và Ma Trận Các Quyền DACL Nguy Hiểm Cấp Đối Tượng",
+          "paragraphs": [
+            "Mọi đối tượng trong cơ sở dữ liệu Active Directory (Users, Groups, Computers, OUs, Domain Root) đều được bảo vệ bởi một cấu trúc dữ liệu nhị phân gọi là Security Descriptor (SD), được lưu trữ trong thuộc tính `nTSecurityDescriptor`. Cấu trúc của Security Descriptor bao gồm: Owner SID (chủ sở hữu đối tượng), Primary Group SID, Discretionary Access Control List (DACL - xác định ai được phép hoặc bị từ chối truy cập), và System Access Control List (SACL - cấu hình ghi nhật ký kiểm toán truy cập). DACL bao gồm một danh sách các Access Control Entries (ACEs).",
+            "Mỗi ACE định nghĩa: (1) ACE Type (Access Allowed hoặc Access Denied); (2) ACE Flags (kiểm soát việc kế thừa quyền xuống các đối tượng con thông qua Container Inherit hoặc Object Inherit); (3) Access Mask (mặt nạ bit thể hiện quyền hạn cụ thể); (4) ObjectType GUID (tùy chọn, chỉ định quyền chỉ áp dụng cho một thuộc tính hoặc một lớp đối tượng cụ thể); và (5) Trustee SID (danh tính người dùng hoặc nhóm được áp dụng quyền). Việc đánh giá quyền truy cập được thực hiện bởi hệ thống con Local Security Authority (LSA) theo nguyên tắc: Access Denied luôn được ưu tiên xử lý trước Access Allowed, và các ACE trực tiếp (Explicit ACEs) luôn được ưu tiên trước các ACE kế thừa (Inherited ACEs).",
+            "Trong kiểm thử xâm nhập và phòng thủ AD, một số ACE mang tính chất 'vũ khí hóa' đặc biệt nguy hiểm: (1) `GenericAll` trao toàn quyền kiểm soát tuyệt đối trên đối tượng; (2) `WriteDacl` cho phép người nắm giữ sửa đổi danh sách kiểm soát truy cập của đối tượng mục tiêu, từ đó tự cấp cho mình quyền `GenericAll`; (3) `WriteOwner` cho phép người nắm giữ tự nhận mình là chủ sở hữu của đối tượng, mà theo kiến trúc Windows, chủ sở hữu luôn có quyền ngầm định tự gán cho mình quyền `WriteDacl`; (4) `GenericWrite` hoặc `WriteProperty` cho phép can thiệp vào các thuộc tính trọng yếu như `scriptPath` hay `member`; (5) `User-Force-Change-Password` (Extended Right) cho phép đặt lại mật khẩu của người dùng mà không cần biết mật khẩu hiện tại."
+          ]
+        },
+        {
+          "title": "Giao Thức MS-DRSR và Kỹ Thuật DCSync: Cơ Chế Sao Chép Cơ Sở Dữ Liệu NTDS.dit Qua Mạng Không Cần Chạy Mã Trên DC",
+          "paragraphs": [
+            "DCSync (được giới thiệu lần đầu trong công cụ Mimikatz) là một trong những kỹ thuật tấn công trích xuất thông tin xác thực (Credential Dumping) tinh vi và phổ biến nhất trong Active Directory. Điểm nguy hiểm cốt tử của DCSync là kẻ tấn công KHÔNG CẦN thực thi bất kỳ đoạn mã độc nào trên Domain Controller, KHÔNG CẦN đăng nhập tương tác hay chạy tiến trình trên DC, và KHÔNG CẦN trích xuất tệp tin `ntds.dit` từ ổ đĩa vật lý. Thay vào đó, DCSync lạm dụng chính giao thức đồng bộ hóa thư mục chuẩn Directory Replication Service Remote Protocol (MS-DRSR / giao diện RPC `drsuapi`).",
+            "Trong điều kiện vận hành bình thường, khi một Domain Controller mới cần đồng bộ hóa dữ liệu tài khoản từ một DC đối tác, nó sử dụng hàm RPC `IDL_DRSGetNCChanges` để yêu cầu sao chép các phân vùng thư mục (Naming Contexts). Để thực hiện thành công thao tác này, hệ thống kiểm tra xem danh tính người gọi có nắm giữ hai quyền mở rộng đặc biệt (Extended Rights) được gán trên đối tượng gốc của Domain (`DC=domain,DC=local`) hay không: (1) `DS-Replication-Get-Changes` (GUID: `1131f6aa-9c07-11d1-f79f-00c04fc2dcd2`); và (2) `DS-Replication-Get-Changes-All` (GUID: `1131f6ad-9c07-11d1-f79f-00c04fc2dcd2`). Trong một số trường hợp, quyền thứ ba `DS-Replication-Get-Changes-In-Filtered-Set` cũng có thể được yêu cầu.",
+            "Mặc định, chỉ các nhóm đặc quyền cao nhất như Domain Admins, Enterprise Admins, Administrators, và chính các tài khoản máy tính của Domain Controllers mới sở hữu các quyền này. Tuy nhiên, trong thực tế quản trị, quyền DCSync thường vô tình bị cấp cho các tài khoản dịch vụ đồng bộ định danh lai (chẳng hạn như Azure AD Connect / Entra Connect Sync Account) hoặc do quản trị viên ủy quyền sai lầm khi cấu hình giải pháp sao lưu (Backup Software). Khi kẻ tấn công chiếm được một tài khoản sở hữu cặp quyền sao chép này, họ có thể yêu cầu DC gửi bản sao dữ liệu mật khẩu mã hóa của bất kỳ tài khoản nào—kể cả tài khoản `krbtgt` và tài khoản `Administrator` (RID 500)—cho phép tạo Golden Ticket và chiếm quyền toàn miền ngay lập tức."
+          ]
+        },
+        {
+          "title": "Lý Thuyết Đồ Thị Định Danh với BloodHound: Nút, Cạnh, và Phân Tích Đường Đi Tấn Công Ngắn Nhất",
+          "paragraphs": [
+            "Tư duy phòng thủ truyền thống của các quản trị viên hệ thống thường dựa trên mô hình danh sách phẳng (Lists) và cấu trúc phân cấp cây thư mục (OU Trees). Quản trị viên kiểm tra xem ai nằm trong nhóm 'Domain Admins' và tin rằng nếu nhóm này chỉ có 5 người thì hệ thống an toàn. Ngược lại, kẻ tấn công tư duy theo Lý thuyết Đồ thị (Graph Theory). Trong mắt kẻ tấn công, Active Directory là một đồ thị có hướng (Directed Graph) khổng lồ chứa hàng chục ngàn đỉnh (Nodes) đại diện cho Users, Computers, Groups, OUs, GPOs, Domains, và các cạnh (Edges) đại diện cho các mối quan hệ kiểm soát như `MemberOf`, `AdminTo`, `HasSession`, `WriteDacl`, `GenericAll`, `Owns`, `GetChangesAll`.",
+            "BloodHound (sử dụng công cụ thu thập dữ liệu SharpHound hoặc BloodHound CE) chuyển đổi toàn bộ thông tin quan hệ từ LDAP và RPC thành một cơ sở dữ liệu đồ thị Neo4j. Sử dụng thuật toán Dijkstra hoặc Breadth-First Search (BFS) thông qua ngôn ngữ truy vấn Cypher, BloodHound cho phép kẻ tấn công và chuyên gia kiểm thử tìm kiếm đường dẫn ngắn nhất (Shortest Path) từ bất kỳ điểm xâm nhập ban đầu nào (ví dụ: một tài khoản thực tập sinh không có quyền quản trị) tới mục tiêu giá trị cao nhất (Tier 0 / Domain Admins).",
+            "Sức mạnh của phân tích đồ thị nằm ở khả năng xâu chuỗi các quyền hạn bắc cầu (Transitive Access Control Chains). Một chuỗi tấn công thực tế có thể bao gồm 5-7 bước: User A thuộc nhóm Nhóm_Tài_Vụ -> Nhóm_Tài_Vụ có quyền `GenericWrite` trên tài khoản máy tính FileServer01 -> Trên FileServer01 đang có phiên đăng nhập (Session) của User B thuộc nhóm IT-Helpdesk -> Nhóm IT-Helpdesk có quyền `WriteOwner` trên nhóm Server-Operators -> Server-Operators có quyền `GenericAll` trên tài khoản dịch vụ Sync-Admin -> Sync-Admin có quyền `DCSync` trên Domain Root. Không có bất kỳ công cụ quản trị giao diện GUI nào của Windows có thể giúp con người nhìn thấy chuỗi liên kết phức tạp này, nhưng đồ thị định danh làm nó lộ diện hoàn toàn."
+          ]
+        },
+        {
+          "title": "Chiến Lược Phòng Thủ Điểm Nghẽn (Chokepoint Remediation) và Giám Sát Liên Tục Bằng Truy Vấn Cypher",
+          "paragraphs": [
+            "Khi đối mặt với một đồ thị Active Directory chứa hàng triệu đường dẫn tấn công tiềm năng, sai lầm lớn nhất của đội ngũ phòng thủ là cố gắng sửa đổi từng quyền riêng lẻ một cách manh mún. Chiến lược phòng thủ hiện đại dựa trên khái niệm Điểm Nghẽn (Chokepoint Remediation). Sử dụng các chỉ số đồ thị như độ trung tâm trung gian (Betweenness Centrality), các nhà phân tích an ninh xác định các nút (Nodes) hoặc cạnh (Edges) đóng vai trò là 'nút thắt cổ chai'—nơi mà hàng trăm chuỗi tấn công khác nhau bắt buộc phải hội tụ trước khi có thể chạm tới Tier 0.",
+            "Bằng cách cắt bỏ duy nhất một cạnh nguy hiểm tại vị trí Chokepoint (chẳng hạn như: xóa bỏ quyền `WriteDacl` của nhóm Helpdesk trên một tài khoản quản trị trung gian, hoặc vô hiệu hóa phiên làm việc của tài khoản đặc quyền trên máy chủ dùng chung), đội ngũ an ninh có thể triệt tiêu đồng thời hàng ngàn đường đi tấn công mà hoàn toàn không gây xáo trộn hay ảnh hưởng tiêu cực tới hoạt động vận hành thường nhật của doanh nghiệp. Đây là phương pháp tối ưu hóa nguồn lực phòng thủ với tỷ suất hiệu quả trên chi phí (ROI) cao nhất.",
+            "Bên cạnh việc khắc phục điểm nghẽn tĩnh, doanh nghiệp cần triển khai giám sát định danh liên tục (Continuous Identity Posture Monitoring). Bằng cách thiết lập các truy vấn Cypher tự động chạy định kỳ trong hệ thống giám sát SIEM/SOAR, đội ngũ phòng thủ có thể phát hiện ngay lập tức sự xuất hiện của bất kỳ đường dẫn tấn công mới nào tới Tier 0 ngay khi quản trị viên vô tình gán quyền sai lệch: `MATCH p = shortestPath((u:User {admincount:0})-[*1..5]->(g:Group {name:'DOMAIN ADMINS@CORP.LOCAL'})) RETURN p`. Kết hợp với việc giám sát Windows Event ID 4662 (Operation on object) đối với các Extended Rights của DCSync, tổ chức có thể thiết lập hệ thống phòng thủ chủ động nhiều tầng."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Phân Tích Đồ Thị Đường Đi Tấn Công BloodHound, Kiểm Toán DACL và Triệt Tiêu Vector DCSync",
+        "objective": "Phát hiện và vô hiệu hóa chuỗi quyền leo thang WriteDacl/WriteOwner, kiểm toán và thu hồi quyền DCSync cấp phát sai quy định trên Domain Root, và ứng dụng Cypher query để xác định và triệt tiêu chokepoint.",
+        "scenario": "Bạn đang đóng vai trò Trưởng nhóm Purple Team thực hiện đánh giá tư thế an ninh định danh (Identity Security Posture Assessment) cho một tập đoàn công nghệ tài chính với 5,000 nhân viên.",
+        "constraints": [
+          "Không thu hồi quyền sao chép hợp lệ của các Domain Controllers vật lý đang thực hiện đồng bộ dữ liệu thư mục.",
+          "Mọi thay đổi trên Access Control Lists của Domain Root phải được kiểm tra trước trên môi trường Staging cách ly.",
+          "Ưu tiên triệt tiêu các đường dẫn tấn công có độ dài dưới 4 bước dẫn tới tài khoản nắm giữ quyền Enterprise Admins."
+        ],
+        "cases": [
+          {
+            "id": "case-72-01",
+            "title": "Phát Hiện và Vô Hiệu Hóa Chuỗi Quyền Bắc Cầu WriteDacl và WriteOwner Nhắm Vào Nhóm Quản Trị Viên",
+            "context": "Dữ liệu BloodHound ghi nhận một đường đi tấn công từ tài khoản 'contractor-dev' tới nhóm 'Domain Admins' thông qua chuỗi: contractor-dev sở hữu quyền WriteOwner trên nhóm 'App-Admins', và nhóm 'App-Admins' sở hữu quyền WriteDacl trên đối tượng nhóm 'Domain Admins'.",
+            "prompt": "Kẻ tấn công có thể thực hiện chuỗi hành động kỹ thuật nào để trở thành Domain Admin và biện pháp khắc phục chuẩn xác nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công không thể làm gì vì WriteDacl chỉ cho phép đọc quyền chứ không cho phép ghi. Khắc phục: Không cần can thiệp.",
+                "correct": false,
+                "rationale": "WriteDacl cho phép sửa đổi toàn bộ Security Descriptor của đối tượng mục tiêu, là một trong những quyền nguy hiểm nhất."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công dùng quyền WriteOwner để tự gán mình làm chủ sở hữu của App-Admins; với tư cách Owner, tự cấp cho mình quyền WriteDacl trên App-Admins; sau đó dùng quyền của App-Admins để sửa DACL của Domain Admins, tự thêm tài khoản của mình vào nhóm Domain Admins. Khắc phục: Xóa bỏ quyền WriteDacl của App-Admins trên Domain Admins, thu hồi quyền WriteOwner của contractor-dev, và thiết lập lại Owner mặc định cho các nhóm quản trị.",
+                "correct": true,
+                "rationale": "WriteOwner cho phép chiếm quyền kiểm soát đối tượng, sau đó WriteDacl cho phép can thiệp danh sách thành viên (member attribute) để chiếm Domain Admins."
+              },
+              {
+                "id": "C",
+                "label": "Kẻ tấn công sẽ gửi mã độc tống tiền khóa toàn bộ tệp tin trên máy trạm của contractor-dev. Khắc phục: Cài đặt lại hệ điều hành Windows trên máy trạm.",
+                "correct": false,
+                "rationale": "Tấn công DACL diễn ra trên cơ sở dữ liệu Active Directory của Domain Controller, không liên quan đến ransomware mã hóa tệp tin cục bộ."
+              },
+              {
+                "id": "D",
+                "label": "Kẻ tấn công sẽ gọi điện cho nhân viên Helpdesk để xin cấp lại mật khẩu của tài khoản Administrator. Khắc phục: Đào tạo nâng cao nhận thức an toàn thông tin.",
+                "correct": false,
+                "rationale": "Đây là tấn công kỹ thuật dựa trên Access Control Lists của AD, không phải kỹ thuật phi kỹ thuật (Social Engineering)."
+              }
+            ]
+          },
+          {
+            "id": "case-72-02",
+            "title": "Kiểm Toán Quyền DS-Replication-Get-Changes-All Lạ và Chặn Đứng Tấn Công DCSync Khẩn Cấp",
+            "context": "Trong quá trình kiểm toán phân vùng Domain Root (DC=corp,DC=local), bạn phát hiện một tài khoản dịch vụ tên 'svc-report-reader' được gán quyền Extended Rights: 'Replicating Directory Changes' và 'Replicating Directory Changes All'. Hệ thống SIEM vừa ghi nhận lưu lượng mạng đột biến với các gói tin RPC gọi hàm IDL_DRSGetNCChanges phát xuất từ máy chủ chạy dịch vụ này.",
+            "prompt": "Nguy cơ an ninh tức thời nào đang diễn ra và đội ngũ phản ứng sự cố cần thực hiện hành động khẩn cấp nào?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Máy chủ dịch vụ đang đồng bộ thời gian NTP với Domain Controller. Hành động: Cấu hình lại dịch vụ w32time trên máy chủ.",
+                "correct": false,
+                "rationale": "Giao thức đồng bộ thời gian NTP sử dụng cổng UDP 123, hoàn toàn không liên quan đến các hàm RPC IDL_DRSGetNCChanges của giao thức MS-DRSR."
+              },
+              {
+                "id": "B",
+                "label": "Tài khoản svc-report-reader đang bị lợi dụng để thực hiện tấn công DCSync trích xuất toàn bộ mật khẩu mã hóa (bao gồm tài khoản krbtgt) từ NTDS.dit qua mạng. Hành động: Lập tức vô hiệu hóa tài khoản svc-report-reader, thu hồi hai quyền Replicating Directory Changes trên Domain Root, và kích hoạt quy trình đổi mật khẩu tài khoản krbtgt hai lần liên tiếp để vô hiệu hóa vé Kerberos giả mạo.",
+                "correct": true,
+                "rationale": "Hai quyền này là điều kiện tiên quyết của DCSync. Khi bị khai thác, kẻ tấn công có thể lấy được krbtgt hash để tạo Golden Ticket, đòi hỏi phải reset krbtgt 2 lần."
+              },
+              {
+                "id": "C",
+                "label": "Dịch vụ báo cáo đang cập nhật danh sách email của nhân viên. Hành động: Cho phép kết nối tiếp tục hoạt động bình thường.",
+                "correct": false,
+                "rationale": "Đọc email nhân viên chỉ cần quyền đọc thuộc tính mail thông thường qua LDAP, hoàn toàn không cần quyền Replicating Directory Changes All."
+              },
+              {
+                "id": "D",
+                "label": "Hệ thống bị tấn công tràn bộ đệm trên dịch vụ DNS Server. Hành động: Khởi động lại máy chủ DNS.",
+                "correct": false,
+                "rationale": "DCSync là việc lạm dụng quyền hợp lệ trên giao thức RPC sao chép thư mục, không phải lỗ hổng tràn bộ đệm DNS."
+              }
+            ]
+          },
+          {
+            "id": "case-72-03",
+            "title": "Sử Dụng Truy Vấn Cypher Phân Tích Đồ Thị BloodHound Để Triệt Tiêu Chokepoints Dẫn Tới Domain Admins",
+            "context": "Sau khi nạp toàn bộ dữ liệu SharpHound của doanh nghiệp vào BloodHound CE, bạn chạy truy vấn tìm đường đi tới nhóm Domain Admins và phát hiện có hơn 120 tài khoản người dùng bình thường đều có đường dẫn tấn công bắc cầu dẫn tới Tier 0. Tất cả 120 đường dẫn này đều bắt buộc phải đi qua một nút trung gian duy nhất: Nhóm 'Tier1-Server-Operators' có quyền GenericAll trên tài khoản 'da-jumpbox-admin'.",
+            "prompt": "Theo phương pháp Chokepoint Remediation, quyết định can thiệp nào đem lại hiệu quả tối ưu nhất với chi phí vận hành thấp nhất?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Xóa toàn bộ 120 tài khoản người dùng bình thường khỏi hệ thống Active Directory để triệt tiêu nguồn gốc của đường đi.",
+                "correct": false,
+                "rationale": "Xóa tài khoản người dùng nghiệp vụ sẽ làm tê liệt hoạt động của doanh nghiệp, không phải là giải pháp bảo mật khả thi."
+              },
+              {
+                "id": "B",
+                "label": "Triệt tiêu ngay tại điểm nghẽn (Chokepoint): Xóa bỏ quyền GenericAll của nhóm Tier1-Server-Operators trên tài khoản da-jumpbox-admin và tách biệt tài khoản này theo đúng ranh giới Tier 0; hành động duy nhất này sẽ lập tức xóa sổ toàn bộ 120 đường dẫn tấn công tới Domain Admins mà không ảnh hưởng tới người dùng bình thường.",
+                "correct": true,
+                "rationale": "Chokepoint Remediation tập trung xử lý tại điểm hội tụ có độ trung tâm cao nhất. Chỉ một can thiệp chính xác tại nút thắt sẽ vô hiệu hóa toàn bộ chuỗi tấn công."
+              },
+              {
+                "id": "C",
+                "label": "Cài đặt lại toàn bộ hệ điều hành Windows Server của tất cả Domain Controllers trong doanh nghiệp.",
+                "correct": false,
+                "rationale": "Cài lại DC không giải quyết được vấn đề phân quyền logic trong cơ sở dữ liệu thư mục NTDS.dit."
+              },
+              {
+                "id": "D",
+                "label": "Nâng cấp cơ sở dữ liệu Neo4j lên phiên bản mới nhất để tự động xóa bỏ các cạnh độc hại trên đồ thị.",
+                "correct": false,
+                "rationale": "Neo4j chỉ là công cụ hiển thị đồ thị dữ liệu, không có khả năng tự động can thiệp sửa đổi quyền hạn trên Active Directory thực tế."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân tích đúng chuỗi leo thang đặc quyền bắc cầu kết hợp giữa WriteOwner và WriteDacl trên các nhóm quản trị viên.",
+          "Chẩn đoán chính xác tấn công DCSync dựa trên giao thức MS-DRSR và cặp quyền Replicating Directory Changes trên Domain Root.",
+          "Ứng dụng thành công lý thuyết đồ thị BloodHound và chiến lược Chokepoint Remediation để triệt tiêu các đường đi tấn công diện rộng."
+        ],
+        "evidenceTemplate": [
+          "Bản đồ thị xuất từ BloodHound thể hiện các chuỗi tấn công bắc cầu trước và sau khi thực hiện xử lý điểm nghẽn",
+          "Báo cáo kiểm toán danh sách các thực thể sở hữu quyền DS-Replication-Get-Changes-All trên Domain Root",
+          "Tập hợp các truy vấn Cypher định kỳ dùng để giám sát tư thế an ninh định danh và phát hiện đường đi ngắn nhất tới Tier 0",
+          "Kế hoạch hành động ứng phó khẩn cấp và quy trình xoay vòng mật khẩu tài khoản krbtgt hai lần liên tiếp"
+        ],
+        "reset": "Khôi phục lại toàn bộ cơ sở dữ liệu đồ thị BloodHound và phân quyền DACL trên Domain Root về trạng thái chuẩn ban đầu.",
+        "cleanup": "Xóa bỏ các phiên kết nối kiểm toán tạm thời và giải phóng dữ liệu bộ nhớ đệm Neo4j."
+      },
+      "governance": {
+        "prevent": [
+          "Khóa chặt quyền hạn trên Domain Root, đảm bảo chỉ có Domain Controllers và Enterprise Admins mới sở hữu các quyền DS-Replication-Get-Changes và DS-Replication-Get-Changes-All.",
+          "Áp dụng nguyên tắc 'Zero Dangerous ACEs': Thường xuyên rà soát và thanh trừng các quyền GenericAll, WriteDacl, WriteOwner cấp cho các nhóm phi quản trị trên mọi đối tượng trong AD.",
+          "Thực hiện nguyên lý Chokepoint Remediation trong quy trình thiết kế và tái cấu trúc quyền hạn thư mục, ngăn chặn hình thành các đường đi bắc cầu tới Tier 0."
+        ],
+        "observe": [
+          "Giám sát Windows Security Event ID 4662 (An operation was performed on an object) với Access Mask tương ứng của quyền DCSync trên Domain Root.",
+          "Theo dõi Event ID 5136 khi có sự thay đổi quyền sở hữu (Owner) hoặc sửa đổi DACL trên các nhóm và tài khoản đặc quyền.",
+          "Triển khai quét SharpHound định kỳ hàng tuần và chạy các truy vấn Cypher tự động để phát hiện các đường dẫn tấn công mới xuất hiện."
+        ],
+        "respond": [
+          "Khi phát hiện có dấu hiệu tấn công DCSync bất hợp pháp, lập tức cô lập tài khoản thực hiện, khóa cổng RPC/SMB từ địa chỉ IP nguồn tới Domain Controllers.",
+          "Tiến hành quy trình xoay vòng mật khẩu tài khoản krbtgt hai lần liên tiếp (cách nhau một khoảng thời gian đủ để đồng bộ) để vô hiệu hóa toàn bộ Golden Tickets đang tồn tại.",
+          "Sử dụng công cụ BloodHound để rà soát toàn bộ các tài khoản liên đới trong chuỗi đường dẫn tấn công và buộc đặt lại thông tin xác thực."
+        ],
+        "residualRisk": [
+          "Việc thu hồi quyền DCSync từ các tài khoản dịch vụ đồng bộ định danh lai (như Entra Connect) có thể làm gián đoạn tạm thời quá trình đồng bộ tài khoản lên đám mây.",
+          "Kẻ tấn công có thể ẩn náu và khai thác các cạnh đồ thị phi truyền thống (như quyền trên GPO hoặc phiên làm việc Session) mà các công cụ quét LDAP thông thường có thể bỏ sót."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Kỹ thuật tấn công DCSync bắt buộc kẻ tấn công phải chiếm được quyền truy cập vật lý hoặc thực thi mã độc trực tiếp trên máy chủ Domain Controller.",
+          "correction": "DCSync hoàn toàn không cần thực thi mã trên DC. Nó lạm dụng giao thức mạng chuẩn MS-DRSR; kẻ tấn công chỉ cần đứng từ bất kỳ máy trạm nào trong mạng và sử dụng một tài khoản có quyền Replicating Directory Changes để yêu cầu DC gửi bản sao mật khẩu qua mạng."
+        },
+        {
+          "claim": "Nếu một tài khoản chỉ có quyền WriteOwner trên một đối tượng thì tài khoản đó vẫn chưa thể thay đổi mật khẩu hay thêm thành viên vào đối tượng đó.",
+          "correction": "Theo kiến trúc bảo mật Windows, chủ sở hữu (Owner) của một đối tượng luôn có quyền ngầm định tự cấp cho mình quyền WriteDacl. Một khi đã có WriteDacl, chủ sở hữu có thể tự cấp tiếp quyền GenericAll và kiểm soát hoàn toàn đối tượng."
+        },
+        {
+          "claim": "Cách tốt nhất để bảo vệ Active Directory là kiểm tra và sửa đổi từng quyền riêng lẻ của tất cả 10,000 người dùng trong hệ thống.",
+          "correction": "Sửa đổi từng quyền riêng lẻ là bất khả thi và dễ gây đứt gãy vận hành. Chiến lược tối ưu là ứng dụng lý thuyết đồ thị định danh để tìm các điểm nghẽn (Chokepoints)—nơi các đường dẫn tấn công hội tụ—và triệt tiêu quyền tại điểm nghẽn đó để vô hiệu hóa hàng ngàn đường đi cùng lúc."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os08-l72-q1",
+          "difficulty": "easy",
+          "question": "Kỹ thuật DCSync lạm dụng giao thức mạng nào của Windows để yêu cầu Domain Controller gửi bản sao mật khẩu tài khoản qua mạng?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Simple Network Management Protocol (SNMP)"
+            },
+            {
+              "id": "B",
+              "label": "Directory Replication Service Remote Protocol (MS-DRSR)"
+            },
+            {
+              "id": "C",
+              "label": "Dynamic Host Configuration Protocol (DHCP)"
+            },
+            {
+              "id": "D",
+              "label": "Network Time Protocol (NTP)"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "DCSync lạm dụng giao thức chuẩn Directory Replication Service Remote Protocol (MS-DRSR) qua RPC interface drsuapi để giả lập một Domain Controller đang đồng bộ dữ liệu thư mục."
+        },
+        {
+          "id": "os08-l72-q2",
+          "difficulty": "medium",
+          "question": "Trong cấu trúc điều khiển truy cập của Active Directory, quyền nào sau đây cho phép người nắm giữ có khả năng sửa đổi Discretionary Access Control List (DACL) của đối tượng mục tiêu để tự trao thêm quyền cho chính mình?",
+          "options": [
+            {
+              "id": "A",
+              "label": "ReadProperty"
+            },
+            {
+              "id": "B",
+              "label": "ListChildren"
+            },
+            {
+              "id": "C",
+              "label": "WriteDacl"
+            },
+            {
+              "id": "D",
+              "label": "ListObject"
+            }
+          ],
+          "correctAnswer": "C",
+          "explanation": "Quyền WriteDacl cho phép người nắm giữ chỉnh sửa danh sách kiểm soát truy cập tùy ý (DACL) của đối tượng, từ đó có thể tự thêm cho mình quyền GenericAll hoặc Full Control."
+        },
+        {
+          "id": "os08-l72-q3",
+          "difficulty": "hard",
+          "question": "Trong phân tích đồ thị đường đi tấn công BloodHound, tại sao chiến lược Chokepoint Remediation lại được coi là phương pháp phòng thủ vượt trội hơn so với việc sửa đổi quyền phân tán?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì Chokepoint Remediation tự động mã hóa toàn bộ cơ sở dữ liệu NTDS.dit bằng thuật toán AES-256"
+            },
+            {
+              "id": "B",
+              "label": "Vì việc triệt tiêu quyền tại một nút thắt tập trung (Chokepoint) sẽ làm sụp đổ hàng trăm đường dẫn tấn công bắc cầu đồng thời mà không gây ảnh hưởng tới hoạt động vận hành của các bộ phận khác"
+            },
+            {
+              "id": "C",
+              "label": "Vì Chokepoint Remediation ngăn chặn hoàn toàn các máy trạm gửi truy vấn DNS tới Domain Controller"
+            },
+            {
+              "id": "D",
+              "label": "Vì phương pháp này bắt buộc tất cả nhân viên phải thay đổi mật khẩu mỗi ngày một lần"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Độ trung tâm của điểm nghẽn (Chokepoint) trên đồ thị định danh thể hiện nơi hội tụ của vô số chuỗi lây lan đặc quyền. Xóa bỏ một cạnh hoặc nút thắt chiến lược này sẽ loại bỏ đồng loạt các chuỗi tấn công tới Tier 0 với chi phí vận hành và rủi ro gián đoạn thấp nhất."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Tập đoàn công nghệ tài chính vừa trải qua một cuộc kiểm toán an ninh độc lập và phát hiện nhiều nhóm quản trị viên ủy quyền có quyền hạn chồng chéo trên Domain Root và các OU nhạy cảm. Bạn được giao nhiệm vụ thực hiện một đợt Purple Teaming: sử dụng SharpHound thu thập dữ liệu đồ thị, phân tích các chuỗi tấn công bắc cầu nguy hiểm nhất, xác định các điểm nghẽn chiến lược (Chokepoints) và xây dựng kế hoạch triệt tiêu đường đi toàn diện.",
+        "tasks": [
+          "Thực hiện thu thập dữ liệu an ninh định danh bằng SharpHound trong môi trường lab cách ly; nhập dữ liệu vào BloodHound và xây dựng ít nhất 3 câu truy vấn Cypher chuyên sâu để nhận diện các tài khoản thường có đường đi ngắn nhất tới nhóm Domain Admins.",
+          "Kiểm toán phân vùng Domain Root (`DC=domain,DC=local`) để xác định toàn bộ các tài khoản người dùng hoặc nhóm sở hữu các quyền Extended Rights liên quan đến DCSync (`DS-Replication-Get-Changes-All`); xây dựng báo cáo phân loại tài khoản hợp lệ (DC, Entra Connect) và tài khoản dư thừa quyền.",
+          "Lập phương án Chokepoint Remediation: xác định 2 điểm nghẽn tập trung có thể triệt tiêu ít nhất 80% các đường dẫn tấn công hiện hữu; thiết lập quy trình kiểm thử tác động vận hành và kế hoạch rollback an toàn."
+        ],
+        "requiredEvidence": [
+          "Bản đồ thị BloodHound minh họa trực quan các chuỗi tấn công bắc cầu trước và sau khi xử lý điểm nghẽn",
+          "Báo cáo kết quả kiểm toán quyền DCSync trên Domain Root kèm script PowerShell phát hiện vi phạm",
+          "Kế hoạch triển khai Chokepoint Remediation chi tiết bao gồm danh sách các ACE cần điều chỉnh và tài liệu đánh giá tác động vận hành"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Microsoft Learn — Active Directory Domain Services Access Control Model",
+          "url": "https://learn.microsoft.com/en-us/windows/win32/ad/access-control-in-active-directory-domain-services",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu trúc Security Descriptor, DACL, SACL và Object ACEs trong Active Directory",
+            "Nguyên tắc đánh giá quyền truy cập và kế thừa quyền trong AD DS"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — Directory Replication Service (DRS) Remote Protocol Specification",
+          "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-drsr/f977faaa-013e-4f16-8208-83c418879abf",
+          "publisher": "Microsoft",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Đặc tả kỹ thuật giao thức MS-DRSR và hàm IDL_DRSGetNCChanges",
+            "Yêu cầu về quyền bảo mật DS-Replication-Get-Changes-All phục vụ sao chép dữ liệu"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Sub-technique T1003.006: OS Credential Dumping - DCSync",
+          "url": "https://attack.mitre.org/techniques/T1003/006/",
+          "publisher": "MITRE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế và phương thức khai thác kỹ thuật DCSync trong tấn công trích xuất thông tin xác thực",
+            "Chiến lược phát hiện thông qua giám sát Event ID 4662 và bảo vệ ranh giới Domain Root"
+          ]
+        }
+      ]
+    }
+  ]
+}

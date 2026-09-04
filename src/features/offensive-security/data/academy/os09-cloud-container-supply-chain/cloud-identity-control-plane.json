@@ -1,0 +1,1167 @@
+{
+  "id": "os09-m01-cloud-identity-control-plane",
+  "slug": "cloud-identity-control-plane",
+  "trackId": "os09-cloud-container-supply-chain",
+  "title": "Định Danh Đám Mây, Chứng Thư Tạm Thời STS & Đặc Quyền Control Plane",
+  "summary": "Phân tích kiến trúc quản trị định danh đám mây (AWS IAM, GCP IAM, Azure RBAC), cơ chế phát hành chứng thư tạm thời qua STS và OIDC Workload Identity Federation, và kiểm toán 21 vector leo thang đặc quyền trên Cloud Control Plane theo nguyên tắc đặc quyền tối thiểu (PoLP).",
+  "difficulty": "intermediate",
+  "estimatedMinutes": 360,
+  "careerPaths": ["penetration-test", "red-team", "purple-team"],
+  "domains": ["cloud", "iam"],
+  "safetyLevel": "isolated-only",
+  "lessons": [
+    {
+      "id": "os09-l79-cloud-identity-and-access-management-models",
+      "slug": "cloud-identity-and-access-management-models",
+      "title": "Mô Hình Quản Trị Định Danh & Kiểm Soát Truy Cập Đám Mây (AWS IAM, GCP IAM & Azure RBAC)",
+      "summary": "Phân tích chuyên sâu kiến trúc quản trị định danh đa đám mây: so sánh mô hình chính sách IAM của AWS (Identity-based, Resource-based, SCPs, Boundaries), kiến trúc cây phân cấp GCP IAM (Org/Folder/Project) và mô hình Azure RBAC trên Entra ID; bóc tách thuật toán đánh giá chính sách (Policy Evaluation Logic) và các rủi ro cấu hình sai lầm phổ biến.",
+      "difficulty": "intermediate",
+      "durationMinutes": 120,
+      "prerequisites": [],
+      "outcomes": [
+        "Phân tích và đối chiếu kiến trúc phân quyền cốt lõi giữa AWS IAM, Google Cloud IAM và Microsoft Azure RBAC, bao gồm cách tiếp cận định danh (Principals), đối tượng tài nguyên và cơ chế gán vai trò.",
+        "Bóc tách thuật toán đánh giá chính sách (Policy Evaluation Logic) đa tầng của AWS: Explicit Deny, Organizations Service Control Policies (SCPs), Permissions Boundaries, Session Policies, và Identity/Resource-based Policies.",
+        "Kiểm toán và nhận diện các lỗ hổng cấu hình chính sách nguy hiểm: wildcard permissions (\"*\"), quyền mở rộng Principal (\"*\") trong Resource-based Policies, và việc thiếu sót các khóa điều kiện (Condition Keys) như aws:PrincipalOrgID hay aws:SourceArn.",
+        "Xây dựng ma trận phân quyền tối thiểu (Least Privilege) và thiết lập các rào chắn kỹ thuật (Guardrails) nhằm ngăn chặn hiện tượng đặc quyền lan tỏa (Privilege Creep) và lây lan ranh giới tài khoản (Cross-Account Drift)."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["cloud", "iam"],
+      "attackTactics": ["initial-access", "privilege-escalation", "defense-evasion"],
+      "keywords": [
+        "aws-iam",
+        "azure-rbac",
+        "gcp-iam",
+        "policy-evaluation-logic",
+        "service-control-policies",
+        "permissions-boundaries",
+        "resource-based-policies",
+        "least-privilege"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Định danh trên đám mây hoạt động như một hệ điều hành phân tán nơi API Control Plane là nhân kernel. Quyền truy cập không bao giờ được quyết định bởi một bảng phân quyền đơn lẻ mà là kết quả của thuật toán giao thoa chính sách (Policy Intersection Logic). Trong AWS, một thao tác chỉ thành công khi thỏa mãn đồng thời hai điều kiện: có ít nhất một Explicit Allow hợp lệ và TUYỆT ĐỐI KHÔNG có bất kỳ Explicit Deny nào từ bất kỳ lớp kiểm soát nào (SCP ở cấp Organization, Permissions Boundary ở cấp Principal, Session Policy khi assume role, hoặc Deny Statement trong chính sách cục bộ). Nắm vững thuật toán đánh giá này là chìa khóa để vừa khai thác triệt để các kẽ hở kiểm soát, vừa thiết kế các rào chắn phòng thủ bất khả xâm phạm.",
+      "visual": {
+        "title": "Thuật Toán Đánh Giá Chính Sách Quyền Hạn Đa Tầng Trong AWS IAM",
+        "caption": "Luồng thẩm định một lệnh gọi API từ Principal qua 4 cổng kiểm soát trước khi đưa ra quyết định Allow hoặc Deny.",
+        "steps": [
+          {
+            "label": "Khởi tạo Yêu cầu API Control Plane",
+            "detail": "Principal gửi yêu cầu API kèm theo ngữ cảnh ngữ nghĩa (Context: IP, MFA, thời gian, tags). Hệ thống khởi tạo quyết định mặc định là Default Deny.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Kiểm tra Organizations SCP & Permissions Boundary",
+            "detail": "Hệ thống duyệt qua SCP của OU và Permissions Boundary của Principal. Nếu xuất hiện bất kỳ Explicit Deny nào, yêu cầu lập tức bị chặn đứng mà không cần xét tiếp.",
+            "tone": "caution"
+          },
+          {
+            "label": "Đánh giá Identity-based & Resource-based Policies",
+            "detail": "Kiểm tra sự hiện diện của Explicit Allow trong chính sách gắn với Principal hoặc chính sách gắn trên tài nguyên đích (S3, KMS, SQS). Nếu có Allow và không có Deny cục bộ, cờ cấp phép được bật.",
+            "tone": "allow"
+          },
+          {
+            "label": "Quyết định Cuối cùng (Final Decision)",
+            "detail": "Nếu có Deny ở bất kỳ tầng nào -> Deny tuyệt đối. Nếu chỉ có Default Deny mà không có Allow nào -> Deny. Chỉ khi có Explicit Allow và không có Explicit Deny -> Cho phép thực thi API.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc Định Danh Đa Đám Mây: Đối Chiếu Toàn Diện AWS IAM, Azure RBAC và GCP Cloud IAM",
+          "paragraphs": [
+            "Quản trị định danh và truy cập (Identity and Access Management - IAM) là phòng tuyến cốt lõi đầu tiên và quan trọng nhất trong mô hình bảo mật Zero Trust trên nền tảng điện toán đám mây. Khác với kiến trúc truyền thống dựa vào tường lửa mạng (Network Perimeter), đám mây định vị danh tính là ranh giới an ninh chính (Identity is the new perimeter). Tuy nhiên, mỗi nhà cung cấp dịch vụ đám mây lớn (CSP) tiếp cận bài toán quản trị danh tính với các triết lý và cấu trúc dữ liệu khác nhau, đòi hỏi chuyên gia bảo mật phải hiểu rõ cơ chế nội tại để tránh các ngộ nhận khi kiểm toán môi trường đa đám mây (Multi-Cloud).",
+            "Trong Amazon Web Services (AWS), IAM tổ chức phân quyền xoay quanh hai khái niệm chính sách bằng tài liệu JSON: Identity-based Policies (gắn trực tiếp vào IAM Users, Groups hoặc Roles) và Resource-based Policies (gắn trực tiếp vào tài nguyên như S3 Bucket Policy, KMS Key Policy, SQS Queue Policy). AWS không có cơ chế kế thừa quyền theo cấu trúc phân cấp tài khoản mặc định; mỗi tài khoản AWS là một ranh giới bảo mật độc lập (hard security boundary). Để quản trị tập trung nhiều tài khoản, AWS sử dụng AWS Organizations kết hợp Service Control Policies (SCPs) để thiết lập ranh giới trần (guardrails) ngăn chặn các hành động nguy hiểm.",
+            "Ngược lại, Google Cloud Platform (GCP) xây dựng cấu trúc quản trị định danh theo cây phân cấp tài nguyên nghiêm ngặt: Organization -> Folders -> Projects -> Resources. Phân quyền trong GCP dựa trên IAM Bindings, liên kết một hoặc nhiều Principals (Google Account, Service Account, Google Group) với một Role duy nhất (Predefined Role hoặc Custom Role) trên một nút tài nguyên cụ thể. Quyền hạn trong GCP mang tính kế thừa xuôi dòng (inheritance downwards): bất kỳ quyền nào được gán ở cấp Organization hoặc Folder sẽ tự động áp dụng xuống toàn bộ các Project và tài nguyên con bên dưới mà không thể bị ghi đè hay thu hồi cục bộ ở tầng dưới.",
+            "Microsoft Azure tiếp cận thông qua sự tích hợp chặt chẽ giữa Microsoft Entra ID (trước đây là Azure AD) và Azure Resource Manager (ARM). Entra ID đóng vai trò là kho thư mục định danh (Identity Directory), trong khi Azure RBAC (Role-Based Access Control) quản lý quyền truy cập trên tài nguyên đám mây. Phân cấp quản trị Azure gồm: Management Groups -> Subscriptions -> Resource Groups -> Resources. Một Role Assignment trong Azure là sự kết hợp giữa Security Principal (User, Group, Service Principal, Managed Identity), Role Definition (tập hợp các quyền Actions và NotActions), và Scope (phạm vi áp dụng). Tương tự như GCP, Azure RBAC kế thừa quyền từ tầng cao xuống tầng thấp, nhưng bổ sung thêm Deny Assignments để chặn quyền kế thừa trong các kịch bản đặc thù (chẳng hạn như Azure Blueprints)."
+          ]
+        },
+        {
+          "title": "Thuật Toán Đánh Giá Chính Sách AWS IAM (Policy Evaluation Logic) và Quyền Lực Của Explicit Deny",
+          "paragraphs": [
+            "Khi một Principal gửi một lệnh gọi API tới AWS Control Plane, AWS Policy Engine không đơn thuần kiểm tra xem Principal đó có quyền hay không, mà thực thi một thuật toán đánh giá ma trận chính sách theo thứ tự ưu tiên xác định. Điểm cốt lõi bất biến của thuật toán này là nguyên tắc: Mặc định từ chối (Default Deny) và Từ chối tường minh luôn có quyền ưu tiên cao nhất (Explicit Deny always wins). Nếu có bất kỳ câu lệnh nào trả về 'Deny' trong toàn bộ chuỗi đánh giá, yêu cầu API sẽ bị hủy bỏ ngay lập tức bất kể có bao nhiêu câu lệnh 'Allow' khác tồn tại.",
+            "Thuật toán đánh giá của AWS diễn ra qua 6 bước tuần tự: (1) Khởi tạo quyết định mặc định là Deny; (2) Đánh giá toàn bộ các chính sách áp dụng xem có Explicit Deny nào khớp với ngữ cảnh yêu cầu (Action, Resource, Condition) hay không; nếu có, lập tức trả về kết quả Deny; (3) Đánh giá Service Control Policies (SCPs) của AWS Organizations: nếu tài khoản nằm trong Organization, SCP phải cho phép hành động đó (nghĩa là phải có Allow và không có Deny trong SCP), nếu không yêu cầu bị Deny ngầm định; (4) Đánh giá Resource-based Policies: nếu tài nguyên đích có chính sách cho phép (ví dụ S3 bucket policy), và không vi phạm SCP, quyền có thể được cấp; (5) Đánh giá Permissions Boundaries: nếu Principal có gắn Permissions Boundary, boundary đó bắt buộc phải chứa Explicit Allow cho hành động đang xét; (6) Đánh giá Identity-based Policies kết hợp Session Policies: nếu tồn tại Explicit Allow và không vi phạm bất kỳ ranh giới nào, kết quả cuối cùng chuyển thành Allow.",
+            "Một đặc điểm cực kỳ quan trọng thường bị bỏ sót trong các đợt kiểm toán an ninh là sự khác biệt giữa tương tác trong cùng một tài khoản (Same-Account) và tương tác liên tài khoản (Cross-Account). Trong Same-Account, chỉ cần Identity-based Policy HOẶC Resource-based Policy cấp quyền Allow (và không có Deny) là Principal đã có thể truy cập tài nguyên. Tuy nhiên, trong Cross-Account (ví dụ Principal từ Account A truy cập S3 Bucket thuộc Account B), nguyên tắc ủy quyền bắt buộc cả hai phía cùng đồng thuận: Account A phải có Identity-based Policy cho phép Principal gọi ra ngoài, VÀ Account B phải có Resource-based Policy cấp quyền cho Principal của Account A truy cập vào."
+          ]
+        },
+        {
+          "title": "Ranh Giới Bảo Mật Control Plane: Service Control Policies (SCPs), Permissions Boundaries và Bẫy Cross-Account",
+          "paragraphs": [
+            "Để ngăn chặn hiện tượng mất kiểm soát đặc quyền trong các doanh nghiệp lớn sở hữu hàng trăm tài khoản AWS, hai cơ chế rào chắn an ninh mạnh mẽ nhất được áp dụng là Service Control Policies (SCPs) và Permissions Boundaries. Hiểu sai bản chất của hai công cụ này là nguồn cơn của nhiều sự cố rò rỉ dữ liệu hoặc đứt gãy vận hành nghiêm trọng.",
+            "Service Control Policies (SCPs) hoạt động ở cấp độ tổ chức (AWS Organizations), gắn vào Root, Organizational Units (OUs), hoặc từng tài khoản thành viên. Cần nhấn mạnh: SCP KHÔNG BAO GIỜ cấp quyền trực tiếp cho bất kỳ ai. SCP chỉ đóng vai trò như một bộ lọc trần (Guardrail / Permission Filter) xác định phạm vi quyền tối đa mà các tài khoản thành viên có thể phân bổ. Ngay cả tài khoản Root của một tài khoản AWS thành viên cũng bị chi phối và hạn chế hoàn toàn bởi SCP. Ví dụ, một SCP chứa lệnh Explicit Deny đối với hành động `s3:DeleteBucket` sẽ ngăn chặn mọi quản trị viên trong tài khoản con xóa S3 bucket, bảo vệ dữ liệu trước các cuộc tấn công phá hoại bằng ransomware.",
+            "Permissions Boundaries là một tính năng nâng cao của IAM dùng để quản lý việc ủy quyền tạo IAM Role (Delegated Administration). Khi cho phép các kỹ sư DevOps quyền tạo IAM Role hoặc User mới để phục vụ ứng dụng, nguy cơ lớn nhất là kỹ sư đó tự tạo một Role có quyền `AdministratorAccess` để leo thang đặc quyền. Bằng cách thiết lập Permissions Boundary, doanh nghiệp quy định mức trần quyền hạn mà Role mới được phép sở hữu. Bất kể chính sách đính kèm vào Role có rộng đến đâu, quyền thực tế của Role đó không bao giờ vượt qua phạm vi giao thoa (intersection) giữa Identity Policy và Permissions Boundary.",
+            "Hiểm họa Cross-Account nảy sinh khi quản trị viên cấu hình Resource-based Policy (như S3 Bucket Policy hoặc KMS Key Policy) sử dụng ký tự đại diện `\"Principal\": \"*\"` kết hợp với `\"Effect\": \"Allow\"` mà không có mệnh đề điều kiện (Condition). Hành vi này vô tình biến tài nguyên thành tài sản công cộng (Public Asset), cho phép bất kỳ ai trên thế giới có một tài khoản AWS bất kỳ đều có thể đọc hoặc ghi đè dữ liệu. Để thiết lập ranh giới liên tài khoản an toàn, bắt buộc phải sử dụng các Condition Keys toàn cục như `aws:PrincipalOrgID` (chỉ cho phép các tài khoản thuộc cùng AWS Organization) hoặc `aws:PrincipalArn` (chỉ định chính xác ARN của danh tính được ủy quyền)."
+          ]
+        },
+        {
+          "title": "Chiến Lược Kiểm Toán Ma Trận Phân Quyền, Phát Hiện Wildcard Permissions và Thực Thi Least Privilege",
+          "paragraphs": [
+            "Trong các đợt đánh giá an ninh chuyên sâu (Cloud Security Assessment), kỹ sư bảo mật thường xuyên chứng kiến các chính sách IAM chứa đầy các quyền wildcard quá mức như `\"Action\": \"*\"` hoặc `\"Action\": \"iam:*\"` đi kèm `\"Resource\": \"*\"`. Đây là thói quen xấu của các nhóm phát triển phần mềm nhằm tránh lỗi phân quyền trong quá trình thử nghiệm, nhưng lại để lại hậu quả khôn lường khi đưa lên môi trường sản xuất (Production).",
+            "Việc sở hữu quyền `\"Action\": \"iam:*\"` tương đương với việc trao chìa khóa vạn năng cho tài khoản, bởi kẻ tấn công có thể lợi dụng hàng chục API quản trị để tự gắn thêm quyền Administrator cho mình. Tương tự, quyền `\"Action\": \"s3:*\"` trên `\"Resource\": \"*\"` không chỉ cho phép đọc dữ liệu trong các bucket được chỉ định mà còn cho phép xóa sổ toàn bộ dữ liệu, sửa đổi bucket policy, hoặc vô hiệu hóa cơ chế mã hóa và ghi nhật ký truy cập S3 Server Access Logging.",
+            "Để thực thi nguyên tắc đặc quyền tối thiểu (Principle of Least Privilege - PoLP), quy trình kiểm toán hiện đại kết hợp phân tích tĩnh (Static IAM Policy Linting) và phân tích động dựa trên nhật ký vận hành thực tế. Công cụ AWS IAM Access Analyzer sử dụng kỹ thuật suy luận tự động (Automated Reasoning) dựa trên toán học hình thức để chứng minh các đường dẫn truy cập ngoài ý muốn vào tài nguyên. Đồng thời, tính năng IAM Access Advisor ghi nhận mốc thời gian cuối cùng mà một dịch vụ được truy cập bởi Principal (Last Accessed Information). Nếu một quyền hạn không hề được sử dụng trong suốt 90 ngày, nó phải lập tức bị loại bỏ khỏi chính sách.",
+            "Quy trình khắc phục chuẩn mực đòi hỏi đội ngũ an ninh phải thay thế toàn bộ các chính sách wildcard bằng các chính sách tùy biến (Customer Managed Policies) có phạm vi thu hẹp: (1) Chỉ định rõ ràng từng Action cần thiết (ví dụ `s3:GetObject`, `s3:PutObject` thay vì `s3:*`); (2) Ràng buộc chính xác Resource ARN (ví dụ `arn:aws:s3:::financial-reports-prod/*`); (3) Bổ sung các Condition bắt buộc mã hóa đường truyền (`aws:SecureTransport: true`), xác thực đa yếu tố (`aws:MultiFactorAuthPresent: true`), và khóa địa chỉ IP nguồn (`aws:SourceIp`)."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Ma Trận Chính Sách IAM, Hóa Giải Xung Đột Phân Quyền Đa Tầng và Khắc Phục Lỗ Hổng Cross-Account",
+        "objective": "Phân tích thuật toán đánh giá chính sách AWS IAM, chẩn đoán nguyên nhân bị chặn bởi Service Control Policy (SCP) và Permissions Boundary, phát hiện cấu hình Resource-based Policy mở và thiết kế kiến trúc phân quyền Least Privilege.",
+        "scenario": "Bạn là Chuyên gia Đánh giá An ninh Đám mây (Cloud Security Auditor) đang rà soát hạ tầng AWS đa tài khoản (AWS Organizations) của một tập đoàn tài chính. Một số nhóm phát triển gặp lỗi Access Denied bất thường khi triển khai ứng dụng, trong khi một số tài nguyên lưu trữ S3 và khóa KMS nhạy cảm đang có nguy cơ bị lộ lọt do cấu hình sai sót chính sách liên tài khoản.",
+        "constraints": [
+          "Không được phép gỡ bỏ các rào chắn Service Control Policy (SCP) áp dụng trên toàn bộ Organization để giải quyết sự cố cục bộ.",
+          "Mọi cấu hình Resource-based Policy phải có Condition Key ràng buộc danh tính nội bộ tổ chức.",
+          "Không cấp quyền wildcard ('*') trên các dịch vụ có rủi ro leo thang đặc quyền Control Plane."
+        ],
+        "cases": [
+          {
+            "id": "case-79-01",
+            "title": "Chẩn Đoán Xung Đột Giữa Organizations SCP và Identity Policy Khi Triển Khai Dịch Vụ Mới",
+            "context": "Nhóm kỹ sư phát triển thuộc dự án 'Payment-Gateway' làm việc trong tài khoản AWS 'account-payment-prod' (thuộc OU 'Workloads-Prod'). Kỹ sư được gán quyền IAM Policy cho phép toàn quyền 'dynamodb:*' trên bảng thanh toán 'arn:aws:dynamodb:us-east-1:111122223333:table/Transactions'. Tuy nhiên, khi ứng dụng gửi lệnh 'dynamodb:PutItem' tới bảng này, hệ thống luôn trả về lỗi 'AccessDeniedException: User is not authorized to perform: dynamodb:PutItem'.",
+            "prompt": "Nguyên nhân kỹ thuật sâu xa nào trong thuật toán đánh giá chính sách giải thích hiện tượng trên và cách giải quyết chuẩn xác nhất là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Do bảng DynamoDB chưa được cấu hình Resource-based Policy cho phép tài khoản thanh toán truy cập; cần viết SQS/DynamoDB Policy để mở quyền.",
+                "correct": false,
+                "rationale": "DynamoDB trước đây không dùng Resource-based Policy truyền thống trong cùng một tài khoản; lỗi Access Denied này do các lớp kiểm soát bên ngoài như SCP gây ra."
+              },
+              {
+                "id": "B",
+                "label": "Do OU 'Workloads-Prod' đang bị áp đặt một Service Control Policy (SCP) chứa điều kiện giới hạn vùng địa lý (Region Restriction) bằng Explicit Deny trên tất cả dịch vụ nếu vùng gọi tới khác 'ap-southeast-1'; do lệnh gửi tới 'us-east-1', Explicit Deny của SCP đã ghi đè toàn bộ Allow của Identity Policy. Khắc phục: Yêu cầu nhóm di chuyển bảng sang vùng 'ap-southeast-1' hoặc kiến nghị kiến trúc sư điều chỉnh ngoại lệ Region trong SCP.",
+                "correct": true,
+                "rationale": "Explicit Deny từ SCP luôn có quyền ưu tiên tuyệt đối trên mọi tài khoản con trong OU. Khi Region bị chặn bởi SCP, không có bất kỳ Identity Policy nào có thể bypass được."
+              },
+              {
+                "id": "C",
+                "label": "Do DynamoDB yêu cầu quyền đọc KMS 'kms:Decrypt' nhưng Identity Policy chưa có; chỉ cần thêm quyền KMS là lệnh PutItem sẽ thành công.",
+                "correct": false,
+                "rationale": "Lỗi trả về nêu rõ danh tính không được phép thực thi 'dynamodb:PutItem', không phải lỗi liên quan tới KMS access denied."
+              },
+              {
+                "id": "D",
+                "label": "Do IAM User chưa kích hoạt MFA trên console nên AWS chặn toàn bộ API gọi từ SDK; cần đăng nhập console để hoàn tất MFA.",
+                "correct": false,
+                "rationale": "Trừ khi có điều kiện aws:MultiFactorAuthPresent trong chính sách, AWS không mặc định chặn API SDK nếu thiếu MFA."
+              }
+            ]
+          },
+          {
+            "id": "case-79-02",
+            "title": "Kiểm Toán và Khắc Phục Lỗ Hổng Mở Tài Nguyên S3 Cross-Account Trái Phép",
+            "context": "Trong đợt quét định kỳ bằng IAM Access Analyzer, hệ thống cảnh báo S3 bucket 'finance-ledger-backup-2026' chứa dữ liệu báo cáo kiểm toán tài chính đang bị lộ lọt ra bên ngoài. Kiểm tra Bucket Policy phát hiện đoạn JSON sau: {\"Effect\": \"Allow\", \"Principal\": {\"AWS\": \"*\"}, \"Action\": \"s3:GetObject\", \"Resource\": \"arn:aws:s3:::finance-ledger-backup-2026/*\"}. Đội ngũ quản trị giải thích rằng họ cần chia sẻ dữ liệu cho đối tác kiểm toán độc lập có AWS Account ID là '999988887777'.",
+            "prompt": "Rủi ro an ninh thực sự của cấu hình trên là gì và phương án tái cấu trúc chính sách nào đảm bảo an toàn tuyệt đối?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Cấu hình này an toàn vì S3 bucket nằm trong tài khoản riêng; chỉ những ai biết tên chính xác của file mới có thể tải về. Không cần thay đổi.",
+                "correct": false,
+                "rationale": "Tên file (object key) có thể bị dò quét hoặc lộ lọt qua nhật ký; việc cấu hình Principal là '*' cho phép bất kỳ tài khoản AWS nào trên toàn cầu truy cập dữ liệu."
+              },
+              {
+                "id": "B",
+                "label": "Chính sách trên biến bucket thành công cộng (Public) cho toàn bộ người dùng AWS trên thế giới. Để khắc phục: Thay thế 'Principal': {'AWS': '*'} bằng ARN chính xác của đối tác: 'Principal': {'AWS': 'arn:aws:iam::999988887777:root'}, đồng thời bổ sung Condition 'StringEquals': {'aws:PrincipalOrgID': 'o-financialorg'} nếu là tài khoản nội bộ, và bật tính năng S3 Block Public Access.",
+                "correct": true,
+                "rationale": "Giới hạn Principal về ARN root của tài khoản đối tác cụ thể kết hợp S3 Block Public Access giúp triệt tiêu hoàn toàn rủi ro truy cập công cộng và thực thi đúng nguyên tắc ủy quyền Cross-Account."
+              },
+              {
+                "id": "C",
+                "label": "Chuyển Action từ 's3:GetObject' sang 's3:ListBucket' để đối tác chỉ được xem danh sách tệp chứ không đọc được nội dung tệp tin.",
+                "correct": false,
+                "rationale": "ListBucket vẫn để lộ metadata nhạy cảm và không đáp ứng được nghiệp vụ tải file kiểm toán của đối tác."
+              },
+              {
+                "id": "D",
+                "label": "Tạo một IAM User trong tài khoản hiện tại rồi xuất Access Key gửi qua email cho đối tác sử dụng.",
+                "correct": false,
+                "rationale": "Việc gửi khóa tĩnh (Long-term Access Keys) qua email vi phạm nghiêm trọng các tiêu chuẩn bảo mật danh tính đám mây."
+              }
+            ]
+          },
+          {
+            "id": "case-79-03",
+            "title": "Thiết Kế Rào Chắn Permissions Boundary Ngăn Chặn Tự Leo Thang Đặc Quyền",
+            "context": "Tổ chức muốn trao quyền cho nhóm DevOps tự tạo IAM Roles cho các microservices mới chạy trên AWS ECS. Tuy nhiên, đội ngũ An ninh lo ngại rằng nếu cấp quyền 'iam:CreateRole' và 'iam:AttachRolePolicy', một kỹ sư DevOps bất cẩn hoặc bị xâm nhập tài khoản có thể tự tạo một Role có quyền 'AdministratorAccess' và gán cho chính mình để chiếm đoạt toàn bộ tài khoản.",
+            "prompt": "Giải pháp kỹ thuật nào sử dụng IAM Permissions Boundary giải quyết triệt để rủi ro này mà vẫn giữ nguyên tính tự chủ của nhóm DevOps?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chỉ cho phép DevOps tạo IAM Role vào ban ngày và yêu cầu xóa toàn bộ Roles vào cuối ngày làm việc.",
+                "correct": false,
+                "rationale": "Biện pháp phi kỹ thuật, không ngăn chặn được hành vi leo thang tức thời và phá vỡ tính sẵn sàng của ứng dụng."
+              },
+              {
+                "id": "B",
+                "label": "Tạo một IAM Policy chuẩn đóng vai trò Permissions Boundary (ví dụ 'MicroserviceBoundary') giới hạn quyền chỉ ở mức CloudWatch, DynamoDB và S3; trong chính sách cấp cho DevOps, chỉ cho phép 'iam:CreateRole' và 'iam:PutRolePolicy' khi có điều kiện 'StringEquals': {'iam:PermissionsBoundary': 'arn:aws:iam::...:policy/MicroserviceBoundary'}, đồng thời cấm DevOps chỉnh sửa hoặc xóa Permissions Boundary này.",
+                "correct": true,
+                "rationale": "Đây là thiết kế Delegated Administration chuẩn mực của AWS: Bắt buộc mọi Role mới tạo phải gắn Permissions Boundary được phê duyệt trước, ngăn chặn Role đó sở hữu quyền vượt quá ranh giới an ninh."
+              },
+              {
+                "id": "C",
+                "label": "Xóa bỏ hoàn toàn quyền tạo Role của DevOps và bắt buộc mọi yêu cầu tạo Role phải gửi ticket cho đội CISO phê duyệt thủ công qua Jira.",
+                "correct": false,
+                "rationale": "Tạo nút thắt cổ chai hành chính làm đình trệ quy trình CI/CD hiện đại và không giải quyết bài toán tự động hóa rào chắn an ninh (Security Guardrails)."
+              },
+              {
+                "id": "D",
+                "label": "Cấu hình CloudTrail để gửi email cảnh báo mỗi khi có Role mới được tạo ra mà không áp dụng bất kỳ rào chắn ngăn chặn nào.",
+                "correct": false,
+                "rationale": "Chỉ là giải pháp giám sát hậu kiểm (Detective Control), kẻ tấn công có thể hoàn tất việc leo thang và xóa vết tích trước khi email cảnh báo được đọc."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Phân tích chính xác nguyên nhân xung đột phân quyền do Explicit Deny từ Service Control Policy (SCP) của Organization.",
+          "Nhận diện đúng rủi ro cấu hình mở Principal trong S3 Bucket Policy và khắc phục bằng ủy quyền Cross-Account an toàn.",
+          "Thiết kế cấu hình IAM Permissions Boundary để ủy quyền an toàn tính năng quản trị IAM Role cho nhóm DevOps."
+        ],
+        "evidenceTemplate": [
+          "Báo cáo chẩn đoán luồng đánh giá chính sách AWS IAM Policy Evaluation đối với sự cố Region restriction của SCP",
+          "Bản chỉnh sửa cấu hình S3 Bucket Policy loại bỏ hoàn toàn wildcard Principal và bổ sung điều kiện ràng buộc tài khoản",
+          "Tài liệu định nghĩa IAM Permissions Boundary Policy kèm chính sách ủy quyền có điều kiện iam:PermissionsBoundary",
+          "Ảnh chụp ma trận kiểm toán quyền hạn từ IAM Access Analyzer sau khi áp dụng các biện pháp cô lập Least Privilege"
+        ],
+        "reset": "Khôi phục toàn bộ chính sách IAM, S3 Bucket Policy và SCP về trạng thái cấu hình chuẩn mực ban đầu của hệ thống.",
+        "cleanup": "Xóa bỏ các chính sách kiểm thử và các báo cáo phân tích tạm thời khỏi môi trường AWS Organizations."
+      },
+      "governance": {
+        "prevent": [
+          "Áp dụng Service Control Policies (SCPs) ở cấp độ AWS Organizations để thiết lập rào chắn trần (Guardrails), cấm tuyệt đối việc vô hiệu hóa CloudTrail, cấm rời khỏi Organization và cấm sử dụng các dịch vụ ngoài khu vực được phê duyệt.",
+          "Thực thi quy tắc kiểm tra tự động mã nguồn IaC (Terraform / CloudFormation) trước khi deploy, từ chối mọi chính sách IAM chứa wildcard ('*') trong Action và Resource mà không có Condition Key.",
+          "Bắt buộc triển khai Permissions Boundary cho mọi danh tính được ủy quyền tạo IAM User hoặc IAM Role nhằm ngăn chặn triệt để hành vi tự leo thang đặc quyền."
+        ],
+        "observe": [
+          "Kích hoạt AWS IAM Access Analyzer trên toàn bộ các tài khoản trong tổ chức để liên tục rà soát các tài nguyên (S3, KMS, SQS, IAM Role) bị chia sẻ ngoài ranh giới tổ chức.",
+          "Giám sát CloudTrail EventBridge đối với các sự kiện quản trị nhạy cảm: CreatePolicy, AttachUserPolicy, PutRolePermissionsBoundary, và UpdateAssumeRolePolicy.",
+          "Theo dõi báo cáo IAM Access Advisor định kỳ mỗi tuần để phát hiện các quyền hạn và dịch vụ không được sử dụng trong vòng 90 ngày nhằm thu hồi kịp thời."
+        ],
+        "respond": [
+          "Khi phát hiện Resource-based Policy bị mở công cộng ('Principal': '*'), lập tức kích hoạt AWS Lambda tự động ghi đè chính sách về chế độ cô lập và bật tính năng S3 Block Public Access.",
+          "Cô lập ngay lập tức bất kỳ IAM Principal nào có dấu hiệu bị thỏa hiệp bằng cách đính kèm DenyAll Inline Policy và vô hiệu hóa toàn bộ Access Keys hiện hành.",
+          "Rà soát toàn bộ nhật ký CloudTrail trong vòng 72 giờ trước đó để xác định phạm vi truy cập dữ liệu và thực hiện quy trình ứng cứu sự cố theo chuẩn NIST SP 800-61."
+        ],
+        "residualRisk": [
+          "Độ trễ truyền tải chính sách (Policy Propagation Delay) của AWS IAM (thường từ 5-30 giây) có thể tạo ra cửa sổ thời gian ngắn cho phép yêu cầu API tiếp tục lọt qua trước khi lệnh thu hồi có hiệu lực hoàn toàn.",
+          "Sự phức tạp của các biểu thức điều kiện (Condition Keys) lồng ghép nhiều toán tử (ArnEquals, StringLike, Null) tiềm ẩn nguy cơ sai sót logic dẫn đến bỏ lọt đường dẫn truy cập."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Một chính sách IAM gắn vào người dùng (Identity-based Policy) cấp quyền 'AdministratorAccess' sẽ cho phép người dùng đó thực hiện mọi hành động trên toàn bộ các tài nguyên trong AWS.",
+          "correction": "Sai lầm. Quyền hạn thực tế của người dùng còn phụ thuộc vào Service Control Policies (SCPs) của Organization, Permissions Boundary gắn trên chính người dùng đó, và Resource-based Policies trên tài nguyên đích. Nếu SCP có Explicit Deny trên một dịch vụ hoặc tài nguyên, người dùng 'AdministratorAccess' vẫn bị chặn hoàn toàn."
+        },
+        {
+          "claim": "Trong AWS, quyền hạn giữa các tài khoản con (Member Accounts) có thể kế thừa xuôi dòng từ tài khoản quản trị (Management Account) tương tự như mô hình cây thư mục Active Directory.",
+          "correction": "Hoàn toàn sai. Mỗi tài khoản AWS là một ranh giới bảo mật độc lập và không có cơ chế kế thừa quyền xuôi dòng mặc định. SCP của Organization chỉ có tác dụng chặn quyền (Filter/Ceiling), chứ không tự động cấp bất kỳ quyền nào xuống tài khoản thành viên."
+        },
+        {
+          "claim": "Chỉ cần cấu hình S3 Bucket Policy cho phép một tài khoản AWS khác truy cập là các người dùng thuộc tài khoản đối tác đó đã có thể đọc được dữ liệu.",
+          "correction": "Không đủ. Trong tương tác liên tài khoản (Cross-Account), sự cho phép phải đến từ cả hai phía: Tài khoản đối tác phải cấp quyền Identity-based Policy cho người dùng của họ, VÀ tài khoản sở hữu S3 Bucket phải cấp quyền trong Bucket Policy. Thiếu một trong hai phía, truy cập sẽ bị từ chối."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os09-l79-q1",
+          "difficulty": "easy",
+          "question": "Trong thuật toán đánh giá chính sách của AWS IAM (Policy Evaluation Logic), yếu tố nào sau đây luôn có quyền ưu tiên cao nhất và ghi đè toàn bộ các yếu tố khác?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Lệnh Cho Phép Tường Minh (Explicit Allow) trong Identity-based Policy"
+            },
+            {
+              "id": "B",
+              "label": "Lệnh Từ Chối Tường Minh (Explicit Deny) xuất hiện ở bất kỳ tầng chính sách nào"
+            },
+            {
+              "id": "C",
+              "label": "Quyền mặc định của tài khoản Root trong tài khoản thành viên"
+            },
+            {
+              "id": "D",
+              "label": "Chính sách Permissions Boundary gắn với IAM Role"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Nguyên tắc cốt lõi của AWS Policy Evaluation Logic là 'Explicit Deny always wins'. Nếu bất kỳ chính sách nào (SCP, Boundary, Identity Policy, Resource Policy, Session Policy) chứa một câu lệnh Deny khớp với yêu cầu, yêu cầu đó sẽ bị từ chối ngay lập tức bất chấp mọi lệnh Allow khác."
+        },
+        {
+          "id": "os09-l79-q2",
+          "difficulty": "medium",
+          "question": "Service Control Policies (SCPs) trong AWS Organizations có đặc điểm kỹ thuật nào sau đây?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cấp phát trực tiếp các quyền quản trị viên cho các IAM Users trong tài khoản thành viên"
+            },
+            {
+              "id": "B",
+              "label": "Thiết lập ranh giới trần (Guardrail Ceiling) giới hạn phạm vi quyền tối đa mà các tài khoản con có thể phân bổ, nhưng bản thân nó không trực tiếp cấp quyền"
+            },
+            {
+              "id": "C",
+              "label": "Chỉ có hiệu lực đối với các tài khoản phụ (Member Accounts) và hoàn toàn bị bỏ qua đối với tài khoản Root của tài khoản phụ đó"
+            },
+            {
+              "id": "D",
+              "label": "Tự động ghi đè và vô hiệu hóa toàn bộ cấu hình Resource-based Policies của Amazon S3"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "SCPs không cấp quyền trực tiếp cho bất kỳ danh tính nào; chúng hoạt động như một bộ lọc trần quy định các quyền tối đa được phép tồn tại trong tài khoản con. Mọi danh tính trong tài khoản con (kể cả tài khoản Root của tài khoản con đó) đều bị hạn chế bởi SCP."
+        },
+        {
+          "id": "os09-l79-q3",
+          "difficulty": "hard",
+          "question": "Một kỹ sư DevOps được cấp quyền 'iam:CreateRole' và 'iam:AttachRolePolicy'. Biện pháp kiến trúc nào sau đây ngăn chặn hiệu quả nhất việc kỹ sư này tự tạo một IAM Role có quyền 'AdministratorAccess' để tự leo thang đặc quyền?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cấu hình AWS Config Rule để tự động xóa các IAM Role có gắn chính sách AdministratorAccess sau 1 giờ"
+            },
+            {
+              "id": "B",
+              "label": "Ràng buộc điều kiện 'iam:PermissionsBoundary' trong chính sách của kỹ sư, bắt buộc mọi Role mới tạo phải đính kèm một Permissions Boundary an toàn đã định nghĩa trước"
+            },
+            {
+              "id": "C",
+              "label": "Chuyển tài khoản của kỹ sư sang một Organizational Unit (OU) khác không có kết nối Internet"
+            },
+            {
+              "id": "D",
+              "label": "Gán thẻ (Tags) cho kỹ sư và dùng thẻ đó để lọc trong CloudWatch Logs"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Bằng cách sử dụng điều kiện StringEquals trên khóa iam:PermissionsBoundary trong chính sách cấp phép CreateRole, kỹ sư chỉ có thể tạo Role mới nếu Role đó được gán đúng Permissions Boundary quy định sẵn. Nhờ đó, quyền tối đa của Role mới không bao giờ vượt qua phạm vi của Permissions Boundary."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Tập đoàn công nghệ tài chính FinTech vừa hoàn tất sáp nhập một công ty khởi nghiệp và cần tích hợp 50 tài khoản AWS của công ty này vào hệ thống AWS Organizations hiện hữu. Hiện tại, các tài khoản con này tồn tại hàng trăm IAM Policies chứa wildcard ('*'), nhiều S3 Bucket Policy mở quyền ra Internet, và các nhóm kỹ sư có toàn quyền tạo IAM Roles không kiểm soát. Bạn được giao nhiệm vụ thiết lập lại kiến trúc ranh giới phân quyền an toàn toàn diện.",
+        "tasks": [
+          "Xây dựng bộ Service Control Policies (SCPs) đa tầng áp dụng tại cấp độ Organization Root và OUs nhằm chặn đứng các hành động nguy hiểm: cấm vô hiệu hóa CloudTrail/GuardDuty, cấm rời khỏi Organization, và cấm gọi API ngoài các Region được phê duyệt.",
+          "Thiết kế tài liệu IAM Permissions Boundary mẫu cho nhóm DevOps và soạn thảo chính sách phân quyền ủy thác an toàn (Delegated Administration Policy) bắt buộc đính kèm Boundary khi tạo IAM Role mới.",
+          "Viết script kiểm toán tự động (sử dụng AWS SDK / Python Boto3) rà soát toàn bộ Resource-based Policies trên các dịch vụ S3 và KMS trong 50 tài khoản con, phát hiện các cấu hình chứa Principal '*' và tạo kế hoạch khắc phục bổ sung Condition Key aws:PrincipalOrgID."
+        ],
+        "requiredEvidence": [
+          "Tệp định nghĩa SCPs (JSON) hoàn chỉnh kèm sơ đồ cây phân cấp Organizations OUs thể hiện phạm vi ảnh hưởng",
+          "Mẫu chính sách Permissions Boundary và đoạn mã IAM Policy chứng minh cơ chế cưỡng chế boundary khi gọi iam:CreateRole",
+          "Mã nguồn script kiểm toán Boto3 và báo cáo mẫu trích xuất danh sách các tài nguyên có nguy cơ bị lộ lọt Cross-Account kèm mã băm tính toàn vẹn"
+        ]
+      },
+      "sources": [
+        {
+          "title": "AWS Documentation — IAM Policy Evaluation Logic",
+          "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html",
+          "publisher": "Amazon Web Services",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Thuật toán đánh giá chính sách đa tầng của AWS IAM",
+            "Nguyên tắc Explicit Deny và thứ tự ưu tiên giữa các loại chính sách"
+          ]
+        },
+        {
+          "title": "AWS Documentation — Service Control Policies (SCPs) and Permissions Boundaries",
+          "url": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html",
+          "publisher": "Amazon Web Services",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế hoạt động của Service Control Policies như rào chắn an ninh trần",
+            "Ứng dụng của Permissions Boundaries trong quản trị ủy quyền an toàn"
+          ]
+        },
+        {
+          "title": "Google Cloud Documentation — Resource Hierarchy and Access Control",
+          "url": "https://cloud.google.com/iam/docs/resource-hierarchy-access-control",
+          "publisher": "Google Cloud",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc cây phân cấp quản trị và cơ chế kế thừa quyền trong Google Cloud IAM"
+          ]
+        },
+        {
+          "title": "Microsoft Learn — Azure RBAC Architecture and Scope Hierarchy",
+          "url": "https://learn.microsoft.com/en-us/azure/role-based-access-control/overview",
+          "publisher": "Microsoft",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Mô hình phân cấp quản trị Azure Management Groups, Subscriptions và Resource Groups"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os09-l80-temporary-credentials-sts-and-workload-identity",
+      "slug": "temporary-credentials-sts-and-workload-identity",
+      "title": "Chứng Thư Tạm Thời AWS STS & Liên Hợp Danh Tính Workload Identity Federation",
+      "summary": "Bóc tách cơ chế phát hành chứng thư bảo mật ngắn hạn qua AWS Security Token Service (STS), rủi ro khai thác SSRF đánh cắp credential từ Instance Metadata Service (IMDSv1 vs IMDSv2), và kiến trúc Workload Identity Federation loại bỏ hoàn toàn khóa tĩnh dài hạn (Long-term Access Keys) bằng OpenID Connect (OIDC).",
+      "difficulty": "intermediate",
+      "durationMinutes": 120,
+      "prerequisites": ["os09-l79-cloud-identity-and-access-management-models"],
+      "outcomes": [
+        "Phân tích cấu trúc mật mã học, thành phần và vòng đời của bộ chứng thư tạm thời phát hành bởi AWS STS: AccessKeyId (bắt đầu bằng ASIA), SecretAccessKey, SessionToken và Expiration.",
+        "Bóc tách cơ chế tấn công SSRF trích xuất thông tin định danh máy chủ từ Instance Metadata Service (IMDSv1) và cách IMDSv2 vô hiệu hóa thông qua token session dựa trên giao thức HTTP PUT.",
+        "Thiết kế và triển khai kiến trúc Workload Identity Federation qua OIDC giữa CI/CD (GitHub Actions / GitLab CI) và Cloud Control Plane nhằm loại bỏ vĩnh viễn khóa tĩnh dài hạn.",
+        "Điều tra vết tích truy cập trong CloudTrail, phân tích ngữ cảnh assumed-role session, và xây dựng cơ chế thu hồi khẩn cấp chứng thư bị lộ lọt qua Revocation Policy."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["cloud", "iam"],
+      "attackTactics": ["credential-access", "lateral-movement", "defense-evasion"],
+      "keywords": [
+        "aws-sts",
+        "assumerole",
+        "imdsv1",
+        "imdsv2",
+        "workload-identity-federation",
+        "oidc",
+        "temporary-credentials",
+        "ssrf-cloud"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Khóa tĩnh (Long-term Access Keys) là tử huyệt của kiến trúc bảo mật đám mây vì chúng thường bị hardcode trong source code, lưu trữ trong tệp cấu hình không mã hóa hoặc lọt vào nhật ký hệ thống. Kiến trúc hiện đại thay thế hoàn toàn khóa tĩnh bằng Danh tính Phù du (Ephemeral Credentials) qua STS. Một máy chủ hay CI/CD pipeline không nắm giữ bí mật dài hạn; thay vào đó, nó xuất trình một bằng chứng định danh mật mã học (như JWT Token có chữ ký của GitHub OIDC Provider hoặc Instance Identity Document) để đổi lấy một bộ AccessKeyId/SecretAccessKey/SessionToken chỉ có hiệu lực từ 15 phút đến vài giờ. Kẻ tấn công nhắm vào mắt xích giao thoa này—khai thác SSRF để gọi IMDS lấy token, hoặc khai thác Trust Policy có OIDC Subject lỏng lẻo—để chiếm đoạt phiên làm việc hợp lệ.",
+      "visual": {
+        "title": "Quy Trình Hoán Đổi Danh Tính Workload Identity Qua OIDC Token và AWS STS",
+        "caption": "Các bước xác thực từ GitHub Actions Runner tới AWS Security Token Service để lấy chứng thư tạm thời mà không dùng Access Key tĩnh.",
+        "steps": [
+          {
+            "label": "GitHub Runner Tạo OIDC JWT Token",
+            "detail": "GitHub Actions runner yêu cầu OIDC Provider của GitHub ký số một JSON Web Token (JWT) chứa các claims nhận dạng: iss, aud, sub (repo:org/repo:ref:refs/heads/main).",
+            "tone": "neutral"
+          },
+          {
+            "label": "Gửi Yêu Cầu sts:AssumeRoleWithWebIdentity",
+            "detail": "Runner gửi API AssumeRoleWithWebIdentity tới AWS STS kèm theo JWT Token và ARN của IAM Role mục tiêu.",
+            "tone": "allow"
+          },
+          {
+            "label": "AWS STS Xác Thực Chữ Ký & Trust Policy",
+            "detail": "STS tải bộ khóa công khai từ GitHub JWKS endpoint để kiểm tra chữ ký JWT, sau đó đối chiếu claims với Condition trong Trust Policy.",
+            "tone": "caution"
+          },
+          {
+            "label": "Phát Hành Ephemeral Credentials & Thực Thi Lệnh",
+            "detail": "Nếu khớp hoàn toàn, STS trả về bộ chứng thư ASIA tạm thời có thời hạn 1 giờ. Runner dùng chứng thư này tương tác với S3/EC2. Quá hạn, token tự hủy.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Kiến Trúc AWS Security Token Service (STS) và Cơ Chế Hoạt Động Của Ephemeral Credentials",
+          "paragraphs": [
+            "Trong mô hình bảo mật đám mây hiện đại, việc sử dụng các thông tin xác thực tĩnh dài hạn (Long-term Credentials - như AWS IAM User Access Keys bắt đầu bằng tiền tố `AKIA`) bị coi là một rủi ro vận hành nghiêm trọng. Long-term keys không có cơ chế tự hết hạn, thường xuyên bị rò rỉ qua các kho mã nguồn công khai (GitHub leaks), tệp nhật ký ứng dụng, hoặc bị kẻ tấn công trích xuất khi kiểm soát được máy trạm của lập trình viên. Để loại bỏ hoàn toàn mối đe dọa này, AWS phát triển dịch vụ cốt lõi AWS Security Token Service (STS).",
+            "AWS STS chịu trách nhiệm tạo và phát hành các bộ chứng thư tạm thời (Temporary / Ephemeral Credentials). Một bộ chứng thư tạm thời luôn bao gồm ba thành phần không thể tách rời: (1) `AccessKeyId`: Khóa định danh công khai, luôn bắt đầu bằng tiền tố `ASIA` (khác với `AKIA` của khóa tĩnh); (2) `SecretAccessKey`: Khóa bí mật dùng để ký số các yêu cầu API thông qua thuật toán AWS Signature Version 4 (SigV4); (3) `SessionToken`: Một chuỗi token mã hóa dạng base64 chứa toàn bộ ngữ cảnh phiên làm việc, thời điểm hết hạn và chữ ký mật mã của STS. Bất kỳ yêu cầu API nào gửi tới AWS Control Plane bằng chứng thư `ASIA` bắt buộc phải đính kèm `SessionToken` qua HTTP header `X-Amz-Security-Token`.",
+            "Các API chính của STS phục vụ việc phát hành chứng thư bao gồm: `AssumeRole` (chuyển đổi danh tính từ một IAM User hoặc Role sang một Role đích), `AssumeRoleWithWebIdentity` (liên hợp danh tính dựa trên OpenID Connect dành cho ứng dụng di động hoặc CI/CD), `AssumeRoleWithSAML` (dành cho kiến trúc Single Sign-On của doanh nghiệp qua ADFS/Okta), và `GetSessionToken` (thêm yếu tố xác thực MFA cho người dùng IAM). Thời hạn sống (TTL) của chứng thư tạm thời có thể tùy biến linh hoạt từ 15 phút đến tối đa 12 giờ (được cấu hình qua thuộc tính `MaxSessionDuration` của IAM Role). Khi hết hạn, bộ chứng thư tự động trở nên vô giá trị mà không cần bất kỳ thao tác thu hồi thủ công nào."
+          ]
+        },
+        {
+          "title": "Tấn Công Khai Thác Instance Metadata Service: So Sánh IMDSv1 và Cơ Chế Phòng Ngự IMDSv2",
+          "paragraphs": [
+            "Khi một máy chủ ảo EC2 cần tương tác với các dịch vụ đám mây khác (như đọc S3 bucket hoặc ghi CloudWatch logs), giải pháp chuẩn mực của AWS là gắn một IAM Role thông qua EC2 Instance Profile. Dưới nền tảng ảo hóa, dịch vụ Instance Metadata Service (IMDS) chạy tại địa chỉ IP Link-Local non-routable `169.254.169.254`. Dịch vụ này cho phép hệ điều hành máy khách truy vấn thông tin máy chủ và tự động lấy bộ chứng thư tạm thời của IAM Role tại endpoint: `http://169.254.169.254/latest/meta-data/iam/security-credentials/<RoleName>`.",
+            "Trong phiên bản IMDSv1 ban đầu, việc truy vấn metadata hoạt động thuần túy qua giao thức HTTP GET đơn giản mà không yêu cầu bất kỳ header xác thực nào. Điều này tạo ra một tử huyệt bảo mật nghiêm trọng khi ứng dụng chạy trên máy chủ EC2 dính lỗ hổng Server-Side Request Forgery (SSRF) hoặc lỗi Remote Code Execution (RCE). Kẻ tấn công từ Internet có thể gửi payload SSRF lừa ứng dụng Web gửi yêu cầu GET tới `http://169.254.169.254/...`, trích xuất toàn bộ `AccessKeyId`, `SecretAccessKey` và `Token`, sau đó nhập vào máy tính của kẻ tấn công để kiểm soát hạ tầng đám mây. Vụ tấn công chấn động ngân hàng Capital One năm 2019 chính là minh chứng điển hình cho vector khai thác SSRF đánh cắp IAM Role qua IMDSv1.",
+            "Để vô hiệu hóa hoàn toàn vector tấn công này, AWS giới thiệu IMDSv2. IMDSv2 là một cơ chế định hướng phiên làm việc (session-oriented) an toàn vượt trội, bắt buộc phải trải qua hai bước: (1) Bước khởi tạo phiên: Khách hàng phải gửi một yêu cầu HTTP PUT tới endpoint `http://169.254.169.254/latest/api/token` kèm theo header bắt buộc `X-aws-ec2-metadata-token-ttl-seconds: <giây>` để nhận về một Session Token bí mật; (2) Bước truy vấn dữ liệu: Các yêu cầu GET tiếp theo bắt buộc phải đính kèm Session Token đó trong header `X-aws-ec2-metadata-token`.",
+            "Cơ chế phòng thủ của IMDSv2 đạt hiệu quả tuyệt đối trước phần lớn các cuộc tấn công SSRF bởi ba lý do cốt lõi: Hầu hết các lỗi SSRF thông thường chỉ hỗ trợ phương thức GET và hoàn toàn bất lực trong việc tùy biến gửi HTTP PUT; các reverse proxy hoặc open proxy thường lọc bỏ các header lạ hoặc không hỗ trợ gửi kèm header tùy biến; và quan trọng nhất, IMDSv2 mặc định cấu hình thông số mạng `HttpPutResponseHopLimit = 1`. Giá trị Hop Limit bằng 1 khiến các gói tin PUT không thể vượt qua bất kỳ ranh giới network hop nào (như mạng bridge của Docker container hoặc proxy cục bộ), ngăn chặn container bên trong máy chủ truy xuất trực tiếp metadata của máy chủ vật lý bên ngoài."
+          ]
+        },
+        {
+          "title": "Kiến Trúc Workload Identity Federation: Triệt Tiêu Khóa Tĩnh Dài Hạn Qua OIDC & JWT Claims",
+          "paragraphs": [
+            "Một trong những điểm rò rỉ thông tin xác thực phổ biến nhất trong chuỗi cung ứng phần mềm (Software Supply Chain) là việc lưu trữ AWS Access Keys tĩnh trong mục GitHub Secrets hoặc GitLab CI Variables để phục vụ các pipeline tự động triển khai hạ tầng (CI/CD Deployments). Nếu kho mã nguồn bị chiếm quyền, một pull request độc hại được chấp thuận, hoặc một build log vô tình in biến môi trường, kẻ tấn công sẽ nắm giữ quyền truy cập vĩnh viễn vào hệ thống đám mây của doanh nghiệp.",
+            "Workload Identity Federation giải quyết triệt để rủi ro này bằng cách thiết lập liên minh danh tính trực tiếp thông qua giao thức OpenID Connect (OIDC). Thay vì lưu trữ Access Key bí mật trong CI/CD, tổ chức cấu hình một IAM OIDC Identity Provider trên tài khoản AWS trỏ tới nhà cung cấp danh tính bên ngoài (chẳng hạn `https://token.actions.githubusercontent.com`).",
+            "Mỗi khi một workflow trong GitHub Actions được kích hoạt, runner của GitHub yêu cầu OIDC Provider nội bộ phát hành một JSON Web Token (JWT) được ký số mật mã học bằng khóa riêng của GitHub. Token này chứa các trường dữ liệu tiêu chuẩn (JWT Claims) xác thực ngữ cảnh chạy của build job: `iss` (Issuer URL của GitHub), `aud` (Audience, mặc định là `sts.amazonaws.com`), và đặc biệt là `sub` (Subject claim - định danh duy nhất của công việc, ví dụ: `repo:my-organization/payment-service:ref:refs/heads/main`).",
+            "Runner gửi JWT này tới AWS STS thông qua API `sts:AssumeRoleWithWebIdentity`. Phía AWS, STS tải bộ khóa công khai từ GitHub JWKS endpoint (`.well-known/jwks.json`) để xác minh tính toàn vẹn của chữ ký, sau đó đối chiếu các claims với IAM Role Trust Policy. Điểm mấu chốt an ninh là điều kiện `Condition`: Trust Policy BẮT BUỘC phải kiểm tra chính xác `sub` claim để chỉ cho phép nhánh `main` của đúng kho lưu trữ nội bộ được phép assume role. Nếu quản trị viên lơ là sử dụng wildcard trong `sub` hoặc chỉ kiểm tra `aud`, bất kỳ ai trên thế giới tạo một GitHub repository bất kỳ đều có thể tạo JWT hợp lệ và assume quyền kiểm soát đám mây của doanh nghiệp."
+          ]
+        },
+        {
+          "title": "Phân Tích Pháp Y Dấu Vết CloudTrail Khi Chứng Thư Tạm Thời Bị Thao Túng & Kỹ Thuật Session Revocation",
+          "paragraphs": [
+            "Khi một sự cố an ninh đám mây xảy ra và nghi ngờ chứng thư tạm thời bị rò rỉ ra ngoài, dịch vụ kiểm toán AWS CloudTrail cung cấp toàn bộ bức tranh pháp y số chi tiết. Khác với người dùng IAM thông thường hiển thị `userIdentity.type = 'IAMUser'`, các thao tác thực hiện bằng chứng thư tạm thời hiển thị `userIdentity.type = 'AssumedRole'`. Cấu trúc ARN định danh phiên có dạng: `arn:aws:sts::<AccountID>:assumed-role/<RoleName>/<RoleSessionName>`.",
+            "Kỹ sư điều tra sự cố (Incident Responder) cần phân tích ba trường thông tin then chốt trong CloudTrail record: (1) `sourceIPAddress`: Địa chỉ IP nguồn gọi API; nếu IP này thuộc về một nhà cung cấp dịch vụ Internet nước ngoài hoặc mạng ẩn danh Tor/VPN trong khi EC2 instance hoặc GitHub runner có IP nội bộ cố định, đây là dấu hiệu chắc chắn chứng thư đã bị đánh cắp ra ngoài; (2) `arn` và `roleSessionName`: Xác định chính xác phiên nào đang bị lạm dụng; (3) `userAgent`: Trình thu thập dấu vết của công cụ (ví dụ `aws-cli`, `python-requests`, hoặc công cụ tấn công như `Pacu`).",
+            "Thách thức lớn nhất khi đối phó với sự cố rò rỉ chứng thư tạm thời là: Chứng thư `ASIA` một khi đã được STS phát hành thì KHÔNG THỂ bị xóa bỏ bằng cách đổi mật khẩu hay xóa Access Key như user truyền thống. Chứng thư đó vẫn giữ nguyên tính hợp lệ cho đến khi hết thời hạn TTL tự nhiên của nó. Nếu thời hạn TTL còn tới 12 giờ, kẻ tấn công có thể thoải mái khai thác trong suốt khoảng thời gian đó.",
+            "Phương thức hóa giải khẩn cấp duy nhất có hiệu lực tức thì là áp dụng cơ chế Thu Hồi Phiên (Session Revocation Policy). Đội ngũ an ninh gắn một Inline Policy trực tiếp vào IAM Role bị xâm nhập, chứa một câu lệnh Explicit Deny đối với mọi hành động trên mọi tài nguyên, đi kèm một điều kiện thời gian sử dụng khóa toàn cục `aws:TokenIssueTime`: {\"Effect\": \"Deny\", \"Action\": \"*\", \"Resource\": \"*\", \"Condition\": {\"DateLessThan\": {\"aws:TokenIssueTime\": \"2026-09-04T03:30:00Z\"}}}. Khi chính sách này được áp dụng, AWS Policy Engine sẽ so sánh thời điểm phát hành của SessionToken gửi kèm với mốc thời gian quy định; toàn bộ các token được phát hành trước mốc thời gian đó lập tức bị từ chối truy cập ngay lập tức, trong khi các phiên hợp lệ mới được tạo sau đó vẫn hoạt động bình thường."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Khắc Phục Lỗ Hổng Khai Thác IMDSv1, Thiết Lập Workload Identity OIDC An Toàn và Thu Hồi Khẩn Cấp Session Token",
+        "objective": "Vô hiệu hóa IMDSv1 trên toàn bộ cụm EC2, thiết kế OIDC Trust Policy chống mạo danh kho lưu trữ bên ngoài, và kích hoạt Revocation Policy thu hồi token bị rò rỉ.",
+        "scenario": "Hệ thống Web xử lý hồ sơ tín dụng của ngân hàng bị phát hiện có lỗ hổng SSRF cho phép đọc địa chỉ link-local. Đội ngũ SOC phát hiện một địa chỉ IP lạ từ nước ngoài đang sử dụng Session Token tạm thời của role 'app-prod-processor' để trích xuất dữ liệu từ S3. Đồng thời, nhóm kỹ sư phần mềm đang chuẩn bị chuyển đổi quy trình CI/CD từ GitHub Secrets sang OIDC Workload Identity.",
+        "constraints": [
+          "Không làm gián đoạn hoạt động của các tiến trình xử lý hồ sơ hợp lệ đang chạy trên các phiên bản EC2 hiện hành.",
+          "Chính sách OIDC Trust Policy tuyệt đối không được sử dụng wildcard '*' trên thuộc tính repo subject.",
+          "Quy trình thu hồi Session Token bị lộ phải có hiệu lực ngay lập tức trong vòng dưới 1 phút mà không cần xóa IAM Role."
+        ],
+        "cases": [
+          {
+            "id": "case-80-01",
+            "title": "Chặn Đứng Tấn Công SSRF Đánh Cắp Metadata Bằng Cách Cưỡng Chế IMDSv2",
+            "context": "Ứng dụng Web trên EC2 bị khai thác qua lỗ hổng SSRF tại endpoint '/api/fetch-document?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/app-prod-processor'. Kẻ tấn công đã thu được AccessKeyId (ASIA...), SecretAccessKey và SessionToken. Máy chủ hiện tại đang chạy cấu hình IMDS mặc định (hỗ trợ cả v1 và v2).",
+            "prompt": "Quy trình can thiệp kỹ thuật nào trên AWS CLI vô hiệu hóa hoàn toàn vector SSRF này trên máy chủ mà không làm gián đoạn ứng dụng?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Tắt hoàn toàn card mạng eth0 của máy chủ EC2 và tạo card mạng mới eth1.",
+                "correct": false,
+                "rationale": "Làm gián đoạn toàn bộ dịch vụ của máy chủ và không giải quyết bản chất lỗ hổng khi card mạng mới vẫn kết nối được tới 169.254.169.254."
+              },
+              {
+                "id": "B",
+                "label": "Thực thi lệnh 'aws ec2 modify-instance-metadata-options --instance-id <ID> --http-tokens required --http-endpoint enabled --http-put-response-hop-limit 1' để bắt buộc sử dụng IMDSv2, yêu cầu token session cho mọi truy vấn và chặn đứng SSRF đơn giản.",
+                "correct": true,
+                "rationale": "Cấu hình '--http-tokens required' bắt buộc sử dụng IMDSv2 và vô hiệu hóa hoàn toàn IMDSv1; kết hợp '--http-put-response-hop-limit 1' ngăn chặn triệt để tấn công SSRF trích xuất credential."
+              },
+              {
+                "id": "C",
+                "label": "Chỉnh sửa tệp /etc/hosts trên hệ điều hành Linux để ánh xạ IP 169.254.169.254 về địa chỉ 127.0.0.1.",
+                "correct": false,
+                "rationale": "Địa chỉ 169.254.169.254 là địa chỉ IP số thuần túy không qua phân giải tên miền DNS nên sửa /etc/hosts không có tác dụng."
+              },
+              {
+                "id": "D",
+                "label": "Đổi tên IAM Role 'app-prod-processor' thành 'app-prod-hidden' để kẻ tấn công không đoán được đường dẫn metadata.",
+                "correct": false,
+                "rationale": "Kẻ tấn công có thể truy vấn endpoint '/latest/meta-data/iam/security-credentials/' để liệt kê toàn bộ danh sách tên role hiện có."
+              }
+            ]
+          },
+          {
+            "id": "case-80-02",
+            "title": "Cấu Hình An Toàn Workload Identity Federation Cho GitHub Actions",
+            "context": "Nhóm phát triển tạo IAM Role 'github-ci-deployer' để deploy ứng dụng tự động từ GitHub Actions. Họ cấu hình Trust Policy như sau: {\"Effect\": \"Allow\", \"Principal\": {\"Federated\": \"arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com\"}, \"Action\": \"sts:AssumeRoleWithWebIdentity\", \"Condition\": {\"StringEquals\": {\"token.actions.githubusercontent.com:aud\": \"sts.amazonaws.com\"}}}.",
+            "prompt": "Lỗ hổng bảo mật nghiêm trọng nào tồn tại trong Trust Policy trên và giải pháp khắc phục chuẩn xác là gì?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Chính sách thiếu điều kiện kiểm tra địa chỉ MAC của runner; cần bổ sung aws:SourceMac vào Condition.",
+                "correct": false,
+                "rationale": "AWS IAM không hỗ trợ điều kiện lọc theo địa chỉ MAC của client bên ngoài Internet."
+              },
+              {
+                "id": "B",
+                "label": "Chính sách chỉ kiểm tra Audience ('aud') mà KHÔNG kiểm tra Subject ('sub'); điều này cho phép BẤT KỲ kho mã nguồn GitHub nào trên thế giới (kể cả repo của tin tặc) tạo JWT token hợp lệ và assume quyền kiểm soát IAM Role này. Khắc phục: Bổ sung điều kiện 'StringEquals': {'token.actions.githubusercontent.com:sub': 'repo:bank-corp/credit-app:ref:refs/heads/main'}.",
+                "correct": true,
+                "rationale": "Thiếu kiểm tra 'sub' claim là lỗ hổng chí mạng trong Workload Identity Federation, cho phép bất kỳ ai có tài khoản GitHub mạo danh và chiếm đoạt Role trên AWS."
+              },
+              {
+                "id": "C",
+                "label": "Giao thức OIDC không hỗ trợ mã hóa trên đường truyền nên JWT token bị đọc trộm; cần quay lại dùng Access Key tĩnh AKIA.",
+                "correct": false,
+                "rationale": "OIDC chạy hoàn toàn trên nền tảng HTTPS/TLS 1.3 và JWT được ký số mật mã học, an toàn hơn nhiều so với việc lưu trữ Access Key tĩnh."
+              },
+              {
+                "id": "D",
+                "label": "Cần chuyển Principal từ Federated sang Service 'github.amazonaws.com' để AWS tự động quản lý.",
+                "correct": false,
+                "rationale": "Không tồn tại AWS Service principal nào tên là 'github.amazonaws.com'; OIDC bắt buộc phải sử dụng Federated principal."
+              }
+            ]
+          },
+          {
+            "id": "case-80-03",
+            "title": "Thu Hồi Khẩn Cấp Phiên Làm Việc STS Assumed-Role Đang Bị Lạm Dụng",
+            "context": "SOC phát hiện Session Token của role 'app-prod-processor' phát hành lúc 03:00:00Z có TTL 12 giờ đang bị kẻ tấn công sử dụng từ IP lạ để tải các báo cáo tài chính từ S3 lúc 03:15:00Z. Việc xóa bỏ hay thay đổi quyền của Role lúc này sẽ làm chết toàn bộ cụm máy chủ đang phục vụ khách hàng.",
+            "prompt": "Phương thức cô lập tức thì nào vô hiệu hóa toàn bộ các Session Token đã bị lộ mà vẫn cho phép các phiên làm việc hợp lệ tiếp theo hoạt động?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Khởi động lại toàn bộ máy chủ EC2 để hệ thống tự động đổi địa chỉ MAC của máy chủ.",
+                "correct": false,
+                "rationale": "Khởi động lại máy chủ không vô hiệu hóa được chứng thư ASIA mà kẻ tấn công đã tải về máy tính riêng của họ ngoài Internet."
+              },
+              {
+                "id": "B",
+                "label": "Đính kèm một Revocation Policy vào IAM Role chứa Explicit Deny trên tất cả Action với điều kiện thời gian 'DateLessThan': {'aws:TokenIssueTime': '2026-09-04T03:20:00Z'}. Thao tác này ngay lập tức triệt tiêu toàn bộ token được cấp trước 03:20:00Z, trong khi các instance hợp lệ khi xin cấp token mới sau thời điểm này vẫn hoạt động bình thường.",
+                "correct": true,
+                "rationale": "Sử dụng aws:TokenIssueTime trong Revocation Policy là phương pháp chuẩn mực duy nhất của AWS để thu hồi tức thì các phiên STS đã cấp mà không cần xóa IAM Role."
+              },
+              {
+                "id": "C",
+                "label": "Gửi email yêu cầu đội ngũ hỗ trợ kỹ thuật của AWS can thiệp thủ công từ hệ thống backend của Amazon STS.",
+                "correct": false,
+                "rationale": "Quy trình hỗ trợ mất nhiều giờ hoặc nhiều ngày, không đáp ứng được yêu cầu ứng cứu sự cố tức thì trong vài phút."
+              },
+              {
+                "id": "D",
+                "label": "Xóa toàn bộ các tệp trong S3 bucket để kẻ tấn công không còn dữ liệu để tải về.",
+                "correct": false,
+                "rationale": "Hành động tự phá hoại dữ liệu (Data Loss) nghiêm trọng, đi ngược lại tôn chỉ bảo vệ tính sẵn sàng và toàn vẹn của hệ thống thông tin."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Thực thi đúng câu lệnh cưỡng chế IMDSv2 và Hop Limit trên máy chủ EC2 để chặn đứng khai thác SSRF.",
+          "Phân tích chính xác lỗ hổng thiếu sót Subject (sub) trong OIDC Trust Policy và xây dựng cấu hình khắc phục an toàn.",
+          "Thiết lập thành công Revocation Policy sử dụng khóa điều kiện aws:TokenIssueTime để thu hồi tức thì các phiên làm việc bị lộ."
+        ],
+        "evidenceTemplate": [
+          "Kết quả đầu ra của lệnh 'aws ec2 describe-instances' xác nhận trường HttpTokens chuyển sang trạng thái 'required'",
+          "Tệp cấu hình IAM Role Trust Policy hoàn chỉnh với đầy đủ ràng buộc OIDC iss, aud và sub claims",
+          "Nội dung chính sách Session Revocation Inline Policy kèm mốc thời gian aws:TokenIssueTime được áp dụng trên IAM Role",
+          "Trích xuất CloudTrail log chứng minh các yêu cầu API sử dụng token cũ bị chặn với thông báo AccessDenied"
+        ],
+        "reset": "Khôi phục cấu hình Metadata của EC2 về baseline tiêu chuẩn và dỡ bỏ các chính sách thu hồi phiên tạm thời.",
+        "cleanup": "Xóa bỏ các OIDC identity provider kiểm thử và dọn dẹp các tệp tin cấu hình tạm khỏi môi trường thử nghiệm."
+      },
+      "governance": {
+        "prevent": [
+          "Áp dụng Service Control Policy (SCP) trên toàn tổ chức cấm tạo EC2 instances nếu không bật IMDSv2 (ec2:MetadataHttpTokens = required), đồng thời giới hạn HttpPutResponseHopLimit = 1.",
+          "Cấm hoàn toàn việc tạo mới và sử dụng các IAM User Access Keys tĩnh (AKIA); cưỡng chế chuyển đổi 100% CI/CD pipelines sang OIDC Workload Identity Federation.",
+          "Bắt buộc mọi OIDC Trust Policy phải chứa điều kiện StringEquals hoặc StringLike chặt chẽ trên claim 'sub', nghiêm cấm tuyệt đối việc sử dụng wildcard '*' đơn lẻ."
+        ],
+        "observe": [
+          "Giám sát CloudTrail để phát hiện các sự kiện AssumeRoleWithWebIdentity bất thường, đặc biệt là các yêu cầu phát xuất từ các IP không nằm trong danh sách IP công bố của GitHub / GitLab.",
+          "Theo dõi số liệu thống kê CloudWatch Metric 'MetadataNoToken' trên các máy chủ EC2 để phát hiện ngay lập tức các yêu cầu truy vấn IMDSv1 đáng ngờ.",
+          "Thiết lập cảnh báo tự động của AWS GuardDuty khi phát hiện chứng thư tạm thời của EC2 Role bị sử dụng từ một địa chỉ IP ngoài phạm vi mạng đám mây (InstanceCredentialExfiltration)."
+        ],
+        "respond": [
+          "Khi phát hiện chứng thư tạm thời bị rò rỉ ra ngoài Internet, lập tức kích hoạt playbook tự động gắn Session Revocation Policy với mốc thời gian aws:TokenIssueTime hiện tại vào IAM Role tương ứng.",
+          "Cô lập máy chủ EC2 bị thỏa hiệp bằng cách gán Security Group cách ly (Isolate SG) chặn toàn bộ lưu lượng vào/ra phục vụ công tác điều tra pháp y số.",
+          "Xoay vòng toàn bộ các khóa bí mật và thông tin cấu hình mà IAM Role bị lộ có quyền truy cập (như mật khẩu cơ sở dữ liệu trong Secrets Manager)."
+        ],
+        "residualRisk": [
+          "Trong khoảng thời gian ngắn giữa lúc kẻ tấn công trích xuất token qua SSRF cho đến khi hệ thống SOC phát hiện và áp dụng Revocation Policy, kẻ tấn công vẫn có thể thực thi các lệnh API phá hoại.",
+          "Sự phụ thuộc vào bên thứ ba (OIDC Provider như GitHub/GitLab): Nếu nhà cung cấp danh tính bị xâm phạm hạ tầng phát hành khóa ký JWT, toàn bộ liên minh danh tính đám mây có thể bị ảnh hưởng dây chuyền."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Chứng thư tạm thời phát hành bởi AWS STS chỉ gồm AccessKeyId và SecretAccessKey tương tự như IAM User tĩnh.",
+          "correction": "Sai lầm nghiêm trọng. Chứng thư tạm thời bắt buộc phải có thành phần thứ ba là SessionToken (chứa ngữ cảnh phiên và chữ ký của STS). Nếu gửi API mà thiếu SessionToken trong header X-Amz-Security-Token, yêu cầu sẽ bị từ chối ngay lập tức."
+        },
+        {
+          "claim": "Chỉ cần đổi mật khẩu hoặc xóa IAM Role trên AWS Console là toàn bộ các chứng thư tạm thời (ASIA) đã phát hành từ Role đó sẽ lập tức bị vô hiệu hóa.",
+          "correction": "Hoàn toàn sai. Chứng thư tạm thời độc lập về mặt mật mã học và vẫn duy trì hiệu lực cho đến hết thời hạn TTL của nó (tối đa 12 giờ). Biện pháp duy nhất để vô hiệu hóa tức thì là áp dụng Revocation Policy sử dụng khóa điều kiện aws:TokenIssueTime."
+        },
+        {
+          "claim": "Khi kết nối GitHub Actions với AWS qua OIDC, chỉ cần kiểm tra Audience 'aud': 'sts.amazonaws.com' trong Trust Policy là đủ an toàn vì GitHub đã xác thực tài khoản.",
+          "correction": "Cực kỳ nguy hiểm. Audience chỉ xác nhận token được tạo ra để gửi tới AWS, chứ không xác định token đó thuộc về kho mã nguồn nào. Bất kỳ ai trên thế giới có tài khoản GitHub miễn phí đều có thể tạo token có 'aud': 'sts.amazonaws.com'. Bắt buộc phải kiểm tra Subject 'sub' để chỉ định chính xác tên repository và branch."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os09-l80-q1",
+          "difficulty": "easy",
+          "question": "Dấu hiệu nhận diện trực quan nhanh nhất của một bộ thông tin xác thực tạm thời do AWS STS phát hành so với thông tin xác thực tĩnh là gì?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Access Key ID bắt đầu bằng tiền tố 'AKIA' và mật khẩu có độ dài 32 ký tự"
+            },
+            {
+              "id": "B",
+              "label": "Access Key ID bắt đầu bằng tiền tố 'ASIA' và bắt buộc phải đi kèm một Session Token"
+            },
+            {
+              "id": "C",
+              "label": "Không có Access Key ID mà chỉ sử dụng chứng chỉ số X.509"
+            },
+            {
+              "id": "D",
+              "label": "Chỉ có thể sử dụng từ giao diện AWS Management Console và không hỗ trợ AWS CLI"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Toàn bộ chứng thư tạm thời do AWS Security Token Service (STS) phát hành đều có Access Key ID bắt đầu bằng tiền tố ASIA và bắt buộc phải gửi kèm chuỗi SessionToken trong mỗi lệnh gọi API."
+        },
+        {
+          "id": "os09-l80-q2",
+          "difficulty": "medium",
+          "question": "Tại sao cơ chế IMDSv2 lại có khả năng vô hiệu hóa hầu hết các cuộc tấn công SSRF nhằm đánh cắp thông tin xác thực máy chủ EC2?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Vì IMDSv2 chuyển toàn bộ dữ liệu metadata sang lưu trữ trên Amazon S3 có mã hóa KMS"
+            },
+            {
+              "id": "B",
+              "label": "Vì IMDSv2 bắt buộc phải có một phiên làm việc khởi tạo bằng phương thức HTTP PUT kèm header TTL để lấy Session Token trước khi cho phép gửi yêu cầu GET"
+            },
+            {
+              "id": "C",
+              "label": "Vì IMDSv2 yêu cầu người quản trị phải nhập mã OTP từ Google Authenticator mỗi khi máy chủ khởi động"
+            },
+            {
+              "id": "D",
+              "label": "Vì IMDSv2 chặn toàn bộ kết nối mạng tới cổng 80 và 443 của máy chủ web"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "IMDSv2 thiết lập phiên làm việc hai bước: bắt buộc gửi HTTP PUT với header X-aws-ec2-metadata-token-ttl-seconds để lấy token phiên, sau đó mới dùng token đó cho các lệnh GET. Hầu hết các lỗi SSRF thông thường chỉ hỗ trợ HTTP GET và không thể tạo các header PUT tùy biến phức tạp này."
+        },
+        {
+          "id": "os09-l80-q3",
+          "difficulty": "hard",
+          "question": "Khi phát hiện một chứng thư tạm thời (Session Token) của một IAM Role quan trọng bị kẻ tấn công đánh cắp ra ngoài Internet và thời hạn còn lại là 8 giờ, giải pháp kỹ thuật nào sau đây vô hiệu hóa chứng thư đó NGAY LẬP TỨC mà không phá hủy cấu hình của IAM Role?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Xóa toàn bộ các IAM Users trong cùng tài khoản AWS"
+            },
+            {
+              "id": "B",
+              "label": "Đính kèm một Inline Policy vào IAM Role chứa lệnh Deny với điều kiện 'DateLessThan': {'aws:TokenIssueTime': '<thời điểm hiện tại>'}"
+            },
+            {
+              "id": "C",
+              "label": "Đổi tên dịch vụ EC2 trong vùng chứa máy chủ bị tấn công"
+            },
+            {
+              "id": "D",
+              "label": "Chờ đợi hết 8 giờ để token tự động hết hạn theo đúng chu kỳ sống của nó"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Cơ chế Revocation Policy sử dụng khóa điều kiện aws:TokenIssueTime cho phép từ chối toàn bộ các yêu cầu API được ký bằng các token phát hành trước mốc thời gian chỉ định, vô hiệu hóa ngay lập tức token bị lộ trong khi cho phép các phiên cấp mới sau thời điểm đó tiếp tục hoạt động."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Một công ty công nghệ vừa trải qua một đợt kiểm toán an ninh nghiêm ngặt sau khi phát hiện một lập trình viên vô tình commit file cấu hình chứa AWS Access Key tĩnh lên kho mã nguồn công khai. Ban lãnh đạo yêu cầu bạn làm Trưởng nhóm Kiến trúc An ninh thực hiện chiến dịch 'Zero Static Keys': loại bỏ 100% khóa tĩnh trong CI/CD bằng GitHub Actions OIDC và nâng cấp toàn bộ cụm máy chủ EC2 lên IMDSv2.",
+        "tasks": [
+          "Xây dựng chính sách Service Control Policy (SCP) cấp tổ chức và kịch bản tự động hóa kiểm tra cưỡng chế IMDSv2 trên toàn bộ 200 máy chủ EC2 hiện có, đảm bảo thông số HttpTokens=required và HttpPutResponseHopLimit=1.",
+          "Thiết kế cấu hình IAM OIDC Identity Provider và mẫu IAM Role Trust Policy chuẩn cho 15 microservices trên GitHub Actions, cấu hình chặt chẽ các claims iss, aud và sub theo chuẩn Branch & Environment protection.",
+          "Xây dựng quy trình tự động hóa ứng cứu sự cố (Incident Response Playbook) bằng AWS Lambda: Khi nhận cảnh báo GuardDuty về việc rò rỉ credential (InstanceCredentialExfiltration), Lambda sẽ tự động tính toán thời gian và đính kèm Revocation Policy sử dụng aws:TokenIssueTime vào Role bị ảnh hưởng trong vòng dưới 30 giây."
+        ],
+        "requiredEvidence": [
+          "Tệp định nghĩa SCP (JSON) chặn đứng việc tạo EC2 thiếu IMDSv2 kèm nhật ký thực thi script migrate IMDSv2 thành công",
+          "Mẫu IAM Trust Policy hoàn chỉnh cho GitHub OIDC với điều kiện StringEquals trên repo và branch cụ thể",
+          "Mã nguồn hàm Lambda tự động thu hồi phiên (Session Revocation) kèm nhật ký kiểm thử chứng minh token cũ bị từ chối thành công"
+        ]
+      },
+      "sources": [
+        {
+          "title": "AWS Documentation — Temporary Security Credentials in IAM",
+          "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html",
+          "publisher": "Amazon Web Services",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cấu trúc và vòng đời của chứng thư tạm thời phát hành bởi AWS STS",
+            "Sự khác biệt giữa Access Key AKIA và ASIA đi kèm Session Token"
+          ]
+        },
+        {
+          "title": "AWS Security Blog — Add Defense in Depth Against Open Firewalls, Reverse Proxies, and SSRF Vulnerabilities with IMDSv2",
+          "url": "https://aws.amazon.com/blogs/security/defense-in-depth-open-firewalls-reverse-proxies-ssrf-vulnerabilities-ec2-instance-metadata-service/",
+          "publisher": "Amazon Web Services",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Cơ chế an ninh hướng phiên của IMDSv2",
+            "Nguyên lý phòng chống SSRF và thông số HttpPutResponseHopLimit"
+          ]
+        },
+        {
+          "title": "GitHub Docs — Configuring OpenID Connect in Amazon Web Services",
+          "url": "https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services",
+          "publisher": "GitHub",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kiến trúc Workload Identity Federation giữa GitHub Actions và AWS STS",
+            "Cấu trúc JWT claims iss, aud và sub trong Trust Policy"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Technique T1552.005: Unsecured Credentials - Cloud Instance Metadata API",
+          "url": "https://attack.mitre.org/techniques/T1552/005/",
+          "publisher": "MITRE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Mô hình tấn công khai thác Instance Metadata Service trên môi trường đám mây"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "os09-l81-cloud-control-plane-privilege-escalation",
+      "slug": "cloud-control-plane-privilege-escalation",
+      "title": "Kỹ Thuật Kiểm Toán & Khai Thác 21 Vector Leo Thang Đặc Quyền Cloud Control Plane",
+      "summary": "Nghiên cứu toàn diện 21 phương thức leo thang đặc quyền trên AWS IAM Control Plane theo nghiên cứu của Rhino Security Labs: phân tích cơ chế lạm dụng iam:PassRole kết hợp dịch vụ điện toán (EC2, Lambda, Glue, CloudFormation), thao túng policy versions, tạo access key mạo danh và phương pháp phòng ngự chặn đứng chuỗi tấn công.",
+      "difficulty": "intermediate",
+      "durationMinutes": 120,
+      "prerequisites": [
+        "os09-l79-cloud-identity-and-access-management-models",
+        "os09-l80-temporary-credentials-sts-and-workload-identity"
+      ],
+      "outcomes": [
+        "Phân loại và hệ thống hóa 21 vector leo thang đặc quyền trên AWS IAM Control Plane dựa trên nghiên cứu tiêu chuẩn của Rhino Security Labs.",
+        "Bóc tách cơ chế hoạt động của quyền iam:PassRole khi kết hợp với các dịch vụ điện toán đám mây (EC2 RunInstances, Lambda CreateFunction, Glue CreateDevEndpoint, CloudFormation CreateStack).",
+        "Thực hiện kiểm toán và phát hiện các quyền hạn thao túng chính sách trực tiếp: CreatePolicyVersion, SetDefaultPolicyVersion, AttachUserPolicy, PutUserPolicy, và AddUserToGroup.",
+        "Thiết kế ma trận giám sát CloudTrail và xây dựng các chính sách rào chắn Service Control Policies (SCPs) / Permissions Boundaries nhằm triệt tiêu vĩnh viễn các đường dẫn leo thang tiềm ẩn."
+      ],
+      "careerPaths": ["penetration-test", "red-team", "purple-team"],
+      "domains": ["cloud", "iam"],
+      "attackTactics": ["privilege-escalation", "persistence", "defense-evasion"],
+      "keywords": [
+        "iam-privilege-escalation",
+        "passrole",
+        "rhino-security-labs",
+        "createpolicyversion",
+        "attachuserpolicy",
+        "cloudformation-pivot",
+        "lambda-privesc",
+        "cloudtrail-telemetry"
+      ],
+      "safetyLevel": "isolated-only",
+      "mentalModel": "Leo thang đặc quyền trên Cloud Control Plane hoàn toàn khác biệt với khai thác lỗ hổng nhị phân hay lỗi bộ nhớ trong hệ điều hành truyền thống; đây thuần túy là việc lạm dụng tính năng hợp pháp của các API quản trị đám mây (Legitimate API Feature Abuse). Khi một danh tính bị giới hạn sở hữu một tổ hợp quyền tưởng chừng bình thường—như quyền tạo hàm tính toán Lambda và quyền chuyển tiếp Role (iam:PassRole)—danh tính đó có thể tạo ra một hàm độc hại, gắn một Role quản trị viên cấp cao cho hàm đó, rồi kích hoạt hàm thực thi để tự động cấp toàn quyền Administrator cho chính mình. Người kiểm toán an ninh phải nhìn nhận đồ thị quyền hạn đám mây như một mạng lưới phụ thuộc, nơi bất kỳ nút nào có thể biến đổi trạng thái của nút khác đều là một cầu nối leo thang tiềm ẩn.",
+      "visual": {
+        "title": "Chuỗi Leo Thang Đặc Quyền Control Plane Qua iam:PassRole và Dịch Vụ Điện Toán (Lambda Pivot)",
+        "caption": "Kỹ thuật một danh tính có quyền hạn thấp mượn tay AWS Lambda thực thi API cấp quyền AdministratorAccess cho chính mình.",
+        "steps": [
+          {
+            "label": "Thăm Dò Quyền Hạn Ban Đầu (Enumeration)",
+            "detail": "Tài khoản 'developer-low' sở hữu quyền: lambda:CreateFunction, lambda:InvokeFunction và iam:PassRole trên role 'admin-service-role'.",
+            "tone": "neutral"
+          },
+          {
+            "label": "Tạo Hàm Lambda Độc Hại Kèm PassRole",
+            "detail": "Tài khoản gọi lambda:CreateFunction tải lên payload Python chứa mã gọi iam:AttachUserPolicy gán AdministratorAccess cho developer-low, đồng thời gán Role admin-service-role cho hàm.",
+            "tone": "caution"
+          },
+          {
+            "label": "Kích Hoạt Hàm Lambda (Execution Pivot)",
+            "detail": "Tài khoản gọi lambda:InvokeFunction. Môi trường Lambda thực thi dưới quyền admin-service-role, gửi API hợp lệ tới AWS IAM Control Plane.",
+            "tone": "allow"
+          },
+          {
+            "label": "Hoàn Tất Leo Thang Đặc Quyền (Privilege Acquired)",
+            "detail": "IAM Policy AdministratorAccess được gán thành công cho developer-low. Tài khoản ban đầu giờ đây nắm giữ toàn quyền kiểm soát Cloud Account.",
+            "tone": "stop"
+          }
+        ]
+      },
+      "sections": [
+        {
+          "title": "Hệ Thống Hóa 21 Vector Leo Thang Đặc Quyền AWS IAM Theo Nghiên Cứu Rhino Security Labs",
+          "paragraphs": [
+            "Khái niệm leo thang đặc quyền trên Cloud Control Plane được định hình mang tính bước ngoặt bởi công trình nghiên cứu của Spencer Gietz và đội ngũ Rhino Security Labs, hệ thống hóa thành 21 phương thức tấn công độc lập trên AWS IAM. Khác với các cuộc tấn công khai thác lỗi tràn bộ đệm (Buffer Overflow) hay lỗ hổng phần mềm (CVEs), các vector này khai thác triệt để sự lỏng lẻo trong logic phân quyền nghiệp vụ và sự thiếu hụt các ranh giới kiểm soát chéo giữa các dịch vụ đám mây.",
+            "Toàn bộ 21 vector có thể được phân loại thành 4 nhóm chiến thuật cốt lõi: (1) Nhóm thao túng chính sách trực tiếp (Direct Policy Manipulation): Lợi dụng các quyền quản trị IAM để can thiệp trực tiếp vào cấu trúc quyền hạn của bản thân hoặc nhóm; (2) Nhóm thao túng thông tin xác thực (Credential Manipulation): Tạo mới hoặc thay đổi mật khẩu console và khóa Access Key của các danh tính quản trị viên khác; (3) Nhóm chuyển tiếp quyền hạn qua dịch vụ tính toán (PassRole Compute Pivoting): Sử dụng quyền `iam:PassRole` để chuyển giao một IAM Role đặc quyền cho một dịch vụ điện toán đám mây (EC2, Lambda, Glue, CloudFormation, CodeBuild, ECS) rồi kích hoạt dịch vụ đó thực thi lệnh thay mặt; (4) Nhóm tái cấu hình dịch vụ hiện có (Resource Reconfiguration): Sửa đổi mã nguồn hoặc cấu hình của các tài nguyên đang chạy để chèn mã độc vào luồng thực thi có sẵn.",
+            "Điểm nguy hiểm chung của các vector này là chúng thường vượt qua các công cụ quét mã độc truyền thống vì toàn bộ các lệnh gọi API đều là các cuộc gọi hợp pháp (Legitimate API Calls) được hỗ trợ chính thức bởi nhà cung cấp đám mây. Trừ khi tổ chức thiết lập các rào chắn chính sách hình thức (Formal Verification / Guardrails), một người dùng chỉ có quyền phát triển phần mềm thông thường hoàn toàn có thể trở thành Full Administrator chỉ sau vài giây."
+          ]
+        },
+        {
+          "title": "Tử Huyệt iam:PassRole: Cơ Chế Chuyển Giao Quyền Hạn Cho Dịch Vụ Đám Mây",
+          "paragraphs": [
+            "Trong kiến trúc bảo mật AWS, `iam:PassRole` không phải là một lệnh gọi API độc lập tác động lên hạ tầng, mà là một quyền hạn trừu tượng (Authorization Check) kiểm soát việc một danh tính có được phép giao (pass) một IAM Role cụ thể cho một dịch vụ AWS hay không. Khi một kỹ sư tạo một máy chủ EC2 hoặc một hàm Lambda và muốn tài nguyên đó có quyền truy cập S3, kỹ sư đó bắt buộc phải có quyền `iam:PassRole` đối với Role dự định gán.",
+            "Lỗ hổng xảy ra khi quản trị viên cấp quyền `iam:PassRole` với cấu hình tài nguyên mở: `\"Action\": \"iam:PassRole\", \"Resource\": \"*\"`. Nếu kẻ tấn công nắm giữ một tài khoản có quyền `iam:PassRole` trên `*` kết hợp với một quyền khởi tạo tài nguyên tính toán (như `lambda:CreateFunction` hoặc `ec2:RunInstances`), một đường dẫn leo thang đặc quyền hoàn chỉnh lập tức hình thành.",
+            "Kỹ thuật khai thác qua Lambda Pivot diễn ra như sau: Kẻ tấn công viết một hàm Lambda bằng Python sử dụng thư viện `boto3`. Nội dung của hàm thực hiện lệnh gọi API: `iam.attach_user_policy(UserName='attacker-user', PolicyArn='arn:aws:iam::aws:policy/AdministratorAccess')`. Kẻ tấn công gọi `lambda:CreateFunction`, gán hàm này với một Role sẵn có trong hệ thống có thẩm quyền cao (chẳng hạn một role quản trị tự động hóa hạ tầng). Tiếp theo, kẻ tấn công gọi `lambda:InvokeFunction`. Khi hàm Lambda chạy trên hạ tầng của AWS, nó thực thi với tư cách danh tính của Role được gán và gửi yêu cầu đính kèm AdministratorAccess cho tài khoản của kẻ tấn công.",
+            "Tương tự, với vector `ec2:RunInstances` + `iam:PassRole`: Kẻ tấn công khởi tạo một máy chủ EC2 giá rẻ (như t2.micro), đính kèm một EC2 Instance Profile chứa Role quản trị, và chèn vào tham số `UserData` một đoạn bash script tải mã độc hoặc cấu hình reverse shell gửi ngược về máy chủ tấn công. Khi máy chủ EC2 khởi động, script chạy dưới quyền root cục bộ và tự động trích xuất chứng thư của Role quản trị từ IMDS gửi về cho kẻ tấn công."
+          ]
+        },
+        {
+          "title": "Thao Túng Phiên Bản Chính Sách: Kỹ Thuật Khai Thác CreatePolicyVersion & SetDefaultPolicyVersion",
+          "paragraphs": [
+            "Một nhóm vector tinh vi khác thường bị bỏ sót trong các đợt rà soát an ninh liên quan đến cơ chế quản lý phiên bản chính sách (Policy Versioning) của AWS Customer Managed Policies. AWS cho phép mỗi chính sách tự quản lý lưu trữ tối đa 5 phiên bản (từ v1 đến v5), trong đó luôn có duy nhất một phiên bản được đánh dấu là Default Version (phiên bản đang có hiệu lực áp dụng).",
+            "Vector `iam:CreatePolicyVersion`: Nếu một người dùng sở hữu quyền `iam:CreatePolicyVersion` trên một chính sách đang được gán trực tiếp cho chính mình (hoặc cho nhóm mà mình là thành viên), người dùng đó có thể tạo ra một phiên bản chính sách mới chứa nội dung phân quyền tối thượng: `{\"Effect\": \"Allow\", \"Action\": \"*\", \"Resource\": \"*\"}`. Khi gọi lệnh, người dùng chỉ cần thêm cờ `--set-as-default`. Lập tức phiên bản độc hại trở thành phiên bản mặc định, biến người dùng thành Administrator. Nếu chính sách đã đạt giới hạn 5 phiên bản, kẻ tấn công chỉ cần kết hợp thêm quyền `iam:DeletePolicyVersion` để xóa bỏ một phiên bản cũ không sử dụng trước khi tạo phiên bản mới.",
+            "Vector `iam:SetDefaultPolicyVersion`: Trong nhiều trường hợp thực tế, người quản trị trong quá trình thử nghiệm hoặc khắc phục sự cố hệ thống đã từng tạo ra các phiên bản chính sách cũ có quyền hạn rất rộng (như mở quyền quản trị để test ứng dụng), sau đó khi hoàn tất đã tạo phiên bản mới chặt chẽ hơn và đặt làm mặc định nhưng lại quên xóa phiên bản cũ đi. Kẻ tấn công nếu có quyền `iam:SetDefaultPolicyVersion` chỉ cần dùng lệnh `iam:ListPolicyVersions` để tìm phiên bản cũ chứa nhiều quyền nhất, sau đó gọi `iam:SetDefaultPolicyVersion --version-id <VersionID>` để kích hoạt lại phiên bản đó, hoàn tất leo thang đặc quyền mà không cần tạo mới bất kỳ đối tượng nào.",
+            "Ngoài ra, các quyền thao túng chính sách trực tiếp khác bao gồm: `iam:AttachUserPolicy` (tự gán AdministratorAccess cho mình), `iam:PutUserPolicy` (tự tạo một Inline Policy cấp toàn quyền), `iam:AddUserToGroup` (tự đưa mình vào nhóm Administrators), và `iam:UpdateLoginProfile` / `iam:CreateLoginProfile` (đặt lại mật khẩu console của một tài khoản quản trị viên khác để đăng nhập chiếm quyền)."
+          ]
+        },
+        {
+          "title": "Chiến Lược Phòng Ngự Toàn Diện: SCP Guardrails, Permissions Boundaries & Giám Sát CloudTrail Telemetry",
+          "paragraphs": [
+            "Để triệt tiêu vĩnh viễn 21 vector leo thang đặc quyền trên Cloud Control Plane, kiến trúc an ninh phòng thủ đòi hỏi sự kết hợp chặt chẽ giữa các biện pháp ngăn chặn chủ động (Preventative Guardrails) và phát hiện tự động (Detective Controls).",
+            "Đối với tử huyệt `iam:PassRole`, nguyên tắc bất di bất dịch là KHÔNG BAO GIỜ cấp `\"Resource\": \"*\"`. Quyền PassRole phải luôn bị giới hạn nghiêm ngặt theo hai chiều: (1) Chỉ định danh sách ARN cụ thể của các Role được phép chuyển giao; (2) Sử dụng khóa điều kiện `iam:PassedToService` để giới hạn Role đó chỉ được phép chuyển cho một dịch vụ nhất định (ví dụ: chỉ cho phép pass tới `lambda.amazonaws.com` mà không được pass tới `ec2.amazonaws.com`).",
+            "Cưỡng chế Permissions Boundary bằng chính sách IAM: Khi phân quyền cho các nhóm tự quản trị IAM, chính sách cấp quyền bắt buộc phải chứa mệnh đề điều kiện: `\"Condition\": {\"StringEquals\": {\"iam:PermissionsBoundary\": \"arn:aws:iam::<Account>:policy/CoreBoundary\"}}`. Nếu yêu cầu tạo Role hoặc User không đính kèm Boundary này, lệnh gọi API sẽ bị từ chối ngay lập tức. Đồng thời, tại cấp độ AWS Organizations, thiết lập Service Control Policy (SCP) nghiêm cấm bất kỳ ai trong các tài khoản con được phép gọi `iam:DeleteRolePermissionsBoundary` hoặc `iam:DeleteUserPermissionsBoundary`.",
+            "Thiết lập ma trận phát hiện tự động trên CloudTrail và Amazon EventBridge: Mọi sự kiện gọi các API nhạy cảm nằm trong danh mục 21 vectors (như `CreatePolicyVersion`, `SetDefaultPolicyVersion`, `AttachUserPolicy`, `PutUserPolicy`, `AddUserToGroup`, `CreateAccessKey`) phải được định tuyến ngay lập tức về hệ thống SIEM/SOC. Bất kỳ sự kiện nào xảy ra ngoài khung giờ bảo trì hoặc phát xuất từ một danh tính phi quản trị phải kích hoạt cảnh báo mức độ High/Critical và tự động kích hoạt Lambda cô lập danh tính vi phạm."
+          ]
+        }
+      ],
+      "lab": {
+        "title": "Kiểm Toán Đồ Thị Quyền Hạn Control Plane, Vô Hiệu Hóa Chuỗi Khai Thác iam:PassRole và Cưỡng Chế Permissions Boundary",
+        "objective": "Kiểm toán 21 vector leo thang đặc quyền IAM, phát hiện lỗ hổng PassRole kết hợp Lambda/EC2, và thiết lập rào chắn Permissions Boundary triệt tiêu nguy cơ tự cấp quyền.",
+        "scenario": "Trong đợt diễn tập Purple Team cho môi trường AWS Enterprise, đội ngũ Red Team phát hiện một tài khoản Service Account của CI/CD chỉ có quyền hạn ở mức Developer nhưng lại có thể leo thang thành Administrator trong vòng 3 phút. Là Chuyên gia An ninh Đám mây phụ trách phòng thủ, bạn cần phân tích chuỗi tấn công, xác định chính xác các điểm đứt gãy kiểm soát và thiết lập cơ chế chặn đứng vĩnh viễn.",
+        "constraints": [
+          "Không được thu hồi toàn bộ quyền tự động hóa của CI/CD pipeline đang phục vụ việc triển khai ứng dụng serverless hàng ngày.",
+          "Mọi IAM Role do CI/CD tạo ra bắt buộc phải bị giới hạn bởi một Permissions Boundary không thể vượt qua.",
+          "Quyền iam:PassRole phải được kiểm soát chặt chẽ theo từng dịch vụ đích thông qua điều kiện iam:PassedToService."
+        ],
+        "cases": [
+          {
+            "id": "case-81-01",
+            "title": "Chặn Đứng Vector Leo Thang Đặc Quyền Qua iam:PassRole và AWS Lambda",
+            "context": "Tài khoản CI/CD 'svc-cicd-runner' sở hữu các quyền: 'lambda:CreateFunction', 'lambda:InvokeFunction' và 'iam:PassRole' trên Resource '*'. Red Team đã tạo một hàm Lambda độc hại bằng mã Python tự động gán chính sách 'AdministratorAccess' cho chính tài khoản 'svc-cicd-runner' thông qua việc mượn quyền của role 'arn:aws:iam::111122223333:role/InfraAdminRole'.",
+            "prompt": "Lỗ hổng cốt lõi nằm ở đâu và phương án tái cấu trúc chính sách nào triệt tiêu hoàn toàn vector leo thang này?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Do Lambda cho phép chạy mã Python; cần cấm hoàn toàn ngôn ngữ Python trên AWS Lambda và bắt buộc chuyển sang Node.js.",
+                "correct": false,
+                "rationale": "Ngôn ngữ lập trình không liên quan đến bản chất phân quyền; bất kỳ ngôn ngữ nào cũng có thể gọi AWS API qua SDK tương ứng."
+              },
+              {
+                "id": "B",
+                "label": "Lỗ hổng nằm ở việc cấp quyền 'iam:PassRole' với Resource '*' cho phép chuyển giao bất kỳ Role nào kể cả InfraAdminRole. Khắc phục: Giới hạn 'Resource' của PassRole chỉ trỏ tới danh sách các Role phục vụ microservice cụ thể ('arn:aws:iam::...:role/app-microservice-*'), và bổ sung Condition 'StringEquals': {'iam:PassedToService': 'lambda.amazonaws.com'}.",
+                "correct": true,
+                "rationale": "Thu hẹp phạm vi Resource ARN của iam:PassRole và ràng buộc dịch vụ đích qua iam:PassedToService ngăn chặn triệt để việc chuyển giao trái phép các Role quản trị viên cấp cao."
+              },
+              {
+                "id": "C",
+                "label": "Xóa toàn bộ dịch vụ AWS Lambda trong tài khoản và chuyển đổi toàn bộ ứng dụng sang chạy trên máy chủ vật lý on-premise.",
+                "correct": false,
+                "rationale": "Giải pháp cực đoan, phá hủy toàn bộ kiến trúc đám mây của doanh nghiệp và không giải quyết đúng bản chất quản trị định danh."
+              },
+              {
+                "id": "D",
+                "label": "Chỉ cần đổi tên role 'InfraAdminRole' thành 'SuperSecretRole' để kẻ tấn công không tìm thấy tên Role trong mã nguồn.",
+                "correct": false,
+                "rationale": "Bảo mật bằng sự che giấu (Security through obscurity) hoàn toàn vô hiệu trước các kỹ thuật liệt kê danh tính (Recon/Enum) của kẻ tấn công."
+              }
+            ]
+          },
+          {
+            "id": "case-81-02",
+            "title": "Phát Hiện và Vô Hiệu Hóa Vector iam:CreatePolicyVersion",
+            "context": "Một kỹ sư bảo trì hạ tầng có tài khoản 'operator-dev' chỉ được gán một Customer Managed Policy tên 'OperatorMaintenancePolicy' với các quyền đọc CloudWatch và khởi động lại EC2. Tuy nhiên, trong chính sách này lại có dòng quyền: {\"Effect\": \"Allow\", \"Action\": [\"iam:CreatePolicyVersion\", \"iam:DeletePolicyVersion\"], \"Resource\": \"arn:aws:iam::111122223333:policy/OperatorMaintenancePolicy\"}.",
+            "prompt": "Kẻ tấn công có thể lợi dụng quyền hạn trên như thế nào để chiếm toàn quyền kiểm soát tài khoản AWS?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Kẻ tấn công không thể làm gì vì quyền này chỉ cho phép thao tác trên chính sách hiện tại chứ không gán được chính sách mới của AWS.",
+                "correct": false,
+                "rationale": "Khái niệm sai lầm: Tạo phiên bản mới của chính sách đang gán cho mình cho phép thay đổi toàn bộ nội dung quyền hạn của chính sách đó."
+              },
+              {
+                "id": "B",
+                "label": "Kẻ tấn công sử dụng lệnh 'aws iam create-policy-version' để tạo một version mới (ví dụ v2) cho chính OperatorMaintenancePolicy với nội dung 'Action': '*', 'Resource': '*', đi kèm cờ '--set-as-default'. Lập tức quyền hạn mới có hiệu lực và biến tài khoản operator-dev thành Administrator toàn quyền.",
+                "correct": true,
+                "rationale": "Đây là vector kinh điển của Rhino Security Labs: Tạo phiên bản chính sách mới với quyền tối thượng và đặt làm mặc định trên chính sách đang gắn với mình."
+              },
+              {
+                "id": "C",
+                "label": "Kẻ tấn công chỉ có thể dùng quyền này để xóa bớt các phiên bản cũ nhằm tiết kiệm dung lượng lưu trữ trên đám mây.",
+                "correct": false,
+                "rationale": "Bỏ qua hoàn toàn khả năng tạo phiên bản mới cấp toàn quyền Administrator."
+              },
+              {
+                "id": "D",
+                "label": "Quyền này chỉ hoạt động khi có sự đồng thuận ký số của ít nhất hai quản trị viên độc lập qua email.",
+                "correct": false,
+                "rationale": "AWS IAM API không tích hợp cơ chế phê duyệt kép qua email trừ khi tổ chức tự xây dựng quy trình tùy biến bên ngoài."
+              }
+            ]
+          },
+          {
+            "id": "case-81-03",
+            "title": "Thiết Lập Rào Chắn Cưỡng Chế Permissions Boundary Bằng Service Control Policy (SCP)",
+            "context": "Doanh nghiệp đã triển khai Permissions Boundary cho toàn bộ tài khoản thành viên trong AWS Organizations. Tuy nhiên, đội ngũ an ninh phát hiện một quản trị viên tài khoản con có quyền 'iam:DeleteRolePermissionsBoundary' đã tự ý gỡ bỏ boundary khỏi các Role mà họ sử dụng, phá vỡ rào chắn an ninh của tập đoàn.",
+            "prompt": "Giải pháp nào ở cấp độ AWS Organizations ngăn chặn triệt để hành vi tự ý gỡ bỏ hoặc sửa đổi Permissions Boundary trên toàn bộ các tài khoản con?",
+            "options": [
+              {
+                "id": "A",
+                "label": "Gửi email nhắc nhở toàn bộ quản trị viên các tài khoản con không được tự ý gỡ bỏ boundary.",
+                "correct": false,
+                "rationale": "Biện pháp hành chính không có tính cưỡng chế kỹ thuật, không ngăn chặn được các hành vi cố ý hoặc tài khoản bị xâm nhập."
+              },
+              {
+                "id": "B",
+                "label": "Thiết lập một Service Control Policy (SCP) gắn tại Root hoặc OU cấp cao chứa lệnh Explicit Deny đối với các hành động 'iam:DeleteRolePermissionsBoundary', 'iam:DeleteUserPermissionsBoundary', và 'iam:PutRolePermissionsBoundary' trên ARN của boundary chuẩn mực, ngoại trừ tài khoản của đội an ninh trung tâm.",
+                "correct": true,
+                "rationale": "Explicit Deny từ SCP có hiệu lực tuyệt đối trên toàn bộ tài khoản con trong OU (kể cả tài khoản Root của con), ngăn chặn triệt để mọi nỗ lực gỡ bỏ boundary."
+              },
+              {
+                "id": "C",
+                "label": "Khóa toàn bộ cổng 443 của AWS Console trên tường lửa văn phòng làm việc.",
+                "correct": false,
+                "rationale": "Không ngăn chặn được các lệnh gọi qua AWS CLI hoặc SDK từ các địa chỉ IP khác bên ngoài văn phòng."
+              },
+              {
+                "id": "D",
+                "label": "Xóa toàn bộ các Permissions Boundaries và chuyển sang sử dụng IAM Groups truyền thống.",
+                "correct": false,
+                "rationale": "IAM Groups không thể giới hạn quyền trần của IAM Roles và không ngăn chặn được nguy cơ leo thang đặc quyền."
+              }
+            ]
+          }
+        ],
+        "successCriteria": [
+          "Xác định chính xác lỗ hổng trong cấu hình iam:PassRole và thiết lập điều kiện iam:PassedToService để triệt tiêu vector leo thang.",
+          "Phân tích đúng cơ chế tấn công CreatePolicyVersion và quy trình loại bỏ quyền thao túng phiên bản chính sách trái phép.",
+          "Xây dựng thành công chính sách Service Control Policy (SCP) bảo vệ Permissions Boundary không bị gỡ bỏ tại các tài khoản con."
+        ],
+        "evidenceTemplate": [
+          "Bản phân tích đồ thị quyền hạn (IAM Privilege Escalation Graph) chỉ ra đường dẫn khai thác từ tài khoản CI/CD lên Administrator",
+          "Nội dung chính sách IAM Policy sau khi thu hẹp phạm vi iam:PassRole Resource và bổ sung iam:PassedToService",
+          "Tệp cấu hình SCP (JSON) bảo vệ ranh giới an ninh Permissions Boundary trên AWS Organizations",
+          "Nhật ký cảnh báo CloudTrail / EventBridge khi giả lập một hành vi leo thang đặc quyền bị chặn đứng"
+        ],
+        "reset": "Khôi phục cấu hình phân quyền của các tài khoản Service Accounts và trạng thái chính sách IAM về baseline an toàn ban đầu.",
+        "cleanup": "Xóa bỏ các hàm Lambda kiểm thử, các phiên bản chính sách tạm thời và dọn dẹp log thực thi diễn tập Purple Team."
+      },
+      "governance": {
+        "prevent": [
+          "Nghiêm cấm tuyệt đối việc cấp quyền 'iam:PassRole' với Resource '*' trong mọi chính sách IAM; bắt buộc chỉ định danh sách ARN cụ thể và điều kiện 'iam:PassedToService'.",
+          "Triển khai SCP ở cấp độ Organization cấm mọi tài khoản con tự ý gỡ bỏ hoặc sửa đổi các Permissions Boundaries đã được áp đặt bởi đội ngũ an ninh trung tâm.",
+          "Áp dụng quy tắc CI/CD Linter (như Checkov, tfsec, Parliament) tự động quét mã IaC và chặn đứng việc tạo các chính sách chứa bất kỳ quyền nào trong 21 vectors của Rhino Security Labs mà không có phê duyệt ngoại lệ."
+        ],
+        "observe": [
+          "Thiết lập Amazon EventBridge Rules kích hoạt cảnh báo tức thì khi xuất hiện các sự kiện CloudTrail nhạy cảm: CreatePolicyVersion, SetDefaultPolicyVersion, AttachUserPolicy, PutUserPolicy, AddUserToGroup.",
+          "Liên tục kiểm toán các IAM Roles có quyền PassRole kết hợp với các dịch vụ điện toán (EC2, Lambda, Glue, CloudFormation) bằng công cụ Automated IAM Graph Analysis.",
+          "Giám sát phát hiện hành vi bất thường của các tài khoản Service Accounts khi gọi các API IAM mà thông thường không nằm trong chu trình tự động hóa (Deviation from Baseline)."
+        ],
+        "respond": [
+          "Khi phát hiện một danh tính thực thi thành công một vector leo thang đặc quyền, lập tức kích hoạt AWS Lambda gắn DenyAll Inline Policy và vô hiệu hóa Access Key của danh tính đó trong dưới 15 giây.",
+          "Khôi phục phiên bản chính sách IAM (Policy Version) về phiên bản an toàn trước đó bằng lệnh SetDefaultPolicyVersion tự động và xóa bỏ phiên bản độc hại.",
+          "Tiến hành rà soát toàn bộ các tài nguyên điện toán (EC2 instances, Lambda functions) được tạo ra trong khoảng thời gian xảy ra sự cố để phát hiện mã độc duy trì quyền truy cập (Persistence)."
+        ],
+        "residualRisk": [
+          "Sự ra đời liên tục của các dịch vụ AWS mới có tích hợp tính năng thực thi mã và gắn IAM Role có thể tạo ra các biến thể leo thang đặc quyền mới chưa được định danh trong 21 vectors truyền thống.",
+          "Việc áp dụng Permissions Boundary chặt chẽ có thể đòi hỏi quy trình vận hành phức tạp khi các nhóm phát triển cần tích hợp các dịch vụ đám mây mới chưa có trong danh mục cho phép."
+        ]
+      },
+      "misconceptions": [
+        {
+          "claim": "Quyền 'iam:PassRole' cho phép người dùng đăng nhập hoặc trực tiếp sở hữu toàn bộ các quyền hạn của IAM Role được truyền vào.",
+          "correction": "Hoàn toàn sai. Quyền iam:PassRole chỉ cho phép người dùng chuyển giao (pass) một IAM Role cho một dịch vụ AWS cụ thể (như EC2 hoặc Lambda). Người dùng không tự mình sở hữu quyền của Role đó, nhưng nếu có quyền kích hoạt dịch vụ thực thi mã (như chạy hàm Lambda), họ có thể lừa dịch vụ thực thi lệnh thay mặt mình."
+        },
+        {
+          "claim": "Một Customer Managed Policy có 5 phiên bản (versions) thì cả 5 phiên bản đó đều đồng thời có hiệu lực phân quyền cho người dùng.",
+          "correction": "Sai lầm. Trong 5 phiên bản của một Managed Policy, luôn luôn CHỈ CÓ DUY NHẤT MỘT phiên bản được đánh dấu là Default (IsDefaultVersion = true) là có hiệu lực thực tế. Các phiên bản còn lại chỉ đóng vai trò lưu trữ lịch sử cấu hình."
+        },
+        {
+          "claim": "Nếu một người dùng không có quyền quản trị IAM ('iam:*'), họ tuyệt đối không thể tự cấp thêm quyền Administrator cho chính mình.",
+          "correction": "Cực kỳ sai lầm. Đây chính là bản chất của 21 vector Rhino Security Labs: Chỉ cần sở hữu một tổ hợp quyền rất nhỏ (như CreatePolicyVersion đơn lẻ, hoặc PassRole + Lambda), người dùng hoàn toàn có thể tự nâng quyền thành Full Administrator trong vài giây."
+        }
+      ],
+      "quiz": [
+        {
+          "id": "os09-l81-q1",
+          "difficulty": "easy",
+          "question": "Quyền hạn nào sau đây trong AWS IAM kiểm soát việc chuyển giao một IAM Role cho một dịch vụ đám mây (như EC2 hoặc Lambda) để dịch vụ đó thay mặt người dùng thực thi tác vụ?",
+          "options": [
+            {
+              "id": "A",
+              "label": "iam:AssumeRole"
+            },
+            {
+              "id": "B",
+              "label": "iam:PassRole"
+            },
+            {
+              "id": "C",
+              "label": "iam:DelegateRole"
+            },
+            {
+              "id": "D",
+              "label": "iam:SwitchRole"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Quyền iam:PassRole là quyền kiểm soát việc ủy quyền một IAM Role cho một dịch vụ AWS (như Lambda hay EC2) để tài nguyên đó hoạt động dưới danh tính của Role được chỉ định."
+        },
+        {
+          "id": "os09-l81-q2",
+          "difficulty": "medium",
+          "question": "Trong nghiên cứu của Rhino Security Labs, vector leo thang đặc quyền nào sau đây cho phép một người dùng tự nâng quyền thành Administrator mà KHÔNG CẦN tương tác với bất kỳ dịch vụ điện toán nào (như EC2 hay Lambda)?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Khai thác quyền iam:CreatePolicyVersion trên chính sách đang được gán cho chính mình"
+            },
+            {
+              "id": "B",
+              "label": "Khai thác quyền s3:GetObject trên bucket chứa file log của CloudTrail"
+            },
+            {
+              "id": "C",
+              "label": "Khai thác quyền kms:Encrypt trên khóa mã hóa mặc định của AWS"
+            },
+            {
+              "id": "D",
+              "label": "Khai thác quyền dynamodb:Scan trên bảng dữ liệu người dùng"
+            }
+          ],
+          "correctAnswer": "A",
+          "explanation": "Vector iam:CreatePolicyVersion cho phép người dùng tạo một phiên bản chính sách mới chứa quyền Administrator và đặt làm mặc định trên chính Customer Managed Policy đang gán cho họ, hoàn tất leo thang đặc quyền trực tiếp trong IAM."
+        },
+        {
+          "id": "os09-l81-q3",
+          "difficulty": "hard",
+          "question": "Để ngăn chặn triệt để vector leo thang đặc quyền thông qua việc lạm dụng 'iam:PassRole' kết hợp với dịch vụ điện toán, biện pháp cấu hình chính sách IAM nào sau đây là chuẩn xác nhất?",
+          "options": [
+            {
+              "id": "A",
+              "label": "Cấm hoàn toàn việc sử dụng IAM Roles trong toàn bộ tài khoản AWS"
+            },
+            {
+              "id": "B",
+              "label": "Chỉ cấp iam:PassRole trên các Role ARN cụ thể (không dùng '*') và bắt buộc sử dụng khóa điều kiện 'iam:PassedToService' để giới hạn dịch vụ đích được phép nhận Role"
+            },
+            {
+              "id": "C",
+              "label": "Chuyển toàn bộ các hàm Lambda sang chạy trên Amazon SQS"
+            },
+            {
+              "id": "D",
+              "label": "Yêu cầu lập trình viên phải nhập mật khẩu console mỗi khi gọi lệnh ec2:RunInstances"
+            }
+          ],
+          "correctAnswer": "B",
+          "explanation": "Nguyên tắc Least Privilege đối với PassRole đòi hỏi phải chỉ định chính xác Resource ARN của Role được phép pass và ràng buộc dịch vụ đích thông qua Condition Key iam:PassedToService (ví dụ chỉ cho phép pass tới lambda.amazonaws.com)."
+        }
+      ],
+      "transferChallenge": {
+        "scenario": "Tập đoàn dịch vụ đám mây của bạn chuẩn bị bước vào cuộc kiểm toán tuân thủ an ninh PCI-DSS và SOC 2 Type II. Trong đợt tự đánh giá, công cụ bảo mật nội bộ cảnh báo có hơn 30 tài khoản Service Accounts và Developer Roles đang sở hữu các tổ hợp quyền thuộc danh mục 21 vector leo thang đặc quyền của Rhino Security Labs. Bạn được giao nhiệm vụ chủ trì chiến dịch 'Hardening Control Plane', triệt tiêu toàn bộ các chuỗi tấn công tiềm tàng này.",
+        "tasks": [
+          "Phát triển script phân tích đồ thị quyền hạn (bằng Python / NetworkX hoặc truy vấn Neo4j/BloodHound for Cloud) quét toàn bộ IAM Policies trong tài khoản AWS, phát hiện tất cả các danh tính có khả năng leo thang qua 21 vectors của Rhino Security Labs.",
+          "Xây dựng ma trận Service Control Policies (SCPs) và Permissions Boundaries chuẩn hóa, loại bỏ hoàn toàn việc cấp 'iam:PassRole' với Resource '*', và cưỡng chế điều kiện 'iam:PassedToService' trên toàn bộ các tài khoản thành viên trong AWS Organizations.",
+          "Thiết lập pipeline giám sát phát hiện tự động: Tích hợp AWS CloudTrail với Amazon EventBridge và Lambda để gửi cảnh báo thời gian thực về Slack/SIEM và tự động thu hồi quyền tạm thời khi phát hiện bất kỳ lệnh gọi API nào thuộc nhóm Direct Policy Tampering."
+        ],
+        "requiredEvidence": [
+          "Báo cáo kiểm toán đồ thị quyền hạn thể hiện danh sách các tài khoản có lỗ hổng leo thang trước và sau khi xử lý",
+          "Mẫu mã chính sách IAM Policy và SCPs đã được làm sạch, chứng minh việc giới hạn PassRole và cưỡng chế Permissions Boundary",
+          "Mã nguồn kiến trúc giám sát EventBridge + Lambda và ảnh chụp nhật ký thử nghiệm phát hiện hành vi tấn công tự động"
+        ]
+      },
+      "sources": [
+        {
+          "title": "Rhino Security Labs — AWS IAM Privilege Escalation: 21 Methods and How to Mitigate Them",
+          "url": "https://rhinosecuritylabs.com/aws/aws-privilege-escalation-methods-mitigation/",
+          "publisher": "Rhino Security Labs",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Danh mục và cơ chế hoạt động chi tiết của 21 vector leo thang đặc quyền trên AWS IAM",
+            "Phương pháp phòng ngừa và kiểm toán rủi ro iam:PassRole kết hợp dịch vụ điện toán"
+          ]
+        },
+        {
+          "title": "AWS Documentation — IAM Best Practices and Granting Least Privilege",
+          "url": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html",
+          "publisher": "Amazon Web Services",
+          "sourceType": "official-guidance",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Nguyên tắc đặc quyền tối thiểu trong thiết kế IAM Policy",
+            "Cơ chế sử dụng iam:PassedToService để giới hạn quyền PassRole"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Technique T1078.004: Valid Accounts - Cloud Accounts",
+          "url": "https://attack.mitre.org/techniques/T1078/004/",
+          "publisher": "MITRE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Chiến thuật lạm dụng tài khoản hợp lệ trên nền tảng đám mây để duy trì quyền truy cập"
+          ]
+        },
+        {
+          "title": "MITRE ATT&CK — Technique T1098.001: Account Manipulation - Additional Cloud Credentials",
+          "url": "https://attack.mitre.org/techniques/T1098/001/",
+          "publisher": "MITRE",
+          "sourceType": "official-standard",
+          "accessedAt": "2026-09-04",
+          "supports": [
+            "Kỹ thuật thao túng danh tính và cấp thêm thông tin xác thực trên Cloud Control Plane"
+          ]
+        }
+      ]
+    }
+  ]
+}
