@@ -36,12 +36,81 @@ function getLevelBadgeVariant(level: string) {
   }
 }
 
+function getCategoryBadge(category: string) {
+  switch (category) {
+    case 'react':
+    case 'react-19':
+      return {
+        label: '⚛️ React',
+        className: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
+      };
+    case 'nextjs':
+    case 'next-app-router':
+      return {
+        label: '▲ Next.js',
+        className:
+          'bg-zinc-500/10 text-zinc-900 dark:text-zinc-100 border-zinc-500/30 font-semibold',
+      };
+    case 'typescript':
+      return {
+        label: '🔷 TypeScript',
+        className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+      };
+    case 'javascript':
+      return {
+        label: '🟨 JavaScript',
+        className:
+          'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
+      };
+    case 'go':
+      return {
+        label: '🐹 Go (Golang)',
+        className:
+          'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30 font-semibold',
+      };
+    case 'javascript-typescript':
+      return {
+        label: '🟨 JS / 🔷 TS',
+        className: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+      };
+    case 'browser-runtime-workers':
+      return {
+        label: '⚙️ Browser & Workers',
+        className:
+          'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
+      };
+    case 'performance-optimization':
+      return {
+        label: '⚡ Performance & Security',
+        className:
+          'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+      };
+    case 'frontend-system-design':
+      return {
+        label: '🏛️ System Design',
+        className: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
+      };
+    case 'state-data':
+      return {
+        label: '🗄️ State & Data',
+        className:
+          'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+      };
+    default:
+      return {
+        label: `#${category}`,
+        className: 'text-muted-foreground border-border',
+      };
+  }
+}
+
 export function QuestionCard({ question }: QuestionCardProps) {
   const { bookmarkedQuestionIds, toggleBookmark } = useInterviewStore();
   const [isExpanded, setIsExpanded] = React.useState(false);
 
   const isBookmarked = bookmarkedQuestionIds.includes(question.id);
   const hasRubric = Boolean(question.evaluationRubric);
+  const categoryMeta = getCategoryBadge(question.category);
 
   return (
     <Card className="glass-card glass-card-hover overflow-hidden p-5 transition-all">
@@ -55,8 +124,11 @@ export function QuestionCard({ question }: QuestionCardProps) {
             >
               {question.level}
             </Badge>
-            <Badge variant="outline" className="text-muted-foreground text-[10px]">
-              #{question.category}
+            <Badge
+              variant="outline"
+              className={`border text-[10px] font-medium ${categoryMeta.className}`}
+            >
+              {categoryMeta.label}
             </Badge>
           </div>
 

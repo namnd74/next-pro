@@ -45,7 +45,12 @@ export default function RootLayout({
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH?.replace(/\/$/, '') ?? '';
 
   return (
-    <html lang="en" suppressHydrationWarning className={plusJakartaSans.variable}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      data-scroll-behavior="smooth"
+      className={plusJakartaSans.variable}
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{

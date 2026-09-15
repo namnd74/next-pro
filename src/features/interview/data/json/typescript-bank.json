@@ -1,0 +1,2125 @@
+[
+  {
+    "id": "ts-001",
+    "category": "typescript",
+    "level": "junior",
+    "question": "TypeScript là gì và tại sao nên dùng TypeScript thay JavaScript?",
+    "interviewerIntent": "Đánh giá sự hiểu biết về bản chất của TypeScript (static typing on top of dynamic JS), cơ chế type erasure và giá trị thực tế mang lại cho dự án quy mô lớn.",
+    "contextOrScenario": "Team chuẩn bị khởi động dự án mới và đang thảo luận có nên áp dụng TypeScript hay giữ nguyên thuần JavaScript để dev nhanh hơn lúc đầu.",
+    "expectedKeywords": [
+      "static type checking",
+      "compile time",
+      "type erasure",
+      "runtime zero cost",
+      "refactoring safety",
+      "developer experience"
+    ],
+    "seniorAnswer": {
+      "summary": "TypeScript là typed superset của JavaScript, cung cấp hệ thống kiểm tra kiểu tĩnh (static typing) tại thời điểm compile-time. Toàn bộ types sẽ bị loại bỏ hoàn toàn (type erasure) khi compile sang JavaScript, mang lại độ an toàn và khả năng tái cấu trúc cao mà không phát sinh overhead runtime.",
+      "deepDive": "TypeScript phân tích AST và bắt các lỗi phổ biến như TypeError (gọi undefined method, null dereference) ngay khi viết code thay vì đợi nổ lỗi ở production. Nhờ type definitions, IDE hỗ trợ autocompletion, jump-to-definition và self-documenting code. Cần lưu ý TypeScript chỉ tồn tại ở build-time; tại runtime mã thực thi vẫn là vanilla JavaScript nên dữ liệu từ bên ngoài (API, User Input) vẫn cần schema validation (Zod, Valibot).",
+      "codeExample": "// Type checking ở compile-time:\ninterface UserProfile {\n  id: string;\n  email: string;\n  age?: number;\n}\n\nfunction formatUser(user: UserProfile): string {\n  return `${user.id}: ${user.email}`;\n}\n\n// Compiler bắt lỗi ngay lập tức nếu thiếu field hoặc sai kiểu:\n// formatUser({ id: '1' }); // Error: Property 'email' is missing"
+    },
+    "pitfalls": [
+      "Nghĩ rằng TypeScript cung cấp runtime validation (ảo tưởng an toàn kiểu khi nhận payload từ API ngoài).",
+      "Lạm dụng 'any' để dập tắt lỗi compiler, biến TypeScript trở lại JavaScript lỏng lẻo."
+    ],
+    "followUpQuestions": [
+      "Cơ chế type erasure ảnh hưởng thế nào đến kích thước bundle và hiệu năng khi chạy mã trên Node.js hoặc Browser?",
+      "Tại sao TypeScript không kiểm tra được kiểu của response trả về từ `fetch()`?"
+    ]
+  },
+  {
+    "id": "ts-002",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Type annotation trong TypeScript là gì?",
+    "interviewerIntent": "Kiểm tra kiến thức nền tảng về cú pháp khai báo kiểu rõ ràng (explicit typing) và sự cân bằng giữa Type Annotation với Type Inference.",
+    "contextOrScenario": "Review pull request của junior developer khi họ khai báo type annotation cho mọi biến đơn giản như `const a: number = 1;`.",
+    "expectedKeywords": [
+      "explicit type",
+      "type inference",
+      "syntax colon",
+      "best practices",
+      "readability"
+    ],
+    "seniorAnswer": {
+      "summary": "Type annotation là cú pháp tường minh (`: Type`) gắn sau tên biến, tham số hàm hoặc giá trị trả về để chỉ định kiểu dữ liệu mà TypeScript compiler cần ép buộc. Tuy nhiên, TypeScript có bộ suy luận kiểu (type inference) cực mạnh nên annotation chỉ thực sự cần thiết cho tham số hàm, type phức tạp hoặc khi khởi tạo biến rỗng.",
+      "deepDive": "Annotation đóng vai trò hợp đồng (contract). Khi khai báo tham số hàm hoặc public API, annotation là bắt buộc để document và chặn caller truyền sai kiểu. Ngược lại, với các biến cục bộ có giá trị khởi tạo rõ ràng (`const count = 0`), việc viết thừa `: number` là redundant và đi ngược lại best practice của idiomatic TypeScript.",
+      "codeExample": "// Bắt buộc và khuyến nghị: Function signatures & complex contracts\nfunction calculateDiscount(price: number, percentage: number): number {\n  return price * (1 - percentage / 100);\n}\n\n// Không nên (Redundant - TS tự inference là string):\nconst userName: string = 'Alice';\n\n// Nên (Để inference tự làm việc):\nconst userNameClean = 'Alice'; // Type: 'Alice'"
+    },
+    "pitfalls": [
+      "Viết type annotation tràn lan cho các biến nguyên thủy đơn giản làm giảm tính tinh gọn của code.",
+      "Quên type annotation cho tham số hàm khiến chúng vô tình fallback về 'any' (nếu noImplicitAny tắt)."
+    ],
+    "followUpQuestions": [
+      "Khi nào type inference không đủ an toàn mà bắt buộc phải dùng explicit return type annotation?",
+      "Quy tắc Contextual Typing trong TypeScript suy luận kiểu của tham số callback như thế nào?"
+    ]
+  },
+  {
+    "id": "ts-003",
+    "category": "typescript",
+    "level": "junior",
+    "question": "any, unknown và never khác nhau như thế nào?",
+    "interviewerIntent": "Đánh giá sự thấu hiểu về Top Type và Bottom Type trong lý thuyết Type System của TypeScript.",
+    "contextOrScenario": "Xử lý dữ liệu trả về từ 3rd party SDK hoặc parse JSON không rõ schema từ trước.",
+    "expectedKeywords": [
+      "top type",
+      "bottom type",
+      "type safety",
+      "type narrowing",
+      "unreachable code",
+      "exhaustive check"
+    ],
+    "seniorAnswer": {
+      "summary": "`any` tắt hoàn toàn type checking (bỏ qua an toàn). `unknown` là type-safe top-type: chấp nhận mọi giá trị nhưng bắt buộc phải type narrowing/type guard trước khi thao tác. `never` là bottom-type đại diện cho giá trị không bao giờ xảy ra (hàm throw error vô tận hoặc nhánh type đã bị loại trừ hết).",
+      "deepDive": "`any` vừa là top type vừa là bottom type, gây thủng hệ thống type (unsoundness). `unknown` là giải pháp thay thế chuẩn cho `any` khi xử lý dynamic data (JSON parse, catch error), buộc lập trình viên phải chứng minh kiểu trước khi truy cập thuộc tính. `never` là tập rỗng trong tập hợp kiểu, thường dùng để implement exhaustive checking trong exhaustive switch-case.",
+      "codeExample": "// 1. any: Không an toàn, lọt lỗi runtime\nconst a: any = 'hello';\na.nonExistentMethod(); // Biên dịch bình thường nhưng crash runtime!\n\n// 2. unknown: Bắt buộc narrow trước khi dùng\nconst u: unknown = 'hello';\n// u.toUpperCase(); // Error: 'u' is of type 'unknown'\nif (typeof u === 'string') {\n  console.log(u.toUpperCase()); // Safe\n}\n\n// 3. never: Unreachable hoặc Exhaustive Check\nfunction assertNever(x: never): never {\n  throw new Error(`Unexpected object: ${x}`);\n}"
+    },
+    "pitfalls": [
+      "Dùng `any` trong catch block (`catch (err: any)`) thay vì `catch (err: unknown)` kèm type guard `instanceof Error`.",
+      "Gán `unknown` trực tiếp sang một type cụ thể mà không dùng type guard hoặc assertion."
+    ],
+    "followUpQuestions": [
+      "Tại sao phép giao (intersection) của bất kỳ type nào với `never` luôn ra `never`?",
+      "Làm sao dùng `never` để bắt lỗi compile-time khi thêm một variant mới vào Discriminated Union?"
+    ]
+  },
+  {
+    "id": "ts-004",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Union types và intersection types là gì?",
+    "interviewerIntent": "Đánh giá tư duy đại số kiểu dữ liệu (set theory in types: OR vs AND), cách kết hợp kiểu dữ liệu trong TypeScript.",
+    "contextOrScenario": "Thiết kế component Props cho Button hỗ trợ hoặc kiểu Link (có `href`), hoặc kiểu Action (có `onClick`), đồng thời kế thừa các thuộc tính chung.",
+    "expectedKeywords": [
+      "union (|)",
+      "intersection (&)",
+      "set theory",
+      "discriminant",
+      "overlapping properties"
+    ],
+    "seniorAnswer": {
+      "summary": "Union types (`A | B`) biểu diễn mối quan hệ 'HOẶC' (tập hợp hợp), giá trị có thể thuộc kiểu A hoặc kiểu B. Intersection types (`A & B`) biểu diễn mối quan hệ 'VÀ' (tập hợp giao), giá trị phải thỏa mãn đồng thời tất cả các thuộc tính của cả A và B.",
+      "deepDive": "Với Union (`A | B`), bạn chỉ có thể truy cập an toàn các thuộc tính chung (common properties) của cả hai trước khi thực hiện Type Narrowing. Với Intersection (`A & B`), type kết quả chứa gộp mọi thuộc tính của cả hai; nếu hai type có chung một thuộc tính nhưng kiểu nguyên thủy xung đột (ví dụ string vs number), thuộc tính đó sẽ biến thành `never`.",
+      "codeExample": "// Union: Hoặc là Success hoặc là Error\ntype ApiResponse =\n  | { status: 'success'; data: string[] }\n  | { status: 'error'; message: string };\n\n// Intersection: Kết hợp User và Timestamps\ntype Identifiable = { id: string };\ntype Auditable = { createdAt: Date; updatedAt: Date };\ntype Entity = Identifiable & Auditable;\n\nconst record: Entity = {\n  id: 'usr-1',\n  createdAt: new Date(),\n  updatedAt: new Date()\n};"
+    },
+    "pitfalls": [
+      "Cố truy cập thuộc tính riêng lẻ của một variant trong union mà không thực hiện type guard trước.",
+      "Tạo intersection giữa 2 kiểu có thuộc tính xung đột không tương thích khiến thuộc tính đó thành `never`."
+    ],
+    "followUpQuestions": [
+      "Tại sao phép gán `string & number` lại cho kết quả là `never`?",
+      "Làm thế nào để phân biệt giữa các nhánh trong Union Type khi không có field discriminator chung?"
+    ]
+  },
+  {
+    "id": "ts-005",
+    "category": "typescript",
+    "level": "junior",
+    "question": "as keyword (type assertion) là gì? Khi nào dùng?",
+    "interviewerIntent": "Đánh giá khả năng phân biệt giữa Type Casting (runtime conversion) và Type Assertion (compile-time override), cùng các rủi ro type safety liên quan.",
+    "contextOrScenario": "Thao tác với DOM element (`document.getElementById`) hoặc nhận dữ liệu test mock trong unit test.",
+    "expectedKeywords": [
+      "type assertion",
+      "compile-time override",
+      "not runtime cast",
+      "double assertion",
+      "narrowing preference"
+    ],
+    "seniorAnswer": {
+      "summary": "`as` là cú pháp Type Assertion cho phép lập trình viên bảo với compiler rằng: 'Tôi hiểu rõ cấu trúc dữ liệu này hơn compiler, hãy coi nó là kiểu T'. Đây chỉ là chỉ thị ở compile-time và HOÀN TOÀN KHÔNG thực hiện ép kiểu hay chuyển đổi dữ liệu ở runtime.",
+      "deepDive": "Type assertion là một con dao hai lưỡi vì nó vượt qua cơ chế kiểm tra kiểu của TypeScript. Chỉ nên dùng khi bạn có thông tin ngữ cảnh mà compiler không thể suy luận (ví dụ `getElementById('app') as HTMLDivElement`) hoặc trong mock test. Tuyệt đối không lạm dụng `as` để che giấu lỗi API. Khi 2 type không tương thích, TypeScript sẽ chặn trừ khi dùng 'double assertion' (`as unknown as Target`), đây là dấu hiệu code mùi (code smell).",
+      "codeExample": "// Hợp lệ: Thao tác với DOM đã biết chắc chắn\nconst canvas = document.getElementById('main-canvas') as HTMLCanvasElement;\n\n// Cực kỳ nguy hiểm (Bị crash runtime nhưng compile vẫn pass):\ninterface User { id: string; name: string; }\nconst data = {} as User; \n// console.log(data.name.toUpperCase()); // TypeError: Cannot read properties of undefined"
+    },
+    "pitfalls": [
+      "Nhầm tưởng `as` sẽ chuyển đổi dữ liệu runtime (như ép chuỗi sang số trong các ngôn ngữ khác).",
+      "Dùng `as SomeType` để bypass type check khi parse JSON từ API thay vì dùng schema validation (Zod)."
+    ],
+    "followUpQuestions": [
+      "Tại sao TypeScript không cho phép `const x = 'hello' as number` trực tiếp mà phải qua `as unknown as number`?",
+      "Sự khác nhau giữa cú pháp `<Type>val` và `val as Type` trong file JSX/TSX là gì?"
+    ]
+  },
+  {
+    "id": "ts-006",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Tuple type trong TypeScript là gì?",
+    "interviewerIntent": "Kiểm tra kiến thức về mảng có số lượng phần tử cố định và thứ tự kiểu xác định (fixed-length, ordered array).",
+    "contextOrScenario": "Thiết kế custom React hook trả về cặp giá trị `[value, setValue]` tương tự như `useState`.",
+    "expectedKeywords": [
+      "fixed length",
+      "element order",
+      "labeled tuple elements",
+      "readonly tuple",
+      "array push trap"
+    ],
+    "seniorAnswer": {
+      "summary": "Tuple là một dạng mảng đặc biệt trong TypeScript với số lượng phần tử cố định và kiểu dữ liệu tại từng vị trí index được xác định cụ thể từ trước.",
+      "deepDive": "Tuple rất hữu ích khi biểu diễn cặp tọa độ `[x, y]`, mã trạng thái HTTP kèm message `[200, 'OK']`, hoặc return type của React hooks `[state, setState]`. Từ TypeScript 4.0+, chúng ta có thể đặt tên cho các phần tử trong tuple (Labeled Tuple Elements) để tăng tính tự tài liệu hóa. Cần chú ý cạm bẫy: các hàm thay đổi mảng ở runtime như `array.push()` vẫn có thể làm vỡ độ dài của tuple trừ khi khai báo tuple là `readonly`.",
+      "codeExample": "// Labeled Tuple: Tăng tính tường minh\ntype LatLng = [latitude: number, longitude: number];\nconst hcmLocation: LatLng = [10.7769, 106.7009];\n\n// Readonly Tuple tránh cạm bẫy push():\ntype HttpResponse = readonly [status: number, message: string];\nconst ok: HttpResponse = [200, 'OK'];\n// ok.push('extra'); // Compile Error: Property 'push' does not exist on readonly tuple"
+    },
+    "pitfalls": [
+      "Không dùng `readonly` với tuple khiến các thao tác mutating (`push`, `pop`) phá vỡ ràng buộc độ dài ở runtime.",
+      "Quên type assertion `as const` khi trả về tuple từ custom hook khiến TS suy luận thành mảng `(T | U)[]`."
+    ],
+    "followUpQuestions": [
+      "Tại sao hàm trả về `[state, setState]` cần thêm `as const` nếu không khai báo explicit return type?",
+      "Cú pháp rest elements (`[string, ...number[]]`) trong tuple hoạt động như thế nào?"
+    ]
+  },
+  {
+    "id": "ts-007",
+    "category": "typescript",
+    "level": "junior",
+    "question": "TypeScript strict mode bao gồm những gì?",
+    "interviewerIntent": "Đánh giá mức độ am hiểu về cờ compiler `\"strict\": true` trong `tsconfig.json` và các quy chuẩn code an toàn.",
+    "contextOrScenario": "Thiết lập cấu hình dự án mới hoặc thảo luận về việc bật `strict: true` cho toàn bộ repository.",
+    "expectedKeywords": [
+      "strict: true",
+      "noImplicitAny",
+      "strictNullChecks",
+      "strictFunctionTypes",
+      "strictBindCallApply",
+      "strictPropertyInitialization",
+      "noImplicitThis"
+    ],
+    "seniorAnswer": {
+      "summary": "Strict mode (`\"strict\": true` trong `tsconfig.json`) là meta-flag kích hoạt một họ các quy tắc kiểm tra kiểu nghiêm ngặt nhất của compiler, loại bỏ các hành vi lỏng lẻo mặc định của JavaScript. Các flag cốt lõi gồm: `noImplicitAny`, `strictNullChecks`, `strictFunctionTypes`, `strictBindCallApply`, `strictPropertyInitialization`, `noImplicitThis`, và `useUnknownInCatchVariables`.",
+      "deepDive": "Quan trọng nhất là `strictNullChecks` (không cho phép gán null/undefined cho các kiểu khác nếu không khai báo rõ trong union) và `noImplicitAny` (bắt buộc mọi biểu thức không suy luận được phải có annotation rõ ràng). Bật strict mode ngay từ ngày đầu giúp loại bỏ hơn 80% các lỗi runtime cơ bản.",
+      "codeExample": "// Với strictNullChecks = false (Lỏng lẻo):\n// let name: string = null; // Hợp lệ, dễ crash runtime!\n\n// Với strict: true (Khuyến nghị):\nlet nameSafe: string = 'Alex';\n// nameSafe = null; // Error: Type 'null' is not assignable to type 'string'.\n\n// Bắt buộc khai báo union nếu chấp nhận null:\nlet optionalName: string | null = null; // OK"
+    },
+    "pitfalls": [
+      "Tắt strict mode để né tránh việc sửa lỗi type khi import thư viện cũ.",
+      "Nghĩ rằng `strict: true` sẽ làm chậm runtime của ứng dụng (trong khi nó chỉ tác động tại compile-time)."
+    ],
+    "followUpQuestions": [
+      "Flag `strictPropertyInitialization` bảo vệ class trong TypeScript như thế nào?",
+      "Tại sao `strictFunctionTypes` lại kiểm tra tham số hàm theo cơ chế bivariant hay contravariant?"
+    ]
+  },
+  {
+    "id": "ts-008",
+    "category": "typescript",
+    "level": "junior",
+    "question": "interface và type alias khác nhau như thế nào? Khi nào dùng cái nào?",
+    "interviewerIntent": "Đánh giá khả năng phân biệt Declaration Merging, kế thừa, cũng như khả năng biểu diễn Union/Primitives giữa hai cú pháp.",
+    "contextOrScenario": "Quy chuẩn kiến trúc frontend: Thống nhất khi nào dùng `type` và khi nào dùng `interface` trong toàn bộ team.",
+    "expectedKeywords": [
+      "declaration merging",
+      "union & primitive",
+      "extends vs intersection",
+      "mapped types",
+      "public API design"
+    ],
+    "seniorAnswer": {
+      "summary": "`interface` chuyên dùng để mô tả hình dạng của Object/Class, hỗ trợ Declaration Merging (khả năng gộp nhiều khai báo trùng tên) và có hiệu năng compiler tối ưu hơn khi kế thừa. `type` (type alias) linh hoạt hơn vì có thể định nghĩa Union, Primitives, Tuples, Mapped Types và Conditional Types.",
+      "deepDive": "Interface chỉ có thể định nghĩa Object/Function type, không thể định nghĩa trực tiếp `type ID = string | number`. Tuy nhiên, interface hỗ trợ Declaration Merging, tính năng rất quan trọng khi viết thư viện hoặc mở rộng type của third-party (như Window, Express Request). Best practice: dùng `interface` cho public API, model đối tượng cần mở rộng; dùng `type` cho Union, Tuple, Utility Types, State machine.",
+      "codeExample": "// 1. Declaration Merging chỉ có ở Interface:\ninterface Window {\n  analyticsTrackingId?: string;\n}\ninterface Window {\n  appVersion?: string;\n}\n// Window bây giờ có cả analyticsTrackingId và appVersion\n\n// 2. Type Alias biểu diễn được Union & Primitives:\ntype Status = 'idle' | 'loading' | 'success' | 'error'; // Interface không làm được điều này"
+    },
+    "pitfalls": [
+      "Cố dùng `interface` để tạo Union type dẫn đến lỗi syntax.",
+      "Vô tình dùng `interface` đặt trùng tên ở nhiều nơi khiến chúng tự động merge vào nhau mà không hay biết."
+    ],
+    "followUpQuestions": [
+      "Về mặt hiệu năng biên dịch của TypeScript compiler, tại sao interface extends thường nhanh hơn type intersection (&)?",
+      "Tại sao type alias không thể tham gia vào declaration merging?"
+    ]
+  },
+  {
+    "id": "ts-009",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Cách extend interface và type trong TypeScript?",
+    "interviewerIntent": "Đánh giá kỹ năng mở rộng type (composition & inheritance) thông qua từ khóa `extends` và phép toán `&` (intersection).",
+    "contextOrScenario": "Mở rộng Props của một Base UI Component (Button, Card, Input) để tạo specialized component.",
+    "expectedKeywords": [
+      "extends keyword",
+      "intersection operator (&)",
+      "property override",
+      "type compatibility"
+    ],
+    "seniorAnswer": {
+      "summary": "`interface` mở rộng bằng từ khóa `extends` (`interface B extends A`), hỗ trợ đa kế thừa. `type` mở rộng thông qua Intersection operator `&` (`type B = A & { ... }`). Cả hai cách đều cho phép tái sử dụng và kết hợp cấu trúc dữ liệu.",
+      "deepDive": "Khi `interface extends` gặp trường hợp ghi đè thuộc tính trùng tên (property override), TypeScript sẽ kiểm tra xem kiểu mới có tương thích (assignable) với kiểu cũ hay không; nếu không tương thích compiler sẽ báo lỗi ngay. Ngược lại, Intersection `&` sẽ cố gắng gộp hai kiểu lại, nếu xung đột sẽ biến thuộc tính thành `never` mà không cảnh báo ngay lúc khai báo.",
+      "codeExample": "// 1. Extend bằng Interface:\ninterface BaseUser {\n  id: string;\n  name: string;\n}\ninterface AdminUser extends BaseUser {\n  role: 'admin';\n  permissions: string[];\n}\n\n// 2. Extend bằng Type (Intersection):\ntype WithAudit<T> = T & {\n  createdAt: Date;\n  updatedAt: Date;\n};\ntype AuditedUser = WithAudit<BaseUser>;"
+    },
+    "pitfalls": [
+      "Interface extend với một kiểu thuộc tính không gán được cho kiểu gốc gây compile error.",
+      "Giao 2 type có cùng key nhưng khác kiểu nguyên thủy (`id: string & number`) dẫn đến `id: never`."
+    ],
+    "followUpQuestions": [
+      "Interface có thể `extends` một Type Alias được không, và điều kiện là gì?",
+      "Làm sao để 'Omit' một property từ base type trước khi extend nhằm đổi lại kiểu dữ liệu của property đó?"
+    ]
+  },
+  {
+    "id": "ts-010",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Optional properties (?) và readonly properties là gì?",
+    "interviewerIntent": "Kiểm tra kiến thức về các property modifiers trong object types và cách bảo vệ tính toàn vẹn dữ liệu (immutability).",
+    "contextOrScenario": "Định nghĩa Entity Model của Database, trong đó `id` và `createdAt` không được phép sửa, còn `bio` có thể để trống.",
+    "expectedKeywords": [
+      "optional modifier (?)",
+      "readonly modifier",
+      "compile-time immutability",
+      "shallow immutability",
+      "undefined union"
+    ],
+    "seniorAnswer": {
+      "summary": "Optional property (`?`) cho phép thuộc tính có thể tồn tại hoặc không (tương đương `Type | undefined`). `readonly` ngăn chặn việc gán lại giá trị cho thuộc tính sau khi khởi tạo. Cả hai đều là modifier hoạt động ở compile-time.",
+      "deepDive": "Cần chú ý `readonly` trong TypeScript chỉ là shallow immutability (bất biến nông). Nếu thuộc tính `readonly` trỏ tới một object hoặc array, compiler vẫn cho phép thay đổi các thuộc tính con hoặc mutate mảng (ví dụ `.push()`). Muốn bất biến sâu thì cần đệ quy DeepReadonly hoặc `as const`.",
+      "codeExample": "interface UserEntity {\n  readonly id: string; // Không thể sửa sau khi khởi tạo\n  name: string;\n  bio?: string;        // Kiểu: string | undefined\n}\n\nconst user: UserEntity = { id: 'u1', name: 'Nam' };\n// user.id = 'u2'; // Error: Cannot assign to 'id' because it is a read-only property\nuser.name = 'Nam Nguyen'; // Hợp lệ"
+    },
+    "pitfalls": [
+      "Nghĩ rằng `readonly` ngăn chặn được mutating bên trong mảng hoặc nested object.",
+      "Nhầm lẫn giữa `{ a?: string }` (có thể bỏ qua key `a`) với `{ a: string | undefined }` (bắt buộc phải truyền key `a`, dù giá trị là `undefined`)."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt thực tế giữa flag `exactOptionalPropertyTypes` và optional thông thường là gì?",
+      "Làm thế nào để loại bỏ modifier `readonly` và `?` khỏi một type bằng mapped type syntax (`-readonly`, `-?`)?"
+    ]
+  },
+  {
+    "id": "ts-011",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Partial<T> và Required<T> là gì?",
+    "interviewerIntent": "Đánh giá việc áp dụng các utility types nền tảng để biến đổi tính tùy chọn của object properties.",
+    "contextOrScenario": "Xây dựng hàm `updateUser(id, payload)` nơi người dùng có thể truyền vào bất kỳ trường nào cần cập nhật (Patch operation).",
+    "expectedKeywords": [
+      "utility types",
+      "mapped types",
+      "optional modifier",
+      "required modifier",
+      "shallow transformation"
+    ],
+    "seniorAnswer": {
+      "summary": "`Partial<T>` chuyển tất cả các thuộc tính của `T` thành optional (`?`). Ngược lại, `Required<T>` biến tất cả các thuộc tính của `T` thành bắt buộc (loại bỏ modifier `?`). Cả hai đều là shallow transformation (chỉ tác động cấp đầu tiên).",
+      "deepDive": "Bản chất của `Partial<T>` được định nghĩa dưới dạng Mapped Type: `type Partial<T> = { [P in keyof T]?: T[P]; }`. Tương tự, `Required<T>` dùng cú pháp `-?` để gỡ bỏ tính optional: `type Required<T> = { [P in keyof T]-?: T[P]; }`. Trong thực tế, `Partial<T>` là lựa chọn hàng đầu cho hàm update/patch dữ liệu.",
+      "codeExample": "interface Product {\n  id: string;\n  name: string;\n  price: number;\n  description?: string;\n}\n\n// Tất cả field đều thành optional:\ntype UpdateProductDto = Partial<Product>;\n\n// Tất cả field đều bắt buộc (description cũng bắt buộc):\ntype CompleteProduct = Required<Product>;"
+    },
+    "pitfalls": [
+      "Áp dụng `Partial<T>` cho nested object và ngỡ rằng các thuộc tính lồng sâu bên trong cũng tự động thành optional.",
+      "Dùng `Partial<T>` cho cả các trường định danh bất biến (như ID) thay vì kết hợp `Omit`."
+    ],
+    "followUpQuestions": [
+      "Làm cách nào để viết một type `DeepPartial<T>` tác động lên toàn bộ cây object lồng nhau?",
+      "Cú pháp `-?` trong TypeScript hoạt động ra sao để gỡ bỏ thuộc tính tùy chọn?"
+    ]
+  },
+  {
+    "id": "ts-012",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Record<K, V> là gì? Khác index signature như thế nào?",
+    "interviewerIntent": "Đánh giá khả năng tạo map/dictionary types và so sánh giữa utility type `Record` với `Index Signature` truyền thống.",
+    "contextOrScenario": "Lưu trữ bảng tra cứu (lookup table) từ mã trạng thái đơn hàng sang nhãn tiếng Việt tương ứng.",
+    "expectedKeywords": [
+      "Record<K, V>",
+      "index signature",
+      "union of string literals",
+      "dictionary",
+      "type safety"
+    ],
+    "seniorAnswer": {
+      "summary": "`Record<K, V>` là utility type dùng để tạo ra một object type có keys thuộc tập hợp `K` và giá trị thuộc kiểu `V`. Khác với Index Signature `{[key: string]: V}` chỉ nhận key kiểu tổng quát (`string`, `number`, `symbol`), `Record` có thể nhận một Union of String Literals cụ thể làm tập hợp keys.",
+      "deepDive": "Khi dùng `{ [key: string]: V }`, bạn không thể giới hạn chỉ có một vài keys nhất định. Nhưng với `Record<'admin' | 'user', RoleConfig>`, TypeScript bắt buộc lập trình viên phải cung cấp đủ cả hai keys 'admin' và 'user'. Dưới tầng compiler, `Record<K, V>` được định nghĩa là `type Record<K extends keyof any, T> = { [P in K]: T; }`.",
+      "codeExample": "type OrderStatus = 'pending' | 'shipped' | 'delivered';\n\n// Record ép buộc phải khai báo ĐỦ mọi key trong OrderStatus:\nconst statusLabels: Record<OrderStatus, string> = {\n  pending: 'Chờ xử lý',\n  shipped: 'Đang giao',\n  delivered: 'Đã giao'\n  // Thiếu bất kỳ key nào sẽ báo lỗi compile ngay lập tức!\n};\n\n// Index signature không thể giới hạn được union of literals:\ninterface LooseDict {\n  [key: string]: number; // Chấp nhận mọi chuỗi vô tội vạ\n}"
+    },
+    "pitfalls": [
+      "Dùng `Record<string, V>` mà quên rằng khi truy cập `dict['nonExistent']`, TypeScript mặc định trả về `V` chứ không cảnh báo `V | undefined` (trừ khi bật `noUncheckedIndexedAccess`).",
+      "Cố dùng Index Signature với Union Literal (`{[K in 'a' | 'b']: string}`) bên trong `interface` (gây lỗi syntax vì chỉ `type` mới hỗ trợ mapped types)."
+    ],
+    "followUpQuestions": [
+      "Tại sao compiler flag `noUncheckedIndexedAccess` lại rất quan trọng khi làm việc với `Record<string, T>`?",
+      "Làm sao kết hợp `Record` với `Partial` để tạo một map không bắt buộc phải khai báo đủ tất cả các keys?"
+    ]
+  },
+  {
+    "id": "ts-013",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Pick<T, K> và Omit<T, K> là gì?",
+    "interviewerIntent": "Đánh giá việc tinh chỉnh và tái sử dụng object types bằng cách chọn lọc hoặc loại bỏ các thuộc tính.",
+    "contextOrScenario": "Tạo form input tạo mới người dùng từ `User` model của Database nhưng cần bỏ qua `id`, `createdAt`, `passwordHash`.",
+    "expectedKeywords": ["Pick<T, K>", "Omit<T, K>", "keyof", "Exclude", "DRY principle"],
+    "seniorAnswer": {
+      "summary": "`Pick<T, K>` trích xuất một tập hợp con các thuộc tính từ kiểu `T` dựa trên danh sách keys `K`. Ngược lại, `Omit<T, K>` loại bỏ các thuộc tính `K` khỏi kiểu `T` và giữ lại tất cả các thuộc tính còn lại.",
+      "deepDive": "`Pick<T, K>` an toàn hơn về mặt type check vì `K extends keyof T` - nếu bạn gõ sai tên thuộc tính, TypeScript sẽ báo lỗi ngay. Ngược lại, `Omit<T, K>` định nghĩa qua `Pick<T, Exclude<keyof T, K>>` nên `K` chỉ là `any key`, nếu bạn gõ nhầm tên key không tồn tại trong `T`, TypeScript có thể không báo lỗi.",
+      "codeExample": "interface UserAccount {\n  id: string;\n  username: string;\n  email: string;\n  passwordHash: string;\n  createdAt: Date;\n}\n\n// Pick: Chỉ chọn username và email cho Public Profile\ntype PublicProfile = Pick<UserAccount, 'username' | 'email'>;\n\n// Omit: Bỏ các field nhạy cảm khi nhận payload đăng ký\ntype CreateUserPayload = Omit<UserAccount, 'id' | 'createdAt'>;"
+    },
+    "pitfalls": [
+      "Gõ sai tên key trong `Omit` mà không có autocomplete cảnh báo (do `K` trong Omit không bị ràng buộc chặt chẽ bởi `keyof T`).",
+      "Lạm dụng `Omit` liên tục trên nhiều tầng khiến type khó đọc thay vì tách thành các interfaces nhỏ hơn và kết hợp chúng."
+    ],
+    "followUpQuestions": [
+      "Tại sao trong định nghĩa chuẩn của TypeScript, `Omit<T, K>` lại dùng `K extends keyof any` thay vì `K extends keyof T`?",
+      "Làm cách nào để viết một utility type `StrictOmit<T, K extends keyof T>` nhằm ép buộc autocomplete và bắt lỗi nếu gõ sai key?"
+    ]
+  },
+  {
+    "id": "ts-014",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Trong dự án đang lẫn lộn type và interface, bạn chốt quy ước dùng cái nào cho trường hợp nào?",
+    "interviewerIntent": "Đánh giá khả năng lead kỹ thuật, thiết lập chuẩn mực (team conventions) và giải thích lý do thực tế có tính thuyết phục cao.",
+    "contextOrScenario": "Đội ngũ phát triển có nhiều lập trình viên với background khác nhau, code đang pha trộn lộn xộn giữa `type` và `interface` không có quy luật.",
+    "expectedKeywords": [
+      "team convention",
+      "rule of thumb",
+      "interface for contracts",
+      "type for unions",
+      "declaration merging",
+      "eslint rule"
+    ],
+    "seniorAnswer": {
+      "summary": "Quy ước chuẩn mực trong production: (1) Dùng `interface` cho các định dạng Object đại diện cho Entities, DTOs, Component Props, và Public APIs để tận dụng khả năng kế thừa rõ ràng và thông báo lỗi compiler thân thiện; (2) Dùng `type` cho Union types, Primitives, Tuples, Mapped Types, và Conditional/Utility types.",
+      "deepDive": "Không nên cố ép team dùng 100% một thứ. `interface` sinh ra cho hướng đối tượng và object shapes; nó tối ưu hơn về compiler caching. Tuy nhiên, `type` là bắt buộc khi bạn cần định nghĩa Unions (ví dụ `type State = 'idle' | 'loading'`). Để giữ đồng nhất, nhóm nên cấu hình ESLint rule `@typescript-eslint/consistent-type-definitions` làm người gác cổng tự động.",
+      "codeExample": "// 1. Quy ước Interface: Cho cấu trúc Object & React Props\ninterface UserProfileProps {\n  userId: string;\n  onSelect: (id: string) => void;\n}\n\n// 2. Quy ước Type: Cho Union, Tuple, Computed Types\ntype RequestStatus = 'idle' | 'pending' | 'resolved' | 'rejected';\ntype ActionPayload = string | number | { [key: string]: unknown };"
+    },
+    "pitfalls": [
+      "Tranh cãi vô tận về thẩm mỹ cá nhân mà không thiết lập thành ESLint rule tự động.",
+      "Dùng `interface` cố bọc lấy một union type bằng cách tạo property trung gian không cần thiết."
+    ],
+    "followUpQuestions": [
+      "ESLint rule nào có thể enforce tính nhất quán giữa type và interface?",
+      "Liệu Declaration Merging của interface có thể trở thành nhược điểm (bug nguy hiểm) trong codebase lớn hay không?"
+    ]
+  },
+  {
+    "id": "ts-015",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Bật strictNullChecks trên một codebase cũ thì hay nổ ra những lỗi nào? Sửa theo hướng nào cho đúng?",
+    "interviewerIntent": "Đánh giá kinh nghiệm thực chiến khi refactor hoặc nâng cấp các dự án legacy JavaScript/TypeScript sang strict type-safety.",
+    "contextOrScenario": "Team quyết định bật `\"strictNullChecks\": true` cho repo 2 năm tuổi và ngay lập tức compiler nổ hơn 500 lỗi đỏ rực.",
+    "expectedKeywords": [
+      "strictNullChecks",
+      "null/undefined assignment",
+      "optional chaining (?.)",
+      "nullish coalescing (??)",
+      "type guard",
+      "early return",
+      "non-null assertion (!)"
+    ],
+    "seniorAnswer": {
+      "summary": "Khi bật `strictNullChecks`, 2 lỗi phổ biến nhất là: (1) 'Object is possibly null or undefined' khi truy cập thuộc tính; (2) 'Type null/undefined is not assignable to type T'. Hướng sửa đúng đắn: dùng Optional Chaining (`?.`), Nullish Coalescing (`??`), Type Guards hoặc Early Return; tuyệt đối hạn chế dùng Non-null assertion (`!`).",
+      "deepDive": "Codebase cũ thường ngầm giả định một biến luôn tồn tại hoặc dùng `as T` để làm câm compiler. Khi bật strict, chiến lược di chuyển an toàn là: Bước 1: Không sửa bằng cách gắn bừa `!` khắp nơi; Bước 2: Thêm default values (`param = defaultVal`); Bước 3: Đưa vào các guard clauses `if (!item) return;` ở đầu hàm. Với dữ liệu mảng, các hàm như `Array.find()` sẽ trả về `T | undefined`, buộc dev phải xử lý trường hợp không tìm thấy.",
+      "codeExample": "// Codebase cũ bị lỗi khi bật strictNullChecks:\nfunction getUserCity(user?: { address?: { city: string } }) {\n  // LỖI: user is possibly 'undefined'\n  // return user.address.city; \n\n  // SỬA ĐÚNG: Optional Chaining & Nullish Coalescing\n  return user?.address?.city ?? 'Unknown City';\n}"
+    },
+    "pitfalls": [
+      "Dùng non-null assertion operator `!` khắp nơi để dập tắt lỗi compiler, giữ nguyên nguy cơ crash `Cannot read properties of undefined` ở runtime.",
+      "Sửa kiểu dữ liệu từ `string` thành `any` để né việc kiểm tra null."
+    ],
+    "followUpQuestions": [
+      "Tại sao `??` (Nullish Coalescing) thường an toàn hơn `||` (Logical OR) khi xử lý giá trị mặc định?",
+      "Làm cách nào để lọc bỏ `undefined` ra khỏi một mảng `(string | undefined)[]` bằng `filter()` mà TypeScript hiểu được?"
+    ]
+  },
+  {
+    "id": "ts-016",
+    "category": "typescript",
+    "level": "junior",
+    "question": "Với một tập giá trị cố định (trạng thái đơn hàng, role), nên dùng enum hay union of string literal?",
+    "interviewerIntent": "Đánh giá kiến thức về nhược điểm của TypeScript `enum` (runtime overhead, bundler tree-shaking) so với `Union of String Literals`.",
+    "contextOrScenario": "Thiết kế hệ thống Order Management System cần biểu diễn tập các trạng thái: Pending, Confirmed, Cancelled, Completed.",
+    "expectedKeywords": [
+      "string literal union",
+      "const assertion (as const)",
+      "tree-shaking",
+      "runtime overhead",
+      "type-only construct"
+    ],
+    "seniorAnswer": {
+      "summary": "Trong hiện đại (TypeScript hiện nay), Union of String Literals (`'pending' | 'confirmed' | 'cancelled'`) kết hợp với `as const` object ĐƯỢC ƯU TIÊN VƯỢT TRỘI so với `enum`. Lý do: String literal unions là pure compile-time (zero runtime overhead), dễ debug trực quan trong JSON/network log và thân thiện 100% với tree-shaking của bundlers.",
+      "deepDive": "TypeScript `enum` sinh ra một IIFE object tại runtime trong file JavaScript biên dịch, tạo overhead không cần thiết. Numeric enum lại có cơ chế reverse mapping nguy hiểm và không an toàn kiểu. Trong khi đó, dùng pattern `const ORDER_STATUS = { ... } as const` vừa cung cấp autocomplete cho runtime value, vừa trích xuất được union type compile-time hoàn hảo qua `typeof ORDER_STATUS[keyof typeof ORDER_STATUS]`.",
+      "codeExample": "// Khuyên dùng: Const Object + Extracted Union Type\nexport const OrderStatus = {\n  Pending: 'pending',\n  Shipped: 'shipped',\n  Delivered: 'delivered'\n} as const;\n\nexport type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];\n// OrderStatus tương đương: 'pending' | 'shipped' | 'delivered'\n\nfunction updateStatus(status: OrderStatus) {\n  console.log(`Updated status to: ${status}`);\n}\n// Gọi hàm dễ dàng với literal string sạch:\nupdateStatus('pending'); // Không cần import enum!"
+    },
+    "pitfalls": [
+      "Dùng numeric enum dẫn đến việc vô tình gán một số bất kỳ (ví dụ 999) mà TypeScript vẫn compile qua.",
+      "Enum gây khó khăn khi serialize/deserialize dữ liệu JSON từ REST API nếu client và server không đồng nhất."
+    ],
+    "followUpQuestions": [
+      "`const enum` trong TypeScript khác gì với standard `enum` và tại sao nó bị hạn chế khi dùng với Babel hoặc `isolatedModules`?",
+      "Làm thế nào để trích xuất cả Value Union và Key Union từ một `as const` object?"
+    ]
+  },
+  {
+    "id": "ts-017",
+    "category": "typescript",
+    "level": "junior",
+    "question": "await res.json() trả về kiểu gì? Viết const user = await res.json() as User có an toàn không?",
+    "interviewerIntent": "Đánh giá sự tỉnh táo về ranh giới an toàn kiểu (Type Safety Boundary) giữa Network I/O và TypeScript compile-time.",
+    "contextOrScenario": "Gọi API từ backend và parse JSON trong frontend code: frontend tin tưởng hoàn toàn vào model type mà không validate.",
+    "expectedKeywords": [
+      "any type",
+      "runtime validation",
+      "schema parser (Zod)",
+      "boundary type safety",
+      "unsafe type assertion"
+    ],
+    "seniorAnswer": {
+      "summary": "`await res.json()` trong chuẩn DOM lib trả về kiểu `Promise<any>`. Việc viết `const user = await res.json() as User` KHÔNG HỀ AN TOÀN vì đây chỉ là Type Assertion đơn phương ở compile-time; nếu backend đổi contract hoặc trả về lỗi, runtime vẫn nhận dữ liệu rác và crash bất cứ lúc nào.",
+      "deepDive": "TypeScript chỉ bảo vệ được bên trong hệ sinh thái code nội bộ (Internal Codebase). Tại các ranh giới ngoại vi (External Boundaries: API network, LocalStorage, WebSockets, User inputs), TypeScript bất lực. Giải pháp Senior: coi kết quả trả về là `unknown` và truyền qua một thư viện schema validation ở runtime (như Zod, Valibot hoặc ArkType) để vừa validate dữ liệu thực tế, vừa tự động suy luận ra static type an toàn 100%.",
+      "codeExample": "import { z } from 'zod';\n\n// 1. Định nghĩa schema runtime:\nconst UserSchema = z.object({\n  id: z.string(),\n  email: z.string().email(),\n  name: z.string()\n});\ntype User = z.infer<typeof UserSchema>;\n\n// 2. Fetch và Parse an toàn:\nasync function fetchUser(id: string): Promise<User> {\n  const res = await fetch(`/api/users/${id}`);\n  const rawData: unknown = await res.json();\n  \n  // An toàn tuyệt đối: Ném lỗi ngay nếu schema không khớp\n  return UserSchema.parse(rawData);\n}"
+    },
+    "pitfalls": [
+      "Viết `as User` rồi an tâm không bắt lỗi, dẫn đến bug màn hình trắng tinh khi backend trả về payload rỗng hoặc format camelCase vs snake_case bị lệch.",
+      "Nghĩ rằng TypeScript có thể tự động bắt lỗi cú pháp JSON sai ở runtime."
+    ],
+    "followUpQuestions": [
+      "Làm sao config để fetch API mặc định trả về `unknown` thay vì `any`?",
+      "Cơ chế Type Narrowing với `safeParse()` của Zod hoạt động như thế nào khi xử lý validation error một cách êm đẹp (gracefully)?"
+    ]
+  },
+  {
+    "id": "ts-018",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Literal types trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá mức độ hiểu biết về subtypes của các kiểu nguyên thủy, cơ chế mở rộng kiểu (type widening) và cách dùng literals để khóa chặt giá trị hợp lệ.",
+    "contextOrScenario": "Định nghĩa thuộc tính HTTP Method cho một REST Client chỉ chấp nhận các động từ: 'GET', 'POST', 'PUT', 'DELETE'.",
+    "expectedKeywords": [
+      "literal type",
+      "string literal",
+      "numeric literal",
+      "boolean literal",
+      "type widening",
+      "subtypes"
+    ],
+    "seniorAnswer": {
+      "summary": "Literal types là các kiểu dữ liệu đại diện cho chính xác MỘT giá trị cụ thể duy nhất (ví dụ chuỗi `'GET'`, số `404`, boolean `true`) thay vì toàn bộ tập hợp `string`, `number` hay `boolean`. Chúng là subtype hẹp nhất của các kiểu nguyên thủy tương ứng.",
+      "deepDive": "Khi khai báo bằng `const x = 'hello'`, TypeScript tự động suy luận kiểu là literal `'hello'`. Nhưng với `let y = 'hello'`, compiler thực hiện Type Widening thành `string` vì `let` có thể được gán lại giá trị khác sau này. Kết hợp Literal Types với Union (`'top' | 'bottom' | 'left' | 'right'`) tạo nên sức mạnh mô tả miền giá trị cực kỳ chặt chẽ trong UI design systems.",
+      "codeExample": "// Literal types kết hợp Union:\ntype HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';\n\nfunction request(url: string, method: HttpMethod) {\n  // Logic gọi API...\n}\n\nrequest('/users', 'GET'); // Hợp lệ\n// request('/users', 'PATCH'); // Error: Argument of type '\"PATCH\"' is not assignable to 'HttpMethod'"
+    },
+    "pitfalls": [
+      "Khai báo biến bằng `let` rồi truyền vào hàm đòi hỏi literal type mà không hiểu tại sao bị báo lỗi widening.",
+      "Không tận dụng literal types mà dùng kiểu `string` chung chung, làm mất tính năng autocomplete và bắt lỗi chính tả trong IDE."
+    ],
+    "followUpQuestions": [
+      "Type Widening xảy ra khi nào và cách dùng `as const` để triệt tiêu nó?",
+      "Làm thế nào để kết hợp Template Literal Types với Literal Types để sinh ra một họ các class CSS?"
+    ]
+  },
+  {
+    "id": "ts-019",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Type narrowing là gì? Các cách narrow type trong TypeScript?",
+    "interviewerIntent": "Đánh giá khả năng kiểm soát luồng điều khiển (Control Flow Analysis) của TypeScript compiler khi thu hẹp kiểu dữ liệu từ rộng về hẹp.",
+    "contextOrScenario": "Hàm xử lý input có thể nhận vào `string`, `string[]`, hoặc `null`, cần định dạng chuỗi an toàn mà không bị lỗi undefined.",
+    "expectedKeywords": [
+      "control flow analysis",
+      "typeof guard",
+      "instanceof guard",
+      "in operator",
+      "truthiness narrowing",
+      "equality narrowing",
+      "custom type predicate"
+    ],
+    "seniorAnswer": {
+      "summary": "Type Narrowing là quá trình TypeScript dựa trên các cấu trúc kiểm tra điều kiện tại runtime (Control Flow Analysis) để thu hẹp một kiểu dữ liệu từ dạng tổng quát (như Union hoặc unknown) thành một kiểu cụ thể, an toàn hơn trong phạm vi khối lệnh đó.",
+      "deepDive": "Các kỹ thuật narrowing phổ biến gồm: (1) `typeof` (kiểm tra kiểu nguyên thủy); (2) `instanceof` (kiểm tra class/Error instance); (3) `in` operator (kiểm tra sự tồn tại của property trong object); (4) Truthiness checking (`if (val)`); (5) Equality checks (`===`); (6) Discriminated Unions; (7) User-defined Type Predicates (`is`). Compiler liên tục cập nhật type của biến theo từng dòng code thực thi.",
+      "codeExample": "type Shape =\n  | { kind: 'circle'; radius: number }\n  | { kind: 'rect'; width: number; height: number };\n\nfunction getArea(shape: Shape): number {\n  // Equality narrowing trên property discriminator:\n  if (shape.kind === 'circle') {\n    return Math.PI * shape.radius ** 2; // TS biết chắc chắn shape là circle\n  }\n  return shape.width * shape.height; // TS tự động narrow thành rect\n}"
+    },
+    "pitfalls": [
+      "`typeof null === 'object'`, dẫn đến cạm bẫy khi chỉ kiểm tra `typeof x === 'object'` mà quên loại trừ `null`.",
+      "Narrowing có thể bị 'mất' (reset) nếu giá trị bị mutate qua một hàm trung gian hoặc callback bất đồng bộ."
+    ],
+    "followUpQuestions": [
+      "Tại sao biến đã narrow lại bị reset về kiểu ban đầu khi truy cập bên trong một closure/callback?",
+      "Cơ chế exhaustiveness checking phối hợp với narrowing như thế nào qua type `never`?"
+    ]
+  },
+  {
+    "id": "ts-020",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Non-null assertion operator (!) là gì?",
+    "interviewerIntent": "Kiểm tra sự hiểu biết về hậu quả của việc ép compiler bỏ qua `null` và `undefined` mà không có runtime guard.",
+    "contextOrScenario": "Một dev trong team thường xuyên đặt dấu `!` ở cuối biến (`user!.profile!.name`) để tắt lỗi đỏ của TypeScript khi build.",
+    "expectedKeywords": [
+      "non-null assertion (!)",
+      "compile-time bypass",
+      "no runtime effect",
+      "type safety breach",
+      "strictNullChecks"
+    ],
+    "seniorAnswer": {
+      "summary": "Toán tử `!` (Non-null assertion operator) đặt sau một biểu thức là chỉ thị compile-time bảo compiler loại trừ `null` và `undefined` khỏi kiểu của biểu thức đó. Giống như `as`, toán tử `!` KHÔNG hề sinh ra bất kỳ đoạn mã kiểm tra runtime nào.",
+      "deepDive": "Sử dụng `!` đồng nghĩa với việc lập trình viên cam kết với compiler: 'Tôi cam đoan giá trị này không thể null lúc chạy'. Nếu cam kết này sai (ví dụ dữ liệu API bị thiếu hoặc DOM element chưa render), mã nguồn sẽ nổ `Uncaught TypeError: Cannot read properties of undefined` ngay tại runtime. Ngoại trừ một số ít trường hợp đặc biệt (như React Ref gắn chắc chắn sau mount hoặc setup test), việc dùng `!` trong business logic bị xem là anti-pattern.",
+      "codeExample": "// Rủi ro khi lạm dụng !:\nfunction printUpper(text?: string | null) {\n  // Bỏ qua type check bằng !\n  console.log(text!.toUpperCase()); \n}\n\n// printUpper(null); // CRASH RUNTIME: TypeError: Cannot read properties of null\n\n// Thay thế chuẩn chỉ bằng Narrowing hoặc Optional Chaining:\nfunction printUpperSafe(text?: string | null) {\n  if (text) {\n    console.log(text.toUpperCase());\n  }\n}"
+    },
+    "pitfalls": [
+      "Sử dụng `!` để 'chữa cháy' nhanh lỗi compile dẫn đến bug nghiêm trọng ở production.",
+      "Nhầm lẫn giữa toán tử `!` trong TypeScript (non-null assertion) với toán tử `!` phủ định logic (NOT) trong JavaScript."
+    ],
+    "followUpQuestions": [
+      "Trường hợp hiếm hoi nào được cộng đồng chấp nhận sử dụng `!` một cách hợp lý?",
+      "ESLint rule nào giúp cấm hoàn toàn việc sử dụng toán tử non-null assertion trong repository?"
+    ]
+  },
+  {
+    "id": "ts-021",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Enum trong TypeScript là gì? Numeric vs string enum khác nhau thế nào?",
+    "interviewerIntent": "Đánh giá kiến thức chuyên sâu về cơ chế phát sinh mã JavaScript của enum, reverse mapping và các vấn đề an toàn kiểu.",
+    "contextOrScenario": "Thiết kế hệ thống định danh Role (`ADMIN`, `USER`) trong ứng dụng và cân nhắc giữa Numeric Enum vs String Enum.",
+    "expectedKeywords": [
+      "numeric enum",
+      "string enum",
+      "reverse mapping",
+      "runtime artifact",
+      "IIFE",
+      "type soundness issue"
+    ],
+    "seniorAnswer": {
+      "summary": "`Enum` là một tính năng của TypeScript bổ sung khái niệm liệt kê giá trị vào JavaScript runtime. Numeric Enum tự động tăng giá trị từ 0 và hỗ trợ Reverse Mapping (ánh xạ 2 chiều). String Enum gán giá trị bằng chuỗi và KHÔNG hỗ trợ reverse mapping.",
+      "deepDive": "Numeric Enum có lỗ hổng type-safety: trước TypeScript 5.0, bạn có thể truyền một con số bất kỳ (ví dụ `Role = 999`) vào hàm nhận Numeric Enum mà compiler không hề phàn nàn. Thêm vào đó, Numeric Enum sinh ra object lộn xộn ở runtime vì cơ chế hai chiều: `Enum[Enum['A'] = 0] = 'A'`. String Enum minh bạch hơn khi debug qua network log hoặc console, nhưng vẫn sinh mã IIFE không thể tree-shake tối ưu như `const object`.",
+      "codeExample": "// 1. Numeric Enum (Sinh reverse mapping):\nenum StatusNum {\n  Active, // 0\n  Inactive // 1\n}\n// Runtime JS: { 0: 'Active', 1: 'Inactive', Active: 0, Inactive: 1 }\n\n// 2. String Enum (Không reverse mapping):\nenum StatusStr {\n  Active = 'ACTIVE',\n  Inactive = 'INACTIVE'\n}\n// Runtime JS: { Active: 'ACTIVE', Inactive: 'INACTIVE' }"
+    },
+    "pitfalls": [
+      "Tin rằng Numeric Enum là an toàn tuyệt đối mà không biết nó có thể nhận số tùy ý ngoài tập giá trị khai báo.",
+      "Truyền chuỗi `'ACTIVE'` trực tiếp vào hàm nhận `StatusStr` (TypeScript sẽ bắt buộc phải truyền `StatusStr.Active` chứ không chấp nhận literal string, gây phiền toái khi nhận JSON)."
+    ],
+    "followUpQuestions": [
+      "Tại sao String Enum không thể gán được bằng chính chuỗi literal tương đương mà phải thông qua enum member?",
+      "Cơ chế hoạt động của `const enum` là gì và tại sao nhiều bundler (như Vite/esbuild/swc) lại khuyến cáo tránh dùng?"
+    ]
+  },
+  {
+    "id": "ts-022",
+    "category": "typescript",
+    "level": "middle",
+    "question": "satisfies operator trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá việc cập nhật tính năng mới (ra mắt từ TS 4.9), khả năng vừa validate type conformance vừa bảo toàn narrowest type inference.",
+    "contextOrScenario": "Tạo bảng cấu hình theme/colors vừa phải đảm bảo tuân thủ kiểu `Record<string, string | RGB>`, vừa muốn autocompletion chính xác từng giá trị cụ thể.",
+    "expectedKeywords": [
+      "satisfies operator",
+      "type validation",
+      "preserve inference",
+      "prevent widening",
+      "TypeScript 4.9"
+    ],
+    "seniorAnswer": {
+      "summary": "Toán tử `satisfies` (TypeScript 4.9+) cho phép kiểm tra xem một biểu thức có thỏa mãn (match) một kiểu dữ liệu cho trước hay không, nhưng KHÔNG làm thay đổi (không ép kiểu hay làm widened) kiểu suy luận gốc của biểu thức đó.",
+      "deepDive": "Trước khi có `satisfies`, nếu dùng annotation `: Theme`, các thuộc tính union (như `string | RGB`) sẽ bị widened, làm mất khả năng gọi các method chuyên biệt (ví dụ `.toUpperCase()` cho string). Nếu không dùng annotation thì không có type-check. `satisfies` dung hòa hoàn hảo: compiler báo lỗi ngay nếu config sai kiểu, nhưng vẫn giữ nguyên kiểu literal cụ thể cho từng thuộc tính.",
+      "codeExample": "type RGB = [red: number, green: number, blue: number];\ntype Color = string | RGB;\n\n// Dùng satisfies: Vừa validate vừa giữ nguyên literal type\nconst palette = {\n  primary: '#ff0000',\n  secondary: [0, 255, 0]\n} satisfies Record<string, Color>;\n\n// TS biết chính xác primary là string:\npalette.primary.toUpperCase(); // ✅ Hợp lệ!\n\n// TS biết chính xác secondary là RGB tuple:\npalette.secondary.map(c => c * 2); // ✅ Hợp lệ!\n// palette.invalidColor; // Vẫn có type check nếu khai báo strict keys"
+    },
+    "pitfalls": [
+      "Dùng type annotation `: Type` thay vì `satisfies Type` làm mất thông tin kiểu cụ thể của các thuộc tính.",
+      "Nhầm lẫn `satisfies` với `as`: `satisfies` kiểm tra thực tế, nếu sai kiểu sẽ nổ lỗi ngay; `as` bỏ qua kiểm tra."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt cốt lõi giữa `const x = obj satisfies T` và `const x: T = obj` là gì?",
+      "Làm cách nào để kết hợp `as const` cùng với `satisfies` để tạo ra một cấu trúc cấu hình hoàn toàn bất biến mà vẫn kiểm tra schema?"
+    ]
+  },
+  {
+    "id": "ts-023",
+    "category": "typescript",
+    "level": "middle",
+    "question": "const assertion (as const) là gì?",
+    "interviewerIntent": "Đánh giá khả năng kiểm soát type widening, tạo immutable deep readonly types và literal types từ JavaScript data thông thường.",
+    "contextOrScenario": "Định nghĩa mảng các Routes hoặc Action Types dùng chung trong Redux/Zustand mà không muốn chúng bị suy luận thành `string[]`.",
+    "expectedKeywords": [
+      "const assertion",
+      "as const",
+      "deep readonly",
+      "literal inference",
+      "prevent widening",
+      "tuple conversion"
+    ],
+    "seniorAnswer": {
+      "summary": "`as const` (const assertion) là cú pháp yêu cầu TypeScript compiler suy luận kiểu hẹp nhất có thể (literal types) cho biểu thức, biến mảng thành `readonly tuple`, và biến tất cả các thuộc tính của object thành `readonly` đệ quy.",
+      "deepDive": "Mặc định, khi khai báo object/array với `const`, JavaScript ngăn việc gán lại biến nhưng cho phép sửa thuộc tính bên trong, vì thế TypeScript thực hiện type widening (ví dụ `['a', 'b']` thành `string[]`). Thêm `as const` chuyển toàn bộ cấu trúc sang trạng thái read-only compile-time, giúp dễ dàng trích xuất Union types từ mảng dữ liệu có sẵn thông qua `typeof arr[number]`.",
+      "codeExample": "// Không có as const (TS suy luận: string[])\nconst normalRoles = ['admin', 'editor']; \n\n// Có as const (TS suy luận: readonly ['admin', 'editor'])\nconst ROLES = ['admin', 'editor'] as const;\n\n// Trích xuất Union Type dễ dàng và an toàn:\ntype Role = typeof ROLES[number]; // 'admin' | 'editor'\n\n// ROLES.push('guest'); // Compile Error: Property 'push' does not exist on readonly tuple"
+    },
+    "pitfalls": [
+      "Nghĩ rằng `as const` làm object bị freeze ở runtime (nó chỉ là compile-time check; muốn freeze runtime phải dùng `Object.freeze()`).",
+      "Đặt `as const` ngoài cùng một hàm trả về nhưng bên trong hàm lại dùng biến tạm bị widened."
+    ],
+    "followUpQuestions": [
+      "Tại sao `Object.freeze()` không mang lại kết quả type hoàn toàn tương đương như `as const` trong các nested object phức tạp?",
+      "Làm thế nào để tạo một dictionary type-safe từ một array const assertion?"
+    ]
+  },
+  {
+    "id": "ts-024",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Index signature trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá kiến thức về cách định nghĩa dynamic object keys và các nguy cơ tiềm ẩn liên quan đến `undefined` khi truy cập index.",
+    "contextOrScenario": "Xây dựng In-memory Cache lưu trữ các payload tùy ý dựa trên key động là chuỗi string.",
+    "expectedKeywords": [
+      "index signature",
+      "dynamic properties",
+      "noUncheckedIndexedAccess",
+      "string and number keys",
+      "implicit undefined"
+    ],
+    "seniorAnswer": {
+      "summary": "Index signature (`{ [key: KeyType]: ValueType }`) cho phép mô tả cấu trúc của một object mà tên các thuộc tính chưa được xác định trước, nhưng biết rõ kiểu của key (chỉ có thể là `string`, `number`, `symbol` hoặc template literals) và kiểu của giá trị tương ứng.",
+      "deepDive": "Cạm bẫy lớn nhất của Index Signature trong chế độ mặc định là TypeScript tin rằng mọi key truy cập đều trả về `ValueType`, dẫn đến việc truy cập key không tồn tại vẫn pass type check dù runtime trả về `undefined`. Để biến TypeScript thành hệ thống an toàn tuyệt đối, dự án cần bật flag `noUncheckedIndexedAccess: true` trong `tsconfig.json`, buộc return type phải là `ValueType | undefined`.",
+      "codeExample": "interface CacheStore {\n  [key: string]: string | undefined;\n  // Nếu có property cố định, kiểu của nó PHẢI tương thích với index signature:\n  version?: string; \n}\n\nconst store: CacheStore = {};\nstore['user_1'] = 'data_1';\n\n// Khi có noUncheckedIndexedAccess = true:\nconst val = store['non_existent']; // Type: string | undefined\n// val.toUpperCase(); // Error: 'val' is possibly 'undefined'"
+    },
+    "pitfalls": [
+      "Khai báo một thuộc tính cụ thể có kiểu xung đột với Index Signature (ví dụ `{ [key: string]: number; id: string }` sẽ bị lỗi compile).",
+      "Quên bật `noUncheckedIndexedAccess` khiến code crash do truy cập thuộc tính của `undefined` mà TS không báo."
+    ],
+    "followUpQuestions": [
+      "Tại sao trong TypeScript, một index signature kiểu `number` lại tương thích với index signature kiểu `string`?",
+      "Sự khác biệt khi nào nên dùng `Record<string, T>` và khi nào nên dùng `{ [key: string]: T }`?"
+    ]
+  },
+  {
+    "id": "ts-025",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Discriminated unions là gì? Tại sao hữu ích?",
+    "interviewerIntent": "Đánh giá khả năng thiết kế dữ liệu chuẩn mực (Tagged Union / Algebraic Data Types), nền tảng của type safety trong các ứng dụng phức tạp.",
+    "contextOrScenario": "Mô hình hóa trạng thái Network Request (Idle, Pending, Success có data, Error có error object) cho Redux Reducer hoặc React State.",
+    "expectedKeywords": [
+      "discriminated union",
+      "tagged union",
+      "discriminant property",
+      "common literal field",
+      "exhaustive check",
+      "state modeling"
+    ],
+    "seniorAnswer": {
+      "summary": "Discriminated Union (hay Tagged Union / Algebraic Data Type) là một Union Type của các object types, trong đó mỗi object đều chứa một thuộc tính chung duy nhất (gọi là discriminant hoặc tag) có kiểu Literal Type khác nhau, giúp TypeScript dễ dàng narrow chính xác nhánh type trong switch-case hoặc if-else.",
+      "deepDive": "Đây là mẫu thiết kế mạnh mẽ nhất để loại bỏ 'impossible states' (trạng thái bất khả thi - ví dụ vừa `isLoading: true` lại vừa có `data: [...]` và `error: 'Failed'`). Nhờ discriminant (ví dụ field `status`), khi kiểm tra `if (res.status === 'success')`, TypeScript tự động biết chắc chắn payload `data` tồn tại và ngược lại ở nhánh `'error'` thì có `error.message`.",
+      "codeExample": "type AsyncState<T> =\n  | { status: 'idle' }\n  | { status: 'loading' }\n  | { status: 'success'; data: T }\n  | { status: 'error'; error: Error };\n\nfunction renderUI(state: AsyncState<string[]>) {\n  switch (state.status) {\n    case 'idle': return 'Bấm nút để tải';\n    case 'loading': return 'Đang tải...';\n    case 'success': return `Có ${state.data.length} phần tử`; // Safe 100%\n    case 'error': return `Lỗi: ${state.error.message}`;       // Safe 100%\n  }\n}"
+    },
+    "pitfalls": [
+      "Dùng nhiều biến boolean rời rạc (`isLoading`, `isError`, `isSuccess`) thay vì một Discriminated Union duy nhất, dẫn đến xung đột trạng thái.",
+      "Đặt tên discriminant khác nhau giữa các nhánh (ví dụ nhánh thì dùng `type`, nhánh thì dùng `kind`), khiến TypeScript không nhận diện được Discriminated Union."
+    ],
+    "followUpQuestions": [
+      "Làm sao phối hợp hàm `assertNever(x: never)` trong nhánh `default` của switch-case để đảm bảo không bao giờ bỏ sót nhánh nào khi mở rộng Union?",
+      "Có thể dùng nhiều hơn một field để làm discriminant cho một union phức tạp được không?"
+    ]
+  },
+  {
+    "id": "ts-026",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Recursive types trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá năng lực biểu diễn các cấu trúc dữ liệu tự tham chiếu (cây, đồ thị, JSON lồng nhau) trong hệ thống kiểu.",
+    "contextOrScenario": "Xây dựng Component hiển thị cây thư mục File Tree, hoặc parse payload JSON có độ lồng vô hạn.",
+    "expectedKeywords": [
+      "recursive types",
+      "self-referencing",
+      "tree structure",
+      "JSON value type",
+      "type alias recursion"
+    ],
+    "seniorAnswer": {
+      "summary": "Recursive type là kiểu dữ liệu có định nghĩa tham chiếu đến chính nó. Nó được dùng để mô hình hóa các cấu trúc dữ liệu phân cấp, lồng nhau vô hạn như cấu trúc cây (Tree, DOM nodes), danh sách liên kết, hoặc cấu trúc JSON.",
+      "deepDive": "Từ TypeScript 3.7+, Type Alias hỗ trợ đệ quy trực tiếp mà không cần dùng interface workaround như các bản cũ. Tuy nhiên khi viết đệ quy, lập trình viên cần cẩn thận với độ sâu đệ quy: TypeScript có giới hạn đệ quy compile-time (thường là khoảng 50 tầng hoặc giới hạn instantiation depth), nếu vượt quá compiler sẽ báo lỗi `Type instantiation is excessively deep and possibly infinite`.",
+      "codeExample": "// 1. Mô tả kiểu JSON chuẩn mực:\ntype JSONPrimitive = string | number | boolean | null;\ntype JSONObject = { [key: string]: JSONValue };\ntype JSONArray = JSONValue[];\ntype JSONValue = JSONPrimitive | JSONObject | JSONArray;\n\n// 2. Mô hình hóa cây thư mục:\ninterface TreeNode {\n  name: string;\n  children?: TreeNode[]; // Tự tham chiếu chính nó\n}"
+    },
+    "pitfalls": [
+      "Tạo đệ quy vô hạn không có điểm dừng (base case) trong conditional types gây treo hoặc crash compiler.",
+      "Viết các mapped type đệ quy quá sâu khiến tốc độ gõ code trong IDE bị delay nghiêm trọng."
+    ],
+    "followUpQuestions": [
+      "TypeScript compiler xử lý tail-call optimization cho recursive conditional types từ phiên bản 4.5 như thế nào?",
+      "Làm thế nào để giới hạn độ sâu đệ quy (recursion depth limit) trong một recursive type bằng tuple accumulator?"
+    ]
+  },
+  {
+    "id": "ts-027",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Excess property checking trong TypeScript là gì?",
+    "interviewerIntent": "Kiểm tra sự thấu hiểu về hành vi kiểm tra thuộc tính dư thừa của TypeScript khi truyền Object Literal trực tiếp so với gán qua biến trung gian.",
+    "contextOrScenario": "Dev truyền thêm thuộc tính `extraInfo` vào component props hoặc hàm config, compiler báo lỗi đỏ dù Interface chỉ yêu cầu các trường tối thiểu.",
+    "expectedKeywords": [
+      "excess property checking",
+      "object literal freshness",
+      "structural subtyping",
+      "intermediate variable bypass",
+      "typo prevention"
+    ],
+    "seniorAnswer": {
+      "summary": "Excess Property Checking là cơ chế đặc biệt của TypeScript kích hoạt khi một object literal được gán TRỰC TIẾP cho một target type: compiler sẽ báo lỗi nếu object literal đó chứa bất kỳ thuộc tính nào không được khai báo trong target type, mục đích chính là bắt lỗi gõ sai tên thuộc tính (typos) và thuộc tính rác không mong muốn.",
+      "deepDive": "TypeScript vốn tuân theo nguyên lý Structural Subtyping (Duck Typing) - nghĩa là một đối tượng có nhiều thuộc tính hơn vẫn hợp lệ miễn là nó thỏa mãn các thuộc tính được yêu cầu. Tuy nhiên, với Object Literal mới tạo (fresh object literal), giả định là lập trình viên chỉ muốn truyền đúng những gì interface cần. Nếu bạn gán qua một biến trung gian trước, tính chất 'freshness' mất đi và Excess Property Check sẽ bị vô hiệu hóa.",
+      "codeExample": "interface Options {\n  title: string;\n  darkMode?: boolean;\n}\n\nfunction setup(opt: Options) {}\n\n// 1. Lỗi Excess Property Check (Tránh gõ nhầm darkmode thành darkMod):\n// setup({ title: 'App', darkMod: true }); // Error: Object literal may only specify known properties\n\n// 2. Bypass bằng biến trung gian (Structural typing thông thường):\nconst myConfig = { title: 'App', darkMod: true };\nsetup(myConfig); // ✅ Pass không báo lỗi!"
+    },
+    "pitfalls": [
+      "Nghĩ rằng TypeScript luôn cấm thuộc tính thừa trong mọi trường hợp (quên rằng nó chỉ áp dụng cho direct object literals).",
+      "Vô tình dùng biến trung gian làm lọt các field rác vào database hoặc API payload mà compiler không cảnh báo."
+    ],
+    "followUpQuestions": [
+      "Tại sao TypeScript lại thiết kế hành vi khác biệt giữa direct literal và biến trung gian thay vì cấm triệt để?",
+      "Làm sao để một interface chấp nhận cả các thuộc tính cụ thể lẫn các thuộc tính tùy ý không giới hạn?"
+    ]
+  },
+  {
+    "id": "ts-028",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Generics trong TypeScript là gì? Tại sao cần thiết?",
+    "interviewerIntent": "Đánh giá khả năng viết mã có tính trừu tượng cao, có khả năng tái sử dụng (reusability) nhưng vẫn giữ được type safety tuyệt đối mà không cần dùng `any`.",
+    "contextOrScenario": "Tạo hàm gọi API trả về dữ liệu chuẩn bọc trong format `{ data: T, status: number, timestamp: string }`.",
+    "expectedKeywords": [
+      "generics",
+      "type variables (<T>)",
+      "code reusability",
+      "type safety without any",
+      "dynamic contract"
+    ],
+    "seniorAnswer": {
+      "summary": "Generics cho phép tạo ra các hàm, interface, class hoặc type alias có thể hoạt động với nhiều kiểu dữ liệu khác nhau trong khi vẫn bảo toàn được tính an toàn kiểu (type safety). Thay vì chỉ định một kiểu cụ thể từ trước, ta sử dụng Type Variable (ví dụ `<T>`) làm placeholder nhận kiểu khi sử dụng.",
+      "deepDive": "Nếu không có Generics, lập trình viên buộc phải chọn giữa việc viết nhiều hàm trùng lặp cho từng kiểu hoặc dùng `any`. Dùng `any` làm mất hoàn toàn mối liên kết kiểu giữa tham số đầu vào và giá trị trả về. Generics tạo ra một 'hợp đồng động': compiler sẽ suy luận hoặc khóa chặt kiểu của đầu ra phụ thuộc chính xác vào kiểu truyền vào ở đầu vào.",
+      "codeExample": "// Generic ApiResponse wrapper:\ninterface ApiResponse<TData> {\n  data: TData;\n  status: number;\n  timestamp: number;\n}\n\ninterface User { id: string; name: string; }\ninterface Post { id: string; title: string; }\n\n// Tái sử dụng an toàn tuyệt đối:\nconst userRes: ApiResponse<User> = {\n  data: { id: 'u1', name: 'Nam' },\n  status: 200,\n  timestamp: Date.now()\n};\nconsole.log(userRes.data.name); // IDE autocomplete chuẩn xác"
+    },
+    "pitfalls": [
+      "Tạo Generic thừa thãi cho các hàm không cần thiết (ví dụ `function log<T>(val: T)` nhưng không hề tái sử dụng hoặc liên kết `T` với bất kỳ đâu).",
+      "Lạm dụng `any` thay vì Generic khi viết các data structures tái sử dụng như Queue, Stack, List."
+    ],
+    "followUpQuestions": [
+      "Khi nào không nên dùng Generic trong một function signature?",
+      "Type Argument Inference trong hàm Generic hoạt động ra sao khi ta không truyền `<Type>` một cách tường minh?"
+    ]
+  },
+  {
+    "id": "ts-029",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Generic constraints (extends) trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá khả năng giới hạn phạm vi kiểu của Generic parameter để có thể truy cập an toàn các thuộc tính mong muốn mà không gây lỗi compiler.",
+    "contextOrScenario": "Viết hàm đo độ dài hoặc log thuộc tính `length` của bất kỳ đối tượng nào (string, array, custom object có length).",
+    "expectedKeywords": [
+      "generic constraints",
+      "extends keyword",
+      "narrowing generics",
+      "property access safety",
+      "subtyping in generics"
+    ],
+    "seniorAnswer": {
+      "summary": "Generic Constraint sử dụng từ khóa `extends` (`<T extends Constraint>`) để giới hạn miền kiểu mà generic parameter `T` có thể nhận. Nó buộc `T` phải là subtype của kiểu ràng buộc, từ đó cho phép truy cập an toàn vào các thuộc tính đã được định nghĩa trong ràng buộc đó.",
+      "deepDive": "Mặc định, một generic `<T>` được xem như không có thuộc tính nào cụ thể (tương đương type rộng nhất). Nếu bạn cố truy cập `val.length`, compiler sẽ chặn ngay vì `T` có thể là `number` (không có length). Bằng cách khai báo `<T extends { length: number }>`, ta vừa đảm bảo truy cập được `val.length`, vừa bảo toàn được kiểu trả về nguyên bản của `T` thay vì ép về interface `{ length: number }`.",
+      "codeExample": "interface HasLength {\n  length: number;\n}\n\n// Ép T phải có thuộc tính length:\nfunction logLength<T extends HasLength>(item: T): T {\n  console.log(`Length is: ${item.length}`);\n  return item; // Vẫn giữ nguyên kiểu chính xác của T\n}\n\nlogLength('Hello');      // Hợp lệ (string có length)\nlogLength([1, 2, 3]);    // Hợp lệ (array có length)\n// logLength(123);       // Error: Argument of type 'number' is not assignable to 'HasLength'"
+    },
+    "pitfalls": [
+      "Nhầm lẫn giữa `extends` trong generic constraint (ràng buộc kiểu) với `extends` trong kế thừa Class hoặc Interface.",
+      "Đặt constraint quá chặt khiến hàm generic mất đi tính linh hoạt và khả năng tái sử dụng."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để ràng buộc một generic key `K` phải là một thuộc tính hợp lệ của generic object `T` (`K extends keyof T`)?",
+      "Sự khác biệt giữa việc trả về `T extends Shape` và trả về trực tiếp kiểu `Shape` là gì?"
+    ]
+  },
+  {
+    "id": "ts-030",
+    "category": "typescript",
+    "level": "middle",
+    "question": "keyof operator là gì?",
+    "interviewerIntent": "Kiểm tra kiến thức về Type Operator truy vấn keys (Index Type Query Operator) và cách tạo Union của các tên thuộc tính.",
+    "contextOrScenario": "Tạo hàm lấy giá trị thuộc tính an toàn `getProperty(obj, key)` không lo gõ sai chính tả tên field.",
+    "expectedKeywords": [
+      "keyof operator",
+      "index type query",
+      "union of keys",
+      "property access safety",
+      "mapped types foundation"
+    ],
+    "seniorAnswer": {
+      "summary": "Toán tử `keyof` (Index Type Query) nhận vào một Object Type và trả về một Union Type của tất cả các keys (tên thuộc tính) đã biết của object đó (có thể bao gồm chuỗi, số hoặc symbol).",
+      "deepDive": "Nếu một type có các keys là `'id' | 'name' | 'age'`, thì `keyof Person` sẽ sinh ra chính xác union `'id' | 'name' | 'age'`. Nếu object type có index signature dạng `[key: string]: any`, `keyof` sẽ trả về `string | number` (vì trong JavaScript object key dạng số luôn được convert thành chuỗi). `keyof` là viên gạch nền tảng để xây dựng các Mapped Types và hàm Generic truy cập dynamic properties an toàn.",
+      "codeExample": "interface UserProfile {\n  id: string;\n  name: string;\n  age: number;\n}\n\ntype UserKeys = keyof UserProfile; // 'id' | 'name' | 'age'\n\n// Kết hợp generic để tạo hàm getProperty an toàn tuyệt đối:\nfunction getProp<T, K extends keyof T>(obj: T, key: K): T[K] {\n  return obj[key];\n}\n\nconst user: UserProfile = { id: 'u1', name: 'Nam', age: 30 };\nconst name = getProp(user, 'name'); // Type: string\n// getProp(user, 'invalid'); // Compile Error: Argument of type '\"invalid\"' is not assignable to parameter"
+    },
+    "pitfalls": [
+      "Dùng `keyof` trên một biến JavaScript thay vì Type (phải dùng `keyof typeof variable`).",
+      "Bất ngờ khi `keyof any` cho ra kết quả `string | number | symbol`."
+    ],
+    "followUpQuestions": [
+      "Tại sao `keyof any` lại bằng `string | number | symbol`?",
+      "Khi kết hợp `keyof` với `typeof` trên một Object Literal thì TypeScript phân giải như thế nào?"
+    ]
+  },
+  {
+    "id": "ts-031",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Utility type Parameters<T> và ConstructorParameters<T> là gì?",
+    "interviewerIntent": "Đánh giá năng lực trích xuất kiểu tham số từ function signatures và class constructors bằng infer/utility types.",
+    "contextOrScenario": "Viết hàm bọc (wrapper/decorator/middleware) tái sử dụng lại chính xác các tham số của một hàm từ 3rd party SDK mà không có export type riêng cho params.",
+    "expectedKeywords": [
+      "Parameters<T>",
+      "ConstructorParameters<T>",
+      "tuple of arguments",
+      "infer keyword",
+      "function signature extraction"
+    ],
+    "seniorAnswer": {
+      "summary": "`Parameters<T>` trích xuất kiểu của các tham số từ một function type `T` và trả về dưới dạng một Tuple. `ConstructorParameters<T>` làm điều tương tự nhưng trích xuất các tham số từ constructor của một Class hoặc Constructor Function type.",
+      "deepDive": "Bên dưới compiler, `Parameters<T>` được cài đặt thông qua Conditional Type và từ khóa `infer`: `type Parameters<T extends (...args: any) => any> = T extends (...args: infer P) => any ? P : never`. Đây là công cụ đắc lực khi ta cần wrap một hàm có sẵn (như hàm gửi log, debounce, memoize) mà thư viện bên ngoài không export type tham số ra ngoài.",
+      "codeExample": "function createUser(name: string, age: number, isAdmin: boolean = false) {\n  return { id: '1', name, age, isAdmin };\n}\n\n// Trích xuất tuple tham số: [name: string, age: number, isAdmin?: boolean]\ntype CreateUserParams = Parameters<typeof createUser>;\n\n// Sử dụng để wrap hàm an toàn:\nfunction loggedCreateUser(...args: CreateUserParams) {\n  console.log('Creating user with args:', args);\n  return createUser(...args);\n}"
+    },
+    "pitfalls": [
+      "Truyền trực tiếp tên hàm vào `Parameters<myFunction>` mà quên từ khóa `typeof` (`Parameters<typeof myFunction>`).",
+      "Truyền một kiểu không phải hàm vào `Parameters<T>` khiến compiler trả về `never` hoặc báo lỗi constraint."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để lấy ra kiểu của tham số đầu tiên từ tuple kết quả của `Parameters<T>`?",
+      "Nếu một hàm có multiple overloads, `Parameters<T>` sẽ trích xuất tham số của signature nào?"
+    ]
+  },
+  {
+    "id": "ts-032",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Generic functions với multiple type parameters như thế nào?",
+    "interviewerIntent": "Kiểm tra kỹ năng xử lý mối quan hệ kiểu phức tạp giữa nhiều biến đầu vào và đầu ra trong cùng một hàm.",
+    "contextOrScenario": "Xây dựng hàm `mergeObjects(obj1, obj2)` hoặc hàm `mapArray(array, transformFn)` biến đổi từ kiểu nguồn `T` sang kiểu đích `U`.",
+    "expectedKeywords": [
+      "multiple type parameters",
+      "<T, U>",
+      "type dependencies",
+      "independent inference",
+      "currying generics"
+    ],
+    "seniorAnswer": {
+      "summary": "Generic functions có thể nhận nhiều type parameters (ví dụ `<T, U, K>`) phân tách nhau bằng dấu phẩy. Điều này cho phép biểu diễn các mối quan hệ phụ thuộc giữa các tham số khác nhau hoặc giữa tham số đầu vào và kiểu dữ liệu trả về.",
+      "deepDive": "Compiler sẽ suy luận độc lập từng type parameter dựa trên các đối số thực tế được truyền vào lúc gọi hàm. Bạn có thể ràng buộc parameter này dựa trên parameter kia (ví dụ `<T, K extends keyof T>`), tạo nên sự liên kết chặt chẽ không thể phá vỡ giữa các đối số của hàm.",
+      "codeExample": "// Hàm gộp 2 object và trả về intersection của cả hai kiểu:\nfunction merge<T extends object, U extends object>(first: T, second: U): T & U {\n  return { ...first, ...second };\n}\n\nconst merged = merge({ name: 'Alice' }, { age: 25 });\n// merged có kiểu: { name: string } & { age: number }\nconsole.log(merged.name, merged.age);\n\n// Hàm map dữ liệu: T đầu vào, U đầu ra\nfunction mapList<T, U>(items: T[], fn: (item: T) => U): U[] {\n  return items.map(fn);\n}"
+    },
+    "pitfalls": [
+      "Khai báo quá nhiều generic parameters không cần thiết khiến chữ ký hàm trở nên rối rắm khó bảo trì.",
+      "Chỉ định một type parameter thủ công trong khi để parameter còn lại tự inference (TypeScript không hỗ trợ partial inference trong cùng một danh sách cho đến các bản mới)."
+    ],
+    "followUpQuestions": [
+      "TypeScript xử lý Partial Type Argument Inference (chỉ truyền type cho T còn U để tự suy luận) như thế nào?",
+      "Làm sao dùng kỹ thuật Currying để vượt qua giới hạn không thể chỉ định một nửa generic type parameters?"
+    ]
+  },
+  {
+    "id": "ts-033",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Exclude<T, U> và Extract<T, U> là gì?",
+    "interviewerIntent": "Đánh giá sự hiểu biết về phép bù và phép giao trên Union Types sử dụng Distributive Conditional Types.",
+    "contextOrScenario": "Lọc bỏ trạng thái `'deleted'` ra khỏi Union các trạng thái của hệ thống để chỉ cho phép thao tác trên các trạng thái active.",
+    "expectedKeywords": [
+      "Exclude<T, U>",
+      "Extract<T, U>",
+      "distributive conditional types",
+      "union manipulation",
+      "set difference"
+    ],
+    "seniorAnswer": {
+      "summary": "`Exclude<T, U>` loại bỏ khỏi union `T` tất cả các kiểu có thể gán được cho `U` (phép trừ tập hợp). `Extract<T, U>` trích xuất từ union `T` tất cả các kiểu có thể gán được cho `U` (phép giao tập hợp).",
+      "deepDive": "Cả hai đều hoạt động dựa trên Distributive Conditional Types: `type Exclude<T, U> = T extends U ? never : T;`. Khi `T` là một union (`A | B | C`), conditional type sẽ phân phối qua từng thành viên: nếu thành viên extends `U`, nó trả về `never` (bị triệt tiêu khỏi union); nếu không, nó được giữ lại. Tương tự, `type Extract<T, U> = T extends U ? T : never;`.",
+      "codeExample": "type EventType = 'click' | 'hover' | 'scroll' | 'keydown' | 'keyup';\n\n// 1. Exclude: Loại bỏ các event bàn phím\ntype MouseOrScrollEvent = Exclude<EventType, 'keydown' | 'keyup'>;\n// Kết quả: 'click' | 'hover' | 'scroll'\n\n// 2. Extract: Chỉ lấy các event bàn phím\ntype KeyboardEventOnly = Extract<EventType, 'keydown' | 'keyup' | 'focus'>;\n// Kết quả: 'keydown' | 'keyup'"
+    },
+    "pitfalls": [
+      "Nhầm lẫn giữa `Exclude` (thao tác trên Union types) và `Omit` (thao tác loại bỏ keys khỏi Object types).",
+      "Không nhận ra rằng việc loại trừ dựa trên quan hệ gán được (assignability), nên nếu truyền subtype của `U`, nó cũng sẽ bị loại bỏ."
+    ],
+    "followUpQuestions": [
+      "Tại sao `Exclude<T, U>` lại tự động loại bỏ `never` ra khỏi kết quả union cuối cùng?",
+      "Làm thế nào để implement utility type `NonNullable<T>` chỉ bằng cách dùng `Exclude`?"
+    ]
+  },
+  {
+    "id": "ts-034",
+    "category": "typescript",
+    "level": "middle",
+    "question": "ReturnType<T> và Awaited<T> là gì?",
+    "interviewerIntent": "Đánh giá việc bóc tách kiểu trả về của hàm đồng bộ và xử lý unwrap Promise lồng nhau bằng `Awaited`.",
+    "contextOrScenario": "Cần lấy kiểu dữ liệu của record trả về từ một hàm fetch async phức tạp để làm kiểu dữ liệu cho React State.",
+    "expectedKeywords": [
+      "ReturnType<T>",
+      "Awaited<T>",
+      "unwrap Promise",
+      "infer keyword",
+      "async return type"
+    ],
+    "seniorAnswer": {
+      "summary": "`ReturnType<T>` trích xuất kiểu dữ liệu trả về của một function type `T`. `Awaited<T>` (ra mắt từ TS 4.5) dùng để đệ quy 'unwrap' (bóc vỏ) các Promise/Thenable để lấy ra giá trị thực sự bên trong, mô phỏng chính xác hành vi của từ khóa `await` trong JavaScript.",
+      "deepDive": "Khi một hàm là async (`async function getData()`), `ReturnType<typeof getData>` sẽ trả về `Promise<User>`. Nếu muốn lấy trực tiếp kiểu `User` mà không dính bọc `Promise`, ta lồng `Awaited<ReturnType<typeof getData>>`. `Awaited` giải quyết đệ quy cả các Promise lồng nhau (`Promise<Promise<string>>` -> `string`), điều mà conditional type đơn tầng trước đây rất khó xử lý triệt để.",
+      "codeExample": "async function fetchUserDetail(id: string) {\n  return {\n    id,\n    name: 'Alice',\n    roles: ['admin', 'billing']\n  };\n}\n\n// ReturnType thông thường: Promise<{ id: string; name: string; roles: string[]; }>\ntype RawPromiseReturn = ReturnType<typeof fetchUserDetail>;\n\n// Awaited bóc sạch Promise để lấy Object Type sạch bên trong:\ntype UserDetail = Awaited<ReturnType<typeof fetchUserDetail>>;\n\nconst user: UserDetail = {\n  id: '1',\n  name: 'Alice',\n  roles: ['admin']\n};"
+    },
+    "pitfalls": [
+      "Dùng `ReturnType<typeof asyncFunc>` rồi thắc mắc tại sao gán vào biến lại dính lỗi liên quan tới `Promise`.",
+      "Quên từ khóa `typeof` khi truyền hàm vào `ReturnType`."
+    ],
+    "followUpQuestions": [
+      "Bên dưới TypeScript compiler, `Awaited<T>` xử lý đệ quy các object có method `.then()` (Thenable) như thế nào?",
+      "Làm thế nào để viết một utility type tương tự `Awaited<T>` từ đầu bằng conditional types và `infer`?"
+    ]
+  },
+  {
+    "id": "ts-035",
+    "category": "typescript",
+    "level": "middle",
+    "question": "NonNullable<T> là gì?",
+    "interviewerIntent": "Đánh giá sự am hiểu về việc loại trừ null và undefined khỏi Union Type bằng utility types.",
+    "contextOrScenario": "Chuẩn hóa dữ liệu form đầu vào khi một trường có thể nhận `string | null | undefined`, cần chuyển thành kiểu string chắc chắn trước khi lưu trữ.",
+    "expectedKeywords": [
+      "NonNullable<T>",
+      "strip null and undefined",
+      "conditional type",
+      "strictNullChecks"
+    ],
+    "seniorAnswer": {
+      "summary": "`NonNullable<T>` là utility type loại bỏ hoàn toàn `null` và `undefined` khỏi kiểu `T`. Nếu `T` là một union chứa nhiều loại giá trị kèm `null` hoặc `undefined`, kết quả trả về sẽ là union của các kiểu còn lại.",
+      "deepDive": "Định nghĩa chuẩn của TypeScript: `type NonNullable<T> = T extends null | undefined ? never : T;` hoặc dùng `type NonNullable<T> = T & {};`. Dưới cơ chế distributive conditional types, mỗi nhánh của union được so sánh với `null | undefined`, nhánh nào thỏa mãn sẽ biến thành `never` và tự động bị loại khỏi union kết quả.",
+      "codeExample": "type MaybeString = string | null | undefined;\ntype DefinitelyString = NonNullable<MaybeString>; // string\n\ntype MixedUnion = number[] | null | boolean | undefined;\ntype CleanUnion = NonNullable<MixedUnion>; // number[] | boolean"
+    },
+    "pitfalls": [
+      "Dùng `NonNullable<T>` khi chưa bật `strictNullChecks` trong `tsconfig.json` (khiến nó không có tác dụng vì `null`/`undefined` được gán tùy ý vào mọi kiểu).",
+      "Nhầm lẫn `NonNullable<T>` với `Required<T>` (Required bỏ `?` trên object property, còn NonNullable lọc trực tiếp trên type/union)."
+    ],
+    "followUpQuestions": [
+      "Tại sao cú pháp `T & {}` trong TypeScript hiện đại có thể dùng để lọc bỏ `null` và `undefined`?",
+      "Làm sao lọc sạch `null` và `undefined` từ một mảng bằng `Array.prototype.filter` và custom type guard?"
+    ]
+  },
+  {
+    "id": "ts-036",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Readonly<T> và ReadonlyArray<T> là gì?",
+    "interviewerIntent": "Kiểm tra kỹ năng lập trình hàm (Functional Programming), ngăn chặn side-effects do mutation mảng hoặc object.",
+    "contextOrScenario": "Viết selector function trong Redux/Zustand hoặc State Machine nhằm đảm bảo state không bị mutate trực tiếp ngoài ý muốn.",
+    "expectedKeywords": [
+      "Readonly<T>",
+      "ReadonlyArray<T>",
+      "immutability",
+      "shallow protection",
+      "mutating methods"
+    ],
+    "seniorAnswer": {
+      "summary": "`Readonly<T>` biến tất cả các thuộc tính của object `T` thành chỉ đọc (`readonly`). `ReadonlyArray<T>` (hoặc cú pháp ngắn gọn `readonly T[]`) là mảng chỉ đọc, loại bỏ toàn bộ các phương thức làm thay đổi mảng (mutating methods như `push`, `pop`, `splice`, `sort`, `reverse`).",
+      "deepDive": "Cần nhớ cả hai đều chỉ bảo vệ ở mức nông (shallow immutability). Nếu `ReadonlyArray` chứa các object, các thuộc tính bên trong object đó vẫn có thể bị mutate trừ khi chính object đó cũng là `Readonly`. Việc dùng `ReadonlyArray` giúp lập trình viên tuân thủ tư duy pure functions trong React và Redux.",
+      "codeExample": "const numbers: ReadonlyArray<number> = [1, 2, 3];\n// numbers.push(4); // Error: Property 'push' does not exist on type 'readonly number[]'\n\n// Các hàm không mutate như map, filter, slice vẫn dùng bình thường:\nconst doubled = numbers.map(n => n * 2); // OK\n\ninterface Config {\n  appName: string;\n}\nconst conf: Readonly<Config> = { appName: 'Portal' };\n// conf.appName = 'New Portal'; // Error: Cannot assign to 'appName'"
+    },
+    "pitfalls": [
+      "Tưởng rằng `ReadonlyArray` ngăn được việc thay đổi các thuộc tính của object con nằm bên trong mảng.",
+      "Nhầm lẫn giữa `ReadonlyArray<T>` (type compile-time) với `Object.freeze()` (runtime enforcement)."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa cú pháp `readonly T[]` và `ReadonlyArray<T>` là gì?",
+      "Làm cách nào để ép kiểu từ một `ReadonlyArray<T>` về mảng mutable thông thường khi bắt buộc phải tương tác với thư viện cũ?"
+    ]
+  },
+  {
+    "id": "ts-037",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Hãy implement Partial<T> từ đầu để hiểu cách hoạt động.",
+    "interviewerIntent": "Đánh giá sự hiểu biết cốt lõi về Mapped Types, toán tử `keyof`, Index Access Types và property modifiers.",
+    "contextOrScenario": "Phỏng vấn trực tiếp yêu cầu code live: 'Em hãy tự viết lại utility type Partial<T> của TypeScript mà không dùng built-in'.",
+    "expectedKeywords": [
+      "mapped types",
+      "keyof operator",
+      "indexed access (T[P])",
+      "optional modifier (?)",
+      "homomorphic mapped type"
+    ],
+    "seniorAnswer": {
+      "summary": "Tự implement `Partial<T>` bằng Mapped Type:\n`type MyPartial<T> = { [P in keyof T]?: T[P]; };`.\nCú pháp này lặp qua mọi key `P` trong tập hợp `keyof T`, đánh dấu mỗi key là optional (`?`) và giữ nguyên kiểu giá trị tương ứng `T[P]`.",
+      "deepDive": "Đây là một Homomorphic Mapped Type (Mapped Type đồng hình). Vì nó lặp trực tiếp trên `keyof T`, TypeScript tự động bảo toàn các thuộc tính và modifiers khác (như `readonly`) từ type gốc. Ngược lại, nếu muốn gỡ bỏ dấu `?` để viết `Required<T>`, ta chỉ cần đổi `?` thành `-?`: `type MyRequired<T> = { [P in keyof T]-?: T[P]; };`.",
+      "codeExample": "// Tự định nghĩa MyPartial:\ntype MyPartial<T> = {\n  [P in keyof T]?: T[P];\n};\n\ninterface UserProfile {\n  id: string;\n  name: string;\n  age: number;\n}\n\n// Kết quả tương đương hoàn toàn với Partial<UserProfile>:\ntype PatchUser = MyPartial<UserProfile>;\n\nconst update: PatchUser = {\n  name: 'Nam'\n}; // Hợp lệ, id và age không bắt buộc"
+    },
+    "pitfalls": [
+      "Quên cú pháp `in` trong Mapped Type (`[P in keyof T]` chứ không phải `[P: keyof T]`).",
+      "Nghĩ rằng `MyPartial` sẽ tác động đệ quy lên các nested objects bên trong `T`."
+    ],
+    "followUpQuestions": [
+      "Homomorphic Mapped Type là gì và tại sao nó giữ lại được modifier `readonly` của thuộc tính gốc?",
+      "Làm sao viết `DeepPartial<T>` bằng đệ quy?"
+    ]
+  },
+  {
+    "id": "ts-038",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Type guards là gì? Các loại type guards trong TypeScript?",
+    "interviewerIntent": "Đánh giá toàn diện các kỹ thuật phân nhánh an toàn kiểu dữ liệu tại runtime để phục vụ Control Flow Analysis.",
+    "contextOrScenario": "Hàm nhận tham số `unknown` hoặc Union của nhiều cấu trúc dữ liệu khác nhau, cần kiểm tra và phân loại trước khi thực thi nghiệp vụ.",
+    "expectedKeywords": [
+      "type guards",
+      "typeof",
+      "instanceof",
+      "in operator",
+      "user-defined type guard",
+      "type predicate (is)",
+      "control flow"
+    ],
+    "seniorAnswer": {
+      "summary": "Type Guard là một biểu thức hoặc hàm kiểm tra tại runtime trả về giá trị boolean, cho phép bộ phân tích luồng điều khiển của TypeScript (Control Flow Analysis) thu hẹp phạm vi kiểu của một biến trong phạm vi khối lệnh tương ứng.",
+      "deepDive": "TypeScript hỗ trợ 4 nhóm Type Guards chính:\n1. `typeof`: Dùng cho primitive types (`'string'`, `'number'`, `'boolean'`, `'symbol'`).\n2. `instanceof`: Dùng cho Classes, Errors, Dates hoặc DOM Nodes.\n3. `in` operator: Kiểm tra sự hiện diện của thuộc tính trong đối tượng (`'fly' in animal`).\n4. User-defined Type Guards (Custom Guards): Hàm trả về kiểu Type Predicate (`arg is Type`), cho phép viết logic kiểm tra tùy biến sâu.",
+      "codeExample": "function handleInput(x: string | Date | { message: string }) {\n  if (typeof x === 'string') {\n    console.log(x.toUpperCase()); // Type: string\n  } else if (x instanceof Date) {\n    console.log(x.toISOString()); // Type: Date\n  } else if ('message' in x) {\n    console.log(x.message);       // Type: { message: string }\n  }\n}"
+    },
+    "pitfalls": [
+      "Kiểm tra `typeof x === 'object'` nhưng quên rằng `null` cũng có `typeof` là `'object'`, gây crash khi truy cập thuộc tính.",
+      "Viết hàm kiểm tra boolean thông thường (`isValid(x): boolean`) rồi tưởng rằng compiler sẽ tự động narrow type bên ngoài hàm."
+    ],
+    "followUpQuestions": [
+      "Tại sao hàm trả về `boolean` thông thường không giúp TypeScript narrow type được?",
+      "Toán tử `in` trong TypeScript có hoạt động an toàn với `unknown` không từ phiên bản 4.9?"
+    ]
+  },
+  {
+    "id": "ts-039",
+    "category": "typescript",
+    "level": "middle",
+    "question": "User-defined type guards (type predicates) là gì?",
+    "interviewerIntent": "Đánh giá khả năng viết các hàm kiểm tra kiểu tùy chỉnh với cú pháp `parameterName is Type` để dạy cho compiler hiểu runtime logic.",
+    "contextOrScenario": "Kiểm tra xem một object nhận từ WebSocket hoặc API có đúng cấu trúc của Entity `AdminUser` hay không.",
+    "expectedKeywords": [
+      "user-defined type guard",
+      "type predicate",
+      "parameterName is Type",
+      "custom narrowing",
+      "runtime validation"
+    ],
+    "seniorAnswer": {
+      "summary": "User-defined Type Guard là một hàm JavaScript bình thường nhưng có kiểu trả về đặc biệt gọi là Type Predicate với cú pháp `paramName is TargetType`. Khi hàm này trả về `true`, TypeScript sẽ tự động thu hẹp kiểu của `paramName` thành `TargetType` trong nhánh điều kiện đó.",
+      "deepDive": "Type Predicate là cầu nối mạnh mẽ giữa logic kiểm tra runtime tùy chỉnh của lập trình viên và hệ thống kiểu compile-time của compiler. Đặc biệt hữu ích khi dùng với `Array.prototype.filter()` để lọc bỏ các phần tử `null`/`undefined` hoặc phân loại các phần tử trong danh sách hỗn hợp.",
+      "codeExample": "interface Fish { swim: () => void; }\ninterface Bird { fly: () => void; }\n\n// Type predicate: pet is Fish\nfunction isFish(pet: Fish | Bird): pet is Fish {\n  return (pet as Fish).swim !== undefined;\n}\n\nfunction move(pet: Fish | Bird) {\n  if (isFish(pet)) {\n    pet.swim(); // TS biết chắc chắn pet là Fish\n  } else {\n    pet.fly();  // TS tự suy ra pet là Bird\n  }\n}\n\n// Dùng để filter array:\nconst pets: (Fish | Bird)[] = [];\nconst onlyFishes: Fish[] = pets.filter(isFish); // Type sạch: Fish[]"
+    },
+    "pitfalls": [
+      "Viết logic kiểm tra bên trong hàm sai nhưng hàm vẫn trả về `true`, dẫn đến việc TypeScript tin tưởng sai kiểu (Type lie), gây crash runtime.",
+      "Quên cú pháp `is` mà chỉ khai báo `: boolean` khiến `Array.filter` không thu hẹp được kiểu của mảng."
+    ],
+    "followUpQuestions": [
+      "Assertion Functions (`asserts condition`, `asserts val is Type`) khác gì với Type Predicates thông thường?",
+      "Làm thế nào để viết generic type predicate cho một hàm kiểm tra `isDefined<T>(val: T | null | undefined): val is T`?"
+    ]
+  },
+  {
+    "id": "ts-040",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Declaration files (.d.ts) là gì?",
+    "interviewerIntent": "Kiểm tra sự hiểu biết về cơ chế cung cấp type definitions cho JavaScript libraries (DefinitelyTyped, Ambient declarations) mà không chứa mã thực thi.",
+    "contextOrScenario": "Dự án cần sử dụng một thư viện JavaScript cũ không có sẵn type hoặc cần khai báo type cho file SVG/CSS modules.",
+    "expectedKeywords": [
+      "declaration file",
+      ".d.ts",
+      "ambient declarations",
+      "declare keyword",
+      "@types/package",
+      "DefinitelyTyped"
+    ],
+    "seniorAnswer": {
+      "summary": "File `.d.ts` (Declaration file) chỉ chứa các định nghĩa kiểu dữ liệu (type metadata, interfaces, ambient declarations) mà KHÔNG chứa mã thực thi (implementation code). Chúng đóng vai trò như 'header files' trong C/C++, giúp TypeScript hiểu được cấu trúc và cung cấp autocompletion cho các module viết bằng vanilla JavaScript.",
+      "deepDive": "Mọi khai báo trong `.d.ts` thường bắt đầu bằng từ khóa `declare` (ví dụ `declare module '*.svg'`, `declare const __DEV__: boolean`). Khi biên dịch dự án có cờ `\"declaration\": true`, TypeScript sẽ tự động trích xuất mã nguồn `.ts` thành các file `.d.ts` để phân phối qua npm (giúp người dùng khác tiêu thụ package có type mà không cần đọc mã nguồn gốc).",
+      "codeExample": "// File: globals.d.ts\n// 1. Khai báo biến môi trường toàn cục:\ndeclare const __VERSION__: string;\n\n// 2. Khai báo cho asset modules (CSS/SVG):\ndeclare module '*.module.css' {\n  const classes: { readonly [key: string]: string };\n  export default classes;\n}\n\n// 3. Khai báo mở rộng module bên thứ 3:\ndeclare module 'legacy-analytics-sdk' {\n  export function trackEvent(name: string, payload?: object): void;\n}"
+    },
+    "pitfalls": [
+      "Viết code thực thi (function body, variable initialization) vào trong file `.d.ts` gây lỗi compiler.",
+      "Tạo file `.d.ts` nhưng không đặt trong thư mục nằm trong tầm quét `include` của `tsconfig.json`."
+    ],
+    "followUpQuestions": [
+      "Ambient declarations (`declare global`) được dùng trong trường hợp nào?",
+      "Sự khác biệt giữa việc distribute types kèm package trong `package.json` (`\"types\": \"./index.d.ts\"`) và qua DefinitelyTyped (`@types/`) là gì?"
+    ]
+  },
+  {
+    "id": "ts-041",
+    "category": "typescript",
+    "level": "middle",
+    "question": "tsconfig.json các options quan trọng nhất là gì?",
+    "interviewerIntent": "Đánh giá khả năng cấu hình Compiler Options để tối ưu hóa an toàn kiểu, module resolution và hiệu suất biên dịch cho dự án.",
+    "contextOrScenario": "Khởi tạo file `tsconfig.json` cho dự án Next.js/React hoặc Node.js Microservice mới.",
+    "expectedKeywords": [
+      "strict",
+      "target",
+      "module",
+      "moduleResolution",
+      "skipLibCheck",
+      "noUncheckedIndexedAccess",
+      "isolatedModules"
+    ],
+    "seniorAnswer": {
+      "summary": "Các options quan trọng nhất định hình dự án gồm: (1) An toàn kiểu: `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`; (2) Module & Runtime: `target` (phiên bản JS output), `module` và `moduleResolution` (`NodeNext` hoặc `Bundler`); (3) Tối ưu build & bundler: `skipLibCheck: true`, `isolatedModules: true` (bắt buộc cho Babel/esbuild/swc), và `paths` (path aliases).",
+      "deepDive": "Trong các dự án hiện đại dùng Vite, Next.js, nên set `moduleResolution: \"bundler\"` hoặc `\"NodeNext\"` để phản ánh đúng chuẩn ESM. `skipLibCheck: true` là cứu cánh cho performance biên dịch vì nó bỏ qua việc type-check các file `.d.ts` bên trong `node_modules`. `isolatedModules` đảm bảo mỗi file có thể được transpile độc lập bởi các compiler đơn lẻ như SWC hay esbuild.",
+      "codeExample": "{\n  \"compilerOptions\": {\n    \"target\": \"ES2022\",\n    \"module\": \"ESNext\",\n    \"moduleResolution\": \"bundler\",\n    \"strict\": true,\n    \"noUncheckedIndexedAccess\": true,\n    \"isolatedModules\": true,\n    \"skipLibCheck\": true,\n    \"paths\": {\n      \"@/*\": [\"./src/*\"]\n    }\n  },\n  \"include\": [\"src\"]\n}"
+    },
+    "pitfalls": [
+      "Để `skipLibCheck: false` khiến build time chậm gấp 3-5 lần do compiler check lại toàn bộ types của các thư viện bên thứ 3.",
+      "Không bật `isolatedModules` khi dùng Vite/esbuild khiến phát sinh lỗi khi dùng tính năng TypeScript-only như `const enum` hoặc re-export type không dùng `export type`."
+    ],
+    "followUpQuestions": [
+      "`moduleResolution: 'bundler'` trong TypeScript 5.0+ giải quyết vấn đề gì so với `node`?",
+      "Cờ `exactOptionalPropertyTypes` ngăn chặn hành vi gán sai nào với optional properties?"
+    ]
+  },
+  {
+    "id": "ts-042",
+    "category": "typescript",
+    "level": "middle",
+    "question": "TypeScript với React: typing hooks như thế nào?",
+    "interviewerIntent": "Đánh giá kỹ năng áp dụng TypeScript thực tế trong React: useState, useRef, useReducer, useCallback, useMemo.",
+    "contextOrScenario": "Xây dựng các hooks trong ứng dụng React: quản lý ref của DOM input và typing reducer state/actions.",
+    "expectedKeywords": [
+      "useState<T>",
+      "useRef<T>(null)",
+      "useReducer<Reducer<S, A>>",
+      "implicit inference",
+      "DOM Ref vs Mutable Ref"
+    ],
+    "seniorAnswer": {
+      "summary": "Typing React Hooks: (1) `useState`: Tự suy luận với primitive (`useState(false)`), dùng generic khi giá trị ban đầu là null/undefined (`useState<User | null>(null)`); (2) `useRef`: Dùng `useRef<HTMLInputElement>(null)` cho DOM elements (readonly ref), hoặc `useRef<number>(0)` cho mutable value; (3) `useReducer`: Luôn dùng Discriminated Union cho Actions; (4) `useMemo`/`useCallback`: Thường để TS tự inference return type.",
+      "deepDive": "Điểm tế nhị nhất nằm ở `useRef`: Nếu truyền initial value là `null` (`useRef<HTMLInputElement>(null)`), React trả về `RefObject<T>` với `.current` là read-only (chỉ React gán khi mount). Nếu truyền không tham số hoặc giá trị khởi tạo khác null, nó trả về `MutableRefObject<T>` cho phép bạn tự do gán `ref.current = newVal`.",
+      "codeExample": "import { useState, useRef, useReducer } from 'react';\n\n// 1. useState với Union\nconst [user, setUser] = useState<User | null>(null);\n\n// 2. useRef cho DOM input element\nconst inputRef = useRef<HTMLInputElement>(null);\nconst focusInput = () => inputRef.current?.focus();\n\n// 3. useReducer với Discriminated Union Action\ntype Action = \n  | { type: 'INCREMENT'; by: number }\n  | { type: 'RESET' };\n\nfunction reducer(state: number, action: Action): number {\n  switch (action.type) {\n    case 'INCREMENT': return state + action.by;\n    case 'RESET': return 0;\n  }\n}"
+    },
+    "pitfalls": [
+      "Khai báo `useState()` không truyền generic khiến state có kiểu `undefined`, sau đó không thể `setUser(userData)`.",
+      "Khai báo `useRef<HTMLInputElement>()` thiếu `null` làm mất kiểu `RefObject` chuẩn của React."
+    ],
+    "followUpQuestions": [
+      "Tại sao không nên ép kiểu tường minh cho `useCallback` trừ khi thực sự cần thiết?",
+      "Làm sao type cho Custom Hook trả về tuple tương tự `useState` mà không bị lỗi mảng `(T | U)[]`?"
+    ]
+  },
+  {
+    "id": "ts-043",
+    "category": "typescript",
+    "level": "middle",
+    "question": "TypeScript với React: typing events là gì?",
+    "interviewerIntent": "Kiểm tra kiến thức về SyntheticEvent của React và cách type an toàn cho onClick, onChange, onSubmit trên các phần tử HTML.",
+    "contextOrScenario": "Viết component Input và Form xử lý sự kiện gõ phím và submit trang mà không bị lỗi type `any` cho event parameter.",
+    "expectedKeywords": [
+      "React.SyntheticEvent",
+      "React.ChangeEvent<HTMLInputElement>",
+      "React.FormEvent<HTMLFormElement>",
+      "React.MouseEvent<HTMLButtonElement>",
+      "inline inference"
+    ],
+    "seniorAnswer": {
+      "summary": "React sử dụng hệ thống Synthetic Event bao bọc native DOM events. Để type an toàn, ta dùng các generic event types từ namespace `React`: `React.ChangeEvent<HTMLInputElement>`, `React.MouseEvent<HTMLButtonElement>`, `React.FormEvent<HTMLFormElement>`, `React.KeyboardEvent`.",
+      "deepDive": "Nếu bạn viết handler inline ngay trên JSX (`<button onClick={(e) => ...} />`), TypeScript sẽ tự động suy luận kiểu của `e` (Contextual Typing) mà bạn không cần gõ type. Nhưng khi tách hàm ra ngoài (`const handleClick = (e: ...) => ...`), bạn bắt buộc phải chỉ định đúng kiểu Event và generic type của HTML Element tương ứng để truy cập an toàn các thuộc tính như `e.target.value` hay `e.currentTarget`.",
+      "codeExample": "import React, { useState } from 'react';\n\nexport const LoginForm: React.FC = () => {\n  const [email, setEmail] = useState('');\n\n  // Typing Change Event trên HTMLInputElement\n  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {\n    setEmail(e.target.value); // e.target.value có kiểu string chuẩn xác\n  };\n\n  // Typing Form Submit Event\n  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {\n    e.preventDefault();\n    console.log('Submitted:', email);\n  };\n\n  return (\n    <form onSubmit={handleSubmit}>\n      <input type=\"email\" value={email} onChange={handleEmailChange} />\n      <button type=\"submit\">Login</button>\n    </form>\n  );\n};"
+    },
+    "pitfalls": [
+      "Dùng nhầm native DOM event (`MouseEvent`, `Event`) thay vì React Synthetic Event (`React.MouseEvent`), gây xung đột type.",
+      "Truy cập `e.target.value` trên một element không có thuộc tính value (như div) do gán sai generic type `<HTMLDivElement>`."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt quan trọng giữa `e.target` và `e.currentTarget` trong React SyntheticEvent là gì?",
+      "Làm cách nào để type một handler có thể tái sử dụng cho cả `<input>` và `<textarea>`?"
+    ]
+  },
+  {
+    "id": "ts-044",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Path aliases trong TypeScript (paths config) là gì?",
+    "interviewerIntent": "Đánh giá khả năng cấu hình module resolution sạch đẹp, tránh đường dẫn tương đối dài dòng (`../../../../`).",
+    "contextOrScenario": "Dự án có cấu trúc thư mục lồng sâu, import file dẫn đến các chuỗi `import { Button } from '../../../components/Button'`.",
+    "expectedKeywords": [
+      "path aliases",
+      "baseUrl",
+      "paths config",
+      "tsconfig.json",
+      "bundler sync",
+      "vite/webpack resolve"
+    ],
+    "seniorAnswer": {
+      "summary": "Path Aliases (cấu hình qua `baseUrl` và `paths` trong `tsconfig.json`) cho phép định nghĩa các tên viết tắt (như `@/*`, `~/components/*`) đại diện cho các đường dẫn thư mục tuyệt đối, giúp code import sạch đẹp, dễ tái cấu trúc và không bị phụ thuộc vào độ sâu thư mục.",
+      "deepDive": "Lưu ý sống còn: TypeScript `paths` CHỈ có tác dụng kiểm tra kiểu và hỗ trợ IDE resolve module tại thời điểm compile-time. Nó KHÔNG tự động rewrite đường dẫn trong file JavaScript output. Do đó, bundler (Vite qua `vite-tsconfig-paths`, Webpack qua `resolve.alias`, hoặc Next.js built-in) bắt buộc phải được cấu hình đồng bộ để giải quyết alias tại runtime/bundle.",
+      "codeExample": "// Trong tsconfig.json:\n{\n  \"compilerOptions\": {\n    \"baseUrl\": \".\",\n    \"paths\": {\n      \"@/*\": [\"src/*\"],\n      \"@components/*\": [\"src/components/*\"],\n      \"@utils/*\": [\"src/utils/*\"]\n    }\n  }\n}\n\n// Trong file code TSX:\n// Thay vì: import { UserCard } from '../../../components/UserCard';\nimport { UserCard } from '@components/UserCard'; // Sạch sẽ, an toàn"
+    },
+    "pitfalls": [
+      "Chỉ cấu hình `paths` trong `tsconfig.json` mà quên cấu hình bundler (Vite/Webpack), dẫn đến compile TS thì pass nhưng runtime nổ lỗi `Cannot find module`.",
+      "Đặt alias quá ngắn hoặc trùng với tên npm package (ví dụ alias là `components` thay vì `@/components`)."
+    ],
+    "followUpQuestions": [
+      "Plugin nào giúp Vite tự động đọc cấu hình `paths` từ `tsconfig.json` mà không cần cấu hình lại alias thủ công?",
+      "Tại sao việc dùng Path Aliases giúp ích rất nhiều khi thực hiện Refactor / Di chuyển file?"
+    ]
+  },
+  {
+    "id": "ts-045",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Bạn mô hình hoá state của một màn hình (loading / success / error) bằng type như thế nào?",
+    "interviewerIntent": "Đánh giá tư duy thiết kế hệ thống kiểu nhằm loại bỏ các trạng thái bất khả thi (Making Impossible States Impossible).",
+    "contextOrScenario": "Phỏng vấn thiết kế State cho trang Dashboard hiển thị danh sách giao dịch tài chính từ Backend API.",
+    "expectedKeywords": [
+      "impossible states",
+      "discriminated unions",
+      "boolean flags anti-pattern",
+      "exhaustive matching",
+      "state machine"
+    ],
+    "seniorAnswer": {
+      "summary": "Mô hình hóa chuẩn: Dùng Discriminated Union thay vì nhiều cờ boolean độc lập. Tách state thành các trạng thái loại trừ lẫn nhau: `{ status: 'idle' } | { status: 'loading' } | { status: 'success'; data: T } | { status: 'error'; error: string }`. Cách này ngăn chặn 100% tình trạng 'vừa loading vừa có error vừa có data'.",
+      "deepDive": "Nếu dùng `{ isLoading: boolean, isError: boolean, data?: T, error?: string }`, ta có tới 2^4 = 16 trạng thái kết hợp, trong đó đa số là vô nghĩa và dễ tạo bug giao diện (ví dụ quên set `isLoading = false` khi có error). Với Discriminated Union, số trạng thái hợp lệ đúng bằng 4, và trong nhánh `status === 'success'`, TypeScript bảo đảm `data` luôn tồn tại mà không cần `data?.`.",
+      "codeExample": "// Anti-pattern (Dễ nổ bug):\n// interface BadState { isLoading: boolean; error: string | null; data: Transaction[] | null; }\n\n// Senior Pattern: Discriminated Union\nexport type TransactionScreenState =\n  | { status: 'idle' }\n  | { status: 'loading' }\n  | { status: 'success'; data: Transaction[]; lastUpdated: Date }\n  | { status: 'error'; message: string; retryCount: number };\n\nfunction renderScreen(state: TransactionScreenState) {\n  switch (state.status) {\n    case 'idle': return <EmptyPrompt />;\n    case 'loading': return <Spinner />;\n    case 'success': return <TransactionList items={state.data} />; // state.data tồn tại 100%\n    case 'error': return <ErrorBox message={state.message} />;\n  }\n}"
+    },
+    "pitfalls": [
+      "Dùng nhiều cờ boolean rời rạc dẫn đến việc giao diện đồng thời render cả spinner loading lẫn thông báo lỗi.",
+      "Để kiểu `data?: T` chung cho toàn bộ state khiến lúc nào cũng phải kiểm tra `if (state.data)` dù trạng thái đã là success."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để hỗ trợ trường hợp 'Background Fetching' (vẫn giữ dữ liệu cũ trên màn hình trong khi đang revalidate tải mới)?",
+      "Các thư viện như React Query / TanStack Query mô hình hóa query state theo nguyên tắc này như thế nào?"
+    ]
+  },
+  {
+    "id": "ts-046",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Vì sao narrowing bị \"mất\" sau khi gọi một hàm khác hoặc bên trong callback? Khắc phục thế nào?",
+    "interviewerIntent": "Kiểm tra sự thấu hiểu sâu sắc về giả định side-effect và giới hạn của Control Flow Analysis qua function execution boundaries.",
+    "contextOrScenario": "Lập trình viên kiểm tra `if (item !== null)` rồi gọi `doSomething()`, nhưng dòng tiếp theo TS lại báo lỗi `item is possibly null`.",
+    "expectedKeywords": [
+      "narrowing invalidation",
+      "aliasing & mutation",
+      "closure capture",
+      "side-effects assumption",
+      "const snapshot",
+      "pure function"
+    ],
+    "seniorAnswer": {
+      "summary": "TypeScript mặc định giả định rằng bất kỳ lệnh gọi hàm nào hoặc callback bất đồng bộ nào cũng có thể gây ra side-effect làm thay đổi (mutate) giá trị của biến bên ngoài. Do đó, nếu biến được khai báo bằng `let` hoặc là property của một object, kết quả narrowing trước đó sẽ bị vô hiệu hóa (invalidation).",
+      "deepDive": "Nếu biến là biến cục bộ khai báo bằng `const`, TypeScript biết chắc chắn không ai có thể gán lại biến đó, nên narrowing sẽ được bảo toàn tuyệt đối qua các lời gọi hàm. Khắc phục: (1) Sao lưu giá trị vào một biến `const` cục bộ trước khi kiểm tra điều kiện; (2) Truyền giá trị đã narrow vào hàm dưới dạng tham số thay vì đọc qua biến bao đóng (closure).",
+      "codeExample": "interface Container {\n  data: string | null;\n}\n\nfunction processContainer(c: Container) {\n  if (c.data !== null) {\n    externalMutationCall();\n    // c.data có thể đã bị reset về null bởi externalMutationCall()!\n    // c.data.toUpperCase(); // Error: 'c.data' is possibly 'null'\n  }\n}\n\n// Cách khắc phục chuẩn: Snapshot vào biến const\nfunction processContainerSafe(c: Container) {\n  const currentData = c.data; // Const snapshot\n  if (currentData !== null) {\n    externalMutationCall();\n    console.log(currentData.toUpperCase()); // ✅ An toàn tuyệt đối, TS không bao giờ mất narrowing!\n  }\n}"
+    },
+    "pitfalls": [
+      "Dùng non-null assertion `!` để ép kiểu thay vì gán vào biến `const` an toàn.",
+      "Không hiểu lý do tại sao callback bên trong `forEach` hoặc `setTimeout` lại báo biến possibly undefined dù bên ngoài vừa `if (x != null)`."
+    ],
+    "followUpQuestions": [
+      "Tại sao TypeScript lại phân biệt biến `let` và biến `const` khi thực hiện Control Flow Analysis?",
+      "Cơ chế Property Write Invalidation trong TypeScript hoạt động như thế nào?"
+    ]
+  },
+  {
+    "id": "ts-047",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Khai báo một object config: dùng satisfies T, as T và annotation : T khác nhau ra sao?",
+    "interviewerIntent": "Đánh giá khả năng phân biệt sắc bén giữa 3 cách gán kiểu phổ biến nhất trong TypeScript và chọn giải pháp tối ưu cho từng trường hợp.",
+    "contextOrScenario": "Tạo file cấu hình Routes, Theme hoặc Endpoints trong dự án và cân nhắc phương thức khai báo kiểu phù hợp.",
+    "expectedKeywords": [
+      "satisfies T",
+      "as T (assertion)",
+      ": T (annotation)",
+      "type widening",
+      "type safety",
+      "autocompletion"
+    ],
+    "seniorAnswer": {
+      "summary": "(1) `: T` (Annotation): Ép biến phải khớp kiểu `T`, nhưng làm mất literal types cụ thể (widening về type tổng quát của T); (2) `as T` (Assertion): Ép compiler coi biến là `T` mà không thèm validate chuẩn xác, bỏ qua kiểm tra an toàn; (3) `satisfies T`: Vừa validate 100% object khớp với schema của `T`, vừa giữ nguyên type hẹp nhất và các thuộc tính cụ thể ban đầu.",
+      "deepDive": "`satisfies T` là lựa chọn hoàn hảo nhất cho config objects. Nó bắt lỗi ngay lập tức nếu bạn gõ thừa/thiếu field theo hợp đồng `T`, đồng thời IDE vẫn autocomplete chính xác từng key và value cụ thể mà không bị biến thành `string` chung chung như khi dùng `: T`.",
+      "codeExample": "type RouteConfig = Record<string, { path: string; isProtected?: boolean }>;\n\n// 1. Dùng Type Annotation: Mất autocomplete tên routes cụ thể\nconst routesAnno: RouteConfig = {\n  home: { path: '/' },\n  admin: { path: '/admin', isProtected: true }\n};\n// routesAnno.home // Type chỉ là { path: string; isProtected?: boolean }\n\n// 2. Dùng satisfies: Vừa validate vừa bảo toàn keys cụ thể:\nconst routes = {\n  home: { path: '/' },\n  admin: { path: '/admin', isProtected: true }\n} satisfies RouteConfig;\n// routes.home.path -> IDE biết chính xác tồn tại route 'home' và 'admin'!\n// routes.invalid -> Compile Error ngay lập tức"
+    },
+    "pitfalls": [
+      "Dùng `as T` cho file config khiến gõ sai tên thuộc tính mà compiler vẫn im lặng cho qua.",
+      "Dùng `: T` khiến các hàm sau này muốn nhận chính xác tên key cụ thể phải ép kiểu ngược lại."
+    ],
+    "followUpQuestions": [
+      "Khi nào thì bắt buộc phải dùng `: T` thay vì `satisfies T`?",
+      "Làm thế nào để vừa dùng `as const` vừa dùng `satisfies` trên cùng một object config?"
+    ]
+  },
+  {
+    "id": "ts-048",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Vì sao truyền một biến chuỗi vào tham số kiểu union lại lỗi, thêm as const thì hết?",
+    "interviewerIntent": "Kiểm tra sự hiểu biết về cơ chế Type Widening của biến khi được khai báo trong JavaScript/TypeScript.",
+    "contextOrScenario": "Gọi hàm `setDirection(dir)` với `dir = 'north'`, TS báo lỗi `Argument of type 'string' is not assignable to parameter of type 'north' | 'south'`.",
+    "expectedKeywords": [
+      "type widening",
+      "string vs string literal",
+      "mutable let variable",
+      "as const",
+      "const assertion"
+    ],
+    "seniorAnswer": {
+      "summary": "Khi khai báo một biến chuỗi (đặc biệt là bằng `let` hoặc bên trong object literal), TypeScript tự động thực hiện Type Widening suy luận kiểu của biến thành kiểu tổng quát `string` vì giá trị của nó có thể thay đổi sau này. Do đó, khi truyền biến kiểu `string` vào một hàm chỉ chấp nhận một tập con các chuỗi cụ thể (Literal Union), compiler sẽ báo lỗi không tương thích. Thêm `as const` sẽ khóa chặt kiểu thành Literal Type.",
+      "deepDive": "Một chuỗi `string` tổng quát có thể là bất kỳ giá trị nào (ví dụ `'invalid_value'`), nên nó không thể gán được cho kiểu hẹp hơn như `'north' | 'south'` mà không qua narrowing. `as const` báo hiệu rằng giá trị này là bất biến tuyệt đối, giúp compiler suy luận kiểu hẹp nhất có thể.",
+      "codeExample": "type Direction = 'north' | 'south' | 'east' | 'west';\nfunction move(dir: Direction) {}\n\n// LỖI: Biến trong object bị widened thành string:\nconst config = { dir: 'north' }; // Kiểu: { dir: string }\n// move(config.dir); // Error: Argument of type 'string' is not assignable to 'Direction'\n\n// GIẢI PHÁP: Thêm as const để khóa kiểu literal\nconst safeConfig = { dir: 'north' } as const; // Kiểu: { readonly dir: 'north' }\nmove(safeConfig.dir); // ✅ Hợp lệ 100%"
+    },
+    "pitfalls": [
+      "Khai báo `let dir = 'north'` rồi thắc mắc tại sao truyền vào hàm báo lỗi dù giá trị tại thời điểm đó đúng là `'north'`.",
+      "Sửa bằng cách ép kiểu `as any` thay vì `as const` hoặc type annotation đúng."
+    ],
+    "followUpQuestions": [
+      "Tại sao `const dir = 'north'` (khai báo biến đơn lẻ) lại không bị lỗi này trong khi object property lại bị?",
+      "Khái niệm Freshness trong Type Widening hoạt động như thế nào?"
+    ]
+  },
+  {
+    "id": "ts-049",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Viết hàm pick(obj, keys) type-safe: vì sao cần K extends keyof T?",
+    "interviewerIntent": "Đánh giá năng lực thiết kế Generic Function kết hợp ràng buộc chỉ mục (Index Type Constraints) để đảm bảo an toàn tuyệt đối khi truy cập thuộc tính.",
+    "contextOrScenario": "Tự viết utility function `pick` tương tự thư viện Lodash nhưng có type-safety hoàn hảo tại compile-time.",
+    "expectedKeywords": [
+      "K extends keyof T",
+      "generic constraints",
+      "indexed access type (T[K])",
+      "Pick<T, K>",
+      "lookup safety"
+    ],
+    "seniorAnswer": {
+      "summary": "Cần `K extends keyof T` để thiết lập một ràng buộc chặt chẽ: danh sách keys `K` truyền vào BẮT BUỘC phải là các thuộc tính thực sự tồn tại trong object `T`. Nếu người dùng truyền một key sai chính tả hoặc không tồn tại trong `T`, TypeScript sẽ phát hiện và báo lỗi ngay lập tức.",
+      "deepDive": "Nếu chỉ viết `keys: string[]`, kiểu trả về sẽ không thể biết chính xác object kết quả gồm những thuộc tính nào và kiểu dữ liệu là gì (buộc phải fallback về `any` hoặc `Record<string, any>`). Khi dùng `K extends keyof T`, kiểu trả về được tính toán chính xác tuyệt đối là `Pick<T, K>`, bảo toàn toàn bộ hệ thống kiểu downstream.",
+      "codeExample": "// Implementation hàm pick type-safe:\nfunction pick<T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {\n  const result = {} as Pick<T, K>;\n  for (const key of keys) {\n    result[key] = obj[key];\n  }\n  return result;\n}\n\nconst user = { id: 'u1', name: 'Nam', age: 30, email: 'nam@example.com' };\n\n// Autocomplete và type check chuẩn xác:\nconst summary = pick(user, ['name', 'email']);\n// summary có kiểu: Pick<{ id: string; name: string; age: number; email: string; }, 'name' | 'email'>\n\n// pick(user, ['name', 'invalidKey']); // Error: Type '\"invalidKey\"' is not assignable to type 'keyof ...'"
+    },
+    "pitfalls": [
+      "Khai báo `keys: (keyof T)[]` thay vì generic parameter `K extends keyof T` (làm mất khả năng pick đúng tập con keys cụ thể, biến kiểu trả về thành `Partial<T>` hoặc `Pick<T, keyof T>`).",
+      "Quên type assertion `as Pick<T, K>` khi khởi tạo object rỗng ban đầu bên trong hàm."
+    ],
+    "followUpQuestions": [
+      "Tại sao `pick(user, ['name'])` với `keys: (keyof T)[]` lại trả về kiểu rộng hơn so với dùng `K extends keyof T`?",
+      "Làm cách nào để viết hàm `omit(obj, keys)` type-safe tương tự?"
+    ]
+  },
+  {
+    "id": "ts-050",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Khi nào TypeScript suy luận generic thành string thay vì literal? Ép nó suy luận hẹp bằng cách nào?",
+    "interviewerIntent": "Đánh giá sự hiểu biết về thuật toán suy luận Type Argument và cách sử dụng `const type parameters` (TypeScript 5.0+) để ép suy luận hẹp.",
+    "contextOrScenario": "Viết hàm helper `createRoute(path)` và mong muốn generic type trả về giữ nguyên chính xác path literal thay vì bị nới rộng thành `string`.",
+    "expectedKeywords": [
+      "generic widening",
+      "const type parameters",
+      "TypeScript 5.0",
+      "as const constraint",
+      "narrow inference"
+    ],
+    "seniorAnswer": {
+      "summary": "TypeScript mặc định suy luận Type Parameter `T` thành kiểu tổng quát (như `string`, `number`) khi giá trị truyền vào là một biểu thức có thể thay đổi hoặc không có ràng buộc rõ ràng. Để ép compiler suy luận hẹp thành Literal Type, ta có 2 cách: (1) Ràng buộc `<T extends string>` (thay vì `<T>`); (2) Dùng tính năng Const Type Parameter của TypeScript 5.0+ bằng cú pháp `<const T>`.",
+      "deepDive": "Từ TypeScript 5.0, từ khóa `const` có thể đặt trực tiếp trước tên type parameter: `function make<const T>(arg: T)`. Khi đó, mọi object hoặc array truyền vào hàm sẽ được đối xử như thể có gắn `as const`, tự động suy luận kiểu literal hẹp nhất và chuyển array thành readonly tuple mà không bắt caller phải viết `as const` thủ công.",
+      "codeExample": "// 1. Trước TS 5.0: Ràng buộc extends string giúp narrow string literal\nfunction routeOld<T extends string>(path: T): T { return path; }\nconst r1 = routeOld('/home'); // Type: '/home'\n\n// 2. TypeScript 5.0+: Const Type Parameter cho Object & Arrays phức tạp\nfunction defineRoutes<const T>(routes: T): T {\n  return routes;\n}\n\nconst config = defineRoutes({\n  endpoints: ['/users', '/posts']\n});\n// config.endpoints được suy luận là readonly ['/users', '/posts'] thay vì string[]!"
+    },
+    "pitfalls": [
+      "Viết generic hoàn toàn không có ràng buộc `<T>(val: T)` khiến compiler dễ dàng fallback về các kiểu nguyên thủy rộng.",
+      "Lạm dụng `<const T>` ở những nơi mà hàm có chủ đích mutate tham số đầu vào (vì `<const T>` tạo ra kiểu readonly)."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa `<const T>` trên function parameter và việc caller tự gắn `as const` lúc truyền đối số là gì?",
+      "Tại sao `<T extends string>` lại kích hoạt cơ chế literal inference trong khi `<T extends object>` thì không?"
+    ]
+  },
+  {
+    "id": "ts-051",
+    "category": "typescript",
+    "level": "middle",
+    "question": "Mapped type với key remapping (as) dùng làm gì? Ví dụ sinh type getter và đổi tên key.",
+    "interviewerIntent": "Đánh giá kỹ năng biến đổi key nâng cao (Key Remapping via `as`), tạo ra các cấu trúc types linh hoạt dựa trên Template Literal Types.",
+    "contextOrScenario": "Tạo tự động type cho Store/Event Emitter sinh các hàm getter như `getName()`, `getAge()` từ một interface Data sẵn có.",
+    "expectedKeywords": [
+      "mapped types",
+      "key remapping",
+      "as clause",
+      "template literal types",
+      "Capitalize<string>",
+      "type transformation"
+    ],
+    "seniorAnswer": {
+      "summary": "Key Remapping trong Mapped Types (cú pháp `[K in keyof T as NewKey]`) cho phép biến đổi, đổi tên hoặc lọc bỏ các keys của một object type trong quá trình lặp. Khi kết hợp với Template Literal Types và intrinsic string utility types (như `Capitalize`), ta có thể tự động sinh ra các methods như Getters/Setters tương ứng với từng thuộc tính.",
+      "deepDive": "Nếu `NewKey` trả về `never`, thuộc tính đó sẽ bị loại bỏ hoàn toàn khỏi object type (đây là cách implement `Omit` nâng cao). Cú pháp này giải quyết được hạn chế lớn của mapped type trước TS 4.1 khi tên key trong output luôn bị khóa cứng theo đúng tên key của input.",
+      "codeExample": "interface Person {\n  name: string;\n  age: number;\n  location: string;\n}\n\n// Tự động sinh kiểu Getters cho mọi thuộc tính của T:\ntype Getters<T> = {\n  [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K];\n};\n\ntype PersonGetters = Getters<Person>;\n// Kết quả PersonGetters sẽ có kiểu:\n// {\n//   getName: () => string;\n//   getAge: () => number;\n//   getLocation: () => string;\n// }\n\nconst personService: PersonGetters = {\n  getName: () => 'Nam',\n  getAge: () => 30,\n  getLocation: () => 'Hanoi'\n};"
+    },
+    "pitfalls": [
+      "Quên ràng buộc `string & K` khi truyền `K` vào `Capitalize` (vì `keyof T` có thể chứa cả `number` và `symbol`, những kiểu không dùng được với `Capitalize`).",
+      "Tạo key remapping quá phức tạp làm chậm quá trình type-checking của IDE."
+    ],
+    "followUpQuestions": [
+      "Làm sao sử dụng `as never` trong key remapping để lọc bỏ toàn bộ các property có kiểu là function?",
+      "Sự khác biệt giữa việc lọc key bằng `as never` và dùng `Pick`/`Exclude` là gì?"
+    ]
+  },
+  {
+    "id": "ts-052",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Module augmentation là gì?",
+    "interviewerIntent": "Đánh giá khả năng mở rộng type definitions của third-party packages hoặc thư viện ngoài mà không cần sửa file trong node_modules.",
+    "contextOrScenario": "Mở rộng type của Express Request để gắn thêm session payload từ middleware xác thực JWT, hoặc thêm custom properties vào Vue/React theme context.",
+    "expectedKeywords": [
+      "module augmentation",
+      "declare module",
+      "declaration merging",
+      "ambient context",
+      "express request augmentation"
+    ],
+    "seniorAnswer": {
+      "summary": "Module Augmentation là kỹ thuật cho phép mở rộng hoặc bổ sung các type definitions (interface, class) của một module đã có sẵn từ thư viện bên ngoài mà không cần can thiệp trực tiếp vào mã nguồn gốc của module đó. Nó hoạt động dựa trên cơ chế Declaration Merging trong không gian `declare module 'package-name'`.",
+      "deepDive": "Để augment một module, file khai báo bắt buộc phải là một module (chứa ít nhất một câu lệnh `import` hoặc `export`). Bên trong `declare module '...'`, bạn khai báo lại interface với cùng tên để TypeScript tự động merge các thuộc tính mới vào interface gốc. Nếu file không có import/export nào, TypeScript sẽ hiểu nhầm đó là ambient module definition và ghi đè hoàn toàn toàn bộ module thay vì augment.",
+      "codeExample": "// File: types/express-custom.d.ts\nimport 'express'; // Bắt buộc: Đảm bảo file được coi là module\n\ninterface AuthenticatedUser {\n  id: string;\n  role: 'admin' | 'user';\n}\n\ndeclare module 'express-serve-static-core' {\n  interface Request {\n    currentUser?: AuthenticatedUser; // Mở rộng thêm trường currentUser\n  }\n}\n\n// Trong controller file:\n// req.currentUser.role -> IDE tự nhận diện và autocomplete!"
+    },
+    "pitfalls": [
+      "Quên câu lệnh `import` ở đầu file khai báo khiến TypeScript ghi đè (shadow) toàn bộ module thay vì merge thêm thuộc tính.",
+      "Augment sai module name (ví dụ augment `express` thay vì internal submodule `express-serve-static-core` nơi interface `Request` thực sự được định nghĩa)."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa Module Augmentation (`declare module 'pkg'`) và Global Augmentation (`declare global`) là gì?",
+      "Làm cách nào để augment các methods mới vào prototype của các class chuẩn có sẵn như `Array` hay `String`?"
+    ]
+  },
+  {
+    "id": "ts-053",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Branded types (nominal types) trong TypeScript là gì?",
+    "interviewerIntent": "Kiểm tra kỹ năng mô phỏng Nominal Typing trong một hệ thống Structural Typing để ngăn chặn lỗi logic nghiệp vụ do nhầm lẫn các primitive types cùng kiểu.",
+    "contextOrScenario": "Hệ thống thanh toán có `UserId`, `OrderId`, và `AmountInCents`. Cả 3 đều là `string` hoặc `number` ở runtime, nhưng truyền nhầm `userId` vào chỗ nhận `orderId` sẽ gây hậu quả tai hại.",
+    "expectedKeywords": [
+      "branded types",
+      "nominal typing",
+      "flavoring",
+      "unique symbol",
+      "zero runtime cost",
+      "type branding"
+    ],
+    "seniorAnswer": {
+      "summary": "Branded Types (Nominal Types) là kỹ thuật gắn một nhãn kiểu danh nghĩa duy nhất (brand tag) vào một primitive type (như string hoặc number) thông qua Intersection Type với một unique symbol hoặc phantom object type. Kỹ thuật này biến kiểu nguyên thủy thành một kiểu duy nhất mà không thể gán lẫn lộn, mang lại sự an toàn của Nominal Typing với chi phí runtime bằng 0.",
+      "deepDive": "TypeScript có hệ thống kiểu Structural (Duck typing): hai kiểu có cùng cấu trúc thì có thể thay thế cho nhau. Vì thế `type UserId = string` và `type OrderId = string` thực chất là một, dễ dẫn đến bug tráo nhầm tham số. Bằng cách dùng brand: `type Brand<K, T> = K & { readonly __brand: T }`, ta buộc lập trình viên phải thông qua constructor function hoặc assertion guard để tạo instance, loại bỏ 100% rủi ro tráo nhầm ID.",
+      "codeExample": "// Định nghĩa Brand helper:\ndeclare const brand: unique symbol;\ntype Brand<T, TBrand extends string> = T & { readonly [brand]: TBrand };\n\nexport type UserId = Brand<string, 'UserId'>;\nexport type OrderId = Brand<string, 'OrderId'>;\n\n// Constructor functions với validation:\nfunction makeUserId(id: string): UserId { return id as UserId; }\nfunction makeOrderId(id: string): OrderId { return id as OrderId; }\n\nfunction cancelOrder(orderId: OrderId, userId: UserId) {}\n\nconst uId = makeUserId('usr_123');\nconst oId = makeOrderId('ord_456');\n\ncancelOrder(oId, uId); // ✅ Hợp lệ\n// cancelOrder(uId, oId); // Error: Type 'UserId' is not assignable to type 'OrderId'!"
+    },
+    "pitfalls": [
+      "Đặt brand property bằng string thông thường (`__brand: string`) thay vì `unique symbol`, dễ bị trùng lặp key giữa các package.",
+      "Lạm dụng branded type tràn lan cho mọi trường dữ liệu tầm thường khiến boilerplate code tăng cao."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa 'Hard Branding' (dùng unique symbol không tương thích) và 'Flavoring' (dùng optional property brand) là gì?",
+      "Làm thế nào để tích hợp Branded Types cùng với Zod validation schemas (`z.string().brand<'UserId'>()`)?"
+    ]
+  },
+  {
+    "id": "ts-054",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Mapped types trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá sự am hiểu nền tảng về cơ chế lặp (iteration) qua các keys để tạo ra các biến thể kiểu dữ liệu mới theo nguyên tắc DRY.",
+    "contextOrScenario": "Tự xây dựng thư viện Form Validation hoặc ORM Entity cần biến tất cả các fields của model thành các rule validator tương ứng.",
+    "expectedKeywords": [
+      "mapped types",
+      "keyof operator",
+      "in operator",
+      "index type query",
+      "homomorphic mapping",
+      "modifiers (+/-)"
+    ],
+    "seniorAnswer": {
+      "summary": "Mapped Type là cú pháp cho phép tạo ra một object type mới bằng cách lặp (iterate) qua tập hợp các keys của một type khác (tương tự như `Array.prototype.map` nhưng ở cấp độ type-system). Cú pháp chuẩn: `type Mapped<T> = { [P in keyof T]: NewType };`.",
+      "deepDive": "Mapped types là nền tảng của hầu hết các utility types chuẩn của TypeScript (`Partial`, `Required`, `Readonly`, `Record`). Chúng hỗ trợ thêm hoặc bớt các modifiers (`+readonly`, `-readonly`, `+?`, `-?`). Khi áp dụng trực tiếp trên `keyof T`, nó được gọi là Homomorphic Mapped Type, tự động sao chép các modifiers nguyên thủy của từng property gốc sang type mới trừ khi bị ghi đè tường minh.",
+      "codeExample": "interface UserSchema {\n  id: string;\n  name: string;\n  age: number;\n}\n\n// Biến mọi property thành Validator Function trả về boolean:\ntype FormValidator<T> = {\n  [K in keyof T]: (value: T[K]) => boolean;\n};\n\nconst userValidator: FormValidator<UserSchema> = {\n  id: (val) => val.length > 0,\n  name: (val) => val.trim().length >= 2,\n  age: (val) => val >= 18\n};"
+    },
+    "pitfalls": [
+      "Dùng Mapped Type bên trong cú pháp `interface` (Mapped types chỉ có thể được khai báo bằng `type`).",
+      "Quên rằng Mapped Type mặc định là shallow (nông), nếu gặp nested object thì thuộc tính con bên trong không được biến đổi."
+    ],
+    "followUpQuestions": [
+      "Cơ chế Homomorphic Mapped Types bảo toàn property modifiers của type gốc như thế nào?",
+      "Làm sao kết hợp Mapped Type với Key Remapping (`as`) để vừa filter vừa rename các properties?"
+    ]
+  },
+  {
+    "id": "ts-055",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Conditional types trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá tư duy lập trình hàm bậc cao ở cấp độ type (type-level programming) thông qua toán tử điều kiện `T extends U ? X : Y`.",
+    "contextOrScenario": "Tạo API client tự động suy luận kiểu trả về: nếu truyền `{ stream: true }` thì trả về `ReadableStream`, ngược lại trả về `Promise<JSONData>`.",
+    "expectedKeywords": [
+      "conditional types",
+      "T extends U ? X : Y",
+      "ternary operator at type level",
+      "distributive behavior",
+      "non-distributive syntax"
+    ],
+    "seniorAnswer": {
+      "summary": "Conditional Type biểu diễn mối quan hệ điều kiện ở tầng type system với cú pháp toán tử 3 ngôi: `T extends U ? X : Y`. Nếu kiểu `T` có thể gán được (assignable) cho kiểu `U`, kết quả là kiểu `X`; ngược lại kết quả là kiểu `Y`.",
+      "deepDive": "Conditional types mang lại khả năng rẽ nhánh động cực kỳ mạnh mẽ. Khi kết hợp với generics, compiler có thể tự động suy luận ra kiểu trả về chính xác dựa trên cờ cấu hình đầu vào. Chúng cũng là điều kiện tiên quyết để sử dụng từ khóa `infer` nhằm bóc tách cấu trúc kiểu lồng nhau.",
+      "codeExample": "interface SyncOptions { stream: false; }\ninterface StreamOptions { stream: true; }\n\n// Conditional Type quyết định return type dựa trên option:\ntype FetchResult<T extends { stream: boolean }> = \n  T['stream'] extends true ? ReadableStream<Uint8Array> : Promise<string>;\n\nfunction request<T extends { stream: boolean }>(opts: T): FetchResult<T> {\n  // Implementation code...\n  return null as any;\n}\n\nconst syncRes = request({ stream: false }); // Type: Promise<string>\nconst streamRes = request({ stream: true }); // Type: ReadableStream<Uint8Array>"
+    },
+    "pitfalls": [
+      "Không nhận thức được tính chất phân phối (distributive behavior) khi `T` là một 'naked type parameter', dẫn đến kết quả union ngoài ý muốn.",
+      "Tạo cây điều kiện lồng nhau quá sâu khiến compiler báo lỗi độ sâu instantiation."
+    ],
+    "followUpQuestions": [
+      "Naked type parameter là gì và tại sao nó kích hoạt tính chất phân phối?",
+      "Làm thế nào để 'bọc' type lại (`[T] extends [U]`) để ngăn chặn distributive behavior?"
+    ]
+  },
+  {
+    "id": "ts-056",
+    "category": "typescript",
+    "level": "senior",
+    "question": "infer keyword trong conditional types là gì?",
+    "interviewerIntent": "Kiểm tra kỹ năng pattern matching và trích xuất kiểu tự động (type variable introduction) trong conditional types.",
+    "contextOrScenario": "Xây dựng utility type trích xuất kiểu phần tử của mảng, kiểu payload của Promise, hoặc kiểu tham số của Redux Action.",
+    "expectedKeywords": [
+      "infer keyword",
+      "pattern matching",
+      "type variable declaration",
+      "type extraction",
+      "ReturnType implementation"
+    ],
+    "seniorAnswer": {
+      "summary": "`infer` là từ khóa dùng trong mệnh đề `extends` của một Conditional Type để khai báo một biến kiểu tạm thời (type variable) mà TypeScript compiler sẽ tự động suy luận và bắt lấy (pattern match) từ cấu trúc của kiểu đang được kiểm tra.",
+      "deepDive": "`infer` biến TypeScript thành một hệ thống pattern matching hoàn chỉnh. Ví dụ trong `T extends Array<infer Item>`, compiler sẽ đối chiếu: nếu `T` là `string[]`, `Item` tự động được gán bằng `string`. Ta có thể dùng `infer` nhiều lần trong cùng một biểu thức hoặc kết hợp để bóc tách nhiều tầng lồng nhau.",
+      "codeExample": "// 1. Bóc kiểu phần tử của Array:\ntype ElementOf<T> = T extends (infer E)[] ? E : T;\ntype Num = ElementOf<number[]>; // number\n\n// 2. Tự cài đặt ReturnType của hàm:\ntype MyReturnType<T> = T extends (...args: any[]) => infer R ? R : never;\n\nfunction calculateTax(income: number) { return { tax: income * 0.1, currency: 'VND' }; }\ntype TaxResult = MyReturnType<typeof calculateTax>; // { tax: number; currency: string; }"
+    },
+    "pitfalls": [
+      "Dùng `infer` ngoài mệnh đề `extends` của Conditional Type (gây lỗi cú pháp).",
+      "Lạm dụng `infer` cho các cấu trúc không khớp khiến kết quả luôn rơi vào nhánh fallback `never`."
+    ],
+    "followUpQuestions": [
+      "Khi đặt `infer` ở vị trí tham số hàm (contravariant position), TypeScript sẽ gộp các candidate thành Union hay Intersection?",
+      "Làm sao kết hợp `infer` với Template Literal Types để parse URL query params?"
+    ]
+  },
+  {
+    "id": "ts-057",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Template literal types trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá khả năng thao tác chuỗi ở cấp độ type-system (chuẩn TypeScript 4.1+) để xây dựng route types, event handlers an toàn.",
+    "contextOrScenario": "Thiết kế hệ thống Event Emitter an toàn với tên sự kiện dạng `user:created`, `user:deleted`, hoặc sinh types cho Tailwind CSS classes.",
+    "expectedKeywords": [
+      "template literal types",
+      "string manipulation at type level",
+      "concatenation",
+      "intrinsic string types",
+      "combinatorial explosion"
+    ],
+    "seniorAnswer": {
+      "summary": "Template Literal Types (từ TS 4.1) cho phép sử dụng cú pháp template string (dấu backticks `` `${Type}` ``) để nối chuỗi, biến đổi và tạo ra các String Literal Types mới dựa trên các types có sẵn. Khi kết hợp với Union Types, chúng tự động phân phối để sinh ra tích Descartes (Cartesian product) của các chuỗi.",
+      "deepDive": "TypeScript cung cấp sẵn 4 Intrinsic String Manipulation Types đi kèm: `Uppercase<S>`, `Lowercase<S>`, `Capitalize<S>`, và `Uncapitalize<S>`. Đây là công cụ cực mạnh cho các router (như Next.js route params), CSS design tokens, và typed database column queries.",
+      "codeExample": "type Entity = 'user' | 'order';\ntype Action = 'create' | 'update' | 'delete';\n\n// Tích Descartes: Tự động sinh ra 6 event types chuẩn xác\ntype EventName = `${Entity}:${Action}`;\n// 'user:create' | 'user:update' | 'user:delete' | 'order:create' | 'order:update' | 'order:delete'\n\n// Xây dựng Strongly-typed Event Listener:\nfunction on(event: EventName, callback: () => void) {}\non('user:create', () => {}); // OK\n// on('user:archive', () => {}); // Error: Argument not assignable"
+    },
+    "pitfalls": [
+      "Tổ hợp quá nhiều Union lớn lại với nhau gây bùng nổ tổ hợp (Combinatorial Explosion), khiến compiler cạn kiệt bộ nhớ và treo máy.",
+      "Cố gắng parse regex phức tạp bằng template literal types vượt quá giới hạn đệ quy của compiler."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để phân tách một đường dẫn URL dạng `/users/:id/:tab` thành một object params `{ id: string; tab: string }` bằng Template Literal Types và recursive `infer`?",
+      "Giới hạn số lượng union members tối đa mà compiler cho phép khi sinh template literal types là bao nhiêu?"
+    ]
+  },
+  {
+    "id": "ts-058",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Recursive conditional types là gì?",
+    "interviewerIntent": "Đánh giá năng lực giải quyết các bài toán biến đổi cấu trúc dữ liệu đa tầng bằng thuật toán đệ quy ở tầng kiểu dữ liệu.",
+    "contextOrScenario": "Viết utility type làm phẳng mảng nhiều chiều (`Flat<[1, [2, [3]]]>`) hoặc parse path sâu dạng `a.b.c.d` của một nested config object.",
+    "expectedKeywords": [
+      "recursive conditional types",
+      "tail-call recursion",
+      "depth limit",
+      "type-level iteration",
+      "infinite loop protection"
+    ],
+    "seniorAnswer": {
+      "summary": "Recursive Conditional Type là một Conditional Type mà trong các nhánh kết quả (`X` hoặc `Y`) nó tự gọi lại chính nó với các type arguments đã được biến đổi, tạo ra một vòng lặp xử lý cho đến khi chạm tới điều kiện dừng (base case).",
+      "deepDive": "Từ TypeScript 4.5, compiler đã bổ sung cơ chế tối ưu đệ quy đuôi (Tail-Recursion Elimination) cho conditional types, cho phép số bước lặp đệ quy tăng từ ~50 lên tới 1000 bước nếu mệnh đề gọi đệ quy nằm trực tiếp ở đuôi và tích lũy qua accumulator tuple.",
+      "codeExample": "// Đệ quy làm phẳng mảng đa chiều thành kiểu phần tử cơ sở:\ntype DeepFlatten<T> = T extends Array<infer Element>\n  ? DeepFlatten<Element>\n  : T;\n\ntype NestedArr = number[][][];\ntype Flat = DeepFlatten<NestedArr>; // number\n\ntype Mixed = (string | (number | boolean[])[])[];\ntype Clean = DeepFlatten<Mixed>; // string | number | boolean"
+    },
+    "pitfalls": [
+      "Thiếu base case (điều kiện dừng) dẫn đến lỗi kinh điển: `Type instantiation is excessively deep and possibly infinite`.",
+      "Không tối ưu đệ quy đuôi khiến các type parser phức tạp vượt quá giới hạn recursion limit mặc định của compiler."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để áp dụng kỹ thuật Accumulator Pattern để chuyển một recursive conditional type thành tail-recursive?",
+      "Tại sao TypeScript lại giới hạn độ sâu đệ quy mà không cho phép chạy vô hạn?"
+    ]
+  },
+  {
+    "id": "ts-059",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Deep partial và deep readonly type tạo như thế nào?",
+    "interviewerIntent": "Kiểm tra kỹ năng xây dựng utility types đệ quy nâng cao và xử lý an toàn các kiểu dữ liệu đặc biệt (function, primitives, Date, RegExp, Map/Set).",
+    "contextOrScenario": "Tạo hàm `mergeConfig(defaultConfig, partialConfig)` cho phép truyền vào cấu hình con ở bất kỳ tầng lồng nhau nào.",
+    "expectedKeywords": [
+      "DeepPartial",
+      "DeepReadonly",
+      "recursive mapped types",
+      "primitive boundaries",
+      "function exclusion"
+    ],
+    "seniorAnswer": {
+      "summary": "`DeepPartial<T>` và `DeepReadonly<T>` được tạo bằng cách kết hợp Mapped Types với Recursive Conditional Types: lặp qua từng property của `T`, nếu property là primitive/function/Date thì giữ nguyên (hoặc thêm modifier), nếu là object hoặc array thì gọi đệ quy chính utility type đó lên property con.",
+      "deepDive": "Cạm bẫy lớn nhất khi viết `DeepPartial` là đệ quy nhầm vào `Function`, `Date`, hoặc `RegExp`. Nếu coi `Function` là một object thông thường và lặp `[K in keyof Function]?: ...`, nó sẽ biến tất cả method của function thành optional và phá hủy chữ ký hàm. Do đó, phải luôn có guard clauses loại trừ các kiểu đặc biệt trước.",
+      "codeExample": "type Builtin = Function | Date | Error | RegExp;\n\nexport type DeepPartial<T> = T extends Builtin\n  ? T\n  : T extends Array<infer U>\n  ? DeepPartial<U>[]\n  : T extends ReadonlyArray<infer U>\n  ? readonly DeepPartial<U>[]\n  : T extends object\n  ? { [K in keyof T]?: DeepPartial<T[K]> }\n  : T;\n\ninterface SystemSettings {\n  server: { host: string; port: number; ssl: { cert: string } };\n  timestamp: Date;\n}\n\n// Cập nhật cấu hình lồng sâu tùy ý:\nconst patch: DeepPartial<SystemSettings> = {\n  server: {\n    ssl: {}\n  }\n};"
+    },
+    "pitfalls": [
+      "Quên loại trừ `Function` và `Date` khiến chúng bị biến dạng thành rác sau khi qua `DeepPartial`.",
+      "Không hỗ trợ xử lý mảng (`Array<infer U>`) khiến các phần tử mảng con không được áp dụng tính chất recursive."
+    ],
+    "followUpQuestions": [
+      "Tại sao cần xử lý riêng `ReadonlyArray` và `Array` trong định nghĩa `DeepPartial`?",
+      "Làm cách nào để viết `DeepReadonly<T>` ngăn chặn việc gọi các mutating methods trên mảng lồng sâu?"
+    ]
+  },
+  {
+    "id": "ts-060",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Decorators trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá kiến thức về Decorators: so sánh giữa chuẩn TC39 Stage 3 (TS 5.0+) và Legacy Experimental Decorators (NestJS / Angular).",
+    "contextOrScenario": "Dự án sử dụng NestJS hoặc TypeORM đang dùng decorators cho Dependency Injection và Validation, cân nhắc nâng cấp lên TypeScript 5.x.",
+    "expectedKeywords": [
+      "decorators",
+      "TC39 Stage 3",
+      "experimentalDecorators",
+      "meta-programming",
+      "cross-cutting concerns"
+    ],
+    "seniorAnswer": {
+      "summary": "Decorator là một dạng meta-programming cho phép gắn thêm hành vi, theo dõi hoặc chỉnh sửa class, methods, properties, hoặc getters/setters một cách khai báo (declarative). Hiện có 2 thế giới: (1) Legacy Decorators (kích hoạt bằng `\"experimentalDecorators\": true`, dùng trong NestJS/Angular); (2) Stage 3 Decorators (chuẩn ECMAScript chính thức từ TS 5.0+, không cần cờ experimental).",
+      "deepDive": "Stage 3 Decorator nhận 2 tham số: `target` (hàm/class) và `context` object chứa metadata (loại decorator, tên member, method access). Khác với legacy decorators, Stage 3 Decorators không thể thay đổi type signature của đối tượng được decorate tại compile-time nhưng lại có cấu trúc rõ ràng, chuẩn hóa và không phụ thuộc vào hacking AST của TypeScript cũ.",
+      "codeExample": "// Stage 3 Decorator ghi log thời gian thực thi (TypeScript 5.0+):\nfunction loggedMethod<This, Args extends any[], Return>(\n  target: (this: This, ...args: Args) => Return,\n  context: ClassMethodDecoratorContext<This, (this: This, ...args: Args) => Return>\n) {\n  const methodName = String(context.name);\n  return function (this: This, ...args: Args): Return {\n    console.log(`[START] Calling ${methodName}`);\n    const start = performance.now();\n    const result = target.call(this, ...args);\n    console.log(`[END] ${methodName} executed in ${(performance.now() - start).toFixed(2)}ms`);\n    return result;\n  };\n}"
+    },
+    "pitfalls": [
+      "Trộn lẫn cú pháp và type của legacy decorators với Stage 3 decorators gây lỗi biên dịch nghiêm trọng.",
+      "Nâng cấp lên TypeScript 5.0 nhưng vẫn kỳ vọng NestJS/TypeORM chạy được mà không giữ `experimentalDecorators: true`."
+    ],
+    "followUpQuestions": [
+      "Tại sao NestJS hiện tại vẫn phụ thuộc vào legacy `experimentalDecorators` và `emitDecoratorMetadata`?",
+      "Context object trong TC39 Stage 3 Decorators cung cấp những helper methods nào (ví dụ `addInitializer`)?"
+    ]
+  },
+  {
+    "id": "ts-061",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Decorator metadata và reflect-metadata là gì?",
+    "interviewerIntent": "Đánh giá mức độ am hiểu về cơ chế Reflection tại runtime trong TypeScript và cờ `emitDecoratorMetadata`.",
+    "contextOrScenario": "Xây dựng Inversion of Control (IoC) Container hoặc TypeORM Entity Mapper cần đọc type của constructor params tại runtime.",
+    "expectedKeywords": [
+      "reflect-metadata",
+      "emitDecoratorMetadata",
+      "runtime reflection",
+      "design:type",
+      "design:paramtypes",
+      "IoC container"
+    ],
+    "seniorAnswer": {
+      "summary": "`reflect-metadata` là thư viện polyfill cho Reflection API trong JavaScript. Khi kết hợp với cờ `\"emitDecoratorMetadata\": true` trong `tsconfig.json`, TypeScript compiler sẽ tự động nhúng các thông tin về kiểu dữ liệu compile-time (`design:type`, `design:paramtypes`, `design:returntype`) thành metadata tồn tại tại runtime, cho phép các framework như NestJS hay TypeORM thực hiện Dependency Injection.",
+      "deepDive": "Bình thường types sẽ bị xóa sạch (type erasure). Tuy nhiên với `emitDecoratorMetadata`, compiler sẽ 'cứu' lại thông tin kiểu của các class được gắn decorator và lưu vào bộ nhớ thông qua `Reflect.defineMetadata`. Nhờ vậy tại runtime, IoC container có thể kiểm tra xem class `AppService` cần inject instance của class nào thông qua constructor params.",
+      "codeExample": "import 'reflect-metadata';\n\nfunction Injectable(): ClassDecorator {\n  return (target) => {};\n}\n\n@Injectable()\nclass LoggerService {}\n\n@Injectable()\nclass UserService {\n  constructor(public logger: LoggerService) {}\n}\n\n// Đọc type tại runtime:\nconst paramTypes = Reflect.getMetadata('design:paramtypes', UserService);\nconsole.log(paramTypes[0] === LoggerService); // true! Runtime biết rõ class cần inject"
+    },
+    "pitfalls": [
+      "Quên `import 'reflect-metadata'` ở entry point ứng dụng khiến toàn bộ hệ thống IoC/DI nổ lỗi undefined metadata.",
+      "Chỉ các class/properties có gắn decorator thì TypeScript mới emit metadata, property không có decorator sẽ bị bỏ qua."
+    ],
+    "followUpQuestions": [
+      "Tại sao interfaces lại không thể được trích xuất bằng `design:paramtypes` (mà chỉ có class)?",
+      "Tại sao TC39 Decorator metadata proposal mới không phụ thuộc vào `emitDecoratorMetadata` cũ của TypeScript?"
+    ]
+  },
+  {
+    "id": "ts-062",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Function overloads trong TypeScript là gì?",
+    "interviewerIntent": "Kiểm tra kỹ năng định nghĩa nhiều chữ ký hàm (Overload Signatures) cho một hàm duy nhất và quy tắc của Implementation Signature.",
+    "contextOrScenario": "Viết hàm `formatDate(date: Date): string` và `formatDate(timestamp: number, timezone: string): string`.",
+    "expectedKeywords": [
+      "function overloads",
+      "overload signatures",
+      "implementation signature",
+      "call-site typing",
+      "ambiguous returns"
+    ],
+    "seniorAnswer": {
+      "summary": "Function Overloads cho phép định nghĩa nhiều chữ ký hàm khác nhau (Overload Signatures) cho cùng một hàm, quy định rõ mối quan hệ chặt chẽ giữa các kiểu tham số đầu vào và kiểu trả về tương ứng. Phía dưới cùng là một Implementation Signature duy nhất chứa mã thực thi nhưng KHÔNG được gọi trực tiếp từ bên ngoài.",
+      "deepDive": "Compiler sẽ đối chiếu lời gọi hàm từ trên xuống dưới theo thứ tự khai báo overload, chọn signature đầu tiên khớp. Implementation signature phải có kiểu đủ rộng để tương thích với tất cả các overloads bên trên. Trong nhiều trường hợp hiện đại, Conditional Types kết hợp Generics có thể thay thế Overloads gọn gàng hơn mà không cần viết lặp signature nhiều lần.",
+      "codeExample": "// 1. Overload signatures (Client nhìn thấy):\nfunction makeList(item: string): string[];\nfunction makeList(item: number, count: number): number[];\n\n// 2. Implementation signature (Chứa code thực thi):\nfunction makeList(item: string | number, count: number = 1): (string | number)[] {\n  if (typeof item === 'string') return [item];\n  return Array.from({ length: count }, () => item);\n}\n\nconst sList = makeList('hello'); // Type: string[]\nconst nList = makeList(42, 3);    // Type: number[]\n// makeList('hello', 3);          // Error: No overload matches this call"
+    },
+    "pitfalls": [
+      "Thứ tự overload: Đặt signature có kiểu tổng quát (như `string`) lên trước kiểu hẹp hơn (literal `'admin'`), khiến signature hẹp không bao giờ được chạm tới.",
+      "Tưởng rằng Implementation Signature có thể được gọi độc lập từ bên ngoài."
+    ],
+    "followUpQuestions": [
+      "Khi nào nên dùng Generics + Conditional Types thay vì Function Overloads?",
+      "Làm thế nào để overload method bên trong một Interface hoặc Type Alias?"
+    ]
+  },
+  {
+    "id": "ts-063",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Conditional types với distributive behavior là gì? Cách disable?",
+    "interviewerIntent": "Đánh giá sự thấu hiểu tường tận về hành vi phân phối qua Union của Conditional Types và kỹ thuật chặn phân phối bằng square brackets.",
+    "contextOrScenario": "Viết type kiểm tra xem `T` có phải chính xác là `any[]` hay không, nhưng khi truyền `string | number` vào thì kết quả bị bung ra thành union ngoài ý muốn.",
+    "expectedKeywords": [
+      "distributive conditional types",
+      "naked type parameter",
+      "square brackets syntax ([T])",
+      "union distribution",
+      "non-distributive"
+    ],
+    "seniorAnswer": {
+      "summary": "Khi một Conditional Type nhận một generic parameter trần (naked type parameter `T extends U ? X : Y`), và `T` được truyền vào là một Union (`A | B`), TypeScript sẽ tự động phân phối (distribute) điều kiện lên từng thành viên của union: `(A extends U ? X : Y) | (B extends U ? X : Y)`. Để tắt hành vi phân phối này, ta bọc cả 2 vế trong cặp ngoặc vuông: `[T] extends [U] ? X : Y`.",
+      "deepDive": "Hành vi phân phối là nền tảng của các utility types như `Exclude` và `Extract`. Tuy nhiên, nếu bạn muốn kiểm tra xem một type có chính xác là một union hay không (ví dụ kiểm tra `T` có phải là `never` không: `T extends never` sẽ luôn trả về `never` do union rỗng phân phối!), bạn BẮT BUỘC phải dùng cú pháp non-distributive `[T] extends [never]`.",
+      "codeExample": "// 1. Distributive mặc định: Bung ra thành union\ntype ToArrayDistributive<T> = T extends any ? T[] : never;\ntype StrOrNumArr = ToArrayDistributive<string | number>; // string[] | number[]\n\n// 2. Non-Distributive: Bọc ngoặc vuông [T] để giữ nguyên cả union\ntype ToArrayNonDistributive<T> = [T] extends [any] ? T[] : never;\ntype CombinedArr = ToArrayNonDistributive<string | number>; // (string | number)[]\n\n// 3. Kiểm tra kiểu `never` chính xác:\ntype IsNever<T> = [T] extends [never] ? true : false;\ntype Test = IsNever<never>; // true"
+    },
+    "pitfalls": [
+      "Viết `T extends never ? true : false` và nhận được kết quả là `never` thay vì `true` (do `never` là union rỗng, không có thành viên để phân phối).",
+      "Bất ngờ khi kết quả trả về là một Union phân tán thay vì một kiểu gộp thống nhất."
+    ],
+    "followUpQuestions": [
+      "Tại sao `[T] extends [any]` lại ngăn được hành vi phân phối trong khi `T extends any` lại không?",
+      "Làm sao áp dụng distributive conditional types để viết type `FlattenUnion<T>`?"
+    ]
+  },
+  {
+    "id": "ts-064",
+    "category": "typescript",
+    "level": "senior",
+    "question": "TypeScript với React: generics trong components là gì?",
+    "interviewerIntent": "Đánh giá khả năng thiết kế Generic UI Components tái sử dụng cao (Table, Select, List, Autocomplete) giữ được type an toàn tuyệt đối cho data item.",
+    "contextOrScenario": "Xây dựng Component `DataTable<T>` có thể render dữ liệu của bất kỳ entity nào (User, Product) kèm type check cho cột và sự kiện click row.",
+    "expectedKeywords": [
+      "generic components",
+      "TSX generic syntax (<T,>)",
+      "renderItem pattern",
+      "row selection callback",
+      "type safety in UI"
+    ],
+    "seniorAnswer": {
+      "summary": "Generic Component trong React là component nhận một hoặc nhiều Type Parameters (ví dụ `<T>`), cho phép component linh hoạt hiển thị bất kỳ kiểu dữ liệu nào mà vẫn bảo toàn tính an toàn kiểu giữa danh sách dữ liệu truyền vào (`items: T[]`) và các callbacks xử lý (`onSelect: (item: T) => void`, `renderRow: (item: T) => ReactNode`).",
+      "deepDive": "Trong file `.tsx`, cú pháp generic `<T>` có thể bị compiler nhầm lẫn với một thẻ mở JSX `<T>`. Cách khắc phục kinh điển: thêm dấu phẩy `<T,>` hoặc thêm constraint `<T extends unknown>` để báo hiệu cho JSX parser biết đây là generic parameter.",
+      "codeExample": "import React from 'react';\n\ninterface TableProps<T> {\n  items: T[];\n  renderItem: (item: T) => React.ReactNode;\n  onSelect: (item: T) => void;\n}\n\n// Sử dụng <T,> để tránh nhầm lẫn với thẻ JSX:\nexport function Table<T extends { id: string }>({ items, renderItem, onSelect }: TableProps<T>) {\n  return (\n    <ul>\n      {items.map((item) => (\n        <li key={item.id} onClick={() => onSelect(item)}>\n          {renderItem(item)}\n        </li>\n      ))}\n    </ul>\n  );\n}\n\n// Caller: Tự động suy luận item là User mà không cần gõ type:\ninterface User { id: string; name: string; }\nconst users: User[] = [{ id: '1', name: 'Alice' }];\n\n<Table \n  items={users} \n  renderItem={(u) => <span>{u.name}</span>} // u có type User chuẩn xác\n  onSelect={(u) => console.log(u.id)}\n/>;"
+    },
+    "pitfalls": [
+      "Viết `<T>` trong file `.tsx` khiến compiler báo lỗi cú pháp JSX không đóng thẻ.",
+      "Dùng `items: any[]` khiến toàn bộ lợi ích của TypeScript trong các component con bị vô hiệu hóa."
+    ],
+    "followUpQuestions": [
+      "Làm cách nào để type cho Generic Component khi dùng `React.forwardRef`?",
+      "Cơ chế type inference của React JSX suy luận kiểu `T` từ prop nào truyền vào trước?"
+    ]
+  },
+  {
+    "id": "ts-065",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Assertion functions trong TypeScript là gì?",
+    "interviewerIntent": "Đánh giá việc áp dụng cú pháp `asserts condition` hoặc `asserts value is Type` để ném lỗi và thu hẹp kiểu cho toàn bộ khối mã phía sau.",
+    "contextOrScenario": "Viết hàm kiểm tra invariant `assertIsUser(data)`: nếu không hợp lệ thì throw Error, nếu hợp lệ thì các dòng code phía sau tự động nhận diện data là `User`.",
+    "expectedKeywords": [
+      "assertion functions",
+      "asserts condition",
+      "asserts val is Type",
+      "control flow narrowing",
+      "invariant check"
+    ],
+    "seniorAnswer": {
+      "summary": "Assertion Function là hàm kiểm tra điều kiện tại runtime và ném ra ngoại lệ (throw Exception) nếu điều kiện sai. Cú pháp kiểu trả về đặc biệt `asserts condition` hoặc `asserts val is Type` báo cho TypeScript biết rằng: nếu hàm này hoàn thành bình thường (không ném lỗi), thì biểu thức được assert đảm bảo đúng cho toàn bộ phần còn lại của scope hiện tại.",
+      "deepDive": "Khác với Type Predicates thông thường (trả về boolean và chỉ narrow trong khối `if`), Assertion Functions loại bỏ sự cần thiết của các khối `if-else` lồng nhau. Chúng bảo vệ luồng thực thi bằng fail-fast strategy và narrow kiểu của biến vĩnh viễn trong scope cha.",
+      "codeExample": "interface UserSession {\n  userId: string;\n  token: string;\n}\n\n// Assertion function: Ném lỗi nếu session null/invalid\nfunction assertAuthenticated(session: unknown): asserts session is UserSession {\n  if (!session || typeof session !== 'object' || !('token' in session)) {\n    throw new Error('User is not authenticated!');\n  }\n}\n\nfunction handleRequest(session: unknown) {\n  assertAuthenticated(session);\n  // Kể từ dòng này, session tự động mang kiểu UserSession an toàn 100%:\n  console.log(session.userId, session.token);\n}"
+    },
+    "pitfalls": [
+      "Gán assertion function cho một arrow function không khai báo explicit type (TS yêu cầu explicit assertion signature).",
+      "Hàm không throw error khi false mà âm thầm return (làm lủng an toàn kiểu phía sau)."
+    ],
+    "followUpQuestions": [
+      "Tại sao TypeScript yêu cầu assertion function phải được khai báo dạng `function` keyword hoặc arrow function có explicit type annotation?",
+      "Assertion functions khác gì với `never` return type?"
+    ]
+  },
+  {
+    "id": "ts-066",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Tại sao TypeScript dùng structural typing thay nominal typing?",
+    "interviewerIntent": "Đánh giá tầm nhìn kiến trúc ngôn ngữ: vì sao TypeScript được thiết kế theo Structural Subtyping (Duck Typing) để tương thích với bản chất động của JavaScript.",
+    "contextOrScenario": "Một lập trình viên từ background Java/C# thắc mắc tại sao 2 class độc lập `Person` và `Customer` có cấu trúc thuộc tính giống nhau lại có thể gán qua lại cho nhau trong TypeScript.",
+    "expectedKeywords": [
+      "structural typing",
+      "nominal typing",
+      "duck typing",
+      "javascript compatibility",
+      "interoperability"
+    ],
+    "seniorAnswer": {
+      "summary": "TypeScript chọn Structural Typing (hệ thống kiểu dựa trên hình dạng/cấu trúc của dữ liệu) thay vì Nominal Typing (dựa trên tên/khai báo tường minh) để phản ánh chân thực cách JavaScript vận hành. Trong JavaScript, Object Literals và Anonymous Functions được sử dụng phổ biến khắp nơi; nếu dùng nominal typing, lập trình viên sẽ phải viết vô số boilerplate code để map dữ liệu qua lại.",
+      "deepDive": "Với Structural Typing: nếu đối tượng A có tất cả các thuộc tính mà kiểu B yêu cầu (có hình dạng tương thích), thì A có thể được gán cho B (nguyên lý 'Nếu nó đi như vịt và kêu như vịt, thì nó là con vịt'). Điều này giúp TypeScript tích hợp mượt mà với các thư viện JavaScript sẵn có mà không đòi hỏi các bên phải chia sẻ chung một cây kế thừa Class danh nghĩa.",
+      "codeExample": "class Point2D {\n  constructor(public x: number, public y: number) {}\n}\n\nclass Vector2D {\n  constructor(public x: number, public y: number) {}\n}\n\nfunction renderPoint(p: Point2D) {\n  console.log(`Point: ${p.x}, ${p.y}`);\n}\n\n// Hoàn toàn hợp lệ trong Structural Typing vì hình dạng { x, y } trùng khớp:\nconst vec = new Vector2D(10, 20);\nrenderPoint(vec); // ✅ Pass! Không cần extends Point2D"
+    },
+    "pitfalls": [
+      "Tạo hai class khác biệt hoàn toàn về nghiệp vụ nhưng có cùng danh sách trường, vô tình bị TypeScript coi là tương thích và gán nhầm lẫn nhau.",
+      "Kỳ vọng `instanceof` kiểm tra được TypeScript Interface tại runtime (trong khi interface bị xóa sạch)."
+    ],
+    "followUpQuestions": [
+      "Khi thực sự cần phân biệt giữa hai type có cấu trúc giống hệt nhau, ta dùng kỹ thuật gì (Branded Types)?",
+      "Nguyên lý Liskov Substitution Principle (LSP) được áp dụng như thế nào trong Structural Subtyping của TypeScript?"
+    ]
+  },
+  {
+    "id": "ts-067",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Discriminated unions vs class hierarchy khi nào dùng cái nào?",
+    "interviewerIntent": "So sánh sâu sắc giữa hai trường phái thiết kế: Functional Programming (Discriminated Unions) vs Object-Oriented Programming (Polymorphism & Inheritance).",
+    "contextOrScenario": "Thiết kế hệ thống Xử lý Thanh toán (Payment Processing) hỗ trợ Thẻ tín dụng, Chuyển khoản ngân hàng, Tiền mã hóa.",
+    "expectedKeywords": [
+      "discriminated unions",
+      "class hierarchy",
+      "polymorphism",
+      "expression problem",
+      "FP vs OOP",
+      "tree-shaking"
+    ],
+    "seniorAnswer": {
+      "summary": "Dùng `Discriminated Unions` khi tập hợp các loại đối tượng tương đối cố định nhưng các thao tác/hàm xử lý trên chúng thường xuyên được thêm mới (thuận theo Functional Programming, data và behavior tách rời, 100% type-erased, dễ serialize JSON). Dùng `Class Hierarchy` khi bạn cần đóng gói dữ liệu cùng phương thức (encapsulation), có trạng thái nội bộ phức tạp, hoặc cần dễ dàng cắm thêm các subclass mới (Open-Closed Principle trong OOP).",
+      "deepDive": "Đây chính là 'Expression Problem' trong khoa học máy tính: Discriminated Unions giúp thêm hàm mới cực dễ (chỉ cần viết hàm mới với switch-case exhaustive check) nhưng thêm type mới thì phải sửa tất cả các switch-case cũ. Ngược lại, Class Hierarchy giúp thêm Class mới cực dễ mà không đụng vào code cũ, nhưng thêm method mới thì phải sửa toàn bộ base class và subclasses.",
+      "codeExample": "// Functional: Discriminated Union (Dễ serialize, thuần dữ liệu)\ntype PaymentMethod =\n  | { type: 'card'; cardNumber: string; cvv: string }\n  | { type: 'crypto'; walletAddress: string };\n\nfunction processPayment(p: PaymentMethod) {\n  switch (p.type) {\n    case 'card': return chargeCard(p.cardNumber, p.cvv);\n    case 'crypto': return transferCrypto(p.walletAddress);\n  }\n}"
+    },
+    "pitfalls": [
+      "Lạm dụng Class Hierarchy trong React/Frontend dẫn đến khó khăn khi serialize state và tree-shaking kém.",
+      "Dùng Discriminated Union nhưng thiếu exhaustive check bằng `never` khiến khi thêm variant mới bị bỏ sót xử lý."
+    ],
+    "followUpQuestions": [
+      "Expression Problem là gì và hai giải pháp trên đối mặt với nó ra sao?",
+      "Visitor Pattern trong TypeScript giải quyết nhược điểm gì của Class Hierarchy?"
+    ]
+  },
+  {
+    "id": "ts-068",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Exhaustiveness checking trong TypeScript là gì?",
+    "interviewerIntent": "Kiểm tra kỹ năng đảm bảo không bỏ sót bất kỳ nhánh nào của Discriminated Union bằng cách sử dụng kiểu `never` tại thời điểm biên dịch.",
+    "contextOrScenario": "Hệ thống bổ sung thêm một quyền hạn mới trong Union `Role = 'admin' | 'editor' | 'viewer' | 'superadmin'`, cần compiler tự động báo đỏ tất cả các hàm switch-case chưa xử lý 'superadmin'.",
+    "expectedKeywords": [
+      "exhaustiveness checking",
+      "never type",
+      "default case assertion",
+      "compile-time safety",
+      "unreachable code"
+    ],
+    "seniorAnswer": {
+      "summary": "Exhaustiveness Checking là kỹ thuật tận dụng kiểu `never` trong nhánh `default` của câu lệnh `switch` hoặc `if-else` để đảm bảo tại thời điểm biên dịch rằng TẤT CẢ các nhánh của một Union Type đã được xử lý triệt để. Nếu còn sót bất kỳ nhánh nào, biến tại `default` sẽ không mang kiểu `never` và compiler sẽ ném lỗi ngay lập tức.",
+      "deepDive": "Khi bạn narrow qua từng case của Discriminated Union, TypeScript sẽ loại trừ dần các nhánh khỏi union. Khi đã xử lý hết, kiểu còn lại duy nhất phải là `never` (tập rỗng). Gán giá trị đó vào một hàm nhận `x: never` hoặc biến `const _exhaustive: never = value;` sẽ kích hoạt lỗi type mismatch nếu trong tương lai có dev thêm variant mới vào Union mà quên update switch-case.",
+      "codeExample": "type UserRole = 'admin' | 'editor' | 'viewer';\n\nfunction handleRole(role: UserRole) {\n  switch (role) {\n    case 'admin': return 'Full Access';\n    case 'editor': return 'Edit Access';\n    case 'viewer': return 'Read Only';\n    default: {\n      // Nếu UserRole được thêm 'moderator', dòng này sẽ báo lỗi compile ngay:\n      // Type 'string' is not assignable to type 'never'\n      const _exhaustiveCheck: never = role;\n      throw new Error(`Unhandled role: ${_exhaustiveCheck}`);\n    }\n  }\n}"
+    },
+    "pitfalls": [
+      "Để trống nhánh `default` hoặc chỉ log console mà không gán vào `never`, khiến lỗi lọt ra runtime khi union mở rộng.",
+      "Tắt cờ `noImplicitReturns` khiến hàm có thể âm thầm trả về `undefined` khi rơi vào nhánh chưa xử lý."
+    ],
+    "followUpQuestions": [
+      "Làm cách nào để viết một helper class/function `assertNever(x: never): never` dùng chung cho toàn bộ dự án?",
+      "Cờ compiler nào trong `tsconfig.json` hỗ trợ cảnh báo khi các switch-case bị thiếu nhánh (`noFallthroughCasesInSwitch`)?"
+    ]
+  },
+  {
+    "id": "ts-069",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Type-only imports và exports là gì?",
+    "interviewerIntent": "Đánh giá sự hiểu biết về việc tối ưu hóa bundling, ngăn chặn side-effect import và hỗ trợ các transpiler độc lập (Vite/Rollup/Babel).",
+    "contextOrScenario": "Dự án dùng Vite hoặc Webpack gặp lỗi circular dependency hoặc bundle phình to vì import interface từ một module chứa heavy runtime side-effects.",
+    "expectedKeywords": [
+      "import type",
+      "export type",
+      "type-only imports",
+      "verbatimModuleSyntax",
+      "isolatedModules",
+      "bundler tree-shaking"
+    ],
+    "seniorAnswer": {
+      "summary": "`import type` và `export type` (ra mắt từ TS 3.8) chỉ thị cho compiler rằng những định danh được import/export CHỈ thuần túy là kiểu dữ liệu, bắt buộc phải bị loại bỏ hoàn toàn (elided) khỏi mã JavaScript đầu ra mà không để lại bất kỳ dấu vết nào, kể cả các side-effects của module.",
+      "deepDive": "Nếu bạn viết `import { MyInterface } from './module'`, một số transpiler đơn lẻ (như Babel, SWC, esbuild) không có toàn bộ type system có thể không biết `MyInterface` là type hay class, dẫn đến việc giữ lại câu lệnh import ở JS runtime gây lỗi runtime hoặc kéo theo code không cần thiết vào bundle. Kích hoạt cờ `verbatimModuleSyntax: true` trong TS 5.0+ sẽ bắt buộc tuân thủ chuẩn này.",
+      "codeExample": "// 1. Type-only import ở cấp độ câu lệnh:\nimport type { User, Order } from './models';\n\n// 2. Inline type import (TS 4.5+): Tiện lợi khi import chung với runtime value\nimport { createServer, type ServerOptions, type RequestHandler } from './server';\n\n// 3. Type-only re-export:\nexport type { PublicUser } from './user';"
+    },
+    "pitfalls": [
+      "Import class bằng `import type` rồi cố gắng khởi tạo nó bằng `new MyClass()` tại runtime (gây lỗi ReferenceError).",
+      "Không dùng `import type` gây ra hiện tượng Circular Dependency giả giữa các file chỉ chia sẻ type với nhau."
+    ],
+    "followUpQuestions": [
+      "Flag `verbatimModuleSyntax` trong TypeScript 5.0 thay thế các flags cũ nào (`importsNotUsedAsValues`, `preserveValueImports`)?",
+      "Tại sao `import type` giúp giải quyết triệt để vấn đề Circular Dependency ở runtime?"
+    ]
+  },
+  {
+    "id": "ts-070",
+    "category": "typescript",
+    "level": "senior",
+    "question": "TypeScript performance: tại sao type checking có thể chậm và cách cải thiện?",
+    "interviewerIntent": "Đánh giá kinh nghiệm tối ưu hóa build time, profile chẩn đoán compiler bottlenecks trong các monorepo hoặc repository lớn.",
+    "contextOrScenario": "Thời gian chạy `tsc --noEmit` trên CI kéo dài hơn 5 phút, dev phàn nàn IDE gõ chữ bị lag và chậm hiển thị autocomplete.",
+    "expectedKeywords": [
+      "type checking performance",
+      "skipLibCheck",
+      "project references",
+      "tsc --extendedDiagnostics",
+      "union combinatorial explosion",
+      "interface vs intersection"
+    ],
+    "seniorAnswer": {
+      "summary": "Type checking chậm thường do: (1) Đệ quy conditional types quá sâu; (2) Bùng nổ tổ hợp Union types / Template Literal types; (3) Lạm dụng Type Intersections (`&`) phức tạp thay vì `interface extends` (interface có cơ chế cache type relationships); (4) Type-check lại toàn bộ `node_modules` `.d.ts`. Cải thiện bằng `skipLibCheck: true`, Project References (`incremental: true`), và chẩn đoán bằng `tsc --extendedDiagnostics`.",
+      "deepDive": "`interface extends` tạo ra flat object shape được compiler cache lại rất nhanh; ngược lại, chuỗi `A & B & C` buộc compiler kiểm tra đệ quy từng cặp thuộc tính mỗi khi đối chiếu. Sử dụng `tsc --generateTrace traceDir` rồi mở trong trình duyệt qua `about://tracing` hoặc `ui.perfetto.dev` để định vị chính xác file hoặc type cụ thể nào đang ngốn CPU.",
+      "codeExample": "// 1. Đo lường hiệu năng type-check:\n// Terminal: tsc --noEmit --extendedDiagnostics\n// Kết quả cho thấy: Files, Types, Instantiations, Check time\n\n// 2. Chuyển từ Deep Intersection sang Interface extends để tận dụng Caching:\n// CHẬM: type BigType = TypeA & TypeB & TypeC;\n\n// NHANH (Compiler dễ tối ưu và cache):\ninterface BigType extends TypeA, TypeB, TypeC {}"
+    },
+    "pitfalls": [
+      "Để `skipLibCheck: false` trong các dự án dùng nhiều package khổng lồ.",
+      "Viết type utils đệ quy vô tội vạ để parse chuỗi string phức tạp thay vì kiểm tra bằng logic runtime thông thường."
+    ],
+    "followUpQuestions": [
+      "Làm sao đọc hiểu trace report từ `tsc --generateTrace` để tìm type gây bottleneck?",
+      "Cơ chế TypeScript Project References (`tsc --build`) tăng tốc build trong Monorepo như thế nào?"
+    ]
+  },
+  {
+    "id": "ts-071",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Dùng conditional type + infer để bóc kiểu bên trong (phần tử mảng, giá trị Promise) như thế nào? Distributive gây bẫy gì?",
+    "interviewerIntent": "Kiểm tra kỹ năng bóc tách kiểu lồng nhau ở mức sâu và cảnh giác trước cạm bẫy phân phối union ngoài ý muốn khi dùng generic type parameter trần.",
+    "contextOrScenario": "Viết utility type giải nén kiểu của một API response: nếu nhận vào `Promise<User[]>` thì phải bóc ra được `User`.",
+    "expectedKeywords": [
+      "infer",
+      "conditional types",
+      "unwrap promise",
+      "distributive trap",
+      "naked type parameter",
+      "tuple wrapping"
+    ],
+    "seniorAnswer": {
+      "summary": "Để bóc kiểu bên trong, ta dùng pattern matching dạng `T extends Target<infer U> ? U : fallback`. Khi `T` là một Union (ví dụ `Promise<A> | Promise<B>`), do tính chất phân phối (distributive), compiler sẽ phân tích từng nhánh và trả về Union `A | B`. Bẫy xảy ra khi `T` có nhánh không mong muốn hoặc khi kiểm tra `never`/`any`, khiến toàn bộ kiểu bị bung ra hoặc triệt tiêu ngoài tầm kiểm soát.",
+      "deepDive": "Nếu truyền `Promise<string> | number` vào hàm unwrap thông thường `T extends Promise<infer U> ? U : T`, kết quả sẽ là `string | number`. Nhưng nếu muốn ép rằng CHỈ KHI toàn bộ `T` là Promise thì mới unwrap, ta phải ngăn distributive bằng ngoặc vuông: `[T] extends [Promise<infer U>] ? U : T`. Bẫy lớn nhất là `T extends any` hoặc truyền union vào type unwrap mảng: `(A | B)[]` khác với `A[] | B[]` khi bóc tách.",
+      "codeExample": "// 1. Bóc Promise và Array đệ quy an toàn:\ntype UnwrapDeep<T> = T extends Promise<infer U>\n  ? UnwrapDeep<U>\n  : T extends Array<infer E>\n  ? UnwrapDeep<E>\n  : T;\n\ntype DeepData = Promise<Promise<User[]>>;\ntype Clean = UnwrapDeep<DeepData>; // User\n\n// 2. Cạm bẫy distributive khi T là union:\ntype UnwrapPromise<T> = T extends Promise<infer U> ? U : never;\ntype Trapped = UnwrapPromise<Promise<string> | number>; // Kết quả là 'string' (nhánh number thành never và biến mất!)"
+    },
+    "pitfalls": [
+      "Không nhận ra nhánh `never` bị nuốt mất trong union khi một thành viên không khớp điều kiện `extends`.",
+      "Quên đệ quy khiến chỉ bóc được một lớp `Promise<Promise<T>>` thay vì toàn bộ."
+    ],
+    "followUpQuestions": [
+      "Tại sao `Awaited<T>` chuẩn của TypeScript phải cài đặt rất phức tạp thay vì chỉ một dòng `T extends Promise<infer U> ? U : T`?",
+      "Làm thế nào để phân biệt giữa kiểu `any` và các kiểu khác khi dùng `infer`?"
+    ]
+  },
+  {
+    "id": "ts-072",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Tự viết DeepPartial<T> và RequireAtLeastOne<T> như thế nào? Cần lưu ý gì khi đệ quy qua array, Date, function?",
+    "interviewerIntent": "Đánh giá năng lực giải quyết các bài toán kiểu dữ liệu nâng cao trong thực tế và tư duy phòng ngừa edge-cases hệ thống.",
+    "contextOrScenario": "Viết hàm tìm kiếm nâng cao: SearchFilter yêu cầu người dùng phải cung cấp ít nhất một trong các trường (`keyword`, `categoryId`, hoặc `authorId`), đồng thời payload có cấu trúc lồng nhau.",
+    "expectedKeywords": [
+      "DeepPartial",
+      "RequireAtLeastOne",
+      "builtin types exclusion",
+      "mapped type over union",
+      "Omit and Pick composition"
+    ],
+    "seniorAnswer": {
+      "summary": "(1) `DeepPartial<T>`: Dùng đệ quy qua mapped types nhưng PHẢI chặn các kiểu nguyên thủy và đặc thù (`Function`, `Date`, `RegExp`, `Map`, `Set`) để không làm hỏng cấu trúc của chúng; (2) `RequireAtLeastOne<T, Keys>`: Tạo một union trong đó mỗi nhánh bắt buộc ít nhất một key (`Required<Pick<T, K>>`) và các keys còn lại là optional (`Partial<Omit<T, K>>`).",
+      "deepDive": "Nếu không chặn `Date`, `DeepPartial<Date>` sẽ biến tất cả phương thức như `.getTime()` thành optional property `{ getTime?: () => number }`, dẫn đến việc gán `new Date()` bị lỗi type. Với `RequireAtLeastOne`, giải pháp thanh lịch nhất là duyệt qua từng key của union `Keys` và gộp với phần còn lại đã được omit.",
+      "codeExample": "// 1. RequireAtLeastOne:\nexport type RequireAtLeastOne<T, Keys extends keyof T = keyof T> = \n  Keys extends keyof T\n    ? Required<Pick<T, Keys>> & Partial<Omit<T, Keys>>\n    : never;\n\ninterface SearchFilter {\n  keyword?: string;\n  categoryId?: string;\n  authorId?: string;\n}\n\ntype ValidSearch = RequireAtLeastOne<SearchFilter>;\n// Hợp lệ: Có ít nhất 1 trường\nconst q1: ValidSearch = { keyword: 'typescript' };\n// const q2: ValidSearch = {}; // Error: Type '{}' is not assignable to ..."
+    },
+    "pitfalls": [
+      "Lặp đệ quy qua mảng nhưng lại biến mảng thành object dạng `{ [index: number]: ... }` làm mất các array methods (`map`, `filter`).",
+      "Định nghĩa `RequireAtLeastOne` bằng cách kết hợp union chay dẫn đến việc IDE không autocomplete được các optional fields còn lại."
+    ],
+    "followUpQuestions": [
+      "Làm sao viết `RequireExactlyOne<T>` (chỉ chấp nhận duy nhất một field tồn tại, các fields khác phải là undefined)?",
+      "Cách xử lý `Set` và `Map` khi viết `DeepReadonly<T>` là gì?"
+    ]
+  },
+  {
+    "id": "ts-073",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Template literal type dùng để làm gì trong thực tế (route, event name)? Giới hạn của nó?",
+    "interviewerIntent": "Đánh giá kinh nghiệm thực chiến với Template Literal Types trong các framework hiện đại và hiểu biết về ranh giới năng lực của compiler.",
+    "contextOrScenario": "Tự xây dựng một Type-safe Router tương tự TanStack Router hoặc Hono, tự động parse dynamic segments dạng `/api/v1/:resource/:id`.",
+    "expectedKeywords": [
+      "template literal types",
+      "type-safe routing",
+      "string parsing",
+      "combinatorial explosion",
+      "recursion depth",
+      "static analysis"
+    ],
+    "seniorAnswer": {
+      "summary": "Trong thực tế, Template Literal Types được ứng dụng rộng rãi để: (1) Xây dựng Type-safe Routing (trích xuất params từ path string như `/users/:id`); (2) Strongly-typed Event Emitters (`on('click:button')`); (3) CSS-in-JS design tokens (`padding-${Direction}`); (4) Database query builders. Giới hạn lớn nhất là nguy cơ Bùng nổ tổ hợp (Combinatorial Explosion) và giới hạn độ sâu đệ quy chuỗi của compiler.",
+      "deepDive": "Nếu bạn kết hợp 3 union types mỗi union có 10 members: `${A}-${B}-${C}`, compiler phải sinh ra 10x10x10 = 1,000 types. Nếu tăng lên, nó sẽ chạm giới hạn hard-limit của TypeScript và văng lỗi `Expression produces a union type that is too complex to represent`. Ngoài ra, template literal types không thể thay thế regex cho các mẫu kiểm tra phức tạp có độ dài biến thiên lớn.",
+      "codeExample": "// Type-safe Route Params Extractor:\ntype ExtractRouteParams<T extends string> = \n  T extends `${string}:${infer Param}/${infer Rest}`\n    ? { [K in Param | keyof ExtractRouteParams<`/${Rest}`>]: string }\n    : T extends `${string}:${infer Param}`\n    ? { [K in Param]: string }\n    : {};\n\ntype RouteParams = ExtractRouteParams<'/posts/:category/:postId'>;\n// Kết quả chính xác: { category: string; postId: string; }\n\nfunction navigate<T extends string>(path: T, params: ExtractRouteParams<T>) {}\nnavigate('/posts/:category/:postId', { category: 'tech', postId: '101' }); // ✅ 100% Autocomplete"
+    },
+    "pitfalls": [
+      "Nối các union quá rộng khiến compiler bị tràn bộ nhớ hoặc IDE bị đơ.",
+      "Cố dùng template literal types để validate định dạng số điện thoại hoặc email phức tạp (đây là việc của runtime regex, không phải compile-time type system)."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để viết utility type kiểm tra xem một chuỗi có bắt đầu bằng tiền tố nhất định (`StartsWith<Str, Prefix>`)?",
+      "Tại sao các thư viện như Hono hay TRPC lại tận dụng triệt để Template Literal Types?"
+    ]
+  },
+  {
+    "id": "ts-074",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Cần thêm field user vào Request của Express hoặc mở rộng session của thư viện auth — bạn khai báo ở đâu và bằng cú pháp gì?",
+    "interviewerIntent": "Đánh giá kỹ năng xử lý tình huống thực tế kinh điển trong backend Node.js: Declaration Merging và Module Augmentation.",
+    "contextOrScenario": "Authentication Middleware gắn `req.user` vào request sau khi verify token, nhưng trong controller code `req.user` bị báo lỗi đỏ: `Property 'user' does not exist on type 'Request'`.",
+    "expectedKeywords": [
+      "declare global",
+      "declare namespace Express",
+      "module augmentation",
+      "express.d.ts",
+      "typeRoots / include in tsconfig"
+    ],
+    "seniorAnswer": {
+      "summary": "Khai báo trong một file `.d.ts` (ví dụ `src/types/express.d.ts`) nằm trong phạm vi quét của `tsconfig.json`. Cú pháp chuẩn phụ thuộc vào cách Express export:\n`declare global { namespace Express { interface Request { user?: UserPayload; } } }` (đối với Express 4/5). Đảm bảo file có ít nhất một dòng `import` hoặc `export` nếu cần import kiểu `UserPayload`.",
+      "deepDive": "Lý do cách này hoạt động là vì Express định nghĩa interface `Request` bên trong namespace `Express` toàn cục. Nhờ tính năng Declaration Merging của Interface, khai báo mới sẽ tự động gộp thuộc tính `user` vào interface có sẵn mà không làm mất các thuộc tính gốc (`body`, `params`, `query`). File định nghĩa này phải được include trong `tsconfig.json` thông qua mục `\"include\": [\"src/**/*\"]` hoặc cấu hình `\"files\"`.",
+      "codeExample": "// File: src/types/express-augmented.d.ts\nimport { UserDto } from '../dtos/user.dto';\n\ndeclare global {\n  namespace Express {\n    interface Request {\n      user?: UserDto; // Mở rộng an toàn\n      requestId?: string;\n    }\n  }\n}\n\n// File: src/controllers/auth.controller.ts\nimport { Request, Response } from 'express';\n\nexport function getMe(req: Request, res: Response) {\n  // Hoàn toàn hợp lệ, autocomplete chuẩn xác:\n  if (!req.user) return res.status(401).send('Unauthorized');\n  return res.json({ id: req.user.id });\n}"
+    },
+    "pitfalls": [
+      "Tạo file `express.d.ts` nhưng không import/export gì khi dùng `declare module` hoặc quên `declare global`, khiến module augmentation không ăn khớp.",
+      "Đặt file ở thư mục ngoài phạm vi quét của `include` trong `tsconfig.json`."
+    ],
+    "followUpQuestions": [
+      "Nếu thư viện dùng ES Modules chuẩn (như Fastify hoặc NextAuth), cú pháp augment có gì khác so với namespace Express?",
+      "Tại sao không nên giải quyết vấn đề này bằng cách ép kiểu `(req as any).user`?"
+    ]
+  },
+  {
+    "id": "ts-075",
+    "category": "typescript",
+    "level": "senior",
+    "question": "Vì sao gán thẳng object literal có field thừa thì lỗi, nhưng gán qua biến trung gian lại không?",
+    "interviewerIntent": "Đánh giá sự hiểu biết cốt lõi về triết lý thiết kế của TypeScript: Structural Typing (Subtyping) vs Excess Property Checks on Fresh Object Literals.",
+    "contextOrScenario": "Phỏng vấn Staff/Principal: Giải thích sâu về hành vi 'Object Literal Freshness' và tại sao ngôn ngữ lại thiết kế hai cơ chế dường như mâu thuẫn này.",
+    "expectedKeywords": [
+      "excess property checks",
+      "freshness",
+      "structural subtyping",
+      "width subtyping",
+      "soundness trade-off",
+      "typo catching"
+    ],
+    "seniorAnswer": {
+      "summary": "Đây là sự cân bằng có chủ đích giữa tính thực dụng bắt lỗi (Typo Catching) và nguyên lý lý thuyết kiểu Structural Subtyping. Khi gán trực tiếp Object Literal, TypeScript đánh dấu object đó là 'Fresh' và kích hoạt Excess Property Checking để bắt các lỗi gõ nhầm tên thuộc tính vô ích. Khi gán qua biến trung gian, tính 'freshness' biến mất, compiler quay về quy tắc thuần túy của Structural Subtyping (Width Subtyping): miễn là object có đủ các thuộc tính yêu cầu, nó được phép có thêm các thuộc tính khác.",
+      "deepDive": "Nếu TypeScript cấm triệt để thuộc tính thừa trong mọi trường hợp, tính đa hình (Polymorphism) sẽ bị phá vỡ: một hàm nhận `Point2D` sẽ không thể nhận một instance của `Point3D`. Ngược lại, nếu cho phép thuộc tính thừa trên Fresh Object Literal, khi bạn viết `{ colr: 'red' }` thay vì `{ color: 'red' }`, code sẽ pass type-check nhưng thuộc tính `colr` bị vứt bỏ hoàn toàn mà không ai hay biết. Khái niệm Freshness chính là giải pháp dung hòa tinh tế của Anders Hejlsberg và đội ngũ TypeScript.",
+      "codeExample": "interface UserConfig {\n  theme: 'light' | 'dark';\n  autoSave?: boolean;\n}\n\nfunction applyConfig(cfg: UserConfig) {}\n\n// 1. FRESH OBJECT LITERAL: Kích hoạt Excess Property Check\n// applyConfig({ theme: 'dark', autoSav: true }); \n// ❌ Error: 'autoSav' does not exist in type 'UserConfig'. Did you mean 'autoSave'?\n\n// 2. BIẾN TRUNG GIAN (NON-FRESH): Tuân theo Structural Subtyping\nconst customSettings = {\n  theme: 'dark' as const,\n  autoSav: true, // Lỗi typo nhưng lọt qua vì đã mất tính freshness\n  metadata: 'custom-client'\n};\napplyConfig(customSettings); // ✅ PASS hoàn toàn hợp lệ theo Structural Subtyping!"
+    },
+    "pitfalls": [
+      "Tin rằng biến trung gian giúp code 'an toàn hơn' trong khi nó thực chất che giấu các thuộc tính thừa hoặc lỗi chính tả.",
+      "Không nhận thức được rằng dữ liệu thừa có thể bị rò rỉ khi serialize JSON hoặc lưu trực tiếp vào Database."
+    ],
+    "followUpQuestions": [
+      "Làm cách nào để viết một utility type `Exact<T, Shape>` ép buộc không bao giờ chấp nhận thuộc tính thừa ngay cả với biến trung gian?",
+      "Cơ chế 'Object Literal Freshness' bị xóa bỏ (widened/erased) tại những thời điểm nào trong AST evaluation?"
+    ]
+  }
+]

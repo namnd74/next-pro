@@ -38,6 +38,20 @@ export function InterviewStats() {
     return Math.min(Math.round(bugScore + mockScore), 100);
   }, [solvedBugCount, totalBugHunts, averageMockScore, mounted]);
 
+  const languageBreakdown = React.useMemo(() => {
+    const react = MOCK_INTERVIEW_QUESTIONS.filter(
+      (q) => q.category === 'react' || q.category === 'react-19'
+    ).length;
+    const nextjs = MOCK_INTERVIEW_QUESTIONS.filter(
+      (q) => q.category === 'nextjs' || q.category === 'next-app-router'
+    ).length;
+    const ts = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'typescript').length;
+    const js = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'javascript').length;
+    const go = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'go').length;
+    const others = MOCK_INTERVIEW_QUESTIONS.length - (react + nextjs + ts + js + go);
+    return { react, nextjs, ts, js, go, others };
+  }, []);
+
   return (
     <div className="space-y-4">
       {/* 4 Stats Cards */}
@@ -109,6 +123,35 @@ export function InterviewStats() {
           <span className="text-primary">{readinessScore}%</span>
         </div>
         <Progress value={readinessScore} />
+
+        {/* Language & Framework Distribution */}
+        <div className="border-border/40 flex flex-wrap items-center justify-between gap-2 border-t pt-2.5 text-xs">
+          <span className="text-muted-foreground text-[11px] font-medium">
+            Phân bố ngân hàng câu hỏi theo ngôn ngữ:
+          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400">
+              ⚛️ React: {languageBreakdown.react}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-zinc-500/30 bg-zinc-500/10 px-2 py-0.5 text-[11px] font-semibold text-zinc-800 dark:text-zinc-200">
+              ▲ Next.js: {languageBreakdown.nextjs}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-blue-500/30 bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+              🔷 TypeScript: {languageBreakdown.ts}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+              🟨 JavaScript: {languageBreakdown.js}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[11px] font-semibold text-sky-600 dark:text-sky-400">
+              🐹 Go: {languageBreakdown.go}
+            </span>
+            {languageBreakdown.others > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+                🌐 Architecture: {languageBreakdown.others}
+              </span>
+            )}
+          </div>
+        </div>
       </Card>
     </div>
   );
