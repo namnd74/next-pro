@@ -48,6 +48,7 @@ export function MockSimulator() {
       return allQuestions.filter(
         (q) => q.category === 'javascript' || q.category === 'javascript-typescript'
       );
+    if (selectedLanguage === 'go') return allQuestions.filter((q) => q.category === 'go');
     return allQuestions.filter((q) => q.category === selectedLanguage);
   }, [allQuestions, selectedLanguage]);
 
@@ -190,6 +191,7 @@ export function MockSimulator() {
                 { value: 'nextjs', label: '▲ Next.js' },
                 { value: 'typescript', label: '🔷 TypeScript' },
                 { value: 'javascript', label: '🟨 JavaScript' },
+                { value: 'go', label: '🐹 Go (Golang)' },
               ]}
               className="w-40"
             />

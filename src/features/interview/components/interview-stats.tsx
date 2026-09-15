@@ -47,8 +47,9 @@ export function InterviewStats() {
     ).length;
     const ts = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'typescript').length;
     const js = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'javascript').length;
-    const others = MOCK_INTERVIEW_QUESTIONS.length - (react + nextjs + ts + js);
-    return { react, nextjs, ts, js, others };
+    const go = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'go').length;
+    const others = MOCK_INTERVIEW_QUESTIONS.length - (react + nextjs + ts + js + go);
+    return { react, nextjs, ts, js, go, others };
   }, []);
 
   return (
@@ -140,6 +141,9 @@ export function InterviewStats() {
             </span>
             <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-400">
               🟨 JavaScript: {languageBreakdown.js}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[11px] font-semibold text-sky-600 dark:text-sky-400">
+              🐹 Go: {languageBreakdown.go}
             </span>
             {languageBreakdown.others > 0 && (
               <span className="inline-flex items-center gap-1 rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">

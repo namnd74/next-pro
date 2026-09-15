@@ -6,6 +6,7 @@ export type InterviewCategory =
   | 'nextjs'
   | 'typescript'
   | 'javascript'
+  | 'go'
   | 'react-19'
   | 'next-app-router'
   | 'javascript-typescript'

@@ -62,6 +62,12 @@ function getCategoryBadge(category: string) {
         className:
           'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
       };
+    case 'go':
+      return {
+        label: '🐹 Go (Golang)',
+        className:
+          'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30 font-semibold',
+      };
     case 'javascript-typescript':
       return {
         label: '🟨 JS / 🔷 TS',

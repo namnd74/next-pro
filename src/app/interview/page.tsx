@@ -60,8 +60,32 @@ export default function InterviewPage() {
       javascript: allQuestions.filter(
         (q) => q.category === 'javascript' || q.category === 'javascript-typescript'
       ).length,
+      go: allQuestions.filter((q) => q.category === 'go').length,
     };
   }, [allQuestions]);
+
+  const levelCounts = React.useMemo(() => {
+    const langSubset = allQuestions.filter((q) => {
+      if (selectedCategory === 'all') return true;
+      if (selectedCategory === 'react')
+        return q.category === 'react' || q.category === 'react-19';
+      if (selectedCategory === 'nextjs')
+        return q.category === 'nextjs' || q.category === 'next-app-router';
+      if (selectedCategory === 'typescript')
+        return q.category === 'typescript' || q.category === 'javascript-typescript';
+      if (selectedCategory === 'javascript')
+        return q.category === 'javascript' || q.category === 'javascript-typescript';
+      if (selectedCategory === 'go') return q.category === 'go';
+      return q.category === selectedCategory;
+    });
+
+    return {
+      all: langSubset.length,
+      junior: langSubset.filter((q) => q.level === 'junior').length,
+      middle: langSubset.filter((q) => q.level === 'middle').length,
+      senior: langSubset.filter((q) => q.level === 'senior').length,
+    };
+  }, [allQuestions, selectedCategory]);
 
   const filteredQuestions = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -77,7 +101,9 @@ export default function InterviewPage() {
                 ? q.category === 'typescript' || q.category === 'javascript-typescript'
                 : selectedCategory === 'javascript'
                   ? q.category === 'javascript' || q.category === 'javascript-typescript'
-                  : q.category === selectedCategory;
+                  : selectedCategory === 'go'
+                    ? q.category === 'go'
+                    : q.category === selectedCategory;
 
       const matchLevel = selectedLevel === 'all' || q.level === selectedLevel;
       const matchBookmark = !onlyBookmarked || bookmarkedQuestionIds.includes(q.id);
@@ -247,6 +273,83 @@ export default function InterviewPage() {
                     {languageCounts.javascript}
                   </span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('go')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'go'
+                      ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🐹 Go (Golang)</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.go}
+                  </span>
+                </button>
+              </div>
+
+              {/* Level Classification Quick Filter Pills */}
+              <div className="border-border/40 flex flex-wrap items-center gap-1.5 border-t pt-2 pb-1">
+                <span className="text-muted-foreground mr-1 text-[11px] font-semibold">
+                  Level:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevel('all')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                    selectedLevel === 'all'
+                      ? 'bg-foreground text-background shadow-sm'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>Tất cả</span>
+                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {levelCounts.all}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevel('junior')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                    selectedLevel === 'junior'
+                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🟢 Cơ bản (Junior)</span>
+                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {levelCounts.junior}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevel('middle')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                    selectedLevel === 'middle'
+                      ? 'bg-amber-600 text-white shadow-sm shadow-amber-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🟡 Trung bình (Middle)</span>
+                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {levelCounts.middle}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedLevel('senior')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                    selectedLevel === 'senior'
+                      ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🔴 Nâng cao (Senior)</span>
+                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {levelCounts.senior}
+                  </span>
+                </button>
               </div>
 
               {/* Search bar */}
@@ -278,6 +381,7 @@ export default function InterviewPage() {
                       { value: 'nextjs', label: 'Next.js Interview Bank' },
                       { value: 'typescript', label: 'TypeScript Bank' },
                       { value: 'javascript', label: 'JavaScript Core Bank' },
+                      { value: 'go', label: 'Go (Golang) Bank' },
                       { value: 'react-19', label: 'React 19 Core' },
                       { value: 'next-app-router', label: 'Next.js App Router' },
                       {

@@ -3,6 +3,7 @@ import reactBankQuestions from './json/react-bank.json';
 import nextjsBankQuestions from './json/nextjs-bank.json';
 import typescriptBankQuestions from './json/typescript-bank.json';
 import javascriptBankQuestions from './json/javascript-bank.json';
+import goBankQuestions from './json/go-bank.json';
 import nextjsQuestions from './json/nextjs-app-router.json';
 import react19Questions from './json/react19-core.json';
 import jsTsQuestions from './json/javascript-typescript.json';
@@ -17,6 +18,7 @@ export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(nextjsBankQuestions as InterviewQuestion[]),
   ...(typescriptBankQuestions as InterviewQuestion[]),
   ...(javascriptBankQuestions as InterviewQuestion[]),
+  ...(goBankQuestions as InterviewQuestion[]),
   ...(nextjsQuestions as InterviewQuestion[]),
   ...(react19Questions as InterviewQuestion[]),
   ...(jsTsQuestions as InterviewQuestion[]),
