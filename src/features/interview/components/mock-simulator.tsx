@@ -28,6 +28,29 @@ export function MockSimulator() {
     return [...MOCK_INTERVIEW_QUESTIONS, ...customQuestions];
   }, [customQuestions]);
 
+  const [selectedLanguage, setSelectedLanguage] = React.useState<string>('all');
+
+  const filteredSimulatorQuestions = React.useMemo(() => {
+    if (selectedLanguage === 'all') return allQuestions;
+    if (selectedLanguage === 'react')
+      return allQuestions.filter(
+        (q) => q.category === 'react' || q.category === 'react-19'
+      );
+    if (selectedLanguage === 'nextjs')
+      return allQuestions.filter(
+        (q) => q.category === 'nextjs' || q.category === 'next-app-router'
+      );
+    if (selectedLanguage === 'typescript')
+      return allQuestions.filter(
+        (q) => q.category === 'typescript' || q.category === 'javascript-typescript'
+      );
+    if (selectedLanguage === 'javascript')
+      return allQuestions.filter(
+        (q) => q.category === 'javascript' || q.category === 'javascript-typescript'
+      );
+    return allQuestions.filter((q) => q.category === selectedLanguage);
+  }, [allQuestions, selectedLanguage]);
+
   const [selectedQuestionId, setSelectedQuestionId] = React.useState<string>(
     allQuestions[0]?.id || MOCK_INTERVIEW_QUESTIONS[0].id
   );
@@ -38,7 +61,8 @@ export function MockSimulator() {
     React.useState<MockInterviewResult | null>(null);
 
   const activeQuestion =
-    allQuestions.find((q) => q.id === selectedQuestionId) ||
+    filteredSimulatorQuestions.find((q) => q.id === selectedQuestionId) ||
+    filteredSimulatorQuestions[0] ||
     allQuestions[0] ||
     MOCK_INTERVIEW_QUESTIONS[0];
 
@@ -121,9 +145,57 @@ export function MockSimulator() {
       {/* Question Selector Bar */}
       <Card className="glass-card relative z-20 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-xs font-semibold">
-              Select Question:
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted-foreground text-xs font-semibold">Ngôn ngữ:</span>
+            <Select
+              value={selectedLanguage}
+              onValueChange={(val) => {
+                setSelectedLanguage(val);
+                const nextSubset =
+                  val === 'all'
+                    ? allQuestions
+                    : val === 'react'
+                      ? allQuestions.filter(
+                          (q) => q.category === 'react' || q.category === 'react-19'
+                        )
+                      : val === 'nextjs'
+                        ? allQuestions.filter(
+                            (q) =>
+                              q.category === 'nextjs' || q.category === 'next-app-router'
+                          )
+                        : val === 'typescript'
+                          ? allQuestions.filter(
+                              (q) =>
+                                q.category === 'typescript' ||
+                                q.category === 'javascript-typescript'
+                            )
+                          : val === 'javascript'
+                            ? allQuestions.filter(
+                                (q) =>
+                                  q.category === 'javascript' ||
+                                  q.category === 'javascript-typescript'
+                              )
+                            : allQuestions.filter((q) => q.category === val);
+                if (nextSubset.length > 0) {
+                  setSelectedQuestionId(nextSubset[0].id);
+                }
+                setEvaluatedResult(null);
+                setUserAnswer('');
+                setIsRecording(false);
+                setTimeSeconds(0);
+              }}
+              options={[
+                { value: 'all', label: '🌐 Tất cả ngôn ngữ' },
+                { value: 'react', label: '⚛️ React' },
+                { value: 'nextjs', label: '▲ Next.js' },
+                { value: 'typescript', label: '🔷 TypeScript' },
+                { value: 'javascript', label: '🟨 JavaScript' },
+              ]}
+              className="w-40"
+            />
+
+            <span className="text-muted-foreground ml-1 text-xs font-semibold">
+              Câu hỏi ({filteredSimulatorQuestions.length}):
             </span>
             <Select
               value={selectedQuestionId}
@@ -134,9 +206,9 @@ export function MockSimulator() {
                 setIsRecording(false);
                 setTimeSeconds(0);
               }}
-              options={allQuestions.map((q, idx) => ({
+              options={filteredSimulatorQuestions.map((q, idx) => ({
                 value: q.id,
-                label: `#${idx + 1} - [${q.level.toUpperCase()}] ${q.question.slice(0, 55)}...`,
+                label: `#${idx + 1} - [${q.level.toUpperCase()}] ${q.question.slice(0, 50)}...`,
               }))}
               className="max-w-md"
             />
@@ -146,14 +218,17 @@ export function MockSimulator() {
             variant="outline"
             size="sm"
             onClick={() => {
-              const randomIndex = Math.floor(Math.random() * allQuestions.length);
-              setSelectedQuestionId(allQuestions[randomIndex].id);
+              if (filteredSimulatorQuestions.length === 0) return;
+              const randomIndex = Math.floor(
+                Math.random() * filteredSimulatorQuestions.length
+              );
+              setSelectedQuestionId(filteredSimulatorQuestions[randomIndex].id);
               setEvaluatedResult(null);
               setUserAnswer('');
               setIsRecording(false);
               setTimeSeconds(0);
             }}
-            className="gap-1.5 text-xs"
+            className="shrink-0 gap-1.5 text-xs"
           >
             <Sparkles className="text-primary h-3 w-3" />
             Random Question

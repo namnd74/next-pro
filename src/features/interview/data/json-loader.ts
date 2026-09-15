@@ -1,4 +1,8 @@
 import { InterviewQuestion } from '../types';
+import reactBankQuestions from './json/react-bank.json';
+import nextjsBankQuestions from './json/nextjs-bank.json';
+import typescriptBankQuestions from './json/typescript-bank.json';
+import javascriptBankQuestions from './json/javascript-bank.json';
 import nextjsQuestions from './json/nextjs-app-router.json';
 import react19Questions from './json/react19-core.json';
 import jsTsQuestions from './json/javascript-typescript.json';
@@ -9,6 +13,10 @@ import systemDesignQuestions from './json/frontend-system-design.json';
 import perfQuestions from './json/web-performance-security.json';
 
 export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
+  ...(reactBankQuestions as InterviewQuestion[]),
+  ...(nextjsBankQuestions as InterviewQuestion[]),
+  ...(typescriptBankQuestions as InterviewQuestion[]),
+  ...(javascriptBankQuestions as InterviewQuestion[]),
   ...(nextjsQuestions as InterviewQuestion[]),
   ...(react19Questions as InterviewQuestion[]),
   ...(jsTsQuestions as InterviewQuestion[]),

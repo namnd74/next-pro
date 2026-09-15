@@ -2,6 +2,10 @@ export type InterviewLevel = 'junior' | 'middle' | 'senior' | 'lead';
 
 export type InterviewCategory =
   | 'all'
+  | 'react'
+  | 'nextjs'
+  | 'typescript'
+  | 'javascript'
   | 'react-19'
   | 'next-app-router'
   | 'javascript-typescript'

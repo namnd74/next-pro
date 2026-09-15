@@ -45,10 +45,40 @@ export default function InterviewPage() {
     return [...MOCK_INTERVIEW_QUESTIONS, ...customQuestions];
   }, [customQuestions]);
 
+  const languageCounts = React.useMemo(() => {
+    return {
+      all: allQuestions.length,
+      react: allQuestions.filter(
+        (q) => q.category === 'react' || q.category === 'react-19'
+      ).length,
+      nextjs: allQuestions.filter(
+        (q) => q.category === 'nextjs' || q.category === 'next-app-router'
+      ).length,
+      typescript: allQuestions.filter(
+        (q) => q.category === 'typescript' || q.category === 'javascript-typescript'
+      ).length,
+      javascript: allQuestions.filter(
+        (q) => q.category === 'javascript' || q.category === 'javascript-typescript'
+      ).length,
+    };
+  }, [allQuestions]);
+
   const filteredQuestions = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return allQuestions.filter((q) => {
-      const matchCategory = selectedCategory === 'all' || q.category === selectedCategory;
+      const matchCategory =
+        selectedCategory === 'all'
+          ? true
+          : selectedCategory === 'react'
+            ? q.category === 'react' || q.category === 'react-19'
+            : selectedCategory === 'nextjs'
+              ? q.category === 'nextjs' || q.category === 'next-app-router'
+              : selectedCategory === 'typescript'
+                ? q.category === 'typescript' || q.category === 'javascript-typescript'
+                : selectedCategory === 'javascript'
+                  ? q.category === 'javascript' || q.category === 'javascript-typescript'
+                  : q.category === selectedCategory;
+
       const matchLevel = selectedLevel === 'all' || q.level === selectedLevel;
       const matchBookmark = !onlyBookmarked || bookmarkedQuestionIds.includes(q.id);
 
@@ -143,7 +173,82 @@ export default function InterviewPage() {
           {/* Mode 2: Senior Question Bank */}
           <TabsContent value="bank" className="space-y-6">
             {/* Search and Filter controls */}
-            <Card className="glass-card relative z-20 space-y-3 p-4">
+            <Card className="glass-card relative z-20 space-y-3.5 p-4">
+              {/* Language Classification Quick Filter Pills */}
+              <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('all')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'all'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🌐 Tất cả</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.all}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('react')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'react' || selectedCategory === 'react-19'
+                      ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-500/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>⚛️ React</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.react}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('nextjs')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'nextjs' ||
+                    selectedCategory === 'next-app-router'
+                      ? 'bg-zinc-800 text-white shadow-sm dark:bg-zinc-200 dark:text-zinc-900'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>▲ Next.js</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.nextjs}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('typescript')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'typescript'
+                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🔷 TypeScript</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.typescript}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('javascript')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'javascript'
+                      ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🟨 JavaScript</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.javascript}
+                  </span>
+                </button>
+              </div>
+
               {/* Search bar */}
               <div className="relative">
                 <Search className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
@@ -169,6 +274,10 @@ export default function InterviewPage() {
                     onValueChange={(val) => setSelectedCategory(val as InterviewCategory)}
                     options={[
                       { value: 'all', label: 'Tất cả chủ đề' },
+                      { value: 'react', label: 'React Interview Bank' },
+                      { value: 'nextjs', label: 'Next.js Interview Bank' },
+                      { value: 'typescript', label: 'TypeScript Bank' },
+                      { value: 'javascript', label: 'JavaScript Core Bank' },
                       { value: 'react-19', label: 'React 19 Core' },
                       { value: 'next-app-router', label: 'Next.js App Router' },
                       {
