@@ -192,6 +192,10 @@ export function MockSimulator() {
                 { value: 'typescript', label: '🔷 TypeScript' },
                 { value: 'javascript', label: '🟨 JavaScript' },
                 { value: 'go', label: '🐹 Go (Golang)' },
+                { value: 'nestjs', label: '🐱 NestJS' },
+                { value: 'nodejs', label: '🟩 Node.js' },
+                { value: 'python', label: '🐍 Python' },
+                { value: 'django', label: '🎯 Django' },
               ]}
               className="w-40"
             />

@@ -61,6 +61,10 @@ export default function InterviewPage() {
         (q) => q.category === 'javascript' || q.category === 'javascript-typescript'
       ).length,
       go: allQuestions.filter((q) => q.category === 'go').length,
+      nestjs: allQuestions.filter((q) => q.category === 'nestjs').length,
+      nodejs: allQuestions.filter((q) => q.category === 'nodejs').length,
+      python: allQuestions.filter((q) => q.category === 'python').length,
+      django: allQuestions.filter((q) => q.category === 'django').length,
     };
   }, [allQuestions]);
 
@@ -287,6 +291,62 @@ export default function InterviewPage() {
                     {languageCounts.go}
                   </span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('nestjs')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'nestjs'
+                      ? 'bg-red-500 text-white shadow-sm shadow-red-500/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🐱 NestJS</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.nestjs}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('nodejs')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'nodejs'
+                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🟩 Node.js</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.nodejs}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('python')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'python'
+                      ? 'bg-yellow-600 text-white shadow-sm shadow-yellow-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🐍 Python</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.python}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('django')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'django'
+                      ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>🎯 Django</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.django}
+                  </span>
+                </button>
               </div>
 
               {/* Level Classification Quick Filter Pills */}
@@ -382,6 +442,10 @@ export default function InterviewPage() {
                       { value: 'typescript', label: 'TypeScript Bank' },
                       { value: 'javascript', label: 'JavaScript Core Bank' },
                       { value: 'go', label: 'Go (Golang) Bank' },
+                      { value: 'nestjs', label: 'NestJS Enterprise Bank' },
+                      { value: 'nodejs', label: 'Node.js Backend Bank' },
+                      { value: 'python', label: 'Python & FastAPI Bank' },
+                      { value: 'django', label: 'Django & DRF Bank' },
                       { value: 'react-19', label: 'React Core' },
                       { value: 'next-app-router', label: 'Next.js App Router' },
                       {

@@ -4,6 +4,10 @@ import nextjsBankQuestions from './json/nextjs-bank.json';
 import typescriptBankQuestions from './json/typescript-bank.json';
 import javascriptBankQuestions from './json/javascript-bank.json';
 import goBankQuestions from './json/go-bank.json';
+import nestjsBankQuestions from './json/nestjs-bank.json';
+import nodejsBankQuestions from './json/nodejs-bank.json';
+import pythonBankQuestions from './json/python-bank.json';
+import djangoBankQuestions from './json/django-bank.json';
 import nextjsQuestions from './json/nextjs-app-router.json';
 import react19Questions from './json/react19-core.json';
 import jsTsQuestions from './json/javascript-typescript.json';
@@ -19,6 +23,10 @@ export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(typescriptBankQuestions as InterviewQuestion[]),
   ...(javascriptBankQuestions as InterviewQuestion[]),
   ...(goBankQuestions as InterviewQuestion[]),
+  ...(nestjsBankQuestions as InterviewQuestion[]),
+  ...(nodejsBankQuestions as InterviewQuestion[]),
+  ...(pythonBankQuestions as InterviewQuestion[]),
+  ...(djangoBankQuestions as InterviewQuestion[]),
   ...(nextjsQuestions as InterviewQuestion[]),
   ...(react19Questions as InterviewQuestion[]),
   ...(jsTsQuestions as InterviewQuestion[]),
