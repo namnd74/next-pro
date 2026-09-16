@@ -625,7 +625,7 @@ export function DevProLogo({
               currentSize.sub
             )}
           >
-            FULLSTACK PLATFORM
+            NEXT PRO
           </span>
         )}
       </div>

@@ -289,7 +289,7 @@ export function Header() {
           </div>
 
           <div className="text-muted-foreground flex items-center justify-between pt-1 text-xs">
-            <span>NextPro Fullstack Platform</span>
+            <span>NextPro</span>
             <a
               href="https://github.com"
               target="_blank"

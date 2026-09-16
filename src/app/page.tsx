@@ -32,7 +32,7 @@ export default function HomePage() {
       <section className="space-y-4 pt-4 pb-4 text-center">
         <div className="animate-pulse-subtle border-primary/20 bg-primary/10 text-primary mb-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium shadow-sm">
           <Sparkles className="h-3.5 w-3.5" />
-          <span>Fullstack & Modern Engineering Fast-Track</span>
+          <span>NextPro Fast-Track</span>
           <span className="bg-primary h-1 w-1 rounded-full" />
           <span className="text-muted-foreground">Production & Interview Ready</span>
         </div>
