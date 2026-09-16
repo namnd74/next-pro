@@ -16,6 +16,7 @@ import {
   MOCK_INTERVIEW_QUESTIONS,
   MOCK_BUG_HUNT_CHALLENGES,
   QuestionCard,
+  VirtualQuestionList,
   MockSimulator,
   BugHunter,
   InterviewStats,
@@ -495,16 +496,15 @@ export default function InterviewPage() {
               </div>
             </Card>
 
-            {/* Questions list */}
-            <div className="space-y-4">
-              {filteredQuestions.length === 0 ? (
-                <Card className="glass-card text-muted-foreground p-8 text-center text-sm">
-                  Không tìm thấy câu hỏi nào phù hợp với từ khóa hoặc bộ lọc hiện tại.
-                </Card>
-              ) : (
-                filteredQuestions.map((q) => <QuestionCard key={q.id} question={q} />)
-              )}
-            </div>
+            {/* Questions list with Progressive Virtual Loading */}
+            {/* Questions list with Virtual Windowing */}
+            {filteredQuestions.length === 0 ? (
+              <Card className="glass-card text-muted-foreground p-8 text-center text-sm">
+                Không tìm thấy câu hỏi nào phù hợp với từ khóa hoặc bộ lọc hiện tại.
+              </Card>
+            ) : (
+              <VirtualQuestionList questions={filteredQuestions} />
+            )}
           </TabsContent>
 
           {/* Mode 3: Bug Hunting Challenge */}

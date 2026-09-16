@@ -41,6 +41,15 @@ export interface InterviewReference {
   url: string;
 }
 
+export interface InterviewFollowUpItem {
+  question: string;
+  answer: string;
+  codeExample?: string;
+  codeLanguage?: string;
+}
+
+export type InterviewFollowUp = string | InterviewFollowUpItem;
+
 export interface InterviewQuestion {
   id: string;
   category: Exclude<InterviewCategory, 'all'>;
@@ -53,7 +62,7 @@ export interface InterviewQuestion {
   evaluationRubric?: InterviewEvaluationRubric;
   references?: InterviewReference[];
   pitfalls: string[];
-  followUpQuestions: string[];
+  followUpQuestions: InterviewFollowUp[];
 }
 
 export interface BugHuntChallenge {

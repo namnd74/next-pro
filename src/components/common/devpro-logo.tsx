@@ -618,16 +618,6 @@ export function DevProLogo({
           </span>
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
         </div>
-        {showTagline && (
-          <span
-            className={cn(
-              'text-muted-foreground -mt-0.5 font-mono font-medium tracking-wider uppercase',
-              currentSize.sub
-            )}
-          >
-            NEXT PRO
-          </span>
-        )}
       </div>
     </div>
   );
