@@ -42,6 +42,8 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
   const nextLesson =
     currentIndex < track.lessons.length - 1 ? track.lessons[currentIndex + 1] : null;
 
+  const isNextJsTrack = NEXTJS_SERIES_TRACK_SLUGS.includes(track.slug);
+
   const theory = (
     <>
       <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-950 dark:text-amber-100">
@@ -93,12 +95,12 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
 
             {recipe.beforeCode ? (
               <Tabs defaultValue="after" className="w-full">
-                <TabsList className="grid h-auto w-full max-w-md grid-cols-2 p-1">
+                <TabsList className="grid h-auto w-full max-w-lg grid-cols-2 p-1">
                   <TabsTrigger value="after" className="px-3 py-1.5 text-xs">
-                    Recommended
+                    Recommended ({isNextJsTrack ? 'Next.js App Router' : 'React v19+'})
                   </TabsTrigger>
                   <TabsTrigger value="before" className="px-3 py-1.5 text-xs">
-                    Legacy
+                    Legacy ({isNextJsTrack ? 'Pages Router / v14' : 'React v18'})
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="after" className="mt-3">
@@ -125,8 +127,6 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
   const quiz = lesson.quizzes.length ? (
     <BlitzQuiz lessonId={lesson.id} quizzes={lesson.quizzes} />
   ) : null;
-
-  const isNextJsTrack = NEXTJS_SERIES_TRACK_SLUGS.includes(track.slug);
 
   const dynamicLab = React.useMemo(() => {
     return generateDynamicLabFiles(lesson, track, isNextJsTrack);
@@ -170,9 +170,32 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
 
   const interactiveLab = (
     <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground text-xs font-semibold">
+            Môi trường thực hành:
+          </span>
+          <Badge
+            variant="outline"
+            className={
+              isNextJsTrack
+                ? 'border-indigo-500/30 bg-indigo-500/5 font-mono text-[11px] text-indigo-500'
+                : 'border-cyan-500/30 bg-cyan-500/5 font-mono text-[11px] text-cyan-600 dark:text-cyan-400'
+            }
+          >
+            {isNextJsTrack
+              ? 'Next.js v15.4 · React v19.2 (WebContainer)'
+              : 'React v19.2 (Client Sandbox)'}
+          </Badge>
+        </div>
+        <span className="text-muted-foreground font-mono text-[11px]">
+          {isNextJsTrack ? 'Node.js Wasm · Hot Reload' : 'ESM CDN · Hot Reload'}
+        </span>
+      </div>
+
       {isNextJsTrack ? (
         <NextPlayground
-          title={`Next.js 16 Curriculum Studio: ${lesson.title}`}
+          title={`Next.js Curriculum Studio: ${lesson.title}`}
           initialFiles={nextInitialFiles}
           entryPath={lesson.interactiveLab?.entryFile || '/app/page.tsx'}
           instructions={labInstructions}

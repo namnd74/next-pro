@@ -78,7 +78,7 @@ interface ExecutionLogStep {
 export function ApiDemoTester() {
   const [activeKey, setActiveKey] = React.useState<ApiEndpointKey>('auth-session');
 
-  // React 19 Concurrent Transition: Keeps old UI 100% intact until new response is atomically ready!
+  // React Concurrent Transition: Keeps old UI 100% intact until new response is atomically ready!
   const [isPending, startTransition] = React.useTransition();
 
   const [responseTimeMs, setResponseTimeMs] = React.useState<number | null>(null);
@@ -93,7 +93,7 @@ export function ApiDemoTester() {
 
   const activeDemo = DEMO_ENDPOINTS.find((d) => d.key === activeKey) || DEMO_ENDPOINTS[0];
 
-  // Atomic Concurrent Request Handler using React 19 useTransition
+  // Atomic Concurrent Request Handler using React useTransition
   const handleExecuteRequest = () => {
     startTransition(async () => {
       if (activeKey === 'silent-refresh') {
@@ -233,7 +233,7 @@ export function ApiDemoTester() {
         <div className="space-y-1">
           <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-0.5 text-xs font-semibold">
             <Send className="h-3.5 w-3.5" />
-            <span>Concurrent React 19 API Testing Suite</span>
+            <span>Concurrent React API Testing Suite</span>
           </div>
           <h3 className="text-foreground text-xl font-bold tracking-tight">
             Demo Trực Tiếp Các Endpoint API & HTTP Headers

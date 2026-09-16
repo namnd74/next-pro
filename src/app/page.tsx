@@ -32,7 +32,7 @@ export default function HomePage() {
       <section className="space-y-4 pt-4 pb-4 text-center">
         <div className="animate-pulse-subtle border-primary/20 bg-primary/10 text-primary mb-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium shadow-sm">
           <Sparkles className="h-3.5 w-3.5" />
-          <span>React 19 & Next.js 16 Fast-Track</span>
+          <span>NextPro Fast-Track</span>
           <span className="bg-primary h-1 w-1 rounded-full" />
           <span className="text-muted-foreground">Production & Interview Ready</span>
         </div>
@@ -46,7 +46,7 @@ export default function HomePage() {
 
         <p className="text-muted-foreground mx-auto max-w-2xl text-base leading-relaxed sm:text-lg">
           Nền tảng học tập 80/20, trắc nghiệm 60s Blitz Quiz và luyện phỏng vấn kỹ thuật
-          thực chiến dành cho lập trình viên React 19 & Next.js 16 App Router.
+          thực chiến dành cho lập trình viên React, Next.js, Go & Fullstack.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -106,7 +106,7 @@ export default function HomePage() {
                   Lộ Trình Học & Mental Model
                 </h3>
                 <p className="text-muted-foreground text-xs leading-relaxed">
-                  React 19 Actions, App Router RSC vs Client, Streaming Suspense, TanStack
+                  React Actions, App Router RSC vs Client, Streaming Suspense, TanStack
                   Query v5 & Zustand.
                 </p>
               </div>

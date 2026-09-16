@@ -18,7 +18,7 @@ export function generateDynamicLabFiles(
     'Tối ưu hóa state và giảm thiểu re-render không cần thiết';
 
   if (isNextJs) {
-    // Cấu hình file cho Next.js 16 App Router (WebContainer)
+    // Cấu hình file cho Next.js App Router (WebContainer)
     const pageContent = `'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -28,7 +28,7 @@ export default function NextAppPage() {
   const [data, setData] = useState<{ status: string; timestamp: string; latencyMs: number } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [actionLogs, setActionLogs] = useState<string[]>([
-    '🟢 [Next.js 16 Runtime] App Router sẵn sàng...',
+    '🟢 [Next.js v15.4 Runtime] App Router sẵn sàng...',
     '⚡ Lab Topic: ${safeTitle}'
   ]);
 
@@ -57,7 +57,10 @@ export default function NextAppPage() {
       <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-r from-indigo-950/50 via-slate-900 to-slate-950 p-6 shadow-xl">
         <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-400">
           <Sparkles className="h-3.5 w-3.5" />
-          <span>Next.js 16 App Router · Interactive Lab</span>
+          <span>Next.js App Router · Interactive Lab</span>
+          <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 font-semibold">
+            Next.js v15.4 · React v19.2
+          </span>
         </div>
 
         <h1 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">
@@ -90,7 +93,7 @@ export default function NextAppPage() {
           </div>
 
           <p className="text-xs text-slate-300 leading-relaxed">
-            Nhấn nút bên dưới để mô phỏng một Server Action gọi dữ liệu với \`useTransition\` trong Next.js 16:
+            Nhấn nút bên dưới để mô phỏng một Server Action gọi dữ liệu với \`useTransition\` trong Next.js:
           </p>
 
           <button
@@ -174,11 +177,11 @@ export default function Page() {
         '/app/page.tsx': serverPageContent,
         '/app/client-demo.tsx': pageContent,
       },
-      instructions: `Thực hành Next.js 16: ${lesson.title}. Bạn có thể tự do chỉnh sửa client state tại app/client-demo.tsx và server component boundary tại app/page.tsx, chạy thử Server Action và kiểm tra kết quả tức thì.`,
+      instructions: `Thực hành Next.js: ${lesson.title}. Bạn có thể tự do chỉnh sửa client state tại app/client-demo.tsx và server component boundary tại app/page.tsx, chạy thử Server Action và kiểm tra kết quả tức thì.`,
     };
   }
 
-  // Cấu hình file cho React 19 (React-lite Playground)
+  // Cấu hình file cho React (React-lite Playground)
   const reactAppContent = `import React, { useState } from 'react';
 import { Sparkles, Code2, CheckCircle2, RotateCcw, Activity, ArrowRight, Shield } from 'lucide-react';
 
@@ -223,7 +226,10 @@ export default function App() {
             <Code2 className="w-4 h-4" />
           </span>
           <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">
-            React 19 Lab Studio
+            React Lab Studio
+          </span>
+          <span className="rounded bg-cyan-500/15 border border-cyan-500/30 px-1.5 py-0.5 font-mono text-[10px] text-cyan-600 dark:text-cyan-300 font-bold">
+            React v19.2
           </span>
         </div>
         <h2 className="text-lg font-black tracking-tight text-slate-900 dark:text-white">
@@ -290,7 +296,7 @@ export default function App() {
           <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1 list-disc list-inside">
             <li>${keyPoint1}</li>
             <li>${keyPoint2}</li>
-            <li>Mở file <code className="font-mono font-bold text-cyan-600 dark:text-cyan-300">App.tsx</code> để tự do thử nghiệm cú pháp mới của React 19!</li>
+            <li>Mở file <code className="font-mono font-bold text-cyan-600 dark:text-cyan-300">App.tsx</code> để tự do thử nghiệm cú pháp mới của React!</li>
           </ul>
         </div>
       </div>
@@ -306,7 +312,7 @@ export default function App() {
       '/src/App.tsx': reactAppContent,
       '/src/index.css': '/* Custom playground styles */\n',
     },
-    instructions: `Thực hành React 19: ${lesson.title}. Bạn có thể xem cấu trúc index.html, main.tsx và trực tiếp chỉnh sửa component trong src/App.tsx.`,
+    instructions: `Thực hành React: ${lesson.title}. Bạn có thể xem cấu trúc index.html, main.tsx và trực tiếp chỉnh sửa component trong src/App.tsx.`,
   };
 }
 

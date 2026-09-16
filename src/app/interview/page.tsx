@@ -133,11 +133,11 @@ export default function InterviewPage() {
         <div className="space-y-3">
           <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
             <Briefcase className="h-4 w-4" />
-            <span>Senior Frontend Interview Simulator</span>
+            <span>Senior Technical Interview Hub</span>
           </div>
 
           <h1 className="text-foreground text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Luyện Phỏng Vấn React 19 & Next.js 16
+            Luyện Phỏng Vấn Kỹ Thuật Chuyên Sâu
           </h1>
           <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed sm:text-base">
             Mô phỏng phỏng vấn kỹ thuật thực tế với bộ câu hỏi Senior, bẫy tuyển dụng
@@ -382,7 +382,7 @@ export default function InterviewPage() {
                       { value: 'typescript', label: 'TypeScript Bank' },
                       { value: 'javascript', label: 'JavaScript Core Bank' },
                       { value: 'go', label: 'Go (Golang) Bank' },
-                      { value: 'react-19', label: 'React 19 Core' },
+                      { value: 'react-19', label: 'React Core' },
                       { value: 'next-app-router', label: 'Next.js App Router' },
                       {
                         value: 'javascript-typescript',

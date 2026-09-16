@@ -16,9 +16,9 @@ import {
 import { Card } from '@/components/ui/card';
 
 export const metadata: Metadata = {
-  title: 'Lộ trình Học React 19 & Next.js 16 App Router | NextPro',
+  title: 'Lộ trình Học React & Next.js App Router | NextPro',
   description:
-    'Lộ trình 80/20 thực chiến: Nắm vững 2 Seri chuyên sâu React 19 và Next.js 16 App Router RSC, Server Actions, TanStack Query v5.',
+    'Lộ trình 80/20 thực chiến: Nắm vững các chuyên đề React và Next.js App Router RSC, Server Actions, TanStack Query v5.',
 };
 
 const LEARNING_STEPS = [
@@ -46,7 +46,7 @@ export default function LearnPage() {
       <section className="space-y-4 text-center sm:text-left">
         <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
           <GraduationCap className="h-4 w-4" />
-          <span>2 Chuyên Đề: React 19 & Next.js 16 Fast-Track</span>
+          <span>Chuyên Đề Lộ Trình: React & Next.js Fast-Track</span>
         </div>
 
         <h1 className="text-foreground text-3xl font-extrabold tracking-tight sm:text-4xl">
@@ -57,7 +57,7 @@ export default function LearnPage() {
           Được chia thành 2 Seri chuyên biệt:{' '}
           <strong className="text-foreground font-semibold">Seri React Mastery</strong> và{' '}
           <strong className="text-foreground font-semibold">
-            Seri Next.js 16 Fullstack
+            Seri Next.js Fullstack
           </strong>
           .
         </p>

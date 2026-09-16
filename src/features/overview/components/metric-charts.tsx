@@ -19,7 +19,7 @@ interface MetricChartsProps {
 export function MetricCharts({ activities = [] }: MetricChartsProps) {
   const stackItems = [
     {
-      name: 'Next.js 16 (App Router)',
+      name: 'Next.js (App Router)',
       desc: 'RSC, Server Actions, Dynamic Routes',
       tag: 'Framework',
     },

@@ -2,7 +2,7 @@
   "id": "track-next-architecture-rendering",
   "slug": "nextjs-architecture-rendering-strategies",
   "title": "Next.js Architecture & Rendering",
-  "description": "Lộ trình App Router từ routing, navigation, Server/Client boundary đến streaming, error handling, Cache Components và chiến lược rendering Next.js 16.",
+  "description": "Lộ trình App Router từ routing, navigation, Server/Client boundary đến streaming, error handling, Cache Components và chiến lược rendering Next.js.",
   "iconName": "Layers",
   "color": "from-indigo-500 to-purple-600",
   "totalLessons": 5,
@@ -14,11 +14,11 @@
       "summary": "Đọc cây thư mục App Router, xây layout dùng chung và chọn Link hay router API cho từng kiểu navigation.",
       "durationMinutes": 22,
       "level": "beginner",
-      "tags": ["Next.js 16", "App Router", "Layouts", "Navigation"],
+      "tags": ["Next.js", "App Router", "Layouts", "Navigation"],
       "mentalModel": "Filesystem tạo route tree: folder là segment, `layout.tsx` giữ UI dùng chung, `page.tsx` tạo endpoint UI và `[slug]` nhận segment động. Navigation nội bộ dùng Link để Next prefetch và chuyển trang phía client; router API dành cho điều hướng bằng code.",
       "keyPoints": [
         "`layout.tsx` bao bọc các segment con và giữ state/UI dùng chung qua navigation; route groups `(group)` tổ chức code mà không thêm segment vào URL.",
-        "Trong Next.js 16, `params` và `searchParams` ở Server Component là Promise và cần `await` hoặc đọc bằng `use` trong trường hợp phù hợp.",
+        "Trong Next.js, `params` và `searchParams` ở Server Component là Promise và cần `await` hoặc đọc bằng `use` trong trường hợp phù hợp.",
         "Ưu tiên `<Link>` cho liên kết nội bộ; dùng `useRouter` trong Client Component khi navigation là kết quả của logic/event, không dùng để thay mọi link.",
         "Search params phù hợp cho filter/sort/page có thể bookmark; validate giá trị ở boundary thay vì tin chuỗi URL."
       ],
@@ -27,7 +27,7 @@
           "title": "Lab 1 — Layout và dynamic product route",
           "language": "tsx",
           "afterCode": "// app/shop/layout.tsx\nimport type { ReactNode } from 'react';\nimport Link from 'next/link';\n\nexport default function ShopLayout({ children }: { children: ReactNode }) {\n  return (\n    <div className=\"grid grid-cols-[14rem_1fr] gap-6\">\n      <nav aria-label=\"Shop\"><Link href=\"/shop\">Sản phẩm</Link></nav>\n      <main>{children}</main>\n    </div>\n  );\n}\n\n// app/shop/[slug]/page.tsx\nexport default async function ProductPage({\n  params,\n}: {\n  params: Promise<{ slug: string }>;\n}) {\n  const { slug } = await params;\n  const product = await getProduct(slug);\n  return <ProductDetails product={product} />;\n}",
-          "takeaway": "Layout thuộc route tree và được tái sử dụng; dynamic params được đọc bất đồng bộ trong Next.js 16."
+          "takeaway": "Layout thuộc route tree và được tái sử dụng; dynamic params được đọc bất đồng bộ trong Next.js."
         },
         {
           "title": "Lab 2 — Filter được lưu trong search params",
@@ -51,7 +51,7 @@
         },
         {
           "id": "q-na-00-2",
-          "question": "Trong Next.js 16 Server Component, cách đọc params đúng là gì?",
+          "question": "Trong Next.js Server Component, cách đọc params đúng là gì?",
           "options": [
             { "key": "A", "text": "Đọc params.id đồng bộ trong mọi trường hợp" },
             { "key": "B", "text": "Khai báo params là Promise và await params" },
@@ -82,7 +82,7 @@
       "summary": "Hiểu cơ chế chạy của Server Component và Client Component, cùng ranh giới module và serialization giữa chúng.",
       "durationMinutes": 16,
       "level": "advanced",
-      "tags": ["Next.js 16", "RSC", "Client Boundary", "Architecture"],
+      "tags": ["Next.js", "RSC", "Client Boundary", "Architecture"],
       "mentalModel": "Server Component render trong môi trường server và module code của nó không được gửi xuống browser. Client Component có thể được prerender thành HTML ban đầu, nhưng module nằm sau ranh giới `use client` sẽ vào client bundle để hydrate.",
       "keyPoints": [
         "Server Component: chạy trong môi trường server, có thể truy cập DB và secret, rồi tạo RSC payload. Module code của chính Server Component không được đưa vào client bundle, nhưng Client Component con vẫn có JavaScript riêng.",
@@ -93,7 +93,7 @@
         {
           "title": "Mô hình Phân tách An toàn Server & Client Code",
           "language": "tsx",
-          "afterCode": "// 1. db-service.ts (server-only)\nimport 'server-only'; // Báo lỗi build nếu module bị kéo vào client graph\nimport { db } from '@/lib/db';\n\nexport async function getPrivateUserData(userId: string) {\n  return db.user.findUnique({ where: { id: userId } });\n}\n\n// 2. app/users/[id]/page.tsx (Server Component)\nimport { getPrivateUserData } from './db-service';\nimport { ClientAvatarMenu } from './ClientAvatarMenu';\n\nexport default async function UserProfilePage({\n  params,\n}: {\n  params: Promise<{ id: string }>;\n}) {\n  const { id } = await params; // Dynamic APIs là async trong Next.js 16\n  const user = await getPrivateUserData(id);\n  if (!user) return null;\n\n  return (\n    <div>\n      <h1>Welcome {user.name}</h1>\n      <ClientAvatarMenu user={{ name: user.name, avatarUrl: user.avatarUrl }} />\n    </div>\n  );\n}",
+          "afterCode": "// 1. db-service.ts (server-only)\nimport 'server-only'; // Báo lỗi build nếu module bị kéo vào client graph\nimport { db } from '@/lib/db';\n\nexport async function getPrivateUserData(userId: string) {\n  return db.user.findUnique({ where: { id: userId } });\n}\n\n// 2. app/users/[id]/page.tsx (Server Component)\nimport { getPrivateUserData } from './db-service';\nimport { ClientAvatarMenu } from './ClientAvatarMenu';\n\nexport default async function UserProfilePage({\n  params,\n}: {\n  params: Promise<{ id: string }>;\n}) {\n  const { id } = await params; // Dynamic APIs là async trong Next.js\n  const user = await getPrivateUserData(id);\n  if (!user) return null;\n\n  return (\n    <div>\n      <h1>Welcome {user.name}</h1>\n      <ClientAvatarMenu user={{ name: user.name, avatarUrl: user.avatarUrl }} />\n    </div>\n  );\n}",
           "takeaway": "Giữ truy cập DB và secret trong server-only module, đồng thời chỉ truyền dữ liệu cần thiết và serializable qua client boundary."
         }
       ],
@@ -195,11 +195,11 @@
     {
       "id": "na-04",
       "slug": "nextjs-16-cache-components-revalidation",
-      "title": "Next.js 16 Cache Components & Revalidation",
+      "title": "Next.js Cache Components & Revalidation",
       "summary": "Cache dữ liệu có chủ đích bằng use cache/cacheLife/cacheTag và chọn updateTag hay revalidateTag sau mutation.",
       "durationMinutes": 24,
       "level": "advanced",
-      "tags": ["Next.js 16", "use cache", "cacheLife", "cacheTag"],
+      "tags": ["Next.js", "use cache", "cacheLife", "cacheTag"],
       "mentalModel": "Với Cache Components, code request-time là động mặc định. Chỉ đưa dữ liệu có thể chia sẻ vào cached scope bằng `use cache`; mô tả freshness bằng cacheLife, gắn domain tag bằng cacheTag và invalidation sau mutation theo consistency mà UX cần.",
       "keyPoints": [
         "Bật `cacheComponents: true`; `use cache` có thể đặt ở function/component/file async và cache key bao gồm arguments cùng closed-over values được hỗ trợ.",
@@ -280,13 +280,13 @@
         "SSR (Server-Side Rendering): Render HTML mới ở MỌI request người dùng gửi lên. Dùng cho: Trang tin tức/sản phẩm thời gian thực cần SEO tối đa.",
         "SSG (Static Site Generation): Biến trang thành HTML tĩnh ngay tại Build Time. Tốc độ cực đại CDN. Dùng cho: Trang Landing Page, Blogs, Documentation.",
         "ISR (Incremental Static Regeneration): Cập nhật trang tĩnh ngầm (stale-while-revalidate) theo chu kỳ revalidate giây mà không cần build lại toàn bộ website. Dùng cho: E-commerce có 100,000 sản phẩm.",
-        "PPR trong mô hình Cache Components của Next.js 16: prerender static shell và stream phần request-time nằm sau Suspense. Bật bằng `cacheComponents: true` cho toàn ứng dụng."
+        "PPR trong mô hình Cache Components của Next.js: prerender static shell và stream phần request-time nằm sau Suspense. Bật bằng `cacheComponents: true` cho toàn ứng dụng."
       ],
       "codeRecipes": [
         {
           "title": "Bảng Tiêu chí Chọn Chiến lược Rendering",
           "language": "typescript",
-          "afterCode": "// next.config.ts — bật Cache Components/PPR trong Next.js 16\nimport type { NextConfig } from 'next';\nconst nextConfig: NextConfig = { cacheComponents: true };\nexport default nextConfig;\n\n// app/page.tsx — static shell + request-time content được stream\nimport { Suspense } from 'react';\n\nexport default function Page() {\n  return (\n    <div>\n      <StaticHeader />\n      <Suspense fallback={<Skeleton />}>\n        <DynamicFeed />\n      </Suspense>\n    </div>\n  );\n}\n\n// Với dữ liệu muốn cache trong Cache Components, đặt `use cache`\n// và cấu hình cacheLife/cacheTag trong hàm dữ liệu phù hợp.",
+          "afterCode": "// next.config.ts — bật Cache Components/PPR trong Next.js\nimport type { NextConfig } from 'next';\nconst nextConfig: NextConfig = { cacheComponents: true };\nexport default nextConfig;\n\n// app/page.tsx — static shell + request-time content được stream\nimport { Suspense } from 'react';\n\nexport default function Page() {\n  return (\n    <div>\n      <StaticHeader />\n      <Suspense fallback={<Skeleton />}>\n        <DynamicFeed />\n      </Suspense>\n    </div>\n  );\n}\n\n// Với dữ liệu muốn cache trong Cache Components, đặt `use cache`\n// và cấu hình cacheLife/cacheTag trong hàm dữ liệu phù hợp.",
           "takeaway": "Lựa chọn linh hoạt chiến lược phù hợp theo từng route cụ thể."
         }
       ],

@@ -94,7 +94,7 @@ export function CreateQuestionModal({ isOpen, onClose }: CreateQuestionModalProp
                   { value: 'typescript', label: 'TypeScript' },
                   { value: 'javascript', label: 'JavaScript' },
                   { value: 'go', label: 'Go (Golang)' },
-                  { value: 'react-19', label: 'React 19 Core' },
+                  { value: 'react-19', label: 'React Core' },
                   { value: 'next-app-router', label: 'Next.js App Router' },
                   { value: 'javascript-typescript', label: 'JavaScript / TypeScript' },
                   {

@@ -29,13 +29,13 @@ const navLinks = [
     href: '/learn',
     label: 'Lộ Trình Học',
     icon: BookOpen,
-    desc: 'React 19 & Next.js 16 80/20',
+    desc: 'React & Next.js 80/20',
   },
   {
     href: '/interview',
     label: 'Phỏng Vấn',
     icon: Briefcase,
-    desc: 'Ngân hàng câu hỏi Frontend',
+    desc: 'Ngân hàng câu hỏi kỹ thuật & phỏng vấn',
   },
   {
     href: '/ai',
@@ -289,7 +289,7 @@ export function Header() {
           </div>
 
           <div className="text-muted-foreground flex items-center justify-between pt-1 text-xs">
-            <span>NextPro Fullstack Platform</span>
+            <span>NextPro</span>
             <a
               href="https://github.com"
               target="_blank"

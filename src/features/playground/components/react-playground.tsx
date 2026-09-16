@@ -183,9 +183,17 @@ export function ReactPlayground({
                 <Code2 className="h-4 w-4" />
               </span>
               <div>
-                <h3 className="text-foreground text-xs font-bold sm:text-sm">
-                  React 19 Playground
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-foreground text-xs font-bold sm:text-sm">
+                    React Playground
+                  </h3>
+                  <Badge
+                    variant="outline"
+                    className="border-cyan-500/40 bg-cyan-500/10 font-mono text-[10px] font-semibold text-cyan-600 dark:text-cyan-400"
+                  >
+                    React v19.2
+                  </Badge>
+                </div>
                 <span className="text-muted-foreground hidden font-mono text-[10px] sm:inline">
                   Interactive Client Sandbox · Live Hot Reload
                 </span>
@@ -271,7 +279,7 @@ export function ReactPlayground({
             <div className="border-border/40 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
               <div className="text-muted-foreground flex items-center gap-2 text-xs">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                <span>Supports React 19, Lucide Icons, TypeScript & Hot-Reload.</span>
+                <span>Supports React, Lucide Icons, TypeScript & Hot-Reload.</span>
               </div>
 
               <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -588,7 +596,10 @@ export function ReactPlayground({
                 <span>0 errors</span>
               </span>
             )}
-            <span className="text-slate-500">React 19</span>
+            <span className="flex items-center gap-1.5 font-mono text-[10px] text-slate-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+              React v19.2
+            </span>
           </div>
         </div>
       </div>

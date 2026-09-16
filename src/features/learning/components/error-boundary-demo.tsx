@@ -12,7 +12,7 @@ import { CodeBlock } from '@/components/ui/code-block';
  *
  * 1. React Core Team chỉ cung cấp 2 primitive lifecycle methods: `getDerivedStateFromError` và `componentDidCatch`.
  *    React KHÔNG ship sẵn 1 component `<ErrorBoundary>` mặc định vì mỗi ứng dụng/framework lại có thiết kế Fallback UI khác nhau hoàn toàn.
- * 2. Trong Next.js 16 App Router: Next.js ĐÃ VIẾT SẴN Class Engine này ngầm cho bạn! Khi bạn tạo file `error.tsx`,
+ * 2. Trong Next.js App Router: Next.js ĐÃ VIẾT SẴN Class Engine này ngầm cho bạn! Khi bạn tạo file `error.tsx`,
  *    Next.js tự động bọc Class Engine này xung quanh Functional Component `error.tsx` của bạn.
  * 3. Trong React thuần (Vite/CRA): Bạn tự định nghĩa Class Engine này 1 lần (hoặc dùng package `react-error-boundary`).
  */
@@ -187,7 +187,7 @@ export function ErrorBoundaryDemo() {
 
       <p className="text-muted-foreground text-xs leading-relaxed">
         Lập trình viên sử dụng <strong>Functional Component API</strong> để bọc các nhánh
-        giao diện. Trong Next.js 16, file <code>error.tsx</code> chính là một Functional
+        giao diện. Trong Next.js, file <code>error.tsx</code> chính là một Functional
         Component nhận vào <code>{'{ error, reset }'}</code>!
       </p>
 

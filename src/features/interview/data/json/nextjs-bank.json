@@ -336,7 +336,7 @@
       "Không nhận biết được Date object khi serialize qua JSON thông thường sẽ thành string, trong khi RSC stream hỗ trợ parse Date tự động."
     ],
     "followUpQuestions": [
-      "Tại sao React lại hỗ trợ truyền Promise từ Server Component xuống Client Component thông qua hook `use()` trong React 19?",
+      "Tại sao React lại hỗ trợ truyền Promise từ Server Component xuống Client Component thông qua hook `use()` trong React?",
       "Server Actions được serialize và định danh qua mạng như thế nào khi truyền làm prop?"
     ]
   },
@@ -449,7 +449,7 @@
       "Data fetching co-location"
     ],
     "seniorAnswer": {
-      "summary": "App Router được xây dựng trên nền tảng React Server Components và React 19, mặc định chạy code trên server và chỉ gửi HTML + RSC Payload xuống browser. Ngược lại, Pages Router render component trên cả hai môi trường (SSR rồi full hydration) và dựa vào các hàm chuyên biệt như getServerSideProps/getStaticProps.",
+      "summary": "App Router được xây dựng trên nền tảng React Server Components và React, mặc định chạy code trên server và chỉ gửi HTML + RSC Payload xuống browser. Ngược lại, Pages Router render component trên cả hai môi trường (SSR rồi full hydration) và dựa vào các hàm chuyên biệt như getServerSideProps/getStaticProps.",
       "deepDive": "Trong Pages Router, mọi component trong thư mục `pages/` đều được đóng gói vào client bundle, dẫn đến chi phí tải JavaScript lớn và hiện tượng re-render toàn bộ trang khi chuyển route. App Router mang lại các cải tiến mang tính bước ngoặt: 1) **RSC theo mặc định**: dependencies nặng (markdown parser, DB drivers) không lọt vào client bundle; 2) **Nested Layouts**: các layout cha con lồng nhau duy trì state và không bị unmount khi điều hướng; 3) **Streaming SSR**: kết hợp với Suspense để gửi từng phần giao diện ngay khi có data mà không chặn toàn bộ trang; 4) **Data Fetching đơn giản hóa**: gọi async/await trực tiếp trong Server Component thay vì qua getStaticProps; 5) **Colocation**: cho phép đặt components, styles, tests cùng thư mục với route segment.",
       "codeExample": "// app/dashboard/layout.tsx (App Router: Layout giữ nguyên khi đổi tab)\nexport default function DashboardLayout({\n  children,\n}: { children: React.ReactNode }) {\n  return (\n    <div className=\"dashboard-shell\">\n      <Sidebar /> {/* Không bao giờ bị re-render khi chuyển trang con */}\n      <main>{children}</main>\n    </div>\n  );\n}",
       "codeLanguage": "tsx"
@@ -829,7 +829,7 @@
     ],
     "followUpQuestions": [
       "Làm thế nào để xử lý các thư viện truy cập `window` ngay khi import (top-level) mà ngay cả wrapper 'use client' vẫn bị crash?",
-      "React 19 Server Component ecosystem định hình chuẩn package exports (react-server condition) trong package.json như thế nào?"
+      "React Server Component ecosystem định hình chuẩn package exports (react-server condition) trong package.json như thế nào?"
     ]
   },
   {
@@ -961,7 +961,7 @@
     "category": "nextjs",
     "level": "middle",
     "question": "Streaming SSR trong Next.js hoạt động như thế nào?",
-    "interviewerIntent": "Đánh giá kiến thức về HTTP chunked transfer encoding, React 19 renderToPipeableStream, và cách phá vỡ nút thắt cổ chai (bottleneck) của SSR truyền thống.",
+    "interviewerIntent": "Đánh giá kiến thức về HTTP chunked transfer encoding, React renderToPipeableStream, và cách phá vỡ nút thắt cổ chai (bottleneck) của SSR truyền thống.",
     "contextOrScenario": "Trang chủ trang tin tức có 5 widget: tin nóng (10ms), thời tiết (50ms), tỷ giá (80ms), bảng điểm thể thao (2000ms). Tránh việc cả trang bị giữ lại 2 giây chỉ vì 1 widget chậm.",
     "expectedKeywords": [
       "Streaming SSR",
@@ -1023,19 +1023,19 @@
     "category": "nextjs",
     "level": "middle",
     "question": "Cách sử dụng Server Actions với HTML forms?",
-    "interviewerIntent": "Đánh giá kỹ năng tích hợp Server Actions với native HTML form, xử lý FormData, và các hook hiện đại trong React 19 như useActionState và useFormStatus.",
+    "interviewerIntent": "Đánh giá kỹ năng tích hợp Server Actions với native HTML form, xử lý FormData, và các hook hiện đại trong React như useActionState và useFormStatus.",
     "contextOrScenario": "Xây dựng form đăng ký tài khoản hỗ trợ Progressive Enhancement, có hiển thị trạng thái loading cho nút bấm và hiển thị thông báo lỗi từ server.",
     "expectedKeywords": [
       "form action attribute",
       "FormData object",
-      "useActionState (React 19)",
+      "useActionState (React)",
       "useFormStatus",
       "Progressive Enhancement",
       "Zod validation"
     ],
     "seniorAnswer": {
-      "summary": "Server Actions có thể được truyền trực tiếp vào thuộc tính `action` của thẻ `<form>`. Trong form submission, action tự động nhận đối tượng `FormData` chứa các giá trị của input. Kết hợp với React 19 `useActionState` và `useFormStatus`, bạn dễ dàng quản lý state kết quả và trạng thái pending.",
-      "deepDive": "Quy trình làm việc chuẩn mực: \n1) **Native Form Integration**: Thuộc tính `<form action={serverAction}>` tự động gửi dữ liệu qua POST request. \n2) **Xử lý FormData**: Trong Server Action, dữ liệu được lấy qua `formData.get('field')` và nên được parse qua Zod để đảm bảo kiểu dữ liệu và an toàn; \n3) **React 19 useActionState**: Thay thế `useFormState` cũ, nhận Server Action và initialState, trả về `[state, formAction, isPending]`; \n4) **React DOM useFormStatus**: Đặt trong component con của form để đọc thuộc tính `pending` mà không cần truyền prop drilling, giúp disable nút submit khi đang xử lý.",
+      "summary": "Server Actions có thể được truyền trực tiếp vào thuộc tính `action` của thẻ `<form>`. Trong form submission, action tự động nhận đối tượng `FormData` chứa các giá trị của input. Kết hợp với React `useActionState` và `useFormStatus`, bạn dễ dàng quản lý state kết quả và trạng thái pending.",
+      "deepDive": "Quy trình làm việc chuẩn mực: \n1) **Native Form Integration**: Thuộc tính `<form action={serverAction}>` tự động gửi dữ liệu qua POST request. \n2) **Xử lý FormData**: Trong Server Action, dữ liệu được lấy qua `formData.get('field')` và nên được parse qua Zod để đảm bảo kiểu dữ liệu và an toàn; \n3) **React useActionState**: Thay thế `useFormState` cũ, nhận Server Action và initialState, trả về `[state, formAction, isPending]`; \n4) **React DOM useFormStatus**: Đặt trong component con của form để đọc thuộc tính `pending` mà không cần truyền prop drilling, giúp disable nút submit khi đang xử lý.",
       "codeExample": "// components/register-form.tsx\n'use client';\n\nimport { useActionState } from 'react';\nimport { useFormStatus } from 'react-dom';\nimport { registerUserAction } from '@/app/actions/auth';\n\nfunction SubmitBtn() {\n  const { pending } = useFormStatus();\n  return (\n    <button type=\"submit\" disabled={pending}>\n      {pending ? 'Đang tạo tài khoản...' : 'Đăng ký'}\n    </button>\n  );\n}\n\nexport function RegisterForm() {\n  const [state, formAction] = useActionState(registerUserAction, { error: null });\n\n  return (\n    <form action={formAction}>\n      <input name=\"email\" type=\"email\" required />\n      {state.error && <p className=\"text-red-500\">{state.error}</p>}\n      <SubmitBtn />\n    </form>\n  );\n}",
       "codeLanguage": "tsx"
     },
@@ -1178,10 +1178,10 @@
     "category": "nextjs",
     "level": "middle",
     "question": "Optimistic updates với Server Actions và useOptimistic?",
-    "interviewerIntent": "Khảo sát kiến thức về kỹ thuật nâng cao trải nghiệm người dùng (zero-latency UI) bằng hook `useOptimistic` của React 19 kết hợp với Next.js Server Actions.",
+    "interviewerIntent": "Khảo sát kiến thức về kỹ thuật nâng cao trải nghiệm người dùng (zero-latency UI) bằng hook `useOptimistic` của React kết hợp với Next.js Server Actions.",
     "contextOrScenario": "Tính năng thả tim bài viết hoặc thêm tin nhắn chat: người dùng bấm like, số tim phải nhảy ngay lập tức trên màn hình thay vì đợi 500ms mạng server phản hồi; nếu server lỗi, giao diện tự động hoàn tác (rollback).",
     "expectedKeywords": [
-      "useOptimistic (React 19)",
+      "useOptimistic (React)",
       "Zero-latency UI",
       "Optimistic state",
       "Automatic rollback",
@@ -1189,7 +1189,7 @@
       "Server Action pairing"
     ],
     "seniorAnswer": {
-      "summary": "`useOptimistic` là React 19 hook cho phép cập nhật giao diện ngay lập tức với giả định rằng Server Action sẽ thực thi thành công. Nếu Server Action thành công, dữ liệu thật từ server sẽ đồng bộ lại; nếu server gặp lỗi hoặc throw exception, React tự động rollback giao diện về trạng thái ban đầu.",
+      "summary": "`useOptimistic` là React hook cho phép cập nhật giao diện ngay lập tức với giả định rằng Server Action sẽ thực thi thành công. Nếu Server Action thành công, dữ liệu thật từ server sẽ đồng bộ lại; nếu server gặp lỗi hoặc throw exception, React tự động rollback giao diện về trạng thái ban đầu.",
       "deepDive": "Cơ chế hoạt động của `useOptimistic`: \n1) Hook nhận `(passthroughState, updateFn)` và trả về `[optimisticState, setOptimistic]`; \n2) Khi người dùng kích hoạt sự kiện (ví dụ gửi tin nhắn), bạn gọi `setOptimistic(tempMessage)` bên trong một React Transition (hoặc bên trong Server Action được kích hoạt bởi form); \n3) Giao diện lập tức render với dữ liệu tạm thời (ví dụ tin nhắn hiển thị mờ với trạng thái 'đang gửi'); \n4) Server Action thực thi trên server. Khi hoàn thành và server revalidate, trạng thái chính thức sẽ thay thế trạng thái lạc quan; \n5) Nếu Action ném lỗi (error), transition bị hủy và React tự động khôi phục state ban đầu mà không cần lập trình viên viết code rollback thủ công.",
       "codeExample": "// components/like-button.tsx\n'use client';\n\nimport { useOptimistic, startTransition } from 'react';\nimport { toggleLikeAction } from '@/app/actions/like';\n\nexport function LikeButton({ initialLikes, postId }: { initialLikes: number; postId: string }) {\n  const [optimisticLikes, setOptimisticLikes] = useOptimistic(\n    initialLikes,\n    (current, update: number) => current + update\n  );\n\n  async function handleLike() {\n    startTransition(async () => {\n      setOptimisticLikes(1); // Cập nhật UI ngay lập tức\n      try {\n        await toggleLikeAction(postId);\n      } catch {\n        // Tự động rollback khi catch lỗi\n      }\n    });\n  }\n\n  return <button onClick={handleLike}>❤️ {optimisticLikes} Likes</button>;\n}",
       "codeLanguage": "tsx"
@@ -1635,7 +1635,7 @@
     ],
     "followUpQuestions": [
       "Cú pháp thứ hai của `revalidatePath(path, 'page' | 'layout')` có ý nghĩa cụ thể như thế nào?",
-      "Next.js 16/Canary giới thiệu `updateTag` khác gì với `revalidateTag` truyền thống?"
+      "Next.js giới thiệu `updateTag` khác gì với `revalidateTag` truyền thống?"
     ]
   },
   {
@@ -1674,10 +1674,10 @@
     "category": "nextjs",
     "level": "middle",
     "question": "useFormStatus và useActionState dùng để làm gì với Server Actions, và tại sao useFormStatus phải nằm trong component con của form?",
-    "interviewerIntent": "Đánh giá hiểu biết sâu sắc về các React 19 form hooks mới nhất và cơ chế React Context ngầm của DOM form status.",
+    "interviewerIntent": "Đánh giá hiểu biết sâu sắc về các React form hooks mới nhất và cơ chế React Context ngầm của DOM form status.",
     "contextOrScenario": "Phát triển form đổi thông tin người dùng: cần hiển thị spinner trên nút submit khi đang gửi, hiển thị lỗi validation dưới từng input khi server trả về, và ngăn chặn người dùng bấm submit nhiều lần.",
     "expectedKeywords": [
-      "useActionState (React 19)",
+      "useActionState (React)",
       "useFormStatus (react-dom)",
       "React Form Context",
       "Child component requirement",
@@ -1692,7 +1692,7 @@
     },
     "pitfalls": [
       "Gọi `const { pending } = useFormStatus();` ngay trong file `EditForm.tsx` (cùng file và ngang hàng với `<form>`), khiến `pending` luôn trả về `false`.",
-      "Nhầm lẫn `useFormState` (cũ) với `useActionState` (chuẩn React 19 hiện đại).",
+      "Nhầm lẫn `useFormState` (cũ) với `useActionState` (chuẩn React hiện đại).",
       "Quên gắn cờ `disabled={pending}` vào nút submit, cho phép người dùng spam click gây gửi nhiều request trùng nhau."
     ],
     "followUpQuestions": [
@@ -1820,7 +1820,7 @@
     ],
     "followUpQuestions": [
       "Khi nào nên dùng `export const dynamic = 'error'` trong quy trình kiểm soát chất lượng (QA/CI) dự án?",
-      "Next.js 16 với tính năng Cache Components ('use cache') sẽ thay thế dần những segment config nào ở trên?"
+      "Next.js với tính năng Cache Components ('use cache') sẽ thay thế dần những segment config nào ở trên?"
     ]
   },
   {
@@ -2129,7 +2129,7 @@
       "Truyền object có cấu trúc tham chiếu vòng (Circular Reference) làm crash quá trình parse JSON của server."
     ],
     "followUpQuestions": [
-      "React 19 hỗ trợ truyền Promise qua props từ Server Component xuống Client Component như thế nào với hook `use()`?",
+      "React hỗ trợ truyền Promise qua props từ Server Component xuống Client Component như thế nào với hook `use()`?",
       "Làm thế nào để đo lường kích thước chính xác của RSC Payload trên từng route để phát hiện payload bloat?"
     ]
   },
@@ -2572,7 +2572,7 @@
     "category": "nextjs",
     "level": "senior",
     "question": "Dữ liệu lấy bằng Prisma (không qua fetch) thì Data Cache và revalidateTag có tác dụng không?",
-    "interviewerIntent": "Đánh giá kiến thức cốt lõi về cơ chế caching của Next.js: nhận thức rõ Data Cache mặc định chỉ tích hợp với Fetch API, và cách dùng `unstable_cache` (hoặc React 19 `use cache`) để tích hợp ORMs vào Data Cache.",
+    "interviewerIntent": "Đánh giá kiến thức cốt lõi về cơ chế caching của Next.js: nhận thức rõ Data Cache mặc định chỉ tích hợp với Fetch API, và cách dùng `unstable_cache` (hoặc React `use cache`) để tích hợp ORMs vào Data Cache.",
     "contextOrScenario": "Dự án sử dụng Prisma ORM truy vấn trực tiếp cơ sở dữ liệu `await prisma.post.findMany()`. Lập trình viên cố gắng gọi `revalidateTag('posts')` nhưng thấy không có bất kỳ hiệu lực nào, dữ liệu hoặc là luôn bị gọi lại ở mỗi request hoặc không được cache đúng ý đồ.",
     "expectedKeywords": [
       "Fetch API patch vs ORM",
@@ -2580,11 +2580,11 @@
       "React cache() vs unstable_cache",
       "Data Cache integration",
       "Custom Cache Keys and Tags",
-      "'use cache' (Next.js 16)"
+      "'use cache' (Next.js)"
     ],
     "seniorAnswer": {
-      "summary": "**Hoàn toàn KHÔNG có tác dụng**. Next.js chỉ tự động tích hợp Data Cache và `revalidateTag` với hàm `fetch` toàn cục đã được vá (patched fetch). Khi truy vấn qua Prisma, Drizzle, hoặc database driver trực tiếp, bạn bắt buộc phải bọc câu truy vấn đó trong hàm `unstable_cache()` (hoặc directive `'use cache'` trong Next.js 16) thì mới có thể gán cache tags và revalidate.",
-      "deepDive": "Sự khác biệt căn bản giữa hai cơ chế: \n1) **Hạn chế của ORM**: Prisma gửi câu lệnh qua kết nối TCP socket hoặc binary engine, Next.js không có cách nào tự động can thiệp hay lưu cache kết quả này vào Data Cache nếu bạn chỉ gọi `prisma.user.findMany()`; \n2) **Giải pháp với `unstable_cache`**: \n  - Nhận vào 3 tham số: `(callbackFn, keyParts, options: { revalidate, tags })`; \n  - Lưu kết quả vào hệ thống Data Cache chung của Next.js; \n  - Cho phép sử dụng `revalidateTag` y hệt như với fetch; \n3) **Phân biệt với `React.cache`**: `React.cache()` chỉ có tác dụng trong **phạm vi 1 request duy nhất** (Request Memoization), không lưu persistent giữa các requests của các người dùng khác nhau; \n4) **Tương lai Next.js 16**: Tính năng Cache Components với directive `'use cache'` kết hợp `cacheTag()` sẽ thay thế `unstable_cache` thành chuẩn ngôn ngữ chính thức.",
+      "summary": "**Hoàn toàn KHÔNG có tác dụng**. Next.js chỉ tự động tích hợp Data Cache và `revalidateTag` với hàm `fetch` toàn cục đã được vá (patched fetch). Khi truy vấn qua Prisma, Drizzle, hoặc database driver trực tiếp, bạn bắt buộc phải bọc câu truy vấn đó trong hàm `unstable_cache()` (hoặc directive `'use cache'` trong Next.js) thì mới có thể gán cache tags và revalidate.",
+      "deepDive": "Sự khác biệt căn bản giữa hai cơ chế: \n1) **Hạn chế của ORM**: Prisma gửi câu lệnh qua kết nối TCP socket hoặc binary engine, Next.js không có cách nào tự động can thiệp hay lưu cache kết quả này vào Data Cache nếu bạn chỉ gọi `prisma.user.findMany()`; \n2) **Giải pháp với `unstable_cache`**: \n  - Nhận vào 3 tham số: `(callbackFn, keyParts, options: { revalidate, tags })`; \n  - Lưu kết quả vào hệ thống Data Cache chung của Next.js; \n  - Cho phép sử dụng `revalidateTag` y hệt như với fetch; \n3) **Phân biệt với `React.cache`**: `React.cache()` chỉ có tác dụng trong **phạm vi 1 request duy nhất** (Request Memoization), không lưu persistent giữa các requests của các người dùng khác nhau; \n4) **Tương lai Next.js**: Tính năng Cache Components với directive `'use cache'` kết hợp `cacheTag()` sẽ thay thế `unstable_cache` thành chuẩn ngôn ngữ chính thức.",
       "codeExample": "// lib/data/posts.ts\nimport { unstable_cache } from 'next/cache';\nimport { db } from '@/lib/db';\n\n// Bọc Prisma query vào Data Cache của Next.js kèm tags\nexport const getCachedPosts = unstable_cache(\n  async () => {\n    return db.post.findMany({ where: { published: true } });\n  },\n  ['all-published-posts'], // Cache key duy nhất\n  {\n    revalidate: 3600,      // TTL 1 giờ\n    tags: ['posts-cache'], // Tag để revalidate sau này\n  }\n);\n\n// Sau đó trong Server Action:\n// revalidateTag('posts-cache'); -> Lập tức xóa cache Prisma này!",
       "codeLanguage": "typescript"
     },
@@ -2595,7 +2595,7 @@
     ],
     "followUpQuestions": [
       "Tại sao `keyParts` trong `unstable_cache` lại bắt buộc phải bao gồm tất cả các tham số truyền vào hàm truy vấn?",
-      "Next.js 16 định hình lại cơ chế cache cho ORMs bằng directive `'use cache'` và hàm `cacheTag()` như thế nào?"
+      "Next.js định hình lại cơ chế cache cho ORMs bằng directive `'use cache'` và hàm `cacheTag()` như thế nào?"
     ]
   },
   {
@@ -2769,8 +2769,8 @@
       "suppressHydrationWarning"
     ],
     "seniorAnswer": {
-      "summary": "Hydration Mismatch xảy ra khi cây DOM sinh ra từ Server HTML khác biệt với cây Virtual DOM mà React tính toán ở Client trong lần render đầu tiên. Lỗi này thường xuất hiện ở production do: sự khác biệt Timezone/Locale giữa server và máy người dùng, đọc trực tiếp `window/localStorage`, hoặc do tiện ích mở rộng (Browser Extensions) can thiệp vào DOM. Truy vết bằng cách phân tích chuỗi Server/Client diff trong React 19 hoặc cô lập component bằng flag `isMounted`.",
-      "deepDive": "Các nguyên nhân cốt lõi và quy trình điều tra của Senior Engineer: \n1) **Tại sao dev không thấy mà prod lại bị?**: \n  - Server build production chạy trong Docker (Timezone UTC) trong khi dev chạy trên máy Mac của lập trình viên (Timezone GMT+7); lệnh `new Date().toLocaleDateString()` sinh ra chuỗi khác nhau; \n  - Các tiện ích mở rộng (Grammarly, Google Translate, Password Managers) tự ý chèn thuộc tính hoặc thẻ `<font>` vào DOM của người dùng thật; \n2) **Quy trình truy vết (Troubleshooting)**: \n  - Kiểm tra thông báo lỗi: React 19 và Next.js hiện đại hiển thị chi tiết trực quan (visual diff) chỉ rõ thẻ HTML và text node bị lệch; \n  - Kiểm tra các biểu thức không tất định (non-deterministic): `Math.random()`, `Date.now()`, `window.innerWidth`; \n3) **Giải pháp kiến trúc**: \n  - Với ngày tháng: Chỉ format ngày tháng trong `useEffect` hoặc dùng component chuyên dụng với cờ `suppressHydrationWarning`; \n  - Dùng mẫu thiết kế `useIsMounted()` hai pha để đảm bảo logic browser chỉ render sau khi đã hydrate xong.",
+      "summary": "Hydration Mismatch xảy ra khi cây DOM sinh ra từ Server HTML khác biệt với cây Virtual DOM mà React tính toán ở Client trong lần render đầu tiên. Lỗi này thường xuất hiện ở production do: sự khác biệt Timezone/Locale giữa server và máy người dùng, đọc trực tiếp `window/localStorage`, hoặc do tiện ích mở rộng (Browser Extensions) can thiệp vào DOM. Truy vết bằng cách phân tích chuỗi Server/Client diff trong React hoặc cô lập component bằng flag `isMounted`.",
+      "deepDive": "Các nguyên nhân cốt lõi và quy trình điều tra của Senior Engineer: \n1) **Tại sao dev không thấy mà prod lại bị?**: \n  - Server build production chạy trong Docker (Timezone UTC) trong khi dev chạy trên máy Mac của lập trình viên (Timezone GMT+7); lệnh `new Date().toLocaleDateString()` sinh ra chuỗi khác nhau; \n  - Các tiện ích mở rộng (Grammarly, Google Translate, Password Managers) tự ý chèn thuộc tính hoặc thẻ `<font>` vào DOM của người dùng thật; \n2) **Quy trình truy vết (Troubleshooting)**: \n  - Kiểm tra thông báo lỗi: React và Next.js hiện đại hiển thị chi tiết trực quan (visual diff) chỉ rõ thẻ HTML và text node bị lệch; \n  - Kiểm tra các biểu thức không tất định (non-deterministic): `Math.random()`, `Date.now()`, `window.innerWidth`; \n3) **Giải pháp kiến trúc**: \n  - Với ngày tháng: Chỉ format ngày tháng trong `useEffect` hoặc dùng component chuyên dụng với cờ `suppressHydrationWarning`; \n  - Dùng mẫu thiết kế `useIsMounted()` hai pha để đảm bảo logic browser chỉ render sau khi đã hydrate xong.",
       "codeExample": "// components/client-date.tsx (Mẫu chuẩn xử lý lệch Timezone Hydration)\n'use client';\n\nimport { useState, useEffect } from 'react';\n\nexport function ClientFormattedDate({ date }: { date: Date | string }) {\n  const [formatted, setFormatted] = useState<string>('');\n\n  useEffect(() => {\n    // Chỉ chạy trên trình duyệt người dùng sau khi hydration hoàn tất\n    setFormatted(new Date(date).toLocaleString());\n  }, [date]);\n\n  // Giai đoạn SSR và Client Initial Render dùng chung fallback rỗng hoặc placeholder cố định\n  if (!formatted) {\n    return <span className=\"opacity-0\">Đang tải...</span>;\n  }\n\n  return <span>{formatted}</span>;\n}",
       "codeLanguage": "tsx"
     },
@@ -2781,7 +2781,7 @@
     ],
     "followUpQuestions": [
       "Tại sao các trình duyệt tự động sửa lỗi HTML (HTML Auto-correction) lại là thủ phạm chính gây ra Hydration Mismatch?",
-      "React 19 đã cải tiến cơ chế hiển thị lỗi Hydration Mismatch như thế nào so với các phiên bản React cũ?"
+      "React đã cải tiến cơ chế hiển thị lỗi Hydration Mismatch như thế nào so với các phiên bản React cũ?"
     ]
   },
   {

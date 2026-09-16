@@ -11,7 +11,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
   <!-- Tailwind CSS -->
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   
-  <!-- Single-Instance Unified React 19.2.8 & ReactDOM 19.2.8 Loader -->
+  <!-- Single-Instance Unified React & ReactDOM Loader -->
   <script type="module">
     try {
       const [React, ReactDOM, ReactDOMClient] = await Promise.all([
@@ -47,7 +47,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
       window.__REACT_RUNTIME_READY__ = true;
       window.dispatchEvent(new Event('react-runtime-ready'));
     } catch (err) {
-      console.error('Failed to load React 19.2.8:', err);
+      console.error('Failed to load React:', err);
       window.__REACT_RUNTIME_ERROR__ = err instanceof Error ? err.message : String(err);
       window.dispatchEvent(new Event('react-runtime-error'));
     }
@@ -80,7 +80,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
     <div id="root">
       <div style="display:flex;align-items:center;justify-content:center;min-height:160px;font-family:monospace;font-size:12px;color:#94a3b8;gap:8px;">
         <div style="width:14px;height:14px;border:2px solid #38bdf8;border-top-color:transparent;border-radius:50%;animation:spin 1s linear infinite;"></div>
-        <span>Đang khởi động React 19.2.8 Runtime...</span>
+        <span>Đang khởi động React Runtime...</span>
       </div>
       <style>
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -428,7 +428,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
         return norm;
       };
 
-      // 7. Execution Function (Strict React 19 Single Instance)
+      // 7. Execution Function (Strict React Single Instance)
       function executeProject(runId, entryPath, modules) {
         currentRunId = runId;
         logCount = 0;
@@ -703,7 +703,7 @@ export function generateIframeSrcDoc(sessionId: string): string {
         }
       });
 
-      // 9. Asynchronous Polling for Unified React 19.2.8 availability
+      // 9. Asynchronous Polling for Unified React availability
       function bootstrapRuntime(attempts) {
         attempts = attempts || 0;
         if (window.__REACT_RUNTIME_READY__ === true && window.React && window.ReactDOM && window.ReactDOM.createRoot) {
@@ -736,13 +736,13 @@ export function generateIframeSrcDoc(sessionId: string): string {
             type: 'ERROR',
             payload: {
               category: 'RuntimeBootstrapError',
-              message: 'Không thể tải React 19.2.8 Runtime: ' + window.__REACT_RUNTIME_ERROR__
+              message: 'Không thể tải React Runtime: ' + window.__REACT_RUNTIME_ERROR__
             }
           }, '*');
           const rootEl = document.getElementById('root');
           if (rootEl) {
             rootEl.innerHTML = '<div style="padding:16px;background:#450a0a;border:1px solid #dc2626;color:#fecaca;font-family:monospace;border-radius:8px;font-size:12px;">' +
-              '<b>⚠️ Không thể tải React 19.2.8 Runtime:</b> ' + window.__REACT_RUNTIME_ERROR__ + '<br/>Vui lòng kiểm tra kết nối mạng hoặc tắt extension chặn CDN.</div>';
+              '<b>⚠️ Không thể tải React Runtime:</b> ' + window.__REACT_RUNTIME_ERROR__ + '<br/>Vui lòng kiểm tra kết nối mạng hoặc tắt extension chặn CDN.</div>';
           }
           return;
         }
@@ -757,13 +757,13 @@ export function generateIframeSrcDoc(sessionId: string): string {
             type: 'ERROR',
             payload: {
               category: 'RuntimeBootstrapError',
-              message: 'Quá thời gian tải React 19.2.8 Runtime.'
+              message: 'Quá thời gian tải React Runtime.'
             }
           }, '*');
           const rootEl = document.getElementById('root');
           if (rootEl) {
             rootEl.innerHTML = '<div style="padding:16px;background:#450a0a;border:1px solid #dc2626;color:#fecaca;font-family:monospace;border-radius:8px;font-size:12px;">' +
-              '<b>⚠️ Quá thời gian tải React 19.2.8 Runtime:</b> Vui lòng kiểm tra kết nối mạng hoặc thử tải lại.</div>';
+              '<b>⚠️ Quá thời gian tải React Runtime:</b> Vui lòng kiểm tra kết nối mạng hoặc thử tải lại.</div>';
           }
         }
       }

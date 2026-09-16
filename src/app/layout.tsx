@@ -14,18 +14,27 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: 'NextPro - Production Ready Enterprise Template',
   description:
-    'Modern Next.js 16 template with shadcn/ui, TanStack Query, Axios, Tailwind CSS, Zustand, ESLint, Prettier, and Husky pre-commit hooks.',
+    'Modern Fullstack & Enterprise Platform with Next.js, React, TypeScript, Go, TanStack Query, Tailwind CSS, and Zustand.',
   keywords: [
     'Next.js',
-    'React 19',
+    'React',
+    'TypeScript',
+    'Go',
     'shadcn/ui',
     'TailwindCSS',
     'TanStack Query',
     'Zustand',
     'Axios',
-    'TypeScript',
   ],
   authors: [{ name: 'Antigravity Dev' }],
+  icons: {
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: 'any' },
+    ],
+    apple: [{ url: '/apple-icon.png', sizes: '180x180', type: 'image/png' }],
+    shortcut: ['/favicon.ico'],
+  },
 };
 
 export const viewport: Viewport = {
