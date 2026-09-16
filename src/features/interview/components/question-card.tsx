@@ -68,6 +68,30 @@ function getCategoryBadge(category: string) {
         className:
           'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30 font-semibold',
       };
+    case 'nestjs':
+      return {
+        label: '🐱 NestJS',
+        className:
+          'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 font-semibold',
+      };
+    case 'nodejs':
+      return {
+        label: '🟩 Node.js',
+        className:
+          'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-semibold',
+      };
+    case 'python':
+      return {
+        label: '🐍 Python',
+        className:
+          'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30 font-semibold',
+      };
+    case 'django':
+      return {
+        label: '🎯 Django',
+        className:
+          'bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30 font-semibold',
+      };
     case 'javascript-typescript':
       return {
         label: '🟨 JS / 🔷 TS',

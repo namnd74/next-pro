@@ -1,0 +1,1730 @@
+[
+  {
+    "id": "nestjs-001",
+    "category": "nestjs",
+    "level": "junior",
+    "question": "Module trong NestJS là gì? Giải thích cấu trúc @Module decorator.",
+    "interviewerIntent": "Đánh giá hiểu biết nền tảng về tổ chức code theo Domain-driven / Feature-based module và cách Nest IoC container quản lý module graph.",
+    "contextOrScenario": "Khởi tạo và module hóa dự án thương mại điện tử lớn, phân tách ranh giới giữa User, Order, Payment và Catalog.",
+    "expectedKeywords": [
+      "@Module",
+      "providers",
+      "controllers",
+      "imports",
+      "exports",
+      "Module Graph",
+      "IoC Container"
+    ],
+    "seniorAnswer": {
+      "summary": "Module là class được gắn decorator @Module(), đóng vai trò là đơn vị cấu trúc cơ bản và ranh giới bao gói (encapsulation boundary) trong NestJS. Nó cung cấp metadata để Nest runtime xây dựng Module Graph (đồ hình quan hệ phụ thuộc) khi khởi động ứng dụng.",
+      "deepDive": "@Module() nhận metadata object gồm 4 mảng chính: 1) providers: các service, repository, factory được khởi tạo và quản lý trong scope của module này; 2) controllers: các API route handlers cần khởi tạo; 3) imports: các module khác mà module này phụ thuộc vào để tái sử dụng các exported providers; 4) exports: tập con các providers mà module này muốn công khai (expose) cho các module khác import. Mặc định mọi provider trong NestJS đều được đóng gói kín (private to module), không thể inject từ bên ngoài nếu chưa được khai báo tường minh trong exports.",
+      "codeExample": "@Module({\n  imports: [TypeOrmModule.forFeature([UserEntity]), AuthModule],\n  controllers: [UserController],\n  providers: [UserService, UserAnalyticsService],\n  exports: [UserService], // Chỉ expose UserService, giữ kín UserAnalyticsService\n})\nexport class UserModule {}"
+    },
+    "pitfalls": [
+      "Quên đưa service vào mảng exports khiến module khác dù đã import UserModule vẫn bị lỗi Nest can't resolve dependencies.",
+      "Lạm dụng @Global() decorator bừa bãi làm mất tính ranh giới đóng gói, gây khó kiểm soát đồ hình phụ thuộc và xung đột state."
+    ],
+    "followUpQuestions": [
+      "Sự khác nhau giữa Dynamic Module (forRoot/forFeature) và Static Module là gì?",
+      "Global Module (@Global()) giải quyết vấn đề gì và khi nào nên sử dụng?"
+    ]
+  },
+  {
+    "id": "nestjs-002",
+    "category": "nestjs",
+    "level": "junior",
+    "question": "Controller trong NestJS làm gì? Cách định nghĩa routes với decorators?",
+    "interviewerIntent": "Đánh giá khả năng xử lý HTTP request/response cycle, routing declarative và việc sử dụng các method/param decorators chuẩn của NestJS.",
+    "contextOrScenario": "Xây dựng RESTful API endpoint chuẩn cho module Order, tiếp nhận payload, validate và phân phối tới Service.",
+    "expectedKeywords": [
+      "@Controller",
+      "Route Decorators",
+      "@Get/@Post",
+      "Param Decorators",
+      "@Body",
+      "@Param",
+      "@Query",
+      "HttpCode"
+    ],
+    "seniorAnswer": {
+      "summary": "Controller đóng vai trò tiếp nhận incoming HTTP requests từ client, phân tích route params/headers/body, ủy quyền thực thi nghiệp vụ cho các Service/Use-case và trả về HTTP response tương ứng.",
+      "deepDive": "Controller sử dụng decorator @Controller('prefix') để gắn URL path prefix. Các method bên trong gắn method decorators (@Get, @Post, @Put, @Patch, @Delete) để map HTTP verb. NestJS cung cấp bộ param decorators (@Body(), @Param(), @Query(), @Headers(), @Req(), @Res()) giúp trích xuất dữ liệu một cách declarative. Khác với Express thuần phải req.body hay req.params thủ công, NestJS tự động mapping metadata thông qua reflection. Đặc biệt, controller nên giữ 'skinny' (chỉ điều phối luồng, không chứa business logic phức tạp).",
+      "codeExample": "@Controller('orders')\nexport class OrderController {\n  constructor(private readonly orderService: OrderService) {}\n\n  @Post()\n  @HttpCode(HttpStatus.CREATED)\n  create(@Body() dto: CreateOrderDto) {\n    return this.orderService.createOrder(dto);\n  }\n\n  @Get(':id')\n  findById(@Param('id', ParseUUIDPipe) id: string) {\n    return this.orderService.getOrderById(id);\n  }\n}"
+    },
+    "pitfalls": [
+      "Inject trực tiếp @Res() res: Response mà không có passthrough: true, làm mất cơ chế serialization tự động của NestJS và vô hiệu hóa Interceptors transform response.",
+      "Viết logic database query trực tiếp trong Controller thay vì phân tầng xuống Service/Repository."
+    ],
+    "followUpQuestions": [
+      "Khi nào nên dùng @Res({ passthrough: true }) thay vì dùng @Res() thuần?",
+      "Làm thế nào để custom một Param Decorator (ví dụ @CurrentUser())?"
+    ]
+  },
+  {
+    "id": "nestjs-003",
+    "category": "nestjs",
+    "level": "junior",
+    "question": "Provider và Dependency Injection trong NestJS hoạt động như thế nào?",
+    "interviewerIntent": "Kiểm tra sự hiểu biết cốt lõi về nguyên lý Inversion of Control (IoC), Dependency Injection (DI) pattern và cơ chế reflection metadata trong TypeScript.",
+    "contextOrScenario": "Thiết kế kiến trúc Loose Coupling cho ứng dụng backend để dễ dàng mở rộng, thay thế và viết unit test mock.",
+    "expectedKeywords": [
+      "Dependency Injection",
+      "IoC Container",
+      "@Injectable",
+      "reflect-metadata",
+      "Constructor Injection",
+      "Singleton"
+    ],
+    "seniorAnswer": {
+      "summary": "Provider là bất kỳ class nào được đánh dấu bởi @Injectable(), cho phép NestJS IoC Container quản lý vòng đời, tự động khởi tạo và inject (bơm) vào các class khác thông qua constructor injection.",
+      "deepDive": "Khi TypeScript compile với 'emitDecoratorMetadata: true', trình biên dịch sẽ tạo metadata về kiểu dữ liệu tham số trong constructor ('design:paramtypes'). Khi runtime khởi chạy, IoC Container đọc metadata này qua reflect-metadata, tìm instance tương ứng trong Module Graph rồi inject vào constructor. Mặc định mọi provider là Singleton, container chỉ tạo 1 instance duy nhất và tái sử dụng xuyên suốt vòng đời ứng dụng, giúp tối ưu bộ nhớ và chia sẻ state có kiểm soát.",
+      "codeExample": "@Injectable()\nexport class NotificationService {\n  sendEmail(to: string, message: string) {\n    // Send logic\n  }\n}\n\n@Injectable()\nexport class UserService {\n  // Nest IoC Container tự động inject NotificationService\n  constructor(private readonly notificationService: NotificationService) {}\n}"
+    },
+    "pitfalls": [
+      "Quên gắn @Injectable() vào class provider, khiến TypeScript không emit decorator metadata và Nest không thể resolve dependency.",
+      "Tự tạo instance bằng từ khóa 'new MyService()' bên trong controller thay vì để IoC container quản lý, gây gãy vỡ chuỗi DI và khó test."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để inject một provider dựa trên Interface hoặc String/Symbol Token?",
+      "Điều gì xảy ra khi hai service inject lẫn nhau (Circular Dependency)?"
+    ]
+  },
+  {
+    "id": "nestjs-004",
+    "category": "nestjs",
+    "level": "junior",
+    "question": "ConfigModule và ConfigService trong NestJS hoạt động như thế nào?",
+    "interviewerIntent": "Đánh giá phương pháp quản lý biến môi trường an toàn, tập trung, type-safe và kỹ thuật fail-fast khi boot application.",
+    "contextOrScenario": "Quản lý cấu hình nhiều môi trường (local, staging, production) với các secret như DATABASE_URL, REDIS_PORT, JWT_SECRET.",
+    "expectedKeywords": [
+      "ConfigModule",
+      "ConfigService",
+      ".env",
+      "Joi / Zod validation",
+      "isGlobal: true",
+      "Type-safe config"
+    ],
+    "seniorAnswer": {
+      "summary": "@nestjs/config cung cấp ConfigModule và ConfigService gói gọn thư viện dotenv, hỗ trợ load file .env, validate schema biến môi trường và cung cấp service tập trung để inject cấu hình an toàn.",
+      "deepDive": "ConfigModule.forRoot() thường được cấu hình với isGlobal: true ở AppModule để tránh import lại ở từng feature module. Senior practice luôn yêu cầu validate cấu hình lúc boot bằng Joi schema hoặc Zod (Fail-fast principle): nếu thiếu biến môi trường bắt buộc (như JWT_SECRET), ứng dụng crash ngay lập tức thay vì chạy ngầm rồi lỗi ở runtime. ConfigService cung cấp hàm .get<T>('KEY') hỗ trợ generic type và fallback value, hoặc dùng custom namespaces với registerAs() để có autocomplete type-safe 100%.",
+      "codeExample": "@Module({\n  imports: [\n    ConfigModule.forRoot({\n      isGlobal: true,\n      validationSchema: Joi.object({\n        NODE_ENV: Joi.string().valid('dev', 'prod', 'test').default('dev'),\n        PORT: Joi.number().default(3000),\n        DATABASE_URL: Joi.string().required(),\n      }),\n    }),\n  ],\n})\nexport class AppModule {}"
+    },
+    "pitfalls": [
+      "Truy cập trực tiếp process.env.KEY rải rác khắp các service, khiến code bị phụ thuộc vào global environment và không thể mock khi viết unit test.",
+      "Không validate biến môi trường khi boot, dẫn đến việc app khởi động thành công nhưng lỗi runtime khi user thực hiện tác vụ gọi tới database/Stripe."
+    ],
+    "followUpQuestions": [
+      "Cách sử dụng registerAs() và ConfigType để tạo type-safe configuration trong NestJS?",
+      "Làm sao để load các file .env khác nhau dựa vào NODE_ENV (vd .env.development, .env.production)?"
+    ]
+  },
+  {
+    "id": "nestjs-005",
+    "category": "nestjs",
+    "level": "junior",
+    "question": "Swagger / OpenAPI documentation trong NestJS — setup và các annotations phổ biến?",
+    "interviewerIntent": "Kiểm tra kỹ năng tài liệu hóa API tự động, chuẩn hóa giao tiếp giữa Backend và Frontend/Mobile team.",
+    "contextOrScenario": "Thiết lập API docs interactive cho hệ thống Microservices/REST API công khai cho đối tác và frontend.",
+    "expectedKeywords": [
+      "@nestjs/swagger",
+      "DocumentBuilder",
+      "SwaggerModule",
+      "@ApiProperty",
+      "@ApiOperation",
+      "@ApiResponse",
+      "@ApiBearerAuth"
+    ],
+    "seniorAnswer": {
+      "summary": "@nestjs/swagger tự động sinh OpenAPI (Swagger) spec từ TypeScript AST và decorators, cung cấp giao diện Swagger UI tương tác trực tiếp trên browser.",
+      "deepDive": "Trong main.ts, khởi tạo DocumentBuilder để khai báo Title, Version, Bearer Auth scheme, sau đó tạo document qua SwaggerModule.createDocument() và mount qua SwaggerModule.setup('api-docs', app, document). Trên controller và DTO, sử dụng các decorators: @ApiTags() gom nhóm controller, @ApiOperation() mô tả chức năng, @ApiResponse() định nghĩa HTTP status & model trả về, @ApiBearerAuth() bảo vệ route, @ApiProperty() trên class properties để Swagger render schema validator.",
+      "codeExample": "// main.ts\nconst config = new DocumentBuilder()\n  .setTitle('Core Banking API')\n  .setVersion('1.0')\n  .addBearerAuth()\n  .build();\nconst document = SwaggerModule.createDocument(app, config);\nSwaggerModule.setup('docs', app, document);\n\n// create-user.dto.ts\nexport class CreateUserDto {\n  @ApiProperty({ example: 'user@example.com', description: 'User corporate email' })\n  @IsEmail()\n  email: string;\n}"
+    },
+    "pitfalls": [
+      "Sử dụng TypeScript interface thay vì class cho DTO, khiến Swagger không đọc được metadata ở runtime vì interface bị xóa sạch sau khi compile.",
+      "Quên cấu hình Swagger Plugin trong nest-cli.json dẫn đến việc phải khai báo @ApiProperty() thủ công cho hàng trăm fields gây thừa boilerplate."
+    ],
+    "followUpQuestions": [
+      "Swagger CLI Plugin trong nest-cli.json hoạt động như thế nào và tiết kiệm được công việc gì?",
+      "Làm thế nào để ẩn hoàn toàn một endpoint nội bộ hoặc môi trường Production khỏi Swagger UI?"
+    ]
+  },
+  {
+    "id": "nestjs-006",
+    "category": "nestjs",
+    "level": "junior",
+    "question": "App NestJS báo Nest can't resolve dependencies of the OrderService (?) — nguyên nhân và cách đọc thông báo lỗi này?",
+    "interviewerIntent": "Đánh giá năng lực debug lỗi phổ biến và gây bối rối nhất trong NestJS DI Container, khả năng đọc hiểu IoC stack trace.",
+    "contextOrScenario": "Khi khởi động app (npm run start:dev), console crash với thông báo lỗi 'Nest can't resolve dependencies of the OrderService (?, PaymentService)'.",
+    "expectedKeywords": [
+      "Nest can't resolve dependencies",
+      "Index ?",
+      "DI troubleshooting",
+      "imports/exports",
+      "Forward reference",
+      "TypeORM forFeature"
+    ],
+    "seniorAnswer": {
+      "summary": "Lỗi này xảy ra khi Nest IoC Container không thể tìm thấy instance của provider cần inject tại vị trí dấu chấm hỏi (?) trong danh sách tham số của constructor.",
+      "deepDive": "Dấu hỏi (?) xuất hiện ở chỉ số tham số (parameter index). Nếu báo (?, PaymentService) thì tham số thứ nhất bị thiếu; nếu báo (UserService, ?) thì tham số thứ hai bị thiếu. Nguyên nhân cốt lõi: 1) Class cần inject chưa được thêm vào mảng 'providers' của module hiện tại; 2) Class thuộc module khác nhưng module đó chưa 'exports', hoặc module hiện tại chưa 'imports' module đó; 3) Inject token dạng string/symbol hoặc interface nhưng quên decorator @Inject('TOKEN'); 4) Circular dependency giữa hai service khiến một bên nhận undefined khi boot.",
+      "codeExample": "// Lỗi xảy ra:\n@Injectable()\nexport class OrderService {\n  constructor(\n    private readonly userRepo: Repository<User>, // Index 0: ? nếu thiếu TypeOrmModule.forFeature\n    private readonly paymentService: PaymentService, // Index 1\n  ) {}\n}\n\n// Khắc phục tại OrderModule:\n@Module({\n  imports: [TypeOrmModule.forFeature([User]), PaymentModule],\n  providers: [OrderService],\n})\nexport class OrderModule {}"
+    },
+    "pitfalls": [
+      "Cố tình khai báo service của module khác vào mảng providers của OrderModule thay vì import module của nó, tạo ra hai instance riêng biệt gây lỗi state/DB session.",
+      "Không nhận ra vị trí dấu '?' tương ứng thứ tự tham số trong constructor dẫn đến việc debug sai service."
+    ],
+    "followUpQuestions": [
+      "Nếu lỗi do Circular Dependency (vòng lặp phụ thuộc) thì thông báo lỗi trông như thế nào và cách giải quyết?",
+      "Làm sao dùng forwardRef() để xử lý circular dependency giữa 2 service?"
+    ]
+  },
+  {
+    "id": "nestjs-007",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "NestJS là gì? Tại sao nên dùng NestJS thay vì Express thuần?",
+    "interviewerIntent": "Khảo sát tư duy kiến trúc phần mềm của ứng viên, khả năng so sánh trade-off giữa unopinionated library (Express) và opinionated framework (NestJS) cho hệ thống lớn.",
+    "contextOrScenario": "Quyết định lựa chọn backend tech stack cho dự án enterprise quy mô 20+ lập trình viên, cần bảo trì trong 5-10 năm.",
+    "expectedKeywords": [
+      "Opinionated Architecture",
+      "Modularity",
+      "TypeScript First",
+      "Dependency Injection",
+      "Scalability",
+      "Maintainability"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS là một progressive Node.js framework cung cấp kiến trúc phân tầng chuẩn mực (Module-Controller-Provider) lấy cảm hứng từ Angular/Spring Boot, mang lại tính cấu trúc cao, Type-safety và khả năng mở rộng vượt trội so với Express thuần vô định hình.",
+      "deepDive": "Express chỉ là một routing/middleware library không đưa ra bất kỳ quy chuẩn nào về cấu trúc thư mục, kiến trúc phân tầng hay DI, dẫn tới hiện tượng 'mỗi dev một phách' và code trở thành spaghetti khi dự án phình to. NestJS giải quyết triệt để vấn đề này nhờ: 1) Kiến trúc Module hóa giúp chia tách domain rõ ràng; 2) Built-in IoC/DI container mạnh mẽ hỗ trợ loose coupling và unit testing; 3) Pipeline toàn diện (Middleware, Guards, Interceptors, Pipes, Filters); 4) Hỗ trợ đa nền tảng (chuyển đổi Express sang Fastify bằng 1 dòng code); 5) Tích hợp sẵn Microservices, WebSockets, GraphQL, Message Queues.",
+      "codeExample": "// NestJS chuẩn hóa phân tầng rõ rệt: Controller -> Service -> Repository\n@Injectable()\nexport class ProductService {\n  constructor(\n    @InjectRepository(Product)\n    private readonly productRepo: Repository<Product>,\n  ) {}\n\n  async getActiveProducts(): Promise<Product[]> {\n    return this.productRepo.find({ where: { isActive: true } });\n  }\n}"
+    },
+    "pitfalls": [
+      "Áp dụng NestJS cho các CLI script đơn giản hoặc Lambda micro-task chỉ có 1 endpoint, gây thừa boilerplate và tăng cold-start latency.",
+      "Dùng NestJS nhưng vẫn viết code theo tư duy Express: lạm dụng global variables, bỏ qua DI, dùng req/res trực tiếp."
+    ],
+    "followUpQuestions": [
+      "Khi nào nên chuyển HTTP adapter của NestJS từ Express sang Fastify?",
+      "NestJS hỗ trợ Hexagonal Architecture / Clean Architecture như thế nào?"
+    ]
+  },
+  {
+    "id": "nestjs-008",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Giải thích Request Lifecycle trong NestJS: Middleware → Guards → Interceptors → Pipes → Controller → Exception Filters.",
+    "interviewerIntent": "Kiểm tra kiến thức cốt lõi về thứ tự thực thi của pipeline trong NestJS, đảm bảo ứng viên đặt đúng logic vào đúng tầng kiến trúc.",
+    "contextOrScenario": "Cần xây dựng tính năng bảo mật: log request headers, kiểm tra role người dùng, validate DTO, biến đổi response và bắt lỗi ngoại lệ tập trung.",
+    "expectedKeywords": [
+      "Request Lifecycle",
+      "Middleware",
+      "Guards",
+      "Interceptors (pre/post)",
+      "Pipes",
+      "Controller",
+      "Exception Filters"
+    ],
+    "seniorAnswer": {
+      "summary": "Request lifecycle trong NestJS là chuỗi xử lý tuần tự có trật tự xác định: Incoming Request → Middleware → Guards → Interceptors (Pre) → Pipes → Controller Handler → Interceptors (Post / RxJS tap, map) → Exception Filters (nếu có lỗi bất kỳ).",
+      "deepDive": "Thứ tự thực thi chi tiết: 1) Middleware: chạy đầu tiên theo chuẩn Express/Fastify (thao tác header, cors, morgan logging); 2) Guards: kiểm tra quyền truy cập (AuthN, AuthZ), có thể đọc metadata; 3) Interceptors (Pointcut trước): thực thi trước khi handler chạy (start timer latency, cache check); 4) Pipes: validate và biến đổi kiểu dữ liệu payload (@Body, @Query); 5) Controller Handler: thực thi nghiệp vụ; 6) Interceptors (Pointcut sau): can thiệp stream Observable trả về (transform payload, enrich metadata, log execution time); 7) Exception Filters: nếu bất kỳ tầng nào quăng Exception, filter tương ứng sẽ bắt và format JSON response.",
+      "codeExample": "// Chuỗi lifecycle thể hiện qua Decorator xếp chồng:\n@UseGuards(JwtAuthGuard, RolesGuard)\n@UseInterceptors(LoggingInterceptor, TransformInterceptor)\n@Controller('users')\nexport class UserController {\n  @Post()\n  @UsePipes(new ValidationPipe({ transform: true }))\n  createUser(@Body() dto: CreateUserDto) {\n    return this.userService.create(dto);\n  }\n}"
+    },
+    "pitfalls": [
+      "Đặt logic xác thực phân quyền vào Middleware thay vì Guard, dẫn đến việc không thể truy cập ExecutionContext và Reflector metadata của handler.",
+      "Hiểu nhầm Pipes chạy trước Interceptors; thực tế Interceptor (phần pre-controller) chạy trước Pipes."
+    ],
+    "followUpQuestions": [
+      "Nếu ValidationPipe ném BadRequestException, chặng nào trong Interceptors (pre vs post) sẽ không được kích hoạt?",
+      "Làm sao để biết một exception filter sẽ bắt lỗi ở tầng Global hay tầng Controller?"
+    ]
+  },
+  {
+    "id": "nestjs-009",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Guards trong NestJS là gì? Cách implement JWT Auth Guard?",
+    "interviewerIntent": "Đánh giá khả năng bảo vệ route, xử lý authorization/authentication và hiểu cơ chế CanActivate kết hợp với ExecutionContext.",
+    "contextOrScenario": "Bảo vệ toàn bộ API hệ thống bằng Access Token JWT, nhưng cho phép một số route công khai (vd: /auth/login, /health).",
+    "expectedKeywords": [
+      "CanActivate",
+      "ExecutionContext",
+      "AuthGuard",
+      "Reflector",
+      "IS_PUBLIC_KEY",
+      "PassportStrategy"
+    ],
+    "seniorAnswer": {
+      "summary": "Guard là class implement interface CanActivate, chịu trách nhiệm xác thực (Authentication) và phân quyền (Authorization). Guard trả về boolean hoặc Observable/Promise<boolean> xác định request có được tiếp tục hay không.",
+      "deepDive": "Guard chạy sau Middleware nhưng trước Interceptors/Pipes. Guard có quyền truy cập vào ExecutionContext, cho phép dùng Reflector để đọc custom metadata gắn trên route handler hoặc controller class. Khi kết hợp với @nestjs/passport, JwtAuthGuard thường kế thừa AuthGuard('jwt') và override hàm canActivate() để kiểm tra metadata @Public(): nếu route có decorator public thì cho qua luôn, ngược lại mới gọi super.canActivate(context).",
+      "codeExample": "@Injectable()\nexport class JwtAuthGuard extends AuthGuard('jwt') {\n  constructor(private reflector: Reflector) {\n    super();\n  }\n\n  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {\n    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [\n      context.getHandler(),\n      context.getClass(),\n    ]);\n    if (isPublic) {\n      return true;\n    }\n    return super.canActivate(context);\n  }\n}"
+    },
+    "pitfalls": [
+      "Quên inject Reflector trong constructor của Guard dẫn đến lỗi không đọc được custom metadata.",
+      "Áp dụng JwtAuthGuard ở mức Global bằng APP_GUARD nhưng không tạo cơ chế bypass @Public(), khiến API Login/Register cũng bị chặn vì thiếu token."
+    ],
+    "followUpQuestions": [
+      "Khi đăng ký nhiều Guards cùng lúc, thứ tự thực thi là như thế nào và nếu 1 Guard trả về false thì các Guard sau có chạy không?",
+      "Passport Strategy hoạt động ra sao bên dưới AuthGuard('jwt')?"
+    ]
+  },
+  {
+    "id": "nestjs-010",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Pipes trong NestJS là gì? Cách dùng ValidationPipe với class-validator?",
+    "interviewerIntent": "Khảo sát kiến thức về data transformation, schema validation và cách xử lý payload đầu vào chuẩn declarative.",
+    "contextOrScenario": "Validate DTO request tạo mới đơn hàng với nhiều quy tắc: email hợp lệ, giá tiền > 0, items là mảng không rỗng.",
+    "expectedKeywords": [
+      "PipeTransform",
+      "ValidationPipe",
+      "class-validator",
+      "class-transformer",
+      "whitelist",
+      "forbidNonWhitelisted",
+      "transform"
+    ],
+    "seniorAnswer": {
+      "summary": "Pipe là class implement interface PipeTransform, có 2 vai trò chính: Transformation (ép kiểu/biến đổi dữ liệu đầu vào) và Validation (kiểm tra tính hợp lệ của dữ liệu, ném BadRequestException nếu vi phạm).",
+      "deepDive": "ValidationPipe sử dụng thư viện class-transformer để convert plain JavaScript request object thành class instance tương ứng với DTO, sau đó dùng class-validator để duyệt qua các validation decorator (@IsString, @IsEmail, @IsPositive). Nếu phát hiện lỗi, Pipe tự động gom danh sách vi phạm và quăng BadRequestException với cấu trúc chi tiết. Senior practice luôn cấu hình 3 cờ quan trọng: whitelist: true (tự động loại bỏ các property lạ), forbidNonWhitelisted: true (chặn và báo lỗi nếu có field thừa), transform: true (tự động ép kiểu primitive).",
+      "codeExample": "// main.ts\napp.useGlobalPipes(\n  new ValidationPipe({\n    whitelist: true,\n    forbidNonWhitelisted: true,\n    transform: true,\n    transformOptions: { enableImplicitConversion: true },\n  }),\n);\n\n// create-order.dto.ts\nexport class CreateOrderDto {\n  @IsUUID()\n  customerId: string;\n\n  @IsArray()\n  @ArrayMinSize(1)\n  @ValidateNested({ each: true })\n  @Type(() => OrderItemDto)\n  items: OrderItemDto[];\n}"
+    },
+    "pitfalls": [
+      "Khai báo DTO dưới dạng TypeScript interface thay vì class, khiến class-validator không hoạt động vì interface bị compiler xóa bỏ ở runtime.",
+      "Quên decorator @Type(() => ChildDto) khi validate nested object hoặc array of objects, khiến các validation decorators bên trong ChildDto bị bỏ qua."
+    ],
+    "followUpQuestions": [
+      "Tại sao phải dùng @Type(() => ChildDto) từ class-transformer khi validate nested objects?",
+      "Cách viết một Custom Pipe để validate file size hoặc sanitize HTML input phòng chống XSS?"
+    ]
+  },
+  {
+    "id": "nestjs-011",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Interceptors trong NestJS hoạt động như thế nào? Nêu các use-case phổ biến.",
+    "interviewerIntent": "Đánh giá hiểu biết về kỹ thuật Aspect-Oriented Programming (AOP), RxJS Observables và khả năng can thiệp cả trước lẫn sau khi handler thực thi.",
+    "contextOrScenario": "Chuẩn hóa format response trả về toàn bộ API ({ data, statusCode, timestamp }) và đo latency của từng endpoint.",
+    "expectedKeywords": [
+      "NestInterceptor",
+      "CallHandler",
+      "RxJS",
+      "handle()",
+      "tap / map",
+      "AOP",
+      "Response Transformation"
+    ],
+    "seniorAnswer": {
+      "summary": "Interceptor là class implement NestInterceptor, lấy cảm hứng từ Aspect-Oriented Programming (AOP). Nó cho phép gắn thêm logic trước khi route handler chạy và biến đổi/can thiệp vào kết quả (hoặc bắt lỗi) trả về từ handler thông qua RxJS Observable stream.",
+      "deepDive": "Interceptor nhận 2 tham số: ExecutionContext và CallHandler. Việc gọi next.handle() sẽ kích hoạt route handler và trả về một RxJS Observable stream đại diện cho response. Trước khi gọi next.handle(), ta có thể ghi nhận timestamp bắt đầu. Sau khi next.handle() emit, ta dùng các RxJS operators: tap() để log thời gian xử lý, map() để bọc response payload thành chuẩn { success: true, data: result }, catchError() để chuyển đổi lỗi, hoặc timeout() để hủy request nếu xử lý quá lâu. Interceptor cũng là nơi lý tưởng để cache kết quả.",
+      "codeExample": "@Injectable()\nexport class TransformInterceptor<T> implements NestInterceptor<T, any> {\n  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {\n    const start = Date.now();\n    return next.handle().pipe(\n      map(data => ({\n        success: true,\n        statusCode: context.switchToHttp().getResponse().statusCode,\n        timestamp: new Date().toISOString(),\n        duration: `${Date.now() - start}ms`,\n        data,\n      })),\n    );\n  }\n}"
+    },
+    "pitfalls": [
+      "Quên return next.handle() trong intercept method khiến route handler bị treo vĩnh viễn (hanging request) và client bị timeout.",
+      "Lạm dụng Interceptor để mutate request body thay vì dùng Middleware hoặc Pipe, làm mờ ranh giới kiến trúc."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để implement CacheInterceptor tự động lưu cache Redis dựa trên HTTP method GET và URL path?",
+      "Sự khác biệt giữa Exception Filter và Interceptor catchError() khi xử lý lỗi là gì?"
+    ]
+  },
+  {
+    "id": "nestjs-012",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Exception Filters trong NestJS là gì? Cách tạo global error handler.",
+    "interviewerIntent": "Kiểm tra kỹ năng xử lý lỗi tập trung, ngăn chặn rò rỉ stack trace nhạy cảm ra client và chuẩn hóa error response format.",
+    "contextOrScenario": "Chuẩn hóa định dạng lỗi toàn hệ thống theo RFC 7807 (Problem Details) cho tất cả các HTTP Exceptions và unhandled database errors.",
+    "expectedKeywords": [
+      "ExceptionFilter",
+      "@Catch()",
+      "HttpException",
+      "ArgumentsHost",
+      "Global Filter",
+      "APP_FILTER"
+    ],
+    "seniorAnswer": {
+      "summary": "Exception Filter là lớp phòng thủ cuối cùng trong NestJS Request Lifecycle, chịu trách nhiệm bắt tất cả các ngoại lệ (Exceptions) chưa được xử lý và định dạng lại HTTP response trả về cho client một cách nhất quán, an toàn.",
+      "deepDive": "Mặc định NestJS có sẵn BaseExceptionFilter xử lý HttpException. Khi tạo custom filter, class cần implement ExceptionFilter và gắn decorator @Catch() (để trống nếu muốn bắt mọi loại lỗi bao gồm unhandled exceptions, hoặc chỉ định @Catch(HttpException)). Trong method catch(exception, host), sử dụng ArgumentsHost để lấy đối tượng response và request của HTTP (hoặc RPC/Ws). Sử dụng token APP_FILTER trong AppModule để đăng ký Global Filter thay vì app.useGlobalFilters() giúp filter có thể inject được các dependency khác như LoggerService hoặc ConfigService.",
+      "codeExample": "@Catch()\nexport class AllExceptionsFilter implements ExceptionFilter {\n  constructor(private readonly logger: Logger) {}\n\n  catch(exception: unknown, host: ArgumentsHost) {\n    const ctx = host.switchToHttp();\n    const response = ctx.getResponse<Response>();\n    const request = ctx.getRequest<Request>();\n\n    const status = exception instanceof HttpException \n      ? exception.getStatus() \n      : HttpStatus.INTERNAL_SERVER_ERROR;\n\n    const message = exception instanceof HttpException \n      ? exception.getResponse() \n      : 'Internal server error';\n\n    this.logger.error(`HTTP ${status} Error: ${JSON.stringify(message)}`, (exception as any)?.stack);\n\n    response.status(status).json({\n      statusCode: status,\n      timestamp: new Date().toISOString(),\n      path: request.url,\n      error: message,\n    });\n  }\n}"
+    },
+    "pitfalls": [
+      "Đăng ký filter qua app.useGlobalFilters(new AllExceptionsFilter()) trong main.ts khiến filter không thể inject được bất kỳ service nào từ IoC container.",
+      "Trả về trực tiếp exception.stack hoặc raw database error message cho client ở môi trường production, gây lộ thông tin bảo mật nghiêm trọng."
+    ],
+    "followUpQuestions": [
+      "Tại sao nên đăng ký Global Filter bằng { provide: APP_FILTER, useClass: AllExceptionsFilter } thay vì app.useGlobalFilters()?",
+      "Làm thế nào để filter phân biệt và xử lý riêng biệt giữa QueryFailedError của TypeORM và HttpException của NestJS?"
+    ]
+  },
+  {
+    "id": "nestjs-013",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Cách tích hợp TypeORM với NestJS? Repository pattern hoạt động như thế nào?",
+    "interviewerIntent": "Khảo sát kinh nghiệm làm việc với ORM, Data Mapper pattern vs Active Record, và cách cấu hình TypeOrmModule.",
+    "contextOrScenario": "Thiết lập tầng Data Access cho domain Order, cấu hình database connection và inject Repository vào Service.",
+    "expectedKeywords": [
+      "TypeOrmModule",
+      "forRootAsync",
+      "forFeature",
+      "Repository<T>",
+      "@InjectRepository",
+      "Data Mapper pattern"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS tích hợp TypeORM thông qua gói @nestjs/typeorm. Nó triển khai Data Mapper pattern bằng cách trừu tượng hóa các bảng database thành Entity class và cung cấp Repository<Entity> để thao tác CRUD.",
+      "deepDive": "Cấu hình chuẩn mực gồm 2 bước: 1) Ở root module: dùng TypeOrmModule.forRootAsync() kết hợp ConfigService để load async database credentials và tắt synchronize: true ở production. 2) Ở feature module: dùng TypeOrmModule.forFeature([Entity]) để đăng ký Repository cho entity đó vào IoC container. Trong service, dùng decorator @InjectRepository(Entity) private readonly repo: Repository<Entity> để inject. TypeORM Repository cung cấp các method find, findOne, save, update, remove, create giúp tách biệt hoàn toàn business logic khỏi SQL syntax.",
+      "codeExample": "// order.module.ts\n@Module({\n  imports: [TypeOrmModule.forFeature([OrderEntity, OrderItemEntity])],\n  providers: [OrderService],\n  exports: [OrderService],\n})\nexport class OrderModule {}\n\n// order.service.ts\n@Injectable()\nexport class OrderService {\n  constructor(\n    @InjectRepository(OrderEntity)\n    private readonly orderRepo: Repository<OrderEntity>,\n  ) {}\n\n  async create(dto: CreateOrderDto) {\n    const order = this.orderRepo.create(dto);\n    return this.orderRepo.save(order);\n  }\n}"
+    },
+    "pitfalls": [
+      "Để cờ synchronize: true trong cấu hình TypeORM ở môi trường production, dẫn đến nguy cơ mất dữ liệu hoặc alter table tự động ngoài tầm kiểm soát khi khởi động app.",
+      "Inject Custom Repository dùng @EntityRepository() đã bị deprecate từ TypeORM 0.3.x mà không chuyển sang inject Repository tiêu chuẩn hoặc dùng dataSource.getRepository()."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để custom một Repository methods trong TypeORM 0.3+ khi @EntityRepository decorator đã bị xóa?",
+      "Sự khác biệt giữa method .create() và .save() trong Repository là gì?"
+    ]
+  },
+  {
+    "id": "nestjs-014",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Implement JWT Authentication flow trong NestJS với @nestjs/jwt và Passport?",
+    "interviewerIntent": "Đánh giá khả năng xây dựng hệ thống Auth chuẩn mực: từ login, cấp phát token, validate header, tới phân quyền Passport Strategy.",
+    "contextOrScenario": "Xây dựng luồng xác thực đăng nhập người dùng: xác thực email/password qua LocalStrategy, cấp Access Token JWT, và bảo vệ các API private bằng JwtStrategy.",
+    "expectedKeywords": [
+      "@nestjs/jwt",
+      "PassportStrategy",
+      "JwtStrategy",
+      "ExtractJwt",
+      "validate()",
+      "AuthGuard"
+    ],
+    "seniorAnswer": {
+      "summary": "Luồng JWT Auth kết hợp @nestjs/passport và @nestjs/jwt: Khi login thành công, AuthService ký token qua JwtService.sign(). Các request sau đó gửi header Authorization: Bearer <token>. JwtStrategy tự động trích xuất token, verify chữ ký và gọi validate(payload) để gắn user vào req.user.",
+      "deepDive": "Kiến trúc chuẩn chia thành: 1) LocalStrategy (kế thừa PassportStrategy(Strategy)) dùng cho endpoint POST /auth/login để xác thực email & password; 2) JwtStrategy kế thừa PassportStrategy(Strategy, 'jwt') cấu hình jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken() và secretOrKey. Khi token hợp lệ, hàm validate(payload) được gọi: tại đây có thể truy vấn DB để đảm bảo user chưa bị block/xóa và trả về user object. Đối tượng này được tự động gán vào request.user, sẵn sàng cho Controller hoặc Custom Param Decorator (@CurrentUser()) sử dụng.",
+      "codeExample": "@Injectable()\nexport class JwtStrategy extends PassportStrategy(Strategy) {\n  constructor(private readonly userService: UserService, config: ConfigService) {\n    super({\n      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),\n      ignoreExpiration: false,\n      secretOrKey: config.get<string>('JWT_SECRET'),\n    });\n  }\n\n  async validate(payload: { sub: string; email: string; role: string }) {\n    const user = await this.userService.findById(payload.sub);\n    if (!user || !user.isActive) {\n      throw new UnauthorizedException('User is inactive or not found');\n    }\n    return user; // Sẽ được gán vào req.user\n  }\n}"
+    },
+    "pitfalls": [
+      "Lưu trữ dữ liệu nhạy cảm (password hash, secret key) vào trong payload của JWT token vì JWT chỉ được base64 encode chứ không hề mã hóa bảo mật payload.",
+      "Không kiểm tra trạng thái active/banned của user trong hàm validate(), dẫn đến việc user đã bị khóa tài khoản vẫn dùng token cũ để gọi API bình thường cho tới khi token hết hạn."
+    ],
+    "followUpQuestions": [
+      "Tại sao cần tách riêng Access Token (ngắn hạn) và Refresh Token (dài hạn)? Cơ chế rotation hoạt động ra sao?",
+      "Làm thế nào để revoke (thu hồi ngay lập tức) một Access Token JWT khi user đổi mật khẩu?"
+    ]
+  },
+  {
+    "id": "nestjs-015",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Cách viết unit tests và integration tests trong NestJS?",
+    "interviewerIntent": "Kiểm tra kỹ năng đảm bảo chất lượng phần mềm, sử dụng Test.createTestingModule() để mock dependencies và cô lập unit logic.",
+    "contextOrScenario": "Viết test coverage cho OrderService để kiểm tra tính đúng đắn của logic tính thuế, giảm giá voucher và gọi sang PaymentGateway.",
+    "expectedKeywords": [
+      "TestingModule",
+      "Test.createTestingModule",
+      "compile()",
+      "useValue mock",
+      "jest.spyOn",
+      "Isolation"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS cung cấp gói @nestjs/testing với class Test để tạo một testing module môi trường ảo (TestingModule). Nhờ IoC container, ta có thể dễ dàng thay thế các provider thực tế bằng các mock objects qua cú pháp useValue.",
+      "deepDive": "Trong Unit Test, mục tiêu là cô lập hoàn toàn Service đang test khỏi các external factors (Database, Third-party APIs). Ta cấu hình Test.createTestingModule({ providers: [OrderService, { provide: getRepositoryToken(Order), useValue: mockOrderRepository }] }).compile(). Lấy instance service qua moduleRef.get<OrderService>(OrderService). Dùng jest.spyOn() hoặc mock functions để kiểm tra số lần gọi, tham số truyền vào và kết quả trả về. Với Integration Test, ta chỉ mock ranh giới bên ngoài (external systems) và cho phép tương tác với In-memory DB (SQLite/Testcontainers).",
+      "codeExample": "describe('OrderService', () => {\n  let service: OrderService;\n  let repo: MockType<Repository<OrderEntity>>;\n\n  beforeEach(async () => {\n    const module: TestingModule = await Test.createTestingModule({\n      providers: [\n        OrderService,\n        {\n          provide: getRepositoryToken(OrderEntity),\n          useValue: { findOne: jest.fn(), save: jest.fn() },\n        },\n      ],\n    }).compile();\n\n    service = module.get<OrderService>(OrderService);\n    repo = module.get(getRepositoryToken(OrderEntity));\n  });\n\n  it('should throw NotFoundException if order does not exist', async () => {\n    repo.findOne.mockResolvedValue(null);\n    await expect(service.getOrderById('invalid-id')).rejects.toThrow(NotFoundException);\n  });\n});"
+    },
+    "pitfalls": [
+      "Không mock Repository hoặc Service phụ thuộc trong unit test, khiến unit test cố gắng kết nối tới real database và bị fail trên CI/CD pipeline.",
+      "Lạm dụng quá nhiều logic trong beforeEach mà không dùng jest.clearAllMocks(), làm rò rỉ mock state giữa các test case."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa module.get() và module.resolve() khi test các provider có Scope là REQUEST?",
+      "Làm thế nào để sử dụng Testcontainers (Docker) để chạy Integration Test với real Postgres DB?"
+    ]
+  },
+  {
+    "id": "nestjs-016",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Prisma với NestJS — setup và so sánh với TypeORM?",
+    "interviewerIntent": "Đánh giá hiểu biết so sánh giữa 2 ORM/Query Builder phổ biến nhất trong hệ sinh thái Node.js/NestJS và cách tích hợp PrismaService.",
+    "contextOrScenario": "Lựa chọn ORM cho dự án mới: cân nhắc giữa Schema-first (Prisma) và Code-first Entity (TypeORM).",
+    "expectedKeywords": [
+      "PrismaService",
+      "PrismaClient",
+      "onModuleInit",
+      "Type-safety",
+      "Prisma vs TypeORM",
+      "Schema-first"
+    ],
+    "seniorAnswer": {
+      "summary": "Prisma tích hợp vào NestJS thông qua một custom PrismaService kế thừa PrismaClient và implement OnModuleInit. Khác với TypeORM dùng Code-first (Class entity decorator), Prisma dùng Schema-first (file schema.prisma) sinh ra TypeScript types tự động 100% type-safe.",
+      "deepDive": "Để setup Prisma trong NestJS: 1) Tạo PrismaService extends PrismaClient implements OnModuleInit, gọi $connect() trong onModuleInit(); 2) Inject PrismaService trực tiếp vào các service nghiệp vụ thay vì qua repository token; 3) So sánh: Prisma vượt trội về Type-safety, DX (Developer Experience) khi autocomplete query relations, migrations trực quan, tránh được các lỗi 'magic relation' của TypeORM. Tuy nhiên, TypeORM mạnh hơn ở Data Mapper pattern truyền thống, Enterprise DDD (Domain-Driven Design), hỗ trợ Raw Query Builder linh hoạt hơn và không phụ thuộc vào Rust binary engine như Prisma.",
+      "codeExample": "@Injectable()\nexport class PrismaService extends PrismaClient implements OnModuleInit {\n  async onModuleInit() {\n    await this.$connect();\n  }\n}\n\n@Injectable()\nexport class UserService {\n  constructor(private readonly prisma: PrismaService) {}\n\n  async findActiveUsers() {\n    return this.prisma.user.findMany({\n      where: { status: 'ACTIVE' },\n      include: { profile: true },\n    });\n  }\n}"
+    },
+    "pitfalls": [
+      "Quên gọi $connect() trong onModuleInit() dẫn đến việc request đầu tiên bị latency cao do lazy connection khởi tạo.",
+      "Tạo mới nhiều instance của PrismaClient rải rác thay vì quản lý qua PrismaService Singleton, gây cạn kiệt Connection Pool của Database."
+    ],
+    "followUpQuestions": [
+      "Prisma xử lý Database Transactions ($transaction) khác gì so với QueryRunner của TypeORM?",
+      "Làm thế nào để handle graceful shutdown khi dùng Prisma trong NestJS với PrismaClient?"
+    ]
+  },
+  {
+    "id": "nestjs-017",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "File upload trong NestJS với Multer — upload single, multiple file và validate?",
+    "interviewerIntent": "Khảo sát kỹ năng xử lý multipart/form-data, tích hợp FileInterceptor/FilesInterceptor và validate file (MIME type, file size) an toàn.",
+    "contextOrScenario": "Xây dựng endpoint tải lên Avatar người dùng hoặc tài liệu PDF đính kèm với giới hạn 5MB và định dạng ảnh hợp lệ.",
+    "expectedKeywords": [
+      "FileInterceptor",
+      "FilesInterceptor",
+      "UploadedFile",
+      "ParseFilePipe",
+      "MaxFileSizeValidator",
+      "FileTypeValidator",
+      "Multer"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS tích hợp Multer thông qua các Interceptors (@UseInterceptors(FileInterceptor('file'))). Từ NestJS 9+, việc validate kích thước và định dạng file được chuẩn hóa declarative bằng ParseFilePipe kết hợp MaxFileSizeValidator và FileTypeValidator.",
+      "deepDive": "Khi client gửi multipart/form-data: 1) FileInterceptor bắt stream và parse file vào memory (hoặc diskStorage); 2) @UploadedFile() trích xuất object Express.Multer.File; 3) ParseFilePipe thực thi pipeline kiểm tra: MaxFileSizeValidator kiểm soát dung lượng tối đa (phòng chống DoS), FileTypeValidator kiểm tra regex MIME type (chống tải file thực thi độc hại .exe/.sh). Với nhiều files, sử dụng FilesInterceptor('files', maxCount) hoặc FileFieldsInterceptor cho nhiều fields khác nhau.",
+      "codeExample": "@Post('avatar')\n@UseInterceptors(FileInterceptor('avatar', {\n  storage: memoryStorage(), // Hoặc stream trực tiếp lên S3/Cloudinary\n}))\nuploadAvatar(\n  @UploadedFile(\n    new ParseFilePipe({\n      validators: [\n        new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB\n        new FileTypeValidator({ fileType: '.(png|jpeg|jpg)' }),\n      ],\n    }),\n  )\n  file: Express.Multer.File,\n) {\n  return this.storageService.uploadToS3(file);\n}"
+    },
+    "pitfalls": [
+      "Chỉ kiểm tra đuôi mở rộng file (.jpg/.png) từ originalname mà không kiểm tra MIME type hoặc Magic Bytes, hacker có thể đổi tên mã độc thành image.png để upload.",
+      "Lưu trữ file trực tiếp trên ổ cứng local của container Docker thay vì đẩy lên Object Storage (S3/GCS), khiến file biến mất khi container restart hoặc scale horizontal."
+    ],
+    "followUpQuestions": [
+      "Tại sao trong kiến trúc Microservices/Cloud hiện đại nên dùng Presigned URL thay vì upload file qua NestJS backend?",
+      "Làm thế nào để viết Custom File Validator kiểm tra Magic Bytes (Buffer header) của file?"
+    ]
+  },
+  {
+    "id": "nestjs-018",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Custom Decorators trong NestJS — cách tạo @CurrentUser, @Roles, @Public?",
+    "interviewerIntent": "Kiểm tra sự thành thạo trong việc mở rộng framework bằng metaprogramming, tạo Param Decorators và SetMetadata Decorators.",
+    "contextOrScenario": "Loại bỏ boilerplate code trích xuất user từ req.user và thiết lập hệ thống phân quyền Declarative Role-based Security.",
+    "expectedKeywords": [
+      "createParamDecorator",
+      "SetMetadata",
+      "Reflector",
+      "Custom Decorator",
+      "ExecutionContext",
+      "Type Safety"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS cung cấp 2 cơ chế chính để tạo Custom Decorators: 1) createParamDecorator() để trích xuất dữ liệu từ ExecutionContext đưa vào controller param (vd: @CurrentUser); 2) SetMetadata() (hoặc Reflector.createDecorator) để gắn metadata lên route/class (vd: @Roles, @Public).",
+      "deepDive": "Param Decorator: createParamDecorator((data, ctx: ExecutionContext) => {...}) lấy request từ ctx.switchToHttp().getRequest() và trả về req.user hoặc thuộc tính cụ thể nếu truyền data (vd @CurrentUser('id')). Metadata Decorator: Reflector.createDecorator<string[]>() hoặc SetMetadata('roles', roles) lưu thông tin vào metadata map của class/method. Các Guard sau đó sẽ inject Reflector để đọc các metadata này và thực hiện authorization logic.",
+      "codeExample": "// 1. Param Decorator: @CurrentUser()\nexport const CurrentUser = createParamDecorator(\n  (data: keyof UserEntity | undefined, ctx: ExecutionContext) => {\n    const request = ctx.switchToHttp().getRequest();\n    const user = request.user;\n    return data ? user?.[data] : user;\n  },\n);\n\n// 2. Metadata Decorator: @Public()\nexport const IS_PUBLIC_KEY = 'isPublic';\nexport const Public = () => SetMetadata(IS_PUBLIC_KEY, true);\n\n// Sử dụng trong Controller:\n@Get('profile')\ngetProfile(@CurrentUser() user: UserEntity) {\n  return user;\n}"
+    },
+    "pitfalls": [
+      "Quên rằng createParamDecorator chạy trước khi TypeScript runtime type check, nếu request.user bị undefined (do chưa qua AuthGuard) sẽ ném Cannot read property of undefined.",
+      "Dùng magic string rải rác làm metadata key thay vì định nghĩa hằng số tập trung (const IS_PUBLIC_KEY = ...)."
+    ],
+    "followUpQuestions": [
+      "Reflector.createDecorator() (tính năng mới từ Nest 10) có ưu điểm gì về Type-safety so với SetMetadata() cũ?",
+      "Làm sao để kết hợp nhiều decorator thành một decorator duy nhất (Decorator Composition với applyDecorators)?"
+    ]
+  },
+  {
+    "id": "nestjs-019",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Provider scopes trong NestJS: DEFAULT, REQUEST, TRANSIENT — khác nhau gì?",
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu về vòng đời Provider, quản lý bộ nhớ, hiệu năng và tác động tiêu cực của Request Scope (Scope Bubble Effect).",
+    "contextOrScenario": "Cần lưu tenant context trong hệ thống Multi-tenant hoặc inject Request ID vào Logger mà không làm suy giảm throughput API.",
+    "expectedKeywords": [
+      "Scope.DEFAULT",
+      "Scope.REQUEST",
+      "Scope.TRANSIENT",
+      "Scope Bubble",
+      "Memory Leak",
+      "Performance degradation"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS có 3 Scope: 1) DEFAULT (Singleton - khuyến nghị): 1 instance duy nhất cho toàn app; 2) REQUEST: tạo instance mới cho mỗi HTTP request và garbage collected sau khi request xong; 3) TRANSIENT: tạo instance mới mỗi khi được inject vào một consumer khác.",
+      "deepDive": "Mặc định (DEFAULT), NestJS chia sẻ 1 instance duy nhất xuyên suốt ứng dụng, cho hiệu năng tối đa. Khi một Provider đặt Scope.REQUEST (hoặc inject @Inject(REQUEST)), nó sẽ bị tái tạo ở mọi incoming request. Nguy hiểm nhất là 'Scope Bubble' (bong bóng lan truyền scope): bất kỳ Service/Controller nào inject một Request-scoped Provider sẽ tự động bị biến thành Request-scoped theo. Điều này gây áp lực cực lớn lên V8 Garbage Collector, giảm throughput 3x - 5x. Do đó với Multi-tenant hoặc Request Context, senior thường dùng AsyncLocalStorage của Node.js thay vì lạm dụng Scope.REQUEST.",
+      "codeExample": "@Injectable({ scope: Scope.REQUEST })\nexport class RequestContextService {\n  constructor(@Inject(REQUEST) private readonly request: Request) {}\n\n  getTenantId(): string {\n    return this.request.headers['x-tenant-id'] as string;\n  }\n}"
+    },
+    "pitfalls": [
+      "Không nhận thức được Scope Bubble: vô tình inject 1 Request-scoped Service vào UserService khiến UserService, Controller, và toàn bộ chuỗi dependency bị tái tạo liên tục.",
+      "Lưu trữ state tích lũy trong Scope.DEFAULT (Singleton) dẫn đến rò rỉ dữ liệu giữa các người dùng khác nhau (Race condition/Data leak)."
+    ],
+    "followUpQuestions": [
+      "Tại sao AsyncLocalStorage trong Node.js lại là giải pháp tối ưu hơn Scope.REQUEST để truyền Request Context?",
+      "Khi viết unit test cho Request-scoped provider, cần dùng moduleRef.resolve() thay vì moduleRef.get() như thế nào?"
+    ]
+  },
+  {
+    "id": "nestjs-020",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Dynamic Modules trong NestJS — forRoot và forRootAsync pattern?",
+    "interviewerIntent": "Kiểm tra kỹ năng thiết kế module có thể cấu hình động (Configurable Modules), đóng gói thư viện dùng chung (reusable packages).",
+    "contextOrScenario": "Xây dựng RedisModule hoặc MailModule dùng chung cho nhiều microservices, cần nhận options cấu hình từ ConfigService bất đồng bộ.",
+    "expectedKeywords": [
+      "DynamicModule",
+      "forRoot",
+      "forRootAsync",
+      "useFactory",
+      "ConfigurableModuleBuilder",
+      "Async configuration"
+    ],
+    "seniorAnswer": {
+      "summary": "Dynamic Module là module có khả năng tiếp nhận tham số cấu hình động tại thời điểm import và trả về đối tượng DynamicModule (gồm module, providers, exports). forRoot dùng cho cấu hình tĩnh (synchronous), còn forRootAsync cho phép inject ConfigService để lấy options bất đồng bộ.",
+      "deepDive": "Khi viết reusable module (vd: DatabaseModule, CacheModule), cấu hình thường phụ thuộc vào biến môi trường chỉ có sẵn ở runtime. Cấu trúc forRootAsync chuẩn gồm: imports (ConfigModule), inject ([ConfigService]), useFactory: async (config: ConfigService) => ({ host: config.get('HOST') }). Bên trong dynamic module, factory provider sẽ nhận options và khởi tạo client (vd: Redis Client, Mailer). Từ NestJS 9+, ConfigurableModuleBuilder giúp tự động sinh boilerplate forRoot/forRootAsync chỉ với vài dòng code.",
+      "codeExample": "// Định nghĩa Dynamic Module:\n@Module({})\nexport class RedisModule {\n  static forRootAsync(options: {\n    imports?: any[];\n    useFactory: (...args: any[]) => Promise<RedisOptions> | RedisOptions;\n    inject?: any[];\n  }): DynamicModule {\n    return {\n      module: RedisModule,\n      imports: options.imports || [],\n      providers: [\n        {\n          provide: 'REDIS_OPTIONS',\n          useFactory: options.useFactory,\n          inject: options.inject || [],\n        },\n        RedisService,\n      ],\n      exports: [RedisService],\n    };\n  }\n}"
+    },
+    "pitfalls": [
+      "Chỉ implement forRoot (đồng bộ) mà không hỗ trợ forRootAsync, khiến các consumers không thể truyền cấu hình lấy từ ConfigService hoặc Vault/AWS Secrets Manager.",
+      "Quên export các provider được khởi tạo động, khiến module import nó không thể inject được service."
+    ],
+    "followUpQuestions": [
+      "ConfigurableModuleBuilder trong @nestjs/common hoạt động thế nào để tự động sinh ra forRootAsync?",
+      "Quy ước đặt tên method trong Dynamic Module: forRoot, forFeature, register khác nhau ở điểm nào?"
+    ]
+  },
+  {
+    "id": "nestjs-021",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Custom providers: useValue, useClass, useFactory, useExisting — khi nào dùng cái nào?",
+    "interviewerIntent": "Đánh giá mức độ làm chủ Nest IoC Container, khả năng linh hoạt thay thế implementation, mock test và khởi tạo provider có điều kiện.",
+    "contextOrScenario": "Tạo PaymentService linh hoạt chuyển đổi giữa Stripe và PayPal dựa trên config, hoặc mock third-party client khi chạy test.",
+    "expectedKeywords": [
+      "Custom Providers",
+      "useValue",
+      "useClass",
+      "useFactory",
+      "useExisting",
+      "Injection Token"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS hỗ trợ 4 cú pháp Custom Provider: 1) useValue: gán giá trị tĩnh hoặc mock object; 2) useClass: ánh xạ token sang một class cụ thể; 3) useFactory: hàm khởi tạo động với dependency injection; 4) useExisting: tạo alias tham chiếu đến một provider sẵn có.",
+      "deepDive": "Sử dụng chi tiết: 1) useValue: dùng để inject hằng số cấu hình hoặc mock dependencies trong unit test; 2) useClass: áp dụng Strategy pattern (vd: môi trường dev dùng MockPaymentService, prod dùng StripePaymentService); 3) useFactory: khi việc khởi tạo provider đòi hỏi tính toán logic, gọi async I/O hoặc inject các services khác qua 'inject: [...]'; 4) useExisting: tạo alias cho một token khác mà không tạo thêm instance mới trong bộ nhớ.",
+      "codeExample": "@Module({\n  providers: [\n    // useValue (Mock test hoặc Constant)\n    { provide: 'API_TIMEOUT', useValue: 5000 },\n\n    // useClass (Đa hình Polymorphism)\n    { \n      provide: 'PaymentService', \n      useClass: process.env.NODE_ENV === 'test' ? MockPaymentService : StripeService \n    },\n\n    // useFactory (Khởi tạo động có dependency)\n    {\n      provide: 'DATABASE_CONNECTION',\n      useFactory: async (config: ConfigService) => createConnection(config.get('DB_URL')),\n      inject: [ConfigService],\n    },\n  ],\n})\nexport class AppModule {}"
+    },
+    "pitfalls": [
+      "Quên khai báo mảng 'inject' khi sử dụng useFactory có tham số, dẫn đến các tham số trong factory function nhận giá trị undefined.",
+      "Dùng useClass nhưng tưởng rằng nó tạo alias, trong khi useClass sẽ khởi tạo một instance độc lập nếu không dùng useExisting."
+    ],
+    "followUpQuestions": [
+      "Khi nào nên dùng string token thay vì class token, và tại sao cần kết hợp với decorator @Inject()?",
+      "Làm sao để inject một Factory Provider bất đồng bộ (async useFactory)?"
+    ]
+  },
+  {
+    "id": "nestjs-022",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "ExecutionContext trong NestJS là gì? Cách switch giữa HTTP và WebSocket context?",
+    "interviewerIntent": "Kiểm tra sự thấu hiểu về khả năng trừu tượng hóa đa giao thức (HTTP, WebSockets, Microservices RPC) của NestJS.",
+    "contextOrScenario": "Viết một AuthGuard hoặc LoggingInterceptor dùng chung cho cả REST API, Socket.io Gateway và Kafka Consumer.",
+    "expectedKeywords": [
+      "ExecutionContext",
+      "ArgumentsHost",
+      "switchToHttp",
+      "switchToWs",
+      "switchToRpc",
+      "getType",
+      "Polymorphic Pipeline"
+    ],
+    "seniorAnswer": {
+      "summary": "ExecutionContext là class kế thừa từ ArgumentsHost, cung cấp metadata bổ sung về method handler và class controller hiện tại đang được thực thi, đồng thời cho phép chuyển đổi ngữ cảnh an toàn giữa các giao thức (HTTP, WebSocket, RPC/Microservices).",
+      "deepDive": "NestJS được thiết kế để chạy trên mọi nền tảng truyền thông. ExecutionContext cung cấp: 1) getClass<T>() và getHandler(): lấy reference của Controller và Action method (phục vụ Reflector đọc metadata); 2) getType(): xác định kiểu ngữ cảnh ('http' | 'ws' | 'rpc'); 3) switchToHttp(): lấy { getRequest(), getResponse(), getNext() }; 4) switchToWs(): lấy { getClient(), getData() }; 5) switchToRpc(): lấy { getData(), getContext() }. Nhờ đó, ta có thể viết 1 Guard hoặc ExceptionFilter duy nhất hoạt động xuyên suốt cả HTTP REST và WebSocket Gateway.",
+      "codeExample": "@Injectable()\nexport class UniversalAuthGuard implements CanActivate {\n  canActivate(context: ExecutionContext): boolean {\n    const type = context.getType(); // 'http' | 'ws' | 'rpc'\n\n    if (type === 'http') {\n      const request = context.switchToHttp().getRequest<Request>();\n      return this.validateToken(request.headers.authorization);\n    } else if (type === 'ws') {\n      const client = context.switchToWs().getClient<Socket>();\n      return this.validateToken(client.handshake.auth.token);\n    }\n    return true;\n  }\n}"
+    },
+    "pitfalls": [
+      "Gọi context.switchToHttp().getRequest() trong một WebSocket Gateway hoặc RPC handler dẫn đến lỗi crash runtime do các đối tượng HTTP không tồn tại.",
+      "Quên rằng ArgumentsHost chỉ có các getter tham số, còn ExecutionContext mới có thêm getClass() và getHandler()."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để lấy được WebSocket Client Socket khi client ngắt kết nối trong Exception Filter?",
+      "Reflector.get() sử dụng context.getHandler() và context.getClass() để làm gì?"
+    ]
+  },
+  {
+    "id": "nestjs-023",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Transactions trong TypeORM với NestJS — cách implement đúng?",
+    "interviewerIntent": "Đánh giá năng lực đảm bảo tính toàn vẹn dữ liệu (ACID), xử lý giao dịch an toàn khi xảy ra lỗi và phòng chống race condition.",
+    "contextOrScenario": "Xử lý đặt hàng: trừ tồn kho (Inventory), tạo bản ghi đơn hàng (Order) và tạo lịch sử thanh toán (Payment) trong cùng một database transaction.",
+    "expectedKeywords": [
+      "QueryRunner",
+      "DataSource",
+      "startTransaction",
+      "commitTransaction",
+      "rollbackTransaction",
+      "ACID",
+      "release()"
+    ],
+    "seniorAnswer": {
+      "summary": "Trong TypeORM hiện đại (>=0.3), cách chuẩn mực và an toàn nhất để thực hiện Transaction là sử dụng QueryRunner từ DataSource hoặc dataSource.transaction(). Mọi thao tác truy vấn trong transaction PHẢI đi qua queryRunner.manager.",
+      "deepDive": "Quy trình chuẩn với QueryRunner: 1) Tạo runner: const qr = dataSource.createQueryRunner(); 2) Kết nối: await qr.connect(); 3) Bắt đầu: await qr.startTransaction(); 4) Thực thi: gọi các hàm save/update thông qua qr.manager.save() (tuyệt đối KHÔNG dùng standard repository thông thường vì nó chạy ngoài transaction); 5) Commit: await qr.commitTransaction(); 6) Catch error: await qr.rollbackTransaction(); 7) Cuối cùng (finally): BẮT BUỘC gọi await qr.release() để trả connection về pool, tránh cạn kiệt kết nối.",
+      "codeExample": "@Injectable()\nexport class OrderService {\n  constructor(private readonly dataSource: DataSource) {}\n\n  async checkout(orderDto: CreateOrderDto) {\n    const queryRunner = this.dataSource.createQueryRunner();\n    await queryRunner.connect();\n    await queryRunner.startTransaction();\n\n    try {\n      // BẮT BUỘC dùng queryRunner.manager\n      const order = await queryRunner.manager.save(OrderEntity, orderDto);\n      await queryRunner.manager.decrement(ProductEntity, { id: orderDto.productId }, 'stock', 1);\n\n      await queryRunner.commitTransaction();\n      return order;\n    } catch (err) {\n      await queryRunner.rollbackTransaction();\n      throw err;\n    } finally {\n      await queryRunner.release(); // Trả connection lại pool\n    }\n  }\n}"
+    },
+    "pitfalls": [
+      "Quên đặt queryRunner.release() trong khối finally, khiến connection bị chiếm giữ vĩnh viễn và database pool bị tràn (Connection Pool Exhaustion) sau vài chục request.",
+      "Sử dụng nhầm this.orderRepository.save() bên trong try block thay vì queryRunner.manager.save(), khiến thao tác không nằm trong transaction và không thể rollback."
+    ],
+    "followUpQuestions": [
+      "Làm sao để implement Transactional Decorator (@Transactional) sử dụng AsyncLocalStorage để code gọn gàng hơn?",
+      "Transaction Isolation Levels (READ COMMITTED, REPEATABLE READ, SERIALIZABLE) ảnh hưởng thế nào đến concurrency trong TypeORM?"
+    ]
+  },
+  {
+    "id": "nestjs-024",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "TypeORM Query Builder vs Repository API — khi nào dùng cái nào?",
+    "interviewerIntent": "Khảo sát khả năng tối ưu truy vấn SQL, hiểu rõ trade-off giữa tính tiện dụng (DX) của Repository và hiệu năng/độ linh hoạt của QueryBuilder.",
+    "contextOrScenario": "Phát triển trang dashboard báo cáo doanh thu với các phép tính Aggregation, Group By, Subquery và Full-text search phức tạp.",
+    "expectedKeywords": [
+      "QueryBuilder",
+      "Repository API",
+      "N+1 Problem",
+      "Aggregation / Group By",
+      "Performance",
+      "leftJoinAndSelect"
+    ],
+    "seniorAnswer": {
+      "summary": "Repository API thích hợp cho các thao tác CRUD cơ bản, truy vấn quan hệ đơn giản theo ID. QueryBuilder là công cụ bắt buộc khi cần truy vấn phức tạp: joins nhiều bảng có điều kiện, aggregations (SUM, AVG, COUNT), subqueries, pagination tối ưu hoặc cập nhật hàng loạt (bulk update/delete).",
+      "deepDive": "Repository API (find, findOne) nhanh, tiện lợi, type-safe nhưng có hạn chế lớn: dễ gây ra N+1 query nếu lạm dụng eager relation, không hỗ trợ Group By/Having, và khó tối ưu mệnh đề WHERE phức tạp. Ngược lại, SelectQueryBuilder (repo.createQueryBuilder('alias')) cho phép kiểm soát 100% câu lệnh SQL sinh ra, tối ưu hóa index, chọn lọc chính xác các cột cần lấy (select subset columns giúp giảm tải I/O mạng), và thực hiện atomic updates (vd: SET stock = stock - 1).",
+      "codeExample": "// QueryBuilder cho truy vấn phức tạp, tính tổng doanh thu theo tháng:\nasync getRevenueReport(year: number) {\n  return this.orderRepo.createQueryBuilder('order')\n    .select(\"DATE_TRUNC('month', order.createdAt)\", 'month')\n    .addSelect('SUM(order.totalAmount)', 'totalRevenue')\n    .addSelect('COUNT(order.id)', 'orderCount')\n    .where('EXTRACT(YEAR FROM order.createdAt) = :year', { year })\n    .andWhere('order.status = :status', { status: 'COMPLETED' })\n    .groupBy('month')\n    .orderBy('month', 'ASC')\n    .getRawMany();\n}"
+    },
+    "pitfalls": [
+      "Dùng Repository find({ relations: ['items', 'items.product'] }) trên danh sách lớn thay vì QueryBuilder, khiến ứng dụng load toàn bộ dữ liệu thừa vào RAM và làm nghẽn Event Loop.",
+      "Viết tham số thô trực tiếp vào câu lệnh QueryBuilder (chuỗi template `WHERE id = ${id}`) thay vì dùng parameterized query (:id), gây nguy cơ SQL Injection nghiêm trọng."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa getMany() và getRawMany() trong TypeORM QueryBuilder là gì?",
+      "Làm thế nào để xử lý N+1 Problem triệt để trong TypeORM khi lấy danh sách phân trang có relation?"
+    ]
+  },
+  {
+    "id": "nestjs-025",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Helmet, CORS, Rate Limiting — security hardening cho NestJS API?",
+    "interviewerIntent": "Đánh giá tư duy phòng thủ bảo mật ứng dụng web (AppSec), kỹ năng thiết lập các middleware bảo mật cơ bản trước khi đưa lên production.",
+    "contextOrScenario": "Chuẩn bị hạ tầng API cho đợt pentest bảo mật và ngăn chặn các cuộc tấn công Brute-force, DDoS, XSS, Clickjacking.",
+    "expectedKeywords": [
+      "Helmet",
+      "CORS",
+      "@nestjs/throttler",
+      "Security Headers",
+      "Rate Limiting",
+      "ThrottlerGuard"
+    ],
+    "seniorAnswer": {
+      "summary": "Bộ 3 security hardening cốt lõi cho NestJS gồm: 1) Helmet: thiết lập các HTTP response headers an toàn (CSP, X-Frame-Options); 2) CORS: giới hạn domain client được phép gọi API; 3) Rate Limiting (@nestjs/throttler): kiểm soát tần suất request từ mỗi IP để chống brute-force và DDoS.",
+      "deepDive": "1) Helmet (app.use(helmet())) tự động xóa header X-Powered-By (tránh lộ công nghệ) và áp đặt các policy chống clickjacking, MIME-sniffing, XSS. 2) CORS (app.enableCors({ origin: ['https://trusted.com'], credentials: true })) chặn các cross-origin request trái phép từ trình duyệt. 3) ThrottlerModule (@nestjs/throttler): đăng ký ThrottlerGuard mức global, cấu hình ttl (thời gian) và limit (số request cho phép), hỗ trợ lưu trữ trạng thái rate limit vào Redis (ThrottlerStorageRedisService) khi chạy cụm multi-instance.",
+      "codeExample": "// main.ts\napp.use(helmet());\napp.enableCors({\n  origin: process.env.ALLOWED_ORIGINS?.split(',') || 'https://example.com',\n  credentials: true,\n  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],\n});\n\n// app.module.ts\n@Module({\n  imports: [\n    ThrottlerModule.forRoot([{\n      ttl: 60000, // 60s\n      limit: 100, // max 100 requests per IP\n    }]),\n  ],\n  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],\n})\nexport class AppModule {}"
+    },
+    "pitfalls": [
+      "Bật app.enableCors({ origin: '*' }) kèm với credentials: true ở production, vi phạm chuẩn an toàn trình duyệt và tạo lỗ hổng CSRF.",
+      "Chạy ThrottlerModule với In-Memory storage trên môi trường nhiều container (Kubernetes Pods) khiến rate limit bị phân mảnh và không hiệu quả."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để custom key phân loại trong @nestjs/throttler (vd rate limit theo User ID thay vì Client IP)?",
+      "Khi đứng sau Nginx/Cloudflare Reverse Proxy, cần cấu hình app.set('trust proxy', 1) trong Express adapter thế nào để lấy đúng IP client?"
+    ]
+  },
+  {
+    "id": "nestjs-026",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Session vs JWT — khi nào dùng cái nào trong NestJS?",
+    "interviewerIntent": "Khảo sát khả năng phân tích kiến trúc State-full vs Stateless, hiểu trade-off giữa bảo mật thu hồi tức thì và khả năng scale ngang.",
+    "contextOrScenario": "Lựa chọn giải pháp quản lý phiên đăng nhập cho ứng dụng Web Bán Lẻ có cả phiên bản Web SSR và Mobile App iOS/Android.",
+    "expectedKeywords": [
+      "Stateful vs Stateless",
+      "Session Cookie",
+      "JWT (JSON Web Token)",
+      "Redis Session Store",
+      "Token Revocation",
+      "Horizontal Scaling"
+    ],
+    "seniorAnswer": {
+      "summary": "Session (Stateful) lưu trạng thái phiên trên server/Redis và định danh client bằng cookie session ID, cho phép thu hồi (revoke/kick user) tức thì. JWT (Stateless) tự đóng gói payload và chữ ký số trong token, không cần truy vấn DB khi xác thực, phù hợp cho Mobile apps và Microservices cross-domain.",
+      "deepDive": "Session phù hợp với ứng dụng monolithic web/SSR, hệ thống tài chính ngân hàng đòi hỏi kiểm soát phiên tuyệt đối (đăng xuất tức thì khi nghi ngờ gian lận, giới hạn 1 tài khoản chỉ đăng nhập 1 thiết bị). Khi scale, session yêu cầu shared store như Redis (express-session + connect-redis). Ngược lại, JWT phù hợp cho Mobile App, Single Page Applications (SPA), Microservices vì tính stateless giúp server không tốn RAM lưu session và không cần query database mỗi khi giải mã token. Tuy nhiên, JWT rất khó vô hiệu hóa trước khi hết hạn trừ khi kết hợp blacklist trên Redis.",
+      "codeExample": "// NestJS tích hợp Express Session với Redis:\n// main.ts\nconst RedisStore = connectRedis(session);\nconst redisClient = createClient({ url: process.env.REDIS_URL });\n\napp.use(\n  session({\n    store: new RedisStore({ client: redisClient }),\n    secret: process.env.SESSION_SECRET,\n    resave: false,\n    saveUninitialized: false,\n    cookie: { httpOnly: true, secure: process.env.NODE_ENV === 'production', maxAge: 86400000 },\n  }),\n);"
+    },
+    "pitfalls": [
+      "Lưu JWT Token vào LocalStorage của trình duyệt khiến token dễ dàng bị đánh cắp bởi mã độc XSS (nên lưu trong HttpOnly, Secure, SameSite Cookie).",
+      "Dùng Session trong môi trường Microservices phân tán cao mà không cấu hình Centralized Redis Store, dẫn đến tình trạng user bị logout liên tục khi request route sang node khác."
+    ],
+    "followUpQuestions": [
+      "Làm sao để kết hợp ưu điểm của cả hai: JWT ngắn hạn (15 phút) kết hợp Refresh Token lưu database để dễ thu hồi?",
+      "Cơ chế SameSite Cookie (Strict, Lax, None) bảo vệ chống lại tấn công CSRF như thế nào?"
+    ]
+  },
+  {
+    "id": "nestjs-027",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Mock providers trong NestJS unit tests — TestingModule và jest.fn()?",
+    "interviewerIntent": "Đánh giá kỹ năng viết unit test chất lượng cao, kiểm tra khả năng mock sâu các dynamic dependencies và external services.",
+    "contextOrScenario": "Viết unit test cho AuthService để test case đăng nhập: thành công, sai mật khẩu, tài khoản bị khóa mà không chạm tới database.",
+    "expectedKeywords": [
+      "TestingModule",
+      "overrideProvider",
+      "useValue",
+      "jest.fn()",
+      "jest.spyOn",
+      "Isolation"
+    ],
+    "seniorAnswer": {
+      "summary": "Trong NestJS unit test, ta sử dụng TestingModule kết hợp useValue và jest.fn() để thay thế toàn bộ các dependency bên ngoài bằng các mock functions, cho phép mô phỏng các kịch bản thành công và ngoại lệ một cách độc lập.",
+      "deepDive": "Sử dụng createTestingModule() để khai báo service cần test cùng danh sách mock providers. Thay vì truyền class thật, ta dùng { provide: UserService, useValue: { findByEmail: jest.fn(), comparePassword: jest.fn() } }. Trong từng test case, ta điều khiển hành vi của mock bằng .mockResolvedValue(), .mockRejectedValue() hoặc .mockReturnValue(). Có thể dùng type helper như Record<keyof Service, jest.Mock> để đảm bảo type-safety khi mock.",
+      "codeExample": "const mockUserService = {\n  findByEmail: jest.fn(),\n  updateLastLogin: jest.fn(),\n};\n\ndescribe('AuthService', () => {\n  let authService: AuthService;\n\n  beforeEach(async () => {\n    const module: TestingModule = await Test.createTestingModule({\n      providers: [\n        AuthService,\n        { provide: UserService, useValue: mockUserService },\n        { provide: JwtService, useValue: { sign: jest.fn().mockReturnValue('mock-jwt-token') } },\n      ],\n    }).compile();\n\n    authService = module.get<AuthService>(AuthService);\n  });\n\n  it('should return token when credentials are valid', async () => {\n    mockUserService.findByEmail.mockResolvedValue({ id: '1', email: 'test@example.com', passwordHash: 'hash' });\n    jest.spyOn(bcrypt, 'compare').mockResolvedValue(true as never);\n\n    const result = await authService.login('test@example.com', 'correct-password');\n    expect(result.accessToken).toBe('mock-jwt-token');\n    expect(mockUserService.updateLastLogin).toHaveBeenCalledWith('1');\n  });\n});"
+    },
+    "pitfalls": [
+      "Quên gọi jest.clearAllMocks() trong sau mỗi test case, dẫn đến việc số lần gọi (toHaveBeenCalledTimes) bị cộng dồn giữa các test case.",
+      "Chỉ mock các hàm happy-path mà bỏ qua việc test các exception cases (mockRejectedValue) để kiểm tra các Exception Filter."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để mock một Custom Inject Token dạng String hoặc Symbol?",
+      "Sự khác nhau giữa mockReturnValue() và mockResolvedValue() trong Jest là gì?"
+    ]
+  },
+  {
+    "id": "nestjs-028",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "E2E tests với Supertest trong NestJS — setup và best practices?",
+    "interviewerIntent": "Khảo sát năng lực thiết lập kiểm thử đầu cuối (End-to-End Testing), kiểm tra sự phối hợp toàn vẹn giữa Controller, Service, Guard, Pipe và DB.",
+    "contextOrScenario": "Thiết lập pipeline E2E test cho luồng thanh toán giỏ hàng, chạy trước khi deploy lên môi trường Production.",
+    "expectedKeywords": [
+      "Supertest",
+      "INestApplication",
+      "createTestingModule",
+      "init()",
+      "Test DB cleanup",
+      "close()"
+    ],
+    "seniorAnswer": {
+      "summary": "E2E test trong NestJS sử dụng thư viện supertest để gửi HTTP request thực sự vào instance app (INestApplication) được khởi tạo bởi Test.createTestingModule(), xác nhận status code, headers và response body.",
+      "deepDive": "Best practices cho E2E test: 1) Trong beforeAll(), khởi tạo app từ AppModule nhưng override các provider môi trường nhạy cảm (như PaymentService, MailerService) bằng overrideProvider(). 2) BẮT BUỘC gọi await app.init() để kích hoạt toàn bộ lifecycle hooks, pipes, guards; 3) Thiết lập cấu hình app.useGlobalPipes() giống hệt main.ts để test đúng validation logic; 4) Sử dụng database cô lập (SQLite in-memory hoặc Testcontainers Postgres); 5) Trong afterAll(), gọi await app.close() và ngắt kết nối database để tránh memory leak và process treo trên CI.",
+      "codeExample": "describe('UsersController (e2e)', () => {\n  let app: INestApplication;\n\n  beforeAll(async () => {\n    const moduleFixture: TestingModule = await Test.createTestingModule({\n      imports: [AppModule],\n    }).compile();\n\n    app = moduleFixture.createNestApplication();\n    app.useGlobalPipes(new ValidationPipe({ whitelist: true }));\n    await app.init();\n  });\n\n  afterAll(async () => {\n    await app.close();\n  });\n\n  it('/users (POST) should validate and create user', () => {\n    return request(app.getHttpServer())\n      .post('/users')\n      .send({ email: 'john@example.com', name: 'John' })\n      .expect(HttpStatus.CREATED)\n      .expect((res) => {\n        expect(res.body.id).toBeDefined();\n        expect(res.body.email).toBe('john@example.com');\n      });\n  });\n});"
+    },
+    "pitfalls": [
+      "Quên cấu hình useGlobalPipes trong E2E test dẫn đến việc API chấp nhận payload sai định dạng trong test nhưng lại trả lỗi 400 ở production.",
+      "Không dọn dẹp (truncate/rollback) dữ liệu database sau mỗi test suite, khiến các test case phụ thuộc vào thứ tự chạy và sinh lỗi flaky tests."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để truyền Bearer Token JWT vào supertest request để test các private endpoints?",
+      "Cách sử dụng Testcontainers để chạy real PostgreSQL database trong GitHub Actions CI cho E2E test?"
+    ]
+  },
+  {
+    "id": "nestjs-029",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Event Emitter trong NestJS — @OnEvent và EventEmitter2?",
+    "interviewerIntent": "Đánh giá hiểu biết về Event-Driven Architecture nội bộ (In-process Event Bus), giúp decouple (phân rã) các module trong monolith.",
+    "contextOrScenario": "Sau khi đơn hàng tạo thành công (OrderCreated), cần gửi email thông báo, trừ điểm tích lũy và đẩy dữ liệu sang Analytics mà không làm chậm API response.",
+    "expectedKeywords": [
+      "@nestjs/event-emitter",
+      "EventEmitter2",
+      "@OnEvent",
+      "Async events",
+      "Decoupling",
+      "In-process Event Bus"
+    ],
+    "seniorAnswer": {
+      "summary": "@nestjs/event-emitter tích hợp thư viện eventemitter2 vào NestJS, cho phép giao tiếp giữa các module theo kiến trúc Publish/Subscribe trong cùng process Node.js bằng cách emit event và lắng nghe bằng @OnEvent().",
+      "deepDive": "Để decouple code: OrderModule chỉ cần inject EventEmitter2 và gọi this.eventEmitter.emit('order.created', new OrderCreatedEvent(order)). Ở NotificationModule và AnalyticsModule, các method được gắn decorator @OnEvent('order.created'). NestJS hỗ trợ cờ async: true (@OnEvent('order.created', { async: true })) để chạy event handler bất đồng bộ, giúp endpoint checkout trả về ngay cho client mà không phải chờ tác vụ gửi email hoặc logging hoàn tất. Thư viện còn hỗ trợ wildcard matching ('order.*') và namespace events.",
+      "codeExample": "// 1. Phát sinh sự kiện:\n@Injectable()\nexport class OrderService {\n  constructor(private eventEmitter: EventEmitter2) {}\n\n  async createOrder(dto: CreateOrderDto) {\n    const order = await this.orderRepo.save(dto);\n    this.eventEmitter.emit('order.created', new OrderCreatedEvent(order.id, order.userId));\n    return order;\n  }\n}\n\n// 2. Lắng nghe sự kiện bất đồng bộ:\n@Injectable()\nexport class NotificationListener {\n  @OnEvent('order.created', { async: true })\n  async handleOrderCreated(event: OrderCreatedEvent) {\n    await this.emailService.sendReceipt(event.userId, event.orderId);\n  }\n}"
+    },
+    "pitfalls": [
+      "Ném unhandled error trong một async @OnEvent handler khiến Node.js process có thể bị crash nếu không có try/catch hoặc error listener phù hợp.",
+      "Nhầm lẫn giữa In-process Event Emitter (chỉ hoạt động trong 1 server instance) với Distributed Message Broker (Kafka/RabbitMQ khi scale ngang nhiều pods)."
+    ],
+    "followUpQuestions": [
+      "Khi hệ thống scale lên 10 pods trên Kubernetes, tại sao EventEmitter2 không thể thay thế cho Redis PubSub hoặc RabbitMQ?",
+      "Làm sao để xử lý transaction rollback: nếu DB transaction failed thì event đã emit có bị hủy không?"
+    ]
+  },
+  {
+    "id": "nestjs-030",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Pagination trong NestJS — Cursor-based vs Offset-based?",
+    "interviewerIntent": "Khảo sát tư duy tối ưu truy vấn dữ liệu lớn (Big Data pagination), hiểu rõ điểm yếu hiệu năng của OFFSET/LIMIT và cách implement Cursor pagination.",
+    "contextOrScenario": "Thiết kế API danh sách tin nhắn chat hoặc feed bài viết với hàng triệu bản ghi, cần cuộn vô tận (Infinite Scroll) mượt mà.",
+    "expectedKeywords": [
+      "Offset-based (LIMIT/OFFSET)",
+      "Cursor-based (Keyset)",
+      "Performance at Scale",
+      "Data Drift",
+      "TypeORM Pagination"
+    ],
+    "seniorAnswer": {
+      "summary": "Offset-based (LIMIT X OFFSET Y) dễ làm nhưng hiệu năng giảm dần theo độ sâu trang (O(N)) và bị trượt dữ liệu (data drift). Cursor-based (WHERE id < cursor LIMIT X) tận dụng B-Tree Index, đạt hiệu năng O(1) bất kể dữ liệu lớn đến đâu và không bị duplicate khi có bản ghi mới.",
+      "deepDive": "So sánh chuyên sâu: 1) Offset: SELECT * FROM posts ORDER BY created_at DESC LIMIT 20 OFFSET 100000; Database phải scan và bỏ qua 100,000 bản ghi đầu tiên gây quá tải I/O và RAM. Nếu có bài mới thêm vào, trang tiếp theo sẽ bị trùng bài cũ. 2) Cursor (Keyset): SELECT * FROM posts WHERE (created_at, id) < (:cursorCreatedAt, :cursorId) ORDER BY created_at DESC, id DESC LIMIT 20. Database nhảy thẳng đến vị trí cursor thông qua Index, độ phức tạp O(log N). Cursor thường được encode base64 gửi về cho client dưới dạng nextCursor.",
+      "codeExample": "// Cursor-based pagination với TypeORM QueryBuilder:\nasync getFeed(cursor?: string, limit = 20) {\n  const qb = this.postRepo.createQueryBuilder('post')\n    .orderBy('post.createdAt', 'DESC')\n    .addOrderBy('post.id', 'DESC')\n    .take(limit + 1); // Lấy thêm 1 để check hasNextPage\n\n  if (cursor) {\n    const { createdAt, id } = decodeCursor(cursor);\n    qb.where('(post.createdAt, post.id) < (:createdAt, :id)', { createdAt, id });\n  }\n\n  const items = await qb.getMany();\n  const hasNextPage = items.length > limit;\n  if (hasNextPage) items.pop();\n\n  const nextCursor = hasNextPage ? encodeCursor(items[items.length - 1]) : null;\n  return { items, nextCursor, hasNextPage };\n}"
+    },
+    "pitfalls": [
+      "Dùng Cursor-based nhưng trường dùng làm cursor không được đánh INDEX trong database, khiến câu truy vấn rơi vào Full Table Scan.",
+      "Áp dụng Cursor-based cho giao diện yêu cầu 'nhảy thẳng đến trang số 15' (Cursor không hỗ trợ random page access, chỉ phù hợp Infinite Scroll / Next-Prev)."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để tạo Cursor an toàn khi sort theo trường có giá trị không unique (như createdAt hoặc viewCount)?",
+      "Tại sao nên lấy limit + 1 bản ghi thay vì chạy thêm 1 câu COUNT(*) để kiểm tra hasNextPage?"
+    ]
+  },
+  {
+    "id": "nestjs-031",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Serialization và response transformation với class-transformer trong NestJS?",
+    "interviewerIntent": "Kiểm tra kỹ năng bảo vệ dữ liệu nhạy cảm (ẩn password/salt), format output data và sử dụng ClassSerializerInterceptor.",
+    "contextOrScenario": "Trả về thông tin User entity nhưng phải tự động loại bỏ passwordHash, haiFactorSecret và định dạng fullName ảo trước khi response gửi về client.",
+    "expectedKeywords": [
+      "ClassSerializerInterceptor",
+      "class-transformer",
+      "@Exclude()",
+      "@Expose()",
+      "plainToInstance",
+      "Serialization"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS cung cấp ClassSerializerInterceptor dựa trên thư viện class-transformer. Khi áp dụng, nó sẽ tự động lọc bỏ các thuộc tính được đánh dấu @Exclude() và hiển thị các trường tính toán ảo với @Expose() từ các đối tượng trả về.",
+      "deepDive": "Để kích hoạt: gắn @UseInterceptors(ClassSerializerInterceptor) trên controller hoặc đăng ký global bằng APP_INTERCEPTOR. Trong Entity hoặc DTO class: 1) Dùng @Exclude() trên các trường nhạy cảm như passwordHash, refreshToken; 2) Dùng @Expose() trên các getter function để tạo computed fields (vd get fullName() { return `${this.firstName} ${this.lastName}`; }); 3) Nếu trả về plain object, cần bọc qua plainToInstance(UserEntity, rawUser) để class-transformer nhận diện metadata.",
+      "codeExample": "@Entity()\nexport class UserEntity {\n  @PrimaryGeneratedColumn('uuid')\n  id: string;\n\n  @Column()\n  firstName: string;\n\n  @Column()\n  lastName: string;\n\n  @Column()\n  @Exclude() // Tự động bị xóa khi serialize ra JSON\n  passwordHash: string;\n\n  @Expose()\n  get fullName(): string {\n    return `${this.firstName} ${this.lastName}`;\n  }\n}\n\n// Controller kích hoạt serializer:\n@UseInterceptors(ClassSerializerInterceptor)\n@Get('me')\ngetMe(@CurrentUser() user: UserEntity) {\n  return user;\n}"
+    },
+    "pitfalls": [
+      "Trả về plain JavaScript object từ Service mà không chuyển thành class instance (qua new User() hoặc plainToInstance()), khiến ClassSerializerInterceptor không đọc được metadata và password vẫn bị lộ ra ngoài.",
+      "Lạm dụng serialization ở tầng controller cho hàng ngàn bản ghi lớn khiến tiêu tốn CPU đột biến (V8 reflection overhead)."
+    ],
+    "followUpQuestions": [
+      "Tại sao NestJS cần ClassSerializerInterceptor thay vì dùng method toJSON() của JavaScript class?",
+      "Làm sao để cấu hình serialize động dựa trên quyền của user (ví dụ Admin xem được email, User thường thì bị ẩn)?"
+    ]
+  },
+  {
+    "id": "nestjs-032",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Soft delete và audit timestamps với TypeORM — createdAt, updatedAt, deletedAt?",
+    "interviewerIntent": "Đánh giá hiểu biết về toàn vẹn dữ liệu lịch sử, cơ chế xóa mềm (Soft Delete) và các decorators audit chuẩn mực của TypeORM.",
+    "contextOrScenario": "Tuân thủ quy định kiểm toán dữ liệu tài chính (Audit Log) và GDPR: người dùng bấm xóa tài khoản nhưng dữ liệu chỉ được đánh dấu đã xóa để phục hồi khi cần.",
+    "expectedKeywords": [
+      "@CreateDateColumn",
+      "@UpdateDateColumn",
+      "@DeleteDateColumn",
+      "softDelete()",
+      "restore()",
+      "withDeleted"
+    ],
+    "seniorAnswer": {
+      "summary": "TypeORM hỗ trợ sẵn Audit Timestamps và Soft Delete thông qua bộ 3 decorators: @CreateDateColumn() (lưu thời điểm tạo), @UpdateDateColumn() (tự động cập nhật khi sửa bản ghi), và @DeleteDateColumn() (lưu thời điểm xóa mềm).",
+      "deepDive": "Khi entity có @DeleteDateColumn() deletedAt: Date: 1) Gọi repo.softDelete(id) hoặc repo.softRemove(entity) sẽ cập nhật deletedAt = NOW() thay vì chạy lệnh DELETE FROM; 2) Các câu query thông thường (find, findOne, QueryBuilder) tự động chèn thêm điều kiện WHERE deletedAt IS NULL; 3) Để khôi phục bản ghi, dùng repo.restore(id); 4) Khi muốn truy vấn cả bản ghi đã xóa (vd cho màn hình Admin thùng rác), cần truyền { withDeleted: true } hoặc gọi qb.withDeleted().",
+      "codeExample": "@Entity('products')\nexport class ProductEntity {\n  @PrimaryGeneratedColumn('uuid')\n  id: string;\n\n  @Column()\n  name: string;\n\n  @CreateDateColumn({ type: 'timestamptz' })\n  createdAt: Date;\n\n  @UpdateDateColumn({ type: 'timestamptz' })\n  updatedAt: Date;\n\n  @DeleteDateColumn({ type: 'timestamptz', nullable: true })\n  deletedAt: Date; // Null nếu đang active, có timestamp nếu đã xóa mềm\n}\n\n// Khôi phục sản phẩm:\nasync restoreProduct(id: string) {\n  return this.productRepo.restore(id);\n}"
+    },
+    "pitfalls": [
+      "Sử dụng unique constraint trong database (vd UNIQUE(email)) kết hợp soft delete: khi user xóa mềm tài khoản, họ không thể đăng ký lại bằng chính email đó vì bản ghi cũ vẫn tồn tại trong DB.",
+      "Viết raw SQL query hoặc custom QueryBuilder nhưng quên thêm điều kiện deletedAt IS NULL, vô tình làm lộ các bản ghi đã xóa ra ngoài API."
+    ],
+    "followUpQuestions": [
+      "Giải pháp thiết kế database index nào xử lý triệt để xung đột Unique Constraint khi áp dụng Soft Delete (vd Partial Unique Index trong Postgres)?",
+      "Sự khác nhau giữa softDelete() và softRemove() trong TypeORM là gì?"
+    ]
+  },
+  {
+    "id": "nestjs-033",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Connection pooling và database performance optimization trong NestJS?",
+    "interviewerIntent": "Khảo sát kiến thức vận hành hạ tầng database, kiểm soát tài nguyên kết nối (pool size) và tối ưu truy vấn dưới tải cao.",
+    "contextOrScenario": "Ứng dụng NestJS phục vụ đợt Flash Sale, lưu lượng tăng vọt dẫn tới lỗi 'remaining connection slots are reserved for non-replication superuser connections' trên PostgreSQL.",
+    "expectedKeywords": [
+      "Connection Pool",
+      "max connections",
+      "idleTimeoutMillis",
+      "PgBouncer",
+      "Connection Leak",
+      "TypeORM Pool Config"
+    ],
+    "seniorAnswer": {
+      "summary": "Connection Pooling duy trì một tập hợp các kết nối database mở sẵn để tái sử dụng, loại bỏ chi phí đắt đỏ của việc mở/đóng TCP handshake và TLS auth ở mỗi query. Tối ưu pool đòi hỏi cấu hình đúng size dựa trên số lượng container pods và năng lực phần cứng của database.",
+      "deepDive": "Trong cấu hình TypeORM (Postgres/MySQL driver): 1) extra.max: số connection tối đa trong pool của 1 pod (mặc định pg là 10); 2) Công thức tính: Tổng kết nối = Số Pods x max_pool_size. Nếu có 20 pods x 10 = 200 connections, vượt quá max_connections của Postgres (thường là 100-200) sẽ gây sập DB; 3) Giải pháp enterprise: đặt pool size nhỏ (3-5 kết nối/pod) kết hợp Connection Pooler chuyên dụng như PgBouncer (Transaction Pooling mode); 4) Luôn giải phóng queryRunner bằng release() để tránh connection leak.",
+      "codeExample": "// Cấu hình tối ưu pool trong TypeOrmModule:\nTypeOrmModule.forRootAsync({\n  imports: [ConfigModule],\n  inject: [ConfigService],\n  useFactory: (config: ConfigService) => ({\n    type: 'postgres',\n    url: config.get<string>('DATABASE_URL'),\n    extra: {\n      max: 10, // Giới hạn connection tối đa mỗi instance\n      min: 2,  // Giữ tối thiểu 2 connection mở sẵn\n      idleTimeoutMillis: 30000,\n      connectionTimeoutMillis: 2000, // Fail-fast nếu chờ kết nối quá 2s\n    },\n    logging: process.env.NODE_ENV === 'development',\n  }),\n})"
+    },
+    "pitfalls": [
+      "Đặt max pool size quá lớn (vd 50-100) trên từng container, khi auto-scale Kubernetes tăng số Pod sẽ làm sập PostgreSQL do cạn kiệt RAM và connection slots.",
+      "Quên release QueryRunner trong khối finally của custom transaction, làm connection pool bị drain về 0."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa Session Pooling và Transaction Pooling trong PgBouncer khi triển khai NestJS là gì?",
+      "Tại sao tăng connection pool quá cao lại làm giảm throughput của database thay vì tăng lên (CPU context switching)?"
+    ]
+  },
+  {
+    "id": "nestjs-034",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Vì sao logic phân quyền đọc metadata @Roles() phải viết trong Guard, không viết được trong middleware của NestJS?",
+    "interviewerIntent": "Kiểm tra sự am hiểu ranh giới kiến trúc giữa Middleware và Guard, hiểu rõ thời điểm phân giải route metadata trong Request Lifecycle.",
+    "contextOrScenario": "Phỏng vấn ứng viên nhằm phân biệt rõ khi nào dùng Middleware và khi nào dùng Guard cho hệ thống Auth/Security.",
+    "expectedKeywords": [
+      "ExecutionContext",
+      "Reflector",
+      "Route Metadata",
+      "Request Lifecycle",
+      "Middleware limitation",
+      "CanActivate"
+    ],
+    "seniorAnswer": {
+      "summary": "Logic đọc metadata @Roles() bắt buộc phải viết trong Guard vì Middleware chạy trước khi NestJS Router phân giải (resolve) route handler. Do đó, ở tầng Middleware chưa thể biết controller/method nào sẽ xử lý request và không có quyền truy cập ExecutionContext cùng Reflector.",
+      "deepDive": "Về mặt kiến trúc: 1) Middleware là lớp kế thừa trực tiếp từ Express/Fastify (chạy ở tầng platform HTTP), nó chỉ tiếp nhận req, res, next thô. Tại thời điểm này, NestJS chưa thực hiện route matching; 2) Guards chạy sau Middleware, tại thời điểm NestJS đã xác định chính xác Class Controller và Method Handler sẽ tiếp nhận request; 3) Guard được cung cấp ExecutionContext, cho phép inject Reflector để đọc các metadata được gắn thông qua @SetMetadata('roles', [...]) trên chính method hoặc class đó; 4) Do đó, chỉ từ Guard trở đi (Guard, Interceptor, Pipe) ta mới có thể lập trình hướng khía cạnh (AOP) dựa trên route metadata.",
+      "codeExample": "@Injectable()\nexport class RolesGuard implements CanActivate {\n  constructor(private reflector: Reflector) {}\n\n  canActivate(context: ExecutionContext): boolean {\n    // Chỉ Guard mới có context.getHandler() để đọc metadata\n    const requiredRoles = this.reflector.getAllAndOverride<string[]>('roles', [\n      context.getHandler(),\n      context.getClass(),\n    ]);\n    if (!requiredRoles) return true;\n\n    const { user } = context.switchToHttp().getRequest();\n    return requiredRoles.some(role => user?.roles?.includes(role));\n  }\n}"
+    },
+    "pitfalls": [
+      "Cố gắng inject Reflector vào Express Middleware và gọi context.getHandler(), dẫn đến lỗi vì middleware không có ExecutionContext.",
+      "Tự parse regex URL trong middleware để kiểm tra quyền thay vì dùng Guard + Metadata, tạo ra code mong manh, dễ lọt lỗ hổng bảo mật."
+    ],
+    "followUpQuestions": [
+      "Reflector.getAllAndOverride() và Reflector.getAllAndMerge() khác nhau như thế nào khi merge roles từ class level và handler level?",
+      "Nếu cần trích xuất Tenant từ Subdomain/Header trước khi Guard chạy thì nên dùng Middleware hay Guard?"
+    ]
+  },
+  {
+    "id": "nestjs-035",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Cấu hình ValidationPipe thế nào để chặn field lạ và ép kiểu query param? whitelist, forbidNonWhitelisted, transform khác nhau ra sao?",
+    "interviewerIntent": "Đánh giá chi tiết kỹ năng cấu hình ValidationPipe, bảo vệ hệ thống khỏi Mass Assignment attack và ép kiểu an toàn cho HTTP query parameters.",
+    "contextOrScenario": "Phòng chống lỗ hổng bảo mật người dùng gửi thêm field isAdmin: true khi đăng ký tài khoản, và tự động ép kiểu query ?page=1&limit=10 thành số nguyên.",
+    "expectedKeywords": [
+      "whitelist",
+      "forbidNonWhitelisted",
+      "transform",
+      "Mass Assignment Vulnerability",
+      "enableImplicitConversion",
+      "class-transformer"
+    ],
+    "seniorAnswer": {
+      "summary": "3 cờ cốt lõi của ValidationPipe: whitelist: true tự động loại bỏ các field không khai báo trong DTO (chống Mass Assignment); forbidNonWhitelisted: true sẽ quăng lỗi 400 nếu request chứa field lạ; transform: true tự động chuyển đổi plain object thành DTO instance và ép kiểu các primitive types (string sang number/boolean).",
+      "deepDive": "Chi tiết cơ chế: 1) whitelist: true: loại bỏ âm thầm các field không có decorator trong DTO. Rất quan trọng để ngăn chặn hacker inject trường isAdmin, role; 2) forbidNonWhitelisted: true: kết hợp với whitelist để ném BadRequestException ngay lập tức nếu client gửi thừa field lạ, giúp frontend phát hiện bug nhanh; 3) transform: true: tự động convert primitive query/param type (vd string '10' thành number 10) dựa trên TypeScript type hoặc @Type(() => Number) thông qua class-transformer.",
+      "codeExample": "// main.ts\napp.useGlobalPipes(\n  new ValidationPipe({\n    whitelist: true, // Lọc sạch field không định nghĩa\n    forbidNonWhitelisted: true, // Ném lỗi nếu có field thừa\n    transform: true, // Ép kiểu query/params sang number/boolean\n    transformOptions: {\n      enableImplicitConversion: true, // Tự động convert theo TypeScript reflection type\n    },\n  }),\n);\n\n// query.dto.ts\nexport class PaginationQueryDto {\n  @IsOptional()\n  @IsInt()\n  @Min(1)\n  page?: number = 1; // Nhận '1' từ URL query nhưng tự ép thành số 1\n}"
+    },
+    "pitfalls": [
+      "Chỉ bật whitelist: true mà không có forbidNonWhitelisted: true, khiến API âm thầm bỏ qua field sai chính tả của client mà không thông báo lỗi.",
+      "Khai báo trường trong DTO nhưng quên gắn bất kỳ decorator nào của class-validator, khiến trường đó bị whitelist coi là field lạ và xóa mất."
+    ],
+    "followUpQuestions": [
+      "Tại sao cần cẩn trọng khi bật enableImplicitConversion: true với kiểu boolean?",
+      "Làm sao để custom error message chuẩn format khi forbidNonWhitelisted phát hiện trường lạ?"
+    ]
+  },
+  {
+    "id": "nestjs-036",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "Đăng ký global exception filter bằng app.useGlobalFilters() và bằng token APP_FILTER khác nhau ở điểm nào?",
+    "interviewerIntent": "Khảo sát mức độ am hiểu về Dependency Injection trong NestJS, biết cách tạo global filter có thể inject các service khác.",
+    "contextOrScenario": "Tạo Global Exception Filter cần inject LoggerService, ConfigService và TelegramAlertService để gửi cảnh báo khi có lỗi 500.",
+    "expectedKeywords": [
+      "app.useGlobalFilters()",
+      "APP_FILTER token",
+      "Dependency Injection",
+      "IoC Container",
+      "Module scope",
+      "Custom Logger"
+    ],
+    "seniorAnswer": {
+      "summary": "Sự khác biệt cốt lõi nằm ở Dependency Injection (DI): app.useGlobalFilters(new Filter()) đăng ký bên ngoài IoC container nên KHÔNG thể inject bất kỳ service nào; trong khi đăng ký bằng token { provide: APP_FILTER, useClass: Filter } trong AppModule nằm hoàn toàn bên trong IoC container, cho phép inject mọi service bình thường.",
+      "deepDive": "Khi dùng app.useGlobalFilters(new MyFilter()) trong main.ts, ta phải tự new instance bằng tay trước khi container sẵn sàng, khiến filter bị cô lập khỏi DI graph. Ngược lại, khi đăng ký trong AppModule với token APP_FILTER: NestJS coi filter này như một provider chính thức thuộc module graph. Container sẽ tự động resolve các dependency khai báo trong constructor của filter (vd: Logger, HttpService, ConfigService), sau đó tự động đăng ký nó làm global filter cho toàn ứng dụng.",
+      "codeExample": "// CÁCH SENIOR: Đăng ký trong AppModule với APP_FILTER\n@Module({\n  imports: [ConfigModule, LoggerModule],\n  providers: [\n    {\n      provide: APP_FILTER,\n      useClass: GlobalExceptionsFilter,\n    },\n  ],\n})\nexport class AppModule {}\n\n// Bên trong Filter hoàn toàn inject được dependency:\n@Catch()\nexport class GlobalExceptionsFilter implements ExceptionFilter {\n  constructor(\n    private readonly logger: CustomLoggerService,\n    private readonly alertService: AlertService,\n  ) {}\n\n  catch(exception: unknown, host: ArgumentsHost) {\n    this.logger.error('Unhandled exception', (exception as any)?.stack);\n    this.alertService.notifyDevTeam(exception);\n    // Format JSON response...\n  }\n}"
+    },
+    "pitfalls": [
+      "Đăng ký filter bằng app.useGlobalFilters() rồi cố gắng inject LoggerService vào constructor, gây lỗi Cannot read properties of undefined ở runtime.",
+      "Khai báo provider APP_FILTER ở nhiều feature modules khác nhau gây duplicate filter pipeline hoặc nhầm lẫn về scope."
+    ],
+    "followUpQuestions": [
+      "Ngoài APP_FILTER, NestJS còn có những multi-provider tokens nào khác (vd: APP_GUARD, APP_INTERCEPTOR, APP_PIPE)?",
+      "Nếu khai báo cả app.useGlobalFilters() và APP_FILTER thì thứ tự ưu tiên bắt lỗi như thế nào?"
+    ]
+  },
+  {
+    "id": "nestjs-037",
+    "category": "nestjs",
+    "level": "middle",
+    "question": "@MessagePattern và @EventPattern trong NestJS Microservices khác nhau thế nào? Khi nào dùng cái nào?",
+    "interviewerIntent": "Đánh giá khả năng phân biệt 2 mô hình giao tiếp phân tán cơ bản: Request-Response (Đồng bộ logic) vs Event-Driven / Fire-and-Forget (Bất đồng bộ).",
+    "contextOrScenario": "Thiết kế giao tiếp giữa Order Service và Payment Service: kiểm tra số dư ví cần kết quả ngay (Request-Response), còn gửi email hóa đơn chỉ cần emit sự kiện (Fire-and-Forget).",
+    "expectedKeywords": [
+      "@MessagePattern",
+      "@EventPattern",
+      "Request-Response",
+      "Event-Driven",
+      "Fire-and-Forget",
+      "ClientProxy",
+      "send() vs emit()"
+    ],
+    "seniorAnswer": {
+      "summary": "@MessagePattern áp dụng mô hình Request-Response (Client gọi client.send() và CHỜ kết quả trả về). @EventPattern áp dụng mô hình Event-Driven / Fire-and-Forget (Client gọi client.emit() và KHÔNG chờ kết quả, chỉ publish sự kiện đi).",
+      "deepDive": "1) @MessagePattern: sử dụng khi consumer cần xử lý dữ liệu và trả kết quả/lỗi ngược lại cho caller (tương đương RPC). Client dùng client.send('pattern', data).toPromise(). Broker sẽ duy trì reply queue hoặc correlation ID để định tuyến phản hồi. 2) @EventPattern: sử dụng khi chỉ cần thông báo một sự kiện nghiệp vụ đã xảy ra (Domain Event) cho 1 hoặc nhiều subscriber mà không cần quan tâm kết quả xử lý. Client dùng client.emit('pattern', data). Mô hình này giúp giảm latency tối đa và tăng khả năng chịu tải cho hệ thống.",
+      "codeExample": "@Controller()\nexport class OrderConsumer {\n  // Request-Response: Có trả về kết quả\n  @MessagePattern({ cmd: 'calculate_tax' })\n  calculateTax(data: { amount: number }): number {\n    return data.amount * 0.1;\n  }\n\n  // Event-Driven: Fire-and-forget, không trả về giá trị\n  @EventPattern('order_placed')\n  async handleOrderPlaced(data: OrderPlacedDto) {\n    await this.analyticsService.track(data);\n  }\n}"
+    },
+    "pitfalls": [
+      "Dùng client.send() với @EventPattern hoặc dùng client.emit() với @MessagePattern dẫn đến việc client bị treo vĩnh viễn (hanging) do chờ response không bao giờ tới.",
+      "Dùng @MessagePattern cho các tác vụ tốn thời gian (như render video, export file lớn) làm nghẽn kênh truyền RPC và timeout client."
+    ],
+    "followUpQuestions": [
+      "Trong Kafka transport, @MessagePattern được mô phỏng thế nào khi Kafka về bản chất là Message Log chứ không phải RPC broker?",
+      "Làm sao để handle timeout khi gọi client.send() với RxJS timeout operator?"
+    ]
+  },
+  {
+    "id": "nestjs-038",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "NestJS Microservices hoạt động như thế nào? Các transport layers phổ biến?",
+    "interviewerIntent": "Đánh giá kiến trúc phân tán cấp độ Senior, khả năng thiết kế hệ thống Microservices sử dụng đa dạng Message Brokers và RPC protocols.",
+    "contextOrScenario": "Chuyển đổi hệ thống Monolith thương mại điện tử sang kiến trúc Microservices phân tán với độ trễ thấp và khả năng scale độc lập.",
+    "expectedKeywords": [
+      "NestMicroservice",
+      "Transport",
+      "TCP",
+      "Redis PubSub",
+      "NATS",
+      "RabbitMQ",
+      "Kafka",
+      "gRPC",
+      "ClientProxy"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS Microservices là một module chuyên biệt (@nestjs/microservices) trừu tượng hóa tầng truyền thông phân tán. Thay vì giao tiếp qua HTTP REST, các service giao tiếp qua Message Brokers hoặc RPC thông qua các Transport Layers tích hợp sẵn.",
+      "deepDive": "Kiến trúc gồm 2 thành phần chính: Microservice Server (lắng nghe patterns qua app.connectMicroservice()) và ClientProxy (inject qua ClientsModule để gửi messages). Các Transports phổ biến và use-case: 1) TCP: giao tiếp trực tiếp point-to-point, zero-dependency, phù hợp mạng nội bộ; 2) Redis: Pub/Sub nhanh, nhẹ, phù hợp chat/broadcast; 3) RabbitMQ (AMQP): Message Queuing mạnh mẽ, hỗ trợ routing keys, dead-letter exchange, bảo đảm deliver message; 4) Apache Kafka: Stream processing, throughput cực cao, event replay, lưu trữ log vĩnh viễn cho Big Data; 5) gRPC: HTTP/2 binary protocol, độ trễ siêu thấp, strongly-typed qua Protobuf, tối ưu cho inter-service communication tốc độ cao.",
+      "codeExample": "// main.ts của Microservice Consumer:\nconst app = await NestFactory.createMicroservice<MicroserviceOptions>(AppModule, {\n  transport: Transport.RMQ,\n  options: {\n    urls: ['amqp://admin:pass@localhost:5672'],\n    queue: 'orders_queue',\n    queueOptions: { durable: true },\n  },\n});\nawait app.listen();"
+    },
+    "pitfalls": [
+      "Dùng Redis Pub/Sub cho các tác vụ quan trọng như xử lý thanh toán: Redis Pub/Sub không có cơ chế lưu trữ hàng đợi (message persistence), nếu consumer offline thì message bị mất vĩnh viễn.",
+      "Không cấu hình Consumer Acknowledgment (noAck: false) trong RabbitMQ, khiến message bị xóa khỏi queue ngay khi gửi đi dù consumer xử lý crash."
+    ],
+    "followUpQuestions": [
+      "Khi nào nên chọn gRPC thay vì Kafka cho giao tiếp giữa các internal microservices?",
+      "Cơ chế ClientProxy pool connections và tái kết nối tự động khi Message Broker restart như thế nào?"
+    ]
+  },
+  {
+    "id": "nestjs-039",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "WebSockets trong NestJS — cách implement real-time features với @WebSocketGateway?",
+    "interviewerIntent": "Khảo sát kỹ năng xây dựng ứng dụng thời gian thực (Real-time), quản lý Socket connection lifecycle, Rooms, Authentication và Scaling qua Redis Adapter.",
+    "contextOrScenario": "Xây dựng hệ thống Chat Real-time và thông báo đơn hàng cho tài xế với hàng chục ngàn kết nối đồng thời trên nhiều server nodes.",
+    "expectedKeywords": [
+      "@WebSocketGateway",
+      "Socket.io",
+      "OnGatewayConnection",
+      "OnGatewayDisconnect",
+      "@SubscribeMessage",
+      "Redis Adapter",
+      "Socket Auth"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS cung cấp @nestjs/websockets và adapter Socket.io (hoặc ws) qua decorator @WebSocketGateway(). Nó cho phép quản lý vòng đời kết nối, phòng chat (rooms), broadcast events và xác thực token ngay lúc handshake.",
+      "deepDive": "Senior implementation: 1) Lifecycle: implement OnGatewayConnection và OnGatewayDisconnect để theo dõi người dùng online/offline; 2) Authentication: xác thực JWT token ngay trong handleConnection() từ client.handshake.auth.token, ngắt kết nối client.disconnect() nếu token không hợp lệ; 3) Rooms & Namespace: dùng client.join(`order_${id}`) để gửi tin nhắn có chủ đích thay vì broadcast toàn mạng; 4) Scaling: khi scale ra nhiều server pods, socket kết nối tới các pod khác nhau. BẮT BUỘC dùng @socket.io/redis-adapter để đồng bộ broadcast giữa các cluster nodes qua Redis Pub/Sub.",
+      "codeExample": "@WebSocketGateway({ cors: { origin: '*' }, namespace: 'orders' })\nexport class OrderGateway implements OnGatewayConnection, OnGatewayDisconnect {\n  @WebSocketServer()\n  server: Server;\n\n  constructor(private jwtService: JwtService) {}\n\n  async handleConnection(client: Socket) {\n    try {\n      const token = client.handshake.auth?.token;\n      const payload = await this.jwtService.verifyAsync(token);\n      client.data.user = payload; // Lưu thông tin auth vào socket session\n      client.join(`user_${payload.sub}`);\n    } catch {\n      client.disconnect();\n    }\n  }\n\n  @SubscribeMessage('joinOrderRoom')\n  handleJoinRoom(@ConnectedSocket() client: Socket, @MessageBody() orderId: string) {\n    client.join(`order_${orderId}`);\n    return { status: 'joined', orderId };\n  }\n}"
+    },
+    "pitfalls": [
+      "Xác thực token ở từng @SubscribeMessage() thay vì chặn ngay từ handleConnection(), tạo ra rủi ro unauthenticated client vẫn chiếm giữ socket connection.",
+      "Chạy WebSocket trên nhiều pods nhưng không cài đặt Redis Adapter, dẫn đến người dùng ở Pod A không thể nhận thông báo do Pod B phát ra."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để áp dụng Guards và Exception Filters trên WebSocket Gateway?",
+      "So sánh trade-off hiệu năng giữa thư viện socket.io và ws thuần trong NestJS?"
+    ]
+  },
+  {
+    "id": "nestjs-040",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Tối ưu performance NestJS: Fastify, Caching, Compression, Rate Limiting?",
+    "interviewerIntent": "Đánh giá tư duy tối ưu hóa hiệu năng mức hệ thống, throughput, latency và khả năng tinh chỉnh runtime Node.js cho tải hàng chục nghìn RPS.",
+    "contextOrScenario": "Hệ thống API backend bị quá tải trong đợt sale lớn, thời gian phản hồi p99 tăng lên 2000ms, cần tối ưu giảm tải CPU và tăng throughput gấp 3 lần.",
+    "expectedKeywords": [
+      "FastifyAdapter",
+      "In-memory / Redis Caching",
+      "compression",
+      "Cluster Mode",
+      "Throughput optimization",
+      "Event Loop lag"
+    ],
+    "seniorAnswer": {
+      "summary": "Chiến lược tối ưu hiệu năng toàn diện cho NestJS: 1) Chuyển đổi HTTP engine từ Express sang FastifyAdapter (tăng throughput 1.5x - 2x); 2) Áp dụng HTTP Compression (gzip/brotli); 3) Multi-level Caching (In-memory L1 + Redis L2); 4) Giới hạn tải bằng Rate Limiting; 5) Tận dụng đa nhân CPU với Node.js Cluster hoặc PM2.",
+      "deepDive": "Các bước tinh chỉnh chuyên sâu: 1) FastifyAdapter: loại bỏ overhead middleware của Express, sử dụng schema serialization cực nhanh (fast-json-stringify); 2) Compression: nén response payload giảm băng thông mạng và thời gian truyền tải; 3) CacheModule: cache các API đọc nhiều, ít thay đổi với Redis; 4) Tối ưu Provider Scopes: đảm bảo 100% providers là Scope.DEFAULT (Singleton) để tránh Garbage Collection churn; 5) Tránh block Event Loop: đẩy các tác vụ nặng (PDF generation, mã hóa nặng, resize ảnh) sang Worker Threads hoặc BullMQ background queue.",
+      "codeExample": "// main.ts với Fastify và Compression:\nimport { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';\nimport compression from '@fastify/compress';\n\nasync function bootstrap() {\n  const app = await NestFactory.create<NestFastifyApplication>(\n    AppModule,\n    new FastifyAdapter({ logger: false }),\n  );\n\n  await app.register(compression, { encodings: ['gzip', 'deflate'] });\n  await app.listen(3000, '0.0.0.0');\n}\nbootstrap();"
+    },
+    "pitfalls": [
+      "Chuyển sang Fastify nhưng vẫn dùng các middleware chuyên dụng của Express mà không cài đặt gói tương thích của Fastify (@fastify/...), gây lỗi crash khi khởi động.",
+      "Cache toàn bộ HTTP GET response nhưng quên không lập cơ chế Cache Invalidation khi có tác vụ POST/PUT/DELETE làm client nhận dữ liệu cũ (stale data)."
+    ],
+    "followUpQuestions": [
+      "Những hạn chế hoặc lưu ý tương thích nào cần chú ý khi chuyển từ Express sang Fastify trong NestJS?",
+      "Làm sao để giám sát Event Loop Delay trong NestJS production bằng thư viện prom-client?"
+    ]
+  },
+  {
+    "id": "nestjs-041",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Middleware trong NestJS — functional vs class middleware, apply theo routes?",
+    "interviewerIntent": "Kiểm tra kiến thức phân biệt giữa Functional Middleware và Class-based Middleware, cách cấu hình MiddlewareConsumer và Dependency Injection.",
+    "contextOrScenario": "Xây dựng Correlation ID middleware để theo dõi distributed tracing xuyên suốt hệ thống và áp dụng có chọn lọc cho một số API routes.",
+    "expectedKeywords": [
+      "NestMiddleware",
+      "MiddlewareConsumer",
+      "apply().forRoutes()",
+      "Functional Middleware",
+      "Correlation ID",
+      "RouteInfo"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS hỗ trợ 2 loại: Class Middleware (implement NestMiddleware, hỗ trợ DI container) và Functional Middleware (hàm gọn nhẹ không có dependency). Middleware được cấu hình trong hàm configure() của module thông qua MiddlewareConsumer.",
+      "deepDive": "So sánh: Functional Middleware phù hợp cho các logic đơn giản không cần inject service (như parse header, morgan logger). Class Middleware bắt buộc khi cần inject các Provider khác (như ConfigService, AuthService, WinstonLogger). MiddlewareConsumer cung cấp fluent API: .apply(CorsMiddleware, AuthMiddleware).exclude({ path: 'health', method: RequestMethod.GET }).forRoutes({ path: 'api/*', method: RequestMethod.ALL }) hoặc chỉ định trực tiếp Controller class.",
+      "codeExample": "@Injectable()\nexport class CorrelationIdMiddleware implements NestMiddleware {\n  use(req: Request, res: Response, next: NextFunction) {\n    const correlationId = req.headers['x-correlation-id'] || uuidv4();\n    req.headers['x-correlation-id'] = correlationId;\n    res.setHeader('X-Correlation-Id', correlationId);\n    next();\n  }\n}\n\n// Cấu hình trong AppModule:\nexport class AppModule implements NestModule {\n  configure(consumer: MiddlewareConsumer) {\n    consumer\n      .apply(CorrelationIdMiddleware)\n      .exclude('health')\n      .forRoutes({ path: '*', method: RequestMethod.ALL });\n  }\n}"
+    },
+    "pitfalls": [
+      "Quên gọi hàm next() bên trong middleware khiến request bị treo vô thời hạn (hanging request).",
+      "Kỳ vọng Middleware có thể bắt Exception được ném ra từ Controller hoặc Interceptor (Middleware không nằm trong phạm vi Exception Filters của NestJS)."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để apply một middleware ở mức Global (tất cả các routes) mà vẫn inject được dependencies?",
+      "Tại sao Middleware trong NestJS không thể truy cập vào ExecutionContext giống như Guards?"
+    ]
+  },
+  {
+    "id": "nestjs-042",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Hierarchical Dependency Injection trong NestJS — module hierarchy và provider lookup?",
+    "interviewerIntent": "Khảo sát kiến thức chuyên sâu về cơ chế giải quyết phụ thuộc (Dependency Resolution Algorithm) theo cây phân cấp Module trong IoC Container.",
+    "contextOrScenario": "Thiết kế hệ thống đa tenant hoặc kiến trúc micro-kernel: ghi đè cấu hình hoặc provider ở module con mà không ảnh hưởng module cha.",
+    "expectedKeywords": [
+      "Module Hierarchy",
+      "Provider Lookup Algorithm",
+      "Encapsulation",
+      "Bubble Up Resolution",
+      "Global vs Local Providers"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS quản lý DI theo mô hình cây phân cấp (Hierarchical Tree) dựa trên Module Graph. Khi một class yêu cầu một Provider, Nest sẽ tìm kiếm trong phạm vi cục bộ của Module đó trước, nếu không thấy mới tìm trong các module được import hoặc global modules.",
+      "deepDive": "Thuật toán tìm kiếm (Lookup Algorithm): 1) Kiểm tra mảng 'providers' nội bộ của module hiện tại; 2) Nếu không có, tìm trong danh sách các provider được 'exports' từ các module nằm trong mảng 'imports'; 3) Nếu vẫn không có, tìm trong Global Module Registry (@Global()); 4) Nếu không tìm thấy, quăng UnknownDependenciesException. Tính chất này đảm bảo Encapsulation: một module con có thể override provider của module cha bằng cách tự khai báo provider cùng token trong scope cục bộ của mình mà không gây ô nhiễm (pollute) toàn hệ sinh thái.",
+      "codeExample": "// Module A cung cấp Default Logger\n@Module({\n  providers: [{ provide: 'LOGGER', useValue: new ConsoleLogger() }],\n  exports: ['LOGGER'],\n})\nexport class BaseModule {}\n\n// Module B ghi đè Logger thành File Logger cho riêng nó\n@Module({\n  imports: [BaseModule],\n  providers: [{ provide: 'LOGGER', useValue: new FileLogger() }], // Override cục bộ\n  controllers: [ReportController],\n})\nexport class ReportModule {}"
+    },
+    "pitfalls": [
+      "Hiểu lầm rằng khi Module B import Module A thì Module B có quyền truy cập tất cả các service của Module A mà không cần Module A phải exports.",
+      "Tạo ra các provider trùng token ở nhiều nơi mà không hiểu thứ tự ghi đè, dẫn đến hành vi khó đoán khi inject."
+    ],
+    "followUpQuestions": [
+      "Cơ chế ModuleRef.get({ strict: false }) hoạt động như thế nào khi tìm kiếm provider xuyên qua các modules?",
+      "Tại sao NestJS không hỗ trợ Dynamic Scoping theo kiểu Angular component hierarchy?"
+    ]
+  },
+  {
+    "id": "nestjs-043",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "RBAC (Role-Based Access Control) với custom Guards và Decorators trong NestJS?",
+    "interviewerIntent": "Đánh giá năng lực thiết kế hệ thống phân quyền doanh nghiệp nhiều cấp độ (Role/Permission Matrix) một cách declarative, an toàn và dễ kiểm thử.",
+    "contextOrScenario": "Xây dựng hệ thống phân quyền cho Enterprise SaaS với các vai trò: SuperAdmin, OrgAdmin, Manager, Member và quyền chi tiết theo từng resource.",
+    "expectedKeywords": [
+      "RBAC",
+      "RolesGuard",
+      "SetMetadata",
+      "Reflector",
+      "getAllAndOverride",
+      "Hierarchical Roles"
+    ],
+    "seniorAnswer": {
+      "summary": "Hệ thống RBAC chuẩn trong NestJS kết hợp: 1) Custom Decorator @Roles(...roles) để khai báo quyền yêu cầu; 2) RolesGuard đọc metadata qua Reflector và so sánh với user.roles trong request; 3) Đăng ký RolesGuard mức Global bằng APP_GUARD sau JwtAuthGuard.",
+      "deepDive": "Kiến trúc thực thi chuẩn: Decorator @Roles(Role.ADMIN) dùng SetMetadata lưu metadata. RolesGuard implement CanActivate: sử dụng reflector.getAllAndOverride<Role[]>('roles', [context.getHandler(), context.getClass()]) để lấy danh sách role yêu cầu (quy tắc: role khai báo ở method sẽ override role ở class). Sau đó lấy user từ request (đã được JwtAuthGuard gán vào trước đó) và kiểm tra: user.roles.some(role => requiredRoles.includes(role)). Nếu thất bại, ném ForbiddenException ('Forbidden resource'). Với RBAC nâng cao, có thể mở rộng sang ABAC (Attribute-Based Access Control) bằng CASL library.",
+      "codeExample": "// 1. roles.decorator.ts\nexport enum Role { USER = 'user', ADMIN = 'admin' }\nexport const ROLES_KEY = 'roles';\nexport const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);\n\n// 2. roles.guard.ts\n@Injectable()\nexport class RolesGuard implements CanActivate {\n  constructor(private reflector: Reflector) {}\n\n  canActivate(context: ExecutionContext): boolean {\n    const requiredRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [\n      context.getHandler(),\n      context.getClass(),\n    ]);\n    if (!requiredRoles || requiredRoles.length === 0) return true;\n\n    const { user } = context.switchToHttp().getRequest();\n    if (!user || !user.roles) throw new ForbiddenException('Access denied');\n\n    return requiredRoles.some((role) => user.roles.includes(role));\n  }\n}"
+    },
+    "pitfalls": [
+      "Đăng ký RolesGuard trước JwtAuthGuard, khiến request.user chưa kịp giải mã và luôn bị undefined, dẫn đến mọi request đều bị từ chối 403.",
+      "Chỉ kiểm tra Role thô (vd: ADMIN) mà không kiểm tra Resource Ownership (vd: User A sửa bài viết của User B), tạo ra lỗ hổng IDOR (Insecure Direct Object References)."
+    ],
+    "followUpQuestions": [
+      "Khi nào nên chuyển đổi từ RBAC sang ABAC/PBAC với thư viện @casl/ability trong NestJS?",
+      "Làm sao để cache quyền của user trên Redis để không phải query database permissions ở mỗi request?"
+    ]
+  },
+  {
+    "id": "nestjs-044",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "TypeORM migrations — workflow và best practices trong production?",
+    "interviewerIntent": "Khảo sát quy trình quản lý lược đồ cơ sở dữ liệu (Database Schema Evolution), bảo đảm Zero-Downtime Deployment và an toàn dữ liệu.",
+    "contextOrScenario": "Thực hiện thay đổi cấu trúc bảng (thêm cột, đổi kiểu dữ liệu, tạo foreign key) trên hệ thống Production có hàng chục triệu bản ghi đang hoạt động.",
+    "expectedKeywords": [
+      "TypeORM Migrations",
+      "migration:generate",
+      "migration:run",
+      "Zero-Downtime",
+      "Expand and Contract Pattern",
+      "synchronize: false"
+    ],
+    "seniorAnswer": {
+      "summary": "Trong production, BẮT BUỘC tắt synchronize: false và kiểm soát 100% thay đổi schema thông qua TypeORM Migrations. Mỗi migration là một class có 2 hàm up() (áp dụng thay đổi) và down() (rollback khi gặp sự cố).",
+      "deepDive": "Quy trình chuẩn Production: 1) Developer chỉnh sửa Entity class, chạy CLI: typeorm migration:generate -n AddStatusToOrders; 2) Senior review file migration SQL sinh ra, tối ưu index và kiểm tra xem có câu lệnh khóa bảng (exclusive table lock) không; 3) Áp dụng Expand and Contract Pattern khi đổi tên cột: Bước 1 thêm cột mới, Bước 2 sync dữ liệu, Bước 3 xóa cột cũ; 4) Chạy migration trong CD pipeline (hoặc Kubernetes Job trước khi rollout pods mới) bằng command: typeorm migration:run; 5) Tuyệt đối không chạy migration trực tiếp bên trong main.ts của application pods để tránh race condition khi nhiều pods khởi động đồng thời.",
+      "codeExample": "export class AddDiscountToOrder1690000000000 implements MigrationInterface {\n  public async up(queryRunner: QueryRunner): Promise<void> {\n    await queryRunner.addColumn(\n      'orders',\n      new TableColumn({\n        name: 'discount_amount',\n        type: 'decimal',\n        precision: 10,\n        scale: 2,\n        default: 0,\n        isNullable: false,\n      }),\n    );\n  }\n\n  public async down(queryRunner: QueryRunner): Promise<void> {\n    await queryRunner.dropColumn('orders', 'discount_amount');\n  }\n}"
+    },
+    "pitfalls": [
+      "Chạy typeorm migration:run bên trong onModuleInit() của server: khi deploy 10 pods cùng lúc, các pods sẽ đồng thời tranh chấp bảng migrations gây deadlock.",
+      "Viết hàm up() nhưng để trống hàm down(), khiến hệ thống không thể rollback khẩn cấp khi deployment gặp lỗi."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để thực hiện Zero-downtime database migration khi đổi tên một cột đang có hàng triệu lượt đọc/ghi mỗi giây?",
+      "Cơ chế transaction locking của TypeORM migration table hoạt động như thế nào?"
+    ]
+  },
+  {
+    "id": "nestjs-045",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Refresh token strategy trong NestJS — implement rotation và revocation?",
+    "interviewerIntent": "Đánh giá mức độ am hiểu về bảo mật xác thực chuyên sâu, kỹ thuật Token Rotation và phòng chống Replay Attack khi token bị đánh cắp.",
+    "contextOrScenario": "Xây dựng hệ thống bảo mật tài khoản ngân hàng số, tự động cấp mới Access Token mà không bắt user đăng nhập lại, đồng thời phát hiện tấn công rò rỉ token.",
+    "expectedKeywords": [
+      "Refresh Token Rotation",
+      "Token Revocation",
+      "Replay Attack Detection",
+      "Family of Tokens",
+      "HttpOnly Cookie",
+      "Hashed Refresh Token"
+    ],
+    "seniorAnswer": {
+      "summary": "Refresh Token Strategy an toàn đòi hỏi Refresh Token Rotation (RTR): mỗi khi client dùng Refresh Token để lấy Access Token mới, server sẽ thu hồi Refresh Token cũ và cấp một cặp Access + Refresh Token hoàn toàn mới. Đồng thời lưu hash của token trong DB/Redis để phát hiện tái sử dụng trái phép (Replay Attack).",
+      "deepDive": "Quy trình thực thi chuẩn: 1) Access Token có TTL ngắn (10-15 phút), Refresh Token có TTL dài (7-30 ngày); 2) Hash Refresh Token bằng bcrypt hoặc SHA-256 trước khi lưu vào DB; 3) Khi client gọi /auth/refresh: so sánh hash token; 4) Nếu token đã bị thu hồi trước đó nhưng lại được gửi lên -> CẢNH BÁO NGUY HIỂM (Replay Attack): Hacker đã đánh cắp token! Server lập tức vô hiệu hóa TOÀN BỘ token family của user đó và bắt đăng nhập lại; 5) Nếu hợp lệ: tạo cặp token mới, update hash token mới vào DB, gửi token qua Set-Cookie với cờ HttpOnly, Secure, SameSite=Strict.",
+      "codeExample": "@Injectable()\nexport class AuthService {\n  async refreshTokens(userId: string, refreshToken: string) {\n    const user = await this.userRepo.findOneBy({ id: userId });\n    if (!user || !user.refreshTokenHash) throw new ForbiddenException('Access Denied');\n\n    const matches = await argon2.verify(user.refreshTokenHash, refreshToken);\n    if (!matches) {\n      // Phát hiện dùng token cũ/giả mạo: Xóa toàn bộ token session của user\n      await this.userRepo.update(userId, { refreshTokenHash: null });\n      throw new ForbiddenException('Compromised token detected! Please login again.');\n    }\n\n    const tokens = await this.generateTokens(user.id, user.email);\n    await this.updateRefreshTokenHash(user.id, tokens.refreshToken);\n    return tokens;\n  }\n}"
+    },
+    "pitfalls": [
+      "Lưu plain text Refresh Token trong database: nếu database bị dump, kẻ tấn công có thể vĩnh viễn tạo access token mạo danh người dùng.",
+      "Không implement Token Rotation: Refresh Token có hạn 30 ngày dùng đi dùng lại nhiều lần, nếu bị lộ hacker có 30 ngày toàn quyền truy cập."
+    ],
+    "followUpQuestions": [
+      "Tại sao lưu Refresh Token trong HttpOnly Cookie lại an toàn hơn lưu trong LocalStorage?",
+      "Làm sao để xây dựng chức năng 'Đăng xuất khỏi tất cả các thiết bị khác' (Logout other devices) với Redis?"
+    ]
+  },
+  {
+    "id": "nestjs-046",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Kafka integration với NestJS Microservices — producer và consumer setup?",
+    "interviewerIntent": "Đánh giá năng lực tích hợp Apache Kafka với NestJS ở quy mô enterprise, xử lý partitioning, consumer group và serialization.",
+    "contextOrScenario": "Xây dựng luồng xử lý luồng sự kiện (Event Streaming) hàng triệu giao dịch thanh toán mỗi ngày giữa Billing Service và Fraud Detection Service.",
+    "expectedKeywords": [
+      "ClientKafka",
+      "KafkaJS",
+      "Consumer Group",
+      "Partitioning",
+      "subscribeToResponseOf",
+      "@EventPattern",
+      "Commit Offset"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS tích hợp Kafka thông qua @nestjs/microservices (dựa trên KafkaJS). Ứng dụng có thể cấu hình vừa là Consumer (lắng nghe topic thông qua @EventPattern/@MessagePattern) vừa là Producer (dùng ClientKafka để emit message).",
+      "deepDive": "Chi tiết kiến trúc: 1) Consumer: Cấu hình Transport.KAFKA với broker list và groupId xác định. Consumer group cho phép phân chia partitions giữa các pods tự động; 2) Producer: Inject ClientKafka qua ClientsModule.register(). BẮT BUỘC gọi await this.client.connect() trong onModuleInit(); 3) Nếu dùng Request-Response (@MessagePattern), BẮT BUỘC gọi client.subscribeToResponseOf('topic_name') trước khi khởi chạy để NestJS tạo reply topic tương ứng; 4) Với event-driven fire-and-forget, dùng this.client.emit('topic', { key: 'partitionKey', value: data }) để định tuyến đúng partition đảm bảo thứ tự message (message ordering).",
+      "codeExample": "// Producer Service:\n@Injectable()\nexport class OrderProducerService implements OnModuleInit {\n  constructor(@Inject('KAFKA_SERVICE') private readonly client: ClientKafka) {}\n\n  async onModuleInit() {\n    // Đăng ký reply topic nếu dùng send()\n    this.client.subscribeToResponseOf('order.process');\n    await this.client.connect();\n  }\n\n  emitOrderEvent(order: OrderDto) {\n    return this.client.emit('order.created', {\n      key: order.userId, // Phân vùng theo userId đảm bảo thứ tự\n      value: JSON.stringify(order),\n    });\n  }\n}"
+    },
+    "pitfalls": [
+      "Quên gọi client.subscribeToResponseOf() khi dùng client.send(), khiến request bị timeout vì Kafka không biết route kết quả về đâu.",
+      "Không truyền 'key' khi publish message lên Kafka, khiến message bị phân bổ ngẫu nhiên (Round-robin) vào các partitions khác nhau làm mất thứ tự nghiệp vụ."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để cấu hình Manual Commit Offset trong NestJS Kafka để tránh mất message khi consumer crash?",
+      "Cơ chế Consumer Rebalancing trong Kafka ảnh hưởng như thế nào đến độ trễ của NestJS microservice?"
+    ]
+  },
+  {
+    "id": "nestjs-047",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Hybrid application trong NestJS — serve HTTP và Microservice transport cùng lúc?",
+    "interviewerIntent": "Khảo sát kinh nghiệm thiết kế ứng dụng lai (Hybrid Application), tối ưu tài nguyên máy chủ bằng cách phục vụ cả HTTP REST và Message Consumer trong 1 tiến trình.",
+    "contextOrScenario": "Dự án cần vừa expose REST API cho Frontend Web, vừa lắng nghe hàng đợi RabbitMQ/Kafka để xử lý tác vụ ngầm mà không cần tách làm 2 repo/deployment riêng biệt.",
+    "expectedKeywords": [
+      "Hybrid Application",
+      "connectMicroservice()",
+      "startAllMicroservices()",
+      "listen()",
+      "Multi-transport",
+      "Single Process"
+    ],
+    "seniorAnswer": {
+      "summary": "Hybrid Application là kỹ thuật cho phép một ứng dụng NestJS duy nhất vừa đóng vai trò là một HTTP Web Server truyền thống (Express/Fastify), vừa đồng thời kết nối và lắng nghe các Microservice Transport (RabbitMQ, Kafka, TCP, Redis).",
+      "deepDive": "Cách thiết lập trong main.ts: 1) Khởi tạo app HTTP bằng NestFactory.create(AppModule); 2) Gọi app.connectMicroservice<MicroserviceOptions>({...}) để gắn thêm một hoặc nhiều transport layer (có thể gắn cả RabbitMQ và Kafka cùng lúc); 3) Gọi await app.startAllMicroservices() để kích hoạt các consumers; 4) Cuối cùng gọi await app.listen(port) để mở cổng HTTP. Toàn bộ Controllers trong app có thể chứa song song cả route handlers (@Get, @Post) và message handlers (@MessagePattern, @EventPattern), chia sẻ chung 1 bộ IoC Container và Database Connection Pool.",
+      "codeExample": "async function bootstrap() {\n  const app = await NestFactory.create(AppModule);\n\n  // Gắn thêm RabbitMQ Microservice Transport vào HTTP app:\n  app.connectMicroservice<MicroserviceOptions>({\n    transport: Transport.RMQ,\n    options: {\n      urls: [process.env.RMQ_URL],\n      queue: 'orders_queue',\n      queueOptions: { durable: true },\n    },\n  });\n\n  await app.startAllMicroservices(); // Chạy consumer ngầm\n  await app.listen(3000); // Mở port phục vụ HTTP REST\n}\nbootstrap();"
+    },
+    "pitfalls": [
+      "Quên gọi await app.startAllMicroservices(), dẫn đến HTTP API hoạt động bình thường nhưng toàn bộ các @EventPattern/@MessagePattern hoàn toàn không nhận được message.",
+      "Tác vụ xử lý message từ Queue quá nặng làm nghẽn Event Loop của Node.js, khiến các HTTP REST API bị tăng response latency đột biến."
+    ],
+    "followUpQuestions": [
+      "Khi triển khai Kubernetes, tại sao sau một quy mô nhất định ta nên tách Hybrid App thành 2 deployment riêng (HTTP Pods vs Worker Pods)?",
+      "Graceful shutdown cho Hybrid Application cần xử lý đóng những kết nối nào theo thứ tự nào?"
+    ]
+  },
+  {
+    "id": "nestjs-048",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Structured Logging với Winston trong NestJS?",
+    "interviewerIntent": "Đánh giá năng lực thiết lập hệ thống quan sát (Observability), ghi log có cấu trúc (JSON Format), Traceability và tích hợp với ELK / Datadog / Grafana Loki.",
+    "contextOrScenario": "Thay thế log console mặc định của NestJS bằng Structured JSON Logger chuẩn doanh nghiệp, tự động gắn CorrelationId và metadata ngữ cảnh.",
+    "expectedKeywords": [
+      "nest-winston",
+      "Structured Logging",
+      "JSON Format",
+      "Correlation ID",
+      "Log Levels",
+      "Distributed Tracing"
+    ],
+    "seniorAnswer": {
+      "summary": "Structured Logging là phương pháp ghi log dưới dạng JSON có cấu trúc rõ ràng (thay vì plain text) để máy móc (Logstash, Loki, CloudWatch) dễ dàng đánh chỉ mục, tìm kiếm và phân tích. Trong NestJS, ta sử dụng nest-winston hoặc pino để thay thế Logger mặc định của framework.",
+      "deepDive": "Senior setup gồm các yếu tố: 1) Winston format: kết hợp winston.format.json(), timestamp(), errors({ stack: true }); 2) Thay thế app logger trong main.ts bằng app.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER)); 3) Tự động inject Correlation ID / Request ID vào log record thông qua AsyncLocalStorage hoặc middleware; 4) Phân cấp log level rõ ràng: ERROR (lỗi hệ thống cần alert ngay), WARN (nghi vấn), INFO (sự kiện nghiệp vụ quan trọng), DEBUG (chi tiết dev); 5) Không log dữ liệu nhạy cảm (PII: mật khẩu, số thẻ tín dụng) bằng cơ chế data masking.",
+      "codeExample": "// winston.config.ts\nexport const winstonConfig: WinstonModuleOptions = {\n  transports: [\n    new winston.transports.Console({\n      format: winston.format.combine(\n        winston.format.timestamp(),\n        winston.format.errors({ stack: true }),\n        winston.format.json(), // Chuẩn hóa JSON cho CloudWatch / ELK\n      ),\n    }),\n  ],\n};\n\n// main.ts\nconst app = await NestFactory.create(AppModule);\napp.useLogger(app.get(WINSTON_MODULE_NEST_PROVIDER));"
+    },
+    "pitfalls": [
+      "Dùng console.log() rải rác trong code thay vì LoggerService, gây rò rỉ bộ nhớ, mất timestamp và làm giảm throughput do console.log là hàm I/O đồng bộ (blocking) trong một số môi trường.",
+      "Ghi log dạng plain text đa dòng: các hệ thống log aggregator (như CloudWatch) sẽ hiểu mỗi dòng trong stack trace là 1 log entry riêng biệt, làm vỡ ngữ cảnh lỗi."
+    ],
+    "followUpQuestions": [
+      "So sánh giữa Winston và Pino về hiệu năng throughput và benchmark tiêu tốn CPU?",
+      "Làm thế nào để tự động gắn traceId và spanId từ OpenTelemetry vào mỗi dòng log của Winston?"
+    ]
+  },
+  {
+    "id": "nestjs-049",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Health checks và graceful shutdown trong NestJS production?",
+    "interviewerIntent": "Kiểm tra kinh nghiệm vận hành ứng dụng Cloud-Native trên Kubernetes, thiết lập Liveness/Readiness probes và xử lý đóng ứng dụng an toàn không rớt request.",
+    "contextOrScenario": "Deploy NestJS app lên Kubernetes cluster: cấu hình probes để K8s biết khi nào pod sẵn sàng nhận traffic và xử lý tín hiệu SIGTERM khi rolling update.",
+    "expectedKeywords": [
+      "@nestjs/terminus",
+      "HealthCheckService",
+      "Liveness vs Readiness",
+      "Graceful Shutdown",
+      "enableShutdownHooks()",
+      "SIGTERM"
+    ],
+    "seniorAnswer": {
+      "summary": "@nestjs/terminus cung cấp bộ công cụ Health Check toàn diện cho Liveness/Readiness Probes trên Kubernetes. Graceful Shutdown (app.enableShutdownHooks()) đảm bảo khi nhận tín hiệu SIGTERM, app dừng nhận request mới, hoàn tất các request dở dang và giải phóng kết nối DB an toàn.",
+      "deepDive": "1) Health Checks: Liveness Probe (/health/live) kiểm tra app process có còn sống không (Memory heap); Readiness Probe (/health/ready) kiểm tra app đã sẵn sàng phục vụ chưa (kết nối Database, Redis, RabbitMQ qua TypeOrmHealthIndicator, MicroserviceHealthIndicator). 2) Graceful Shutdown: Kích hoạt app.enableShutdownHooks() trong main.ts. Khi K8s gửi SIGTERM: NestJS kích hoạt các lifecycle hooks onModuleDestroy, beforeApplicationShutdown, onApplicationShutdown. Tại đây app sẽ: đóng HTTP listener -> chờ các in-flight requests hoàn tất -> đóng DB pool / Redis client -> exit process.",
+      "codeExample": "@Controller('health')\nexport class HealthController {\n  constructor(\n    private health: HealthCheckService,\n    private db: TypeOrmHealthIndicator,\n    private memory: MemoryHealthIndicator,\n  ) {}\n\n  @Get('ready')\n  @HealthCheck()\n  checkReadiness() {\n    return this.health.check([\n      () => this.db.pingCheck('database'),\n      () => this.memory.checkHeap('memory_heap', 300 * 1024 * 1024), // 300MB\n    ]);\n  }\n}\n\n// main.ts\napp.enableShutdownHooks(); // Bắt buộc để nhận SIGTERM/SIGINT"
+    },
+    "pitfalls": [
+      "Quên gọi app.enableShutdownHooks() khiến khi K8s kill pod (Rolling deploy), Node.js bị ép tắt ngay lập tức làm gián đoạn các request của khách hàng đang xử lý dở dang (lỗi 502 Bad Gateway).",
+      "Cấu hình Liveness Probe kiểm tra database connection: khi database bị chậm tạm thời, K8s sẽ restart hàng loạt toàn bộ pods cùng lúc gây ra hiện tượng Thundering Herd làm sập hẳn hệ thống."
+    ],
+    "followUpQuestions": [
+      "Tại sao Liveness Probe chỉ nên kiểm tra nội tại process của app mà KHÔNG nên ping tới external database?",
+      "Làm sao để cấu hình timeout chờ in-flight requests hoàn tất trước khi process exit hoàn toàn?"
+    ]
+  },
+  {
+    "id": "nestjs-050",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "API Key authentication và multi-tenant trong NestJS?",
+    "interviewerIntent": "Khảo sát kiến trúc phần mềm Multi-tenant SaaS và kỹ năng xác thực API Key dựa trên Custom Guard kết hợp Tenant Context Isolation.",
+    "contextOrScenario": "Phát triển nền tảng B2B SaaS nơi mỗi khách hàng doanh nghiệp (Tenant) sở hữu một API Key riêng, và mọi câu truy vấn database phải được cô lập tuyệt đối theo Tenant.",
+    "expectedKeywords": [
+      "API Key Auth",
+      "Multi-tenancy",
+      "Tenant Isolation",
+      "AsyncLocalStorage",
+      "Tenant Context",
+      "Row-Level Security (RLS)"
+    ],
+    "seniorAnswer": {
+      "summary": "Xác thực API Key thường được thực hiện qua ApiKeyGuard đọc header x-api-key, tra cứu thông tin Tenant. Để cô lập dữ liệu Multi-tenant hiệu quả mà không bị suy giảm hiệu năng bởi Scope.REQUEST, ta lưu tenantId vào AsyncLocalStorage (Node.js) và tự động gắn điều kiện lọc vào ORM.",
+      "deepDive": "Chiến lược Multi-tenant gồm 3 cấp độ: 1) Shared Database, Shared Schema (phân tách bằng cột tenant_id kết hợp Postgres Row-Level Security); 2) Separate Schema; 3) Separate Database. Quy trình: ApiKeyGuard trích xuất header x-api-key, hash và tra cứu trong cache Redis/DB để lấy tenant info. TenantContextService sử dụng AsyncLocalStorage.run() để lưu trữ tenantId xuyên suốt luồng thực thi bất đồng bộ của request mà không gây Scope Bubble. Tầng Repository hoặc TypeORM Subscriber tự động inject WHERE tenant_id = currentTenantId cho mọi câu query.",
+      "codeExample": "@Injectable()\nexport class ApiKeyGuard implements CanActivate {\n  constructor(private tenantService: TenantService) {}\n\n  async canActivate(context: ExecutionContext): Promise<boolean> {\n    const req = context.switchToHttp().getRequest();\n    const apiKey = req.headers['x-api-key'];\n    if (!apiKey) throw new UnauthorizedException('API Key missing');\n\n    const tenant = await this.tenantService.validateApiKey(apiKey);\n    if (!tenant) throw new UnauthorizedException('Invalid API Key');\n\n    // Lưu vào AsyncLocalStorage để dùng xuyên suốt không cần Scope.REQUEST\n    TenantContext.setTenantId(tenant.id);\n    req.tenant = tenant;\n    return true;\n  }\n}"
+    },
+    "pitfalls": [
+      "Áp dụng Scope.REQUEST cho toàn bộ các Service và Repository để lưu TenantId, gây sụt giảm 70% throughput hệ thống do V8 garbage collection quá tải.",
+      "Lọc tenant_id thủ công bằng cách truyền tham số tay vào từng câu query, rất dễ bỏ quên trong một hàm nào đó dẫn đến rò rỉ dữ liệu chéo giữa các công ty đối thủ."
+    ],
+    "followUpQuestions": [
+      "PostgreSQL Row-Level Security (RLS) hoạt động thế nào kết hợp với NestJS connection pool?",
+      "Làm sao để cache API Key trên Redis để tránh query database xác thực ở mỗi request?"
+    ]
+  },
+  {
+    "id": "nestjs-051",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Caching với Redis trong NestJS — CacheModule, TTL strategy và cache invalidation?",
+    "interviewerIntent": "Đánh giá chiến lược lưu trữ đệm (Caching Patterns), giải quyết các bài toán kinh điển: Cache Aside, Cache Invalidation, Cache Stampede / Thundering Herd.",
+    "contextOrScenario": "Tối ưu hóa API danh mục sản phẩm và bảng giá: 95% request là đọc, dữ liệu thay đổi không thường xuyên nhưng khi cập nhật giá thì cache phải xóa ngay lập tức.",
+    "expectedKeywords": [
+      "CacheModule",
+      "cache-manager",
+      "RedisStore",
+      "Cache-Aside Pattern",
+      "Cache Invalidation",
+      "TTL Jitter",
+      "Cache Stampede"
+    ],
+    "seniorAnswer": {
+      "summary": "NestJS cung cấp CacheModule (kết hợp cache-manager và redis store) cho phép auto-caching response qua CacheInterceptor hoặc manual caching qua CacheService theo mẫu Cache-Aside. Chiến lược TTL cần đi đôi với cơ chế Cache Invalidation tức thì khi có mutation.",
+      "deepDive": "Chiến lược chuẩn Senior: 1) Setup CacheModule.registerAsync() với cache-manager-redis-yet; 2) Cache-Aside pattern: Đọc cache -> Nếu Miss -> Query DB -> Ghi Cache -> Trả về; 3) Cache Invalidation: Khi Admin cập nhật sản phẩm (PUT /products/:id), phát sinh event hoặc gọi trực tiếp cacheService.del('products:*') để xóa cache liên quan; 4) Phòng chống Cache Stampede: khi hàng ngàn request cùng lúc truy cập một key vừa hết hạn, sử dụng Mutex Lock (Redlock) hoặc kỹ thuật Stale-While-Revalidate; 5) Thêm TTL Jitter (ngẫu nhiên hóa TTL: 60s ± 10s) để tránh toàn bộ cache hết hạn cùng 1 giây.",
+      "codeExample": "@Injectable()\nexport class ProductService {\n  constructor(\n    @Inject(CACHE_MANAGER) private cache: Cache,\n    private repo: ProductRepository,\n  ) {}\n\n  async getProduct(id: string): Promise<Product> {\n    const cacheKey = `product:${id}`;\n    const cached = await this.cache.get<Product>(cacheKey);\n    if (cached) return cached;\n\n    const product = await this.repo.findById(id);\n    if (product) {\n      // Set TTL 1 giờ + jitter ngẫu nhiên 0-60 giây\n      const jitter = Math.floor(Math.random() * 60);\n      await this.cache.set(cacheKey, product, (3600 + jitter) * 1000);\n    }\n    return product;\n  }\n\n  async updateProduct(id: string, dto: UpdateProductDto) {\n    const updated = await this.repo.update(id, dto);\n    await this.cache.del(`product:${id}`); // Invalidate ngay lập tức\n    return updated;\n  }\n}"
+    },
+    "pitfalls": [
+      "Đặt TTL cố định giống hệt nhau cho hàng triệu keys, khiến toàn bộ keys đồng loạt expire cùng thời điểm làm sập Database (Cache Avalanche).",
+      "Lạm dụng CacheInterceptor tự động ở mức Global cho các API có tham số query động phức tạp, dẫn đến cạn kiệt RAM của Redis server."
+    ],
+    "followUpQuestions": [
+      "Cache Stampede (Thundering Herd) là gì và làm thế nào giải quyết bằng kỹ thuật Probabilistic Early Expiration (XFetch)?",
+      "Làm sao để xóa cache theo pattern (vd: xóa tất cả keys bắt đầu bằng 'product:category:5:*') trong Redis Cluster?"
+    ]
+  },
+  {
+    "id": "nestjs-052",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "gRPC trong NestJS — setup và so sánh với REST?",
+    "interviewerIntent": "Khảo sát kiến thức về High-Performance RPC, giao thức HTTP/2, Protobuf serialization và cách xây dựng microservice truyền thông tốc độ cao.",
+    "contextOrScenario": "Xây dựng kênh truyền thông giữa Matching Engine và Order Ledger trong sàn giao dịch chứng khoán, yêu cầu độ trễ dưới 2ms và kiểu dữ liệu kiểm soát chặt chẽ.",
+    "expectedKeywords": [
+      "gRPC",
+      "Protobuf (.proto)",
+      "HTTP/2",
+      "Transport.GRPC",
+      "ClientGrpc",
+      "Binary Serialization",
+      "Unary vs Streaming"
+    ],
+    "seniorAnswer": {
+      "summary": "gRPC là chuẩn RPC mã nguồn mở sử dụng giao thức HTTP/2 và định dạng nhị phân Protocol Buffers (Protobuf). So với REST/JSON, gRPC nhanh hơn 5-10 lần, payload nhỏ hơn nhiều lần, hỗ trợ streaming hai chiều và sinh code contract-first cực kỳ chặt chẽ.",
+      "deepDive": "Triển khai trong NestJS: 1) Định nghĩa file hero.proto mô tả Service và Messages; 2) Microservice server cấu hình Transport.GRPC chỉ định package và protoPath; 3) Controller sử dụng @GrpcMethod('HeroService', 'FindOne') hoặc @GrpcStreamMethod(); 4) Client sử dụng ClientsModule.register({ transport: Transport.GRPC }) và inject ClientGrpc, gọi client.getService<HeroService>('HeroService'). So sánh: REST phù hợp giao tiếp Client-to-Server (Browser/Mobile tới API Gateway) vì tính thân thiện với HTTP caching và human-readable; gRPC là tiêu chuẩn vàng cho Server-to-Server giao tiếp nội bộ trong Microservices.",
+      "codeExample": "// 1. hero.proto\n// service HeroService { rpc FindOne (HeroById) returns (Hero); }\n\n// 2. hero.controller.ts\n@Controller()\nexport class HeroController {\n  @GrpcMethod('HeroService', 'FindOne')\n  findOne(data: HeroById): Hero {\n    return { id: data.id, name: 'Spider-Man' };\n  }\n}\n\n// 3. Client gọi gRPC:\n@Injectable()\nexport class AppService implements OnModuleInit {\n  private heroService: HeroServiceClient;\n  constructor(@Inject('HERO_PACKAGE') private client: ClientGrpc) {}\n\n  onModuleInit() {\n    this.heroService = this.client.getService<HeroServiceClient>('HeroService');\n  }\n\n  getHero(id: number) {\n    return this.heroService.findOne({ id });\n  }\n}"
+    },
+    "pitfalls": [
+      "Không load cân bằng tải (Load Balancing) đúng cách cho gRPC: vì HTTP/2 duy trì single long-lived TCP connection, các L4 Load Balancer sẽ dồn toàn bộ traffic vào 1 pod duy nhất nếu không dùng L7 Load Balancer (Envoy).",
+      "Cố gắng dùng gRPC trực tiếp từ trình duyệt Web thông thường mà không qua Envoy gRPC-Web proxy."
+    ],
+    "followUpQuestions": [
+      "Tại sao chuẩn HTTP/2 Multiplexing trong gRPC lại giải quyết được bài toán Head-of-Line Blocking của HTTP/1.1?",
+      "Cách cấu hình gRPC Streaming (Client streaming, Server streaming, Bidirectional) trong NestJS?"
+    ]
+  },
+  {
+    "id": "nestjs-053",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Scheduler và CRON jobs trong NestJS với @nestjs/schedule?",
+    "interviewerIntent": "Đánh giá kỹ năng lập lịch tác vụ định kỳ, đồng thời kiểm tra giải pháp chạy Cron Job an toàn trong môi trường nhiều Container Pods (Distributed Locking).",
+    "contextOrScenario": "Chạy tác vụ tính toán lãi suất ngân hàng vào 00:00 hàng ngày trên hệ thống backend đang chạy 5 pods nhân bản.",
+    "expectedKeywords": [
+      "@nestjs/schedule",
+      "ScheduleModule",
+      "@Cron()",
+      "CronExpression",
+      "Distributed Lock",
+      "Redlock",
+      "Idempotency"
+    ],
+    "seniorAnswer": {
+      "summary": "@nestjs/schedule tích hợp node-cron cho phép lập lịch tác vụ qua decorator @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT). Trong môi trường Production nhiều pods, BẮT BUỘC phải kết hợp Distributed Lock (như Redlock) để tránh việc tác vụ bị thực thi trùng lặp 5 lần cùng lúc.",
+      "deepDive": "Triển khai an toàn: 1) AppModule import ScheduleModule.forRoot(); 2) Service khai báo @Cron('0 0 * * *'); 3) Vấn đề đa Pod: Khi deploy 5 replicas trên K8s, cả 5 pods đều kích hoạt @Cron vào nửa đêm, dẫn đến cộng dồn lãi suất 5 lần gây thảm họa tài chính. Giải pháp Senior: sử dụng thư viện redlock hoặc advisory lock của PostgreSQL. Khi cron kích hoạt, pod nào giành được lock trước mới được chạy, các pod còn lại bỏ qua. Đồng thời logic bên trong phải đảm bảo tính Idempotent (chạy lại nhiều lần không đổi kết quả).",
+      "codeExample": "@Injectable()\nexport class InterestCalculationScheduler {\n  constructor(private readonly redlock: Redlock, private readonly service: InterestService) {}\n\n  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)\n  async handleDailyInterest() {\n    const lockKey = `locks:daily-interest:${new Date().toISOString().slice(0, 10)}`;\n    let lock;\n    try {\n      // Giành quyền thực thi độc quyền trong 30 phút\n      lock = await this.redlock.acquire([lockKey], 30 * 60 * 1000);\n      await this.service.calculateAndDisburse();\n    } catch (err) {\n      // Không lấy được lock chứng tỏ pod khác đang chạy -> Bỏ qua an toàn\n      console.log('Task already acquired by another pod, skipping.');\n    } finally {\n      if (lock) await lock.release();\n    }\n  }\n}"
+    },
+    "pitfalls": [
+      "Quên tính đến việc scale ngang nhiều instance: chạy Cron trực tiếp không có distributed lock khiến email khuyến mãi hoặc lệnh trừ tiền bị gửi nhiều lần cho khách hàng.",
+      "Chạy tác vụ CRON tính toán dữ liệu khổng lồ kéo dài hàng giờ trực tiếp trên main thread của HTTP API pod, làm nghẽn CPU và rớt các HTTP request."
+    ],
+    "followUpQuestions": [
+      "Tại sao các hệ thống lớn thường tách hẳn CRON jobs thành Kubernetes CronJob pods độc lập hoặc dùng BullMQ thay vì dùng @nestjs/schedule?",
+      "Cơ chế Clock Drift ảnh hưởng thế nào đến Redlock thuật toán?"
+    ]
+  },
+  {
+    "id": "nestjs-054",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Request validation với nested DTOs, arrays và conditional validation?",
+    "interviewerIntent": "Khảo sát kỹ năng validation phức tạp, kiểm soát chặt chẽ schema lồng nhau, mảng đối tượng và validation có điều kiện phụ thuộc vào giá trị trường khác.",
+    "contextOrScenario": "Validate form đăng ký hợp đồng bảo hiểm: nếu chọn hình thức 'DOANH_NGHIEP' thì bắt buộc nhập mã số thuế và danh sách người thụ hưởng (mảng nested object), nếu 'CA_NHAN' thì không.",
+    "expectedKeywords": [
+      "@ValidateNested()",
+      "@Type()",
+      "@ValidateIf()",
+      "class-validator",
+      "Nested DTO",
+      "Conditional Validation"
+    ],
+    "seniorAnswer": {
+      "summary": "Để validate cấu trúc phức tạp trong NestJS: Dùng @ValidateNested({ each: true }) kết hợp @Type(() => ChildDto) từ class-transformer cho mảng đối tượng lồng nhau; dùng @ValidateIf((o) => condition) cho validation có điều kiện phụ thuộc.",
+      "deepDive": "3 kỹ thuật nâng cao: 1) Nested Objects: BẮT BUỘC phải có @Type(() => ChildDto) để class-transformer hydrate plain object thành class instance trước khi class-validator duyệt rules; 2) Arrays of Objects: dùng @IsArray() kèm @ValidateNested({ each: true }) và @Type(() => ChildDto); 3) Conditional Validation: decorator @ValidateIf((obj, val) => obj.type === 'BUSINESS') đặt trước @IsNotEmpty() @IsTaxCode(): rule chỉ được kích hoạt khi biểu thức trả về true; 4) Có thể tạo Custom Constraint Class (ValidatorConstraint) để kiểm tra logic liên trường phức tạp.",
+      "codeExample": "export class BeneficiaryDto {\n  @IsString()\n  @IsNotEmpty()\n  name: string;\n\n  @IsInt()\n  @Min(1)\n  @Max(100)\n  percentage: number;\n}\n\nexport class CreateContractDto {\n  @IsEnum(['INDIVIDUAL', 'BUSINESS'])\n  clientType: 'INDIVIDUAL' | 'BUSINESS';\n\n  @ValidateIf(o => o.clientType === 'BUSINESS')\n  @IsNotEmpty({ message: 'Tax code is required for business clients' })\n  @IsTaxId('vi-VN')\n  taxCode?: string;\n\n  @IsArray()\n  @ArrayMinSize(1)\n  @ValidateNested({ each: true })\n  @Type(() => BeneficiaryDto)\n  beneficiaries: BeneficiaryDto[];\n}"
+    },
+    "pitfalls": [
+      "Quên decorator @Type(() => ChildDto) trên thuộc tính nested: class-validator sẽ âm thầm bỏ qua toàn bộ các decorator kiểm tra bên trong ChildDto, để lọt dữ liệu bẩn vào database.",
+      "Lạm dụng quá nhiều logic database query bên trong Custom Validator làm giảm nghiêm trọng hiệu năng của ValidationPipe."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để tạo một Custom Validation Decorator có thể inject Service từ NestJS IoC container (sử dụng useContainer)?",
+      "Làm sao để validate tổng phần trăm (sum of percentage) của mảng beneficiaries bằng 100%?"
+    ]
+  },
+  {
+    "id": "nestjs-055",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Docker và deployment NestJS — multi-stage build và containerization?",
+    "interviewerIntent": "Đánh giá kỹ năng DevOps/Docker hóa ứng dụng, tối ưu kích thước image, bảo mật container (non-root user) và thời gian CI/CD build.",
+    "contextOrScenario": "Tối ưu hóa Dockerfile cho microservice NestJS: giảm dung lượng image từ 1.2GB xuống dưới 150MB và loại bỏ toàn bộ source code/dev tools khi lên production.",
+    "expectedKeywords": [
+      "Multi-stage Build",
+      "Docker Alpine",
+      "dumb-init / tini",
+      "Non-root User",
+      "node_modules pruning",
+      "Distroless"
+    ],
+    "seniorAnswer": {
+      "summary": "Multi-stage build phân tách Dockerfile thành 3 giai đoạn: Base/Dependencies -> Build (compile TypeScript ra dist) -> Production Runtime. Kết quả tạo ra image tối giản chỉ chứa dist/ và production node_modules, giảm dung lượng từ >1GB xuống ~100MB và tăng cường bảo mật.",
+      "deepDive": "Các tiêu chuẩn vàng cho Dockerfile NestJS: 1) Stage 1 (deps): npm ci để tận dụng Docker cache layer; 2) Stage 2 (build): copy source và npm run build để tạo thư mục dist/; 3) Stage 3 (runner): dùng node:20-alpine hoặc gcr.io/distroless/nodejs, chỉ copy package.json và chạy npm ci --omit=dev, sau đó copy dist/ từ Stage 2; 4) Chạy bằng Non-root user (USER node) để phòng chống container breakout; 5) Sử dụng dumb-init để quản lý process PID 1, giúp nhận và chuyển tiếp tín hiệu SIGTERM một cách chính xác.",
+      "codeExample": "FROM node:20-alpine AS deps\nWORKDIR /app\nCOPY package*.json ./\nRUN npm ci\n\nFROM node:20-alpine AS builder\nWORKDIR /app\nCOPY --from=deps /app/node_modules ./node_modules\nCOPY . .\nRUN npm run build\n\nFROM node:20-alpine AS runner\nWORKDIR /app\nENV NODE_ENV=production\nRUN apk add --no-cache dumb-init\nCOPY package*.json ./\nRUN npm ci --omit=dev && npm cache clean --force\nCOPY --from=builder /app/dist ./dist\nUSER node\nEXPOSE 3000\nENTRYPOINT [\"dumb-init\", \"--\"]\nCMD [\"node\", \"dist/main.js\"]"
+    },
+    "pitfalls": [
+      "Để lại toàn bộ devDependencies (TypeScript, Webpack, Jest) trong image production, khiến image nặng nề và chứa nhiều lỗ hổng bảo mật (CVEs).",
+      "Chạy container dưới quyền mặc định root, nếu app dính lỗ hổng Remote Code Execution (RCE), hacker có toàn quyền can thiệp vào host node."
+    ],
+    "followUpQuestions": [
+      "Tại sao Node.js chạy với PID 1 trong Docker container không thể tự xử lý tín hiệu SIGTERM nếu không có dumb-init?",
+      "Làm thế nào để cấu hình Docker Cache Mounts (type=cache) trong BuildKit để tăng tốc độ cài đặt npm packages?"
+    ]
+  },
+  {
+    "id": "nestjs-056",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Error handling và Dead Letter Queue (DLQ) trong NestJS Microservices?",
+    "interviewerIntent": "Kiểm tra kiến thức xử lý sự cố trong hệ thống phân tán, chống kịch bản Poison Pill Message làm crash consumer và chiến lược Retry / DLQ.",
+    "contextOrScenario": "Consumer đọc message từ RabbitMQ/Kafka bị lỗi cú pháp JSON hoặc lỗi database timeout, cần tránh việc message bị loop vô tận gây tê liệt hàng đợi.",
+    "expectedKeywords": [
+      "Dead Letter Queue (DLQ)",
+      "Poison Pill",
+      "RpcException",
+      "RpcExceptionFilter",
+      "Exponential Backoff",
+      "Acknowledge (ack/nack)"
+    ],
+    "seniorAnswer": {
+      "summary": "Trong Microservices, khi consumer gặp lỗi không thể xử lý (Poison Message), nếu liên tục nack và requeue sẽ gây vòng lặp vô tận (Infinite Retry Loop). Giải pháp là áp dụng Retry với Exponential Backoff kèm giới hạn (vd 3 lần), nếu vẫn lỗi thì đẩy message vào Dead Letter Queue (DLQ) để điều tra thủ công.",
+      "deepDive": "Kiến trúc thực thi: 1) Exception Handling: Sử dụng RpcException và custom RpcExceptionFilter thay vì HttpException; 2) RabbitMQ setup: Cấu hình x-dead-letter-exchange và x-dead-letter-routing-key trên queue. Khi message bị reject với basic.nack(requeue: false), broker sẽ tự động chuyển nó sang DLQ; 3) Kafka setup: Xây dựng topic retry chuyên biệt (vd orders.retry-1, orders.retry-2) và cuối cùng là orders.dlq; 4) Xây dựng Dashboard hoặc Alert theo dõi số lượng message trong DLQ để đội ngũ DevOps phát hiện kịp thời các lỗi định dạng payload.",
+      "codeExample": "@UseFilters(new ExceptionFilter())\n@Controller()\nexport class PaymentConsumer {\n  @EventPattern('payment_process')\n  async handlePayment(@Payload() data: any, @Ctx() context: RmqContext) {\n    const channel = context.getChannelRef();\n    const originalMsg = context.getMessage();\n\n    try {\n      await this.paymentService.charge(data);\n      channel.ack(originalMsg); // Thành công -> Xác nhận đã xử lý\n    } catch (error) {\n      const retryCount = originalMsg.properties.headers['x-retry-count'] || 0;\n      if (retryCount >= 3) {\n        // Vượt quá số lần thử -> Đẩy vào DLQ (không requeue)\n        channel.nack(originalMsg, false, false);\n      } else {\n        // Tái xuất với delay / retry counter tăng dần\n        this.retryService.publishWithBackoff(data, retryCount + 1);\n        channel.ack(originalMsg);\n      }\n    }\n  }\n}"
+    },
+    "pitfalls": [
+      "Để chế độ tự động requeue vô điều kiện (nack with requeue: true) khi gặp lỗi mã code bug (vd TypeError: Cannot read property of undefined), làm nghẽn toàn bộ hàng đợi consumer.",
+      "Quăng HttpException trong Microservice RPC handler khiến NestJS không thể serialize lỗi đúng định dạng RPC cho caller."
+    ],
+    "followUpQuestions": [
+      "Sự khác biệt giữa Transient Error (lỗi mạng tạm thời) và Permanent Error (lỗi dữ liệu sai) trong chiến lược Retry là gì?",
+      "Làm thế nào để replay (chạy lại) hàng loạt messages từ Dead Letter Queue sau khi bug code đã được fix và deploy?"
+    ]
+  },
+  {
+    "id": "nestjs-057",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Hai module NestJS import lẫn nhau gây circular dependency — xử lý thế nào và vì sao nên hạn chế forwardRef?",
+    "interviewerIntent": "Đánh giá tư duy thiết kế kiến trúc phần mềm (Clean Architecture), nhận diện 'Code Smell' và hiểu cơ chế lazy resolution của forwardRef().",
+    "contextOrScenario": "UserModule cần OrderService để tính tổng chi tiêu, OrderModule cần UserService để kiểm tra thông tin khách hàng -> Gây crash app vì vòng lặp phụ thuộc.",
+    "expectedKeywords": [
+      "Circular Dependency",
+      "forwardRef()",
+      "Architectural Smell",
+      "Domain Event / Mediator",
+      "Common/Shared Module",
+      "Lazy Resolution"
+    ],
+    "seniorAnswer": {
+      "summary": "Circular Dependency xảy ra khi 2 module hoặc service phụ thuộc chéo lẫn nhau. NestJS cho phép khắc phục tạm thời bằng forwardRef(), nhưng Senior coi đây là dấu hiệu của kiến trúc kém (Architectural Smell) và ưu tiên tái cấu trúc bằng Domain Events hoặc tách Shared Module.",
+      "deepDive": "Cơ chế: forwardRef(() => Module) sử dụng closure JavaScript để trì hoãn việc phân giải token cho đến khi tất cả các modules đã được tải xong. Nhược điểm của forwardRef(): làm mờ ranh giới rành mạch của domain, làm chậm thời gian boot, dễ gây memory leak hoặc lỗi undefined khó debug nếu chuỗi phụ thuộc phức tạp. Giải pháp chuẩn kiến trúc: 1) Tách module thứ ba (SharedModule) chứa entity hoặc service dùng chung; 2) Sử dụng Event-Driven (@nestjs/event-emitter): UserModule phát sự kiện 'user.created', OrderModule lắng nghe mà không cần import UserModule; 3) Áp dụng Mediator Pattern hoặc CQRS.",
+      "codeExample": "// Cách khắc phục tạm thời với forwardRef:\n// user.module.ts\n@Module({\n  imports: [forwardRef(() => OrderModule)],\n  providers: [UserService],\n  exports: [UserService],\n})\nexport class UserModule {}\n\n// GIẢI PHÁP CHUẨN KIẾN TRÚC: Dùng Event thay vì import trực tiếp\n@Injectable()\nexport class OrderService {\n  constructor(private eventEmitter: EventEmitter2) {}\n\n  async completeOrder(orderId: string) {\n    // Không cần UserService, chỉ emit sự kiện\n    this.eventEmitter.emit('order.completed', { orderId, amount: 500 });\n  }\n}"
+    },
+    "pitfalls": [
+      "Chỉ khai báo forwardRef() ở tầng Module mà quên khai báo @Inject(forwardRef(() => Service)) ở constructor của Service, khiến service vẫn nhận undefined.",
+      "Lạm dụng forwardRef() khắp dự án thay vì thiết kế lại đồ hình quan hệ phân cấp rõ ràng (Directed Acyclic Graph - DAG)."
+    ],
+    "followUpQuestions": [
+      "Tại sao nguyên lý Dependency Inversion Principle (D trong SOLID) giúp triệt tiêu hoàn toàn Circular Dependency?",
+      "Cơ chế moduleRef.get() có thể thay thế forwardRef() như thế nào khi cần phá vỡ vòng lặp?"
+    ]
+  },
+  {
+    "id": "nestjs-058",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "Muốn inject theo interface trong NestJS (vd đổi PaymentGateway giữa SePay và Stripe) thì làm thế nào?",
+    "interviewerIntent": "Khảo sát kiến trúc Clean/Hexagonal Architecture (Ports and Adapters), hiểu rõ giới hạn của TypeScript Interface ở runtime và cách dùng Custom Injection Token.",
+    "contextOrScenario": "Thiết kế module thanh toán hỗ trợ đa cổng (SePay, Stripe, VNPay), có thể hoán đổi dễ dàng qua cấu hình biến môi trường mà không sửa code nghiệp vụ.",
+    "expectedKeywords": [
+      "Custom Injection Token",
+      "Interface Polymorphism",
+      "@Inject()",
+      "Symbol Token",
+      "Hexagonal Architecture",
+      "Ports and Adapters"
+    ],
+    "seniorAnswer": {
+      "summary": "Trong TypeScript, 'interface' bị xóa sạch sau khi biên dịch ra JavaScript nên không thể dùng làm DI token ở runtime. Để inject theo interface, ta tạo một Injection Token dạng Symbol hoặc String, và sử dụng decorator @Inject(TOKEN) trong constructor.",
+      "deepDive": "Quy trình thiết kế chuẩn Ports & Adapters (Hexagonal Architecture): 1) Port (Interface): export interface PaymentGateway { charge(amount: number): Promise<boolean>; }; 2) Token: export const PAYMENT_GATEWAY = Symbol('PAYMENT_GATEWAY'); 3) Adapters (Implementations): StripeGateway và SepayGateway đều implement PaymentGateway; 4) Module Provider: cấu hình dynamic provider { provide: PAYMENT_GATEWAY, useClass: config.get('GATEWAY') === 'SEPAY' ? SepayGateway : StripeGateway }; 5) Consumer: constructor(@Inject(PAYMENT_GATEWAY) private readonly gateway: PaymentGateway).",
+      "codeExample": "// 1. payment.interface.ts\nexport interface IPaymentGateway {\n  charge(amount: number): Promise<TransactionResult>;\n}\nexport const PAYMENT_GATEWAY_TOKEN = Symbol('IPaymentGateway');\n\n// 2. payment.module.ts\n@Module({\n  providers: [\n    {\n      provide: PAYMENT_GATEWAY_TOKEN,\n      useClass: process.env.PAYMENT_PROVIDER === 'SEPAY' ? SepayGateway : StripeGateway,\n    },\n    OrderService,\n  ],\n})\nexport class PaymentModule {}\n\n// 3. order.service.ts\n@Injectable()\nexport class OrderService {\n  constructor(\n    @Inject(PAYMENT_GATEWAY_TOKEN)\n    private readonly paymentGateway: IPaymentGateway, // Đa hình hoàn hảo\n  ) {}\n}"
+    },
+    "pitfalls": [
+      "Quên decorator @Inject(TOKEN) và chỉ viết constructor(private gateway: IPaymentGateway) dẫn đến lỗi Nest can't resolve dependencies vì token là undefined ở runtime.",
+      "Dùng String token thay vì Symbol dẫn đến nguy cơ xung đột tên (Name Collision) nếu nhiều thư viện cùng đặt tên token giống nhau."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để tạo custom decorator @InjectPaymentGateway() để gom gọn cú pháp @Inject(PAYMENT_GATEWAY_TOKEN)?",
+      "Tại sao NestJS không hỗ trợ tự động sinh symbol token cho interfaces như một số framework khác?"
+    ]
+  },
+  {
+    "id": "nestjs-059",
+    "category": "nestjs",
+    "level": "senior",
+    "question": "ModuleRef dùng để làm gì? Lấy provider REQUEST-scoped bên ngoài vòng đời một HTTP request ra sao?",
+    "interviewerIntent": "Đánh giá mức độ làm chủ sâu sắc NestJS Container Internals, kỹ thuật tra cứu service động (Service Locator) và khởi tạo Request Sub-tree thủ công.",
+    "contextOrScenario": "Cần gọi một Request-scoped Service (ví dụ AuditLoggerService có lưu tenant context) từ bên trong một BullMQ Queue Worker hoặc CRON Job chạy ngầm.",
+    "expectedKeywords": [
+      "ModuleRef",
+      "moduleRef.get()",
+      "moduleRef.resolve()",
+      "ContextIdFactory",
+      "REQUEST-scoped provider",
+      "Service Locator Pattern"
+    ],
+    "seniorAnswer": {
+      "summary": "ModuleRef là đối tượng nội bộ của NestJS cho phép điều hướng và truy xuất động các providers trong container. Nó có 2 phương thức: .get() để lấy Singleton provider đồng bộ, và .resolve() kết hợp ContextIdFactory để tạo ra một DI sub-tree độc lập và phân giải các Request-scoped providers bên ngoài luồng HTTP.",
+      "deepDive": "Sử dụng chuyên sâu: 1) moduleRef.get(Service): dùng để lấy Singleton instance nhanh chóng (chỉ tìm trong module hiện tại trừ khi truyền { strict: false }); 2) moduleRef.resolve(Service, contextId): dành cho Request hoặc Transient scope. Khi chạy ngoài HTTP (như Cron, Queue Job, Socket), NestJS không có request context tự động. Ta dùng ContextIdFactory.create() để tạo một ContextId giả lập. Sau đó truyền contextId vào moduleRef.resolve(): NestJS sẽ tự động tạo một cây phụ thuộc riêng biệt (Isolated DI Sub-tree) cho contextId đó và tự động dọn dẹp sau khi hoàn thành.",
+      "codeExample": "@Injectable()\nexport class QueueConsumer {\n  constructor(private readonly moduleRef: ModuleRef) {}\n\n  async processJob(jobData: JobPayload) {\n    // 1. Tạo một Context ID giả lập độc lập\n    const contextId = ContextIdFactory.create();\n\n    // 2. Gắn thông tin tenant/user vào sub-tree nếu cần\n    this.moduleRef.registerRequestByContextId({ tenantId: jobData.tenantId }, contextId);\n\n    // 3. Phân giải Request-scoped service an toàn\n    const auditLogger = await this.moduleRef.resolve<AuditLoggerService>(\n      AuditLoggerService,\n      contextId,\n    );\n\n    await auditLogger.logAction(jobData.action);\n  }\n}"
+    },
+    "pitfalls": [
+      "Dùng moduleRef.get() để lấy một Request-scoped provider: hàm sẽ ném ngoại lệ Scope Exception vì get() chỉ hoạt động với Singleton.",
+      "Lạm dụng ModuleRef trong toàn bộ business code biến code thành Service Locator Anti-pattern, làm mất đi tính minh bạch của Constructor Dependency Injection."
+    ],
+    "followUpQuestions": [
+      "Tham số { strict: false } trong moduleRef.get() hoạt động như thế nào để tìm kiếm provider xuyên module?",
+      "Sự khác biệt về bộ nhớ giữa transient provider và request-scoped provider khi được resolve qua ModuleRef là gì?"
+    ]
+  }
+]

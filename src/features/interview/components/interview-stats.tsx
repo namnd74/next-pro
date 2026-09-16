@@ -48,8 +48,14 @@ export function InterviewStats() {
     const ts = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'typescript').length;
     const js = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'javascript').length;
     const go = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'go').length;
-    const others = MOCK_INTERVIEW_QUESTIONS.length - (react + nextjs + ts + js + go);
-    return { react, nextjs, ts, js, go, others };
+    const nestjs = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'nestjs').length;
+    const nodejs = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'nodejs').length;
+    const python = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'python').length;
+    const django = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'django').length;
+    const others =
+      MOCK_INTERVIEW_QUESTIONS.length -
+      (react + nextjs + ts + js + go + nestjs + nodejs + python + django);
+    return { react, nextjs, ts, js, go, nestjs, nodejs, python, django, others };
   }, []);
 
   return (
@@ -144,6 +150,18 @@ export function InterviewStats() {
             </span>
             <span className="inline-flex items-center gap-1 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-[11px] font-semibold text-sky-600 dark:text-sky-400">
               🐹 Go: {languageBreakdown.go}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-600 dark:text-red-400">
+              🐱 NestJS: {languageBreakdown.nestjs}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
+              🟩 Node.js: {languageBreakdown.nodejs}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-[11px] font-semibold text-yellow-700 dark:text-yellow-400">
+              🐍 Python: {languageBreakdown.python}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-md border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[11px] font-semibold text-teal-700 dark:text-teal-400">
+              🎯 Django: {languageBreakdown.django}
             </span>
             {languageBreakdown.others > 0 && (
               <span className="inline-flex items-center gap-1 rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
