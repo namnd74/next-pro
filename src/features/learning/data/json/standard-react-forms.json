@@ -69,7 +69,7 @@
         "Controlled Component (useState + onChange): Phù hợp cho realtime input validation, dynamic field masking, dependent inputs. Nhược điểm: Re-render component ở MỌI phím gõ.",
         "Uncontrolled Component (useRef + FormData): giá trị nằm trong DOM nên mỗi phím gõ không tự lên lịch React render. Phù hợp khi chỉ cần đọc dữ liệu lúc submit; live validation và đồng bộ UI sẽ khó hơn.",
         "Bế tắc của Form truyền thống: (1) Form lớn 100 inputs bị giật lag re-render; (2) Xử lý pending status thủ công tốn code; (3) Server validation error mapping phức tạp; (4) Không có JS thì form hỏng.",
-        "Giải pháp React 19: Dùng Form Actions + useActionState kết hợp ưu điểm của cả 2 mô hình!"
+        "Giải pháp React: Dùng Form Actions + useActionState kết hợp ưu điểm của cả 2 mô hình!"
       ],
       "codeRecipes": [
         {
@@ -160,24 +160,24 @@
     {
       "id": "sr-04",
       "slug": "react-error-boundary-nextjs-error-tsx",
-      "title": "Khoanh vùng lỗi với React Error Boundary & Next.js 16 error.tsx",
+      "title": "Khoanh vùng lỗi với React Error Boundary & Next.js error.tsx",
       "summary": "Ngăn ngừa White Screen of Death (WSOD), bắt Unhandled Render Errors và khôi phục giao diện mượt mà với reset().",
       "durationMinutes": 18,
       "level": "advanced",
-      "tags": ["React Error Boundary", "Next.js 16", "error.tsx", "Resilience"],
+      "tags": ["React Error Boundary", "Next.js", "error.tsx", "Resilience"],
       "mentalModel": "Error Boundary đóng vai trò như cầu chì bảo vệ điện: khi 1 bóng đèn (component con) bị chập cháy, cầu chì ngắt điện khoanh vùng tại chỗ mà KHÔNG làm sập điện toàn bộ tòa nhà.",
       "keyPoints": [
         "Tại sao cần Error Boundary: Nếu không có Error Boundary, 1 lỗi JavaScript nhỏ khi render ở component con sẽ khiến React gỡ toàn bộ cây DOM, biến toàn bộ trang web thành màn hình trắng (White Screen of Death).",
         "React Class Component Error Boundary: Bắt buộc dùng Class Component với static getDerivedStateFromError(error) và componentDidCatch(error, info) (hoặc thư viện react-error-boundary).",
-        "Next.js 16 App Router `error.tsx`: tạo error boundary cho route segment. Component nhận `{ error, reset }`; `reset()` thử render lại segment và không bảo đảm lỗi nguồn đã được xử lý.",
+        "Next.js App Router `error.tsx`: tạo error boundary cho route segment. Component nhận `{ error, reset }`; `reset()` thử render lại segment và không bảo đảm lỗi nguồn đã được xử lý.",
         "Phạm vi BẮT ĐƯỢC lỗi: Lỗi xảy ra trong khi Render, Lỗi trong Lifecycle methods, Lỗi trong Constructors của cây component con.",
         "Phạm vi KHÔNG BẮT ĐƯỢC lỗi: Lỗi trong Event Handlers (onClick - dùng try/catch), Lỗi trong mã Asynchronous (setTimeout, requestAnimationFrame), Lỗi phía Server (Server Actions)."
       ],
       "codeRecipes": [
         {
-          "title": "Next.js 16 App Router error.tsx & Custom Class Error Boundary",
+          "title": "Next.js App Router error.tsx & Custom Class Error Boundary",
           "language": "tsx",
-          "afterCode": "// 1. app/dashboard/error.tsx (Next.js 16 Client Error Boundary)\n'use client';\nimport { useEffect } from 'react';\n\nexport default function Error({\n  error,\n  reset,\n}: {\n  error: Error & { digest?: string };\n  reset: () => void;\n}) {\n  useEffect(() => {\n    // Gửi log lỗi lên Sentry / LogRocket\n    console.error('Unhandled Route Error:', error);\n  }, [error]);\n\n  return (\n    <div className=\"p-6 rounded-xl border border-red-500/30 bg-red-500/10 space-y-4\">\n      <h2 className=\"text-sm font-bold text-red-400\">⚠️ Đã xảy ra lỗi ở phân hệ này!</h2>\n      <p className=\"text-xs text-muted-foreground\">{error.message}</p>\n      <button onClick={() => reset()} className=\"px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg\">\n        Thử khôi phục (Reset)\n      </button>\n    </div>\n  );\n}",
+          "afterCode": "// 1. app/dashboard/error.tsx (Next.js Client Error Boundary)\n'use client';\nimport { useEffect } from 'react';\n\nexport default function Error({\n  error,\n  reset,\n}: {\n  error: Error & { digest?: string };\n  reset: () => void;\n}) {\n  useEffect(() => {\n    // Gửi log lỗi lên Sentry / LogRocket\n    console.error('Unhandled Route Error:', error);\n  }, [error]);\n\n  return (\n    <div className=\"p-6 rounded-xl border border-red-500/30 bg-red-500/10 space-y-4\">\n      <h2 className=\"text-sm font-bold text-red-400\">⚠️ Đã xảy ra lỗi ở phân hệ này!</h2>\n      <p className=\"text-xs text-muted-foreground\">{error.message}</p>\n      <button onClick={() => reset()} className=\"px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg\">\n        Thử khôi phục (Reset)\n      </button>\n    </div>\n  );\n}",
           "takeaway": "Error boundary ở route segment giúp giới hạn phạm vi crash; layout cha thường vẫn hoạt động, còn lỗi trong chính boundary hoặc event handler cần cơ chế xử lý khác."
         }
       ],

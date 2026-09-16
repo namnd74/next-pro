@@ -221,7 +221,7 @@ export function StateTester() {
             <span>Devtools embedded at bottom right</span>
             <span className="text-primary flex items-center gap-1">
               <Sparkles className="h-3 w-3" />
-              React 19 Ready
+              Modern React Ready
             </span>
           </div>
         </CardContent>

@@ -10,7 +10,7 @@ const FALLBACK_OVERVIEW_DATA: OverviewData = {
       change: '+14.2%',
       isPositive: true,
       iconName: 'users',
-      description: 'Monthly active learners mastering React 19 & Next.js 16',
+      description: 'Monthly active learners mastering React & Next.js',
     },
     {
       id: 'metric-2',
@@ -50,7 +50,7 @@ const FALLBACK_OVERVIEW_DATA: OverviewData = {
     },
     {
       id: 'act-2',
-      action: 'React 19 Form Actions & useOptimistic track completed',
+      action: 'React Form Actions & useOptimistic track completed',
       actor: 'Interactive Lab',
       time: '2 mins ago',
       status: 'completed',

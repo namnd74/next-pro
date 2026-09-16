@@ -93,7 +93,7 @@ export function LearningStats() {
       <Card className="glass-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex-1 space-y-1.5">
           <div className="flex items-center justify-between text-xs font-semibold">
-            <span className="text-foreground">Overall React 19 & Next.js 16 Mastery</span>
+            <span className="text-foreground">Overall React & Next.js Mastery</span>
             <span className="text-primary">{progressPercent}%</span>
           </div>
           <Progress value={progressPercent} />

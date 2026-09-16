@@ -82,14 +82,14 @@ export function LearningCatalogView({
             </span>
             <h2 className="text-foreground text-xl font-black tracking-tight">
               {isReact
-                ? 'Không Gian Học & Luyện Tập React 19'
-                : 'Không Gian Học & Luyện Tập Next.js 16'}
+                ? 'Không Gian Học & Luyện Tập React'
+                : 'Không Gian Học & Luyện Tập Next.js'}
             </h2>
           </div>
           <p className="text-muted-foreground max-w-2xl text-xs leading-relaxed">
             {isReact
-              ? 'Học chuyên sâu React 19: Mental Model thuần khiết, Custom Hooks, Form Architecture, Performance và làm bài tập thực hành trên Client Sandbox.'
-              : 'Học chuyên sâu Next.js 16: App Router RSC, Server Actions, TanStack Query v5, Bảo mật và thực hành trên WebContainer Node.js ảo.'}
+              ? 'Học chuyên sâu React: Mental Model thuần khiết, Custom Hooks, Form Architecture, Performance và làm bài tập thực hành trên Client Sandbox.'
+              : 'Học chuyên sâu Next.js: App Router RSC, Server Actions, TanStack Query v5, Bảo mật và thực hành trên WebContainer Node.js ảo.'}
           </p>
         </div>
 

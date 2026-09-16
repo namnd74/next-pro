@@ -224,7 +224,7 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
           }`}
         >
           <Code2 className="h-3.5 w-3.5" />
-          <span>React 19</span>
+          <span>React</span>
         </button>
 
         <button
@@ -245,7 +245,7 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
           }`}
         >
           <Layers className="h-3.5 w-3.5" />
-          <span>Next.js 16</span>
+          <span>Next.js</span>
         </button>
       </div>
 
@@ -268,7 +268,7 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
         </span>
         <div className="min-w-0 space-y-0.5">
           <span className="text-foreground block truncate text-xs font-extrabold tracking-tight">
-            {isNextjs ? 'Seri Next.js 16 Fullstack' : 'Seri React 19 Mastery'}
+            {isNextjs ? 'Seri Next.js Fullstack' : 'Seri React Mastery'}
           </span>
           <span className="text-muted-foreground block font-mono text-[9px] tracking-widest uppercase">
             {isNextjs ? '4 Lộ trình · WebContainer' : '8 Lộ trình · Sandbox'}
@@ -279,7 +279,7 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
       {/* Navigation List - Only Active Series */}
       <nav
         className="space-y-3"
-        aria-label={isNextjs ? 'Lộ trình học Next.js 16' : 'Lộ trình học React 19'}
+        aria-label={isNextjs ? 'Lộ trình học Next.js' : 'Lộ trình học React'}
       >
         <div className="flex items-center justify-between px-1">
           <div

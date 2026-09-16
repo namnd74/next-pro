@@ -64,7 +64,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Next.js App Router Compatibility Studio',
-  description: 'Next.js 16 curriculum on a WebContainer-compatible Next.js 15.4 runtime',
+  description: 'Next.js curriculum on a WebContainer-compatible runtime',
 };
 
 export default function RootLayout({
@@ -145,7 +145,7 @@ export default function ClientDemo() {
         <div className="space-y-4">
           <div className="p-4 bg-slate-950/60 border border-slate-800 rounded-xl flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-slate-200">React 19 State Counter</p>
+              <p className="text-sm font-semibold text-slate-200">React State Counter</p>
               <p className="text-xs text-slate-400">Client-Side Interactivity</p>
             </div>
             <button

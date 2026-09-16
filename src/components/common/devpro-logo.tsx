@@ -625,7 +625,7 @@ export function DevProLogo({
               currentSize.sub
             )}
           >
-            React 19 & Next 16
+            FULLSTACK PLATFORM
           </span>
         )}
       </div>

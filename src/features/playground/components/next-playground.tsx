@@ -85,7 +85,7 @@ export default function ClientDemo() {
       <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-b from-indigo-950/40 to-slate-900/60 p-6 shadow-xl backdrop-blur">
         <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-400">
           <Sparkles className="h-3.5 w-3.5" />
-          <span>Next.js 16 Curriculum · React 19</span>
+          <span>Next.js Curriculum · React</span>
         </div>
 
         <h1 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">
@@ -139,7 +139,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Next.js App Router Compatibility Sandbox',
-  description: 'Next.js 16 curriculum on a WebContainer-compatible Next.js 15.4 runtime',
+  description: 'Next.js curriculum on a WebContainer-compatible runtime',
 };
 
 export default function RootLayout({
@@ -287,7 +287,7 @@ export interface NextPlaygroundProps {
 }
 
 export function NextPlayground({
-  title = 'Next.js 16 Curriculum Studio',
+  title = 'Next.js Curriculum Studio',
   initialFiles,
   entryPath = '/app/page.tsx',
   instructions,
@@ -705,14 +705,14 @@ export function NextPlayground({
                       <span>{title}</span>
                       <Badge
                         variant="outline"
-                        className="border-indigo-500/40 text-[10px] text-indigo-400"
+                        className="border-indigo-500/40 bg-indigo-500/10 font-mono text-[10px] font-semibold text-indigo-400"
                       >
-                        Next 15.4 Runtime + React 19
+                        Next.js v15.4 · React v19.2
                       </Badge>
                     </h3>
                     <p className="text-muted-foreground text-xs">
-                      Next.js 16 curriculum running on WebContainer-compatible Node.js
-                      Wasm runtime with App Router & Route Handlers.
+                      Next.js curriculum running on WebContainer-compatible Node.js Wasm
+                      runtime with App Router & Route Handlers.
                     </p>
                   </div>
                 </div>
@@ -1183,14 +1183,16 @@ export function NextPlayground({
                       : 'bg-amber-500'
                 }`}
               />
-              <span>Next 15.4 Compatibility Runtime</span>
+              <span>Next.js v15.4 Wasm Runtime</span>
             </span>
             <span>·</span>
             <span className="text-foreground">{activePath}</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="text-slate-400">Next.js 16 Curriculum + React 19</span>
+            <span className="font-mono text-[10px] text-slate-400">
+              Next.js v15.4 · React v19.2 · WebContainer
+            </span>
             {layout.isFullscreen && (
               <button
                 type="button"
