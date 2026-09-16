@@ -9,3 +9,4 @@ export * from './components/bug-hunter';
 export * from './components/rich-text-editor';
 export * from './components/json-manager-modal';
 export * from './components/create-question-modal';
+export * from './components/virtual-question-list';

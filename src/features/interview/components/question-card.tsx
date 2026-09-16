@@ -16,9 +16,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CodeBlock } from '@/components/ui/code-block';
+import { resolveFollowUp } from '../data/followup-resolver';
 
 interface QuestionCardProps {
   question: InterviewQuestion;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 function getLevelBadgeVariant(level: string) {
@@ -128,87 +131,143 @@ function getCategoryBadge(category: string) {
   }
 }
 
-export function QuestionCard({ question }: QuestionCardProps) {
+export function QuestionCard({
+  question,
+  isExpanded: controlledExpanded,
+  onToggleExpand,
+}: QuestionCardProps) {
   const { bookmarkedQuestionIds, toggleBookmark } = useInterviewStore();
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [internalExpanded, setInternalExpanded] = React.useState(false);
+  const [revealedFollowUps, setRevealedFollowUps] = React.useState<Set<number>>(
+    new Set()
+  );
+
+  const isControlled = typeof controlledExpanded === 'boolean';
+  const isExpanded = isControlled ? controlledExpanded : internalExpanded;
+
+  const handleToggleExpand = React.useCallback(() => {
+    if (isControlled && onToggleExpand) {
+      onToggleExpand();
+    } else {
+      setInternalExpanded((prev) => !prev);
+    }
+  }, [isControlled, onToggleExpand]);
 
   const isBookmarked = bookmarkedQuestionIds.includes(question.id);
   const hasRubric = Boolean(question.evaluationRubric);
   const categoryMeta = getCategoryBadge(question.category);
 
+  const toggleFollowUp = (idx: number) => {
+    setRevealedFollowUps((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  };
+
   return (
     <Card className="glass-card glass-card-hover overflow-hidden p-5 transition-all">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              variant={getLevelBadgeVariant(question.level)}
-              className="text-[10px] tracking-wider uppercase"
-            >
-              {question.level}
-            </Badge>
-            <Badge
-              variant="outline"
-              className={`border text-[10px] font-medium ${categoryMeta.className}`}
-            >
-              {categoryMeta.label}
-            </Badge>
+      {/* Clickable Header Area */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        onClick={handleToggleExpand}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleToggleExpand();
+          }
+        }}
+        className="group hover:bg-muted/30 focus-visible:ring-primary/40 -m-2 cursor-pointer rounded-xl p-2 transition-all select-none focus:outline-none focus-visible:ring-2"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant={getLevelBadgeVariant(question.level)}
+                className="text-[10px] tracking-wider uppercase"
+              >
+                {question.level}
+              </Badge>
+              <Badge
+                variant="outline"
+                className={`border text-[10px] font-medium ${categoryMeta.className}`}
+              >
+                {categoryMeta.label}
+              </Badge>
+            </div>
+
+            <h3 className="text-foreground group-hover:text-primary text-base leading-snug font-bold transition-colors">
+              {question.question}
+            </h3>
+
+            {question.contextOrScenario && (
+              <p className="text-muted-foreground/90 text-xs italic">
+                <span className="text-foreground font-semibold">Scenario: </span>
+                {question.contextOrScenario}
+              </p>
+            )}
           </div>
 
-          <h3 className="text-foreground text-base leading-snug font-bold">
-            {question.question}
-          </h3>
+          <div
+            className="flex shrink-0 items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleBookmark(question.id);
+              }}
+              className={`h-8 w-8 rounded-lg p-0 ${
+                isBookmarked
+                  ? 'bg-purple-500/10 text-purple-500'
+                  : 'text-muted-foreground'
+              }`}
+              title={isBookmarked ? 'Remove bookmark' : 'Bookmark question'}
+            >
+              <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-purple-500' : ''}`} />
+            </Button>
 
-          {question.contextOrScenario && (
-            <p className="text-muted-foreground/90 text-xs italic">
-              <span className="text-foreground font-semibold">Scenario: </span>
-              {question.contextOrScenario}
-            </p>
-          )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleToggleExpand();
+              }}
+              className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-lg p-0"
+              title={isExpanded ? 'Thu gọn' : 'Mở rộng chi tiết'}
+            >
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-200 ${
+                  isExpanded ? 'text-primary rotate-180' : ''
+                }`}
+              />
+            </Button>
+          </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => toggleBookmark(question.id)}
-            className={`h-8 w-8 rounded-lg p-0 ${
-              isBookmarked ? 'bg-purple-500/10 text-purple-500' : 'text-muted-foreground'
-            }`}
-            title={isBookmarked ? 'Remove bookmark' : 'Bookmark question'}
-          >
-            <Bookmark className={`h-4 w-4 ${isBookmarked ? 'fill-purple-500' : ''}`} />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="text-muted-foreground h-8 w-8 rounded-lg p-0"
-          >
-            {isExpanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* Quick Keywords Preview */}
-      <div className="border-border/40 mt-3 flex flex-wrap items-center gap-1.5 border-t pt-2">
-        <span className="text-muted-foreground text-[11px] font-semibold">
-          Key concepts:
-        </span>
-        {question.expectedKeywords.map((kw, i) => (
-          <span
-            key={i}
-            className="bg-secondary/80 text-foreground rounded-md px-2 py-0.5 text-[10px] font-medium"
-          >
-            {kw}
+        {/* Quick Keywords Preview */}
+        <div className="border-border/40 mt-3 flex flex-wrap items-center gap-1.5 border-t pt-2">
+          <span className="text-muted-foreground text-[11px] font-semibold">
+            Key concepts:
           </span>
-        ))}
+          {question.expectedKeywords.map((kw, i) => (
+            <span
+              key={i}
+              className="bg-secondary/80 text-foreground rounded-md px-2 py-0.5 text-[10px] font-medium"
+            >
+              {kw}
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Expandable Deep Content */}
@@ -365,20 +424,87 @@ export function QuestionCard({ question }: QuestionCardProps) {
             </TabsContent>
 
             {/* Follow-up Questions Tab */}
-            <TabsContent value="followup" className="space-y-2 pt-2">
-              <div className="space-y-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10 p-3.5">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300">
-                  <HelpCircle className="h-3.5 w-3.5" />
-                  Interviewer Follow-up Inquiries:
-                </span>
-                <ul className="space-y-1.5 text-xs text-indigo-900 dark:text-indigo-200">
-                  {question.followUpQuestions.map((f, fIdx) => (
-                    <li key={fIdx} className="flex items-start gap-2">
-                      <span className="font-bold text-indigo-500">{fIdx + 1}.</span>
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
+            <TabsContent value="followup" className="space-y-3 pt-2">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                    <HelpCircle className="h-3.5 w-3.5" />
+                    Câu hỏi đào sâu mở rộng (Follow-up Inquiries):
+                  </span>
+                  <span className="text-muted-foreground text-[11px] font-medium">
+                    Nhấn vào câu hỏi để xem gợi ý đáp án
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {question.followUpQuestions.map((f, fIdx) => {
+                    const isRevealed = revealedFollowUps.has(fIdx);
+                    const resolved = resolveFollowUp(question, f, fIdx);
+
+                    return (
+                      <div
+                        key={fIdx}
+                        className="overflow-hidden rounded-xl border border-indigo-500/25 bg-indigo-500/5 transition-all hover:border-indigo-500/40"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleFollowUp(fIdx)}
+                          className="flex w-full items-start justify-between gap-3 p-3 text-left transition-colors hover:bg-indigo-500/10"
+                        >
+                          <div className="flex flex-1 items-start gap-2.5">
+                            <span className="shrink-0 font-mono text-xs font-bold text-indigo-500">
+                              #{fIdx + 1}
+                            </span>
+                            <span className="text-foreground text-xs leading-relaxed font-semibold">
+                              {resolved.questionText}
+                            </span>
+                          </div>
+                          <span
+                            title={isRevealed ? 'Thu gọn' : 'Xem đáp án'}
+                            className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition-all ${
+                              isRevealed
+                                ? 'border-indigo-500/40 bg-indigo-500/20 text-indigo-400 shadow-xs'
+                                : 'border-border/60 bg-muted/40 text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            <ChevronDown
+                              className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                                isRevealed ? 'rotate-180 text-indigo-400' : ''
+                              }`}
+                            />
+                          </span>
+                        </button>
+
+                        {isRevealed && (
+                          <div className="bg-background/80 animate-in fade-in-50 space-y-3 border-t border-indigo-500/20 p-4 text-xs duration-200">
+                            <div className="flex items-center gap-1.5 font-bold text-indigo-600 dark:text-indigo-300">
+                              <span>🎯</span>
+                              <span>
+                                Đáp án & Phân tích kỹ thuật chuyên sâu (Senior Focus):
+                              </span>
+                            </div>
+
+                            <div className="bg-secondary/40 border-border/50 text-foreground space-y-2.5 rounded-lg border p-3.5 text-xs leading-relaxed font-normal whitespace-pre-line">
+                              {resolved.answer}
+                            </div>
+
+                            {resolved.codeExample && (
+                              <div className="space-y-1.5 pt-1">
+                                <span className="text-muted-foreground flex items-center gap-1 text-[11px] font-semibold">
+                                  <span>💻</span> Ví dụ minh họa kỹ thuật:
+                                </span>
+                                <CodeBlock
+                                  code={resolved.codeExample}
+                                  language={resolved.codeLanguage || 'tsx'}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </TabsContent>
 
