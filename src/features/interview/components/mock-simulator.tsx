@@ -186,16 +186,16 @@ export function MockSimulator() {
                 setTimeSeconds(0);
               }}
               options={[
-                { value: 'all', label: '🌐 Tất cả ngôn ngữ' },
-                { value: 'react', label: '⚛️ React' },
-                { value: 'nextjs', label: '▲ Next.js' },
-                { value: 'typescript', label: '🔷 TypeScript' },
-                { value: 'javascript', label: '🟨 JavaScript' },
-                { value: 'go', label: '🐹 Go (Golang)' },
-                { value: 'nestjs', label: '🐱 NestJS' },
-                { value: 'nodejs', label: '🟩 Node.js' },
-                { value: 'python', label: '🐍 Python' },
-                { value: 'django', label: '🎯 Django' },
+                { value: 'all', label: 'Tất cả ngôn ngữ' },
+                { value: 'react', label: 'React' },
+                { value: 'nextjs', label: 'Next.js' },
+                { value: 'typescript', label: 'TypeScript' },
+                { value: 'javascript', label: 'JavaScript' },
+                { value: 'go', label: 'Go (Golang)' },
+                { value: 'nestjs', label: 'NestJS' },
+                { value: 'nodejs', label: 'Node.js' },
+                { value: 'python', label: 'Python' },
+                { value: 'django', label: 'Django' },
               ]}
               className="w-40"
             />

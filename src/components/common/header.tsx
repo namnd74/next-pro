@@ -10,7 +10,6 @@ import {
   Briefcase,
   Home,
   Github,
-  Crosshair,
   BrainCircuit,
   Menu,
   X,
@@ -23,7 +22,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLearningStore } from '@/features/learning/stores/use-learning-store';
 
-const navLinks = [
+interface NavLinkItem {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  desc: string;
+  comingSoon?: boolean;
+}
+
+const navLinks: NavLinkItem[] = [
   { href: '/', label: 'Overview', icon: Home, desc: 'Tổng quan nền tảng & tính năng' },
   {
     href: '/learn',
@@ -43,23 +50,21 @@ const navLinks = [
     icon: BrainCircuit,
     desc: 'Hệ thống AI & Prompt Engineering',
   },
-  {
-    href: '/offensive-security',
-    label: 'Offensive Security',
-    icon: Crosshair,
-    desc: 'Bảo mật Web & Red Team Range',
-    comingSoon: true,
-  },
 ];
 
 export function Header() {
   const pathname = usePathname();
   const [mounted, setMounted] = React.useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [scrolled, setScrolled] = React.useState(false);
   const { streakDays, completedLessonIds } = useLearningStore();
 
   React.useEffect(() => {
     setMounted(true);
+    const onScroll = () => setScrolled(window.scrollY > 16);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   // Close mobile menu on route change
@@ -73,9 +78,17 @@ export function Header() {
     return pathname.startsWith(link.href);
   };
 
+  const isHome = pathname === '/';
+
   return (
     <header className="sticky top-4 z-50 mx-auto w-full max-w-6xl px-4">
-      <div className="glass flex h-16 items-center justify-between rounded-2xl px-4 shadow-lg shadow-black/5 sm:px-6">
+      <div
+        className={`flex h-16 items-center justify-between rounded-2xl px-4 transition-all duration-300 sm:px-6 ${
+          scrolled || !isHome
+            ? 'glass shadow-lg shadow-black/5'
+            : 'border-transparent bg-transparent shadow-none'
+        }`}
+      >
         {/* Brand Logo */}
         <div className="flex items-center gap-3">
           <Link href="/" className="focus:outline-hidden">
