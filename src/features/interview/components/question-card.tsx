@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CodeBlock } from '@/components/ui/code-block';
+import { TechIcon, TechIconName } from '@/components/common/tech-icon';
 import { resolveFollowUp } from '../data/followup-resolver';
 
 interface QuestionCardProps {
@@ -39,87 +40,103 @@ function getLevelBadgeVariant(level: string) {
   }
 }
 
-function getCategoryBadge(category: string) {
+function getCategoryBadge(category: string): {
+  iconName?: TechIconName;
+  label: string;
+  className: string;
+} {
   switch (category) {
     case 'react':
     case 'react-19':
       return {
-        label: '⚛️ React',
+        iconName: 'react',
+        label: 'React',
         className: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
       };
     case 'nextjs':
     case 'next-app-router':
       return {
-        label: '▲ Next.js',
+        iconName: 'nextjs',
+        label: 'Next.js',
         className:
           'bg-zinc-500/10 text-zinc-900 dark:text-zinc-100 border-zinc-500/30 font-semibold',
       };
     case 'typescript':
       return {
-        label: '🔷 TypeScript',
+        iconName: 'typescript',
+        label: 'TypeScript',
         className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
       };
     case 'javascript':
       return {
-        label: '🟨 JavaScript',
+        iconName: 'javascript',
+        label: 'JavaScript',
         className:
           'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
       };
     case 'go':
       return {
-        label: '🐹 Go (Golang)',
+        iconName: 'go',
+        label: 'Go (Golang)',
         className:
           'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30 font-semibold',
       };
     case 'nestjs':
       return {
-        label: '🐱 NestJS',
+        iconName: 'nestjs',
+        label: 'NestJS',
         className:
           'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 font-semibold',
       };
     case 'nodejs':
       return {
-        label: '🟩 Node.js',
+        iconName: 'nodejs',
+        label: 'Node.js',
         className:
           'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-semibold',
       };
     case 'python':
       return {
-        label: '🐍 Python',
+        iconName: 'python',
+        label: 'Python',
         className:
           'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30 font-semibold',
       };
     case 'django':
       return {
-        label: '🎯 Django',
+        iconName: 'django',
+        label: 'Django',
         className:
           'bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30 font-semibold',
       };
     case 'javascript-typescript':
       return {
-        label: '🟨 JS / 🔷 TS',
+        iconName: 'typescript',
+        label: 'JS / TS',
         className: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
       };
     case 'browser-runtime-workers':
       return {
-        label: '⚙️ Browser & Workers',
+        label: 'Browser & Workers',
         className:
           'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
       };
     case 'performance-optimization':
       return {
-        label: '⚡ Performance & Security',
+        label: 'Performance & Security',
         className:
           'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
       };
     case 'frontend-system-design':
+    case 'architecture':
       return {
-        label: '🏛️ System Design',
+        iconName: 'architecture',
+        label: 'System Design',
         className: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
       };
     case 'state-data':
       return {
-        label: '🗄️ State & Data',
+        label: 'State & Data',
         className:
           'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
       };
@@ -196,9 +213,12 @@ export function QuestionCard({
               </Badge>
               <Badge
                 variant="outline"
-                className={`border text-[10px] font-medium ${categoryMeta.className}`}
+                className={`flex items-center gap-1 border text-[10px] font-medium ${categoryMeta.className}`}
               >
-                {categoryMeta.label}
+                {categoryMeta.iconName && (
+                  <TechIcon name={categoryMeta.iconName} className="h-3 w-3" />
+                )}
+                <span>{categoryMeta.label}</span>
               </Badge>
             </div>
 

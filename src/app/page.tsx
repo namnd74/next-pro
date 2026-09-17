@@ -1,268 +1,114 @@
-'use client';
-
-import * as React from 'react';
 import Link from 'next/link';
-import {
-  Sparkles,
-  Activity,
-  Layers,
-  Terminal,
-  RefreshCw,
-  BookOpen,
-  Briefcase,
-  Crosshair,
-  ArrowRight,
-  BrainCircuit,
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import {
-  StatCard,
-  StateTester,
-  MetricCharts,
-  useOverviewMetrics,
-} from '@/features/overview';
+import { Marquee } from '@/components/ui/marquee';
+import { HeroDevice } from '@/components/landing-hero-device';
+
+const TECH_STACK = [
+  'Next.js',
+  'React',
+  'TypeScript',
+  'TanStack Query',
+  'Zustand',
+  'Tailwind CSS',
+  'WebContainer API',
+  'Playwright',
+  'shadcn/ui',
+  'CodeMirror',
+  'Husky',
+];
 
 export default function HomePage() {
-  const { data, isLoading, isError, error, refetch, isFetching } = useOverviewMetrics();
-
   return (
-    <div className="space-y-10">
-      {/* Hero Section */}
-      <section className="space-y-4 pt-4 pb-4 text-center">
-        <div className="animate-pulse-subtle border-primary/20 bg-primary/10 text-primary mb-2 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium shadow-sm">
-          <Sparkles className="h-3.5 w-3.5" />
-          <span>NextPro Fast-Track</span>
-          <span className="bg-primary h-1 w-1 rounded-full" />
-          <span className="text-muted-foreground">Production & Interview Ready</span>
-        </div>
+    <div className="relative flex min-h-0 w-full flex-1 flex-col justify-between overflow-hidden">
+      {/* Subtle grid background */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+        style={{
+          backgroundImage:
+            'linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)',
+          backgroundSize: '36px 36px',
+        }}
+      />
 
-        <h1 className="text-foreground mx-auto max-w-3xl text-4xl leading-tight font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
-          React & Next.js Pro{' '}
-          <span className="via-primary bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
-            Mastery & Interview Hub
-          </span>
-        </h1>
+      {/* Purple radial glow behind laptop on the right */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 -right-24 h-[480px] w-[600px] -translate-y-1/2 rounded-full bg-gradient-to-l from-purple-600/25 via-indigo-600/15 to-transparent blur-[110px]"
+      />
 
-        <p className="text-muted-foreground mx-auto max-w-2xl text-base leading-relaxed sm:text-lg">
-          Nền tảng học tập 80/20, trắc nghiệm 60s Blitz Quiz và luyện phỏng vấn kỹ thuật
-          thực chiến dành cho lập trình viên React, Next.js, Go & Fullstack.
-        </p>
-
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-          <Link href="/learn">
-            <Button size="lg" className="shadow-primary/25 gap-2 font-semibold shadow-lg">
-              <BookOpen className="h-4 w-4" />
-              <span>Bắt Đầu Học (80/20 Tracks)</span>
-            </Button>
-          </Link>
-
-          <Link href="/interview">
-            <Button variant="outline" size="lg" className="gap-2 font-semibold">
-              <Briefcase className="text-primary h-4 w-4" />
-              <span>Luyện Phỏng Vấn (Mock Simulator)</span>
-            </Button>
-          </Link>
-
-          <Link href="/ai">
-            <Button
-              variant="outline"
-              size="lg"
-              className="gap-2 border-violet-500/30 font-semibold text-violet-600 hover:bg-violet-500/10 dark:text-violet-400"
-            >
-              <BrainCircuit className="h-4 w-4" aria-hidden="true" />
-              <span>AI Engineering Hub</span>
-            </Button>
-          </Link>
-
-          <div className="inline-flex items-center">
-            <Button
-              variant="outline"
-              size="lg"
-              disabled
-              className="border-destructive/30 text-destructive/60 cursor-not-allowed gap-2 font-semibold opacity-70"
-            >
-              <Crosshair className="h-4 w-4" />
-              <span>Offensive Security</span>
-              <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500">
-                Coming Soon
-              </span>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Quick Access Cards */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/learn" className="group">
-          <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-600" />
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-500">
-                  <BookOpen className="h-5 w-5" />
-                </div>
-                <h3 className="text-foreground group-hover:text-primary text-lg font-bold transition-colors">
-                  Lộ Trình Học & Mental Model
-                </h3>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  React Actions, App Router RSC vs Client, Streaming Suspense, TanStack
-                  Query v5 & Zustand.
-                </p>
-              </div>
-              <ArrowRight className="text-muted-foreground group-hover:text-primary mt-2 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1" />
-            </div>
-          </Card>
-        </Link>
-
-        <Link href="/interview" className="group">
-          <Card className="glass-card glass-card-hover relative overflow-hidden p-6">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-600" />
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500">
-                  <Briefcase className="h-5 w-5" />
-                </div>
-                <h3 className="text-foreground group-hover:text-primary text-lg font-bold transition-colors">
-                  Luyện Phỏng Vấn Kỹ Thuật
-                </h3>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Mock Interview Simulator bấm giờ & chấm điểm, 100+ Senior Q&A Bank, và
-                  Bug Hunting Challenge.
-                </p>
-              </div>
-              <ArrowRight className="text-muted-foreground group-hover:text-primary mt-2 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1" />
-            </div>
-          </Card>
-        </Link>
-
-        <Link href="/ai" className="group">
-          <Card className="glass-card glass-card-hover relative h-full overflow-hidden p-6">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-500" />
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-500">
-                  <BrainCircuit className="h-5 w-5" aria-hidden="true" />
-                </div>
-                <h3 className="text-foreground text-lg font-bold transition-colors group-hover:text-violet-500">
-                  AI Engineering Hub
-                </h3>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Interface, agent runtime, harness, skills, sub-agent, safety và evals
-                  trong hệ thống AI hiện đại.
-                </p>
-              </div>
-              <ArrowRight className="text-muted-foreground mt-2 h-5 w-5 shrink-0 transition-transform group-hover:translate-x-1 group-hover:text-violet-500" />
-            </div>
-          </Card>
-        </Link>
-
-        <div className="group relative cursor-not-allowed">
-          <Card className="glass-card relative overflow-hidden border-dashed p-6 opacity-75">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-500/40 via-orange-500/40 to-amber-500/40" />
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="bg-destructive/10 text-destructive/70 flex h-10 w-10 items-center justify-center rounded-xl">
-                    <Crosshair className="h-5 w-5" />
-                  </div>
-                  <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500">
-                    Coming Soon
-                  </span>
-                </div>
-                <h3 className="text-foreground text-lg font-bold">
-                  Offensive Security Academy
-                </h3>
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  Lộ trình bảo mật Web & Red Team Range đang được hoàn thiện nội dung và
-                  sẽ ra mắt trong bản cập nhật kế tiếp.
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </section>
-
-      {/* Live Server State Metrics (TanStack Query + Axios) */}
-      <section className="space-y-4 pt-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-foreground flex items-center gap-2 text-lg font-bold tracking-tight">
-              <Activity className="text-primary h-4 w-4" />
-              Live Server State Metrics
-            </h2>
-            <p className="text-muted-foreground text-xs">
-              Fetched via Axios from Next.js API route & managed by TanStack Query v5
-            </p>
+      {/* Main 2-Column Hero Area (Vertically Centered in remaining space) */}
+      <div className="relative z-10 mx-auto my-auto grid min-h-0 w-full max-w-7xl flex-1 grid-cols-1 items-center gap-6 px-4 py-2 sm:gap-8 sm:px-6 sm:py-4 lg:grid-cols-12 lg:gap-8 xl:gap-12">
+        {/* Left Column (5 cols): Badge, Headline, Subtitle, Buttons */}
+        <div className="flex flex-col items-center gap-4 text-center sm:gap-5 lg:col-span-5 lg:items-start lg:text-left xl:gap-6">
+          {/* Pill Badge */}
+          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1 text-xs font-medium text-indigo-400 backdrop-blur-md">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
+            Fast-Track to Production Ready
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => refetch()}
-            disabled={isFetching}
-          >
-            <RefreshCw className={`h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
-            <span>{isFetching ? 'Syncing...' : 'Sync'}</span>
-          </Button>
-        </div>
+          {/* Headline */}
+          <h1 className="text-3xl leading-[1.12] font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl xl:text-6xl">
+            Làm chủ
+            <br />
+            React &{' '}
+            <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-sky-400 bg-clip-text text-transparent">
+              Next.js
+            </span>
+          </h1>
 
-        {isLoading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="border-border bg-secondary/40 h-36 animate-pulse rounded-2xl border"
-              />
-            ))}
-          </div>
-        ) : isError ? (
-          <div className="border-destructive/20 bg-destructive/10 text-destructive flex items-center justify-between rounded-2xl border p-6 text-sm">
-            <span>Failed to load server state: {error?.message}</span>
-            <Button variant="outline" size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {data?.metrics.map((metric) => (
-              <StatCard key={metric.id} metric={metric} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Interactive State & Persistence Demo */}
-      <section id="interactive-demo" className="space-y-4 pt-4">
-        <div>
-          <h2 className="text-foreground flex items-center gap-2 text-lg font-bold tracking-tight">
-            <Layers className="text-primary h-4 w-4" />
-            Interactive State & Data Management
-          </h2>
-          <p className="text-muted-foreground text-xs">
-            Test Zustand global persistence & TanStack Query cache invalidation live in
-            the browser
+          {/* Subtitle */}
+          <p className="-mt-1 text-xl font-semibold tracking-tight text-slate-400 sm:-mt-2 sm:text-2xl lg:text-3xl">
+            bằng cách thực sự làm.
           </p>
+
+          {/* CTAs */}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1 lg:justify-start">
+            <Link href="/learn">
+              <Button
+                size="lg"
+                className="cursor-pointer rounded-xl bg-white px-6 py-5 text-sm font-semibold text-slate-950 shadow-xl shadow-white/5 hover:bg-slate-100 sm:px-7 sm:py-6 sm:text-base"
+              >
+                Bắt đầu học ngay
+              </Button>
+            </Link>
+            <Link href="/interview">
+              <Button
+                variant="outline"
+                size="lg"
+                className="cursor-pointer rounded-xl border-slate-700/80 bg-slate-900/50 px-6 py-5 text-sm font-semibold text-slate-200 backdrop-blur-md hover:bg-slate-800 sm:px-7 sm:py-6 sm:text-base"
+              >
+                Luyện phỏng vấn
+              </Button>
+            </Link>
+          </div>
         </div>
 
-        <StateTester />
-      </section>
-
-      {/* Tech Stack Matrix & Audit Stream */}
-      <section className="space-y-4 pt-4">
-        <div>
-          <h2 className="text-foreground flex items-center gap-2 text-lg font-bold tracking-tight">
-            <Terminal className="text-primary h-4 w-4" />
-            Architecture Overview & Telemetry
-          </h2>
-          <p className="text-muted-foreground text-xs">
-            Module breakdown and real-time execution events
-          </p>
+        {/* Right Column (7 cols): MacBook Pro Device */}
+        <div className="flex min-h-0 w-full justify-center lg:col-span-7 lg:justify-end">
+          <HeroDevice />
         </div>
+      </div>
 
-        <MetricCharts activities={data?.recentActivities} />
-      </section>
+      {/* Marquee Strip pinned flush to the bottom */}
+      <div className="relative z-10 mt-auto w-full shrink-0">
+        <div className="from-background pointer-events-none absolute inset-y-0 left-0 z-10 w-20 bg-gradient-to-r to-transparent sm:w-28" />
+        <div className="from-background pointer-events-none absolute inset-y-0 right-0 z-10 w-20 bg-gradient-to-l to-transparent sm:w-28" />
+        <Marquee
+          pauseOnHover
+          gap="2rem"
+          className="border-border/30 bg-background/50 border-t py-2.5 backdrop-blur-xs [--duration:25s] sm:py-3.5"
+        >
+          {TECH_STACK.map((tech) => (
+            <span
+              key={tech}
+              className="text-muted-foreground/70 mx-3 text-xs font-medium whitespace-nowrap sm:mx-4 sm:text-sm"
+            >
+              {tech}
+            </span>
+          ))}
+        </Marquee>
+      </div>
     </div>
   );
 }

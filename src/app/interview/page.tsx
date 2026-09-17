@@ -15,7 +15,6 @@ import {
 import {
   MOCK_INTERVIEW_QUESTIONS,
   MOCK_BUG_HUNT_CHALLENGES,
-  QuestionCard,
   VirtualQuestionList,
   MockSimulator,
   BugHunter,
@@ -29,6 +28,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
+import { TechIcon } from '@/components/common/tech-icon';
 
 export default function InterviewPage() {
   const { bookmarkedQuestionIds, customQuestions } = useInterviewStore();
@@ -230,7 +230,8 @@ export default function InterviewPage() {
                       : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>⚛️ React</span>
+                  <TechIcon name="react" className="h-3.5 w-3.5" />
+                  <span>React</span>
                   <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
                     {languageCounts.react}
                   </span>
@@ -245,7 +246,8 @@ export default function InterviewPage() {
                       : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>▲ Next.js</span>
+                  <TechIcon name="nextjs" className="h-3.5 w-3.5" />
+                  <span>Next.js</span>
                   <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
                     {languageCounts.nextjs}
                   </span>
@@ -259,7 +261,8 @@ export default function InterviewPage() {
                       : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>🔷 TypeScript</span>
+                  <TechIcon name="typescript" className="h-3.5 w-3.5" />
+                  <span>TypeScript</span>
                   <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
                     {languageCounts.typescript}
                   </span>
@@ -273,7 +276,8 @@ export default function InterviewPage() {
                       : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>🟨 JavaScript</span>
+                  <TechIcon name="javascript" className="h-3.5 w-3.5" />
+                  <span>JavaScript</span>
                   <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
                     {languageCounts.javascript}
                   </span>
@@ -287,7 +291,8 @@ export default function InterviewPage() {
                       : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>🐹 Go (Golang)</span>
+                  <TechIcon name="go" className="h-3.5 w-3.5" />
+                  <span>Go (Golang)</span>
                   <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
                     {languageCounts.go}
                   </span>
@@ -301,7 +306,8 @@ export default function InterviewPage() {
                       : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>🐱 NestJS</span>
+                  <TechIcon name="nestjs" className="h-3.5 w-3.5" />
+                  <span>NestJS</span>
                   <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
                     {languageCounts.nestjs}
                   </span>
@@ -315,7 +321,8 @@ export default function InterviewPage() {
                       : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>🟩 Node.js</span>
+                  <TechIcon name="nodejs" className="h-3.5 w-3.5" />
+                  <span>Node.js</span>
                   <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
                     {languageCounts.nodejs}
                   </span>
@@ -329,7 +336,8 @@ export default function InterviewPage() {
                       : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>🐍 Python</span>
+                  <TechIcon name="python" className="h-3.5 w-3.5" />
+                  <span>Python</span>
                   <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
                     {languageCounts.python}
                   </span>
@@ -343,7 +351,8 @@ export default function InterviewPage() {
                       : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <span>🎯 Django</span>
+                  <TechIcon name="django" className="h-3.5 w-3.5" />
+                  <span>Django</span>
                   <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
                     {languageCounts.django}
                   </span>

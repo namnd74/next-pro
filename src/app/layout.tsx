@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import '@/styles/globals.css';
 import { AppProviders } from '@/providers';
-import { Header } from '@/components/common/header';
+import { AppShell } from '@/components/common/app-shell';
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -12,7 +12,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'NextPro - Production Ready Enterprise Template',
+  title: 'dev-pro',
   description:
     'Modern Fullstack & Enterprise Platform with Next.js, React, TypeScript, Go, TanStack Query, Tailwind CSS, and Zustand.',
   keywords: [
@@ -78,22 +78,7 @@ export default function RootLayout({
         </div>
 
         <AppProviders>
-          <div className="relative z-10 flex min-h-screen flex-col">
-            <Header />
-            <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
-            <footer className="border-border/40 text-muted-foreground border-t py-6 text-center text-xs">
-              <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row">
-                <span>
-                  © {new Date().getFullYear()} NextPro Starter. All rights reserved.
-                </span>
-                <span className="flex items-center gap-2">
-                  Built with{' '}
-                  <span className="text-primary font-semibold">UI/UX Pro Max</span>{' '}
-                  guidelines
-                </span>
-              </div>
-            </footer>
-          </div>
+          <AppShell>{children}</AppShell>
         </AppProviders>
       </body>
     </html>
