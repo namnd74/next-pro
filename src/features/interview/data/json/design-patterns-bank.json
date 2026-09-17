@@ -1,0 +1,1414 @@
+[
+  {
+    "id": "dp-001",
+    "category": "design-patterns",
+    "level": "junior",
+    "question": "Single Responsibility Principle (SRP) là gì và tại sao nó quan trọng?",
+    "interviewerIntent": "Đánh giá hiểu biết cốt lõi về Single Responsibility Principle (chữ S trong SOLID) và tư duy phân tách trách nhiệm trong module/class.",
+    "contextOrScenario": "Một service hoặc component chứa cả logic tính tiền, format dữ liệu, gọi API và gửi email thông báo.",
+    "expectedKeywords": [
+      "single responsibility",
+      "reason to change",
+      "high cohesion",
+      "separation of concerns",
+      "maintainability"
+    ],
+    "seniorAnswer": {
+      "summary": "SRP quy định: 'Một class/module chỉ nên có duy nhất một lý do để thay đổi' (A class should have only one reason to change). Nghĩa là một đơn vị code chỉ nên phục vụ một actor hoặc một nghiệp vụ cốt lõi.",
+      "deepDive": "Lý do thay đổi ở đây liên quan đến Stakeholder/Actor: Nếu kế toán yêu cầu đổi công thức thuế, lập trình viên chỉ sửa TaxCalculator; nếu UI/UX yêu cầu đổi format hiển thị, chỉ sửa View/Formatter. Vi phạm SRP dẫn đến 'God Object/Class', khiến việc kiểm thử đơn vị (Unit Test) khó khăn và rủi ro side-effect lan truyền cao.",
+      "codeExample": "// ❌ Vi phạm SRP:\nclass OrderManager {\n  calculateTotal() {}\n  saveToDatabase() {}\n  sendConfirmationEmail() {}\n}\n\n// ✅ Tuân thủ SRP:\nclass OrderPriceCalculator { calculateTotal() {} }\nclass OrderRepository { save() {} }\nclass OrderNotificationService { sendEmail() {} }"
+    },
+    "pitfalls": [
+      "Chia nhỏ quá mức (Over-engineering): Mỗi class chỉ có đúng 1 hàm 2 dòng dẫn đến vỡ vụn kiến trúc (Anemic domain model)."
+    ],
+    "followUpQuestions": [
+      "Làm sao để biết một class đang có nhiều hơn 1 lý do để thay đổi?"
+    ]
+  },
+  {
+    "id": "dp-002",
+    "category": "design-patterns",
+    "level": "junior",
+    "question": "Open/Closed Principle (OCP) là gì? Cho ví dụ thực tế.",
+    "interviewerIntent": "Kiểm tra kiến thức về Open/Closed Principle (chữ O trong SOLID), khả năng mở rộng chức năng mà không cần sửa đổi mã nguồn đã ổn định.",
+    "contextOrScenario": "Cần thêm phương thức thanh toán mới (Apple Pay, Momo) vào hệ thống checkout đang chạy production.",
+    "expectedKeywords": [
+      "open for extension",
+      "closed for modification",
+      "polymorphism",
+      "interface abstraction",
+      "strategy pattern"
+    ],
+    "seniorAnswer": {
+      "summary": "OCP quy định: 'Các thực thể phần mềm (classes, modules, functions) nên mở cho việc mở rộng (Open for extension) nhưng đóng cho việc sửa đổi (Closed for modification)'.",
+      "deepDive": "Để tuân thủ OCP, ta trừu tượng hóa các hành vi biến đổi thông qua Interface hoặc Abstract Class (thường dùng Strategy hoặc Factory Pattern). Khi có yêu cầu nghiệp vụ mới, ta chỉ cần tạo class mới hiện thực interface đó mà không đụng vào code cũ đã được test kỹ.",
+      "codeExample": "interface PaymentProcessor {\n  pay(amount: number): Promise<void>;\n}\nclass MomoPayment implements PaymentProcessor {\n  async pay(amount: number) {}\n}\nclass ApplePayPayment implements PaymentProcessor {\n  async pay(amount: number) {}\n}"
+    },
+    "pitfalls": [
+      "Tạo interface trừu tượng quá sớm (Premature Abstraction) khi nghiệp vụ chưa có dấu hiệu thay đổi."
+    ],
+    "followUpQuestions": ["Làm thế nào để áp dụng OCP trong React components?"]
+  },
+  {
+    "id": "dp-003",
+    "category": "design-patterns",
+    "level": "junior",
+    "question": "DRY, KISS, YAGNI là gì? Khi nào nên áp dụng và khi nào không?",
+    "interviewerIntent": "Đánh giá tư duy thực dụng (Pragmatic Engineering) và khả năng cân bằng giữa các nguyên lý DRY, KISS, YAGNI.",
+    "contextOrScenario": "Tranh luận trong code review khi một lập trình viên cố gắng trừu tượng hóa một đoạn code mới chỉ lặp lại 2 lần.",
+    "expectedKeywords": [
+      "DRY (Don't Repeat Yourself)",
+      "KISS (Keep It Simple, Stupid)",
+      "YAGNI (You Aren't Gonna Need It)",
+      "rule of three",
+      "premature abstraction"
+    ],
+    "seniorAnswer": {
+      "summary": "DRY: Tránh lặp lại tri thức/logic nghiệp vụ. KISS: Giữ giải pháp đơn giản nhất có thể. YAGNI: Không lập trình cho những tính năng 'có thể tương lai sẽ cần'.",
+      "deepDive": "Sandi Metz có câu châm ngôn kinh điển: 'Duplication is far cheaper than the wrong abstraction' (Lặp code rẻ hơn nhiều so với việc trừu tượng hóa sai). Tuân thủ 'Rule of Three': Chỉ trừu tượng hóa khi logic đó lặp lại từ lần thứ 3 trở lên.",
+      "codeExample": "// Tránh over-engineering theo YAGNI:\n// Không viết dynamic query builder đa năng phức tạp khi chỉ cần 1 câu query cố định."
+    },
+    "pitfalls": [
+      "Áp dụng DRY mù quáng bằng cách gom 2 đoạn code nhìn giống nhau về cú pháp nhưng khác nhau hoàn toàn về mục đích nghiệp vụ (Accidental Duplication)."
+    ],
+    "followUpQuestions": [
+      "Khi nào chấp nhận lặp code (vi phạm DRY) để bảo vệ tính đơn giản (KISS)?"
+    ]
+  },
+  {
+    "id": "dp-004",
+    "category": "design-patterns",
+    "level": "junior",
+    "question": "Tại sao SOLID quan trọng trong phát triển phần mềm thực tế?",
+    "interviewerIntent": "Đánh giá khả năng liên hệ 5 nguyên lý SOLID với chất lượng dự án phần mềm dài hạn.",
+    "contextOrScenario": "Dự án phát triển được 2 năm bắt đầu xuất hiện tình trạng sửa 1 bug lại đẻ ra 3 bug khác ở module khác.",
+    "expectedKeywords": [
+      "maintainability",
+      "testability",
+      "decoupling",
+      "extensibility",
+      "clean architecture"
+    ],
+    "seniorAnswer": {
+      "summary": "SOLID là kim chỉ nam giúp giảm thiểu độ phụ thuộc (Low Coupling), tăng độ kết dính (High Cohesion), giúp code dễ đọc, dễ viết Unit Test và dễ mở rộng khi quy mô team/sản phẩm tăng lên.",
+      "deepDive": "SOLID ngăn chặn sự thoái hóa của kiến trúc (Architectural Decay). Khi thiếu SOLID, hệ thống sẽ rơi vào trạng thái 'Fragile' (dễ vỡ) và 'Rigid' (cứng nhắc, sửa 1 chỗ kéo theo sửa hàng loạt chỗ).",
+      "codeExample": "class UserService {\n  constructor(private userRepo: IUserRepository) {} // DI (chữ D) giúp dễ dàng inject MockRepo khi test\n}"
+    },
+    "pitfalls": [
+      "Áp dụng máy móc cả 5 nguyên lý cho các script ngắn, module dùng 1 lần hoặc MVP."
+    ],
+    "followUpQuestions": [
+      "Trong 5 nguyên lý SOLID, nguyên lý nào thường bị vi phạm nhiều nhất trong JavaScript/TypeScript?"
+    ]
+  },
+  {
+    "id": "dp-005",
+    "category": "design-patterns",
+    "level": "junior",
+    "question": "Bốn trụ cột của lập trình hướng đối tượng (OOP) là gì?",
+    "interviewerIntent": "Kiểm tra kiến thức nền tảng về Lập trình hướng đối tượng (OOP).",
+    "contextOrScenario": "Phỏng vấn kiểm tra kiến thức khoa học máy tính cơ bản.",
+    "expectedKeywords": ["encapsulation", "abstraction", "inheritance", "polymorphism"],
+    "seniorAnswer": {
+      "summary": "4 trụ cột OOP gồm: (1) Encapsulation: Gom dữ liệu và hàm xử lý vào class, che giấu state nội bộ qua private/protected; (2) Abstraction: Chỉ hiển thị interface cần thiết, giấu chi tiết cài đặt; (3) Inheritance: Tái sử dụng thuộc tính/phương thức từ class cha; (4) Polymorphism: Cùng một interface/hàm nhưng các đối tượng con thực thi theo các cách khác nhau.",
+      "deepDive": "Trong JavaScript hiện đại, kế thừa (Inheritance) thường bị hạn chế theo nguyên lý 'Composition over Inheritance' để tránh phân cấp lớp sâu (deep inheritance hierarchies) gây cứng nhắc.",
+      "codeExample": "abstract class Shape {\n  abstract calculateArea(): number; // Abstraction & Polymorphism\n}\nclass Circle extends Shape {\n  constructor(private radius: number) { super(); } // Encapsulation\n  calculateArea() { return Math.PI * this.radius ** 2; }\n}"
+    },
+    "pitfalls": [
+      "Lạm dụng kế thừa nhiều tầng (Deep Inheritance) dẫn đến Fragile Base Class Problem."
+    ],
+    "followUpQuestions": [
+      "Tại sao hiện nay cộng đồng software khuyên dùng Composition over Inheritance?"
+    ]
+  },
+  {
+    "id": "dp-006",
+    "category": "design-patterns",
+    "level": "junior",
+    "question": "Hàm tính phí ship của em có chuỗi if/else theo loại nhà vận chuyển, mỗi lần thêm hãng mới lại phải sửa hàm đó. Em refactor thế nào?",
+    "interviewerIntent": "Đánh giá khả năng nhận diện Code Smell (Long if/else chain) và áp dụng Strategy Pattern để tái cấu trúc.",
+    "contextOrScenario": "Hàm tính phí ship có chuỗi 10 nhánh if/else theo hãng vận chuyển (GHTK, GHN, ViettelPost, J&T).",
+    "expectedKeywords": [
+      "strategy pattern",
+      "open/closed principle",
+      "polymorphism",
+      "replace conditional with polymorphism"
+    ],
+    "seniorAnswer": {
+      "summary": "Refactor bằng **Strategy Pattern**: Tách mỗi hãng vận chuyển thành một class riêng hiện thực chung interface `ShippingCarrierStrategy`, sau đó dùng Map/Factory để chọn strategy tương ứng tại runtime.",
+      "deepDive": "Giải pháp này loại bỏ hoàn toàn chuỗi if/else. Khi có thêm nhà vận chuyển mới, ta chỉ tạo thêm 1 file strategy mới và đăng ký vào Strategy Map, tuân thủ tuyệt đối OCP.",
+      "codeExample": "interface ShippingStrategy {\n  calculate(weight: number): number;\n}\nclass GHNStrategy implements ShippingStrategy {\n  calculate(weight: number) { return weight * 15000; }\n}\nconst shippingStrategies: Record<string, ShippingStrategy> = {\n  ghn: new GHNStrategy(),\n};\nexport function getShippingFee(carrier: string, weight: number) {\n  const strategy = shippingStrategies[carrier];\n  if (!strategy) throw new Error('Unsupported carrier');\n  return strategy.calculate(weight);\n}"
+    },
+    "pitfalls": ["Không tạo fallback/default strategy khi gặp mã carrier không hợp lệ."],
+    "followUpQuestions": [
+      "Nếu logic tính phí ship cần gọi API từ server của đối tác thì Strategy Pattern kết hợp async/await như thế nào?"
+    ]
+  },
+  {
+    "id": "dp-007",
+    "category": "design-patterns",
+    "level": "junior",
+    "question": "Constructor của em có 8 tham số, nhiều cái optional, gọi ra toàn null, null, true. Nên xử lý sao?",
+    "interviewerIntent": "Đánh giá kỹ năng xử lý Code Smell 'Telescoping Constructor / Long Parameter List'.",
+    "contextOrScenario": "Constructor của class có 8 tham số (name, age, email, address, isVip, phone, gender, note) gọi ra toàn null, undefined.",
+    "expectedKeywords": [
+      "builder pattern",
+      "parameter object",
+      "named arguments",
+      "options pattern"
+    ],
+    "seniorAnswer": {
+      "summary": "Có 2 cách xử lý chuẩn: (1) Trong TypeScript/JS: Dùng **Parameter Object (Options Pattern)** với destructuring và default values; (2) Trong OOP cổ điển: Áp dụng **Builder Pattern** với fluent interface (chaining methods).",
+      "deepDive": "Parameter Object là cách thanh thoát và chuẩn nhất trong TypeScript: vừa có Type-safety, vừa tự document tên tham số tại nơi gọi (named arguments), vừa không lo sai thứ tự tham số.",
+      "codeExample": "interface UserProfileOptions {\n  name: string;\n  email: string;\n  age?: number;\n  isVip?: boolean;\n}\nclass UserProfile {\n  constructor(options: UserProfileOptions) {}\n}\n// Gọi gọn gàng:\nnew UserProfile({ name: 'Nam', email: 'nam@test.com', isVip: true });"
+    },
+    "pitfalls": [
+      "Dùng Builder pattern quá phức tạp khi chỉ cần 1 plain interface object trong TypeScript."
+    ],
+    "followUpQuestions": [
+      "Zod schema validation kết hợp với Parameter Object như thế nào để đảm bảo runtime safety?"
+    ]
+  },
+  {
+    "id": "dp-008",
+    "category": "design-patterns",
+    "level": "junior",
+    "question": "Khi đơn hàng chuyển sang trạng thái đã thanh toán, em phải gửi mail, trừ tồn kho, ghi log, đẩy notification. Hàm markPaid càng ngày càng dài. Xử lý sao?",
+    "interviewerIntent": "Đánh giá kỹ năng xử lý God Method và áp dụng Observer / Event-Driven Architecture / Domain Events.",
+    "contextOrScenario": "Hàm markPaid() thực hiện: cập nhật DB, gửi mail, trừ tồn kho kho hàng, ghi audit log, bắn push notification.",
+    "expectedKeywords": [
+      "domain events",
+      "observer pattern",
+      "event emitter",
+      "mediatr",
+      "side-effects decoupling"
+    ],
+    "seniorAnswer": {
+      "summary": "Refactor bằng **Domain Events / Observer Pattern**: Hàm `markPaid()` chỉ tập trung thay đổi trạng thái đơn hàng và phát ra sự kiện `OrderPaidEvent`. Các nghiệp vụ gửi mail, trừ kho, ghi audit log sẽ là các Event Listeners/Handlers độc lập lắng nghe sự kiện này.",
+      "deepDive": "Giải pháp này giúp: (1) Tuân thủ SRP; (2) Nếu một side-effect (như gửi email) bị lỗi hoặc chậm, nó không làm rollback giao dịch thanh toán chính (có thể đẩy vào message queue xử lý async); (3) Dễ dàng bổ sung hành vi mới (như cộng điểm tích lũy) mà không đụng vào `markPaid()`.",
+      "codeExample": "class OrderService {\n  async markPaid(orderId: string) {\n    await this.orderRepo.updateStatus(orderId, 'PAID');\n    eventBus.emit('ORDER_PAID', { orderId, timestamp: Date.now() });\n  }\n}\neventBus.on('ORDER_PAID', sendEmailReceipt);\neventBus.on('ORDER_PAID', deductInventory);\neventBus.on('ORDER_PAID', writeAuditLog);"
+    },
+    "pitfalls": [
+      "Không xử lý tính phân tán của giao dịch (Distributed Transaction): Trừ kho lỗi sau khi đã thanh toán thành công."
+    ],
+    "followUpQuestions": [
+      "Nếu trừ tồn kho thất bại sau khi nhận event ORDER_PAID thì xử lý rollback thế nào (Saga Pattern)?"
+    ]
+  },
+  {
+    "id": "dp-009",
+    "category": "design-patterns",
+    "level": "junior",
+    "question": "Team em gọi SDK của một cổng thanh toán rải rác khắp code. Sau này đổi cổng thì sửa rất nhiều chỗ. Nên bọc lại thế nào?",
+    "interviewerIntent": "Đánh giá kiến thức về Adapter Pattern trong việc che giấu thư viện bên thứ ba (Third-party SDK).",
+    "contextOrScenario": "Codebase gọi trực tiếp Stripe SDK rải rác ở 20 file khác nhau, nay công ty muốn chuyển sang VNPay hoặc tích hợp song song cả hai.",
+    "expectedKeywords": [
+      "adapter pattern",
+      "vendor lock-in",
+      "abstraction layer",
+      "anti-corruption layer (acl)"
+    ],
+    "seniorAnswer": {
+      "summary": "Áp dụng **Adapter Pattern (kết hợp Anti-Corruption Layer)**: Định nghĩa interface thanh toán nội bộ thống nhất (`IPaymentGateway`), sau đó tạo các Adapter (`StripePaymentAdapter`, `VNPayPaymentAdapter`) bọc SDK ngoài vào chuẩn interface nội bộ.",
+      "deepDive": "Toàn bộ business logic của ứng dụng chỉ phụ thuộc vào `IPaymentGateway`. Khi thay đổi nhà cung cấp hoặc đổi version SDK, ta chỉ cần chỉnh sửa hoặc viết mới 1 file Adapter duy nhất. Điều này bảo vệ codebase khỏi vendor lock-in.",
+      "codeExample": "interface IPaymentGateway {\n  charge(amount: number, token: string): Promise<PaymentResult>;\n}\nclass StripeAdapter implements IPaymentGateway {\n  constructor(private stripeSdk: Stripe) {}\n  async charge(amount: number, token: string) {\n    const res = await this.stripeSdk.charges.create({ amount, source: token });\n    return { success: res.status === 'succeeded', transactionId: res.id };\n  }\n}"
+    },
+    "pitfalls": [
+      "Để lộ các kiểu dữ liệu (Types/DTOs) đặc thù của SDK bên thứ ba vào interface nội bộ."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để viết Mock Adapter hỗ trợ kiểm thử tự động (Unit Test) mà không cần gọi API thật của ngân hàng?"
+    ]
+  },
+  {
+    "id": "dp-010",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Liskov Substitution Principle (LSP) là gì? Khi nào bị vi phạm?",
+    "interviewerIntent": "Kiểm tra kiến thức về Liskov Substitution Principle (chữ L trong SOLID) và các trường hợp vi phạm thực tế.",
+    "contextOrScenario": "Bài toán kinh điển Rectangle - Square hoặc class con ném UnsupportedOperationException.",
+    "expectedKeywords": [
+      "liskov substitution principle (lsp)",
+      "subtyping",
+      "behavioral subtyping",
+      "square rectangle problem",
+      "design by contract"
+    ],
+    "seniorAnswer": {
+      "summary": "LSP quy định: 'Các đối tượng của lớp con phải có khả năng thay thế lớp cha mà không làm thay đổi tính đúng đắn của chương trình'. Vi phạm xảy ra khi class con làm hẹp điều kiện đầu ra, nới lỏng điều kiện đầu vào, hoặc ném exception ở phương thức của class cha.",
+      "deepDive": "Ví dụ kinh điển: Class `Square` kế thừa `Rectangle`. Khi gán `setWidth(5)` và `setHeight(4)`, diện tích hình chữ nhật là 20 nhưng Square ép cả 2 cạnh thành 4 (diện tích = 16), phá vỡ kỳ vọng của caller. Vi phạm thứ hai là Override hàm nhưng ném lỗi `throw new Error('Not implemented')`.",
+      "codeExample": "class ReadOnlyRepository extends BaseRepository {\n  save(data: any) {\n    throw new Error('Read-only: cannot save!'); // ❌ Phá vỡ hợp đồng của lớp cha\n  }\n}"
+    },
+    "pitfalls": [
+      "Cố tình dùng kế thừa chỉ để tái sử dụng một vài hàm của class cha nhưng lại vô hiệu hóa các hàm còn lại."
+    ],
+    "followUpQuestions": [
+      "ISP (Interface Segregation) giúp giải quyết vi phạm LSP như thế nào?"
+    ]
+  },
+  {
+    "id": "dp-011",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Interface Segregation Principle (ISP) là gì? Ví dụ trong TypeScript?",
+    "interviewerIntent": "Đánh giá hiểu biết về chữ I trong SOLID, tránh tạo Fat Interface ép class implement những hàm không cần thiết.",
+    "contextOrScenario": "Xây dựng repository hoặc component UI dùng chung interface quá lớn.",
+    "expectedKeywords": [
+      "interface segregation",
+      "fat interface",
+      "role interface",
+      "client specific interfaces"
+    ],
+    "seniorAnswer": {
+      "summary": "ISP quy định: 'Client không nên bị ép buộc phụ thuộc vào các interface mà nó không sử dụng'. Thay vì tạo 1 interface khổng lồ, nên chia thành nhiều interface nhỏ, chuyên biệt theo vai trò.",
+      "deepDive": "Trong TypeScript, ta có thể dùng Intersection Types (`&`) để gộp các interface nhỏ lại khi cần. Ví dụ: Tách `IWorker` thành `IWorkable` và `IEatable`, thay vì ép cả robot lẫn người phải implement hàm `eat()`.",
+      "codeExample": "interface Reader<T> { read(id: string): T; }\ninterface Writer<T> { write(data: T): void; }\n// Client chỉ cần đọc thì chỉ phụ thuộc Reader\nfunction display(repo: Reader<User>) { repo.read('1'); }"
+    },
+    "pitfalls": [
+      "Tạo quá nhiều interface mỗi cái chỉ có 1 method gây phân mảnh không cần thiết."
+    ],
+    "followUpQuestions": ["Làm thế nào để áp dụng ISP cho React component props?"]
+  },
+  {
+    "id": "dp-012",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Dependency Inversion Principle (DIP) là gì? Liên quan gì đến Dependency Injection?",
+    "interviewerIntent": "Phân biệt giữa Nguyên lý đảo ngược phụ thuộc (DIP - Principle) và Kỹ thuật tiêm phụ thuộc (DI - Technique/Pattern).",
+    "contextOrScenario": "Service tầng cao phụ thuộc cứng vào tầng thấp (như SQL client) khiến không thể test hoặc đổi database.",
+    "expectedKeywords": [
+      "dependency inversion principle",
+      "high level modules",
+      "low level modules",
+      "abstractions",
+      "dependency injection"
+    ],
+    "seniorAnswer": {
+      "summary": "DIP là nguyên lý kiến trúc: 'Module cấp cao không nên phụ thuộc vào module cấp thấp; cả hai nên phụ thuộc vào abstractions'. Dependency Injection (DI) là kỹ thuật hiện thực hóa DIP bằng cách đưa (inject) dependency từ bên ngoài vào thay vì tự `new` bên trong.",
+      "deepDive": "Khi áp dụng DIP, luồng phụ thuộc mã nguồn (Source code dependency) đảo ngược so với luồng điều khiển thực thi (Control flow). Module cấp cao sở hữu interface trừu tượng, module cấp thấp hiện thực interface đó.",
+      "codeExample": "// Module cấp cao sở hữu Interface\ninterface INotificationSender { send(msg: string): Promise<void>; }\nclass OrderService {\n  constructor(private sender: INotificationSender) {} // DI qua constructor\n}"
+    },
+    "pitfalls": [
+      "Tưởng rằng DIP và DI là một (DIP là nguyên lý, DI là công cụ thực thi)."
+    ],
+    "followUpQuestions": [
+      "Inversion of Control (IoC) Container hoạt động như thế nào trong NestJS?"
+    ]
+  },
+  {
+    "id": "dp-013",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Làm thế nào để áp dụng SOLID trong dự án Next.js/React thực tế?",
+    "interviewerIntent": "Khảo sát khả năng chuyển dịch tư duy SOLID từ OOP truyền thống sang Functional Programming và Component-Driven Development trong React.",
+    "contextOrScenario": "Refactor component 800 dòng trong Next.js App Router.",
+    "expectedKeywords": [
+      "solid in react",
+      "single responsibility components",
+      "custom hooks",
+      "composition over inheritance",
+      "dependency injection via context"
+    ],
+    "seniorAnswer": {
+      "summary": "Áp dụng SOLID trong React: (S) Component chỉ làm 1 việc (UI riêng, data fetching riêng qua Custom Hooks); (O) Mở rộng component qua Composition / Children / Render props; (L) Custom component thay thế được thẻ HTML gốc; (I) Chỉ truyền props tối thiểu cần thiết; (D) Inject phụ thuộc qua React Context hoặc Custom Hooks.",
+      "deepDive": "Thay vì viết Server Action trực tiếp lẫn lộn logic DB trong UI component, tách thành Data Access Layer (DAL) và Service Class được inject vào Server Action để dễ dàng test độc lập.",
+      "codeExample": "// SRP trong React:\nfunction UserProfileContainer() {\n  const { user, loading } = useUser(); // S: Tách data logic\n  return <UserProfileView user={user} isLoading={loading} />; // S: Pure UI\n}"
+    },
+    "pitfalls": [
+      "Đưa nguyên xi class OOP phức tạp vào React function component làm mất tính thanh thoát."
+    ],
+    "followUpQuestions": [
+      "Custom Hook có thể xem là hiện thực hóa của nguyên lý nào trong SOLID?"
+    ]
+  },
+  {
+    "id": "dp-014",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Singleton pattern là gì? Vấn đề của nó trong môi trường hiện đại?",
+    "interviewerIntent": "Đánh giá hiểu biết về Singleton, lý do nó hay bị coi là Anti-Pattern trong môi trường concurrency và unit test.",
+    "contextOrScenario": "Quản trị Database Connection Pool hoặc Cache Instance toàn cục.",
+    "expectedKeywords": [
+      "singleton pattern",
+      "single instance",
+      "global state",
+      "anti-pattern",
+      "unit test isolation",
+      "module caching"
+    ],
+    "seniorAnswer": {
+      "summary": "Singleton đảm bảo một class chỉ có duy nhất một instance trong toàn bộ ứng dụng và cung cấp một điểm truy cập toàn cục tới instance đó. Trong môi trường hiện đại (Node.js/ESM), module export mặc định đã là cached instance (Module Singleton).",
+      "deepDive": "Vấn đề của Singleton: (1) Tạo Global State ẩn giấu; (2) Phá vỡ tính độc lập của Unit Test (state bị rò rỉ giữa các test case); (3) Gây nghẽn (bottleneck) trong môi trường đa luồng/concurrency; (4) Khó khăn khi cần mở rộng thành multi-tenant.",
+      "codeExample": "class DatabaseConnection {\n  private static instance: DatabaseConnection;\n  private constructor() {}\n  public static getInstance(): DatabaseConnection {\n    if (!DatabaseConnection.instance) {\n      DatabaseConnection.instance = new DatabaseConnection();\n    }\n    return DatabaseConnection.instance;\n  }\n}"
+    },
+    "pitfalls": [
+      "Trong môi trường Serverless (AWS Lambda), Singleton không chia sẻ được giữa các container độc lập."
+    ],
+    "followUpQuestions": [
+      "Node.js module cache có thay thế hoàn toàn Singleton class không?"
+    ]
+  },
+  {
+    "id": "dp-015",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Factory Method pattern là gì? Khác gì Simple Factory?",
+    "interviewerIntent": "Phân biệt giữa Simple Factory (idiom lập trình) và Factory Method (GoF design pattern chuẩn có kế thừa).",
+    "contextOrScenario": "Hệ thống xuất báo cáo (PDF, Excel, CSV) theo yêu cầu người dùng.",
+    "expectedKeywords": [
+      "factory method",
+      "simple factory",
+      "polymorphism",
+      "creator class",
+      "subclass instantiation"
+    ],
+    "seniorAnswer": {
+      "summary": "Simple Factory là 1 class duy nhất có hàm nhận tham số và trả về object tương ứng qua switch/case. Factory Method định nghĩa một method trừu tượng trong class cha, nhường quyền quyết định khởi tạo instance cụ thể cho các class con.",
+      "deepDive": "Factory Method tuân thủ OCP: Khi có sản phẩm mới, ta tạo class con mới kế thừa Creator mà không sửa đổi class Creator cũ. Simple Factory vi phạm OCP vì mỗi lần thêm sản phẩm phải vào sửa switch/case.",
+      "codeExample": "abstract class ReportGenerator {\n  abstract createDocument(): Document; // Factory Method\n  generate() {\n    const doc = this.createDocument();\n    doc.export();\n  }\n}\nclass PdfReportGenerator extends ReportGenerator {\n  createDocument() { return new PdfDocument(); }\n}"
+    },
+    "pitfalls": ["Gọi nhầm bất kỳ hàm nào trả về object là Factory Method."],
+    "followUpQuestions": [
+      "Khi nào dùng Simple Factory là đủ mà không cần Factory Method?"
+    ]
+  },
+  {
+    "id": "dp-016",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Abstract Factory pattern là gì? Khi nào nên dùng thay Factory Method?",
+    "interviewerIntent": "Kiểm tra khả năng thiết kế hệ thống sản xuất họ đối tượng có liên quan (families of related products).",
+    "contextOrScenario": "Xây dựng Design System hỗ trợ đa nền tảng (Material Design vs Cupertino cho iOS).",
+    "expectedKeywords": [
+      "abstract factory",
+      "families of related products",
+      "cross platform ui",
+      "factory of factories"
+    ],
+    "seniorAnswer": {
+      "summary": "Abstract Factory cung cấp một interface để tạo ra một họ các đối tượng có quan hệ phụ thuộc nhau (ví dụ: Button, Checkbox, Dialog) mà không cần chỉ định class cụ thể. Dùng khi hệ thống cần hỗ trợ nhiều biến thể giao diện hoặc môi trường.",
+      "deepDive": "Factory Method chỉ tạo ra 1 sản phẩm; Abstract Factory tạo ra cả 1 hệ sinh thái sản phẩm tương thích với nhau (ví dụ: WindowsFactory sinh ra WindowsButton + WindowsScrollbar, MacFactory sinh ra MacButton + MacScrollbar).",
+      "codeExample": "interface GUIFactory {\n  createButton(): Button;\n  createCheckbox(): Checkbox;\n}\nclass MacFactory implements GUIFactory {\n  createButton() { return new MacButton(); }\n  createCheckbox() { return new MacCheckbox(); }\n}"
+    },
+    "pitfalls": [
+      "Dùng Abstract Factory khi chỉ có 1 loại sản phẩm duy nhất gây lãng phí trừu tượng."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để thêm 1 sản phẩm mới vào Abstract Factory mà không phá vỡ các Factory hiện có?"
+    ]
+  },
+  {
+    "id": "dp-017",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Builder pattern là gì? Ưu điểm so với constructor có nhiều tham số?",
+    "interviewerIntent": "Đánh giá kỹ năng xây dựng đối tượng phức tạp từng bước (Step-by-step construction).",
+    "contextOrScenario": "Xây dựng SQL Query Builder hoặc cấu hình HTTP Request phức tạp.",
+    "expectedKeywords": [
+      "builder pattern",
+      "fluent interface",
+      "method chaining",
+      "immutable objects",
+      "telescoping constructor"
+    ],
+    "seniorAnswer": {
+      "summary": "Builder tách rời quá trình khởi dựng một đối tượng phức tạp khỏi biểu diễn của nó, cho phép cùng một tiến trình xây dựng có thể tạo ra các biểu diễn khác nhau. Ưu điểm: Code dễ đọc, tránh lỗi truyền sai thứ tự tham số, hỗ trợ method chaining mượt mà.",
+      "deepDive": "Builder pattern cho phép kiểm tra tính hợp lệ (Validation) tại bước `.build()`, đảm bảo đối tượng sau khi sinh ra luôn ở trạng thái hoàn chỉnh và bất biến (Immutable).",
+      "codeExample": "class QueryBuilder {\n  private query = { where: [] as string[] };\n  select(fields: string[]) { return this; }\n  where(condition: string) { this.query.where.push(condition); return this; }\n  build() { return 'SELECT ...'; }\n}"
+    },
+    "pitfalls": [
+      "Quên gọi phương thức kết thúc `.build()`, làm việc với đối tượng Builder dở dang."
+    ],
+    "followUpQuestions": ["Director class trong Builder pattern đóng vai trò gì?"]
+  },
+  {
+    "id": "dp-018",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Prototype pattern là gì? Khi nào dùng trong JavaScript/TypeScript?",
+    "interviewerIntent": "Kiểm tra hiểu biết về sao chép đối tượng (Object Cloning) và cơ chế Prototypal Inheritance của JavaScript.",
+    "contextOrScenario": "Khởi tạo đối tượng đồ họa trong game hoặc clone một cấu hình phức tạp tiêu tốn CPU/RAM.",
+    "expectedKeywords": [
+      "prototype pattern",
+      "cloning",
+      "shallow copy vs deep copy",
+      "structuredClone",
+      "prototypal inheritance"
+    ],
+    "seniorAnswer": {
+      "summary": "Prototype cho phép sao chép (clone) các đối tượng đang tồn tại mà không làm cho mã nguồn bị phụ thuộc vào các class cụ thể của chúng. Dùng khi chi phí khởi tạo đối tượng mới (I/O, database, CPU) đắt đỏ hơn việc clone từ một instance mẫu.",
+      "deepDive": "Bản thân JavaScript xây dựng trên cơ chế Prototypal: `Object.create(proto)` kế thừa trực tiếp từ đối tượng mẫu. Khi clone đối tượng có lồng nhau, cần phân biệt Shallow Copy (spread operator) và Deep Copy (`structuredClone`).",
+      "codeExample": "class Cell {\n  constructor(public dna: string) {}\n  clone(): Cell {\n    return new Cell(this.dna);\n  }\n}"
+    },
+    "pitfalls": [
+      "Dùng `JSON.parse(JSON.stringify(obj))` để clone làm mất hàm, Date object, undefined và Symbol."
+    ],
+    "followUpQuestions": [
+      "`structuredClone()` trong JavaScript hiện đại có ưu điểm gì so với các thư viện clone cũ?"
+    ]
+  },
+  {
+    "id": "dp-019",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Object Pool pattern là gì? Ứng dụng thực tế trong Node.js/Go?",
+    "interviewerIntent": "Khảo sát kỹ năng tối ưu tài nguyên phần cứng (Memory/GC optimization) trong hệ thống high-throughput.",
+    "contextOrScenario": "Quản lý Database Connections, Worker Threads, hoặc Buffer xử lý video/âm thanh.",
+    "expectedKeywords": [
+      "object pool",
+      "garbage collection pressure",
+      "database connection pool",
+      "reuse objects",
+      "high throughput"
+    ],
+    "seniorAnswer": {
+      "summary": "Object Pool duy trì một tập hợp các đối tượng đã được khởi tạo sẵn (pool) để tái sử dụng thay vì liên tục cấp phát (allocate) và giải phóng (GC), giúp giảm áp lực Garbage Collector và tiết kiệm thời gian mở kết nối mạng.",
+      "deepDive": "Ứng dụng kinh điển: `pg-pool` trong Node.js, `sync.Pool` trong Go. Khi cần, client mượn (acquire/borrow) từ pool; dùng xong phải trả (release) về pool để đối tượng khác tái sử dụng.",
+      "codeExample": "class ConnectionPool {\n  private available: Connection[] = [];\n  acquire(): Connection { return this.available.pop() ?? new Connection(); }\n  release(conn: Connection) { this.available.push(conn); }\n}"
+    },
+    "pitfalls": [
+      "Quên trả đối tượng về pool (pool leakage), dẫn đến cạn kiệt tài nguyên và treo toàn bộ server."
+    ],
+    "followUpQuestions": ["`sync.Pool` trong Go khác gì so với connection pool tự viết?"]
+  },
+  {
+    "id": "dp-020",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Dependency Injection (DI) là gì? Các loại DI và framework hỗ trợ?",
+    "interviewerIntent": "Kiểm tra toàn diện về DI, Inversion of Control, và khả năng sử dụng các framework doanh nghiệp.",
+    "contextOrScenario": "Thiết kế kiến trúc ứng dụng với NestJS hoặc Angular.",
+    "expectedKeywords": [
+      "dependency injection",
+      "inversion of control (ioc)",
+      "constructor injection",
+      "property injection",
+      "nestjs",
+      "tsyringe"
+    ],
+    "seniorAnswer": {
+      "summary": "DI là một design pattern trong đó một đối tượng nhận các phụ thuộc của nó từ bên ngoài thay vì tự tạo ra chúng. Có 3 loại DI chính: (1) Constructor Injection (khuyên dùng nhất); (2) Setter/Property Injection; (3) Interface/Method Injection.",
+      "deepDive": "DI Container (như trong NestJS, InversifyJS, Angular) sử dụng Reflection và Metadata Decorators (`reflect-metadata`) để tự động phân tích cây phụ thuộc, khởi tạo Singleton/Transient instance và inject vào class khi khởi động.",
+      "codeExample": "@Injectable()\nexport class OrderService {\n  constructor(private readonly paymentService: PaymentService) {} // Constructor Injection trong NestJS\n}"
+    },
+    "pitfalls": [
+      "Circular Dependency (Phụ thuộc vòng tròn: A cần B, B cần A) làm sập quá trình khởi động IoC Container."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để xử lý Circular Dependency trong NestJS bằng `forwardRef()`?"
+    ]
+  },
+  {
+    "id": "dp-021",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Khi nào nên dùng Creational patterns? Cách chọn pattern phù hợp?",
+    "interviewerIntent": "Tổng kết tư duy lựa chọn nhóm Creational Patterns (Factory, Builder, Singleton, Prototype, Pool).",
+    "contextOrScenario": "Quyết định kiến trúc khởi tạo đối tượng trong dự án mới.",
+    "expectedKeywords": [
+      "creational patterns selection",
+      "factory vs builder",
+      "singleton vs dependency injection"
+    ],
+    "seniorAnswer": {
+      "summary": "Dùng Creational patterns khi logic khởi tạo đối tượng trở nên phức tạp, phụ thuộc vào cấu hình runtime, hoặc cần tối ưu hiệu năng. Tiêu chí chọn: Singleton cho quản lý tài nguyên duy nhất; Factory cho tạo 1 đối tượng linh hoạt; Abstract Factory cho họ đối tượng; Builder cho đối tượng nhiều thuộc tính; Prototype cho clone tiết kiệm CPU; Object Pool cho tái sử dụng tài nguyên đắt.",
+      "deepDive": "Quy tắc ngón tay cái: Bắt đầu đơn giản với Factory Method hoặc Parameter Object. Chỉ nâng cấp lên Abstract Factory hoặc Builder khi số lượng biến thể và thuộc tính tăng vượt tầm kiểm soát.",
+      "codeExample": "// Ma trận lựa chọn: 1 object nhiều biến thể -> Factory. Nhiều tham số -> Builder. Tái sử dụng -> Pool."
+    },
+    "pitfalls": [
+      "Áp dụng tất cả creational patterns ngay từ đầu khi ứng dụng chưa có độ phức tạp (Over-design)."
+    ],
+    "followUpQuestions": [
+      "Creational patterns ảnh hưởng thế nào đến khả năng viết Unit Test?"
+    ]
+  },
+  {
+    "id": "dp-022",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Adapter pattern là gì? Ví dụ thực tế trong TypeScript?",
+    "interviewerIntent": "Kiểm tra kỹ năng chuyển đổi interface không tương thích thành interface tương thích.",
+    "contextOrScenario": "Tích hợp thư viện Logger của bên thứ 3 (như Winston) vào chuẩn `ILogger` của công ty.",
+    "expectedKeywords": [
+      "adapter pattern",
+      "wrapper",
+      "incompatible interfaces",
+      "legacy integration"
+    ],
+    "seniorAnswer": {
+      "summary": "Adapter đóng vai trò cầu nối chuyển đổi interface của một class thành một interface khác mà client kỳ vọng, cho phép các class có interface không tương thích có thể làm việc cùng nhau.",
+      "deepDive": "Có 2 dạng: Class Adapter (dùng đa kế thừa) và Object Adapter (dùng composition - khuyên dùng). Trong TypeScript, Object Adapter bọc instance của adaptee bên trong và chuyển tiếp các lời gọi hàm.",
+      "codeExample": "interface AppLogger { log(message: string): void; }\nclass ThirdPartyLogger { writeLog(level: number, text: string) {} }\nclass LoggerAdapter implements AppLogger {\n  constructor(private adaptee: ThirdPartyLogger) {}\n  log(message: string) { this.adaptee.writeLog(1, message); }\n}"
+    },
+    "pitfalls": [
+      "Cố nhồi thêm logic nghiệp vụ mới vào Adapter thay vì chỉ làm nhiệm vụ dịch interface."
+    ],
+    "followUpQuestions": ["Adapter khác Proxy và Facade ở điểm mấu chốt nào?"]
+  },
+  {
+    "id": "dp-023",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Bridge pattern là gì? Khác gì Adapter?",
+    "interviewerIntent": "Phân biệt giữa Bridge (thiết kế ngay từ đầu để tách rời Abstraction và Implementation) và Adapter (chữa cháy khi 2 interface đã có sẵn không khớp).",
+    "contextOrScenario": "Thiết kế hệ thống giao diện điều khiển (Remote Control) độc lập với thiết bị (TV, Radio, Quạt).",
+    "expectedKeywords": [
+      "bridge pattern",
+      "abstraction and implementation",
+      "orthogonal dimensions",
+      "two dimensional inheritance"
+    ],
+    "seniorAnswer": {
+      "summary": "Bridge tách một trừu tượng (Abstraction) khỏi hiện thực (Implementation) của nó để cả hai có thể biến đổi độc lập. Khác biệt cốt lõi: Adapter kết nối các module ĐÃ TỒN TẠI không tương thích; Bridge được thiết kế NGAY TỪ ĐẦU để chống bùng nổ phân cấp lớp (combinatorial explosion).",
+      "deepDive": "Nếu có $N$ loại Remote và $M$ loại Device, kế thừa thông thường sẽ cần $N \\times M$ classes. Dùng Bridge, ta chỉ cần $N + M$ classes bằng cách inject `Device` vào trong `RemoteControl`.",
+      "codeExample": "interface Device { turnOn(): void; }\nclass TV implements Device { turnOn() {} }\nclass RemoteControl {\n  constructor(protected device: Device) {}\n  togglePower() { this.device.turnOn(); }\n}"
+    },
+    "pitfalls": [
+      "Áp dụng Bridge cho bài toán chỉ có 1 chiều biến đổi duy nhất làm tăng độ phức tạp không đáng có."
+    ],
+    "followUpQuestions": [
+      "Khi nào nên refactor từ kế thừa nhiều tầng sang Bridge pattern?"
+    ]
+  },
+  {
+    "id": "dp-024",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Composite pattern là gì? Khi nào dùng?",
+    "interviewerIntent": "Kiểm tra kỹ năng biểu diễn cấu trúc cây phân cấp (Tree structures) và xử lý đồng nhất giữa phần tử lá và phần tử nhánh.",
+    "contextOrScenario": "Thiết kế cấu trúc thư mục file/folder, menu đa cấp hoặc DOM/UI tree.",
+    "expectedKeywords": [
+      "composite pattern",
+      "tree structure",
+      "leaf and composite",
+      "recursive composition",
+      "uniform treatment"
+    ],
+    "seniorAnswer": {
+      "summary": "Composite cho phép nhóm các đối tượng thành cấu trúc cây để đại diện cho hệ thống phân cấp một phần - toàn bộ. Pattern này cho phép client xử lý các đối tượng đơn lẻ (Leaf) và các nhóm đối tượng (Composite) theo cùng một cách.",
+      "deepDive": "Cả `File` (Leaf) và `Folder` (Composite) đều kế thừa interface `FileSystemItem` có hàm `getSize()`. Khi gọi `folder.getSize()`, nó tự đệ quy tính tổng kích thước các phần tử con bên trong một cách trong suốt đối với caller.",
+      "codeExample": "interface Component { render(): string; }\nclass Leaf implements Component { render() { return 'Leaf'; } }\nclass Composite implements Component {\n  private children: Component[] = [];\n  add(c: Component) { this.children.push(c); }\n  render() { return this.children.map(c => c.render()).join(''); }\n}"
+    },
+    "pitfalls": [
+      "Vòng lặp vô tận (Infinite recursion) khi một node con vô tình chứa tham chiếu ngược lại node cha."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để implement thao tác duyệt cây (Tree Traversal) trong Composite pattern?"
+    ]
+  },
+  {
+    "id": "dp-025",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Decorator pattern là gì? Khác gì Inheritance? Ví dụ trong TypeScript?",
+    "interviewerIntent": "Đánh giá hiểu biết về mở rộng tính năng động tại runtime (Open/Closed Principle) mà không dùng kế thừa tĩnh.",
+    "contextOrScenario": "Thêm tính năng ghi log, nén dữ liệu (compression) và mã hóa (encryption) cho File Stream.",
+    "expectedKeywords": [
+      "decorator pattern",
+      "dynamic extension",
+      "composition over inheritance",
+      "wrapper",
+      "typescript decorators"
+    ],
+    "seniorAnswer": {
+      "summary": "Decorator cho phép gắn thêm các hành vi mới vào một đối tượng cụ thể tại runtime bằng cách đặt đối tượng đó vào trong một wrapper object đặc biệt. Khác kế thừa: Kế thừa là tĩnh lúc compile-time và áp dụng cho toàn bộ class; Decorator là động lúc runtime và chỉ áp dụng cho instance cụ thể.",
+      "deepDive": "Decorator kế thừa cùng interface với đối tượng được bọc, nhận đối tượng đó qua constructor và ủy quyền (delegate) công việc kèm bổ sung hành vi trước/sau lời gọi.",
+      "codeExample": "interface Notifier { send(msg: string): void; }\nclass BaseNotifier implements Notifier { send(msg: string) {} }\nclass SmsDecorator implements Notifier {\n  constructor(private wrappee: Notifier) {}\n  send(msg: string) { this.wrappee.send(msg); this.sendSms(msg); }\n  private sendSms(msg: string) {}\n}"
+    },
+    "pitfalls": [
+      "Lạm dụng quá nhiều lớp decorator lồng nhau làm việc debug stack trace trở nên khó khăn."
+    ],
+    "followUpQuestions": [
+      "TypeScript Method Decorator (`@Log()`) khác gì với GoF Decorator Pattern?"
+    ]
+  },
+  {
+    "id": "dp-026",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Facade pattern là gì? Ứng dụng trong frontend development?",
+    "interviewerIntent": "Kiểm tra khả năng đơn giản hóa interface phức tạp của subsystem cho client sử dụng dễ dàng.",
+    "contextOrScenario": "Tạo API client module che giấu fetch, parse token, refresh token, format headers và retry logic.",
+    "expectedKeywords": [
+      "facade pattern",
+      "simplified interface",
+      "subsystem complexity",
+      "api client",
+      "high level interface"
+    ],
+    "seniorAnswer": {
+      "summary": "Facade cung cấp một giao diện đơn giản hóa cho một hệ thống con (subsystem) phức tạp bao gồm nhiều class, thư viện hoặc bước xử lý. Trong frontend, Facade cực kỳ phổ biến để che giấu các quy trình phức tạp (như Web Audio API, Audio/Video player, hoặc API client).",
+      "deepDive": "Facade không che giấu hoàn toàn hệ thống con (nếu client muốn, họ vẫn có thể truy cập trực tiếp class bên dưới), nó chỉ cung cấp đường tắt tiện lợi (shortcut) cho 90% use case phổ biến nhất.",
+      "codeExample": "class ApiClientFacade {\n  async getProducts() {\n    const token = await auth.getToken();\n    const raw = await http.get('/products', { headers: { Authorization: token } });\n    return parseProductDto(raw);\n  }\n}"
+    },
+    "pitfalls": [
+      "Biến Facade thành God Object biết tuốt và ôm đồm quá nhiều logic nghiệp vụ."
+    ],
+    "followUpQuestions": ["Facade khác Adapter ở điểm nào khi cả hai đều là wrapper?"]
+  },
+  {
+    "id": "dp-027",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Proxy pattern là gì? Các loại Proxy phổ biến?",
+    "interviewerIntent": "Đánh giá hiểu biết về việc can thiệp kiểm soát truy cập đối tượng thông qua đại diện (surrogate).",
+    "contextOrScenario": "Thực hiện Lazy Loading hình ảnh, Caching kết quả hàm, hoặc kiểm tra phân quyền truy cập.",
+    "expectedKeywords": [
+      "proxy pattern",
+      "virtual proxy",
+      "protection proxy",
+      "caching proxy",
+      "javascript proxy api"
+    ],
+    "seniorAnswer": {
+      "summary": "Proxy cung cấp một đối tượng đại diện để kiểm soát quyền truy cập tới một đối tượng khác, cho phép thực hiện hành động trước hoặc sau khi yêu cầu được chuyển tiếp tới đối tượng thực sự. Các loại phổ biến: Virtual Proxy (Lazy Loading), Protection Proxy (Auth check), Caching Proxy, Remote Proxy.",
+      "deepDive": "JavaScript có sẵn `Proxy` API cho phép bắt và can thiệp (trap) các thao tác cơ bản trên object (như `get`, `set`, `has`), là nền tảng của các hệ thống Reactive như Vue 3 Reactivity.",
+      "codeExample": "const expensiveService = new HeavyService();\nconst cachedProxy = {\n  cache: new Map(),\n  getData(id: string) {\n    if (!this.cache.has(id)) this.cache.set(id, expensiveService.getData(id));\n    return this.cache.get(id);\n  }\n};"
+    },
+    "pitfalls": [
+      "Proxy làm sai lệch con trỏ `this` của đối tượng gốc nếu không bind cẩn thận."
+    ],
+    "followUpQuestions": [
+      "Vue 3 sử dụng JavaScript Proxy để theo dõi thay đổi dữ liệu (Reactivity) như thế nào?"
+    ]
+  },
+  {
+    "id": "dp-028",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Flyweight pattern là gì? Khi nào nên dùng?",
+    "interviewerIntent": "Kiểm tra kỹ năng tối ưu bộ nhớ RAM khi phải render hoặc xử lý hàng chục nghìn đối tượng tương tự nhau.",
+    "contextOrScenario": "Render rừng cây 100,000 cây trong game 3D hoặc hiển thị văn bản trong Text Editor.",
+    "expectedKeywords": [
+      "flyweight pattern",
+      "intrinsic state",
+      "extrinsic state",
+      "memory optimization",
+      "shared state"
+    ],
+    "seniorAnswer": {
+      "summary": "Flyweight chia trạng thái của đối tượng thành 2 phần: (1) Intrinsic State (bất biến, dùng chung giữa mọi đối tượng - ví dụ: màu sắc, texture 3D); (2) Extrinsic State (biến đổi theo ngữ cảnh - ví dụ: tọa độ X, Y). Nhờ đó gom hàng nghìn object thành 1 instance chia sẻ.",
+      "deepDive": "Dùng khi ứng dụng tiêu tốn quá nhiều RAM do tạo quá nhiều đối tượng tương tự nhau. Bằng cách tách dữ liệu dùng chung ra Flyweight Factory, ứng dụng giảm được 80–90% dung lượng heap memory.",
+      "codeExample": "class TreeType { constructor(public name: string, public texture: string) {} } // Flyweight\nclass Tree { constructor(public x: number, public y: number, public type: TreeType) {} }"
+    },
+    "pitfalls": [
+      "Tách nhầm Extrinsic state vào Flyweight khiến các đối tượng bị ghi đè dữ liệu lẫn nhau."
+    ],
+    "followUpQuestions": [
+      "Trình duyệt web áp dụng Flyweight pattern như thế nào trong việc quản lý Font chữ và Style?"
+    ]
+  },
+  {
+    "id": "dp-029",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Khi nào nên dùng Structural patterns? Cách chọn đúng?",
+    "interviewerIntent": "Tổng kết tư duy lựa chọn nhóm Structural Patterns (Adapter, Bridge, Composite, Decorator, Facade, Proxy, Flyweight).",
+    "contextOrScenario": "Tổ chức cấu trúc liên kết giữa các class và module trong dự án lớn.",
+    "expectedKeywords": [
+      "structural patterns selection",
+      "wrapper patterns comparison",
+      "coupling and cohesion"
+    ],
+    "seniorAnswer": {
+      "summary": "Structural patterns tập trung vào cách ghép nối các class và đối tượng thành cấu trúc lớn hơn nhưng vẫn giữ được tính linh hoạt: Adapter khi cần khớp interface; Facade khi cần đơn giản hóa subsystem; Decorator khi cần thêm tính năng động; Proxy khi cần kiểm soát truy cập; Composite khi xử lý cây; Bridge khi có 2 chiều biến đổi; Flyweight khi tiết kiệm RAM.",
+      "deepDive": "So sánh 4 Wrapper patterns: Adapter đổi interface; Decorator giữ nguyên interface và thêm hành vi; Proxy giữ nguyên interface và kiểm soát truy cập; Facade tạo ra interface mới đơn giản hơn.",
+      "codeExample": "// Bảng chọn: Khớp interface -> Adapter. Đơn giản hóa -> Facade. Thêm chức năng -> Decorator. Can thiệp truy cập -> Proxy."
+    },
+    "pitfalls": [
+      "Nhầm lẫn mục đích giữa Decorator và Adapter dẫn đến thiết kế interface méo mó."
+    ],
+    "followUpQuestions": [
+      "Tại sao Decorator và Proxy có cấu trúc class gần như giống hệt nhau nhưng mục đích lại khác nhau?"
+    ]
+  },
+  {
+    "id": "dp-030",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Observer pattern là gì? Ứng dụng trong JavaScript/React?",
+    "interviewerIntent": "Kiểm tra hiểu biết về mô hình Publish-Subscribe, One-to-Many dependency và Reactive Programming.",
+    "contextOrScenario": "Cập nhật UI tự động khi dữ liệu state thay đổi (như Redux, Zustand, RxJS).",
+    "expectedKeywords": [
+      "observer pattern",
+      "subject and observers",
+      "publish subscribe",
+      "event driven",
+      "reactivity"
+    ],
+    "seniorAnswer": {
+      "summary": "Observer định nghĩa mối phụ thuộc 1-Nhiều giữa các đối tượng: Khi một đối tượng (Subject) thay đổi trạng thái, tất cả các đối tượng phụ thuộc (Observers) sẽ được tự động thông báo và cập nhật.",
+      "deepDive": "Trong JavaScript: `addEventListener` chính là Observer pattern. Trong React: Redux/Zustand dùng Observer để notify các React component re-render khi store update thông qua `store.subscribe()`.",
+      "codeExample": "class Subject {\n  private observers: Array<(data: any) => void> = [];\n  subscribe(fn: (data: any) => void) { this.observers.push(fn); }\n  notify(data: any) { this.observers.forEach(fn => fn(data)); }\n}"
+    },
+    "pitfalls": [
+      "Memory Leak do không Unsubscribe (Lapsed Listener Problem) khi component bị unmount."
+    ],
+    "followUpQuestions": [
+      "Pub/Sub khác Observer pattern ở điểm mấu chốt nào (gợi ý: Message Broker)?"
+    ]
+  },
+  {
+    "id": "dp-031",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Strategy pattern là gì? So sánh với if/else và switch/case?",
+    "interviewerIntent": "Khảo sát khả năng đóng gói thuật toán hoán đổi cho nhau tại runtime và loại bỏ code smell branching.",
+    "contextOrScenario": "Xử lý logic giảm giá / chiết khấu (Black Friday, VIP member, Coupon voucher).",
+    "expectedKeywords": [
+      "strategy pattern",
+      "encapsulate algorithm",
+      "runtime interchangeable",
+      "eliminate switch/case"
+    ],
+    "seniorAnswer": {
+      "summary": "Strategy pattern định nghĩa một họ các thuật toán, đóng gói từng thuật toán vào một class riêng và làm cho chúng có thể hoán đổi cho nhau tại runtime. So với if/else: Strategy giúp code dễ mở rộng (tuân thủ OCP), dễ unit test từng thuật toán độc lập và tránh hàm dài hàng trăm dòng.",
+      "deepDive": "Khi số lượng nhánh chỉ là 2–3 điều kiện đơn giản và không có xu hướng tăng thêm, dùng if/else hoặc switch/case sẽ đơn giản và gọn gàng hơn (KISS). Chỉ chuyển sang Strategy khi thuật toán phức tạp hoặc số lượng biến thể thường xuyên thay đổi.",
+      "codeExample": "interface DiscountStrategy { apply(price: number): number; }\nclass BlackFridayDiscount implements DiscountStrategy { apply(p: number) { return p * 0.5; } }\nclass Context { constructor(private strategy: DiscountStrategy) {} calculate(p: number) { return this.strategy.apply(p); } }"
+    },
+    "pitfalls": [
+      "Biến các biểu thức logic 1 dòng thành 10 class Strategy riêng gây cồng kềnh (over-engineering)."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để lưu trữ và nạp động các Strategy từ database hoặc dynamic import?"
+    ]
+  },
+  {
+    "id": "dp-032",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Command pattern là gì? Ứng dụng Undo/Redo?",
+    "interviewerIntent": "Kiểm tra kỹ năng đóng gói yêu cầu thành đối tượng, hỗ trợ queueing, logging và hoàn tác (Undo/Redo).",
+    "contextOrScenario": "Xây dựng phần mềm vẽ đồ họa hoặc text editor có tính năng Ctrl+Z.",
+    "expectedKeywords": [
+      "command pattern",
+      "encapsulate request as object",
+      "undo and redo",
+      "invoker and receiver",
+      "command history stack"
+    ],
+    "seniorAnswer": {
+      "summary": "Command pattern đóng gói một yêu cầu hành động (Request) thành một đối tượng độc lập chứa đầy đủ thông tin về hành động đó (hàm execute và unexecute/undo). Nhờ đó, ta có thể tham số hóa client với các yêu cầu khác nhau, xếp hàng (queue), ghi log, và hỗ trợ Undo/Redo.",
+      "deepDive": "Để làm Undo/Redo: Ta duy trì 2 stack `undoStack` và `redoStack`. Khi thực thi, gọi `cmd.execute()` và push vào `undoStack`. Khi người dùng bấm Undo, pop command ra và gọi `cmd.undo()`, đồng thời push sang `redoStack`.",
+      "codeExample": "interface Command { execute(): void; undo(): void; }\nclass InsertTextCommand implements Command {\n  constructor(private editor: Editor, private text: string) {}\n  execute() { this.editor.insert(this.text); }\n  undo() { this.editor.delete(this.text.length); }\n}"
+    },
+    "pitfalls": [
+      "Command không lưu đủ snapshot trạng thái trước đó khiến hàm `undo()` khôi phục sai lệch."
+    ],
+    "followUpQuestions": [
+      "Command pattern kết hợp thế nào với CQRS trong kiến trúc backend?"
+    ]
+  },
+  {
+    "id": "dp-033",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Template Method pattern là gì? Khác Strategy ở điểm nào?",
+    "interviewerIntent": "Phân biệt giữa Template Method (dùng kế thừa khung thuật toán ở class cha) và Strategy (dùng ủy quyền composition).",
+    "contextOrScenario": "Quy trình xử lý đơn hàng gồm 4 bước: Validate -> Tính thuế -> Trừ kho -> Gửi mail.",
+    "expectedKeywords": [
+      "template method",
+      "skeleton of algorithm",
+      "inheritance vs composition",
+      "hollywood principle"
+    ],
+    "seniorAnswer": {
+      "summary": "Template Method định nghĩa bộ khung (skeleton) của một thuật toán trong một phương thức của class cha, nhường việc triển khai chi tiết một số bước cụ thể cho các class con mà không làm thay đổi cấu trúc tổng thể của thuật toán.",
+      "deepDive": "Khác biệt: Template Method dựa trên Kế thừa (Inheritance, tĩnh lúc compile-time); Strategy dựa trên Ủy quyền (Composition, động lúc runtime). Template Method áp dụng 'Hollywood Principle' (Don't call us, we'll call you): class cha gọi phương thức của class con.",
+      "codeExample": "abstract class DataMiner {\n  // Template method cố định khung thuật toán\n  mine() {\n    this.openFile();\n    this.parseData(); // abstract\n    this.closeFile();\n  }\n  abstract parseData(): void;\n}"
+    },
+    "pitfalls": [
+      "Class con ghi đè (override) luôn cả template method chính thay vì chỉ override các bước con."
+    ],
+    "followUpQuestions": [
+      "Khi nào nên refactor từ Template Method sang Strategy pattern?"
+    ]
+  },
+  {
+    "id": "dp-034",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Chain of Responsibility là gì? Ứng dụng trong Express.js middleware?",
+    "interviewerIntent": "Đánh giá hiểu biết về chuỗi xử lý tuần tự, cho phép request đi qua các handler kế tiếp nhau.",
+    "contextOrScenario": "Xây dựng pipeline xác thực: RateLimit -> Authenticate -> Authorize -> ValidateInput.",
+    "expectedKeywords": [
+      "chain of responsibility",
+      "middleware pipeline",
+      "next() function",
+      "handler chain"
+    ],
+    "seniorAnswer": {
+      "summary": "Chain of Responsibility cho phép chuyển các yêu cầu dọc theo một chuỗi các trình xử lý (Handlers). Khi nhận được yêu cầu, mỗi trình xử lý quyết định xử lý yêu cầu hoặc chuyển tiếp cho trình xử lý kế tiếp trong chuỗi.",
+      "deepDive": "Express.js / NestJS Middleware chính là Chain of Responsibility kinh điển: Mỗi middleware nhận `(req, res, next)`. Nếu request hợp lệ, gọi `next()` để chuyển sang middleware sau; nếu vi phạm (như chưa login), ngắt chuỗi và trả về lỗi 401 ngay lập tức.",
+      "codeExample": "const authMiddleware = (req, res, next) => {\n  if (!req.headers.authorization) return res.status(401).send('Unauthorized');\n  next(); // chuyển tiếp cho handler sau trong chain\n};"
+    },
+    "pitfalls": [
+      "Quên gọi `next()` trong middleware khiến request bị treo (hanging) vô thời hạn."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để xử lý lỗi tập trung trong Chain of Responsibility (Express error middleware)?"
+    ]
+  },
+  {
+    "id": "dp-035",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "State pattern là gì? Khác FSM (Finite State Machine) ở đâu?",
+    "interviewerIntent": "Kiểm tra kỹ năng quản lý vòng đời trạng thái của đối tượng phức tạp mà không dùng chuỗi switch/case khổng lồ.",
+    "contextOrScenario": "Quản lý trạng thái bài viết: Draft -> Moderation -> Published -> Archived.",
+    "expectedKeywords": [
+      "state pattern",
+      "finite state machine (fsm)",
+      "state transitions",
+      "context and state interface"
+    ],
+    "seniorAnswer": {
+      "summary": "State pattern cho phép một đối tượng thay đổi hành vi của nó khi trạng thái nội bộ của nó thay đổi, giống như đối tượng đã thay đổi class của nó. Khác FSM: FSM là mô hình lý thuyết toán học; State pattern là cách hiện thực FSM trong OOP bằng cách biến mỗi trạng thái thành một class riêng.",
+      "deepDive": "Khi ở trạng thái `Draft`, bấm nút Publish sẽ chuyển sang `Moderation`; nhưng khi ở trạng thái `Published`, bấm Publish sẽ không làm gì cả. Toàn bộ logic kiểm tra chuyển trạng thái được đóng gói bên trong từng State class.",
+      "codeExample": "interface State { publish(doc: Document): void; }\nclass DraftState implements State {\n  publish(doc: Document) { doc.changeState(new ModerationState()); }\n}"
+    },
+    "pitfalls": [
+      "Các State class tham chiếu chéo phụ thuộc chặt chẽ vào nhau khiến khó tái sử dụng."
+    ],
+    "followUpQuestions": [
+      "XState trong JavaScript/React triển khai State Machine vượt trội hơn State pattern OOP như thế nào?"
+    ]
+  },
+  {
+    "id": "dp-036",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Iterator pattern là gì? JavaScript Iterator Protocol hoạt động ra sao?",
+    "interviewerIntent": "Kiểm tra kiến thức về duyệt cấu trúc dữ liệu tuần tự và Iterator/Generator Protocol trong JavaScript chuẩn ES6.",
+    "contextOrScenario": "Duyệt qua các phần tử của cây thư mục hoặc danh sách liên kết mà không để lộ cấu trúc dữ liệu bên trong.",
+    "expectedKeywords": [
+      "iterator pattern",
+      "traversal",
+      "symbol.iterator",
+      "generator function",
+      "for...of loop"
+    ],
+    "seniorAnswer": {
+      "summary": "Iterator cung cấp một cách để truy cập tuần tự các phần tử của một tập hợp đối tượng mà không để lộ biểu diễn cấu trúc dữ liệu bên dưới của nó (List, Tree, Graph hay Hash Table).",
+      "deepDive": "Trong JavaScript, một đối tượng tuân thủ Iterable Protocol khi nó có phương thức `[Symbol.iterator]()` trả về đối tượng có hàm `next()` trả về `{ value, done }`. Đây là cơ chế giúp vòng lặp `for...of` và toán tử spread `[...]` hoạt động được.",
+      "codeExample": "const customRange = {\n  from: 1, to: 3,\n  [Symbol.iterator]() {\n    let current = this.from;\n    return {\n      next: () => ({ value: current, done: current++ > this.to })\n    };\n  }\n};\nfor (const num of customRange) console.log(num); // 1, 2, 3"
+    },
+    "pitfalls": [
+      "Tạo Iterator vô hạn mà không có điều kiện dừng `done: true` làm treo trình duyệt."
+    ],
+    "followUpQuestions": [
+      "Generator function (`function*`) giúp viết Iterator đơn giản hơn như thế nào?"
+    ]
+  },
+  {
+    "id": "dp-037",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "MVC, MVP, MVVM là gì? Sự khác biệt và ứng dụng trong frontend hiện đại?",
+    "interviewerIntent": "Phân tích sự tiến hóa của các mô hình kiến trúc giao diện người dùng từ desktop sang web hiện đại.",
+    "contextOrScenario": "Lựa chọn mô hình kiến trúc cho ứng dụng Single Page App phức tạp.",
+    "expectedKeywords": [
+      "mvc (model view controller)",
+      "mvp (model view presenter)",
+      "mvvm (model view viewmodel)",
+      "two-way data binding",
+      "react unidirection"
+    ],
+    "seniorAnswer": {
+      "summary": "MVC: Controller nhận input từ user, cập nhật Model, Model báo View render lại. MVP: Presenter làm trung gian 1-1 giữa View và Model, View hoàn toàn thụ động (Passive View). MVVM: ViewModel liên kết tự động với View qua Data-Binding (Two-Way Binding như Angular, Vue).",
+      "deepDive": "Frontend hiện đại (React) đã chuyển dịch từ MVVM sang **Component-Based Architecture với Unidirectional Data Flow (Luồng dữ liệu 1 chiều)**. Component vừa chứa View vừa chứa State logic cục bộ, đồng bộ qua Virtual DOM.",
+      "codeExample": "// React: View = f(State)\n// Không còn khái niệm Controller hay ViewModel truyền thống."
+    },
+    "pitfalls": [
+      "Nhầm lẫn Data Binding tự động của MVVM luôn tốt hơn luồng dữ liệu 1 chiều của React."
+    ],
+    "followUpQuestions": [
+      "Tại sao các framework hiện đại lại chuộng One-way Data Binding hơn Two-way Data Binding của MVVM?"
+    ]
+  },
+  {
+    "id": "dp-038",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Memento pattern là gì? Nó hỗ trợ undo/redo như thế nào?",
+    "interviewerIntent": "Kiểm tra kỹ năng chụp và khôi phục snapshot trạng thái nội bộ của đối tượng mà không vi phạm tính đóng gói (Encapsulation).",
+    "contextOrScenario": "Lưu lịch sử chỉnh sửa tài liệu hoặc checkpoint lưu game.",
+    "expectedKeywords": [
+      "memento pattern",
+      "state snapshot",
+      "originator",
+      "caretaker",
+      "undo mechanism",
+      "immutability"
+    ],
+    "seniorAnswer": {
+      "summary": "Memento chụp lại trạng thái nội bộ của một đối tượng (Originator) tại một thời điểm vào một đối tượng Memento độc lập, cho phép khôi phục lại trạng thái đó sau này mà không làm lộ các thuộc tính private của đối tượng.",
+      "deepDive": "Cơ chế: Originator tạo Memento chứa bản sao state. Caretaker (quản lý lịch sử) lưu trữ danh sách các Memento này. Khi cần Undo, Caretaker lấy Memento cũ đưa lại cho Originator để khôi phục.",
+      "codeExample": "class EditorMemento { constructor(private state: string) {} getState() { return this.state; } }\nclass Editor {\n  private content = '';\n  save(): EditorMemento { return new EditorMemento(this.content); }\n  restore(m: EditorMemento) { this.content = m.getState(); }\n}"
+    },
+    "pitfalls": [
+      "Lưu trữ quá nhiều snapshot Memento mà không giới hạn số lượng làm tràn bộ nhớ RAM."
+    ],
+    "followUpQuestions": [
+      "Immutability trong Redux/Zustand có thể coi là một dạng Memento pattern hiện đại không?"
+    ]
+  },
+  {
+    "id": "dp-039",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Null Object pattern là gì? Nó giúp loại bỏ việc kiểm tra null ra sao?",
+    "interviewerIntent": "Đánh giá kỹ năng loại bỏ lỗi `TypeError: Cannot read properties of undefined` và các câu lệnh `if (x !== null)` rải rác.",
+    "contextOrScenario": "Xử lý trường hợp người dùng chưa đăng nhập (Guest User / Anonymous).",
+    "expectedKeywords": [
+      "null object pattern",
+      "null pointer exception",
+      "special case pattern",
+      "polymorphic default behavior"
+    ],
+    "seniorAnswer": {
+      "summary": "Null Object cung cấp một đối tượng đóng vai trò thay thế cho giá trị `null/undefined`, hiện thực cùng interface với đối tượng thật nhưng các phương thức chỉ thực hiện hành vi mặc định hoặc không làm gì cả (no-op).",
+      "deepDive": "Nhờ Null Object, mã nguồn phía gọi (caller) không bao giờ phải viết `if (user !== null)` trước khi gọi `user.getName()` hay `user.hasPermission()`. Ta tạo class `NullUser` trả về tên là 'Khách' và quyền là rỗng.",
+      "codeExample": "interface User { getName(): string; hasAccess(): boolean; }\nclass RegisteredUser implements User { getName() { return this.name; } hasAccess() { return true; } }\nclass NullUser implements User { getName() { return 'Khách'; } hasAccess() { return false; } }\n// Caller gọi an toàn:\nconsole.log(user.getName()); // Không bao giờ crash"
+    },
+    "pitfalls": [
+      "Lạm dụng Null Object để che giấu các lỗi hệ thống nghiêm trọng vốn cần phải fail-fast."
+    ],
+    "followUpQuestions": [
+      "Toán tử Optional Chaining (`?.`) và Nullish Coalescing (`??`) trong TypeScript có làm Null Object pattern lỗi thời không?"
+    ]
+  },
+  {
+    "id": "dp-040",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Association, Aggregation và Composition khác nhau thế nào trong quan hệ đối tượng (UML)?",
+    "interviewerIntent": "Kiểm tra kiến thức mô hình hóa quan hệ giữa các đối tượng trong phân tích thiết kế hệ thống.",
+    "contextOrScenario": "Thiết kế sơ đồ lớp (Class Diagram) cho hệ thống Thương mại điện tử (User, Order, OrderItem, Company).",
+    "expectedKeywords": [
+      "association",
+      "aggregation (has-a)",
+      "composition (part-of)",
+      "lifecycle dependency",
+      "uml relationships"
+    ],
+    "seniorAnswer": {
+      "summary": "Association: Quan hệ liên kết lỏng lẻo (Thầy giáo - Học sinh). Aggregation: Quan hệ sở hữu ('Has-A') nhưng vòng đời độc lập (Phòng học - Máy tính: Xóa phòng học máy tính vẫn tồn tại). Composition: Quan hệ sở hữu chặt chẽ ('Part-Of') và gắn liền vòng đời (Đơn hàng - Chi tiết đơn hàng: Xóa Đơn hàng thì OrderItem bị xóa theo).",
+      "deepDive": "Trong thiết kế Domain-Driven Design (DDD), Composition xác định ranh giới của một Aggregate: Aggregate Root quản lý các entities con có vòng đời phụ thuộc hoàn toàn vào nó.",
+      "codeExample": "class OrderItem {}\nclass Order {\n  private items: OrderItem[] = []; // Composition: items không tồn tại độc lập ngoài Order\n}\nclass Department {\n  constructor(private employees: Employee[]) {} // Aggregation: employee vẫn tồn tại độc lập\n}"
+    },
+    "pitfalls": [
+      "Nhầm lẫn giữa Aggregation và Composition dẫn đến xóa dữ liệu dây chuyền (Cascade Delete) nhầm."
+    ],
+    "followUpQuestions": [
+      "Trong cơ sở dữ liệu quan hệ, quan hệ Composition thường được biểu diễn bằng khóa ngoại và thuộc tính gì?"
+    ]
+  },
+  {
+    "id": "dp-041",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Cohesion và Coupling là gì? Vì sao nên hướng tới high cohesion và low coupling?",
+    "interviewerIntent": "Kiểm tra tư duy kiến trúc nền tảng quan trọng nhất của kỹ thuật phần mềm: Độ kết dính và Độ ghép nối.",
+    "contextOrScenario": "Đánh giá chất lượng thiết kế của một module trước khi merge vào codebase chính.",
+    "expectedKeywords": [
+      "high cohesion",
+      "low coupling",
+      "maintainability",
+      "architectural metrics",
+      "modularity"
+    ],
+    "seniorAnswer": {
+      "summary": "Cohesion (Độ kết dính): Mức độ các phần tử bên trong một module tập trung thực hiện cùng một mục tiêu nghiệp vụ duy nhất. Coupling (Độ ghép nối): Mức độ phụ thuộc lẫn nhau giữa các module khác nhau. Mục tiêu vàng: **High Cohesion, Low Coupling**.",
+      "deepDive": "High Cohesion giúp code dễ đọc, dễ kiểm thử và dễ tái sử dụng. Low Coupling giúp thay đổi một module mà không sợ làm sập module khác, cho phép các team phát triển độc lập.",
+      "codeExample": "// Low Cohesion: File utils.ts chứa từ tính tiền, format ngày đến gọi camera.\n// High Cohesion: DateUtils chỉ xử lý ngày, PaymentService chỉ xử lý tiền."
+    },
+    "pitfalls": [
+      "Theo đuổi Zero Coupling (không có ghép nối nào) dẫn đến code vô dụng vì các module không thể làm việc cùng nhau."
+    ],
+    "followUpQuestions": [
+      "Nguyên lý nào trong SOLID trực tiếp phục vụ cho việc đạt được High Cohesion và Low Coupling?"
+    ]
+  },
+  {
+    "id": "dp-042",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Hệ thống cần khởi tạo storage/payment khác nhau theo config môi trường. Khi nào dùng Factory Method, khi nào Abstract Factory?",
+    "interviewerIntent": "Kiểm tra khả năng lựa chọn giữa Factory Method và Abstract Factory trong bài toán thực tế.",
+    "contextOrScenario": "Cấu hình AWS S3 trên Production và Local Disk trên Development.",
+    "expectedKeywords": [
+      "factory method vs abstract factory",
+      "environment configuration",
+      "cloud providers abstraction"
+    ],
+    "seniorAnswer": {
+      "summary": "Dùng **Factory Method** khi hệ thống chỉ cần khởi tạo duy nhất 1 đối tượng độc lập (ví dụ: `StorageService` trả về `S3Storage` hoặc `LocalStorage`). Dùng **Abstract Factory** khi cấu hình môi trường kéo theo cả một bộ các dịch vụ tương thích (ví dụ: Môi trường AWS cần `S3Storage` + `SQSQueue` + `SESMail`; môi trường GCP cần `GCSStorage` + `PubSubQueue` + `SendgridMail`).",
+      "deepDive": "Abstract Factory đảm bảo tính tương thích đồng bộ: Không bao giờ xảy ra lỗi nhặt nhạnh S3 của AWS đi kèm với PubSub của GCP nếu môi trường yêu cầu trọn bộ dịch vụ Google Cloud.",
+      "codeExample": "interface CloudServicesFactory {\n  createStorage(): Storage;\n  createQueue(): Queue;\n}\nclass AwsFactory implements CloudServicesFactory {\n  createStorage() { return new S3Storage(); }\n  createQueue() { return new SqsQueue(); }\n}"
+    },
+    "pitfalls": [
+      "Tạo cả Abstract Factory phức tạp chỉ để switch giữa 2 database driver đơn lẻ."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để kết hợp Factory với Dependency Injection Container trong NestJS?"
+    ]
+  },
+  {
+    "id": "dp-043",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Vì sao Singleton hay bị gọi là anti-pattern, nhất là trong code có unit test?",
+    "interviewerIntent": "Đào sâu vào góc khuất của Singleton trong môi trường Continuous Integration và Automated Testing.",
+    "contextOrScenario": "Bộ Unit Test chạy tuần tự thì pass, nhưng bật chế độ chạy song song (Parallel Tests) thì fail ngẫu nhiên.",
+    "expectedKeywords": [
+      "singleton anti-pattern",
+      "hidden dependencies",
+      "global mutable state",
+      "flaky tests",
+      "parallel test execution"
+    ],
+    "seniorAnswer": {
+      "summary": "Singleton bị coi là anti-pattern vì: (1) Che giấu sự phụ thuộc (Hidden Dependencies) thay vì khai báo rõ ràng qua constructor; (2) Mang trạng thái toàn cục có thể thay đổi (Global Mutable State); (3) Làm cho các Unit Test bị nhiễm chéo trạng thái của nhau (Test Pollution) khi chạy song song; (4) Không thể mock hoặc stub dễ dàng.",
+      "deepDive": "Giải pháp thay thế Singleton: Sử dụng Dependency Injection Container với vòng đời Singleton Scope. Bản thân class là class thường, chỉ có IoC Container quản lý việc chỉ tạo 1 instance trong runtime.",
+      "codeExample": "// ❌ Singleton làm test bị phụ thuộc thứ tự chạy:\ntest('test 1', () => { Counter.getInstance().increment(); });\ntest('test 2', () => { expect(Counter.getInstance().getVal()).toBe(0); }); // FAIL!"
+    },
+    "pitfalls": [
+      "Nghĩ rằng Singleton Scope trong NestJS cũng là Anti-pattern (Container-managed singleton hoàn toàn lành mạnh và mock được)."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để reset state của một Singleton giữa các test case trong Vitest/Jest nếu bắt buộc phải dùng nó?"
+    ]
+  },
+  {
+    "id": "dp-044",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Em cần thêm cache, retry và đo thời gian cho một service đang chạy nhưng không muốn sửa class đó. Làm thế nào?",
+    "interviewerIntent": "Kiểm tra khả năng áp dụng Decorator / Proxy Pattern để thêm Cross-Cutting Concerns theo nguyên lý OCP.",
+    "contextOrScenario": "Thêm Redis cache và retry 3 lần cho hàm `fetchExchangeRate()` của ngân hàng bên ngoài.",
+    "expectedKeywords": [
+      "decorator pattern",
+      "cross cutting concerns",
+      "proxy pattern",
+      "aspect oriented programming (aop)"
+    ],
+    "seniorAnswer": {
+      "summary": "Áp dụng **Decorator Pattern** (hoặc Proxy Pattern): Tạo các class bao bọc (Wrapper) hiện thực cùng interface với service ban đầu. Ta có thể bọc lồng nhau: `new TimedDecorator(new RetryDecorator(new CachedDecorator(new ExternalService())))`.",
+      "deepDive": "Mỗi Decorator chỉ tập trung vào một nhiệm vụ duy nhất (SRP) và không đụng vào mã nguồn gốc của service (OCP). Service gốc hoàn toàn không biết mình đang được cache hay retry.",
+      "codeExample": "class CachedExchangeRateService implements IExchangeRateService {\n  constructor(private wrappee: IExchangeRateService, private cache: Cache) {}\n  async getRate(cur: string) {\n    if (await this.cache.has(cur)) return this.cache.get(cur);\n    const rate = await this.wrappee.getRate(cur);\n    await this.cache.set(cur, rate);\n    return rate;\n  }\n}"
+    },
+    "pitfalls": [
+      "Nhầm lẫn thứ tự bọc decorator: Bọc Timed bên trong Cached sẽ đo sai thời gian truy vấn."
+    ],
+    "followUpQuestions": [
+      "Trong NestJS, Interceptors có phải là hiện thực của Decorator pattern không?"
+    ]
+  },
+  {
+    "id": "dp-045",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Controller đăng ký người dùng của em đang gọi 6 service theo thứ tự (tạo user, tạo profile, gửi mail, ghi audit...). Có nên gom lại không, và gom bằng gì?",
+    "interviewerIntent": "Kiểm tra kỹ năng giải quyết Fat Controller và áp dụng Facade / UseCase / Domain Event / Saga.",
+    "contextOrScenario": "Controller `register()` dài 150 dòng inject trực tiếp 6 service khác nhau.",
+    "expectedKeywords": [
+      "facade pattern",
+      "use case pattern",
+      "mediator pattern",
+      "fat controller",
+      "domain events"
+    ],
+    "seniorAnswer": {
+      "summary": "Rất nên gom lại! Controller chỉ nên làm nhiệm vụ HTTP (parse request, validate, trả status code). Giải pháp: (1) Áp dụng **Facade Pattern / UseCase Interactor**: Tạo `RegisterUserUseCase` chứa quy trình phối hợp 6 service; hoặc (2) Áp dụng **Domain Events**: Tạo user xong chỉ bắn sự kiện `UserRegisteredEvent`, các service khác tự lắng nghe.",
+      "deepDive": "Theo Clean Architecture, Controller không nên chứa nghiệp vụ điều phối (Orchestration logic). Việc chuyển sang UseCase giúp logic đăng ký có thể được tái sử dụng bởi CLI script, gRPC endpoint hoặc Queue Worker mà không cần Controller.",
+      "codeExample": "// Controller chỉ còn 3 dòng:\n@Post('/register')\nasync register(@Body() dto: RegisterDto) {\n  return await this.registerUserUseCase.execute(dto);\n}"
+    },
+    "pitfalls": [
+      "Gom 6 service vào 1 service phụ nhưng vẫn giữ nguyên chuỗi gọi hàm đồng bộ dài dặc."
+    ],
+    "followUpQuestions": [
+      "Khi nào nên dùng Command Bus (Mediator) thay vì trực tiếp gọi UseCase class?"
+    ]
+  },
+  {
+    "id": "dp-046",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Repository pattern giải quyết vấn đề gì, và khi nào nó là lớp thừa?",
+    "interviewerIntent": "Đánh giá tính thực tiễn khi dùng Repository Pattern và khả năng nhận diện Over-engineering khi làm việc với ORM hiện đại.",
+    "contextOrScenario": "Sử dụng Prisma hoặc TypeORM trong ứng dụng Node.js/NestJS.",
+    "expectedKeywords": [
+      "repository pattern",
+      "data access abstraction",
+      "orm redundancy",
+      "anemic repository",
+      "pragmatic architecture"
+    ],
+    "seniorAnswer": {
+      "summary": "Repository pattern đóng vai trò lớp trung gian trừu tượng hóa giữa tầng nghiệp vụ và tầng lưu trữ dữ liệu, che giấu các câu lệnh SQL/DB driver. Nó trở thành **lớp thừa (Redundant Layer)** khi bản thân ORM hiện đại (như Prisma, TypeORM ActiveRecord) đã là một Repository pattern hoàn chỉnh.",
+      "deepDive": "Nếu bạn tạo `UserRepository` chỉ để viết các hàm bọc đơn thuần 1 dòng như `findById(id) { return prisma.user.findUnique({ where: { id } }); }`, bạn đang tạo ra Boilerplate vô nghĩa. Chỉ nên viết Repository tùy biến khi có các câu query phức tạp hoặc cần decoupled tuyệt đối khỏi ORM.",
+      "codeExample": "// ❌ Repository vô nghĩa:\nclass UserRepository {\n  find(id: string) { return this.prisma.user.findUnique({ where: { id } }); }\n}"
+    },
+    "pitfalls": [
+      "Viết Repository pattern chỉ với mục đích 'đề phòng sau này đổi từ MySQL sang MongoDB' (99% không bao giờ xảy ra)."
+    ],
+    "followUpQuestions": ["Data Mapper pattern khác gì so với Active Record pattern?"]
+  },
+  {
+    "id": "dp-047",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Dependency Injection khác Service Locator ở đâu? Vì sao Service Locator thường bị đánh giá thấp hơn?",
+    "interviewerIntent": "So sánh hai cơ chế cung cấp phụ thuộc và lý do Service Locator bị coi là Anti-Pattern trong thiết kế hiện đại.",
+    "contextOrScenario": "Refactor code cũ gọi `ServiceLocator.get('Database')` sang Constructor Injection.",
+    "expectedKeywords": [
+      "dependency injection",
+      "service locator",
+      "anti-pattern",
+      "hidden dependencies",
+      "run-time errors"
+    ],
+    "seniorAnswer": {
+      "summary": "Cả hai đều giải quyết bài toán Inversion of Control. Tuy nhiên: DI yêu cầu khai báo tường minh các phụ thuộc qua Constructor; Service Locator cung cấp một registry toàn cục và class tự chủ động gọi `locator.get(ServiceName)` để lấy phụ thuộc.",
+      "deepDive": "Service Locator bị đánh giá thấp vì: (1) Che giấu dependencies: Nhìn vào constructor không biết class cần gì, phải đọc hết code mới biết; (2) Lỗi chuyển từ compile-time sang run-time nếu quên đăng ký service; (3) Khó khăn trong việc viết Unit Test vì phải cấu hình mock cho cả locator toàn cục.",
+      "codeExample": "// ❌ Service Locator (Ẩn giấu phụ thuộc):\nclass OrderService {\n  process() {\n    const db = ServiceLocator.get('Database'); // Bị crash lúc runtime nếu thiếu\n  }\n}\n// ✅ DI (Tường minh):\nclass OrderService {\n  constructor(private db: Database) {} // Rõ ràng ngay lúc viết code\n}"
+    },
+    "pitfalls": [
+      "Dùng Service Locator ngay bên trong một project đã có sẵn NestJS/DI Container."
+    ],
+    "followUpQuestions": [
+      "Khi nào Service Locator vẫn là lựa chọn hợp lý (ví dụ: dynamic plugin loading)?"
+    ]
+  },
+  {
+    "id": "dp-048",
+    "category": "design-patterns",
+    "level": "middle",
+    "question": "Ba job import file (CSV, Excel, XML) có cùng khung xử lý nhưng khác phần parse. Nên dùng Template Method hay Strategy?",
+    "interviewerIntent": "Kiểm tra khả năng cân nhắc giữa hai pattern hành vi giải quyết bài toán biến thể thuật toán.",
+    "contextOrScenario": "Xây dựng pipeline import dữ liệu kế toán từ 3 định dạng file khác nhau.",
+    "expectedKeywords": [
+      "template method vs strategy",
+      "algorithm skeleton",
+      "composition vs inheritance"
+    ],
+    "seniorAnswer": {
+      "summary": "Nên chọn **Template Method** nếu quy trình tổng thể có khung cố định chặt chẽ (Đọc file -> Parse -> Validate từng dòng -> Ghi DB -> Gửi báo cáo) và chỉ có đúng bước `parseLine()` là khác nhau. Chọn **Strategy** nếu thuật toán parse phức tạp và cần được tái sử dụng độc lập ở nhiều nơi khác ngoài job import.",
+      "deepDive": "Template Method giúp chia sẻ 90% mã nguồn khung (quản lý transaction DB, xử lý lỗi, log tiến độ). Strategy mang lại sự linh hoạt hơn nhưng đòi hỏi tạo thêm các interface và class rời rạc.",
+      "codeExample": "abstract class FileImporter {\n  import(path: string) {\n    const raw = this.readFile(path);\n    const rows = this.parse(raw); // Abstract step\n    this.saveToDb(rows);\n  }\n  abstract parse(content: string): Row[];\n}"
+    },
+    "pitfalls": [
+      "Dùng kế thừa (Template Method) khi các định dạng file có luồng xử lý hoàn toàn khác nhau (ví dụ file stream vs file batch)."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để kết hợp cả hai: Dùng Template Method cho khung import và inject Parser Strategy vào?"
+    ]
+  },
+  {
+    "id": "dp-049",
+    "category": "design-patterns",
+    "level": "senior",
+    "question": "Mediator pattern là gì? Khác Observer và tại sao quan trọng trong microservices?",
+    "interviewerIntent": "Đánh giá hiểu biết về việc giảm bớt liên kết đa chiều (Many-to-Many) giữa các đối tượng thông qua một điều phối viên trung tâm.",
+    "contextOrScenario": "Phòng chat trực tuyến (Chat Room), Form tương tác nhiều control, hoặc Message Broker trong microservices.",
+    "expectedKeywords": [
+      "mediator pattern",
+      "many-to-many communication",
+      "hub and spoke",
+      "message broker",
+      "mediatr"
+    ],
+    "seniorAnswer": {
+      "summary": "Mediator định nghĩa một đối tượng đóng vai trò trung tâm điều phối giao tiếp giữa các đối tượng khác (Colleagues), ngăn chúng tham chiếu trực tiếp tới nhau. Khác Observer: Observer là quan hệ 1-Nhiều một chiều; Mediator điều phối giao tiếp 2 chiều Nhiều-Nhiều phức tạp.",
+      "deepDive": "Trong Microservices, Event Broker (như Kafka, RabbitMQ) hoặc API Gateway đóng vai trò là Mediator: Thay vì Service A gọi Service B, C, D trực tiếp (mesh coupling), mọi service chỉ giao tiếp thông qua Mediator trung tâm (Hub-and-Spoke).",
+      "codeExample": "class ChatRoomMediator {\n  sendMessage(msg: string, sender: User) {\n    this.users.filter(u => u !== sender).forEach(u => u.receive(msg));\n  }\n}"
+    },
+    "pitfalls": [
+      "Mediator phình to thành God Object kiểm soát toàn bộ logic của hệ thống."
+    ],
+    "followUpQuestions": [
+      "Thư viện MediatR trong .NET hoặc NestJS CQRS Module áp dụng Mediator pattern như thế nào?"
+    ]
+  },
+  {
+    "id": "dp-050",
+    "category": "design-patterns",
+    "level": "senior",
+    "question": "Visitor pattern là gì? Khi nào đây là lựa chọn đúng?",
+    "interviewerIntent": "Kiểm tra pattern hành vi phức tạp nhất của GoF, tách biệt thuật toán khỏi cấu trúc dữ liệu đối tượng.",
+    "contextOrScenario": "Xây dựng trình biên dịch AST (Abstract Syntax Tree), Babel plugin hoặc xuất báo cáo định dạng khác nhau từ cây tài liệu.",
+    "expectedKeywords": [
+      "visitor pattern",
+      "double dispatch",
+      "abstract syntax tree (ast)",
+      "open/closed principle",
+      "algorithm separation"
+    ],
+    "seniorAnswer": {
+      "summary": "Visitor cho phép định nghĩa một thao tác mới trên một cấu trúc đối tượng mà không làm thay đổi các class của các phần tử trong cấu trúc đó. Sử dụng kỹ thuật **Double Dispatch**: Phần tử nhận Visitor (`element.accept(visitor)`), sau đó gọi lại phương thức tương ứng trên Visitor (`visitor.visitElementA(this)`).",
+      "deepDive": "Lựa chọn đúng khi: Cấu trúc lớp dữ liệu (Element classes) rất ít khi thay đổi (như các node AST trong compiler: IfNode, VariableNode), nhưng các thao tác cần thực hiện trên chúng thường xuyên được bổ sung thêm (TypeChecker, CodeGenerator, Linter).",
+      "codeExample": "interface Visitor { visitBook(b: Book): void; }\nclass ExportPdfVisitor implements Visitor {\n  visitBook(b: Book) { /* render PDF */ }\n}"
+    },
+    "pitfalls": [
+      "Dùng Visitor khi hệ thống liên tục thêm các class Element mới (mỗi lần thêm Element phải sửa toàn bộ các Visitor)."
+    ],
+    "followUpQuestions": [
+      "Tại sao Babel và ESLint lại sử dụng Visitor pattern làm kiến trúc cốt lõi?"
+    ]
+  },
+  {
+    "id": "dp-051",
+    "category": "design-patterns",
+    "level": "senior",
+    "question": "Anti-patterns cần tránh trong software development là gì? Ví dụ thực tế?",
+    "interviewerIntent": "Kiểm tra kinh nghiệm thực chiến và khả năng nhận diện các bẫy thiết kế phổ biến gây hại cho dự án.",
+    "contextOrScenario": "Đánh giá sức khỏe kỹ thuật của một codebase legacy.",
+    "expectedKeywords": [
+      "anti-patterns",
+      "god object",
+      "spaghetti code",
+      "golden hammer",
+      "lava flow",
+      "premature optimization"
+    ],
+    "seniorAnswer": {
+      "summary": "Anti-pattern là những giải pháp bề ngoài có vẻ giải quyết được vấn đề nhưng thực tế lại mang lại hậu quả tiêu cực lâu dài. Các anti-pattern phổ biến: (1) God Object (Class ôm đồm mọi thứ); (2) Golden Hammer (Áp dụng 1 công nghệ cho mọi bài toán); (3) Premature Optimization (Tối ưu hóa quá sớm); (4) Lava Flow (Code cũ thừa thãi không ai dám xóa); (5) Magic Numbers/Strings.",
+      "deepDive": "Ví dụ: 'Lava Flow' xảy ra khi team không có test, người mới vào thấy code thừa nhưng sợ lỗi nên không dám xóa mà viết đè code mới lên trên, lâu dần tạo thành các tầng địa chất code rác.",
+      "codeExample": "// Golden Hammer: Ép dùng Microservices cho ứng dụng chỉ có 50 người dùng nội bộ."
+    },
+    "pitfalls": [
+      "Tự nhận thức được anti-pattern nhưng không lập kế hoạch Refactor định kỳ (Technical Debt tích tụ)."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để dọn dẹp 'Lava Flow' code trong một hệ thống production an toàn?"
+    ]
+  },
+  {
+    "id": "dp-052",
+    "category": "design-patterns",
+    "level": "senior",
+    "question": "Tính năng editor cần undo/redo, và một số thao tác phải chạy nền qua queue. Command pattern giúp gì ở đây và cần lưu ý gì?",
+    "interviewerIntent": "Đánh giá kỹ năng kết hợp Command Pattern cho cả Client-side Undo/Redo và Server-side Asynchronous Job Execution.",
+    "contextOrScenario": "Hệ thống thiết kế đồ họa giống Canva hoặc Figma.",
+    "expectedKeywords": [
+      "command pattern",
+      "serializable command",
+      "job queue",
+      "undo redo history",
+      "idempotency"
+    ],
+    "seniorAnswer": {
+      "summary": "Command pattern biến mỗi thao tác (Resize, Move, ApplyFilter) thành một object có thể Serialize (JSON). Giúp: (1) Lưu vào Undo Stack để hoàn tác; (2) Lưu chuỗi command vào DB để phục hồi trạng thái (Event Sourcing); (3) Đẩy command object vào Message Queue (Redis/BullMQ) để worker chạy nền.",
+      "deepDive": "Lưu ý quan trọng: Command chạy nền qua queue phải có tính **Idempotent (Không bị trùng lặp khi retry)** và Command phải là **Self-contained (chứa đầy đủ dữ liệu tại thời điểm phát sinh)**, không phụ thuộc vào trạng thái đang thay đổi của UI.",
+      "codeExample": "interface CommandPayload {\n  id: string;\n  type: 'RESIZE_IMAGE';\n  payload: { imageId: string; width: number; height: number };\n}"
+    },
+    "pitfalls": [
+      "Command chứa tham chiếu trực tiếp tới DOM element hoặc React state khiến không thể serialize gửi qua queue."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để giải quyết xung đột khi 2 người cùng gửi Command chỉnh sửa đồng thời (Collaborative Editing)?"
+    ]
+  },
+  {
+    "id": "dp-053",
+    "category": "design-patterns",
+    "level": "senior",
+    "question": "Vòng đời đơn hàng (pending → paid → shipped → completed / cancelled / refunded) đang được kiểm bằng if rải rác. Em mô hình hóa bằng state machine thế nào?",
+    "interviewerIntent": "Đánh giá khả năng áp dụng Finite State Machine (FSM) để kiểm soát chuyển đổi trạng thái an toàn.",
+    "contextOrScenario": "Đơn hàng đang ở trạng thái 'Cancelled' nhưng vẫn bị API gọi hàm 'Ship' do thiếu điều kiện if.",
+    "expectedKeywords": [
+      "finite state machine",
+      "state transition table",
+      "invalid state transition",
+      "order lifecycle"
+    ],
+    "seniorAnswer": {
+      "summary": "Mô hình hóa bằng State Machine với Transition Matrix (Bảng chuyển đổi trạng thái): Định nghĩa rõ ràng: (1) Danh sách States hợp lệ; (2) Danh sách Events/Triggers; (3) Ma trận chuyển đổi cho phép từ State nào được sang State nào. Mọi hành vi vi phạm ma trận sẽ bị chặn ngay lập tức.",
+      "deepDive": "Sử dụng thư viện như XState hoặc tự tạo State Transition Map. Khi nhận event `SHIP`, hệ thống tra cứu: nếu trạng thái hiện tại là `PAID` $\\rightarrow$ chuyển thành `SHIPPED`; nếu là `CANCELLED` $\\rightarrow$ ném lỗi `InvalidStateTransitionException`.",
+      "codeExample": "const orderTransitions: Record<OrderState, Partial<Record<OrderEvent, OrderState>>> = {\n  PENDING: { PAY: 'PAID', CANCEL: 'CANCELLED' },\n  PAID: { SHIP: 'SHIPPED', REFUND: 'REFUNDED' },\n  SHIPPED: { COMPLETE: 'COMPLETED' },\n};\nfunction transition(current: OrderState, event: OrderEvent): OrderState {\n  const next = orderTransitions[current]?.[event];\n  if (!next) throw new Error(`Cannot ${event} from ${current}`);\n  return next;\n}"
+    },
+    "pitfalls": [
+      "Để trạng thái đơn hàng bị cập nhật trực tiếp qua câu lệnh UPDATE SQL mà không thông qua State Machine guard."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để xử lý Side-effects (như gửi email) tương ứng với từng State Transition?"
+    ]
+  },
+  {
+    "id": "dp-054",
+    "category": "design-patterns",
+    "level": "senior",
+    "question": "Áp dụng Dependency Inversion trong dự án thật nghĩa là gì? Chỉ cần tách interface ra là xong phải không?",
+    "interviewerIntent": "Kiểm tra mức độ thấu hiểu bản chất của DIP, tránh nhầm lẫn giữa việc 'tách interface hình thức' và 'đảo ngược quyền sở hữu'.",
+    "contextOrScenario": "Lập trình viên tạo class `UserService` và `IUserService` giống hệt nhau và tự nhận đã tuân thủ DIP.",
+    "expectedKeywords": [
+      "dependency inversion principle",
+      "ownership of abstraction",
+      "domain driven design",
+      "clean architecture boundaries"
+    ],
+    "seniorAnswer": {
+      "summary": "HOÀN TOÀN KHÔNG PHẢI chỉ tách interface là xong! Bản chất của DIP nằm ở **Quyền sở hữu Interface (Ownership of Abstraction)**: Interface phải thuộc về module cấp cao (Domain layer định nghĩa những gì nó cần), chứ không phải thuộc về module cấp thấp.",
+      "deepDive": "Nếu module cấp cao phụ thuộc vào interface do module cấp thấp định nghĩa (`UserDomain` dùng `IPrismaClient`), thì luồng phụ thuộc kiến trúc vẫn là Domain phụ thuộc Database. DIP thực sự là: Domain định nghĩa `IUserRepository`, và tầng Database infrastructure phải adapt theo interface đó.",
+      "codeExample": "// ✅ Đúng bản chất DIP:\n// File: domain/order.ts (Domain sở hữu interface)\nexport interface IEmailSender { send(to: string, msg: string): Promise<void>; }\n\n// File: infrastructure/sendgrid.ts (Tầng ngoài phụ thuộc vào Domain)\nexport class SendgridEmailSender implements IEmailSender { ... }"
+    },
+    "pitfalls": [
+      "Tạo một đống file interface vô nghĩa chỉ để đối phó tiêu chí code review mà không đảo ngược phụ thuộc."
+    ],
+    "followUpQuestions": [
+      "DIP giúp bảo vệ Business Logic (Domain) khỏi sự thay đổi của Framework và Database như thế nào?"
+    ]
+  },
+  {
+    "id": "dp-055",
+    "category": "design-patterns",
+    "level": "senior",
+    "question": "Open/Closed Principle trong thực tế áp dụng ra sao mà không rơi vào tình trạng abstraction sớm?",
+    "interviewerIntent": "Đánh giá khả năng cân bằng giữa việc chuẩn bị cho sự mở rộng và giữ code đơn giản thực dụng.",
+    "contextOrScenario": "Cân nhắc giữa việc viết if/else đơn giản hay tạo Strategy Pattern ngay từ ngày đầu tiên làm tính năng.",
+    "expectedKeywords": [
+      "pragmatic ocp",
+      "premature abstraction",
+      "fool me once",
+      "predictive design"
+    ],
+    "seniorAnswer": {
+      "summary": "Nguyên tắc thực tế: **Không bao giờ trừu tượng hóa dựa trên phỏng đoán (Never abstract on speculation)**. Áp dụng quy tắc 'Fool me once, shame on you; fool me twice, shame on me': Lần đầu viết code đơn giản nhất có thể (kể cả if/else). Chỉ khi nghiệp vụ xuất hiện biến thể thứ 2 hoặc thứ 3, ta mới refactor sang OCP.",
+      "deepDive": "Áp dụng kỹ thuật 'Separate what varies from what stays the same' (Tách phần biến đổi khỏi phần cố định). Khi nhận thấy một thuật toán liên tục bị sửa đổi mỗi quý, đó là tín hiệu vàng để đóng gói nó lại theo OCP.",
+      "codeExample": "// Lần 1: Dùng if/else đơn giản.\n// Lần 3: Refactor sang Strategy pattern mà không làm vỡ các Unit Test cũ."
+    },
+    "pitfalls": [
+      "Tạo hệ thống Plugin phức tạp cho một tính năng chỉ chạy trong nội bộ và không bao giờ mở rộng."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để viết Unit Test làm 'lưới bảo vệ' (Safety Net) khi refactor code sang OCP?"
+    ]
+  },
+  {
+    "id": "dp-056",
+    "category": "design-patterns",
+    "level": "senior",
+    "question": "Làm sao nhận ra một codebase đang lạm dụng design pattern, và nên cải thiện dần thế nào thay vì viết lại?",
+    "interviewerIntent": "Kiểm tra năng lực của Senior/Lead Engineer: Nhận diện Pattern Overdose, tư duy Refactoring thực dụng thay vì đập đi xây lại (Rewrite).",
+    "contextOrScenario": "Dự án có class `UserAbstractFactoryBuilderSingletonImpl` dài ngoằng để giải quyết việc gán 2 biến.",
+    "expectedKeywords": [
+      "design pattern abuse",
+      "patternitis",
+      "refactoring vs rewrite",
+      "strangler fig pattern",
+      "code smell"
+    ],
+    "seniorAnswer": {
+      "summary": "Dấu hiệu lạm dụng (Patternitis): (1) Phải nhảy qua 10 file interface/abstract/factory chỉ để tìm được 3 dòng code xử lý thật sự; (2) Chi phí hiểu code cao hơn nhiều giá trị nghiệp vụ nó đem lại; (3) Pattern không giải quyết vấn đề thực tế mà chỉ để 'khoe kiến thức'.",
+      "deepDive": "Cách cải thiện: (1) **TUYỆT ĐỐI KHÔNG REWRITE TOÀN BỘ** (Rewrite là bẫy tử thần); (2) Viết Unit/Integration test bao phủ hành vi hiện tại; (3) Áp dụng **Strangler Fig Pattern**: Làm phẳng (Flatten) dần các tầng kế thừa thừa thãi, thay các Factory rỗng bằng hàm thuần túy (Pure Functions); (4) Refactor từng module nhỏ theo chu kỳ Sprint.",
+      "codeExample": "// Thay vì 3 class Factory/Interface:\n// Refactor về 1 hàm thuần túy đơn giản:\nexport function createNotification(type: 'email' | 'sms') { ... }"
+    },
+    "pitfalls": [
+      "Đập đi viết lại từ đầu làm mất hàng năm trời và bỏ quên vô số edge cases đã được fix trong code cũ."
+    ],
+    "followUpQuestions": [
+      "Kỹ thuật Strangler Fig Pattern giúp di chuyển kiến trúc an toàn trên production như thế nào?"
+    ]
+  }
+]

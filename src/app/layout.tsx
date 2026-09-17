@@ -67,6 +67,37 @@ export default function RootLayout({
           }}
         />
         <script src={`${basePath}/coi-serviceworker.min.js`} async />
+        {/* Mobile device redirection to /interview for static export */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var search = window.location.search || '';
+                  if (search.indexOf('desktop=true') !== -1) {
+                    sessionStorage.setItem('devpro_force_desktop', 'true');
+                    return;
+                  }
+                  if (search.indexOf('desktop=false') !== -1) {
+                    sessionStorage.removeItem('devpro_force_desktop');
+                  }
+                  if (sessionStorage.getItem('devpro_force_desktop') === 'true') {
+                    return;
+                  }
+                  var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth > 0 && window.innerWidth < 768);
+                  var basePath = '${basePath}';
+                  var target = basePath + '/interview';
+                  var pathname = window.location.pathname || '';
+                  var targetNormalized = target.replace(/\\/+$/, '');
+                  var pathNormalized = pathname.replace(/\\/+$/, '');
+                  if (isMobile && pathNormalized !== targetNormalized && !pathNormalized.startsWith(targetNormalized + '/')) {
+                    window.location.replace(target);
+                  }
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
       </head>
       <body
         suppressHydrationWarning

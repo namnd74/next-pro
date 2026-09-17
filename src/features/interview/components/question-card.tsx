@@ -1,14 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import {
-  Bookmark,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  AlertTriangle,
-  HelpCircle,
-} from 'lucide-react';
+import { Bookmark, ChevronDown, Sparkles, AlertTriangle, HelpCircle } from 'lucide-react';
 import { InterviewQuestion } from '../types';
 import { useInterviewStore } from '../stores/use-interview-store';
 import { Card } from '@/components/ui/card';
@@ -127,12 +120,40 @@ function getCategoryBadge(category: string): {
         className:
           'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
       };
+    case 'html':
+      return {
+        label: 'HTML5 & Web',
+        className:
+          'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30 font-semibold',
+      };
+    case 'css':
+      return {
+        label: 'CSS3 & Styling',
+        className:
+          'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30 font-semibold',
+      };
+    case 'design-patterns':
+      return {
+        iconName: 'architecture',
+        label: 'Design Patterns',
+        className:
+          'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30 font-semibold',
+      };
+    case 'micro-frontend':
+      return {
+        iconName: 'architecture',
+        label: 'Micro-Frontend',
+        className:
+          'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30 font-semibold',
+      };
+    case 'system-design':
     case 'frontend-system-design':
     case 'architecture':
       return {
         iconName: 'architecture',
         label: 'System Design',
-        className: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
+        className:
+          'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 font-semibold',
       };
     case 'state-data':
       return {

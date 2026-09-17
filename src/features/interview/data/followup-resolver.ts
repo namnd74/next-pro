@@ -1,4 +1,4 @@
-import { InterviewQuestion, InterviewFollowUp, InterviewFollowUpItem } from '../types';
+import { InterviewQuestion, InterviewFollowUp } from '../types';
 
 export interface ResolvedFollowUp {
   questionText: string;
@@ -277,7 +277,7 @@ function normalizeQuery(q: string): string {
 export function resolveFollowUp(
   parentQuestion: InterviewQuestion,
   followUp: InterviewFollowUp,
-  index: number
+  _index?: number
 ): ResolvedFollowUp {
   // Case 1: Already structured object with explicit answer
   if (typeof followUp === 'object' && followUp !== null && followUp.answer) {
