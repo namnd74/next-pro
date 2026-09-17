@@ -52,5 +52,135 @@
     "followUpQuestions": [
       "React Compiler (React Forget) ảnh hưởng thế nào đến việc dùng useMemo và useCallback trong tương lai?"
     ]
+  },
+  {
+    "id": "r19-03",
+    "category": "react-19",
+    "level": "middle",
+    "question": "Hook use() trong React 19: Đọc Promise trong render và đọc Context có điều kiện bên trong if/for hoạt động thế nào?",
+    "interviewerIntent": "Đánh giá hiểu biết sâu về tính năng mang tính cách mạng của React 19: Hook duy nhất được phép gọi bên trong câu lệnh điều kiện.",
+    "contextOrScenario": "Lấy dữ liệu từ Promise hoặc đọc Theme Context chỉ khi component ở một điều kiện cụ thể.",
+    "expectedKeywords": [
+      "use() hook",
+      "suspense integration",
+      "conditional context",
+      "promise unwrapping",
+      "breaking rules of hooks"
+    ],
+    "seniorAnswer": {
+      "summary": "`use()` là API mới của React 19 cho phép 'unwrap' (mở gói) giá trị của Promise hoặc Context trực tiếp trong quá trình render. Điểm đặc biệt nhất: `use()` là hook duy nhất CÓ THỂ ĐƯỢC GỌI BÊN TRONG CÂU LỆNH ĐIỀU KIỆN `if` VÀ VÒNG LẶP `for`.",
+      "deepDive": "Khi truyền Promise vào `use(promise)`, nếu Promise chưa resolve, React sẽ 'Suspend' component đó và hiển thị fallback của `<Suspense>` gần nhất. Khi Promise resolve, React tự động tiếp tục render với dữ liệu nhận được mà không cần viết `useEffect`, `useState` và `isLoading` thủ công.",
+      "codeExample": "function UserProfile({ userPromise, shouldShowTheme }: Props) {\n  // 1. Unwrap Promise với Suspense tự động:\n  const user = use(userPromise);\n  \n  // 2. Đọc Context có điều kiện bên trong if:\n  let theme = 'default';\n  if (shouldShowTheme) {\n    theme = use(ThemeContext);\n  }\n  \n  return <div className={theme}>{user.name}</div>;\n}"
+    },
+    "pitfalls": [
+      "Tạo Promise mới bên trong thân component khi dùng `use(newPromise)` gây ra vòng lặp render vô tận (Promise phải được tạo từ ngoài hoặc memoized)."
+    ],
+    "followUpQuestions": [
+      "Hook `use()` khác gì so với `useContext()` truyền thống trong React?"
+    ]
+  },
+  {
+    "id": "r19-04",
+    "category": "react-19",
+    "level": "middle",
+    "question": "useFormStatus và Progressive Enhancement trong React 19 hoạt động như thế nào?",
+    "interviewerIntent": "Kiểm tra kiến thức về tính năng form native và thiết kế form hoạt động bền bỉ ngay cả khi mạng chậm.",
+    "contextOrScenario": "Thiết kế nút bấm Submit tự động hiển thị spinner loading và disabled khi form đang được gửi.",
+    "expectedKeywords": [
+      "useformstatus",
+      "progressive enhancement",
+      "form submission",
+      "pending state",
+      "nested submit button"
+    ],
+    "seniorAnswer": {
+      "summary": "`useFormStatus` cung cấp thông tin về trạng thái của form cha gần nhất (`pending`, `data`, `method`, `action`). Nút Submit con có thể tự động biết form đang gửi hay không để hiển thị spinner mà không cần truyền props từ cha.",
+      "deepDive": "Nguyên lý Progressive Enhancement: Trong React 19 và Next.js, `<form action={serverAction}>` hoạt động chuẩn theo HTML native. Nếu người dùng chưa tải xong JavaScript hoặc tắt JS, form vẫn submit bằng standard HTTP POST và server render lại trang bình thường mà không bị chết.",
+      "codeExample": "import { useFormStatus } from 'react-dom';\n\nfunction SubmitButton() {\n  const { pending } = useFormStatus();\n  return (\n    <button type=\"submit\" disabled={pending}>\n      {pending ? 'Đang lưu...' : 'Lưu thay đổi'}\n    </button>\n  );\n}\n\n// Trong Form cha:\nfunction ProfileForm() {\n  return (\n    <form action={updateProfileAction}>\n      <input name=\"username\" />\n      <SubmitButton /> {/* Tự động đọc pending từ form cha */}\n    </form>\n  );\n}"
+    },
+    "pitfalls": [
+      "Gọi `useFormStatus` ngay trong chính component chứa thẻ `<form>` (nó bắt buộc phải được gọi từ component CON nằm bên trong form)."
+    ],
+    "followUpQuestions": [
+      "Tại sao React lại thiết kế `useFormStatus` bắt buộc phải gọi từ component con thay vì gọi trực tiếp ở component cha?"
+    ]
+  },
+  {
+    "id": "r19-05",
+    "category": "react-19",
+    "level": "middle",
+    "question": "Vòng đời Server Actions và useActionState trong React 19: Quản lý Form State và Error Handling chuẩn mực?",
+    "interviewerIntent": "Đánh giá khả năng xử lý form hiện đại không cần thư viện ngoài bằng các hook bản địa của React 19.",
+    "contextOrScenario": "Xử lý form cập nhật thông tin người dùng có validate lỗi từ server và hiển thị thông báo lỗi.",
+    "expectedKeywords": [
+      "useactionstate",
+      "server actions lifecycle",
+      "form state",
+      "previous state",
+      "isloading automation"
+    ],
+    "seniorAnswer": {
+      "summary": "`useActionState` (trước đây là `useFormState`) nhận một Action function và initialState, trả về `[state, formAction, isPending]`. Nó tự động hóa hoàn toàn việc cập nhật state từ kết quả của Server Action và quản lý trạng thái pending.",
+      "deepDive": "Luồng hoạt động: Khi form kích hoạt `formAction`, `isPending` chuyển thành `true`. Server Action chạy trên server, trả về dữ liệu mới hoặc lỗi `{ error: 'Email đã tồn tại' }`. Khi hoàn thành, `isPending` chuyển thành `false` và `state` được cập nhật vào component.",
+      "codeExample": "// action.ts\n'use server';\nexport async function updateEmail(prevState: any, formData: FormData) {\n  const email = formData.get('email');\n  if (!email) return { error: 'Email không được để trống' };\n  return { success: true };\n}\n\n// component.tsx\nfunction EmailForm() {\n  const [state, formAction, isPending] = useActionState(updateEmail, null);\n  return (\n    <form action={formAction}>\n      <input name=\"email\" />\n      {state?.error && <p className=\"text-red-500\">{state.error}</p>}\n      <button disabled={isPending}>{isPending ? 'Đang gửi...' : 'Cập nhật'}</button>\n    </form>\n  );\n}"
+    },
+    "pitfalls": [
+      "Quên tham số `prevState` ở vị trí đầu tiên của Action function khi dùng với `useActionState`."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để reset trạng thái của `useActionState` sau khi form submit thành công?"
+    ]
+  },
+  {
+    "id": "r19-06",
+    "category": "react-19",
+    "level": "senior",
+    "question": "Async Transitions trong React 19: startTransition hỗ trợ async/await thay đổi cách viết UI như thế nào?",
+    "interviewerIntent": "Kiểm tra mức độ cập nhật tính năng mới của React 19 Concurrency và loại bỏ các biến state loading thủ công.",
+    "contextOrScenario": "Thực hiện một hành động async (gọi API xóa item) nhưng muốn UI vẫn tương tác mượt mà và hiển thị trạng thái pending.",
+    "expectedKeywords": [
+      "async transitions",
+      "starttransition with async/await",
+      "ispending",
+      "concurrent rendering",
+      "non-blocking ui"
+    ],
+    "seniorAnswer": {
+      "summary": "Trong React 18, hàm truyền vào `startTransition` bắt buộc phải là đồng bộ. Trong React 19, `startTransition` chính thức hỗ trợ hàm **async/await**. React sẽ giữ `isPending = true` xuyên suốt toàn bộ thời gian async action chạy và tự động cập nhật UI khi hoàn tất.",
+      "deepDive": "Async Transitions giúp loại bỏ hoàn toàn việc phải tự quản lý `setIsLoading(true)` và `setIsLoading(false)` trong khối `try/catch/finally`. Trong khi transition đang chờ server, React vẫn cho phép người dùng click các nút khác trên trang mà không bị đơ UI.",
+      "codeExample": "function DeletePostButton({ postId }: { postId: string }) {\n  const [isPending, startTransition] = useTransition();\n\n  const handleDelete = () => {\n    startTransition(async () => {\n      // Hỗ trợ async/await trực tiếp trong React 19!\n      await deletePostServerAction(postId);\n      toast.success('Đã xóa bài viết');\n    });\n  };\n\n  return (\n    <button onClick={handleDelete} disabled={isPending}>\n      {isPending ? 'Đang xóa...' : 'Xóa bài'}\n    </button>\n  );\n}"
+    },
+    "pitfalls": [
+      "Bọc các cập nhật UI khẩn cấp (như gõ text vào input) vào trong `startTransition` khiến input bị lag."
+    ],
+    "followUpQuestions": [
+      "Khi có nhiều async transitions được kích hoạt liên tiếp thì React 19 điều phối thứ tự ưu tiên như thế nào?"
+    ]
+  },
+  {
+    "id": "r19-07",
+    "category": "react-19",
+    "level": "middle",
+    "question": "Ref Cleanup Callback Function và Document Metadata Native trong React 19?",
+    "interviewerIntent": "Kiểm tra kiến thức về các cải tiến tiện ích giúp loại bỏ boilerplate và thư viện bên ngoài trong React 19.",
+    "contextOrScenario": "Khởi tạo thư viện bên thứ 3 (Chart.js, Canvas, GSAP) trên DOM node và đặt thẻ title/meta SEO trong component.",
+    "expectedKeywords": [
+      "ref cleanup function",
+      "native document metadata",
+      "hoisting to head",
+      "replace react-helmet",
+      "resource preloading"
+    ],
+    "seniorAnswer": {
+      "summary": "React 19 bổ sung 2 tính năng cực kỳ tiện lợi: (1) **Ref Callback Cleanup**: Callback của `ref` giờ đây có thể trả về một cleanup function để dọn dẹp khi node unmount; (2) **Native Document Metadata**: Cho phép render trực tiếp `<title>`, `<meta>`, `<link>` trong component, React sẽ tự động đẩy (hoist) chúng lên `<head>`.",
+      "deepDive": "Trước đây với Ref callback: Khi DOM node unmount, React gọi callback với tham số `null` (`ref={(el) => { if (!el) destroy(); }}`). Nay viết như `useEffect`: `ref={(el) => { init(el); return () => destroy(); }}`. Tính năng Document Metadata giúp loại bỏ hoàn toàn thư viện `react-helmet` cồng kềnh.",
+      "codeExample": "// 1. Ref cleanup function:\n<div ref={(node) => {\n  const chart = initChart(node);\n  return () => chart.destroy(); // Tự động dọn dẹp khi DOM node bị unmount!\n}} />\n\n// 2. Native Metadata SEO:\nfunction BlogPost({ post }: Props) {\n  return (\n    <article>\n      <title>{post.title}</title>\n      <meta name=\"description\" content={post.summary} />\n      <h1>{post.title}</h1>\n    </article>\n  );\n}"
+    },
+    "pitfalls": [
+      "Vừa trả về cleanup function trong ref callback vừa gán `ref.current` theo cách cũ gây nhầm lẫn."
+    ],
+    "followUpQuestions": [
+      "React 19 tối ưu hóa việc tải trước tài nguyên (Resource Preloading: preload, preconnect) bằng các hàm nào?"
+    ]
   }
 ]

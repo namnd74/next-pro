@@ -1,0 +1,565 @@
+[
+  {
+    "id": "mfe-001",
+    "category": "micro-frontend",
+    "level": "junior",
+    "question": "Micro-frontend là gì?",
+    "interviewerIntent": "Đánh giá hiểu biết nền tảng về khái niệm kiến trúc chia nhỏ ứng dụng frontend theo domain tương tự microservices ở backend.",
+    "contextOrScenario": "Ứng dụng doanh nghiệp mở rộng từ 1 team lên 10 team phát triển đồng thời trên cùng một giao diện web.",
+    "expectedKeywords": [
+      "microservices for frontend",
+      "cross-functional teams",
+      "independent deployment",
+      "domain-driven design",
+      "composition"
+    ],
+    "seniorAnswer": {
+      "summary": "Micro-frontend là mô hình kiến trúc mở rộng khái niệm microservices lên tầng giao diện: chia nhỏ ứng dụng web nguyên khối (monolithic frontend) thành các ứng dụng nhỏ hơn, độc lập về mặt nghiệp vụ, có thể build, test và deploy riêng biệt bởi các team độc lập.",
+      "deepDive": "Mỗi micro-frontend đại diện cho một Bounded Context (ví dụ: Team Giỏ hàng, Team Thanh toán, Team Tìm kiếm). Các micro-frontend này sau đó được tích hợp lại thành một trải nghiệm duy nhất cho người dùng (Host / Shell application) thông qua client-side routing, Webpack/Vite Module Federation, iframe, hoặc server-side composition.",
+      "codeExample": "// Host Application (Shell) - dynamically loading Remotes\nimport('navApp/Header');\nimport('cartApp/MiniCart');"
+    },
+    "pitfalls": [
+      "Áp dụng micro-frontend cho dự án nhỏ hoặc team dưới 10 người gây lãng phí tài nguyên và chi phí vận hành (operational overhead) khổng lồ."
+    ],
+    "followUpQuestions": ["Khi nào KHÔNG NÊN áp dụng kiến trúc Micro-frontend?"]
+  },
+  {
+    "id": "mfe-002",
+    "category": "micro-frontend",
+    "level": "junior",
+    "question": "Micro-frontend khác monolith frontend ở đâu? Khi nào nên dùng?",
+    "interviewerIntent": "Khảo sát tư duy so sánh kiến trúc và khả năng xác định đúng thời điểm chuyển đổi.",
+    "contextOrScenario": "Ban giám đốc yêu cầu đánh giá xem có nên đập Monolith React hiện tại sang Micro-frontend hay không.",
+    "expectedKeywords": [
+      "monolith vs micro-frontend",
+      "team autonomy",
+      "build time",
+      "deployment bottleneck",
+      "organizational scaling"
+    ],
+    "seniorAnswer": {
+      "summary": "Monolith Frontend gom toàn bộ mã nguồn vào 1 repo, 1 quy trình build/deploy duy nhất; Micro-frontend chia thành nhiều repo/package chạy độc lập. Nên dùng Micro-frontend khi tổ chức có từ 3–5 team trở lên bị nghẽn quy trình release (deployment queue) và build time quá chậm.",
+      "deepDive": "Micro-frontend không sinh ra để tối ưu performance cho người dùng (ngược lại có thể làm tăng bundle size nếu chia sẻ dependency kém), mà sinh ra để giải quyết bài toán Tổ chức con người (Conway's Law): cho phép các team tự do về chu kỳ release, tech stack (ở mức độ kiểm soát) mà không phụ thuộc vào nhau.",
+      "codeExample": "// Monolith: 1 package.json, 1 webpack build 30 phút\n// Micro-frontend: Mỗi team sở hữu 1 pipeline deploy 2 phút"
+    },
+    "pitfalls": [
+      "Nghĩ rằng micro-frontend giúp app tải nhanh hơn (thực tế nếu không cấu hình shared dependencies sẽ gây tải trùng React, Lodash)."
+    ],
+    "followUpQuestions": [
+      "Conway's Law ảnh hưởng thế nào đến quyết định chọn kiến trúc frontend?"
+    ]
+  },
+  {
+    "id": "mfe-003",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Chia sẻ về micro-frontend ở công ty bạn đang làm (nếu có)?",
+    "interviewerIntent": "Kiểm tra kinh nghiệm thực chiến, hiểu biết về production architecture và những bài học kinh nghiệm (lessons learned).",
+    "contextOrScenario": "Ứng viên chia sẻ cách tổ chức hệ thống thực tế tại doanh nghiệp cũ.",
+    "expectedKeywords": [
+      "host shell",
+      "remote modules",
+      "CI/CD pipeline",
+      "design system tokens",
+      "monitoring & rollback"
+    ],
+    "seniorAnswer": {
+      "summary": "Mô tả hệ thống gồm 1 Shell App (chịu trách nhiệm Auth, Navigation bar, Global State, Layout) và 3–5 Remote Apps (Product Catalog, Checkout, Account Portal) được tích hợp bằng Webpack 5 Module Federation và deploy qua AWS S3/CloudFront riêng biệt.",
+      "deepDive": "Điểm mấu chốt trong dự án thực tế là quy định Governance: Shared Design System qua npm package, cơ chế Semantic Versioning cho remotes, Fallback UI khi remote bị lỗi 404/500 bằng React Error Boundary, và quy chuẩn contract communication qua Custom Events.",
+      "codeExample": "// Error boundary bảo vệ Host khi remote sập\n<ErrorBoundary fallback={<ServiceUnavailableFallback />}>\n  <RemoteProductList />\n</ErrorBoundary>"
+    },
+    "pitfalls": [
+      "Chỉ kể lý thuyết suông mà không nêu được các khó khăn thực tế như version mismatch, CSS leaking hay CI/CD complexity."
+    ],
+    "followUpQuestions": [
+      "Các bạn xử lý rollback một remote bị lỗi trên production như thế nào mà không cần deploy lại Host?"
+    ]
+  },
+  {
+    "id": "mfe-004",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Có những cách nào để tích hợp các micro-frontend lại với nhau?",
+    "interviewerIntent": "Đánh giá độ rộng kiến thức về các mô hình tích hợp: Build-time, Server-side, Client-side runtime.",
+    "contextOrScenario": "Chọn giải pháp kỹ thuật tích hợp giữa các micro-frontend cho nền tảng thương mại điện tử.",
+    "expectedKeywords": [
+      "build-time integration",
+      "server-side routing (reverse proxy)",
+      "client-side runtime (Module Federation, single-spa)",
+      "iframes",
+      "web components"
+    ],
+    "seniorAnswer": {
+      "summary": "Có 4 hướng tích hợp chính: (1) Build-time (npm packages); (2) Server-side routing / Reverse Proxy (Nginx định tuyến theo URL path /checkout, /products); (3) Client-side runtime (Module Federation, single-spa); (4) Sandboxed runtime (iFrames, Web Components).",
+      "deepDive": "Build-time đơn giản nhất nhưng mất tính năng independent deployment. Server-side reverse proxy là cách an toàn và ít rủi ro nhất (mỗi app là 1 Next.js/SSR container riêng). Client-side Module Federation mang lại trải nghiệm SPA liền mạch nhất nhưng đòi hỏi quản lý runtime dependencies chặt chẽ.",
+      "codeExample": "# Nginx Reverse Proxy\nlocation /store/ {\n    proxy_pass http://store-service.internal;\n}\nlocation /checkout/ {\n    proxy_pass http://checkout-service.internal;\n}"
+    },
+    "pitfalls": [
+      "Dùng build-time npm packages và gọi là micro-frontend (mỗi lần sửa remote lại phải build và deploy lại host -> vẫn là monolith phân tán)."
+    ],
+    "followUpQuestions": [
+      "Đánh đổi lớn nhất giữa Client-side integration và Server-side integration là gì?"
+    ]
+  },
+  {
+    "id": "mfe-005",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Module Federation là gì? Hoạt động như thế nào?",
+    "interviewerIntent": "Đào sâu vào công nghệ cốt lõi của Webpack 5 / Vite Module Federation hiện đang là tiêu chuẩn công nghiệp.",
+    "contextOrScenario": "Cấu hình chia sẻ component giữa Host và Remote mà không cần build lại Host.",
+    "expectedKeywords": [
+      "Webpack 5 Module Federation",
+      "host and remote",
+      "remoteEntry.js",
+      "shared dependencies",
+      "singleton"
+    ],
+    "seniorAnswer": {
+      "summary": "Module Federation là tính năng của Webpack 5 cho phép một ứng dụng JavaScript nạp mã nguồn từ một ứng dụng JavaScript khác tại runtime. Host tải file manifest `remoteEntry.js` của Remote và import dynamic component như thể module nội bộ.",
+      "deepDive": "Cơ chế hoạt động gồm Share Scope: Khi ứng dụng khởi động, Host và các Remote đăng ký danh sách thư viện chung (React, React-DOM) với version semver. Webpack runtime tự động chọn phiên bản phù hợp nhất và đảm bảo singleton (chỉ khởi tạo 1 instance React trong toàn bộ window).",
+      "codeExample": "// webpack.config.js (Remote)\nnew ModuleFederationPlugin({\n  name: 'cart',\n  filename: 'remoteEntry.js',\n  exposes: {\n    './MiniCart': './src/components/MiniCart',\n  },\n  shared: { react: { singleton: true }, 'react-dom': { singleton: true } },\n});"
+    },
+    "pitfalls": [
+      "Quên đặt `singleton: true` cho `react` và `react-dom` dẫn đến lỗi Invalid Hook Call do có 2 bản React cùng chạy."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để handle dynamic remote URL theo môi trường (dev/staging/prod) trong Module Federation?"
+    ]
+  },
+  {
+    "id": "mfe-006",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "single-spa là gì? Nó giải quyết vấn đề gì?",
+    "interviewerIntent": "Kiểm tra hiểu biết về router orchestrator hàng đầu cho micro-frontend trước khi Module Federation phổ biến.",
+    "contextOrScenario": "Tích hợp các ứng dụng viết bằng framework khác nhau (React, Vue, Angular) vào cùng 1 trang SPA.",
+    "expectedKeywords": [
+      "single-spa orchestrator",
+      "framework agnostic",
+      "lifecycle methods (bootstrap, mount, unmount)",
+      "activity function",
+      "routing table"
+    ],
+    "seniorAnswer": {
+      "summary": "single-spa là một Javascript framework đóng vai trò Top-level Router / Orchestrator, cho phép kết hợp nhiều micro-frontend (kể cả khác framework: React, Angular, Vue) trên cùng 1 trang SPA bằng cách quản lý vòng đời mount/unmount theo URL.",
+      "deepDive": "Mỗi micro-app đăng ký với single-spa kèm 3 lifecycle bắt buộc: `bootstrap`, `mount`, `unmount` và 1 hàm `activityFn(location)` để quyết định khi nào app được active. Khi URL thay đổi, single-spa gọi unmount app cũ và mount app mới vào DOM mà không cần reload trang.",
+      "codeExample": "// root-config.js\nregisterApplication({\n  name: '@org/navbar',\n  app: () => System.import('@org/navbar'),\n  activeWhen: ['/'],\n});\nregisterApplication({\n  name: '@org/billing',\n  app: () => System.import('@org/billing'),\n  activeWhen: ['/billing'],\n});\nstart();"
+    },
+    "pitfalls": [
+      "Không cleanup các global event listener hoặc setInterval trong hàm `unmount`, gây memory leak tích tụ sau nhiều lần chuyển route."
+    ],
+    "followUpQuestions": ["single-spa khác với Module Federation ở điểm cơ bản nào?"]
+  },
+  {
+    "id": "mfe-007",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Các micro-frontend giao tiếp với nhau như thế nào?",
+    "interviewerIntent": "Đánh giá tư duy thiết kế loosely coupled (ghép lỏng) và tránh anti-pattern rò rỉ state giữa các app độc lập.",
+    "contextOrScenario": "Micro-frontend Giỏ hàng cần cập nhật số lượng khi Micro-frontend Chi tiết sản phẩm bấm 'Thêm vào giỏ'.",
+    "expectedKeywords": [
+      "custom events / window.dispatchEvent",
+      "pub/sub pattern",
+      "URL search params",
+      "shared event bus",
+      "loose coupling"
+    ],
+    "seniorAnswer": {
+      "summary": "Nên ưu tiên giao tiếp theo cơ chế ghép lỏng (loosely coupled): (1) Custom Events native (`window.dispatchEvent`); (2) URL Search Params (state đồng bộ qua query string); (3) Pub/Sub Event Bus hoặc BroadcastChannel (nếu giao tiếp đa tab). Hạn chế dùng chung 1 Global Store (như Redux) cho tất cả micro-frontend.",
+      "deepDive": "Dùng chung Global Store (Redux/Zustand) làm các micro-frontend phụ thuộc chặt chẽ vào schema của nhau, phá vỡ tính độc lập. Chuẩn hóa communication bằng CustomEvent kèm Payload rõ ràng và validate payload ở phía nhận.",
+      "codeExample": "// Phát sự kiện từ Product App:\nwindow.dispatchEvent(new CustomEvent('cart:item-added', { detail: { productId: 101, qty: 1 } }));\n\n// Lắng nghe ở Cart App:\nwindow.addEventListener('cart:item-added', (e: any) => {\n  updateBadge(e.detail);\n});"
+    },
+    "pitfalls": [
+      "Tạo một Global Redux Store khổng lồ ở Host và inject store vào tất cả Remote apps."
+    ],
+    "followUpQuestions": [
+      "Làm sao tránh xung đột event name giữa các team khi hệ thống mở rộng lên 20 micro-frontend?"
+    ]
+  },
+  {
+    "id": "mfe-008",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Routing hoạt động ra sao trong kiến trúc micro-frontend?",
+    "interviewerIntent": "Khảo sát kiến thức xử lý xung đột routing giữa Host và các Remote component.",
+    "contextOrScenario": "Ứng dụng con bên trong có router riêng (React Router) chạy lồng trong router chính của Shell App.",
+    "expectedKeywords": [
+      "browser history API",
+      "sub-routing",
+      "base path / basename",
+      "memory router vs browser router",
+      "synchronization"
+    ],
+    "seniorAnswer": {
+      "summary": "Mô hình định tuyến 2 cấp: (1) Host Router điều hướng cấp cao (Top-level) dựa trên Path prefix (ví dụ: `/checkout/*` $\\rightarrow$ Checkout MFE); (2) Remote Router quản lý các route con bên trong bằng `MemoryHistory` hoặc cấu hình `basename` tương ứng.",
+      "deepDive": "Nếu cả Host và Remote đều dùng `BrowserRouter` với `HTML5 History API` trực tiếp, chúng sẽ can thiệp đè lẫn nhau. Giải pháp tối ưu là Remote sử dụng `createMemoryRouter` và đồng bộ navigation events hai chiều với Host Router thông qua callback hoặc listener.",
+      "codeExample": "// Remote Component\nexport function RemoteApp({ initialPath, onNavigate }: Props) {\n  const router = createMemoryRouter(routes, { initialEntries: [initialPath] });\n  // Lắng nghe thay đổi để báo cho Host\n  useEffect(() => router.subscribe(state => onNavigate(state.location.pathname)), [router]);\n  return <RouterProvider router={router} />;\n}"
+    },
+    "pitfalls": [
+      "Đặt nhiều `BrowserRouter` cùng lúc mà không có `basename`, khiến nút Back/Forward của trình duyệt nhảy loạn xạ."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để hỗ trợ Deeplinking vào thẳng trang con của một remote micro-frontend?"
+    ]
+  },
+  {
+    "id": "mfe-009",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Làm sao tách biệt CSS để các micro-frontend không ghi đè style của nhau?",
+    "interviewerIntent": "Đánh giá các giải pháp cô lập CSS (CSS Isolation) để tránh xung đột global style.",
+    "contextOrScenario": "Team A dùng Bootstrap 4, Team B dùng Tailwind CSS, gây vỡ giao diện khi render chung màn hình.",
+    "expectedKeywords": [
+      "css modules",
+      "css-in-js",
+      "shadow dom",
+      "tailwind prefix",
+      "postcss namespacing"
+    ],
+    "seniorAnswer": {
+      "summary": "Có 4 giải pháp cô lập CSS: (1) Shadow DOM (cô lập tuyệt đối ở cấp độ trình duyệt); (2) CSS Modules / Scoped CSS (băm hash class name); (3) PostCSS prefixing / Tailwind prefix (thêm namespace `.mfe-checkout-` vào mọi selector); (4) CSS-in-JS với unique style injection.",
+      "deepDive": "Shadow DOM cô lập style tốt nhất nhưng gây khó khăn khi dùng chung Design System tokens và portal dialogs/tooltips. Trong thực tế, kết hợp Tailwind Prefix (`prefix: 'tw-cart-'`) hoặc PostCSS Namespace Wrapper là giải pháp cân bằng tốt nhất giữa hiệu năng và độ cô lập.",
+      "codeExample": "// tailwind.config.js cho Remote Cart\nmodule.exports = {\n  prefix: 'cart-',\n  important: '#cart-root',\n};"
+    },
+    "pitfalls": [
+      "Dùng reset CSS (normalize.css / browser reset) ở remote app làm reset luôn style toàn bộ trang Host."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để chia sẻ Design Tokens và theme biến màu CSS (`--primary`) xuyên suốt các micro-frontend?"
+    ]
+  },
+  {
+    "id": "mfe-010",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Micro-frontend có nhược điểm và thách thức gì?",
+    "interviewerIntent": "Đánh giá tính khách quan và tư duy đánh đổi (trade-offs) của kỹ sư senior, tránh thiên hướng hype công nghệ.",
+    "contextOrScenario": "Bảo vệ quan điểm trước CTO về những rủi ro khi chuyển đổi sang micro-frontend.",
+    "expectedKeywords": [
+      "bundle size overhead",
+      "operational complexity",
+      "version fragmentation",
+      "inconsistent ui/ux",
+      "difficult end-to-end testing"
+    ],
+    "seniorAnswer": {
+      "summary": "Thách thức lớn nhất gồm: (1) Bundle size tăng cao do trùng lặp thư viện; (2) Trải nghiệm người dùng dễ bị phân mảnh (UI không nhất quán); (3) Độ phức tạp vận hành CI/CD và deployment tăng vọt; (4) Debug và test E2E khó khăn gấp nhiều lần so với Monolith.",
+      "deepDive": "Phát sinh chi phí ẩn về mặt Governance: Phải có team Core / Platform chuyên trách để duy trì Host Shell, Shared Components, bảo mật và tooling. Nếu quản trị lỏng lẻo, mỗi team dùng một phiên bản thư viện khác nhau dẫn đến browser tải hàng chục MB JavaScript.",
+      "codeExample": "// Thách thức giám sát:\n// 1 trang web tải từ 5 domain S3 khác nhau, khi lỗi xảy ra rất khó trace nguyên nhân từ remote nào."
+    },
+    "pitfalls": [
+      "Xem micro-frontend là giải pháp 'chữa bách bệnh' cho code xấu, trong khi micro-frontend chỉ giải quyết bài toán quy mô tổ chức."
+    ],
+    "followUpQuestions": [
+      "Làm sao để đảm bảo tính nhất quán UX/UI giữa các micro-frontend do các team khác nhau phát triển?"
+    ]
+  },
+  {
+    "id": "mfe-011",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Dùng iframe để dựng micro-frontend có ưu và nhược điểm gì?",
+    "interviewerIntent": "Kiểm tra hiểu biết về giải pháp cô lập lâu đời nhất của web platform và lý do tại sao ít dùng cho UI phức tạp hiện đại.",
+    "contextOrScenario": "Tích hợp một ứng dụng Legacy (PHP/jQuery) vào cổng thông tin nội bộ React.",
+    "expectedKeywords": [
+      "perfect isolation",
+      "security sandbox",
+      "responsive/resizing issues",
+      "accessibility (a11y)",
+      "seo and routing constraints"
+    ],
+    "seniorAnswer": {
+      "summary": "Ưu điểm: Cô lập tuyệt đối về JS, CSS, Global Scope và bảo mật (sandbox). Nhược điểm: Khó co giãn kích thước linh hoạt theo nội dung (height iframe resizing), điều hướng routing và deep-link rất khó khăn, hiệu năng kém do tiêu tốn RAM riêng cho mỗi browsing context, và trải nghiệm UX bị giật.",
+      "deepDive": "Iframe rất phù hợp khi nhúng ứng dụng của bên thứ 3 (Payment Gateway, Chat widget) hoặc hệ thống legacy không thể refactor. Tuy nhiên, nếu dùng iframe cho từng thành phần con trong một giao diện (như Header, Sidebar, Content), modal/dialog sẽ bị đóng khung bên trong iframe và không phủ tràn màn hình được.",
+      "codeExample": "<iframe\n  src=\"https://legacy-billing.internal/app\"\n  sandbox=\"allow-scripts allow-same-origin\"\n  style={{ width: '100%', height: dynamicHeight }}\n/>"
+    },
+    "pitfalls": [
+      "Cố gắng làm dropdown menu hoặc modal popup bên trong iframe mà muốn nó nổi lên trên các phần tử của trang cha."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để hai window cha - con trong iframe giao tiếp an toàn qua `window.postMessage`?"
+    ]
+  },
+  {
+    "id": "mfe-012",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Dùng Web Components cho micro-frontend như thế nào?",
+    "interviewerIntent": "Khảo sát kiến thức về chuẩn web tiêu chuẩn (Custom Elements, Shadow DOM) làm lớp bao bọc (wrapper) framework-agnostic.",
+    "contextOrScenario": "Đóng gói một widget Angular hoặc Vue để team React có thể sử dụng dễ dàng như thẻ HTML chuẩn.",
+    "expectedKeywords": [
+      "custom elements",
+      "shadow dom",
+      "framework agnostic",
+      "html attributes / props",
+      "custom events"
+    ],
+    "seniorAnswer": {
+      "summary": "Web Components cung cấp chuẩn chung của trình duyệt: Bọc component React/Vue/Angular bên trong Custom Element (`customElements.define('user-badge', UserBadgeElement)`). Host chỉ cần render thẻ `<user-badge user-id=\"123\"></user-badge>` mà không cần quan tâm remote viết bằng gì.",
+      "deepDive": "Web Components mang lại tính độc lập hoàn hảo về công nghệ nhờ Shadow DOM cô lập CSS. Giao tiếp từ ngoài vào qua HTML Attributes/Properties, từ trong ra qua `dispatchEvent(new CustomEvent(...))`. Thách thức là SSR với Declarative Shadow DOM còn mới và bundle runtime của từng framework vẫn bị đóng gói kèm.",
+      "codeExample": "class CartElement extends HTMLElement {\n  connectedCallback() {\n    const root = ReactDOM.createRoot(this.attachShadow({ mode: 'open' }));\n    root.render(<CartWidget />);\n  }\n}\ncustomElements.define('mfe-cart', CartElement);"
+    },
+    "pitfalls": [
+      "Shadow DOM làm các global modal hoặc CSS utility (như Tailwind ở Shell) không thể tác động vào bên trong element."
+    ],
+    "followUpQuestions": [
+      "Declarative Shadow DOM giải quyết vấn đề Server-Side Rendering (SSR) cho Web Components như thế nào?"
+    ]
+  },
+  {
+    "id": "mfe-013",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Module Federation và single-spa khác nhau thế nào? Khi nào dùng cái nào?",
+    "interviewerIntent": "So sánh hai giải pháp phổ biến nhất trong hệ sinh thái Micro-frontend hiện đại.",
+    "contextOrScenario": "Lựa chọn kiến trúc cho dự án mới hoàn toàn (Greenfield) hoặc hệ thống đang có.",
+    "expectedKeywords": [
+      "build tool vs router",
+      "bundler integration",
+      "module sharing",
+      "framework agnostic orchestrator"
+    ],
+    "seniorAnswer": {
+      "summary": "single-spa là Router Orchestrator (quản lý lifecycle mount/unmount app theo URL), độc lập với bundler; Module Federation là cơ chế của Bundler (Webpack/Vite) cho phép nạp dynamic modules và chia sẻ shared dependencies tự động ở cấp độ mã nguồn.",
+      "deepDive": "Nếu hệ thống có nhiều framework khác nhau (React + Angular + Vue), single-spa là lựa chọn phù hợp nhất để điều phối. Nếu toàn bộ tổ chức thống nhất dùng React (hoặc cùng 1 hệ sinh thái build), Module Federation vượt trội hơn hẳn về khả năng chia sẻ dependencies, lazy loading micro-components và DX mượt mà.",
+      "codeExample": "// Thực tế có thể kết hợp cả hai:\n// Dùng single-spa để routing giữa các trang lớn, và Module Federation để nạp shared components."
+    },
+    "pitfalls": [
+      "Nghĩ rằng Module Federation và single-spa loại trừ lẫn nhau (chúng có thể bổ trợ cho nhau)."
+    ],
+    "followUpQuestions": ["Vite có hỗ trợ Module Federation tương tự Webpack 5 không?"]
+  },
+  {
+    "id": "mfe-014",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Test micro-frontend như thế nào?",
+    "interviewerIntent": "Khảo sát chiến lược kiểm thử (Testing Strategy) kim tự tháp trong môi trường phân tán.",
+    "contextOrScenario": "Thiết lập pipeline CI/CD kiểm thử để một team deploy remote không làm hỏng Host trên production.",
+    "expectedKeywords": [
+      "unit testing in isolation",
+      "contract testing (pact)",
+      "mock host shell",
+      "e2e synthetic testing (playwright)",
+      "canary deployment"
+    ],
+    "seniorAnswer": {
+      "summary": "Chiến lược 3 tầng: (1) Unit & Component Test độc lập bên trong từng repo remote (chạy với Mock Shell); (2) Contract Testing (kiểm tra giao ước event và props giữa Host và Remote); (3) Synthetic E2E Test (Playwright) chạy trên môi trường Staging tích hợp đầy đủ trước khi promote.",
+      "deepDive": "Tránh phụ thuộc hoàn toàn vào E2E test vì E2E rất chậm và dễ flaky khi có 10+ remote. Contract Testing (như Pact) giúp đảm bảo Remote không thay đổi payload của CustomEvent mà Host đang chờ đợi.",
+      "codeExample": "// Component test với Mock Shell Container\ndescribe('RemoteCart', () => {\n  it('dispatches checkout event', () => {\n    const spy = vi.fn();\n    window.addEventListener('cart:checkout', spy);\n    render(<RemoteCart />);\n    fireEvent.click(screen.getByText('Checkout'));\n    expect(spy).toHaveBeenCalled();\n  });\n});"
+    },
+    "pitfalls": [
+      "Bỏ qua contract testing, chỉ test remote chạy lẻ rồi deploy trực tiếp gây lỗi trắng trang ở Host."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để chạy E2E testing nhanh chóng khi có hàng chục micro-frontend cùng thay đổi?"
+    ]
+  },
+  {
+    "id": "mfe-015",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Ưu và nhược điểm của micro-frontend là gì?",
+    "interviewerIntent": "Đánh giá khả năng tóm lược tổng quan và phản biện kiến trúc của ứng viên.",
+    "contextOrScenario": "Phỏng vấn vòng Architectural Review.",
+    "expectedKeywords": [
+      "pros: autonomous teams, independent deploy, incremental upgrades",
+      "cons: payload size, complexity, inconsistent styling, network overhead"
+    ],
+    "seniorAnswer": {
+      "summary": "Ưu điểm: Trao quyền độc lập cho các team (Team Autonomy), deploy độc lập không phụ thuộc, nâng cấp công nghệ từng phần (Incremental Upgrades). Nhược điểm: Phình to kích thước bundle tải về browser, độ phức tạp cấu hình CI/CD và infrastructure, khó quản trị trải nghiệm đồng nhất.",
+      "deepDive": "Micro-frontend là sự đánh đổi giữa Hiệu quả tổ chức (Team Scalability) và Chi phí kỹ thuật (Technical Complexity). Nó là giải pháp tuyệt vời cho các tập đoàn lớn có hàng trăm kỹ sư, nhưng là 'thuốc độc' cho các startup nhỏ cần tinh gọn.",
+      "codeExample": "// Đánh đổi rõ rệt:\n// Monolith: 1 bundle 2MB, tải 1 lần\n// Micro-frontend: 1 Shell 500KB + 4 Remotes 400KB mỗi cái = 2.1MB + overhead network latency."
+    },
+    "pitfalls": [
+      "Xem micro-frontend là mục tiêu kỹ thuật cần đạt được thay vì là phương tiện giải quyết bài toán nhân sự."
+    ],
+    "followUpQuestions": [
+      "Khi nào một tổ chức nên từ bỏ Micro-frontend để quay về Monolith?"
+    ]
+  },
+  {
+    "id": "mfe-016",
+    "category": "micro-frontend",
+    "level": "middle",
+    "question": "Có những công nghệ và framework nào để xây micro-frontend?",
+    "interviewerIntent": "Khảo sát kiến thức cập nhật về hệ sinh thái tooling hiện đại.",
+    "contextOrScenario": "Khảo sát công nghệ trước khi lập báo cáo đề xuất dự án.",
+    "expectedKeywords": [
+      "Webpack 5 Module Federation",
+      "Vite Plugin Module Federation / Module Federation 2.0 (ByteDance)",
+      "single-spa",
+      "qiankun",
+      "Bit",
+      "OpenComponents"
+    ],
+    "seniorAnswer": {
+      "summary": "Các công nghệ phổ biến nhất hiện nay: (1) Webpack 5 Module Federation & Module Federation 2.0 (phổ biến nhất); (2) single-spa và qiankun (dựa trên single-spa của Ant Financial); (3) Vite Module Federation (@originjs/vite-plugin-federation); (4) Bit (component-driven micro-frontends); (5) Native Web Components & Import Maps.",
+      "deepDive": "qiankun là framework rất mạnh xây dựng trên single-spa, bổ sung thêm JS Sandbox (Proxy Sandbox chống ô nhiễm window object), HTML Entry loader và CSS Scoping tự động, rất được ưa chuộng trong các dự án enterprise.",
+      "codeExample": "// qiankun start\nimport { registerMicroApps, start } from 'qiankun';\nregisterMicroApps([\n  { name: 'react app', entry: '//localhost:7100', container: '#container', activeRule: '/react' },\n]);\nstart();"
+    },
+    "pitfalls": [
+      "Chọn framework mà không kiểm tra khả năng tương thích với build tool (Webpack vs Vite)."
+    ],
+    "followUpQuestions": [
+      "Proxy Sandbox trong qiankun ngăn ngừa ô nhiễm biến toàn cục (`window`) như thế nào?"
+    ]
+  },
+  {
+    "id": "mfe-017",
+    "category": "micro-frontend",
+    "level": "senior",
+    "question": "Làm sao chia sẻ dependency chung và tránh tải trùng (vd nhiều bản React)?",
+    "interviewerIntent": "Kiểm tra kỹ năng tối ưu hiệu năng sâu và hiểu rõ cơ chế dependency resolution của Module Federation.",
+    "contextOrScenario": "Audit bundle size thấy cả Shell và Remote đều tải riêng `react`, `react-dom` và `lodash` làm app tải cực chậm.",
+    "expectedKeywords": [
+      "shared scope",
+      "singleton: true",
+      "requiredVersion",
+      "strictVersion",
+      "eager loading"
+    ],
+    "seniorAnswer": {
+      "summary": "Sử dụng cấu hình `shared` trong Module Federation Plugin: Đặt `singleton: true` để chỉ cho phép 1 instance duy nhất được khởi tạo trong runtime, và khai báo `requiredVersion: dependencies['react']` để kiểm tra độ tương thích semver.",
+      "deepDive": "Khi chạy, Webpack Share Scope sẽ so sánh phiên bản semver của Host và Remote. Nếu `strictVersion: false` và phiên bản tương thích (ví dụ `^18.2.0`), remote sẽ tái sử dụng React đã nạp bởi Host. Nếu `strictVersion: true` và version không khớp, Webpack sẽ cảnh báo hoặc nạp bản riêng (nếu không phải singleton). Với React, bắt buộc phải singleton để tránh vỡ React Context và Hooks dispatcher.",
+      "codeExample": "// webpack.config.js\nnew ModuleFederationPlugin({\n  shared: {\n    react: {\n      singleton: true,\n      requiredVersion: deps.react,\n      eager: false, // Để lazy load tránh lock Host startup\n    },\n    'react-dom': {\n      singleton: true,\n      requiredVersion: deps['react-dom'],\n    },\n  },\n});"
+    },
+    "pitfalls": [
+      "Bật `eager: true` cho shared libraries ở Remote khiến toàn bộ dependency bị đóng gói tĩnh vào bundle, vô hiệu hóa việc chia sẻ động."
+    ],
+    "followUpQuestions": [
+      "Lỗi 'Shared module is not available for eager consumption' xảy ra do đâu và fix thế nào?"
+    ]
+  },
+  {
+    "id": "mfe-018",
+    "category": "micro-frontend",
+    "level": "senior",
+    "question": "Independent deployment trong micro-frontend đạt được bằng cách nào?",
+    "interviewerIntent": "Đánh giá kiến thức về CI/CD pipeline, cloud hosting, cache invalidation và live discovery của remotes.",
+    "contextOrScenario": "Team Checkout muốn release tính năng mới lên production lúc 2 giờ chiều mà không cần thông báo hay phối hợp deploy với team Shell.",
+    "expectedKeywords": [
+      "s3/cdn bucket per remote",
+      "manifest / dynamic remote urls",
+      "cache-control: no-cache for remoteEntry.js",
+      "hash-named asset chunks",
+      "feature flags"
+    ],
+    "seniorAnswer": {
+      "summary": "Độc lập triển khai đạt được khi mỗi Micro-frontend có repo riêng, CI/CD pipeline riêng và deploy file tĩnh lên S3/CloudFront riêng. Host không bundle code của Remote mà nạp động file `remoteEntry.js` thông qua URL tĩnh hoặc service discovery API.",
+      "deepDive": "Quy tắc cốt lõi về Caching: File `remoteEntry.js` phải luôn có header `Cache-Control: no-cache, no-store` để trình duyệt luôn lấy manifest mới nhất. Các file chunk JS/CSS có hash (`main.a8b1c.js`) được cache vĩnh viễn (`max-age=31536000, immutable`). Khi remote deploy mới, chỉ cần ghi đè `remoteEntry.js` trên S3, toàn bộ người dùng sẽ tự động nhận code mới ở lần F5 tiếp theo.",
+      "codeExample": "# S3 deployment policy cho Remote:\naws s3 cp dist/ s3://my-mfe-cart/ --exclude 'remoteEntry.js' --cache-control 'max-age=31536000,immutable'\naws s3 cp dist/remoteEntry.js s3://my-mfe-cart/ --cache-control 'no-cache,no-store,must-revalidate'"
+    },
+    "pitfalls": [
+      "Cache file `remoteEntry.js` trên CDN nhiều ngày khiến khách hàng không cập nhật được phiên bản mới sau khi deploy."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để Host hỗ trợ Dynamic Remote URLs thông qua Feature Flags / Config Service?"
+    ]
+  },
+  {
+    "id": "mfe-019",
+    "category": "micro-frontend",
+    "level": "senior",
+    "question": "Làm sao chia sẻ state toàn cục giữa các micro-frontend một cách an toàn?",
+    "interviewerIntent": "Đánh giá tư duy kiến trúc dữ liệu phân tán, ngăn ngừa memory leak và race conditions trên browser.",
+    "contextOrScenario": "Thông tin User Profile (Token, Role, Permissions) cần được truy cập đồng thời bởi 5 micro-frontend khác nhau trên trang.",
+    "expectedKeywords": [
+      "unidirectional data flow",
+      "immutable state snapshot",
+      "reactive store wrapper (Zustand/RxJS)",
+      "read-only contracts",
+      "window custom events"
+    ],
+    "seniorAnswer": {
+      "summary": "Nguyên tắc: Chỉ có Shell/Host mới có quyền ghi (write) vào Global State (User Auth, Theme); các Remote Micro-frontends chỉ được cấp quyền đọc (read-only) thông qua Context Adapter hoặc Subscribe Pattern.",
+      "deepDive": "Có thể dùng một lightweight reactive store (như Zustand hoặc RxJS BehaviorSubject) được xuất bản từ Host. Host cung cấp interface `getAuthState()` và `subscribeToAuth(callback)`. Không bao giờ cho phép Remote tự ý thay đổi auth token trực tiếp để tránh race conditions khó lường.",
+      "codeExample": "// Shared auth package hoặc Host expose:\nexport const authService = {\n  getUser: () => ({ ...currentUser }), // trả về shallow copy\n  subscribe: (cb: (user: User) => void) => eventEmitter.on('user_change', cb),\n  // Chỉ Host mới gọi được login/logout\n};"
+    },
+    "pitfalls": [
+      "Cho phép các remote tùy ý mutate state chung khiến việc debug nguồn gốc bug trở thành bất khả thi."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để đồng bộ state giữa các tabs trình duyệt khác nhau bằng BroadcastChannel API?"
+    ]
+  },
+  {
+    "id": "mfe-020",
+    "category": "micro-frontend",
+    "level": "senior",
+    "question": "Server-side rendering (SSR) với micro-frontend khác gì so với tích hợp ở client?",
+    "interviewerIntent": "Khảo sát kiến thức chuyên sâu về kiến trúc SSR phân tán (Distributed SSR), một trong những bài toán khó nhất của web development.",
+    "contextOrScenario": "Yêu cầu xây dựng trang thương mại điện tử chuẩn SEO và First Contentful Paint < 1s bằng Micro-frontend.",
+    "expectedKeywords": [
+      "distributed ssr",
+      "podlet / tailor",
+      "edge side includes (esi)",
+      "streaming ssr",
+      "hydration synchronization"
+    ],
+    "seniorAnswer": {
+      "summary": "Client-side tích hợp tải file JS về trình duyệt rồi mới render (SEO kém, màn hình trắng ban đầu). Server-Side Rendering (SSR) với Micro-frontend đòi hỏi Server Shell phải gọi song song các Server Remotes để lấy HTML phân mảnh, ghép thành 1 trang hoàn chỉnh trả về client trước khi hydrate.",
+      "deepDive": "Các giải pháp triển khai SSR Micro-frontend: (1) Edge-Side Includes (ESI) tại Cloudflare/Nginx CDN; (2) Next.js Multi-zones; (3) Next.js Module Federation Server (`@module-federation/nextjs-mf`). Thách thức lớn nhất là xử lý Waterfall latency khi một remote server phản hồi chậm, và Hydration Mismatch khi client nạp khác version.",
+      "codeExample": "// Next.js Multi-Zones config (next.config.js)\nasync rewrites() {\n  return [\n    { source: '/blog/:path*', destination: 'https://blog.my-domain.com/blog/:path*' },\n  ];\n}"
+    },
+    "pitfalls": [
+      "Chờ tất cả remote SSR xong mới trả HTML (1 remote chậm làm cả trang bị nghẽn TTFB) $\\rightarrow$ Cần dùng React Suspense Streaming HTML."
+    ],
+    "followUpQuestions": [
+      "React 18 Streaming SSR và Suspense giúp giải quyết bài toán remote chậm trong Micro-frontend SSR như thế nào?"
+    ]
+  },
+  {
+    "id": "mfe-021",
+    "category": "micro-frontend",
+    "level": "senior",
+    "question": "Import maps là gì và đóng vai trò gì trong micro-frontend?",
+    "interviewerIntent": "Đánh giá kiến thức về chuẩn Web ES Modules (ESM) gốc hiện đại thay thế cho các bundler phức tạp.",
+    "contextOrScenario": "Xây dựng hệ thống micro-frontend thuần chuẩn W3C mà không cần phụ thuộc vào Webpack.",
+    "expectedKeywords": [
+      "w3c standard",
+      "browser native es modules",
+      "bare module specifiers",
+      "cdn resolution",
+      "no bundler runtime"
+    ],
+    "seniorAnswer": {
+      "summary": "Import Maps là chuẩn W3C của trình duyệt cho phép kiểm soát cách trình duyệt phân giải các 'bare module specifier' (như `import React from 'react'`) thành các URL tĩnh cụ thể mà không cần bundler can thiệp.",
+      "deepDive": "Trong micro-frontend, Import Maps hoạt động như một Service Registry tập trung. Bằng cách định nghĩa `<script type=\"importmap\">`, Host chỉ định rõ `\"react\": \"https://cdn.esm.sh/react@18\"` và `\"@mfe/cart\": \"https://cdn.my-company.com/cart/v2/index.js\"`. Khi cần cập nhật phiên bản, chỉ cần cập nhật thẻ Import Map trong HTML mà không cần re-bundle bất kỳ ứng dụng nào.",
+      "codeExample": "<script type=\"importmap\">\n{\n  \"imports\": {\n    \"react\": \"https://esm.sh/react@18.2.0\",\n    \"react-dom\": \"https://esm.sh/react-dom@18.2.0\",\n    \"@my-org/cart\": \"https://assets.my-org.com/cart/main.js\"\n  }\n}\n</script>\n<script type=\"module\">\n  import { Cart } from '@my-org/cart';\n</script>"
+    },
+    "pitfalls": [
+      "Import maps chỉ có thể khai báo một lần duy nhất trước khi bất kỳ module script nào được thực thi; không thể append thêm động sau khi đã nạp module."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để hỗ trợ dynamic import map updates hoặc fallback trên các trình duyệt cũ?"
+    ]
+  },
+  {
+    "id": "mfe-022",
+    "category": "micro-frontend",
+    "level": "senior",
+    "question": "Làm sao để một micro-frontend lỗi không làm sập cả trang (fault isolation)?",
+    "interviewerIntent": "Đánh giá năng lực thiết kế hệ thống bền bỉ (Resilience), phòng thủ sâu và xử lý sự cố runtime (Fault Tolerance).",
+    "contextOrScenario": "Server của team Review bị sập 500, trang Chi tiết sản phẩm vẫn phải cho khách xem giá và mua hàng bình thường.",
+    "expectedKeywords": [
+      "react error boundary",
+      "dynamic import fallback",
+      "circuit breaker",
+      "graceful degradation",
+      "sentry / telemetry reporting"
+    ],
+    "seniorAnswer": {
+      "summary": "Áp dụng nguyên tắc Fault Isolation (Cô lập lỗi): (1) Bọc mọi Remote Component bằng React Error Boundary độc lập; (2) Xử lý fallback khi Dynamic Import bị network failure; (3) Ngắt kết nối circuit-breaker để không spam request khi remote bị sập liên tục.",
+      "deepDive": "Khi nạp remote qua `React.lazy(() => import('remote/Widget'))`, nếu remote script tải thất bại (404/500/timeout), React sẽ ném uncaught error làm sập toàn bộ cây component nếu không được bắt. Cần tạo component `SafeRemoteLoader` có sẵn retry logic (3 lần), timeout guard (5s) và render Skeleton/Fallback UI kèm gửi log telemetry về Sentry.",
+      "codeExample": "export function SafeRemoteLoader({ children, fallback }: Props) {\n  return (\n    <ErrorBoundary fallback={fallback ?? <DefaultErrorAlert />}>\n      <Suspense fallback={<WidgetSkeleton />}>\n        {children}\n      </Suspense>\n    </ErrorBoundary>\n  );\n}"
+    },
+    "pitfalls": [
+      "Chỉ bọc Error Boundary ở cấp Root của Host app, khiến bất kỳ 1 widget con nào lỗi cũng làm cả trang biến thành màn hình báo lỗi."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để implement cơ chế tự động Retry tải file remote chunk khi người dùng bị mất mạng tạm thời?"
+    ]
+  }
+]

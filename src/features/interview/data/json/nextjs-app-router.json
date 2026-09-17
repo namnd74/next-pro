@@ -80,6 +80,219 @@
     ]
   },
   {
+    "id": "int-02",
+    "category": "next-app-router",
+    "level": "senior",
+    "question": "Trong Next.js 15+, tại sao params, searchParams, cookies() và headers() lại chuyển từ synchronous thành asynchronous Promise? Cách xử lý đúng trong Server Components, Client Components và Route Handlers là gì?",
+    "interviewerIntent": "Đánh giá hiểu biết sâu về lý do kiến trúc phía sau việc chuyển đổi async (cho phép server render static shell sớm trước khi có request headers, tối ưu streaming TTFB), cách refactor migration an toàn, và việc xử lý searchParams kết hợp Suspense.",
+    "contextOrScenario": "Team nâng cấp dự án từ Next.js 14 lên Next.js 15. Hàng chục page component bị cảnh báo hoặc lỗi runtime vì destructuring trực tiếp { params: { id } } hoặc gọi cookies().get('token') đồng bộ.",
+    "expectedKeywords": [
+      "async request APIs",
+      "await params",
+      "await cookies()",
+      "await headers()",
+      "prerendering pipeline",
+      "Suspense boundary",
+      "useSearchParams",
+      "codemod"
+    ],
+    "seniorAnswer": {
+      "summary": "Trong Next.js 15+, các API đọc ngữ cảnh request (params, searchParams, cookies(), headers()) chuyển thành Promise không đồng bộ. Mục đích cốt lõi là giải phóng server prerender pipeline: Next.js có thể bắt đầu render trước các phần tĩnh của component tree mà không bị chặn bởi việc đợi toàn bộ thông tin request sẵn sàng. Trong Server Components và Route Handlers, ta bắt buộc phải await các giá trị này. Trong Client Components, dùng React use(params) hoặc hook useSearchParams() được bọc trong <Suspense>.",
+      "mentalModel": "Xem request context như một luồng dữ liệu trễ: thay vì chặn toàn bộ quá trình render server để chờ đọc cookie hay URL params, server component nhận một Promise. Component nào chưa cần tới request data có thể prerender và stream về browser ngay lập tức (instant TTFB), chỉ phần nào thật sự await Promise mới tạm dừng.",
+      "reasoningSteps": [
+        "Cập nhật type definition: Props của page/layout chuyển từ { params: { id: string } } thành { params: Promise<{ id: string }> }.",
+        "Trong thân async Server Component: gọi const { id } = await params; và const cookieStore = await cookies();.",
+        "Xử lý searchParams ở Client Components: bọc component gọi useSearchParams() trong <Suspense fallback={<SearchSkeleton />}> để tránh de-opt toàn trang về dynamic rendering.",
+        "Dùng Codemod chính thức npx @next/codemod@canary next-async-request-api . để tự động chuyển đổi hàng loạt code cũ.",
+        "Lưu ý Route Handlers: export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) cũng phải await params."
+      ],
+      "deepDive": "Trước Next.js 15, việc gọi cookies() hoặc đọc params đồng bộ ép React Server Components phải chờ cho đến khi request đến máy chủ hoàn chỉnh thì mới render được. Điều này cản trở các tối ưu hóa kiến trúc hiện đại như Partial Prerendering (PPR), nơi mà Static Shell (layout, header, navigation) được prerender sẵn từ trước ở Edge/Build-time.\n\nBằng cách biến các request API thành asynchronous Promises, Next.js phân tách rõ ràng giữa thời điểm component bắt đầu chuẩn bị thực thi và thời điểm component thực sự tiêu thụ dữ liệu phụ thuộc request. Điều này cũng đồng bộ với định hướng của React 19 và React Server Components chuẩn hóa, mở đường cho streaming tối ưu hơn.",
+      "tradeoffs": [
+        "Cần refactor nhiều file khi nâng cấp từ Next 14 lên 15, phá vỡ cú pháp destructuring quen thuộc trong function parameters.",
+        "Cần hiểu rõ ranh giới Suspense: nếu quên bọc component dùng searchParams trong Suspense, Next.js sẽ cảnh báo và có thể de-opt trang khỏi prerendering.",
+        "Giúp TTFB giảm đáng kể vì static shell có thể phục vụ ngay lập tức, trong khi phần dynamic stream về sau."
+      ],
+      "codeLanguage": "tsx",
+      "codeExample": "// app/products/[category]/[id]/page.tsx (Next.js 15+)\nimport { cookies } from 'next/headers';\nimport { Suspense } from 'react';\n\ntype PageProps = {\n  params: Promise<{ category: string; id: string }>;\n  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;\n};\n\nexport default async function ProductPage({ params, searchParams }: PageProps) {\n  // 1. Await params và searchParams bất đồng bộ\n  const { category, id } = await params;\n  const query = await searchParams;\n  \n  // 2. Await cookies và headers\n  const cookieStore = await cookies();\n  const token = cookieStore.get('auth_token')?.value;\n\n  return (\n    <div>\n      <h1>Category: {category} | Product: {id}</h1>\n      <p>Affiliate Source: {query.ref ?? 'direct'}</p>\n      <p>Logged In: {token ? 'Yes' : 'No'}</p>\n    </div>\n  );\n}",
+      "verification": [
+        "Chạy typecheck với TypeScript strict mode xác nhận không còn lỗi TS2339 trên params/cookies.",
+        "Chạy next build và kiểm tra terminal output không xuất hiện cảnh báo Synchronous Request API Warning.",
+        "Kiểm tra trang có dùng searchParams vẫn giữ được icon Static/PPR thay vì bị ép toàn bộ sang Dynamic Server Rendering ngoài ý muốn."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Nêu được params, searchParams, cookies() là Promise trong Next.js 15+.",
+        "Biết dùng await trước khi truy cập thuộc tính trong Server Component."
+      ],
+      "strong": [
+        "Giải thích được nguyên nhân kiến trúc: phục vụ prerendering pipeline và Partial Prerendering (PPR).",
+        "Nêu đúng cách xử lý ở Client Component với Suspense boundary khi dùng searchParams."
+      ],
+      "exceptional": [
+        "Phân tích sâu tác động đến TTFB, streaming lifecycle trong React 19.",
+        "Đưa ra kế hoạch migrate production quy mô lớn dùng automated codemods kết hợp canary rollout."
+      ]
+    },
+    "references": [
+      {
+        "title": "Next.js 15 Upgrade Guide — Async Request APIs",
+        "url": "https://nextjs.org/docs/app/building-your-application/upgrading/version-15#async-request-api-breaking-change"
+      }
+    ],
+    "pitfalls": [
+      "Destructure trực tiếp { params: { id } } trong signature của Page component gây lỗi build trên Next.js 15.",
+      "Gọi cookies().get() đồng bộ mà không có await.",
+      "Dùng useSearchParams() trong Client Component nhưng không bọc trong <Suspense>, khiến toàn bộ route bị ép render dynamic."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để đọc dynamic params bên trong một Client Component mà không cần truyền props từ Server Component?",
+      "Nếu một component cần cả cookies và DB query, bạn sắp xếp thứ tự await như thế nào để tối ưu song song (parallel)?"
+    ]
+  },
+  {
+    "id": "int-03",
+    "category": "next-app-router",
+    "level": "senior",
+    "question": "Next.js 15 đã đảo ngược toàn bộ mặc định caching so với Next.js 14 như thế nào? Phân tích sự thay đổi của fetch (mặc định no-store), GET Route Handlers, và Client Router Cache staleTimes.",
+    "interviewerIntent": "Kiểm tra ứng viên có cập nhật phiên bản mới nhất hay vẫn giữ tư duy Next 14 (nơi fetch tự động cache vĩnh viễn), hiểu triết lý 'caching must be opt-in and predictable', và biết cách quản lý cache chủ động trong ứng dụng production.",
+    "contextOrScenario": "Trong Next.js 14, nhiều lập trình viên gặp khó khăn vì dữ liệu thay đổi trên database nhưng web vẫn hiện data cũ do fetch ngầm định cache vĩnh viễn (force-cache). Next.js 15 đã thực hiện cuộc đại tu toàn diện về cơ chế mặc định này.",
+    "expectedKeywords": [
+      "uncached by default",
+      "no-store default",
+      "GET Route Handlers uncached",
+      "Client Router Cache",
+      "staleTimes",
+      "opt-in caching",
+      "fetchCache"
+    ],
+    "seniorAnswer": {
+      "summary": "Next.js 15 đảo ngược hoàn toàn triết lý caching: từ 'Cached by default' (Next 14) sang 'Uncached by default'. Cụ thể: 1) fetch requests mặc định là no-store thay vì force-cache; 2) GET Route Handlers mặc định không còn bị cache tĩnh trừ khi cấu hình explicit; 3) Client Router Cache có staleTimes cho dynamic routes giảm về 0 giây (ngăn client hiển thị data cũ khi điều hướng tới lui). Caching giờ đây là quyết định opt-in chủ động của lập trình viên.",
+      "mentalModel": "Nguyên tắc 'No Surprises': Hệ thống ưu tiên tính chính xác và tươi mới (freshness/correctness) của dữ liệu lên hàng đầu. Lập trình viên chỉ bật cache khi biết rõ dữ liệu đó tĩnh và có chiến lược revalidation cụ thể.",
+      "reasoningSteps": [
+        "Xác định bản chất thay đổi: fetch(url) không truyền options trong Next 15 tương đương fetch(url, { cache: 'no-store' }).",
+        "Nếu muốn cache một request trong Next 15: phải khai báo rõ ràng { cache: 'force-cache' } hoặc { next: { revalidate: 3600 } }.",
+        "Route Handlers (app/api/.../route.ts): hàm export async function GET() sẽ chạy động mỗi request trừ khi thêm export const dynamic = 'force-static'.",
+        "Client Router Cache: Next 15 đặt staleTimes.dynamic = 0, nghĩa là khi user click nút Back/Forward hoặc navigate giữa các dynamic page, client router sẽ fetch lại RSC payload mới nhất thay vì dùng bản snapshot trong RAM.",
+        "Khi cần bật lại cache toàn cục hoặc tùy chỉnh staleTimes, cấu hình trong next.config.ts."
+      ],
+      "deepDive": "Trong Next.js 13 và 14, cơ chế Data Cache tích hợp sâu vào native fetch đã gây ra nhiều tranh luận lớn trong cộng đồng React/Next.js. Mặc định force-cache khiến rất nhiều ứng dụng vô tình hiển thị thông tin stale, thậm chí leak dữ liệu cá nhân nếu developer quên đánh dấu no-store.\n\nTại Next.js 15, nhóm kỹ thuật đã lắng nghe phản hồi và đưa Next.js trở về với hành vi web tiêu chuẩn: fetch mặc định lấy dữ liệu tươi nhất. Đồng thời, cấu hình staleTimes cho phép tùy chỉnh thời gian sống của client-side cache trong next.config.ts.\nSự thay đổi này dọn đường cho mô hình Cache Components (use cache) trong Next.js 15/16, biến caching thành một cơ chế declarative, granular và có kiểm soát chặt chẽ.",
+      "tradeoffs": [
+        "Mặc định uncached giúp loại bỏ 99% bug dữ liệu không cập nhật, tăng tính an toàn và minh bạch khi code.",
+        "Tuy nhiên, nếu không chú ý cache các static API calls, số lượng request đánh trực tiếp vào backend/database có thể tăng đột biến sau khi nâng cấp.",
+        "Developer cần chủ động nhận diện endpoint nào là static để thêm force-cache hoặc revalidate."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "// app/api/rates/route.ts (Next.js 15+)\n// 1. Mặc định GET là Dynamic (uncached):\nexport async function GET() {\n  const rates = await fetchLatestExchangeRates();\n  return Response.json(rates);\n}\n\n// 2. Nếu muốn biến Route Handler thành Cached Static:\n// export const dynamic = 'force-static';\n// export const revalidate = 600; // cache 10 phút\n\n// Trong Server Component:\n// fetch mặc định là no-store; muốn cache phải opt-in:\nexport async function getGlobalConfig() {\n  const res = await fetch('https://api.example.com/config', {\n    cache: 'force-cache', // Opt-in vào Data Cache\n    next: { tags: ['global-config'], revalidate: 86400 },\n  });\n  return res.json();\n}",
+      "verification": [
+        "Kiểm tra terminal log khi build (next build): các Route Handlers mặc định hiển thị icon dynamic ƒ thay vì static ○.",
+        "Test client navigation: click qua lại giữa 2 trang dynamic và xem Network tab xác nhận RSC payload được re-fetch theo đúng staleTimes: 0.",
+        "Kiểm tra các request fetch bên thứ ba không bị lưu vĩnh viễn trong file system .next/cache/fetch-cache."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Nêu được Next 15 đổi mặc định fetch sang không cache (no-store).",
+        "Biết cách bật lại cache bằng { cache: 'force-cache' }."
+      ],
+      "strong": [
+        "Phân tích được cả 3 khía cạnh: fetch default, GET Route Handlers, và Client Router Cache staleTimes.",
+        "Giải thích được lý do thiết kế: ưu tiên tính đúng đắn và an toàn hơn là tối ưu hiệu năng gây bất ngờ."
+      ],
+      "exceptional": [
+        "So sánh được sự tiến hóa giữa Next 14 fetch cache, Next 15 uncached default, và mô hình 'use cache' (Cache Components).",
+        "Đưa ra giải pháp giám sát database query load khi migrate hệ thống lớn lên Next 15."
+      ]
+    },
+    "references": [
+      {
+        "title": "Next.js 15 Release Notes — Caching Semantics",
+        "url": "https://nextjs.org/blog/next-15#caching-semantics"
+      }
+    ],
+    "pitfalls": [
+      "Cho rằng Next 15 vẫn tự động cache fetch như Next 14 và không khai báo revalidate, dẫn đến backend bị quá tải request.",
+      "Tưởng rằng Router Cache phía client vẫn giữ trang cũ trong 30 giây như Next 14, trong khi mặc định dynamic là 0 giây.",
+      "Cấu hình force-static trên Route Handler cần đọc secret header của request."
+    ],
+    "followUpQuestions": [
+      "Trong trường hợp nào bạn nên tăng staleTimes.dynamic lên 30 hoặc 60 giây trong next.config.ts?",
+      "Làm sao để vừa có uncached fetch mặc định, vừa tránh N+1 problem khi nhiều component con cùng fetch cùng một URL?"
+    ]
+  },
+  {
+    "id": "int-04",
+    "category": "next-app-router",
+    "level": "senior",
+    "question": "Partial Prerendering (PPR) trong Next.js giải quyết bài toán trade-off giữa SSG và SSR như thế nào? Cơ chế kết hợp Static Shell prerender lúc build và Dynamic Hole streaming qua một HTTP connection duy nhất hoạt động ra sao?",
+    "interviewerIntent": "Đánh giá tư duy kiến trúc performance đỉnh cao của Next.js: không còn phải chọn giữa toàn trang tĩnh (SSG) hay toàn trang động (SSR). Trình duyệt nhận ngay static shell tức thì từ CDN edge, và stream data động qua cùng 1 kết nối.",
+    "contextOrScenario": "Trang chi tiết sản phẩm e-commerce có 90% nội dung cố định (header, navigation, mô tả sản phẩm, layout) nhưng có 10% nội dung cá nhân hóa động (giỏ hàng, giá khuyến mãi theo tài khoản, gợi ý sản phẩm). Dùng SSR thì TTFB chậm; dùng SSG thì phải gọi API phụ ở client gây giật layout (layout shift) và hydration chậm.",
+    "expectedKeywords": [
+      "Partial Prerendering",
+      "PPR",
+      "Static Shell",
+      "Dynamic Holes",
+      "Suspense boundary",
+      "Single HTTP response",
+      "Edge CDN",
+      "zero layout shift"
+    ],
+    "seniorAnswer": {
+      "summary": "Partial Prerendering (PPR) kết hợp ưu điểm của cả SSG và SSR trên cùng một route: Khi build, Next.js prerender toàn bộ layout và component tĩnh thành một Static Shell HTML tĩnh lưu tại CDN Edge. Các component động phụ thuộc cookies, headers hoặc dynamic DB được bọc trong React <Suspense> đóng vai trò là các 'Dynamic Holes'. Khi user request: Edge CDN trả về Static Shell ngay lập tức (TTFB ~ vài mili-giây), đồng thời giữ mở cùng một kết nối HTTP đó để server stream tiếp các chunk HTML của Dynamic Holes khi dữ liệu render xong.",
+      "mentalModel": "Tưởng tượng một tờ báo in: khung báo, tiêu đề, chuyên mục (Static Shell) được in sẵn và phát ngay cho độc giả. Các ô hiển thị giá vàng hoặc thị trường chứng khoán (Dynamic Holes) có một khung skeleton giữ chỗ, dữ liệu số nhảy vào ngay lập tức khi bảng điện tử cập nhật, không làm thay đổi hình dáng tờ báo.",
+      "reasoningSteps": [
+        "Nhận diện Static vs Dynamic: Phân tách component tĩnh (Navbar, Footer, Product Title, Image) và component động (User Cart, Personalized Price, Recommended Items).",
+        "Bọc mọi component động phụ thuộc Request Data bên trong <Suspense fallback={<Skeleton />}>.",
+        "Cấu hình bật PPR: thiết lập ppr: 'incremental' trong next.config.ts và export const experimental_ppr = true trong route tương ứng.",
+        "Quá trình Build: Next.js tạo sẵn file HTML tĩnh chứa Static Shell kèm các Suspense fallback HTML.",
+        "Quá trình Runtime: CDN trả về file HTML tĩnh tức thì; đồng thời server tính toán các Promise bên trong Suspense và đẩy các thẻ script/payload thay thế fallback qua HTTP streaming chunk.",
+        "Kết quả: TTFB nhanh bằng SSG nhưng dữ liệu vẫn tươi mới và cá nhân hóa bằng SSR, không cần thêm client-side fetch vòng thứ hai."
+      ],
+      "deepDive": "Trong kiến trúc web truyền thống, bạn buộc phải thỏa hiệp:\n1. SSG: TTFB cực nhanh từ CDN, nhưng nếu muốn hiện giỏ hàng cá nhân hóa, bạn phải render client-side qua useEffect/SWR, gây hiện tượng nhấp nháy UI (content shift) và tốn tài nguyên client.\n2. SSR: Dữ liệu luôn tươi mới ngay từ server, nhưng TTFB phụ thuộc vào query chậm nhất trên trang. Một DB query mất 800ms sẽ khiến cả trang trắng xóa suốt 800ms.\n\nPPR sử dụng sức mạnh của React 19 Server Streaming. Điểm đột phá kỹ thuật là: Static Shell và Dynamic Stream được gửi trên cùng một response HTTP. Trình duyệt không cần tạo một kết nối mạng thứ hai. Trình duyệt bắt đầu parse và vẽ DOM của Static Shell ngay miligiây thứ 10, trong khi server tiếp tục stream các phần tử động lấp vào đúng vị trí của Suspense fallback.",
+      "tradeoffs": [
+        "Ưu điểm: TTFB đạt mức gần như tiệm cận SSG trên toàn bộ hệ thống; loại bỏ hoàn toàn layout shift so với client-side fetching.",
+        "Chi phí: Đòi hỏi hạ tầng hosting hỗ trợ streaming ở Edge (như Vercel, hoặc Node.js server được cấu hình streaming proxy không đệm buffer).",
+        "Độ phức tạp: Thiết kế Suspense boundary phải cẩn thận; nếu vô tình đọc cookies ngoài Suspense, toàn bộ trang sẽ bị rớt khỏi Static Shell về Dynamic rendering."
+      ],
+      "codeLanguage": "tsx",
+      "codeExample": "// next.config.ts\nimport type { NextConfig } from 'next';\nconst nextConfig: NextConfig = {\n  experimental: {\n    ppr: 'incremental',\n  },\n};\nexport default nextConfig;\n\n// app/products/[id]/page.tsx\nimport { Suspense } from 'react';\nimport { StaticProductDetails } from '@/components/product-details';\nimport { DynamicUserPrice, PriceSkeleton } from '@/components/dynamic-price';\nimport { CartIndicator, CartSkeleton } from '@/components/cart-indicator';\n\nexport const experimental_ppr = true;\n\ntype Props = { params: Promise<{ id: string }> };\n\nexport default async function ProductPage({ params }: Props) {\n  const { id } = await params;\n\n  return (\n    <main className=\"p-6\">\n      {/* 1. Static Shell: Prerendered sẵn ở build time, serve từ CDN */}\n      <div className=\"flex justify-between items-center\">\n        <StaticProductDetails productId={id} />\n        \n        {/* 2. Dynamic Hole 1: Đọc cookies/session, stream vào sau */}\n        <Suspense fallback={<CartSkeleton />}>\n          <CartIndicator />\n        </Suspense>\n      </div>\n\n      {/* 3. Dynamic Hole 2: Tính giá theo VIP tier người dùng */}\n      <Suspense fallback={<PriceSkeleton />}>\n        <DynamicUserPrice productId={id} />\n      </Suspense>\n    </main>\n  );\n}",
+      "verification": [
+        "Chạy next build và kiểm tra icon trong route list: Route có PPR sẽ có biểu tượng vòng tròn pha nửa rỗng nửa đặc (◐ Partial Prerender).",
+        "Dùng cURL hoặc Network tab inspect response headers: Header được trả về ngay lập tức với HTTP 200 và Transfer-Encoding: chunked.",
+        "Tắt JavaScript ở trình duyệt và refresh trang: Static Shell và Suspense Fallback vẫn hiển thị hoàn hảo từ initial HTML."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Hiểu PPR là sự kết hợp giữa static shell và dynamic stream.",
+        "Biết dùng Suspense để phân chia ranh giới tĩnh và động."
+      ],
+      "strong": [
+        "Giải thích được cơ chế single HTTP request streaming và việc lưu trữ static shell tại CDN Edge.",
+        "Chỉ ra được lợi ích so sánh với SSG + Client fetching (loại bỏ layout shift, tối ưu Core Web Vitals LCP/INP)."
+      ],
+      "exceptional": [
+        "Phân tích sâu rủi ro de-opt khi đọc request API (cookies/headers) ngoài Suspense.",
+        "Hiểu rõ yêu cầu hạ tầng HTTP chunked streaming trên các reverse proxy (Nginx proxy_buffering off) khi tự self-host."
+      ]
+    },
+    "references": [
+      {
+        "title": "Next.js — Partial Prerendering (PPR)",
+        "url": "https://nextjs.org/docs/app/building-your-application/rendering/partial-prerendering"
+      }
+    ],
+    "pitfalls": [
+      "Gọi cookies() hoặc headers() ở component cha bên ngoài Suspense boundary, làm hỏng toàn bộ Static Shell của cả route.",
+      "Tưởng rằng PPR yêu cầu hai request HTTP riêng biệt (1 static HTML + 1 API call).",
+      "Deploy self-host phía sau Nginx mà quên tắt buffer (proxy_buffering off), khiến streaming bị giữ lại thành cục to mất tác dụng."
+    ],
+    "followUpQuestions": [
+      "Khi self-host Next.js với PPR trên Kubernetes và Nginx Ingress, cần cấu hình gì ở reverse proxy để streaming không bị đệm?",
+      "Mối quan hệ giữa PPR và mô hình Cache Components 'use cache' mới là gì?"
+    ]
+  },
+  {
     "id": "int-05",
     "category": "next-app-router",
     "level": "middle",
@@ -241,6 +454,155 @@
       "Feed và detail dùng tag nào để update một post không over-invalidate toàn catalog?",
       "Static export cần nội dung CMS cập nhật trong vài phút thì bạn đổi deployment/data architecture ra sao?",
       "Multi-region instances phối hợp cache tag invalidation và deploy version thế nào?"
+    ]
+  },
+  {
+    "id": "int-07",
+    "category": "next-app-router",
+    "level": "senior",
+    "question": "Làm thế nào để bảo vệ dữ liệu nhạy cảm (API secrets, password hash, user PII) không bị vô tình leak qua ranh giới React Server Component xuống Client Component? Giải thích vai trò của server-only và các React Taint APIs.",
+    "interviewerIntent": "Đánh giá kiến thức an toàn thông tin mức Senior trong môi trường RSC: ngoài việc dùng server-only ngăn import nhầm file, ứng viên cần biết cơ chế đánh dấu dữ liệu nhạy cảm (Taint APIs) để React ném lỗi ngay khi dữ liệu bị serialize xuống browser.",
+    "contextOrScenario": "Trong một dự án lớn, một developer vô tình truyền toàn bộ đối tượng user (chứa passwordHash và stripeCustomerId) từ Server Component sang một Client Component <UserProfileCard user={user} />. Trình duyệt đã nhận được toàn bộ dữ liệu nhạy cảm này trong RSC Payload.",
+    "expectedKeywords": [
+      "React Taint APIs",
+      "experimental_taintObjectReference",
+      "experimental_taintUniqueValue",
+      "server-only",
+      "RSC Payload leak",
+      "data serialization guard",
+      "Data Transfer Object (DTO)"
+    ],
+    "seniorAnswer": {
+      "summary": "Để ngăn leak dữ liệu nhạy cảm qua ranh giới Server-Client, Next.js và React cung cấp 3 tầng phòng thủ: 1) Package server-only để ngăn việc import code server vào client module graph ở compile-time; 2) Triệt để dùng DTO (Data Transfer Object) chỉ chọn lọc các trường công khai; 3) React Taint APIs (taintObjectReference, taintUniqueValue) để gắn cờ các đối tượng hoặc giá trị nhạy cảm ở runtime. Nếu bất kỳ dữ liệu bị gắn cờ nào vô tình bị serialize gửi qua Client Component, React sẽ lập tức ném lỗi và chặn build/render.",
+      "mentalModel": "Module boundary (server-only) bảo vệ 'CODE không chạy ở client'; còn Taint APIs bảo vệ 'DỮ LIỆU không bao giờ lọt xuống browser', ngay cả khi lập trình viên lơ đãng truyền nhầm props.",
+      "reasoningSteps": [
+        "Tầng 1: Đặt import 'server-only' ở tất cả các file chứa kết nối database, ORM, SDK thanh toán hoặc secrets. Nếu file client nào import nó, bundler sẽ báo lỗi ngay ở compile time.",
+        "Tầng 2: Áp dụng DTO pattern bằng cách chỉ select các field an toàn (ví dụ Prisma select: { id: true, name: true }) thay vì select * rồi truyền nguyên object.",
+        "Tầng 3: Bật experimental.taint: true trong next.config.ts.",
+        "Tầng 4: Dùng experimental_taintObjectReference(errorMessage, object) để khóa các object nhạy cảm (như toàn bộ user record từ DB).",
+        "Tầng 5: Dùng experimental_taintUniqueValue(errorMessage, lifetime, secretValue) để khóa các chuỗi bí mật như API tokens, private keys."
+      ],
+      "deepDive": "Một trong những rủi ro bảo mật tiềm tàng lớn nhất của React Server Components là RSC Payload. Mọi prop truyền vào Client Component đều được serialize thành text trong payload gửi về trình duyệt. Kể cả khi Client Component không hiển thị trường passwordHash lên màn hình, bất kỳ ai inspect Network Tab hoặc mã nguồn trang cũng có thể đọc được.\n\nReact Taint APIs giải quyết vấn đề này ở tầng gốc rễ:\n- taintObjectReference(msg, obj): Đăng ký reference của object vào WeakMap nội bộ của React. Nếu object đó (hoặc bản clone trực tiếp) bị serialize qua client boundary, React abort rendering và log cảnh báo đỏ.\n- taintUniqueValue(msg, lifetime, val): Khóa một giá trị string/token cụ thể. Ngay cả khi giá trị đó bị nhúng vào một object khác hoặc template string gửi xuống client, React vẫn phát hiện được chữ ký của chuỗi đó và chặn lại.\nKết hợp Taint APIs với kiến trúc Data Access Layer (DAL) là chuẩn mực bảo mật cao nhất hiện nay cho Next.js Enterprise.",
+      "tradeoffs": [
+        "Taint APIs mang lại độ an toàn tuyệt đối, ngăn chặn hoàn toàn sai sót do con người khi làm việc trong team lớn.",
+        "Đòi hỏi kỷ luật kiến trúc: phải tập trung hóa tầng truy vấn dữ liệu (DAL) để taint các đối tượng ngay khi chúng vừa được lấy ra từ Database.",
+        "Tính năng Taint hiện vẫn mang tiền tố experimental, cần bật cờ trong next.config.ts."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "// next.config.ts\nimport type { NextConfig } from 'next';\nconst nextConfig: NextConfig = {\n  experimental: {\n    taint: true,\n  },\n};\nexport default nextConfig;\n\n// lib/data-access/user.ts\nimport 'server-only';\nimport { experimental_taintObjectReference, experimental_taintUniqueValue } from 'react';\nimport { db } from '@/lib/db';\n\nexport async function getUserById(id: string) {\n  const user = await db.user.findUnique({ where: { id } });\n  if (!user) return null;\n\n  // 1. Khóa toàn bộ object user nhạy cảm\n  experimental_taintObjectReference(\n    'Không được truyền trực tiếp raw user object xuống Client Component! Dùng DTO.',\n    user\n  );\n\n  // 2. Khóa token thanh toán nhạy cảm nếu có\n  if (user.stripeSecretToken) {\n    experimental_taintUniqueValue(\n      'Không bao giờ được leak stripe token xuống browser!',\n      user,\n      user.stripeSecretToken\n    );\n  }\n\n  return user;\n}\n\n// Trong Server Component: nếu lỡ tay làm thế này sẽ NÉM LỖI NGAY:\n// <ClientCard user={user} /> -> Error: Không được truyền trực tiếp raw user object...\n// Cách đúng: chỉ truyền DTO công khai:\n// <ClientCard user={{ id: user.id, name: user.name }} />",
+      "verification": [
+        "Viết unit test hoặc integration test thử truyền object đã bị taint vào một Client Component và assert rằng React render bị throw exception.",
+        "Kiểm tra RSC Payload trong tab Network (filter file query có _rsc) xác nhận không tồn tại các trường bí mật.",
+        "CI pipeline quét regex tự động kiểm tra xem các module data access có chứa import 'server-only' hay không."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Biết dùng server-only để ngăn import nhầm module server vào client.",
+        "Hiểu nguy cơ RSC Payload có thể làm lộ dữ liệu nhạy cảm nếu truyền thừa props."
+      ],
+      "strong": [
+        "Nêu được cơ chế và công dụng của taintObjectReference và taintUniqueValue.",
+        "Thiết kế được Data Access Layer (DAL) kết hợp DTO pattern để chọn lọc dữ liệu trước khi gửi cho client."
+      ],
+      "exceptional": [
+        "Phân tích sâu ranh giới bảo mật giữa Compiler-time check (server-only) và Runtime serialization guard (Taint APIs).",
+        "Có kinh nghiệm audit RSC Payload leak trong các dự án sản xuất lớn."
+      ]
+    },
+    "references": [
+      {
+        "title": "Next.js Security — Tainting Data",
+        "url": "https://nextjs.org/docs/app/building-your-application/data-fetching/fetching#tainting-data"
+      },
+      {
+        "title": "React Docs — experimental_taintObjectReference",
+        "url": "https://react.dev/reference/react/experimental_taintObjectReference"
+      }
+    ],
+    "pitfalls": [
+      "Tin rằng Client Component không render một trường ra giao diện thì trường đó an toàn, bỏ qua việc nó nằm công khai trong RSC Payload.",
+      "Chỉ taint ở cấp component thay vì đặt taint ngay tại Data Access Layer (DAL), dẫn đến việc phải nhớ gọi taint ở nhiều nơi.",
+      "Nhầm lẫn giữa server-only (chặn code import) và taint (chặn data serialization)."
+    ],
+    "followUpQuestions": [
+      "Tại sao taintObjectReference không thể bảo vệ nếu developer tự extract từng primitive field (như user.apiKey) ra rồi truyền lẻ?",
+      "Data Access Layer (DAL) trong Next.js App Router nên được cấu trúc như thế nào để đảm bảo 100% data đi qua DTO?"
+    ]
+  },
+  {
+    "id": "int-08",
+    "category": "next-app-router",
+    "level": "senior",
+    "question": "Thiết kế kiến trúc Dynamic Multi-tenancy hỗ trợ hàng nghìn subdomain ([tenant].platform.com) và custom domain trong Next.js App Router bằng Middleware rewrite.",
+    "interviewerIntent": "Kiểm tra kỹ năng thiết kế System Design cho ứng dụng SaaS B2B quy mô lớn trên Next.js App Router: mapping domain động, rewrite đường dẫn nội bộ mà không đổi URL trình duyệt, caching dữ liệu theo tenant isolation và xác thực ở Edge.",
+    "contextOrScenario": "Công ty xây dựng nền tảng thương mại điện tử B2B (tương tự Shopify). Mỗi khách hàng doanh nghiệp có một subdomain riêng (ví dụ: nike.platform.com) hoặc gắn custom domain riêng (ví dụ: store.nike.com). Hệ thống chỉ dùng một Next.js code base duy nhất phục vụ toàn bộ các tenant này.",
+    "expectedKeywords": [
+      "Multi-tenancy",
+      "Subdomain Routing",
+      "Middleware rewrite",
+      "NextResponse.rewrite",
+      "Custom Domains",
+      "Edge KV lookup",
+      "Tenant Isolation",
+      "x-tenant-id"
+    ],
+    "seniorAnswer": {
+      "summary": "Kiến trúc Multi-tenancy tối ưu trong Next.js App Router dựa trên Middleware URL Rewriting tại Edge: 1) Middleware đọc request hostname (tenant.platform.com hoặc customdomain.com); 2) Tra cứu tenant ID tương ứng qua fast cache/Edge KV (như Vercel KV, Redis Edge); 3) Sử dụng NextResponse.rewrite() để ánh xạ ngầm request tới dynamic route nội bộ app/[tenant]/... mà không làm thay đổi URL trên thanh địa chỉ của người dùng; 4) Gắn header nội bộ x-tenant-id để Server Components và Data Access Layer thực thi tenant isolation truy vấn database an toàn.",
+      "mentalModel": "Middleware đóng vai trò như một Reverse Proxy thông minh tại cổng vào (Gatekeeper): Biến thế giới bên ngoài (vô số domain, subdomain phức tạp) thành một cây thư mục phân cấp nội bộ gọn gàng /[tenant]/[locale]/[page] mà không cần khởi tạo các cụm server riêng biệt.",
+      "reasoningSteps": [
+        "Bóc tách hostname trong middleware.ts: Phân biệt root domain (trang chủ marketing), admin portal (app.platform.com), và tenant store ([subdomain].platform.com hoặc custom domain).",
+        "Nếu là tenant domain: tra cứu tenant data từ Edge Cache/Redis (với TTL ngắn hoặc revalidate on-demand). Tránh gọi database SQL nặng nề trong Edge Middleware.",
+        "Thực hiện rewrite nội bộ: return NextResponse.rewrite(new URL(`/${tenantSlug}${url.pathname}`, request.url)) kèm header x-tenant-id.",
+        "Cấu trúc thư mục App Router: app/[tenant]/layout.tsx, app/[tenant]/products/page.tsx, tách biệt với app/(marketing)/... bằng Route Groups.",
+        "Tại Data Access Layer: luôn trích xuất tenantId từ headers/params để inject vào mọi WHERE clause database query, đảm bảo không rò rỉ dữ liệu chéo giữa các tenant."
+      ],
+      "deepDive": "Khi triển khai multi-tenancy ở quy mô hàng chục nghìn tenant, có 3 thách thức lớn cần giải quyết:\n1. Edge Resolution Latency: Không thể query PostgreSQL truyền thống trong Middleware vì connection overhead. Cần dùng Edge KV hoặc In-memory LRU cache để resolve Domain -> TenantSlug trong < 5ms.\n2. Cache Isolation: Next.js Data Cache và Cache Tags phải được gắn tiền tố tenantId (ví dụ cacheTag(`tenant-${tenantId}-products`)). Nếu không, tenant A có thể nhìn thấy dữ liệu cache của tenant B.\n3. Custom Domain SSL: Tích hợp với Vercel Domains API hoặc Cloudflare for SaaS để tự động cấp phát SSL certificate theo cơ chế on-demand TLS khi khách hàng trỏ CNAME về hệ thống.",
+      "tradeoffs": [
+        "Kiến trúc Single-deploy Multi-tenancy tiết kiệm 90% chi phí vận hành và tài nguyên so với việc deploy một cụm server riêng cho từng tenant.",
+        "Tuy nhiên, nếu code Data Access Layer không chặt chẽ, rủi ro leak dữ liệu chéo giữa các tenant rất nguy hiểm; đòi hỏi phân quyền nghiêm ngặt và Row-Level Security (RLS) ở Database.",
+        "Cần chiến lược cache invalidation rõ ràng theo tenant tag để tránh làm chậm hệ thống khi một tenant cập nhật dữ liệu."
+      ],
+      "codeLanguage": "typescript",
+      "codeExample": "// middleware.ts\nimport { NextRequest, NextResponse } from 'next/server';\nimport { getTenantFromHost } from '@/lib/tenant-resolver.edge';\n\nexport const config = {\n  matcher: ['/((?!api/|_next/|_static/|_vercel|[\\\\w-]+\\\\.\\\\w+).*)'],\n};\n\nexport async function middleware(request: NextRequest) {\n  const url = request.nextUrl;\n  const hostname = request.headers.get('host') || '';\n  \n  // 1. Phân giải tenant từ subdomain hoặc custom domain\n  const tenant = await getTenantFromHost(hostname);\n  if (!tenant) {\n    return NextResponse.redirect(new URL('https://platform.com/not-found', request.url));\n  }\n\n  // 2. Rewrite ngầm tới dynamic route app/[tenant]/...\n  const rewriteUrl = new URL(`/${tenant.slug}${url.pathname}${url.search}`, request.url);\n  \n  const response = NextResponse.rewrite(rewriteUrl);\n  // 3. Gắn header tenant an toàn cho Server Components tiêu thụ\n  response.headers.set('x-tenant-id', tenant.id);\n  response.headers.set('x-tenant-slug', tenant.slug);\n  \n  return response;\n}\n\n// app/[tenant]/page.tsx\nimport { headers } from 'next/headers';\nimport { db } from '@/lib/db';\n\nexport default async function TenantHomePage({\n  params,\n}: { params: Promise<{ tenant: string }> }) {\n  const { tenant } = await params;\n  const headersList = await headers();\n  const tenantId = headersList.get('x-tenant-id');\n\n  // Query đảm bảo tuyệt đối cách ly dữ liệu\n  const products = await db.product.findMany({\n    where: { tenantId: tenantId! },\n  });\n\n  return <div>Tenant: {tenant} - {products.length} products</div>;\n}",
+      "verification": [
+        "Kiểm tra cURL với custom Host header: curl -H 'Host: client-a.platform.com' http://localhost:3000/ trả về nội dung của Client A mà không redirect 302/301.",
+        "Kiểm tra thanh URL trên trình duyệt: URL vẫn giữ nguyên client-a.platform.com/products, không bị lộ đường dẫn nội bộ /[tenant]/products.",
+        "Test isolation: Xác nhận một user thuộc Tenant A không thể query hay cập nhật dữ liệu của Tenant B."
+      ]
+    },
+    "evaluationRubric": {
+      "baseline": [
+        "Hiểu cách Middleware dùng hostname để phân biệt subdomain.",
+        "Biết dùng NextResponse.rewrite để mapping URL ngầm."
+      ],
+      "strong": [
+        "Giải thích được kiến trúc Edge KV để giải quyết latency tra cứu domain < 5ms.",
+        "Xử lý tenant isolation ở cả tầng routing (rewrite), cache tags, và database queries."
+      ],
+      "exceptional": [
+        "Phân tích sâu về Custom Domain SSL provisioning (Let's Encrypt / Cloudflare for SaaS).",
+        "Đưa ra giải pháp Row-Level Security (RLS) ở Database kết hợp audit logging phòng chống rò rỉ dữ liệu chéo."
+      ]
+    },
+    "references": [
+      {
+        "title": "Vercel Platforms Starter Kit (Multi-tenant Next.js)",
+        "url": "https://github.com/vercel/platforms"
+      },
+      {
+        "title": "Next.js — Middleware URL Rewriting",
+        "url": "https://nextjs.org/docs/app/building-your-application/routing/middleware#rewrite"
+      }
+    ],
+    "pitfalls": [
+      "Dùng NextResponse.redirect thay vì NextResponse.rewrite, khiến thanh URL bị đổi và lộ cấu trúc route nội bộ.",
+      "Query cơ sở dữ liệu SQL nặng trong Middleware ở Edge, gây chậm trễ cho tất cả request vào hệ thống.",
+      "Không gán prefix tenant vào Cache Tags khiến cache của các tenant bị xung đột đè lên nhau."
+    ],
+    "followUpQuestions": [
+      "Khi tenant upload file (images, videos), bạn quản lý storage và CDN URL theo tenant như thế nào?",
+      "Nếu dùng Database chung (Single DB) với Row-Level Security (RLS), bạn truyền tenant context vào connection pool ra sao?"
     ]
   }
 ]

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Header } from './header';
 import { FeedbackModal } from './feedback-modal';
 
@@ -11,7 +11,44 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const isHome = pathname === '/';
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const checkMobileRoute = () => {
+      try {
+        const search = window.location.search || '';
+        if (search.includes('desktop=true')) {
+          sessionStorage.setItem('devpro_force_desktop', 'true');
+          return;
+        }
+        if (search.includes('desktop=false')) {
+          sessionStorage.removeItem('devpro_force_desktop');
+        }
+        if (sessionStorage.getItem('devpro_force_desktop') === 'true') {
+          return;
+        }
+
+        const isMobile =
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent
+          ) ||
+          (window.innerWidth > 0 && window.innerWidth < 768);
+
+        if (isMobile && !pathname.startsWith('/interview')) {
+          router.replace('/interview');
+        }
+      } catch {
+        // Ignore errors in restricted contexts
+      }
+    };
+
+    checkMobileRoute();
+    window.addEventListener('resize', checkMobileRoute);
+    return () => window.removeEventListener('resize', checkMobileRoute);
+  }, [pathname, router]);
 
   const footer = (
     <footer className="border-border/30 text-muted-foreground/70 bg-background/80 border-t py-6 text-xs backdrop-blur-xs">

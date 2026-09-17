@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Layers,
   Sparkles,
@@ -15,6 +15,8 @@ import {
   X,
   Code2,
   ExternalLink,
+  Monitor,
+  Smartphone,
 } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { DevProLogo } from './devpro-logo';
@@ -54,17 +56,41 @@ const navLinks: NavLinkItem[] = [
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
+  const [isMobile, setIsMobile] = React.useState(false);
+  const [forceDesktop, setForceDesktop] = React.useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [scrolled, setScrolled] = React.useState(false);
   const { streakDays, completedLessonIds } = useLearningStore();
 
   React.useEffect(() => {
     setMounted(true);
+    const checkState = () => {
+      if (typeof window === 'undefined') return;
+      const isForced = sessionStorage.getItem('devpro_force_desktop') === 'true';
+      setForceDesktop(isForced);
+      if (isForced) {
+        setIsMobile(false);
+        return;
+      }
+      const mobile =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        ) ||
+        (window.innerWidth > 0 && window.innerWidth < 768);
+      setIsMobile(mobile);
+    };
+
+    checkState();
     const onScroll = () => setScrolled(window.scrollY > 16);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener('resize', checkState);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', checkState);
+    };
   }, []);
 
   // Close mobile menu on route change
@@ -91,7 +117,10 @@ export function Header() {
       >
         {/* Brand Logo */}
         <div className="flex items-center gap-3">
-          <Link href="/" className="focus:outline-hidden">
+          <Link
+            href={mounted && isMobile ? '/interview' : '/'}
+            className="focus:outline-hidden"
+          >
             <DevProLogo
               concept="bolt"
               variant="horizontal"
@@ -202,6 +231,51 @@ export function Header() {
             )}
           </div>
 
+          {/* Mobile mode banner */}
+          {mounted && isMobile && (
+            <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+              <div className="flex items-center gap-2">
+                <Smartphone className="h-4 w-4 shrink-0 text-emerald-500" />
+                <span className="text-[11px] font-medium sm:text-xs">
+                  Chế độ Mobile: Tối ưu trang Phỏng Vấn
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.setItem('devpro_force_desktop', 'true');
+                  router.push('/?desktop=true');
+                }}
+                className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] font-semibold text-emerald-600 underline hover:text-emerald-700 dark:text-emerald-400"
+              >
+                <Monitor className="h-3 w-3" />
+                <span>Bật Desktop</span>
+              </button>
+            </div>
+          )}
+
+          {mounted && forceDesktop && (
+            <div className="flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              <div className="flex items-center gap-2">
+                <Monitor className="h-4 w-4 shrink-0 text-amber-500" />
+                <span className="text-[11px] font-medium sm:text-xs">
+                  Đang xem chế độ Desktop trên mobile
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.removeItem('devpro_force_desktop');
+                  router.push('/interview');
+                }}
+                className="flex shrink-0 cursor-pointer items-center gap-1 text-[11px] font-semibold text-amber-600 underline hover:text-amber-700 dark:text-amber-400"
+              >
+                <Smartphone className="h-3 w-3" />
+                <span>Về Mobile</span>
+              </button>
+            </div>
+          )}
+
           {/* Main Links */}
           <nav className="grid grid-cols-1 gap-1.5" aria-label="Mobile Main Navigation">
             {navLinks.map((link) => {
@@ -234,32 +308,80 @@ export function Header() {
                 );
               }
 
+              // On mobile, interview is the primary ready route; others are desktop-first
+              if (mounted && isMobile && link.href !== '/interview') {
+                return (
+                  <button
+                    key={link.href}
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      sessionStorage.setItem('devpro_force_desktop', 'true');
+                      router.push(
+                        link.href +
+                          (link.href.includes('?') ? '&desktop=true' : '?desktop=true')
+                      );
+                    }}
+                    className="text-muted-foreground hover:bg-muted/60 flex w-full cursor-pointer items-start justify-between rounded-xl p-3 text-left text-xs font-semibold transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="bg-muted text-muted-foreground mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-foreground/80 text-sm font-bold">
+                          {link.label}
+                        </span>
+                        <span className="text-muted-foreground text-[11px] font-normal">
+                          {link.desc}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="border-border bg-muted/60 text-muted-foreground flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium">
+                      <Monitor className="h-2.5 w-2.5" />
+                      Desktop
+                    </span>
+                  </button>
+                );
+              }
+
               return (
                 <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex cursor-pointer items-start gap-3 rounded-xl p-3 text-xs font-semibold transition-all ${
-                    isActive
-                      ? 'bg-primary/10 text-primary dark:bg-primary/20 shadow-xs'
-                      : 'text-foreground hover:bg-muted/60'
+                  className={`flex cursor-pointer items-start justify-between rounded-xl p-3 text-xs font-semibold transition-all ${
+                    mounted && isMobile && link.href === '/interview'
+                      ? 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-800 shadow-xs dark:text-emerald-200'
+                      : isActive
+                        ? 'bg-primary/10 text-primary dark:bg-primary/20 shadow-xs'
+                        : 'text-foreground hover:bg-muted/60'
                   }`}
                 >
-                  <span
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-                      isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold">{link.label}</span>
-                    <span className="text-muted-foreground text-[11px] font-normal">
-                      {link.desc}
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+                        mounted && isMobile && link.href === '/interview'
+                          ? 'bg-emerald-600 text-white'
+                          : isActive
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
                     </span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-bold">{link.label}</span>
+                      <span className="text-muted-foreground text-[11px] font-normal">
+                        {link.desc}
+                      </span>
+                    </div>
                   </div>
+                  {mounted && isMobile && link.href === '/interview' && (
+                    <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-300">
+                      Mobile Ready
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -268,36 +390,70 @@ export function Header() {
           {/* Quick Learning Series Switcher */}
           <div className="bg-muted/40 border-border/40 space-y-2 rounded-xl border p-3">
             <span className="text-muted-foreground font-mono text-[10px] font-bold tracking-widest uppercase">
-              Khóa Học Nhanh
+              {mounted && isMobile ? 'Luyện Phỏng Vấn Nhanh' : 'Khóa Học Nhanh'}
             </span>
             <div className="grid grid-cols-2 gap-2">
-              <Link
-                href="/learn?domain=react"
-                onClick={() => setMobileMenuOpen(false)}
-                className="bg-background text-foreground hover:border-primary/40 flex items-center gap-2 rounded-lg border border-transparent p-2.5 text-xs font-bold shadow-xs transition-all"
-              >
-                <Code2 className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
-                <div className="flex flex-col">
-                  <span>Seri React</span>
-                  <span className="text-muted-foreground text-[10px] font-normal">
-                    8 Lộ trình
-                  </span>
-                </div>
-              </Link>
+              {mounted && isMobile ? (
+                <>
+                  <Link
+                    href="/interview"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="bg-background text-foreground flex items-center gap-2 rounded-lg border border-transparent p-2.5 text-xs font-bold shadow-xs transition-all hover:border-emerald-500/40"
+                  >
+                    <Code2 className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                    <div className="flex flex-col">
+                      <span>React & Next.js</span>
+                      <span className="text-muted-foreground text-[10px] font-normal">
+                        Ngân hàng Q&A
+                      </span>
+                    </div>
+                  </Link>
 
-              <Link
-                href="/learn?domain=nextjs"
-                onClick={() => setMobileMenuOpen(false)}
-                className="bg-background text-foreground hover:border-primary/40 flex items-center gap-2 rounded-lg border border-transparent p-2.5 text-xs font-bold shadow-xs transition-all"
-              >
-                <Layers className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                <div className="flex flex-col">
-                  <span>Seri Next.js</span>
-                  <span className="text-muted-foreground text-[10px] font-normal">
-                    4 Lộ trình
-                  </span>
-                </div>
-              </Link>
+                  <Link
+                    href="/interview"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="bg-background text-foreground flex items-center gap-2 rounded-lg border border-transparent p-2.5 text-xs font-bold shadow-xs transition-all hover:border-emerald-500/40"
+                  >
+                    <Layers className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <div className="flex flex-col">
+                      <span>TypeScript & Go</span>
+                      <span className="text-muted-foreground text-[10px] font-normal">
+                        Ngân hàng Q&A
+                      </span>
+                    </div>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/learn?domain=react"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="bg-background text-foreground hover:border-primary/40 flex items-center gap-2 rounded-lg border border-transparent p-2.5 text-xs font-bold shadow-xs transition-all"
+                  >
+                    <Code2 className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                    <div className="flex flex-col">
+                      <span>Seri React</span>
+                      <span className="text-muted-foreground text-[10px] font-normal">
+                        8 Lộ trình
+                      </span>
+                    </div>
+                  </Link>
+
+                  <Link
+                    href="/learn?domain=nextjs"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="bg-background text-foreground hover:border-primary/40 flex items-center gap-2 rounded-lg border border-transparent p-2.5 text-xs font-bold shadow-xs transition-all"
+                  >
+                    <Layers className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    <div className="flex flex-col">
+                      <span>Seri Next.js</span>
+                      <span className="text-muted-foreground text-[10px] font-normal">
+                        4 Lộ trình
+                      </span>
+                    </div>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
 

@@ -35,6 +35,7 @@ const server = http.createServer((req, res) => {
   }
 
   // Resolution 1: Direct file
+  const filePath = path.join(OUT_DIR, reqPath);
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
     return serveFile(filePath, res);
   }

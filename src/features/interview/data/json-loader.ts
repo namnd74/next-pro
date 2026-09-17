@@ -16,12 +16,22 @@ import browserWorkerQuestions from './json/browser-workers.json';
 import frontendOpenEndedQuestions from './json/frontend-open-ended.json';
 import systemDesignQuestions from './json/frontend-system-design.json';
 import perfQuestions from './json/web-performance-security.json';
+import htmlBankQuestions from './json/html-bank.json';
+import cssBankQuestions from './json/css-bank.json';
+import systemDesignBankQuestions from './json/system-design-bank.json';
+import designPatternsBankQuestions from './json/design-patterns-bank.json';
+import microFrontendBankQuestions from './json/micro-frontend-bank.json';
 
 export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(reactBankQuestions as InterviewQuestion[]),
   ...(nextjsBankQuestions as InterviewQuestion[]),
   ...(typescriptBankQuestions as InterviewQuestion[]),
   ...(javascriptBankQuestions as InterviewQuestion[]),
+  ...(htmlBankQuestions as InterviewQuestion[]),
+  ...(cssBankQuestions as InterviewQuestion[]),
+  ...(systemDesignBankQuestions as InterviewQuestion[]),
+  ...(designPatternsBankQuestions as InterviewQuestion[]),
+  ...(microFrontendBankQuestions as InterviewQuestion[]),
   ...(goBankQuestions as InterviewQuestion[]),
   ...(nestjsBankQuestions as InterviewQuestion[]),
   ...(nodejsBankQuestions as InterviewQuestion[]),
