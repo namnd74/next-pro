@@ -301,7 +301,7 @@ export function HeroDevice({ previewMode = 'A' }: HeroDeviceProps) {
                         type="button"
                         onClick={() =>
                           setUserName(
-                            userName === 'Alex Rivera' ? 'Nam Nguyen' : 'Alex Rivera'
+                            userName === 'Alex Rivera' ? 'Jordan Lee' : 'Alex Rivera'
                           )
                         }
                         className="cursor-pointer rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-[10px] font-semibold text-slate-200 transition hover:bg-slate-700"
@@ -480,7 +480,7 @@ export function HeroDevice({ previewMode = 'A' }: HeroDeviceProps) {
                     type="button"
                     onClick={() =>
                       setUserName(
-                        userName === 'Alex Rivera' ? 'Nam Nguyen' : 'Alex Rivera'
+                        userName === 'Alex Rivera' ? 'Jordan Lee' : 'Alex Rivera'
                       )
                     }
                     className="w-full rounded bg-slate-800 py-1 text-[10px] font-semibold text-slate-200 transition hover:bg-slate-700"

@@ -5,9 +5,9 @@ export const dynamic = 'force-static';
 export async function GET() {
   const mockUser = {
     id: 'user-77',
-    name: 'Nam Nguyen',
+    name: 'Alex Rivera',
     role: 'Senior Frontend Architect',
-    email: 'namnd74@nextpro.dev',
+    email: 'alex.rivera@nextpro.dev',
     isAuthenticated: true,
   };
 

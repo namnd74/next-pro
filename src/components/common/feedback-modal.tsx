@@ -2,7 +2,17 @@
 
 import React, { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Mail, MessageSquarePlus, X, Send, CheckCircle2, Loader2 } from 'lucide-react';
+import {
+  Mail,
+  MessageSquarePlus,
+  X,
+  Send,
+  CheckCircle2,
+  Loader2,
+  Copy,
+  Check,
+  ExternalLink,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,10 +34,13 @@ export function FeedbackModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [fallbackToMailto, setFallbackToMailto] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    setFallbackToMailto(false);
 
     if (!message.trim() || message.trim().length < 5) {
       setErrorMessage('Vui lòng nhập nội dung góp ý tối thiểu 5 ký tự.');
@@ -35,36 +48,95 @@ export function FeedbackModal() {
     }
 
     setIsSubmitting(true);
+    let sent = false;
+
+    // 1. Try local/server API first (Node runtime / next dev)
     try {
       const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, category, message }),
+        body: JSON.stringify({ email: email.trim(), category, message: message.trim() }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Có lỗi xảy ra khi gửi.');
+      const contentType = res.headers.get('content-type') || '';
+      if (res.ok && contentType.includes('application/json')) {
+        const data = (await res.json()) as { success?: boolean; error?: string };
+        if (data.success) {
+          sent = true;
+        }
       }
+    } catch {
+      // API unavailable or network failed, proceed to client fallback
+    }
 
+    // 2. If API was not successful (e.g. 405 on GitHub Pages or 404), try FormSubmit client endpoint
+    if (!sent) {
+      try {
+        const senderDisplay = email.trim() || 'Ẩn danh';
+        const fsRes = await fetch('https://formsubmit.co/ajax/contact@dev-pro.online', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({
+            name: senderDisplay,
+            email: email.trim() || 'noreply@dev-pro.online',
+            category,
+            message: message.trim(),
+            _subject: `[dev-pro] Góp ý mới: ${category} (từ ${senderDisplay})`,
+          }),
+        });
+
+        if (fsRes.ok) {
+          const fsData = (await fsRes.json()) as { success?: boolean | string };
+          if (fsData.success === true || fsData.success === 'true') {
+            sent = true;
+          }
+        }
+      } catch {
+        // FormSubmit network error
+      }
+    }
+
+    // 3. Evaluation
+    if (sent) {
       setIsSuccess(true);
       setMessage('');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi gửi.';
-      setErrorMessage(msg);
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      // Fallback: If automatic submission could not be completed on static hosting, provide 1-click mailto
+      setFallbackToMailto(true);
+      setErrorMessage(
+        'Không thể gửi tự động qua API máy chủ (hosting tĩnh GitHub Pages). Bạn có thể bấm nút bên dưới để mở Email client gửi trực tiếp tới contact@dev-pro.online.'
+      );
     }
+    setIsSubmitting(false);
   };
 
   const pathname = usePathname();
   const isInterviewPage = pathname?.startsWith('/interview');
   const isHome = pathname === '/';
 
+  const mailtoSubject = encodeURIComponent(
+    `[dev-pro] Góp ý: ${category} (từ ${email.trim() || 'Ẩn danh'})`
+  );
+  const mailtoBody = encodeURIComponent(
+    `Chủ đề: ${category}\nNgười gửi: ${email.trim() || 'Ẩn danh'}\n\nNội dung góp ý:\n${message.trim()}\n\n---\nGửi từ dev-pro.online`
+  );
+  const mailtoUrl = `mailto:contact@dev-pro.online?subject=${mailtoSubject}&body=${mailtoBody}`;
+
+  const handleCopyContent = () => {
+    const textToCopy = `Chủ đề: ${category}\nNgười gửi: ${email.trim() || 'Ẩn danh'}\n\nNội dung:\n${message.trim()}`;
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleClose = () => {
     setIsOpen(false);
     setIsSuccess(false);
     setErrorMessage('');
+    setFallbackToMailto(false);
   };
 
   return (
@@ -159,8 +231,37 @@ export function FeedbackModal() {
                 </div>
 
                 {errorMessage && (
-                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-                    {errorMessage}
+                  <div className="space-y-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
+                    <p className="leading-relaxed">{errorMessage}</p>
+                    {fallbackToMailto && (
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <a
+                          href={mailtoUrl}
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-indigo-500"
+                        >
+                          <Mail className="h-3.5 w-3.5" />
+                          <span>Mở ứng dụng Email gửi ngay</span>
+                          <ExternalLink className="h-3 w-3 opacity-70" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={handleCopyContent}
+                          className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 hover:text-white"
+                        >
+                          {copied ? (
+                            <>
+                              <Check className="h-3.5 w-3.5 text-emerald-400" />
+                              <span>Đã sao chép</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5" />
+                              <span>Sao chép nội dung</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
