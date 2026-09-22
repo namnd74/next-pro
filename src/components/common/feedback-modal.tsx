@@ -70,6 +70,7 @@ export function FeedbackModal() {
     }
 
     // 2. If API was not successful (e.g. 405 on GitHub Pages or 404), try FormSubmit client endpoint
+    let activationPending = false;
     if (!sent) {
       try {
         const senderDisplay = email.trim() || 'Ẩn danh';
@@ -85,13 +86,21 @@ export function FeedbackModal() {
             category,
             message: message.trim(),
             _subject: `[dev-pro] Góp ý mới: ${category} (từ ${senderDisplay})`,
+            _template: 'table',
+            _captcha: 'false',
           }),
         });
 
         if (fsRes.ok) {
-          const fsData = (await fsRes.json()) as { success?: boolean | string };
+          const fsData = (await fsRes.json()) as { success?: boolean | string; message?: string };
           if (fsData.success === true || fsData.success === 'true') {
             sent = true;
+          } else if (
+            fsData.message &&
+            (fsData.message.toLowerCase().includes('activation') ||
+              fsData.message.toLowerCase().includes('activate'))
+          ) {
+            activationPending = true;
           }
         }
       } catch {
@@ -103,11 +112,16 @@ export function FeedbackModal() {
     if (sent) {
       setIsSuccess(true);
       setMessage('');
+    } else if (activationPending) {
+      setFallbackToMailto(true);
+      setErrorMessage(
+        'Hòm thư contact@dev-pro.online cần kích hoạt FormSubmit 1 lần duy nhất để nhận thư trên GitHub Pages. FormSubmit đã gửi email xác nhận tới contact@dev-pro.online, bạn chỉ cần mở hòm thư và nhấn "Activate Form". Trong lúc chờ, bạn có thể gửi ngay qua nút bên dưới:'
+      );
     } else {
       // Fallback: If automatic submission could not be completed on static hosting, provide 1-click mailto
       setFallbackToMailto(true);
       setErrorMessage(
-        'Không thể gửi tự động qua API máy chủ (hosting tĩnh GitHub Pages). Bạn có thể bấm nút bên dưới để mở Email client gửi trực tiếp tới contact@dev-pro.online.'
+        'Không thể gửi tự động lúc này. Bạn có thể bấm nút bên dưới để mở Email client gửi trực tiếp tới contact@dev-pro.online.'
       );
     }
     setIsSubmitting(false);
