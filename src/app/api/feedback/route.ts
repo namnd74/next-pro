@@ -19,6 +19,12 @@ export async function POST(request: Request) {
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
 
+    // Sanitize input to prevent email header injection
+    const cleanEmail = typeof email === 'string' ? email.replace(/[\r\n]/g, '').trim() : '';
+    const cleanCategory =
+      typeof category === 'string' ? category.replace(/[\r\n]/g, '').trim() : 'Góp ý chung';
+    const senderDisplay = cleanEmail || 'Ẩn danh';
+
     // If SMTP credentials are provided, send a real email via Hostinger
     if (smtpUser && smtpPass) {
       const transporter = nodemailer.createTransport({
@@ -29,10 +35,12 @@ export async function POST(request: Request) {
           user: smtpUser,
           pass: smtpPass,
         },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
       });
 
-      const senderDisplay = email && email.trim() ? email.trim() : 'Ẩn danh';
-      const subject = `[dev-pro] Góp ý mới: ${category || 'Góp ý chung'} (từ ${senderDisplay})`;
+      const subject = `[dev-pro] Góp ý mới: ${cleanCategory} (từ ${senderDisplay})`;
 
       const htmlContent = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
@@ -44,7 +52,7 @@ export async function POST(request: Request) {
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
             <tr>
               <td style="padding: 8px 0; color: #64748b; width: 120px; font-weight: 600;">Chủ đề:</td>
-              <td style="padding: 8px 0; color: #0f172a; font-weight: bold;">${category || 'Góp ý chung'}</td>
+              <td style="padding: 8px 0; color: #0f172a; font-weight: bold;">${cleanCategory}</td>
             </tr>
             <tr>
               <td style="padding: 8px 0; color: #64748b; font-weight: 600;">Người gửi:</td>
@@ -70,12 +78,18 @@ export async function POST(request: Request) {
       await transporter.sendMail({
         from: `"dev-pro Feedback" <${smtpUser}>`,
         to: recipient,
-        replyTo: email && email.includes('@') ? email : undefined,
+        replyTo: cleanEmail && cleanEmail.includes('@') ? cleanEmail : undefined,
         subject,
         html: htmlContent,
       });
 
       console.log(`[FEEDBACK_SENT] Email sent via Hostinger SMTP to ${recipient}`);
+
+      return NextResponse.json({
+        success: true,
+        mode: 'smtp',
+        message: 'Góp ý của bạn đã được tiếp nhận thành công!',
+      });
     } else {
       // Fallback: log to server console when credentials not yet set in .env.local
       console.warn(
@@ -83,23 +97,25 @@ export async function POST(request: Request) {
       );
       console.log({
         to: recipient,
-        sender: email || 'Ẩn danh',
-        category,
+        sender: senderDisplay,
+        category: cleanCategory,
         message: message.trim(),
         timestamp: new Date().toISOString(),
       });
-    }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Góp ý của bạn đã được tiếp nhận thành công!',
-    });
-  } catch (error) {
-    console.error('[FEEDBACK_ERROR]', error);
+      return NextResponse.json({
+        success: true,
+        mode: 'dev_mock',
+        message:
+          'Góp ý đã được ghi nhận vào server console (Môi trường Dev: Chưa cấu hình SMTP_USER/SMTP_PASS).',
+      });
+    }
+  } catch (error: unknown) {
+    const errorDetails = error instanceof Error ? error.message : String(error);
+    console.error('[FEEDBACK_ERROR]', errorDetails);
     return NextResponse.json(
       {
-        error:
-          'Không thể gửi email lúc này. Vui lòng thử lại hoặc gửi trực tiếp tới contact@dev-pro.online.',
+        error: `Không thể gửi email lúc này (${errorDetails}). Vui lòng gửi trực tiếp tới contact@dev-pro.online.`,
       },
       { status: 500 }
     );
