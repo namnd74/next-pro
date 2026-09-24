@@ -20,10 +20,10 @@ const TECH_STACK = [
 export default function HomePage() {
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col justify-between overflow-hidden">
-      {/* Subtle grid background */}
+      {/* Subtle grid background (Dark mode only to prevent Hermann grid optical strain in light mode) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+        className="pointer-events-none absolute inset-0 opacity-0 dark:opacity-[0.05]"
         style={{
           backgroundImage:
             'linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)',
@@ -42,8 +42,8 @@ export default function HomePage() {
         {/* Left Column (5 cols): Badge, Headline, Subtitle, Buttons */}
         <div className="flex flex-col items-center gap-4 text-center sm:gap-5 lg:col-span-5 lg:items-start lg:text-left xl:gap-6">
           {/* Pill Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1 text-xs font-medium text-indigo-600 backdrop-blur-md dark:text-indigo-400">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-600 dark:bg-indigo-400" />
+          <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3.5 py-1 text-xs font-medium">
+            <span className="bg-primary h-1.5 w-1.5 rounded-full" />
             Fast-Track to Production Ready
           </div>
 
@@ -52,7 +52,7 @@ export default function HomePage() {
             Làm chủ
             <br />
             React &{' '}
-            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-sky-600 bg-clip-text text-transparent dark:from-indigo-400 dark:via-purple-400 dark:to-sky-400">
+            <span className="text-primary dark:bg-gradient-to-r dark:from-indigo-400 dark:via-purple-400 dark:to-sky-400 dark:bg-clip-text dark:text-transparent">
               Next.js
             </span>
           </h1>
