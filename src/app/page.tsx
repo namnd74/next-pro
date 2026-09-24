@@ -48,7 +48,7 @@ export default function HomePage() {
           </div>
 
           {/* Headline */}
-          <h1 className="text-3xl leading-[1.12] font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl xl:text-6xl dark:text-white">
+          <h1 className="text-foreground text-3xl leading-[1.12] font-extrabold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl dark:text-white">
             Làm chủ
             <br />
             React &{' '}
@@ -58,7 +58,7 @@ export default function HomePage() {
           </h1>
 
           {/* Subtitle */}
-          <p className="-mt-1 text-xl font-semibold tracking-tight text-slate-600 sm:-mt-2 sm:text-2xl lg:text-3xl dark:text-slate-400">
+          <p className="text-muted-foreground -mt-1 text-xl font-semibold tracking-tight sm:-mt-2 sm:text-2xl lg:text-3xl dark:text-slate-400">
             bằng cách thực sự làm.
           </p>
 
@@ -67,7 +67,7 @@ export default function HomePage() {
             <Link href="/learn">
               <Button
                 size="lg"
-                className="cursor-pointer rounded-xl bg-slate-900 px-6 py-5 text-sm font-semibold text-white shadow-xl shadow-slate-900/10 hover:bg-slate-800 sm:px-7 sm:py-6 sm:text-base dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
+                className="bg-foreground text-background cursor-pointer rounded-xl px-6 py-5 text-sm font-semibold shadow-lg shadow-stone-900/10 hover:opacity-90 sm:px-7 sm:py-6 sm:text-base dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
               >
                 Bắt đầu học ngay
               </Button>
@@ -76,7 +76,7 @@ export default function HomePage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="cursor-pointer rounded-xl border border-slate-300 bg-white/90 px-6 py-5 text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-100 sm:px-7 sm:py-6 sm:text-base dark:border-slate-700/80 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="border-border bg-card/90 text-foreground hover:bg-muted/70 cursor-pointer rounded-xl border px-6 py-5 text-sm font-semibold shadow-xs sm:px-7 sm:py-6 sm:text-base dark:border-slate-700/80 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Luyện phỏng vấn
               </Button>
