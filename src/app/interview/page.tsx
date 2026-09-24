@@ -8,10 +8,10 @@ import {
   Bug,
   Filter,
   Bookmark,
-  Search,
   FileJson,
   PlusCircle,
 } from 'lucide-react';
+import { SearchInput, FilterChipGroup, type FilterChipItem } from '@/components/shared';
 import {
   MOCK_INTERVIEW_QUESTIONS,
   MOCK_BUG_HUNT_CHALLENGES,
@@ -102,6 +102,31 @@ export default function InterviewPage() {
       senior: langSubset.filter((q) => q.level === 'senior').length,
     };
   }, [allQuestions, selectedCategory]);
+
+  const levelFilterItems: FilterChipItem[] = React.useMemo(
+    () => [
+      { id: 'all', label: 'Tất cả', count: levelCounts.all },
+      {
+        id: 'junior',
+        label: '🟢 Cơ bản (Junior)',
+        count: levelCounts.junior,
+        activeColorClass: 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/20',
+      },
+      {
+        id: 'middle',
+        label: '🟡 Trung bình (Middle)',
+        count: levelCounts.middle,
+        activeColorClass: 'bg-amber-600 text-white shadow-xs shadow-amber-600/20',
+      },
+      {
+        id: 'senior',
+        label: '🔴 Nâng cao (Senior)',
+        count: levelCounts.senior,
+        activeColorClass: 'bg-rose-600 text-white shadow-xs shadow-rose-600/20',
+      },
+    ],
+    [levelCounts]
+  );
 
   const filteredQuestions = React.useMemo(() => {
     const query = deferredSearchQuery.trim().toLowerCase();
@@ -453,79 +478,20 @@ export default function InterviewPage() {
                 <span className="text-muted-foreground mr-1 text-[11px] font-semibold">
                   Level:
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('all')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    selectedLevel === 'all'
-                      ? 'bg-slate-900 text-white shadow-xs dark:bg-slate-100 dark:text-slate-900'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <span>Tất cả</span>
-                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {levelCounts.all}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('junior')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    selectedLevel === 'junior'
-                      ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/20'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <span>🟢 Cơ bản (Junior)</span>
-                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {levelCounts.junior}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('middle')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    selectedLevel === 'middle'
-                      ? 'bg-amber-600 text-white shadow-xs shadow-amber-600/20'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <span>🟡 Trung bình (Middle)</span>
-                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {levelCounts.middle}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('senior')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    selectedLevel === 'senior'
-                      ? 'bg-rose-600 text-white shadow-xs shadow-rose-600/20'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <span>🔴 Nâng cao (Senior)</span>
-                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {levelCounts.senior}
-                  </span>
-                </button>
+                <FilterChipGroup
+                  items={levelFilterItems}
+                  selectedId={selectedLevel}
+                  onChange={setSelectedLevel}
+                />
               </div>
 
               {/* Search bar */}
-              <div className="relative">
-                <Search
-                  className={`text-muted-foreground absolute top-2.5 left-3 h-4 w-4 transition-all duration-200 ${
-                    isPendingSearch ? 'text-primary animate-spin' : ''
-                  }`}
-                />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm câu hỏi, từ khóa kỹ thuật (VD: RSC, Hydration, useOptimistic...)"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-primary w-full rounded-xl border py-2 pr-4 pl-9 text-xs focus:ring-2 focus:outline-none"
-                />
-              </div>
+              <SearchInput
+                placeholder="Tìm kiếm câu hỏi, từ khóa kỹ thuật (VD: RSC, Hydration, useOptimistic...)"
+                value={searchQuery}
+                onChange={setSearchQuery}
+                isPending={isPendingSearch}
+              />
 
               {/* Filters row */}
               <div className="border-border/40 flex flex-wrap items-center justify-between gap-3 border-t pt-1">
