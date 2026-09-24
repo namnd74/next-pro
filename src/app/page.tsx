@@ -31,10 +31,10 @@ export default function HomePage() {
         }}
       />
 
-      {/* Purple radial glow behind laptop on the right */}
+      {/* Purple radial glow behind laptop on the right (Dark mode only) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute top-1/2 -right-24 h-[480px] w-[600px] -translate-y-1/2 rounded-full bg-gradient-to-l from-purple-600/20 via-indigo-600/10 to-transparent blur-3xl"
+        className="pointer-events-none absolute top-1/2 -right-24 h-[480px] w-[600px] -translate-y-1/2 rounded-full bg-gradient-to-l from-purple-600/20 via-indigo-600/10 to-transparent opacity-0 blur-3xl dark:opacity-100"
       />
 
       {/* Main 2-Column Hero Area (Vertically Centered in remaining space) */}

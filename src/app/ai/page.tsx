@@ -14,7 +14,7 @@ export default function AiHubPage() {
   return (
     <div className="space-y-10">
       <section className="relative overflow-hidden rounded-3xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 via-fuchsia-500/5 to-cyan-500/10 p-6 sm:p-10">
-        <div className="pointer-events-none absolute -top-24 -right-20 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -top-24 -right-20 h-64 w-64 rounded-full bg-violet-500/20 opacity-0 blur-3xl dark:opacity-100" />
         <div className="relative max-w-3xl space-y-5">
           <Badge
             variant="outline"

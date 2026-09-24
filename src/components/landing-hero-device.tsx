@@ -35,14 +35,14 @@ export function HeroDevice({ previewMode = 'A' }: HeroDeviceProps) {
 
   return (
     <div className="relative w-full max-w-xl lg:ml-auto lg:max-w-xl xl:max-w-2xl">
-      {/* Ambient background glow behind laptop */}
+      {/* Ambient background glow behind laptop (Dark mode only) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -top-10 left-1/2 h-[380px] w-[95%] -translate-x-1/2 rounded-full bg-gradient-to-tr from-purple-600/35 via-indigo-600/30 to-sky-500/15 blur-3xl"
+        className="pointer-events-none absolute -top-10 left-1/2 h-[380px] w-[95%] -translate-x-1/2 rounded-full bg-gradient-to-tr from-purple-600/35 via-indigo-600/30 to-sky-500/15 opacity-0 blur-3xl dark:opacity-100"
       />
 
       {/* MacBook Display Lid */}
-      <div className="relative rounded-[18px] border border-slate-700/60 bg-[#161821] p-2 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.95),0_0_50px_rgba(99,102,241,0.2)] sm:rounded-[22px] sm:p-3">
+      <div className="relative rounded-[18px] border border-slate-700/60 bg-[#161821] p-2 shadow-2xl shadow-slate-900/15 sm:rounded-[22px] sm:p-3 dark:shadow-[0_25px_70px_-15px_rgba(0,0,0,0.95),0_0_50px_rgba(99,102,241,0.2)]">
         {/* Web camera dot */}
         <div className="absolute top-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full border border-slate-700 bg-slate-800" />
 
@@ -607,10 +607,10 @@ export function HeroDevice({ previewMode = 'A' }: HeroDeviceProps) {
         <div className="mx-auto h-1 w-20 rounded-b-sm border-t border-white/5 bg-[#0a0c12] sm:h-1.5 sm:w-28" />
       </div>
 
-      {/* Bottom desk reflection / glow */}
+      {/* Bottom desk reflection / glow (Dark mode only) */}
       <div
         aria-hidden
-        className="pointer-events-none mx-auto -mt-1 h-8 w-4/5 rounded-full bg-indigo-500/15 blur-xl"
+        className="pointer-events-none mx-auto -mt-1 h-8 w-4/5 rounded-full bg-indigo-500/15 opacity-0 blur-xl dark:opacity-100"
       />
     </div>
   );
