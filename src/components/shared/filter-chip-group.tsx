@@ -34,8 +34,7 @@ export const FilterChipGroup = React.memo(function FilterChipGroup({
       {items.map((item) => {
         const isSelected = item.id === selectedId;
 
-        const defaultActiveClass =
-          'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs';
+        const defaultActiveClass = 'bg-primary text-primary-foreground shadow-xs';
 
         return (
           <button
@@ -59,7 +58,7 @@ export const FilterChipGroup = React.memo(function FilterChipGroup({
                 className={cn(
                   'py-0.2 rounded-full px-1.5 font-mono text-[10px]',
                   isSelected
-                    ? 'bg-black/20 text-white dark:bg-white/20 dark:text-slate-900'
+                    ? 'bg-primary-foreground/20 text-primary-foreground'
                     : 'bg-background/60 text-muted-foreground'
                 )}
               >

@@ -513,7 +513,7 @@ export function DevProLogo({
     return (
       <div
         className={cn(
-          'inline-flex items-center gap-2 rounded-2xl border border-slate-700/40 bg-slate-900/60 p-1.5 pr-3 shadow-md backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/70',
+          'border-border/80 bg-card/90 inline-flex items-center gap-2 rounded-2xl border p-1.5 pr-3 shadow-md backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/70',
           className
         )}
         {...props}

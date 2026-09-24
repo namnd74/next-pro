@@ -84,8 +84,8 @@ export function TabsTrigger({ value, className, children, ...props }: TabsTrigge
       className={cn(
         'ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center rounded-lg px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
         isActive
-          ? 'bg-background text-foreground dark:bg-card shadow-sm shadow-black/5'
-          : 'text-muted-foreground hover:bg-background/40 hover:text-foreground',
+          ? 'bg-card text-foreground shadow-xs shadow-black/5 dark:shadow-black/20'
+          : 'text-muted-foreground hover:bg-card/40 hover:text-foreground',
         className
       )}
       {...props}

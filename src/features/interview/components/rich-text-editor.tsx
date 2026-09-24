@@ -113,7 +113,7 @@ export function RichTextEditor({
           elements.push(
             <pre
               key={`code-${idx}`}
-              className="my-2 overflow-x-auto rounded-xl border border-slate-700 bg-slate-950 p-3 font-mono text-xs text-slate-100 dark:bg-black/80"
+              className="border-border bg-muted/60 text-foreground my-2 overflow-x-auto rounded-xl border p-3 font-mono text-xs dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
             >
               <code>{codeBlockContent.join('\n')}</code>
             </pre>
