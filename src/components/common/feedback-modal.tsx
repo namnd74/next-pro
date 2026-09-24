@@ -92,7 +92,10 @@ export function FeedbackModal() {
         });
 
         if (fsRes.ok) {
-          const fsData = (await fsRes.json()) as { success?: boolean | string; message?: string };
+          const fsData = (await fsRes.json()) as {
+            success?: boolean | string;
+            message?: string;
+          };
           if (fsData.success === true || fsData.success === 'true') {
             sent = true;
           } else if (

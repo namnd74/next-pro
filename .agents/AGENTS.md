@@ -32,18 +32,17 @@
 
 ## 5. Active Skill Index
 
-| Skill                                  | Trigger                       |
-| :------------------------------------- | :---------------------------- |
-| `skills/ponytail`                      | ALWAYS before writing code    |
-| `skills/matt-pocock-ts`                | TypeScript work + planning    |
-| `skills/react-next`                    | Next.js / React changes       |
-| `skills/tailwind-styling`              | Styling / CSS work            |
-| `skills/ui-ux-pro-max`                 | UI design decisions           |
-| `skills/testing`                       | Writing or fixing tests       |
-| `skills/agent-harness`                 | Multi-step execution planning |
-| `skills/learning-mastery`              | Learning feature development  |
-| `skills/offensive-security-curriculum` | Offensive security content    |
-| `skills/database`                      | Schema / query decisions      |
+| Skill                     | Trigger                       |
+| :------------------------ | :---------------------------- |
+| `skills/ponytail`         | ALWAYS before writing code    |
+| `skills/matt-pocock-ts`   | TypeScript work + planning    |
+| `skills/react-next`       | Next.js / React changes       |
+| `skills/tailwind-styling` | Styling / CSS work            |
+| `skills/ui-ux-pro-max`    | UI design decisions           |
+| `skills/testing`          | Writing or fixing tests       |
+| `skills/agent-harness`    | Multi-step execution planning |
+| `skills/learning-mastery` | Learning feature development  |
+| `skills/database`         | Schema / query decisions      |
 
 ## 6. Safety & Zero-Regression
 
