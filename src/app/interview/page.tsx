@@ -61,6 +61,13 @@ export default function InterviewPage() {
       javascript: allQuestions.filter(
         (q) => q.category === 'javascript' || q.category === 'javascript-typescript'
       ).length,
+      html: allQuestions.filter((q) => q.category === 'html').length,
+      css: allQuestions.filter((q) => q.category === 'css').length,
+      systemDesign: allQuestions.filter(
+        (q) => q.category === 'system-design' || q.category === 'frontend-system-design'
+      ).length,
+      designPatterns: allQuestions.filter((q) => q.category === 'design-patterns').length,
+      microFrontend: allQuestions.filter((q) => q.category === 'micro-frontend').length,
       go: allQuestions.filter((q) => q.category === 'go').length,
       nestjs: allQuestions.filter((q) => q.category === 'nestjs').length,
       nodejs: allQuestions.filter((q) => q.category === 'nodejs').length,
@@ -80,6 +87,8 @@ export default function InterviewPage() {
         return q.category === 'typescript' || q.category === 'javascript-typescript';
       if (selectedCategory === 'javascript')
         return q.category === 'javascript' || q.category === 'javascript-typescript';
+      if (selectedCategory === 'system-design')
+        return q.category === 'system-design' || q.category === 'frontend-system-design';
       if (selectedCategory === 'go') return q.category === 'go';
       return q.category === selectedCategory;
     });
@@ -106,9 +115,12 @@ export default function InterviewPage() {
                 ? q.category === 'typescript' || q.category === 'javascript-typescript'
                 : selectedCategory === 'javascript'
                   ? q.category === 'javascript' || q.category === 'javascript-typescript'
-                  : selectedCategory === 'go'
-                    ? q.category === 'go'
-                    : q.category === selectedCategory;
+                  : selectedCategory === 'system-design'
+                    ? q.category === 'system-design' ||
+                      q.category === 'frontend-system-design'
+                    : selectedCategory === 'go'
+                      ? q.category === 'go'
+                      : q.category === selectedCategory;
 
       const matchLevel = selectedLevel === 'all' || q.level === selectedLevel;
       const matchBookmark = !onlyBookmarked || bookmarkedQuestionIds.includes(q.id);
@@ -357,6 +369,79 @@ export default function InterviewPage() {
                     {languageCounts.django}
                   </span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('html')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'html'
+                      ? 'bg-orange-600 text-white shadow-sm shadow-orange-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>HTML</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.html}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('css')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'css'
+                      ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <span>CSS</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.css}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('system-design')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'system-design'
+                      ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <TechIcon name="architecture" className="h-3.5 w-3.5" />
+                  <span>System Design</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.systemDesign}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('design-patterns')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'design-patterns'
+                      ? 'bg-violet-600 text-white shadow-sm shadow-violet-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <TechIcon name="architecture" className="h-3.5 w-3.5" />
+                  <span>Design Patterns</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.designPatterns}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('micro-frontend')}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    selectedCategory === 'micro-frontend'
+                      ? 'bg-fuchsia-600 text-white shadow-sm shadow-fuchsia-600/20'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <TechIcon name="architecture" className="h-3.5 w-3.5" />
+                  <span>Micro-Frontend</span>
+                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                    {languageCounts.microFrontend}
+                  </span>
+                </button>
               </div>
 
               {/* Level Classification Quick Filter Pills */}
@@ -451,6 +536,11 @@ export default function InterviewPage() {
                       { value: 'nextjs', label: 'Next.js Interview Bank' },
                       { value: 'typescript', label: 'TypeScript Bank' },
                       { value: 'javascript', label: 'JavaScript Core Bank' },
+                      { value: 'html', label: 'HTML5 & Web Bank' },
+                      { value: 'css', label: 'CSS3 & Styling Bank' },
+                      { value: 'system-design', label: 'System Design Bank' },
+                      { value: 'design-patterns', label: 'Design Patterns & SOLID' },
+                      { value: 'micro-frontend', label: 'Micro-Frontend Bank' },
                       { value: 'go', label: 'Go (Golang) Bank' },
                       { value: 'nestjs', label: 'NestJS Enterprise Bank' },
                       { value: 'nodejs', label: 'Node.js Backend Bank' },

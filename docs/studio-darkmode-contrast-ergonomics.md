@@ -1,7 +1,7 @@
 # Nghiên Cứu & Đề Xuất Công Thái Học Dark Mode Cho Studio (Contrast & Learning Ergonomics)
 
 > **Tài liệu tham chiếu thiết kế giao diện (UI/UX Design Specification)**  
-> **Áp dụng cho**: NextPlayground, ReactPlayground, Offensive Security Workbench, CodeMirror, xterm.js, Lesson Viewer.  
+> **Áp dụng cho**: NextPlayground, ReactPlayground, CodeMirror, xterm.js, Lesson Viewer.  
 > **Cơ sở khoa học**: WCAG 2.2 (Level AA & AAA), W3C APCA (Accessible Perceptual Contrast Algorithm), Tiêu chuẩn chống mỏi mắt Asthenopia & Halation Effect.
 
 ---
@@ -128,6 +128,4 @@ Khi agent hoặc lập trình viên tiến hành refactor Dark Mode cho Studio:
    - `src/components/ui/code-block.tsx` (Line numbers, pre container).
    - `src/features/playground/components/code-editor.tsx` (`highContrastDarkTheme` override).
    - `src/features/playground/components/terminal-panel.tsx` (xterm theme object).
-   - `src/features/offensive-security/workbench/components/terminal-view.tsx` (Prompt and history colors).
-   - `src/features/offensive-security/workbench/components/dual-terminal-workbench.tsx` (Prompt and container classes).
 3. **Kiểm tra độ tương phản trước khi commit**: Chạy công cụ kiểm tra màu sắc đảm bảo không có text nhỏ nào < 4.5:1 và văn bản code không vượt quá 12:1.

@@ -27,5 +27,139 @@
     "followUpQuestions": [
       "Làm thế nào để handle Refresh Token Rotation trong Next.js App Router mà không bị race conditions khi nhiều request đồng thời xảy ra?"
     ]
+  },
+  {
+    "id": "fsd-01",
+    "category": "frontend-system-design",
+    "level": "lead",
+    "question": "Thiết kế Virtualized Data Table / Infinite Scroll Feed xử lý 100,000 dòng dữ liệu với dynamic row heights?",
+    "interviewerIntent": "Đánh giá năng lực thiết kế DOM virtualization từ đầu ở cấp độ Lead/Architect: Sliding Window, Overscan, Dynamic Height Estimation, Scroll Restoration.",
+    "contextOrScenario": "Bảng giao dịch chứng khoán hoặc mạng xã hội yêu cầu render liên tục hàng chục nghìn item mà DOM chỉ duy trì tối đa 30 node để giữ 60fps.",
+    "expectedKeywords": [
+      "virtual windowing",
+      "sliding window",
+      "dynamic row heights",
+      "overscan buffer",
+      "resize observer",
+      "scroll restoration"
+    ],
+    "seniorAnswer": {
+      "summary": "Kiến trúc 3 lớp: (1) Container ngoài có chiều cao ảo khổng lồ (`totalHeight = items.length * estimatedHeight`) để giữ thanh cuộn thật; (2) Binary Search tính toán index hiển thị dựa trên `scrollTop`; (3) Viewport trượt chỉ render các items nằm trong khung nhìn cộng thêm vùng đệm (Overscan 5 items) định vị bằng `transform: translateY()`.",
+      "deepDive": "Với Dynamic Row Heights (chiều cao mỗi dòng không bằng nhau): Dùng `ResizeObserver` để đo chiều cao thực tế của item sau khi render, cập nhật vào mảng `heightMap` và tính lại mảng `cumulativeOffsets`. Dùng Binary Search trên `cumulativeOffsets` để tìm `startIndex` và `endIndex` trong thời gian $O(\\log N)$.",
+      "codeExample": "// Virtualizer core logic\nconst startIndex = binarySearchOffsets(cumulativeOffsets, scrollTop);\nconst endIndex = binarySearchOffsets(cumulativeOffsets, scrollTop + viewportHeight) + overscan;\nconst visibleItems = items.slice(startIndex, endIndex);"
+    },
+    "pitfalls": [
+      "Dùng `top` thay vì `transform: translateY()` để định vị item làm kích hoạt layout reflow liên tục khi cuộn.",
+      "Mất vị trí cuộn khi người dùng click vào chi tiết rồi bấm nút Back trình duyệt."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để xử lý Scroll Restoration chính xác khi dữ liệu đầu trang liên tục được thêm mới?"
+    ]
+  },
+  {
+    "id": "fsd-02",
+    "category": "frontend-system-design",
+    "level": "lead",
+    "question": "Thiết kế kiến trúc Offline-First & Realtime Data Sync Engine (IndexedDB + Service Worker + Conflict Resolution)?",
+    "interviewerIntent": "Đánh giá kiến thức chuyên sâu về Client-side storage, Background Sync, và thuật toán giải quyết xung đột dữ liệu phân tán.",
+    "contextOrScenario": "Ứng dụng ghi chú hoặc POS bán hàng cho nhân viên hoạt động ở vùng mất sóng mạng, tự động đồng bộ khi có kết nối trở lại.",
+    "expectedKeywords": [
+      "offline-first",
+      "indexeddb",
+      "service worker",
+      "background sync api",
+      "conflict resolution",
+      "crdts vs last-write-wins"
+    ],
+    "seniorAnswer": {
+      "summary": "Kiến trúc Local-First: Mọi thao tác ghi (Write) đều lưu trực tiếp xuống IndexedDB trước (0ms latency), sau đó đưa vào Mutation Queue. Khi online, Service Worker Background Sync gửi từng mutation lên server. Xử lý xung đột bằng Last-Write-Wins (dựa trên server-assigned version) hoặc CRDTs cho rich text.",
+      "deepDive": "Mutation Queue phải là hàng đợi tuần tự (Sequential FIFO). Mỗi mutation mang `clientId`, `mutationId`, `timestamp`, `baseVersion`. Nếu server phát hiện `baseVersion !== currentServerVersion`, kích hoạt Conflict Resolver: Merge tự động theo trường (field-level merging) hoặc thông báo cho người dùng chọn phiên bản.",
+      "codeExample": "// Sync Worker\nasync function syncQueue() {\n  const queue = await idb.getAll('mutation_queue');\n  for (const item of queue) {\n    try {\n      const res = await api.sync(item);\n      await idb.delete('mutation_queue', item.id);\n    } catch (err) {\n      if (err.status === 409) resolveConflict(item, err.serverData);\n      break; // Dừng để bảo toàn thứ tự mutation\n    }\n  }\n}"
+    },
+    "pitfalls": [
+      "Dùng LocalStorage thay vì IndexedDB (LocalStorage là synchronous, giới hạn 5MB và block Main Thread).",
+      "Tin cậy thời gian `Date.now()` của máy client để làm Last-Write-Wins (đồng hồ máy client có thể sai lệch)."
+    ],
+    "followUpQuestions": [
+      "Tại sao CRDTs (Yjs, Automerge) lại vượt trội hơn Operational Transformation (OT) trong môi trường P2P / Offline-First?"
+    ]
+  },
+  {
+    "id": "fsd-03",
+    "category": "frontend-system-design",
+    "level": "lead",
+    "question": "Thiết kế Ứng dụng Real-time Collaborative (Canvas / Document như Figma, Google Docs mini)?",
+    "interviewerIntent": "Kiểm tra kỹ năng thiết kế hệ thống cộng tác thời gian thực phức tạp trên Frontend: Multi-cursor, Data synchronization, Undo/Redo phân tán.",
+    "contextOrScenario": "Nhiều người dùng cùng vẽ biểu đồ hoặc chỉnh sửa văn bản trên một bảng vẽ đồng thời mà không bị đè dữ liệu của nhau.",
+    "expectedKeywords": [
+      "real-time collaboration",
+      "crdt (yjs / automerge)",
+      "websocket multiplexing",
+      "presence / multiplayer cursor",
+      "distributed undo/redo"
+    ],
+    "seniorAnswer": {
+      "summary": "Tách biệt 2 kênh truyền: (1) Kênh Trạng thái tạm thời (Ephemeral / Presence) truyền vị trí con trỏ chuột, selections qua WebSocket/WebRTC (tần số cao 60Hz, mất gói tin không sao); (2) Kênh Dữ liệu tài liệu (Persistent Data) dùng thư viện CRDT (Yjs) đồng bộ qua WebSocket đảm bảo tính hội tụ (Convergence).",
+      "deepDive": "Giải quyết Undo/Redo phân tán: Người dùng chỉ được hoàn tác những thao tác do CHÍNH HỌ tạo ra mà không làm mất các thay đổi của người khác cùng lúc. Yjs hỗ trợ `UndoManager` theo dõi transaction origins. Với Canvas, dùng Canvas/WebGL layer riêng cho con trỏ multiplayer để không re-render cây DOM chính.",
+      "codeExample": "// Yjs doc + WebSocket provider\nconst ydoc = new Y.Doc();\nconst provider = new WebsocketProvider('wss://collab.server', 'room-101', ydoc);\nconst yelements = ydoc.getArray('elements');\n\n// Lắng nghe thay đổi từ đồng nghiệp\nyelements.observe(event => {\n  canvas.updateElements(yelements.toArray());\n});"
+    },
+    "pitfalls": [
+      "Gửi toàn bộ tài liệu qua WebSocket mỗi khi người dùng thay đổi 1 ký tự (gây nghẽn băng thông nghiêm trọng)."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để giảm tải (Throttle/Batch) vị trí con trỏ chuột của 50 người dùng cùng di chuyển trong phòng?"
+    ]
+  },
+  {
+    "id": "fsd-04",
+    "category": "frontend-system-design",
+    "level": "senior",
+    "question": "Thiết kế Real-Time Notification & Multi-tab Sync Center trong trình duyệt?",
+    "interviewerIntent": "Đánh giá kỹ năng tối ưu tài nguyên mạng và đồng bộ trạng thái giữa các tab trình duyệt của cùng 1 người dùng.",
+    "contextOrScenario": "Người dùng mở 5 tab trang web cùng lúc, chuông thông báo nhảy số và khi bấm đọc ở tab 1, 4 tab còn lại phải tự mất số đỏ.",
+    "expectedKeywords": [
+      "websocket vs sse",
+      "broadcastchannel api",
+      "sharedworker",
+      "connection deduplication",
+      "tab leader election"
+    ],
+    "seniorAnswer": {
+      "summary": "Kiến trúc Single Connection per Browser: (1) Dùng `SharedWorker` (hoặc bầu chọn 1 Tab làm Leader qua `BroadcastChannel`) để chỉ mở DUY NHẤT 1 kết nối WebSocket tới server; (2) Tab Leader nhận thông báo và phân phối tới các tab khác qua `BroadcastChannel`; (3) Khi user đọc thông báo ở tab bất kỳ, broadcast event `NOTIFICATION_READ` để 4 tab còn lại cập nhật UI ngay lập tức.",
+      "deepDive": "Nếu mỗi tab mở 1 kết nối WebSocket riêng, 1 người mở 10 tab sẽ tiêu tốn 10 connections ở backend. Cơ chế Tab Leader Election: Các tab sử dụng `navigator.locks` API hoặc heartbeat timestamp trong `localStorage` để tự bầu leader. Nếu tab leader bị đóng, tab khác tự động lên thay.",
+      "codeExample": "// BroadcastChannel sync giữa các tab\nconst channel = new BroadcastChannel('notifications_bus');\n\nchannel.onmessage = (event) => {\n  if (event.data.type === 'MARK_READ') {\n    setBadgeCount(prev => Math.max(0, prev - 1));\n  }\n};\n\nfunction markAsRead(id: string) {\n  api.markRead(id);\n  channel.postMessage({ type: 'MARK_READ', id });\n}"
+    },
+    "pitfalls": [
+      "Mỗi tab trình duyệt tự mở 1 WebSocket connection riêng biệt làm server bị cạn kiệt socket ports."
+    ],
+    "followUpQuestions": [
+      "Khi trình duyệt rơi vào chế độ chạy nền (Tab Background / Sleep), kết nối WebSocket bị đóng thì cơ chế Reconnect hoạt động thế nào?"
+    ]
+  },
+  {
+    "id": "fsd-05",
+    "category": "frontend-system-design",
+    "level": "senior",
+    "question": "Thiết kế Client-Side Telemetry & Web Vitals RUM (Real User Monitoring) SDK?",
+    "interviewerIntent": "Đánh giá kiến thức về Performance Monitoring, PerformanceObserver API và thu thập số liệu người dùng thực tế không gây ảnh hưởng đến UX.",
+    "contextOrScenario": "Xây dựng thư viện theo dõi sức khỏe ứng dụng đo LCP, INP, CLS, JS Error và gửi về telemetry server.",
+    "expectedKeywords": [
+      "performanceobserver api",
+      "core web vitals (lcp, inp, cls)",
+      "navigator.sendbeacon",
+      "batching queue",
+      "long tasks api"
+    ],
+    "seniorAnswer": {
+      "summary": "Thiết kế SDK gồm 3 module: (1) Metrics Collector sử dụng `PerformanceObserver` bắt các sự kiện LCP, INP, CLS và Long Tasks (>50ms); (2) Error Listener bắt `window.onerror` và `unhandledrejection`; (3) Transport Engine gom dữ liệu vào hàng đợi (Buffer 30s) và gửi bằng `navigator.sendBeacon()` để đảm bảo dữ liệu không bị mất khi người dùng đóng trình duyệt đột ngột.",
+      "deepDive": "Không bao giờ dùng `fetch()` thông thường trong sự kiện `beforeunload/pagehide` vì trình duyệt sẽ hủy request khi trang đóng. `navigator.sendBeacon()` đẩy việc gửi gói tin xuống tầng OS network stack, đảm bảo gói tin 100% được gửi đi ngay cả khi tab đã đóng hoàn toàn.",
+      "codeExample": "// Đăng ký đo INP qua PerformanceObserver\nconst observer = new PerformanceObserver((list) => {\n  for (const entry of list.getEntries()) {\n    if (entry.duration > 200) {\n      telemetryQueue.push({ type: 'INP_VIOLATION', duration: entry.duration, name: entry.name });\n    }\n  }\n});\nobserver.observe({ type: 'first-input', buffered: true });\n\n// Gửi an toàn khi rời trang\nwindow.addEventListener('pagehide', () => {\n  navigator.sendBeacon('/api/telemetry', JSON.stringify(telemetryQueue));\n});"
+    },
+    "pitfalls": [
+      "SDK theo dõi hiệu năng nhưng chính bản thân SDK lại gây nghẽn Main Thread do tính toán nặng và gửi HTTP request quá thường xuyên."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để lấy được Call Stack và Source Map chính xác của lỗi JS trên Production bằng SDK này?"
+    ]
   }
 ]
