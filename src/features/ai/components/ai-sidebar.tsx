@@ -138,20 +138,28 @@ export function AiSidebar({ tracks, onNavigate }: AiSidebarProps) {
                             href={`/ai/${track.slug}/${lesson.slug}`}
                             onClick={onNavigate}
                             aria-current={lessonActive ? 'page' : undefined}
-                            className={`flex items-start gap-1.5 rounded-lg px-1.5 py-1.5 text-[11px] leading-snug transition-colors ${
+                            className={`flex items-start gap-1.5 rounded-lg px-2 py-1.5 text-[11px] leading-snug transition-colors ${
                               lessonActive
-                                ? 'bg-violet-500/10 font-semibold text-violet-600 dark:text-violet-400'
-                                : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+                                ? 'bg-violet-500/10 font-semibold text-violet-700 dark:text-violet-400'
+                                : 'text-foreground/85 hover:bg-muted/80 hover:text-foreground'
                             }`}
                           >
                             {completed ? (
-                              <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+                              <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0 text-emerald-600 dark:text-emerald-400" />
                             ) : (
-                              <Circle className="text-muted-foreground/40 mt-0.5 h-3 w-3 shrink-0" />
+                              <Circle
+                                className={`mt-0.5 h-3 w-3 shrink-0 ${
+                                  lessonActive
+                                    ? 'text-violet-700 dark:text-violet-400'
+                                    : 'text-muted-foreground/60'
+                                }`}
+                              />
                             )}
                             <span className="min-w-0 flex-1">
-                              <span className="line-clamp-2 block">{lesson.title}</span>
-                              <span className="text-muted-foreground/70 flex items-center gap-1 font-mono text-[9px]">
+                              <span className="line-clamp-2 block font-medium">
+                                {lesson.title}
+                              </span>
+                              <span className="text-muted-foreground flex items-center gap-1 font-mono text-[9px]">
                                 <Clock className="h-2.5 w-2.5" aria-hidden="true" />
                                 {lesson.durationMinutes} phút · {lesson.level}
                               </span>

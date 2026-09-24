@@ -210,8 +210,8 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
             variant="outline"
             className={
               isNextJsTrack
-                ? 'border-indigo-500/30 bg-indigo-500/5 font-mono text-[11px] text-indigo-500'
-                : 'border-cyan-500/30 bg-cyan-500/5 font-mono text-[11px] text-cyan-600 dark:text-cyan-400'
+                ? 'border-indigo-500/30 bg-indigo-500/10 font-mono text-[11px] text-indigo-700 dark:text-indigo-400'
+                : 'border-cyan-500/30 bg-cyan-500/10 font-mono text-[11px] text-cyan-700 dark:text-cyan-400'
             }
           >
             {isNextJsTrack

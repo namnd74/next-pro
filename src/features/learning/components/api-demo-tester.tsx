@@ -45,7 +45,7 @@ const DEMO_ENDPOINTS: ApiDemoConfig[] = [
     title: 'TanStack Query Data Caching',
     endpoint: '/api/users?delay=300',
     method: 'GET',
-    icon: <Database className="h-4 w-4 text-cyan-400" />,
+    icon: <Database className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />,
     description: 'Giả lập data query với header stale-while-revalidate và delay mạng.',
   },
   {
