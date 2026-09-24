@@ -78,7 +78,6 @@ export default async function TrackDetailPage({ params }: TrackPageProps) {
         </div>
       </Card>
 
-      {/* Offensive Security Academy Banner — chỉ khi track có collection RT (soft-link qua relatedTrackSlug) */}
       {/* Syllabus / Lessons List */}
       <section className="space-y-4">
         <div className="flex items-center gap-2">
