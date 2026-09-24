@@ -242,8 +242,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('react')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'react' || selectedCategory === 'react-19'
-                      ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-500/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-cyan-600 text-white shadow-xs shadow-cyan-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="react" className="h-3.5 w-3.5" />
@@ -258,8 +258,8 @@ export default function InterviewPage() {
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'nextjs' ||
                     selectedCategory === 'next-app-router'
-                      ? 'bg-zinc-800 text-white shadow-sm dark:bg-zinc-200 dark:text-zinc-900'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-zinc-800 text-white shadow-xs dark:bg-zinc-200 dark:text-zinc-900'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="nextjs" className="h-3.5 w-3.5" />
@@ -273,8 +273,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('typescript')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'typescript'
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-blue-600 text-white shadow-xs shadow-blue-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="typescript" className="h-3.5 w-3.5" />
@@ -288,8 +288,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('javascript')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'javascript'
-                      ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-amber-600 text-white shadow-xs shadow-amber-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="javascript" className="h-3.5 w-3.5" />
@@ -303,8 +303,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('go')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'go'
-                      ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-sky-600 text-white shadow-xs shadow-sky-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="go" className="h-3.5 w-3.5" />
@@ -318,8 +318,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('nestjs')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'nestjs'
-                      ? 'bg-red-500 text-white shadow-sm shadow-red-500/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-rose-600 text-white shadow-xs shadow-rose-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="nestjs" className="h-3.5 w-3.5" />
@@ -458,8 +458,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedLevel('all')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                     selectedLevel === 'all'
-                      ? 'bg-foreground text-background shadow-sm'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-slate-900 text-white shadow-xs dark:bg-slate-100 dark:text-slate-900'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <span>Tất cả</span>
@@ -472,8 +472,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedLevel('junior')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                     selectedLevel === 'junior'
-                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <span>🟢 Cơ bản (Junior)</span>
@@ -486,8 +486,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedLevel('middle')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                     selectedLevel === 'middle'
-                      ? 'bg-amber-600 text-white shadow-sm shadow-amber-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-amber-600 text-white shadow-xs shadow-amber-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <span>🟡 Trung bình (Middle)</span>
@@ -500,8 +500,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedLevel('senior')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                     selectedLevel === 'senior'
-                      ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-rose-600 text-white shadow-xs shadow-rose-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <span>🔴 Nâng cao (Senior)</span>

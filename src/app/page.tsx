@@ -42,23 +42,23 @@ export default function HomePage() {
         {/* Left Column (5 cols): Badge, Headline, Subtitle, Buttons */}
         <div className="flex flex-col items-center gap-4 text-center sm:gap-5 lg:col-span-5 lg:items-start lg:text-left xl:gap-6">
           {/* Pill Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1 text-xs font-medium text-indigo-400 backdrop-blur-md">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
+          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1 text-xs font-medium text-indigo-600 backdrop-blur-md dark:text-indigo-400">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-600 dark:bg-indigo-400" />
             Fast-Track to Production Ready
           </div>
 
           {/* Headline */}
-          <h1 className="text-3xl leading-[1.12] font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl xl:text-6xl">
+          <h1 className="text-3xl leading-[1.12] font-extrabold tracking-tight text-slate-900 sm:text-4xl lg:text-5xl xl:text-6xl dark:text-white">
             Làm chủ
             <br />
             React &{' '}
-            <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-sky-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-sky-600 bg-clip-text text-transparent dark:from-indigo-400 dark:via-purple-400 dark:to-sky-400">
               Next.js
             </span>
           </h1>
 
           {/* Subtitle */}
-          <p className="-mt-1 text-xl font-semibold tracking-tight text-slate-400 sm:-mt-2 sm:text-2xl lg:text-3xl">
+          <p className="-mt-1 text-xl font-semibold tracking-tight text-slate-600 sm:-mt-2 sm:text-2xl lg:text-3xl dark:text-slate-400">
             bằng cách thực sự làm.
           </p>
 
@@ -67,7 +67,7 @@ export default function HomePage() {
             <Link href="/learn">
               <Button
                 size="lg"
-                className="cursor-pointer rounded-xl bg-white px-6 py-5 text-sm font-semibold text-slate-950 shadow-xl shadow-white/5 hover:bg-slate-100 sm:px-7 sm:py-6 sm:text-base"
+                className="cursor-pointer rounded-xl bg-slate-900 px-6 py-5 text-sm font-semibold text-white shadow-xl shadow-slate-900/10 hover:bg-slate-800 sm:px-7 sm:py-6 sm:text-base dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
               >
                 Bắt đầu học ngay
               </Button>
@@ -76,7 +76,7 @@ export default function HomePage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="cursor-pointer rounded-xl border-slate-700/80 bg-slate-900/50 px-6 py-5 text-sm font-semibold text-slate-200 backdrop-blur-md hover:bg-slate-800 sm:px-7 sm:py-6 sm:text-base"
+                className="cursor-pointer rounded-xl border border-slate-300 bg-white/90 px-6 py-5 text-sm font-semibold text-slate-800 shadow-xs hover:bg-slate-100 sm:px-7 sm:py-6 sm:text-base dark:border-slate-700/80 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Luyện phỏng vấn
               </Button>

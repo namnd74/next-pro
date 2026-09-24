@@ -45,7 +45,7 @@ function getCategoryBadge(category: string): {
       return {
         iconName: 'react',
         label: 'React',
-        className: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30',
+        className: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/25',
       };
     case 'nextjs':
     case 'next-app-router':
@@ -53,99 +53,100 @@ function getCategoryBadge(category: string): {
         iconName: 'nextjs',
         label: 'Next.js',
         className:
-          'bg-zinc-500/10 text-zinc-900 dark:text-zinc-100 border-zinc-500/30 font-semibold',
+          'bg-zinc-500/10 text-zinc-900 dark:text-zinc-100 border-zinc-500/25 font-semibold',
       };
     case 'typescript':
       return {
         iconName: 'typescript',
         label: 'TypeScript',
-        className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30',
+        className: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/25',
       };
     case 'javascript':
       return {
         iconName: 'javascript',
         label: 'JavaScript',
         className:
-          'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
+          'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/25',
       };
     case 'go':
       return {
         iconName: 'go',
         label: 'Go (Golang)',
         className:
-          'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30 font-semibold',
+          'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/25 font-semibold',
       };
     case 'nestjs':
       return {
         iconName: 'nestjs',
         label: 'NestJS',
         className:
-          'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 font-semibold',
+          'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/25 font-semibold',
       };
     case 'nodejs':
       return {
         iconName: 'nodejs',
         label: 'Node.js',
         className:
-          'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-semibold',
+          'bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/25 font-semibold',
       };
     case 'python':
       return {
         iconName: 'python',
         label: 'Python',
         className:
-          'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30 font-semibold',
+          'bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-500/25 font-semibold',
       };
     case 'django':
       return {
         iconName: 'django',
         label: 'Django',
         className:
-          'bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30 font-semibold',
+          'bg-teal-500/10 text-teal-800 dark:text-teal-400 border-teal-500/25 font-semibold',
       };
     case 'javascript-typescript':
       return {
         iconName: 'typescript',
         label: 'JS / TS',
-        className: 'bg-amber-500/10 text-amber-600 border-amber-500/30',
+        className:
+          'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/25',
       };
     case 'browser-runtime-workers':
       return {
         label: 'Browser & Workers',
         className:
-          'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
+          'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/25',
       };
     case 'performance-optimization':
       return {
         label: 'Performance & Security',
         className:
-          'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+          'bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-500/25',
       };
     case 'html':
       return {
         label: 'HTML5 & Web',
         className:
-          'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30 font-semibold',
+          'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/25 font-semibold',
       };
     case 'css':
       return {
         label: 'CSS3 & Styling',
         className:
-          'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30 font-semibold',
+          'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/25 font-semibold',
       };
     case 'design-patterns':
       return {
         iconName: 'architecture',
         label: 'Design Patterns',
         className:
-          'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30 font-semibold',
+          'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/25 font-semibold',
       };
     case 'micro-frontend':
       return {
         iconName: 'architecture',
         label: 'Micro-Frontend',
         className:
-          'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30 font-semibold',
+          'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/25 font-semibold',
       };
     case 'system-design':
     case 'frontend-system-design':
@@ -154,13 +155,13 @@ function getCategoryBadge(category: string): {
         iconName: 'architecture',
         label: 'System Design',
         className:
-          'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 font-semibold',
+          'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/25 font-semibold',
       };
     case 'state-data':
       return {
         label: 'State & Data',
         className:
-          'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30',
+          'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/25',
       };
     default:
       return {
@@ -352,8 +353,8 @@ export const QuestionCard = React.memo(function QuestionCard({
 
               {/* Senior Answer Tab */}
               <TabsContent value="answer" className="space-y-3 pt-2">
-                <div className="border-primary/15 bg-primary/5 space-y-1.5 rounded-xl border p-3.5">
-                  <span className="text-primary flex items-center gap-1.5 text-xs font-bold">
+                <div className="dark:bg-primary/5 space-y-1.5 rounded-xl border border-indigo-500/20 bg-indigo-50/70 p-3.5">
+                  <span className="dark:text-primary flex items-center gap-1.5 text-xs font-bold text-indigo-700">
                     <Sparkles className="h-3.5 w-3.5" />
                     30-Second Answer:
                   </span>
@@ -372,8 +373,8 @@ export const QuestionCard = React.memo(function QuestionCard({
                 </div>
 
                 {question.seniorAnswer.mentalModel && (
-                  <div className="space-y-1.5 rounded-xl border border-sky-500/20 bg-sky-500/5 p-3.5">
-                    <span className="text-xs font-bold text-sky-700 dark:text-sky-300">
+                  <div className="space-y-1.5 rounded-xl border border-sky-500/20 bg-sky-50/70 p-3.5 dark:bg-sky-500/5">
+                    <span className="text-xs font-bold text-sky-800 dark:text-sky-300">
                       Mental model:
                     </span>
                     <p className="text-muted-foreground text-xs leading-relaxed">
@@ -399,8 +400,8 @@ export const QuestionCard = React.memo(function QuestionCard({
                 )}
 
                 {question.seniorAnswer.tradeoffs && (
-                  <div className="space-y-1.5 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3.5">
-                    <span className="text-xs font-bold text-violet-700 dark:text-violet-300">
+                  <div className="space-y-1.5 rounded-xl border border-violet-500/20 bg-violet-50/70 p-3.5 dark:bg-violet-500/5">
+                    <span className="text-xs font-bold text-violet-800 dark:text-violet-300">
                       Trade-offs cần nói rõ:
                     </span>
                     <ul className="text-muted-foreground space-y-1.5 text-xs">
@@ -424,8 +425,8 @@ export const QuestionCard = React.memo(function QuestionCard({
                 )}
 
                 {question.seniorAnswer.verification && (
-                  <div className="space-y-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3.5">
-                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                  <div className="space-y-1.5 rounded-xl border border-emerald-500/20 bg-emerald-50/70 p-3.5 dark:bg-emerald-500/5">
+                    <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
                       Cách kiểm chứng trong production:
                     </span>
                     <ul className="text-muted-foreground space-y-1.5 text-xs">
@@ -465,11 +466,11 @@ export const QuestionCard = React.memo(function QuestionCard({
               {/* Pitfalls Tab */}
               <TabsContent value="pitfalls" className="space-y-2 pt-2">
                 <div className="space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5">
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-300">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     Common Red Flags & Mistakes:
                   </span>
-                  <ul className="space-y-1.5 text-xs text-amber-900 dark:text-amber-200">
+                  <ul className="space-y-1.5 text-xs text-amber-950 dark:text-amber-200">
                     {question.pitfalls.map((p, pIdx) => (
                       <li key={pIdx} className="flex items-start gap-2">
                         <span className="mt-0.5 text-amber-500">•</span>
@@ -484,7 +485,7 @@ export const QuestionCard = React.memo(function QuestionCard({
               <TabsContent value="followup" className="space-y-3 pt-2">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-indigo-800 dark:text-indigo-300">
                       <HelpCircle className="h-3.5 w-3.5" />
                       Câu hỏi đào sâu mở rộng (Follow-up Inquiries):
                     </span>
@@ -501,7 +502,7 @@ export const QuestionCard = React.memo(function QuestionCard({
                       return (
                         <div
                           key={fIdx}
-                          className="overflow-hidden rounded-xl border border-indigo-500/25 bg-indigo-500/5 transition-all hover:border-indigo-500/40"
+                          className="overflow-hidden rounded-xl border border-indigo-500/25 bg-indigo-50/60 transition-all hover:border-indigo-500/40 dark:bg-indigo-500/5"
                         >
                           <button
                             type="button"
