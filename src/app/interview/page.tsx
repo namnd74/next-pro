@@ -38,6 +38,8 @@ export default function InterviewPage() {
   const [selectedLevel, setSelectedLevel] = React.useState<string>('all');
   const [onlyBookmarked, setOnlyBookmarked] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const deferredSearchQuery = React.useDeferredValue(searchQuery);
+  const isPendingSearch = searchQuery !== deferredSearchQuery;
 
   const [isJsonModalOpen, setIsJsonModalOpen] = React.useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
@@ -102,7 +104,9 @@ export default function InterviewPage() {
   }, [allQuestions, selectedCategory]);
 
   const filteredQuestions = React.useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = deferredSearchQuery.trim().toLowerCase();
+    const bookmarkSet = onlyBookmarked ? new Set(bookmarkedQuestionIds) : null;
+
     return allQuestions.filter((q) => {
       const matchCategory =
         selectedCategory === 'all'
@@ -123,7 +127,7 @@ export default function InterviewPage() {
                       : q.category === selectedCategory;
 
       const matchLevel = selectedLevel === 'all' || q.level === selectedLevel;
-      const matchBookmark = !onlyBookmarked || bookmarkedQuestionIds.includes(q.id);
+      const matchBookmark = !bookmarkSet || bookmarkSet.has(q.id);
 
       const matchSearch =
         !query ||
@@ -139,7 +143,7 @@ export default function InterviewPage() {
     selectedCategory,
     selectedLevel,
     onlyBookmarked,
-    searchQuery,
+    deferredSearchQuery,
     bookmarkedQuestionIds,
   ]);
 
@@ -509,7 +513,11 @@ export default function InterviewPage() {
 
               {/* Search bar */}
               <div className="relative">
-                <Search className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
+                <Search
+                  className={`text-muted-foreground absolute top-2.5 left-3 h-4 w-4 transition-all duration-200 ${
+                    isPendingSearch ? 'text-primary animate-spin' : ''
+                  }`}
+                />
                 <input
                   type="text"
                   placeholder="Tìm kiếm câu hỏi, từ khóa kỹ thuật (VD: RSC, Hydration, useOptimistic...)"

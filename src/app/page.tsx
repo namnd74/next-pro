@@ -34,7 +34,7 @@ export default function HomePage() {
       {/* Purple radial glow behind laptop on the right */}
       <div
         aria-hidden
-        className="pointer-events-none absolute top-1/2 -right-24 h-[480px] w-[600px] -translate-y-1/2 rounded-full bg-gradient-to-l from-purple-600/25 via-indigo-600/15 to-transparent blur-[110px]"
+        className="pointer-events-none absolute top-1/2 -right-24 h-[480px] w-[600px] -translate-y-1/2 rounded-full bg-gradient-to-l from-purple-600/20 via-indigo-600/10 to-transparent blur-3xl"
       />
 
       {/* Main 2-Column Hero Area (Vertically Centered in remaining space) */}
@@ -97,7 +97,7 @@ export default function HomePage() {
         <Marquee
           pauseOnHover
           gap="2rem"
-          className="border-border/30 bg-background/50 border-t py-2.5 backdrop-blur-xs [--duration:25s] sm:py-3.5"
+          className="border-border/30 bg-background/90 border-t py-2.5 [--duration:25s] sm:py-3.5"
         >
           {TECH_STACK.map((tech) => (
             <span
