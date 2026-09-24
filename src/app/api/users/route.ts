@@ -4,7 +4,7 @@ export const dynamic = 'force-static';
 
 export async function GET() {
   const users = [
-    { id: '1', name: 'Alice Nguyen', role: 'Lead Architect', category: 'react-19' },
+    { id: '1', name: 'Alice Chen', role: 'Lead Architect', category: 'react-19' },
     { id: '2', name: 'Bob Tran', role: 'Senior Engineer', category: 'next-app-router' },
     { id: '3', name: 'Carol Le', role: 'Security Specialist', category: 'web-security' },
   ];
