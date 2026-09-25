@@ -40,7 +40,8 @@ interface CategoryFilterItem {
 const CATEGORY_ITEMS: CategoryFilterItem[] = [
   {
     id: 'all',
-    label: '🌐 Tất cả',
+    label: 'Tất cả',
+    iconName: 'all',
     activeColor: 'bg-primary text-primary-foreground shadow-sm',
   },
   {
@@ -70,21 +71,25 @@ const CATEGORY_ITEMS: CategoryFilterItem[] = [
   {
     id: 'vue',
     label: 'Vue.js',
+    iconName: 'vue',
     activeColor: 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/20',
   },
   {
     id: 'angular',
     label: 'Angular',
+    iconName: 'angular',
     activeColor: 'bg-red-600 text-white shadow-xs shadow-red-600/20',
   },
   {
     id: 'html',
     label: 'HTML5',
+    iconName: 'html',
     activeColor: 'bg-orange-600 text-white shadow-sm shadow-orange-600/20',
   },
   {
     id: 'css',
     label: 'CSS3',
+    iconName: 'css',
     activeColor: 'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
   },
   {
@@ -120,71 +125,85 @@ const CATEGORY_ITEMS: CategoryFilterItem[] = [
   {
     id: 'fastapi',
     label: 'FastAPI',
+    iconName: 'fastapi',
     activeColor: 'bg-teal-600 text-white shadow-sm shadow-teal-600/20',
   },
   {
     id: 'java',
     label: 'Java',
+    iconName: 'java',
     activeColor: 'bg-amber-700 text-white shadow-sm shadow-amber-700/20',
   },
   {
     id: 'spring',
     label: 'Spring Boot',
+    iconName: 'spring',
     activeColor: 'bg-green-600 text-white shadow-sm shadow-green-600/20',
   },
   {
     id: 'csharp',
     label: 'C# (.NET)',
+    iconName: 'csharp',
     activeColor: 'bg-purple-600 text-white shadow-sm shadow-purple-600/20',
   },
   {
     id: 'php',
     label: 'PHP',
+    iconName: 'php',
     activeColor: 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20',
   },
   {
     id: 'laravel',
     label: 'Laravel',
+    iconName: 'laravel',
     activeColor: 'bg-rose-600 text-white shadow-sm shadow-rose-600/20',
   },
   {
     id: 'ruby',
     label: 'Ruby',
+    iconName: 'ruby',
     activeColor: 'bg-red-600 text-white shadow-sm shadow-red-600/20',
   },
   {
     id: 'rails',
     label: 'Rails',
+    iconName: 'rails',
     activeColor: 'bg-red-700 text-white shadow-sm shadow-red-700/20',
   },
   {
     id: 'cpp',
     label: 'C++',
+    iconName: 'cpp',
     activeColor: 'bg-blue-700 text-white shadow-sm shadow-blue-700/20',
   },
   {
     id: 'rust',
     label: 'Rust',
+    iconName: 'rust',
     activeColor: 'bg-orange-700 text-white shadow-sm shadow-orange-700/20',
   },
   {
     id: 'ios',
     label: 'iOS (Swift)',
+    iconName: 'ios',
     activeColor: 'bg-orange-600 text-white shadow-sm shadow-orange-600/20',
   },
   {
     id: 'android',
     label: 'Android',
+    iconName: 'android',
     activeColor: 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20',
   },
   {
     id: 'flutter',
     label: 'Flutter',
+    iconName: 'flutter',
     activeColor: 'bg-sky-500 text-white shadow-sm shadow-sky-500/20',
   },
   {
     id: 'react-native',
     label: 'React Native',
+    iconName: 'react-native',
     activeColor: 'bg-cyan-600 text-white shadow-sm shadow-cyan-600/20',
   },
   {
@@ -196,98 +215,115 @@ const CATEGORY_ITEMS: CategoryFilterItem[] = [
   {
     id: 'design-patterns',
     label: 'Design Patterns',
-    iconName: 'architecture',
+    iconName: 'design-patterns',
     activeColor: 'bg-violet-600 text-white shadow-sm shadow-violet-600/20',
   },
   {
     id: 'micro-frontend',
     label: 'Micro-Frontend',
-    iconName: 'architecture',
+    iconName: 'micro-frontend',
     activeColor: 'bg-fuchsia-600 text-white shadow-sm shadow-fuchsia-600/20',
   },
   {
     id: 'ai',
     label: 'AI & LLM',
+    iconName: 'ai',
     activeColor: 'bg-purple-600 text-white shadow-sm shadow-purple-600/20',
   },
   {
     id: 'database',
     label: 'Database',
+    iconName: 'database',
     activeColor: 'bg-amber-600 text-white shadow-sm shadow-amber-600/20',
   },
   {
     id: 'devops-cloud',
     label: 'DevOps & Cloud',
+    iconName: 'devops-cloud',
     activeColor: 'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
   },
   {
     id: 'cs-fundamentals',
     label: 'CS Fundamentals',
+    iconName: 'cs-fundamentals',
     activeColor: 'bg-slate-700 text-white shadow-sm shadow-slate-700/20',
   },
   {
     id: 'dsa',
     label: 'DSA & Algorithms',
+    iconName: 'dsa',
     activeColor: 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20',
   },
   {
     id: 'data-engineering',
     label: 'Data Engineering',
+    iconName: 'data-engineering',
     activeColor: 'bg-teal-600 text-white shadow-sm shadow-teal-600/20',
   },
   {
     id: 'cybersecurity',
     label: 'Cybersecurity',
+    iconName: 'cybersecurity',
     activeColor: 'bg-rose-700 text-white shadow-sm shadow-rose-700/20',
   },
   {
     id: 'testing-qa',
     label: 'Testing & QA',
+    iconName: 'testing-qa',
     activeColor: 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20',
   },
   {
     id: 'business-analyst',
     label: 'Business Analyst',
+    iconName: 'business-analyst',
     activeColor: 'bg-blue-600 text-white shadow-sm shadow-blue-600/20',
   },
   {
     id: 'behavioral-hr',
     label: 'Behavioral & STAR',
+    iconName: 'behavioral-hr',
     activeColor: 'bg-pink-600 text-white shadow-sm shadow-pink-600/20',
   },
   {
     id: 'graphql',
     label: 'GraphQL',
+    iconName: 'graphql',
     activeColor: 'bg-pink-600 text-white shadow-sm shadow-pink-600/20',
   },
   {
     id: 'state-management',
     label: 'State Management',
+    iconName: 'state-management',
     activeColor: 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20',
   },
   {
     id: 'performance',
     label: 'Web Performance',
+    iconName: 'performance',
     activeColor: 'bg-lime-600 text-white shadow-sm shadow-lime-600/20',
   },
   {
     id: 'build-tools',
     label: 'Build Tools',
+    iconName: 'build-tools',
     activeColor: 'bg-yellow-600 text-white shadow-sm shadow-yellow-600/20',
   },
   {
     id: 'seo',
     label: 'SEO',
+    iconName: 'seo',
     activeColor: 'bg-teal-600 text-white shadow-sm shadow-teal-600/20',
   },
   {
     id: 'backend-api',
     label: 'Backend API',
+    iconName: 'backend-api',
     activeColor: 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20',
   },
   {
     id: 'shell-linux',
     label: 'Shell & Linux',
+    iconName: 'shell-linux',
     activeColor: 'bg-zinc-700 text-white shadow-sm shadow-zinc-700/20',
   },
 ];
@@ -472,17 +508,33 @@ export default function InterviewPage() {
       <section>
         <Tabs defaultValue="simulator" className="w-full space-y-6">
           <TabsList className="mx-auto grid w-full max-w-xl grid-cols-3 sm:mx-0">
-            <TabsTrigger value="simulator" className="gap-2 text-xs sm:text-sm">
-              <PlayCircle className="h-4 w-4" />
-              <span>Mock Simulator</span>
+            <TabsTrigger
+              value="simulator"
+              className="gap-1.5 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <PlayCircle className="h-4 w-4 shrink-0" />
+              <span>
+                <span className="hidden sm:inline">Mock </span>Simulator
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="bank" className="gap-2 text-xs sm:text-sm">
-              <BookOpen className="h-4 w-4" />
-              <span>Senior Q&A Bank ({allQuestions.length})</span>
+            <TabsTrigger
+              value="bank"
+              className="gap-1.5 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <BookOpen className="h-4 w-4 shrink-0" />
+              <span>
+                <span className="hidden sm:inline">Senior </span>Q&A (
+                {allQuestions.length})
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="bughunt" className="gap-2 text-xs sm:text-sm">
-              <Bug className="h-4 w-4" />
-              <span>Bug Hunting</span>
+            <TabsTrigger
+              value="bughunt"
+              className="gap-1.5 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <Bug className="h-4 w-4 shrink-0" />
+              <span>
+                Bug Hunt<span className="hidden sm:inline">ing</span>
+              </span>
             </TabsTrigger>
           </TabsList>
 
@@ -549,8 +601,8 @@ export default function InterviewPage() {
               />
 
               {/* Filters row */}
-              <div className="border-border/40 flex flex-wrap items-center justify-between gap-3 border-t pt-1">
-                <div className="flex flex-wrap items-center gap-3">
+              <div className="border-border/40 flex flex-col gap-3 border-t pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                   <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold">
                     <Filter className="h-3.5 w-3.5" />
                     <span>Chủ đề:</span>
@@ -563,7 +615,7 @@ export default function InterviewPage() {
                       value: item.id,
                       label: `${item.label} (${categoryCounts[item.id] || 0})`,
                     }))}
-                    className="w-56"
+                    className="w-full sm:w-56"
                   />
 
                   <Select
@@ -576,7 +628,7 @@ export default function InterviewPage() {
                       { value: 'senior', label: 'Senior' },
                       { value: 'lead', label: 'Lead' },
                     ]}
-                    className="w-36"
+                    className="w-full sm:w-36"
                   />
                 </div>
 
@@ -584,7 +636,7 @@ export default function InterviewPage() {
                   variant={onlyBookmarked ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setOnlyBookmarked(!onlyBookmarked)}
-                  className="gap-1.5 text-xs"
+                  className="w-full gap-1.5 text-xs sm:w-auto"
                 >
                   <Bookmark className="h-3.5 w-3.5" />
                   <span>Đã Bookmark ({bookmarkedQuestionIds.length})</span>

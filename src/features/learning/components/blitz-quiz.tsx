@@ -88,14 +88,14 @@ export function BlitzQuiz({ lessonId, quizzes, onQuizComplete }: BlitzQuizProps)
   const isPassed = currentScore >= Math.ceil(quizzes.length * 0.7);
 
   return (
-    <Card className="glass-card border-primary/20 overflow-hidden p-6 shadow-md">
+    <Card className="glass-card border-primary/20 overflow-hidden p-4 shadow-md sm:p-6">
       {/* Header */}
-      <div className="border-border/50 flex flex-col gap-3 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-border/50 flex flex-col gap-3 border-b pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
+          <div className="bg-primary/10 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
             <Sparkles className="h-5 w-5" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-foreground text-base font-bold">60s Rapid Blitz Quiz</h3>
             <p className="text-muted-foreground text-xs">
               Test your understanding with 3 rapid questions (Pass mark: 70%+)
@@ -104,7 +104,7 @@ export function BlitzQuiz({ lessonId, quizzes, onQuizComplete }: BlitzQuizProps)
         </div>
 
         {isSubmitted && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge
               variant={isPassed ? 'default' : 'destructive'}
               className="gap-1.5 px-3 py-1 text-xs font-semibold"
@@ -155,8 +155,8 @@ export function BlitzQuiz({ lessonId, quizzes, onQuizComplete }: BlitzQuizProps)
                 <span className="bg-secondary text-foreground flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold">
                   {qIndex + 1}
                 </span>
-                <div className="flex-1 space-y-2">
-                  <p className="text-foreground text-sm leading-snug font-semibold">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-foreground text-sm leading-snug font-semibold break-words">
                     {q.question}
                   </p>
 
@@ -203,7 +203,9 @@ export function BlitzQuiz({ lessonId, quizzes, onQuizComplete }: BlitzQuizProps)
                       <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg border border-current text-[11px] font-bold">
                         {opt.key}
                       </span>
-                      <span className="flex-1 leading-relaxed">{opt.text}</span>
+                      <span className="flex-1 leading-relaxed break-words">
+                        {opt.text}
+                      </span>
                     </button>
                   );
                 })}
@@ -213,7 +215,7 @@ export function BlitzQuiz({ lessonId, quizzes, onQuizComplete }: BlitzQuizProps)
               {isSubmitted && (
                 <div className="border-border/40 bg-background/80 text-muted-foreground mt-3 flex items-start gap-2 rounded-xl border p-3 text-xs leading-relaxed">
                   <HelpCircle className="text-primary mt-0.5 h-4 w-4 shrink-0" />
-                  <div>
+                  <div className="min-w-0 flex-1 break-words">
                     <span className="text-foreground font-semibold">Explanation: </span>
                     {q.explanation}
                   </div>

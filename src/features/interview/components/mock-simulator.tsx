@@ -20,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { TechIcon } from '@/components/common/tech-icon';
 
 export function MockSimulator() {
   const { saveMockResult, customQuestions } = useInterviewStore();
@@ -146,116 +147,123 @@ export function MockSimulator() {
       {/* Question Selector Bar */}
       <Card className="glass-card relative z-20 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground text-xs font-semibold">Ngôn ngữ:</span>
-            <Select
-              value={selectedLanguage}
-              onValueChange={(val) => {
-                setSelectedLanguage(val);
-                const nextSubset =
-                  val === 'all'
-                    ? allQuestions
-                    : val === 'react'
-                      ? allQuestions.filter(
-                          (q) => q.category === 'react' || q.category === 'react-19'
-                        )
-                      : val === 'nextjs'
+          <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground shrink-0 text-xs font-semibold">
+                Ngôn ngữ:
+              </span>
+              <Select
+                value={selectedLanguage}
+                onValueChange={(val) => {
+                  setSelectedLanguage(val);
+                  const nextSubset =
+                    val === 'all'
+                      ? allQuestions
+                      : val === 'react'
                         ? allQuestions.filter(
-                            (q) =>
-                              q.category === 'nextjs' || q.category === 'next-app-router'
+                            (q) => q.category === 'react' || q.category === 'react-19'
                           )
-                        : val === 'typescript'
+                        : val === 'nextjs'
                           ? allQuestions.filter(
                               (q) =>
-                                q.category === 'typescript' ||
-                                q.category === 'javascript-typescript'
+                                q.category === 'nextjs' ||
+                                q.category === 'next-app-router'
                             )
-                          : val === 'javascript'
+                          : val === 'typescript'
                             ? allQuestions.filter(
                                 (q) =>
-                                  q.category === 'javascript' ||
+                                  q.category === 'typescript' ||
                                   q.category === 'javascript-typescript'
                               )
-                            : allQuestions.filter((q) => q.category === val);
-                if (nextSubset.length > 0) {
-                  setSelectedQuestionId(nextSubset[0].id);
-                }
-                setEvaluatedResult(null);
-                setUserAnswer('');
-                setIsRecording(false);
-                setTimeSeconds(0);
-              }}
-              options={[
-                { value: 'all', label: 'Tất cả chủ đề' },
-                { value: 'react', label: 'React' },
-                { value: 'nextjs', label: 'Next.js' },
-                { value: 'typescript', label: 'TypeScript' },
-                { value: 'javascript', label: 'JavaScript' },
-                { value: 'vue', label: 'Vue.js' },
-                { value: 'angular', label: 'Angular' },
-                { value: 'html', label: 'HTML5' },
-                { value: 'css', label: 'CSS3' },
-                { value: 'go', label: 'Go (Golang)' },
-                { value: 'nestjs', label: 'NestJS' },
-                { value: 'nodejs', label: 'Node.js' },
-                { value: 'python', label: 'Python' },
-                { value: 'django', label: 'Django' },
-                { value: 'fastapi', label: 'FastAPI' },
-                { value: 'java', label: 'Java' },
-                { value: 'spring', label: 'Spring Boot' },
-                { value: 'csharp', label: 'C# (.NET)' },
-                { value: 'php', label: 'PHP' },
-                { value: 'laravel', label: 'Laravel' },
-                { value: 'ruby', label: 'Ruby' },
-                { value: 'rails', label: 'Ruby on Rails' },
-                { value: 'cpp', label: 'C++' },
-                { value: 'rust', label: 'Rust' },
-                { value: 'ios', label: 'iOS (Swift)' },
-                { value: 'android', label: 'Android' },
-                { value: 'flutter', label: 'Flutter' },
-                { value: 'react-native', label: 'React Native' },
-                { value: 'system-design', label: 'System Design' },
-                { value: 'design-patterns', label: 'Design Patterns' },
-                { value: 'micro-frontend', label: 'Micro-Frontend' },
-                { value: 'ai', label: 'AI & LLM' },
-                { value: 'database', label: 'Database' },
-                { value: 'devops-cloud', label: 'DevOps & Cloud' },
-                { value: 'cs-fundamentals', label: 'CS Fundamentals' },
-                { value: 'dsa', label: 'DSA & Algorithms' },
-                { value: 'data-engineering', label: 'Data Engineering' },
-                { value: 'cybersecurity', label: 'Cybersecurity' },
-                { value: 'testing-qa', label: 'Testing & QA' },
-                { value: 'business-analyst', label: 'Business Analyst' },
-                { value: 'behavioral-hr', label: 'Behavioral & STAR' },
-                { value: 'graphql', label: 'GraphQL' },
-                { value: 'state-management', label: 'State Management' },
-                { value: 'performance', label: 'Web Performance' },
-                { value: 'build-tools', label: 'Build Tools' },
-                { value: 'seo', label: 'SEO' },
-                { value: 'backend-api', label: 'Backend API' },
-                { value: 'shell-linux', label: 'Shell & Linux' },
-              ]}
-              className="w-48"
-            />
+                            : val === 'javascript'
+                              ? allQuestions.filter(
+                                  (q) =>
+                                    q.category === 'javascript' ||
+                                    q.category === 'javascript-typescript'
+                                )
+                              : allQuestions.filter((q) => q.category === val);
+                  if (nextSubset.length > 0) {
+                    setSelectedQuestionId(nextSubset[0].id);
+                  }
+                  setEvaluatedResult(null);
+                  setUserAnswer('');
+                  setIsRecording(false);
+                  setTimeSeconds(0);
+                }}
+                options={[
+                  { value: 'all', label: 'Tất cả chủ đề' },
+                  { value: 'react', label: 'React' },
+                  { value: 'nextjs', label: 'Next.js' },
+                  { value: 'typescript', label: 'TypeScript' },
+                  { value: 'javascript', label: 'JavaScript' },
+                  { value: 'vue', label: 'Vue.js' },
+                  { value: 'angular', label: 'Angular' },
+                  { value: 'html', label: 'HTML5' },
+                  { value: 'css', label: 'CSS3' },
+                  { value: 'go', label: 'Go (Golang)' },
+                  { value: 'nestjs', label: 'NestJS' },
+                  { value: 'nodejs', label: 'Node.js' },
+                  { value: 'python', label: 'Python' },
+                  { value: 'django', label: 'Django' },
+                  { value: 'fastapi', label: 'FastAPI' },
+                  { value: 'java', label: 'Java' },
+                  { value: 'spring', label: 'Spring Boot' },
+                  { value: 'csharp', label: 'C# (.NET)' },
+                  { value: 'php', label: 'PHP' },
+                  { value: 'laravel', label: 'Laravel' },
+                  { value: 'ruby', label: 'Ruby' },
+                  { value: 'rails', label: 'Ruby on Rails' },
+                  { value: 'cpp', label: 'C++' },
+                  { value: 'rust', label: 'Rust' },
+                  { value: 'ios', label: 'iOS (Swift)' },
+                  { value: 'android', label: 'Android' },
+                  { value: 'flutter', label: 'Flutter' },
+                  { value: 'react-native', label: 'React Native' },
+                  { value: 'system-design', label: 'System Design' },
+                  { value: 'design-patterns', label: 'Design Patterns' },
+                  { value: 'micro-frontend', label: 'Micro-Frontend' },
+                  { value: 'ai', label: 'AI & LLM' },
+                  { value: 'database', label: 'Database' },
+                  { value: 'devops-cloud', label: 'DevOps & Cloud' },
+                  { value: 'cs-fundamentals', label: 'CS Fundamentals' },
+                  { value: 'dsa', label: 'DSA & Algorithms' },
+                  { value: 'data-engineering', label: 'Data Engineering' },
+                  { value: 'cybersecurity', label: 'Cybersecurity' },
+                  { value: 'testing-qa', label: 'Testing & QA' },
+                  { value: 'business-analyst', label: 'Business Analyst' },
+                  { value: 'behavioral-hr', label: 'Behavioral & STAR' },
+                  { value: 'graphql', label: 'GraphQL' },
+                  { value: 'state-management', label: 'State Management' },
+                  { value: 'performance', label: 'Web Performance' },
+                  { value: 'build-tools', label: 'Build Tools' },
+                  { value: 'seo', label: 'SEO' },
+                  { value: 'backend-api', label: 'Backend API' },
+                  { value: 'shell-linux', label: 'Shell & Linux' },
+                ]}
+                className="w-full sm:w-48"
+              />
+            </div>
 
-            <span className="text-muted-foreground ml-1 text-xs font-semibold">
-              Câu hỏi ({filteredSimulatorQuestions.length}):
-            </span>
-            <Select
-              value={selectedQuestionId}
-              onValueChange={(val) => {
-                setSelectedQuestionId(val);
-                setEvaluatedResult(null);
-                setUserAnswer('');
-                setIsRecording(false);
-                setTimeSeconds(0);
-              }}
-              options={filteredSimulatorQuestions.map((q, idx) => ({
-                value: q.id,
-                label: `#${idx + 1} - [${q.level.toUpperCase()}] ${q.question.slice(0, 50)}...`,
-              }))}
-              className="max-w-md"
-            />
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground shrink-0 text-xs font-semibold">
+                Câu hỏi ({filteredSimulatorQuestions.length}):
+              </span>
+              <Select
+                value={selectedQuestionId}
+                onValueChange={(val) => {
+                  setSelectedQuestionId(val);
+                  setEvaluatedResult(null);
+                  setUserAnswer('');
+                  setIsRecording(false);
+                  setTimeSeconds(0);
+                }}
+                options={filteredSimulatorQuestions.map((q, idx) => ({
+                  value: q.id,
+                  label: `#${idx + 1} - [${q.level.toUpperCase()}] ${q.question.slice(0, 50)}...`,
+                }))}
+                className="w-full sm:max-w-md"
+              />
+            </div>
           </div>
 
           <Button
@@ -272,7 +280,7 @@ export function MockSimulator() {
               setIsRecording(false);
               setTimeSeconds(0);
             }}
-            className="shrink-0 gap-1.5 text-xs"
+            className="w-full shrink-0 gap-1.5 text-xs sm:w-auto"
           >
             <Sparkles className="text-primary h-3 w-3" />
             Random Question
@@ -281,7 +289,7 @@ export function MockSimulator() {
       </Card>
 
       {/* Simulator Workspace */}
-      <Card className="glass-card space-y-6 p-6 sm:p-8">
+      <Card className="glass-card space-y-6 p-4 sm:p-6 md:p-8">
         {/* Active Question Banner */}
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -289,8 +297,9 @@ export function MockSimulator() {
               <Badge variant="default" className="text-[10px] uppercase">
                 {activeQuestion.level} Level
               </Badge>
-              <Badge variant="outline" className="text-[10px]">
-                #{activeQuestion.category}
+              <Badge variant="outline" className="gap-1 text-[10px]">
+                <TechIcon name={activeQuestion.category} className="h-3 w-3" />
+                <span>#{activeQuestion.category}</span>
               </Badge>
             </div>
 
@@ -300,12 +309,12 @@ export function MockSimulator() {
             </div>
           </div>
 
-          <h2 className="text-foreground text-xl font-bold tracking-tight sm:text-2xl">
+          <h2 className="text-foreground text-xl font-bold tracking-tight break-words sm:text-2xl">
             {activeQuestion.question}
           </h2>
 
           {activeQuestion.contextOrScenario && (
-            <p className="border-border/40 bg-secondary/50 text-muted-foreground rounded-xl border p-3 text-xs">
+            <p className="border-border/40 bg-secondary/50 text-muted-foreground rounded-xl border p-3 text-xs break-words">
               <span className="text-foreground font-semibold">Scenario: </span>
               {activeQuestion.contextOrScenario}
             </p>
@@ -336,7 +345,7 @@ export function MockSimulator() {
             <Button
               onClick={handleStartSession}
               size="lg"
-              className="shadow-primary/20 gap-2 font-semibold shadow-md"
+              className="shadow-primary/20 w-full gap-2 font-semibold shadow-md sm:w-auto"
             >
               <Play className="h-4 w-4" />
               <span>Start Mock Session (Bắt đầu)</span>

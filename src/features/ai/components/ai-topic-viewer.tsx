@@ -70,11 +70,11 @@ export function AiLessonViewer({ track, lesson }: AiLessonViewerProps) {
             >
               <AiTopicIcon name={lesson.icon} className="h-6 w-6" />
             </div>
-            <div className="space-y-2">
-              <h1 className="text-foreground text-2xl font-extrabold tracking-tight sm:text-3xl">
+            <div className="min-w-0 flex-1 space-y-2">
+              <h1 className="text-foreground text-2xl font-extrabold tracking-tight break-words sm:text-3xl">
                 {lesson.title}
               </h1>
-              <p className="text-muted-foreground max-w-3xl text-sm leading-relaxed sm:text-base">
+              <p className="text-muted-foreground max-w-3xl text-sm leading-relaxed break-words sm:text-base">
                 {lesson.summary}
               </p>
             </div>
@@ -83,11 +83,11 @@ export function AiLessonViewer({ track, lesson }: AiLessonViewerProps) {
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-950 dark:text-amber-100">
             <div className="flex items-start gap-3">
               <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-              <div className="space-y-1">
+              <div className="min-w-0 flex-1 space-y-1">
                 <span className="text-xs font-bold tracking-wider text-amber-700 uppercase dark:text-amber-400">
                   Core Mental Model
                 </span>
-                <p className="text-sm leading-relaxed font-medium">
+                <p className="text-sm leading-relaxed font-medium break-words">
                   {lesson.mentalModel}
                 </p>
               </div>
@@ -104,7 +104,9 @@ export function AiLessonViewer({ track, lesson }: AiLessonViewerProps) {
           {lesson.takeaways.map((takeaway) => (
             <Card key={takeaway} className="glass-card flex items-start gap-3 p-4">
               <CheckCircle2 className="text-primary mt-0.5 h-4 w-4 shrink-0" />
-              <p className="text-foreground text-sm leading-relaxed">{takeaway}</p>
+              <p className="text-foreground min-w-0 flex-1 text-sm leading-relaxed break-words">
+                {takeaway}
+              </p>
             </Card>
           ))}
         </div>
@@ -199,25 +201,38 @@ export function AiLessonViewer({ track, lesson }: AiLessonViewerProps) {
 
       <div className="border-border/40 flex flex-col justify-between gap-3 border-t pt-6 sm:flex-row">
         {previousLesson ? (
-          <Link href={`/ai/${track.slug}/${previousLesson.slug}`}>
-            <Button variant="outline" size="sm" className="w-full gap-2 sm:w-auto">
-              <ArrowLeft className="h-3.5 w-3.5" />
-              {previousLesson.title}
+          <Link
+            href={`/ai/${track.slug}/${previousLesson.slug}`}
+            className="w-full min-w-0 sm:w-auto"
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full min-w-0 justify-start gap-2 sm:w-auto sm:justify-center"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">{previousLesson.title}</span>
             </Button>
           </Link>
         ) : (
           <div />
         )}
         {nextLesson ? (
-          <Link href={`/ai/${track.slug}/${nextLesson.slug}`}>
-            <Button size="sm" className="w-full gap-2 sm:w-auto">
-              {nextLesson.title}
-              <ArrowRight className="h-3.5 w-3.5" />
+          <Link
+            href={`/ai/${track.slug}/${nextLesson.slug}`}
+            className="w-full min-w-0 sm:w-auto"
+          >
+            <Button
+              size="sm"
+              className="w-full min-w-0 justify-end gap-2 sm:w-auto sm:justify-center"
+            >
+              <span className="truncate">{nextLesson.title}</span>
+              <ArrowRight className="h-3.5 w-3.5 shrink-0" />
             </Button>
           </Link>
         ) : (
-          <Link href={`/ai/${track.slug}`}>
-            <Button variant="outline" size="sm">
+          <Link href={`/ai/${track.slug}`} className="w-full sm:w-auto">
+            <Button variant="outline" size="sm" className="w-full sm:w-auto">
               Hoàn tất track
             </Button>
           </Link>
@@ -238,19 +253,19 @@ function AiResourceCard({ resource }: { resource: AiResource }) {
       className="border-border/60 bg-card/60 hover:border-primary/40 hover:bg-primary/5 focus-visible:ring-ring group cursor-pointer rounded-2xl border p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-2">
+        <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="text-[9px] uppercase">
               {meta.kind}
             </Badge>
-            <span className="text-muted-foreground font-mono text-[9px]">
+            <span className="text-muted-foreground truncate font-mono text-[9px]">
               {meta.hostname}
             </span>
           </div>
-          <h3 className="text-foreground group-hover:text-primary text-sm font-bold">
+          <h3 className="text-foreground group-hover:text-primary text-sm font-bold break-words">
             {resource.title}
           </h3>
-          <p className="text-muted-foreground text-xs leading-relaxed">
+          <p className="text-muted-foreground text-xs leading-relaxed break-words">
             {resource.description}
           </p>
         </div>

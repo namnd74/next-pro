@@ -94,12 +94,12 @@ export function LearningCatalogView({
         </div>
 
         {/* View Switcher: All | Chỉ Lộ Trình | Chỉ Bài Tập */}
-        <div className="flex items-center gap-1.5 self-start sm:self-auto">
+        <div className="no-scrollbar flex w-full items-center gap-1.5 self-start overflow-x-auto pb-1 sm:w-auto sm:self-auto sm:pb-0">
           <Button
             size="sm"
             variant={domainView === 'all' ? 'default' : 'outline'}
             onClick={() => setDomainView('all')}
-            className="h-8 text-xs font-semibold"
+            className="h-8 shrink-0 text-xs font-semibold"
           >
             <span>Tất cả</span>
           </Button>
@@ -107,7 +107,7 @@ export function LearningCatalogView({
             size="sm"
             variant={domainView === 'tracks' ? 'default' : 'outline'}
             onClick={() => setDomainView('tracks')}
-            className="h-8 gap-1.5 text-xs font-semibold"
+            className="h-8 shrink-0 gap-1.5 text-xs font-semibold"
           >
             <BookOpen className="h-3.5 w-3.5" />
             <span>Lộ trình ({currentTracks.length})</span>
@@ -116,7 +116,7 @@ export function LearningCatalogView({
             size="sm"
             variant={domainView === 'exercises' ? 'default' : 'outline'}
             onClick={() => setDomainView('exercises')}
-            className="h-8 gap-1.5 text-xs font-semibold"
+            className="h-8 shrink-0 gap-1.5 text-xs font-semibold"
           >
             <Terminal className="h-3.5 w-3.5" />
             <span>Kho bài tập ({currentExercises.length})</span>
@@ -189,8 +189,8 @@ export function LearningCatalogView({
                   className="glass-card hover:border-primary/40 flex flex-col justify-between p-4 transition-all hover:shadow-md"
                 >
                   <div className="space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-muted-foreground/80 truncate text-[11px] font-semibold">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <span className="text-muted-foreground/80 min-w-0 flex-1 truncate text-[11px] font-semibold">
                         {exercise.trackTitle}
                       </span>
                       <div className="flex shrink-0 items-center gap-1.5">
