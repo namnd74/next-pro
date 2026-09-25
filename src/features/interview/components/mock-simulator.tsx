@@ -20,6 +20,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { TechIcon } from '@/components/common/tech-icon';
 
 export function MockSimulator() {
   const { saveMockResult, customQuestions } = useInterviewStore();
@@ -181,67 +182,67 @@ export function MockSimulator() {
                                     q.category === 'javascript-typescript'
                                 )
                               : allQuestions.filter((q) => q.category === val);
-                if (nextSubset.length > 0) {
-                  setSelectedQuestionId(nextSubset[0].id);
-                }
-                setEvaluatedResult(null);
-                setUserAnswer('');
-                setIsRecording(false);
-                setTimeSeconds(0);
-              }}
-              options={[
-                { value: 'all', label: 'Tất cả chủ đề' },
-                { value: 'react', label: 'React' },
-                { value: 'nextjs', label: 'Next.js' },
-                { value: 'typescript', label: 'TypeScript' },
-                { value: 'javascript', label: 'JavaScript' },
-                { value: 'vue', label: 'Vue.js' },
-                { value: 'angular', label: 'Angular' },
-                { value: 'html', label: 'HTML5' },
-                { value: 'css', label: 'CSS3' },
-                { value: 'go', label: 'Go (Golang)' },
-                { value: 'nestjs', label: 'NestJS' },
-                { value: 'nodejs', label: 'Node.js' },
-                { value: 'python', label: 'Python' },
-                { value: 'django', label: 'Django' },
-                { value: 'fastapi', label: 'FastAPI' },
-                { value: 'java', label: 'Java' },
-                { value: 'spring', label: 'Spring Boot' },
-                { value: 'csharp', label: 'C# (.NET)' },
-                { value: 'php', label: 'PHP' },
-                { value: 'laravel', label: 'Laravel' },
-                { value: 'ruby', label: 'Ruby' },
-                { value: 'rails', label: 'Ruby on Rails' },
-                { value: 'cpp', label: 'C++' },
-                { value: 'rust', label: 'Rust' },
-                { value: 'ios', label: 'iOS (Swift)' },
-                { value: 'android', label: 'Android' },
-                { value: 'flutter', label: 'Flutter' },
-                { value: 'react-native', label: 'React Native' },
-                { value: 'system-design', label: 'System Design' },
-                { value: 'design-patterns', label: 'Design Patterns' },
-                { value: 'micro-frontend', label: 'Micro-Frontend' },
-                { value: 'ai', label: 'AI & LLM' },
-                { value: 'database', label: 'Database' },
-                { value: 'devops-cloud', label: 'DevOps & Cloud' },
-                { value: 'cs-fundamentals', label: 'CS Fundamentals' },
-                { value: 'dsa', label: 'DSA & Algorithms' },
-                { value: 'data-engineering', label: 'Data Engineering' },
-                { value: 'cybersecurity', label: 'Cybersecurity' },
-                { value: 'testing-qa', label: 'Testing & QA' },
-                { value: 'business-analyst', label: 'Business Analyst' },
-                { value: 'behavioral-hr', label: 'Behavioral & STAR' },
-                { value: 'graphql', label: 'GraphQL' },
-                { value: 'state-management', label: 'State Management' },
-                { value: 'performance', label: 'Web Performance' },
-                { value: 'build-tools', label: 'Build Tools' },
-                { value: 'seo', label: 'SEO' },
-                { value: 'backend-api', label: 'Backend API' },
-                { value: 'shell-linux', label: 'Shell & Linux' },
-              ]}
-              className="w-full sm:w-48"
-            />
-          </div>
+                  if (nextSubset.length > 0) {
+                    setSelectedQuestionId(nextSubset[0].id);
+                  }
+                  setEvaluatedResult(null);
+                  setUserAnswer('');
+                  setIsRecording(false);
+                  setTimeSeconds(0);
+                }}
+                options={[
+                  { value: 'all', label: 'Tất cả chủ đề' },
+                  { value: 'react', label: 'React' },
+                  { value: 'nextjs', label: 'Next.js' },
+                  { value: 'typescript', label: 'TypeScript' },
+                  { value: 'javascript', label: 'JavaScript' },
+                  { value: 'vue', label: 'Vue.js' },
+                  { value: 'angular', label: 'Angular' },
+                  { value: 'html', label: 'HTML5' },
+                  { value: 'css', label: 'CSS3' },
+                  { value: 'go', label: 'Go (Golang)' },
+                  { value: 'nestjs', label: 'NestJS' },
+                  { value: 'nodejs', label: 'Node.js' },
+                  { value: 'python', label: 'Python' },
+                  { value: 'django', label: 'Django' },
+                  { value: 'fastapi', label: 'FastAPI' },
+                  { value: 'java', label: 'Java' },
+                  { value: 'spring', label: 'Spring Boot' },
+                  { value: 'csharp', label: 'C# (.NET)' },
+                  { value: 'php', label: 'PHP' },
+                  { value: 'laravel', label: 'Laravel' },
+                  { value: 'ruby', label: 'Ruby' },
+                  { value: 'rails', label: 'Ruby on Rails' },
+                  { value: 'cpp', label: 'C++' },
+                  { value: 'rust', label: 'Rust' },
+                  { value: 'ios', label: 'iOS (Swift)' },
+                  { value: 'android', label: 'Android' },
+                  { value: 'flutter', label: 'Flutter' },
+                  { value: 'react-native', label: 'React Native' },
+                  { value: 'system-design', label: 'System Design' },
+                  { value: 'design-patterns', label: 'Design Patterns' },
+                  { value: 'micro-frontend', label: 'Micro-Frontend' },
+                  { value: 'ai', label: 'AI & LLM' },
+                  { value: 'database', label: 'Database' },
+                  { value: 'devops-cloud', label: 'DevOps & Cloud' },
+                  { value: 'cs-fundamentals', label: 'CS Fundamentals' },
+                  { value: 'dsa', label: 'DSA & Algorithms' },
+                  { value: 'data-engineering', label: 'Data Engineering' },
+                  { value: 'cybersecurity', label: 'Cybersecurity' },
+                  { value: 'testing-qa', label: 'Testing & QA' },
+                  { value: 'business-analyst', label: 'Business Analyst' },
+                  { value: 'behavioral-hr', label: 'Behavioral & STAR' },
+                  { value: 'graphql', label: 'GraphQL' },
+                  { value: 'state-management', label: 'State Management' },
+                  { value: 'performance', label: 'Web Performance' },
+                  { value: 'build-tools', label: 'Build Tools' },
+                  { value: 'seo', label: 'SEO' },
+                  { value: 'backend-api', label: 'Backend API' },
+                  { value: 'shell-linux', label: 'Shell & Linux' },
+                ]}
+                className="w-full sm:w-48"
+              />
+            </div>
 
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground shrink-0 text-xs font-semibold">
@@ -296,8 +297,9 @@ export function MockSimulator() {
               <Badge variant="default" className="text-[10px] uppercase">
                 {activeQuestion.level} Level
               </Badge>
-              <Badge variant="outline" className="text-[10px]">
-                #{activeQuestion.category}
+              <Badge variant="outline" className="gap-1 text-[10px]">
+                <TechIcon name={activeQuestion.category} className="h-3 w-3" />
+                <span>#{activeQuestion.category}</span>
               </Badge>
             </div>
 
