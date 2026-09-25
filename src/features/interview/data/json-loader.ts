@@ -21,6 +21,41 @@ import cssBankQuestions from './json/css-bank.json';
 import systemDesignBankQuestions from './json/system-design-bank.json';
 import designPatternsBankQuestions from './json/design-patterns-bank.json';
 import microFrontendBankQuestions from './json/micro-frontend-bank.json';
+import businessAnalystBankQuestions from './json/business-analyst-bank.json';
+import aiBankQuestions from './json/ai-bank.json';
+import databaseBankQuestions from './json/database-bank.json';
+import devopsBankQuestions from './json/devops-bank.json';
+import iosBankQuestions from './json/ios-bank.json';
+import qaTestingBankQuestions from './json/qa-testing-bank.json';
+import dsaBankQuestions from './json/dsa-bank.json';
+import csFundamentalsBankQuestions from './json/cs-fundamentals-bank.json';
+import dataEngineeringBankQuestions from './json/data-engineering-bank.json';
+import cybersecurityBankQuestions from './json/cybersecurity-bank.json';
+import behavioralBankQuestions from './json/behavioral-bank.json';
+import rustBankQuestions from './json/rust-bank.json';
+import shellLinuxBankQuestions from './json/shell-linux-bank.json';
+import vueBankQuestions from './json/vue-bank.json';
+import angularBankQuestions from './json/angular-bank.json';
+import javaBankQuestions from './json/java-bank.json';
+import springBankQuestions from './json/spring-bank.json';
+import csharpBankQuestions from './json/csharp-bank.json';
+import phpBankQuestions from './json/php-bank.json';
+import laravelBankQuestions from './json/laravel-bank.json';
+import rubyBankQuestions from './json/ruby-bank.json';
+import railsBankQuestions from './json/rails-bank.json';
+import cppBankQuestions from './json/cpp-bank.json';
+import flutterBankQuestions from './json/flutter-bank.json';
+import androidBankQuestions from './json/android-bank.json';
+import reactNativeBankQuestions from './json/react-native-bank.json';
+import graphqlBankQuestions from './json/graphql-bank.json';
+import fastapiBankQuestions from './json/fastapi-bank.json';
+import stateManagementBankQuestions from './json/state-management-bank.json';
+import performanceBankQuestions from './json/performance-bank.json';
+import buildToolsBankQuestions from './json/build-tools-bank.json';
+import seoBankQuestions from './json/seo-bank.json';
+import backendApiBankQuestions from './json/backend-api-bank.json';
+import frontendCoreBankQuestions from './json/frontend-core-bank.json';
+import backendCoreBankQuestions from './json/backend-core-bank.json';
 
 export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(reactBankQuestions as InterviewQuestion[]),
@@ -37,6 +72,41 @@ export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(nodejsBankQuestions as InterviewQuestion[]),
   ...(pythonBankQuestions as InterviewQuestion[]),
   ...(djangoBankQuestions as InterviewQuestion[]),
+  ...(businessAnalystBankQuestions as InterviewQuestion[]),
+  ...(aiBankQuestions as InterviewQuestion[]),
+  ...(databaseBankQuestions as InterviewQuestion[]),
+  ...(devopsBankQuestions as InterviewQuestion[]),
+  ...(iosBankQuestions as InterviewQuestion[]),
+  ...(qaTestingBankQuestions as InterviewQuestion[]),
+  ...(dsaBankQuestions as InterviewQuestion[]),
+  ...(csFundamentalsBankQuestions as InterviewQuestion[]),
+  ...(dataEngineeringBankQuestions as InterviewQuestion[]),
+  ...(cybersecurityBankQuestions as InterviewQuestion[]),
+  ...(behavioralBankQuestions as InterviewQuestion[]),
+  ...(rustBankQuestions as InterviewQuestion[]),
+  ...(shellLinuxBankQuestions as InterviewQuestion[]),
+  ...(vueBankQuestions as InterviewQuestion[]),
+  ...(angularBankQuestions as InterviewQuestion[]),
+  ...(javaBankQuestions as InterviewQuestion[]),
+  ...(springBankQuestions as InterviewQuestion[]),
+  ...(csharpBankQuestions as InterviewQuestion[]),
+  ...(phpBankQuestions as InterviewQuestion[]),
+  ...(laravelBankQuestions as InterviewQuestion[]),
+  ...(rubyBankQuestions as InterviewQuestion[]),
+  ...(railsBankQuestions as InterviewQuestion[]),
+  ...(cppBankQuestions as InterviewQuestion[]),
+  ...(flutterBankQuestions as InterviewQuestion[]),
+  ...(androidBankQuestions as InterviewQuestion[]),
+  ...(reactNativeBankQuestions as InterviewQuestion[]),
+  ...(graphqlBankQuestions as InterviewQuestion[]),
+  ...(fastapiBankQuestions as InterviewQuestion[]),
+  ...(stateManagementBankQuestions as InterviewQuestion[]),
+  ...(performanceBankQuestions as InterviewQuestion[]),
+  ...(buildToolsBankQuestions as InterviewQuestion[]),
+  ...(seoBankQuestions as InterviewQuestion[]),
+  ...(backendApiBankQuestions as InterviewQuestion[]),
+  ...(frontendCoreBankQuestions as InterviewQuestion[]),
+  ...(backendCoreBankQuestions as InterviewQuestion[]),
   ...(nextjsQuestions as InterviewQuestion[]),
   ...(react19Questions as InterviewQuestion[]),
   ...(jsTsQuestions as InterviewQuestion[]),
