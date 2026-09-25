@@ -71,14 +71,18 @@ export const Accordion = React.memo(function Accordion({
           headerClassName
         )}
       >
-        <div className="flex flex-1 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           {icon && <span className="shrink-0">{icon}</span>}
-          <div className="flex-1 space-y-0.5">
+          <div className="min-w-0 flex-1 space-y-0.5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-foreground text-sm font-semibold">{title}</span>
+              <span className="text-foreground text-sm font-semibold break-words">
+                {title}
+              </span>
               {badge && <span className="shrink-0">{badge}</span>}
             </div>
-            {subtitle && <p className="text-muted-foreground text-xs">{subtitle}</p>}
+            {subtitle && (
+              <p className="text-muted-foreground text-xs break-words">{subtitle}</p>
+            )}
           </div>
         </div>
 
@@ -101,7 +105,7 @@ export const Accordion = React.memo(function Accordion({
           {hasBeenExpanded && (
             <div
               className={cn(
-                'text-foreground p-4 text-xs leading-relaxed',
+                'text-foreground p-4 text-xs leading-relaxed break-words',
                 contentClassName
               )}
             >

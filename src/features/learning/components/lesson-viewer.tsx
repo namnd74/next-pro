@@ -126,12 +126,12 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
 
             {recipe.beforeCode ? (
               <Tabs defaultValue="after" className="w-full">
-                <TabsList className="grid h-auto w-full max-w-lg grid-cols-2 p-1">
-                  <TabsTrigger value="after" className="px-3 py-1.5 text-xs">
-                    Recommended ({isNextJsTrack ? 'Next.js App Router' : 'React v19+'})
+                <TabsList className="grid h-auto w-full max-w-lg grid-cols-1 gap-1 p-1 sm:grid-cols-2">
+                  <TabsTrigger value="after" className="px-3 py-2 text-xs">
+                    Recommended ({isNextJsTrack ? 'App Router' : 'React 19'})
                   </TabsTrigger>
-                  <TabsTrigger value="before" className="px-3 py-1.5 text-xs">
-                    Legacy ({isNextJsTrack ? 'Pages Router / v14' : 'React v18'})
+                  <TabsTrigger value="before" className="px-3 py-2 text-xs">
+                    Legacy ({isNextJsTrack ? 'Pages Router' : 'React 18'})
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="after" className="mt-3">
@@ -291,14 +291,17 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
 
       <div className="border-border/40 flex flex-col items-stretch justify-between gap-3 border-t pt-5 sm:flex-row sm:items-center">
         {prevLesson ? (
-          <Link href={`/learn/${track.slug}/${prevLesson.slug}`}>
+          <Link
+            href={`/learn/${track.slug}/${prevLesson.slug}`}
+            className="w-full min-w-0 sm:w-auto"
+          >
             <Button
               variant="outline"
               size="sm"
-              className="w-full gap-2 text-xs sm:w-auto"
+              className="w-full min-w-0 justify-start gap-2 text-xs sm:w-auto sm:justify-center"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Trước: {prevLesson.title}</span>
+              <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Trước: {prevLesson.title}</span>
             </Button>
           </Link>
         ) : (
@@ -306,23 +309,26 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
         )}
 
         {nextLesson ? (
-          <Link href={`/learn/${track.slug}/${nextLesson.slug}`}>
+          <Link
+            href={`/learn/${track.slug}/${nextLesson.slug}`}
+            className="w-full min-w-0 sm:w-auto"
+          >
             <Button
               size="sm"
-              className="shadow-primary/20 w-full gap-2 text-xs shadow-md sm:w-auto"
+              className="shadow-primary/20 w-full min-w-0 justify-between gap-2 text-xs shadow-md sm:w-auto sm:justify-center"
             >
-              <span>Tiếp: {nextLesson.title}</span>
-              <ArrowRight className="h-3.5 w-3.5" />
+              <span className="truncate">Tiếp: {nextLesson.title}</span>
+              <ArrowRight className="h-3.5 w-3.5 shrink-0" />
             </Button>
           </Link>
         ) : (
-          <Link href={`/learn/${track.slug}`}>
+          <Link href={`/learn/${track.slug}`} className="w-full min-w-0 sm:w-auto">
             <Button
               size="sm"
               variant="outline"
               className="w-full gap-2 text-xs sm:w-auto"
             >
-              <Award className="text-primary h-3.5 w-3.5" />
+              <Award className="text-primary h-3.5 w-3.5 shrink-0" />
               <span>Hoàn tất track</span>
             </Button>
           </Link>

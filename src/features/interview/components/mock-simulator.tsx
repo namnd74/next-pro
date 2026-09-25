@@ -146,37 +146,41 @@ export function MockSimulator() {
       {/* Question Selector Bar */}
       <Card className="glass-card relative z-20 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-muted-foreground text-xs font-semibold">Ngôn ngữ:</span>
-            <Select
-              value={selectedLanguage}
-              onValueChange={(val) => {
-                setSelectedLanguage(val);
-                const nextSubset =
-                  val === 'all'
-                    ? allQuestions
-                    : val === 'react'
-                      ? allQuestions.filter(
-                          (q) => q.category === 'react' || q.category === 'react-19'
-                        )
-                      : val === 'nextjs'
+          <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground shrink-0 text-xs font-semibold">
+                Ngôn ngữ:
+              </span>
+              <Select
+                value={selectedLanguage}
+                onValueChange={(val) => {
+                  setSelectedLanguage(val);
+                  const nextSubset =
+                    val === 'all'
+                      ? allQuestions
+                      : val === 'react'
                         ? allQuestions.filter(
-                            (q) =>
-                              q.category === 'nextjs' || q.category === 'next-app-router'
+                            (q) => q.category === 'react' || q.category === 'react-19'
                           )
-                        : val === 'typescript'
+                        : val === 'nextjs'
                           ? allQuestions.filter(
                               (q) =>
-                                q.category === 'typescript' ||
-                                q.category === 'javascript-typescript'
+                                q.category === 'nextjs' ||
+                                q.category === 'next-app-router'
                             )
-                          : val === 'javascript'
+                          : val === 'typescript'
                             ? allQuestions.filter(
                                 (q) =>
-                                  q.category === 'javascript' ||
+                                  q.category === 'typescript' ||
                                   q.category === 'javascript-typescript'
                               )
-                            : allQuestions.filter((q) => q.category === val);
+                            : val === 'javascript'
+                              ? allQuestions.filter(
+                                  (q) =>
+                                    q.category === 'javascript' ||
+                                    q.category === 'javascript-typescript'
+                                )
+                              : allQuestions.filter((q) => q.category === val);
                 if (nextSubset.length > 0) {
                   setSelectedQuestionId(nextSubset[0].id);
                 }
@@ -235,27 +239,30 @@ export function MockSimulator() {
                 { value: 'backend-api', label: 'Backend API' },
                 { value: 'shell-linux', label: 'Shell & Linux' },
               ]}
-              className="w-48"
+              className="w-full sm:w-48"
             />
+          </div>
 
-            <span className="text-muted-foreground ml-1 text-xs font-semibold">
-              Câu hỏi ({filteredSimulatorQuestions.length}):
-            </span>
-            <Select
-              value={selectedQuestionId}
-              onValueChange={(val) => {
-                setSelectedQuestionId(val);
-                setEvaluatedResult(null);
-                setUserAnswer('');
-                setIsRecording(false);
-                setTimeSeconds(0);
-              }}
-              options={filteredSimulatorQuestions.map((q, idx) => ({
-                value: q.id,
-                label: `#${idx + 1} - [${q.level.toUpperCase()}] ${q.question.slice(0, 50)}...`,
-              }))}
-              className="max-w-md"
-            />
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground shrink-0 text-xs font-semibold">
+                Câu hỏi ({filteredSimulatorQuestions.length}):
+              </span>
+              <Select
+                value={selectedQuestionId}
+                onValueChange={(val) => {
+                  setSelectedQuestionId(val);
+                  setEvaluatedResult(null);
+                  setUserAnswer('');
+                  setIsRecording(false);
+                  setTimeSeconds(0);
+                }}
+                options={filteredSimulatorQuestions.map((q, idx) => ({
+                  value: q.id,
+                  label: `#${idx + 1} - [${q.level.toUpperCase()}] ${q.question.slice(0, 50)}...`,
+                }))}
+                className="w-full sm:max-w-md"
+              />
+            </div>
           </div>
 
           <Button
@@ -272,7 +279,7 @@ export function MockSimulator() {
               setIsRecording(false);
               setTimeSeconds(0);
             }}
-            className="shrink-0 gap-1.5 text-xs"
+            className="w-full shrink-0 gap-1.5 text-xs sm:w-auto"
           >
             <Sparkles className="text-primary h-3 w-3" />
             Random Question
@@ -281,7 +288,7 @@ export function MockSimulator() {
       </Card>
 
       {/* Simulator Workspace */}
-      <Card className="glass-card space-y-6 p-6 sm:p-8">
+      <Card className="glass-card space-y-6 p-4 sm:p-6 md:p-8">
         {/* Active Question Banner */}
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -300,12 +307,12 @@ export function MockSimulator() {
             </div>
           </div>
 
-          <h2 className="text-foreground text-xl font-bold tracking-tight sm:text-2xl">
+          <h2 className="text-foreground text-xl font-bold tracking-tight break-words sm:text-2xl">
             {activeQuestion.question}
           </h2>
 
           {activeQuestion.contextOrScenario && (
-            <p className="border-border/40 bg-secondary/50 text-muted-foreground rounded-xl border p-3 text-xs">
+            <p className="border-border/40 bg-secondary/50 text-muted-foreground rounded-xl border p-3 text-xs break-words">
               <span className="text-foreground font-semibold">Scenario: </span>
               {activeQuestion.contextOrScenario}
             </p>
@@ -336,7 +343,7 @@ export function MockSimulator() {
             <Button
               onClick={handleStartSession}
               size="lg"
-              className="shadow-primary/20 gap-2 font-semibold shadow-md"
+              className="shadow-primary/20 w-full gap-2 font-semibold shadow-md sm:w-auto"
             >
               <Play className="h-4 w-4" />
               <span>Start Mock Session (Bắt đầu)</span>

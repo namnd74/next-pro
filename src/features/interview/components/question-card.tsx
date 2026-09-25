@@ -424,7 +424,7 @@ export const QuestionCard = React.memo(function QuestionCard({
   };
 
   return (
-    <Card className="glass-card glass-card-hover overflow-hidden p-5 transition-all">
+    <Card className="glass-card glass-card-hover overflow-hidden p-4 transition-all sm:p-5">
       {/* Clickable Header Area */}
       <div
         role="button"
@@ -439,8 +439,8 @@ export const QuestionCard = React.memo(function QuestionCard({
         }}
         className="group hover:bg-muted/30 focus-visible:ring-primary/40 -m-2 cursor-pointer rounded-xl p-2 transition-all select-none focus:outline-none focus-visible:ring-2"
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 space-y-2">
+        <div className="flex items-start justify-between gap-3 sm:gap-4">
+          <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <Badge
                 variant={getLevelBadgeVariant(question.level)}
@@ -459,12 +459,12 @@ export const QuestionCard = React.memo(function QuestionCard({
               </Badge>
             </div>
 
-            <h3 className="text-foreground group-hover:text-primary text-base leading-snug font-bold transition-colors">
+            <h3 className="text-foreground group-hover:text-primary text-base leading-snug font-bold break-words transition-colors">
               {question.question}
             </h3>
 
             {question.contextOrScenario && (
-              <p className="text-muted-foreground/90 text-xs italic">
+              <p className="text-muted-foreground/90 text-xs break-words italic">
                 <span className="text-foreground font-semibold">Scenario: </span>
                 {question.contextOrScenario}
               </p>
@@ -538,13 +538,13 @@ export const QuestionCard = React.memo(function QuestionCard({
           {hasBeenExpanded && (
             <Tabs defaultValue="answer" className="w-full">
               <TabsList
-                className={`grid w-full ${hasRubric ? 'max-w-xl grid-cols-4' : 'max-w-md grid-cols-3'}`}
+                className={`grid w-full ${hasRubric ? 'max-w-xl grid-cols-2 sm:grid-cols-4' : 'max-w-md grid-cols-3'}`}
               >
                 <TabsTrigger value="answer" className="text-xs">
-                  💡 Deep Answer
+                  💡 <span className="hidden sm:inline">Deep </span>Answer
                 </TabsTrigger>
                 <TabsTrigger value="pitfalls" className="text-xs">
-                  ⚠️ Pitfalls & Traps
+                  ⚠️ <span className="hidden sm:inline">Pitfalls &amp; </span>Traps
                 </TabsTrigger>
                 <TabsTrigger value="followup" className="text-xs">
                   🔄 Follow-ups
@@ -714,11 +714,11 @@ export const QuestionCard = React.memo(function QuestionCard({
                             onClick={() => toggleFollowUp(fIdx)}
                             className="flex w-full items-start justify-between gap-3 p-3 text-left transition-colors hover:bg-indigo-500/10"
                           >
-                            <div className="flex flex-1 items-start gap-2.5">
+                            <div className="flex min-w-0 flex-1 items-start gap-2.5">
                               <span className="shrink-0 font-mono text-xs font-bold text-indigo-500">
                                 #{fIdx + 1}
                               </span>
-                              <span className="text-foreground text-xs leading-relaxed font-semibold">
+                              <span className="text-foreground text-xs leading-relaxed font-semibold break-words">
                                 {resolved.questionText}
                               </span>
                             </div>

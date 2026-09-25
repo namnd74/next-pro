@@ -26,7 +26,7 @@ export function BugHunter({ challenges }: BugHunterProps) {
   return (
     <div className="space-y-6">
       {/* Challenge Selector */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="no-scrollbar flex items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap">
         {challenges.map((c, idx) => {
           const isItemSolved = completedBugHuntIds.includes(c.id);
           const isActive = idx === activeChallengeIndex;
@@ -41,7 +41,7 @@ export function BugHunter({ challenges }: BugHunterProps) {
                 setShowHints(false);
                 setShowSolution(false);
               }}
-              className="gap-2 text-xs font-semibold"
+              className="shrink-0 gap-2 text-xs font-semibold"
             >
               {isItemSolved ? (
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
@@ -57,10 +57,10 @@ export function BugHunter({ challenges }: BugHunterProps) {
       </div>
 
       {/* Main Challenge Card */}
-      <Card className="glass-card space-y-6 p-6 sm:p-8">
+      <Card className="glass-card space-y-6 p-4 sm:p-6 md:p-8">
         {/* Header */}
         <div className="border-border/50 flex flex-col gap-3 border-b pb-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex-1 space-y-1.5">
+          <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="destructive" className="gap-1 text-[10px] uppercase">
                 <Bug className="h-3 w-3" />
@@ -74,10 +74,10 @@ export function BugHunter({ challenges }: BugHunterProps) {
               </Badge>
             </div>
 
-            <h2 className="text-foreground text-xl font-bold tracking-tight sm:text-2xl">
+            <h2 className="text-foreground text-xl font-bold tracking-tight break-words sm:text-2xl">
               {activeChallenge.title}
             </h2>
-            <p className="text-muted-foreground text-xs leading-relaxed">
+            <p className="text-muted-foreground text-xs leading-relaxed break-words">
               <span className="text-foreground font-semibold">Scenario: </span>
               {activeChallenge.scenario}
             </p>

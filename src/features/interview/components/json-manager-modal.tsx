@@ -143,7 +143,7 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
 
   return (
     <div className="animate-in fade-in-50 fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <Card className="glass-card w-full max-w-lg space-y-6 p-6 shadow-2xl">
+      <Card className="glass-card max-h-[calc(100dvh-2rem)] w-full max-w-lg space-y-5 overflow-y-auto p-4 shadow-2xl sm:space-y-6 sm:p-6">
         <div className="border-border/60 flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-2">
             <FileJson className="text-primary h-5 w-5" />
@@ -179,10 +179,10 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
           <Button
             onClick={handleExportCurrentBank}
             variant="outline"
-            className="w-full justify-center gap-2 text-xs font-semibold"
+            className="w-full justify-center gap-2 text-xs leading-tight font-semibold whitespace-normal"
           >
             <Download className="h-4 w-4 text-emerald-500" />
-            <span>Xuất JSON Ngân Hàng ({allActiveQuestions.length})</span>
+            <span>Xuất JSON ({allActiveQuestions.length} câu)</span>
           </Button>
 
           <Button
@@ -203,15 +203,15 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
         </div>
 
         {/* Download Template button */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleDownloadTemplate}
-            className="text-muted-foreground hover:text-foreground gap-1.5 text-xs"
+            className="text-muted-foreground hover:text-foreground justify-start gap-1.5 text-xs sm:justify-center"
           >
-            <Download className="h-3.5 w-3.5" />
-            <span>Tải mẫu file JSON cấu trúc chuẩn</span>
+            <Download className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Tải file mẫu JSON chuẩn</span>
           </Button>
 
           {customQuestions.length > 0 && (
@@ -227,9 +227,9 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
                   });
                 }
               }}
-              className="text-destructive hover:text-destructive gap-1 text-xs"
+              className="text-destructive hover:text-destructive justify-start gap-1 text-xs sm:justify-center"
             >
-              <RefreshCw className="h-3 w-3" />
+              <RefreshCw className="h-3 w-3 shrink-0" />
               <span>Reset Custom</span>
             </Button>
           )}

@@ -57,9 +57,9 @@ export function HeroDevice({ previewMode = 'A' }: HeroDeviceProps) {
             </div>
 
             {/* Window URL / Mode */}
-            <div className="flex items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900/80 px-2.5 py-0.5 text-[10px] text-slate-400">
-              <span className="text-indigo-400">devpro://</span>
-              <span>
+            <div className="flex max-w-[160px] items-center gap-1.5 rounded-md border border-slate-800 bg-slate-900/80 px-2.5 py-0.5 text-[10px] text-slate-400 sm:max-w-none">
+              <span className="shrink-0 text-indigo-400">devpro://</span>
+              <span className="truncate">
                 {previewMode === 'B'
                   ? 'live-runtime/split-view'
                   : previewMode === 'C'
@@ -84,12 +84,12 @@ export function HeroDevice({ previewMode = 'A' }: HeroDeviceProps) {
           {previewMode === 'A' && (
             <div className="flex min-h-[340px] flex-col">
               {/* Tabs Header */}
-              <div className="flex items-center border-b border-slate-800/70 bg-[#090d16] text-[11px]">
+              <div className="no-scrollbar flex items-center overflow-x-auto border-b border-slate-800/70 bg-[#090d16] text-[11px]">
                 <button
                   type="button"
                   onClick={() => setActiveTab('editor')}
                   className={cn(
-                    'flex cursor-pointer items-center gap-2 border-r border-slate-800 px-3.5 py-1.5 font-medium transition-colors',
+                    'flex shrink-0 cursor-pointer items-center gap-2 border-r border-slate-800 px-3.5 py-1.5 font-medium whitespace-nowrap transition-colors',
                     activeTab === 'editor'
                       ? 'border-t-2 border-t-indigo-500 bg-[#0b0f19] text-slate-100'
                       : 'text-slate-500 hover:text-slate-300'
@@ -103,7 +103,7 @@ export function HeroDevice({ previewMode = 'A' }: HeroDeviceProps) {
                   type="button"
                   onClick={() => setActiveTab('state')}
                   className={cn(
-                    'flex cursor-pointer items-center gap-2 border-r border-slate-800 px-3.5 py-1.5 font-medium transition-colors',
+                    'flex shrink-0 cursor-pointer items-center gap-2 border-r border-slate-800 px-3.5 py-1.5 font-medium whitespace-nowrap transition-colors',
                     activeTab === 'state'
                       ? 'border-t-2 border-t-indigo-500 bg-[#0b0f19] text-slate-100'
                       : 'text-slate-500 hover:text-slate-300'
@@ -120,7 +120,7 @@ export function HeroDevice({ previewMode = 'A' }: HeroDeviceProps) {
                   type="button"
                   onClick={() => setActiveTab('telemetry')}
                   className={cn(
-                    'flex cursor-pointer items-center gap-2 px-3.5 py-1.5 font-medium transition-colors',
+                    'flex shrink-0 cursor-pointer items-center gap-2 px-3.5 py-1.5 font-medium whitespace-nowrap transition-colors',
                     activeTab === 'telemetry'
                       ? 'border-t-2 border-t-indigo-500 bg-[#0b0f19] text-slate-100'
                       : 'text-slate-500 hover:text-slate-300'

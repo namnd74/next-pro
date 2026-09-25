@@ -472,17 +472,33 @@ export default function InterviewPage() {
       <section>
         <Tabs defaultValue="simulator" className="w-full space-y-6">
           <TabsList className="mx-auto grid w-full max-w-xl grid-cols-3 sm:mx-0">
-            <TabsTrigger value="simulator" className="gap-2 text-xs sm:text-sm">
-              <PlayCircle className="h-4 w-4" />
-              <span>Mock Simulator</span>
+            <TabsTrigger
+              value="simulator"
+              className="gap-1.5 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <PlayCircle className="h-4 w-4 shrink-0" />
+              <span>
+                <span className="hidden sm:inline">Mock </span>Simulator
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="bank" className="gap-2 text-xs sm:text-sm">
-              <BookOpen className="h-4 w-4" />
-              <span>Senior Q&A Bank ({allQuestions.length})</span>
+            <TabsTrigger
+              value="bank"
+              className="gap-1.5 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <BookOpen className="h-4 w-4 shrink-0" />
+              <span>
+                <span className="hidden sm:inline">Senior </span>Q&A (
+                {allQuestions.length})
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="bughunt" className="gap-2 text-xs sm:text-sm">
-              <Bug className="h-4 w-4" />
-              <span>Bug Hunting</span>
+            <TabsTrigger
+              value="bughunt"
+              className="gap-1.5 px-2 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm"
+            >
+              <Bug className="h-4 w-4 shrink-0" />
+              <span>
+                Bug Hunt<span className="hidden sm:inline">ing</span>
+              </span>
             </TabsTrigger>
           </TabsList>
 
@@ -549,8 +565,8 @@ export default function InterviewPage() {
               />
 
               {/* Filters row */}
-              <div className="border-border/40 flex flex-wrap items-center justify-between gap-3 border-t pt-1">
-                <div className="flex flex-wrap items-center gap-3">
+              <div className="border-border/40 flex flex-col gap-3 border-t pt-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="grid grid-cols-1 gap-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                   <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-semibold">
                     <Filter className="h-3.5 w-3.5" />
                     <span>Chủ đề:</span>
@@ -563,7 +579,7 @@ export default function InterviewPage() {
                       value: item.id,
                       label: `${item.label} (${categoryCounts[item.id] || 0})`,
                     }))}
-                    className="w-56"
+                    className="w-full sm:w-56"
                   />
 
                   <Select
@@ -576,7 +592,7 @@ export default function InterviewPage() {
                       { value: 'senior', label: 'Senior' },
                       { value: 'lead', label: 'Lead' },
                     ]}
-                    className="w-36"
+                    className="w-full sm:w-36"
                   />
                 </div>
 
@@ -584,7 +600,7 @@ export default function InterviewPage() {
                   variant={onlyBookmarked ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setOnlyBookmarked(!onlyBookmarked)}
-                  className="gap-1.5 text-xs"
+                  className="w-full gap-1.5 text-xs sm:w-auto"
                 >
                   <Bookmark className="h-3.5 w-3.5" />
                   <span>Đã Bookmark ({bookmarkedQuestionIds.length})</span>
