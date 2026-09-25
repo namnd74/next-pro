@@ -291,13 +291,13 @@ function AiCaseStudyCard({ caseStudy }: { caseStudy: AiCaseStudy }) {
           sizes="(max-width: 768px) 100vw, 900px"
           className="h-auto w-full object-contain"
         />
-        <figcaption className="border-border/50 flex flex-wrap items-center justify-between gap-2 border-t bg-slate-950 px-4 py-2.5 text-[10px] text-slate-300">
+        <figcaption className="border-border/50 bg-muted/60 text-foreground flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-[10px] dark:bg-slate-950 dark:text-slate-300">
           <span>Nguồn visual: {caseStudy.source.title}</span>
           <a
             href={caseStudy.source.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex cursor-pointer items-center gap-1 font-semibold text-cyan-300 hover:text-cyan-200"
+            className="text-primary inline-flex cursor-pointer items-center gap-1 font-semibold hover:underline dark:text-cyan-300 dark:hover:text-cyan-200"
           >
             Xem bản gốc
             <ExternalLink className="h-3 w-3" aria-hidden="true" />

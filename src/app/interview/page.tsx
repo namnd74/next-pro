@@ -8,10 +8,10 @@ import {
   Bug,
   Filter,
   Bookmark,
-  Search,
   FileJson,
   PlusCircle,
 } from 'lucide-react';
+import { SearchInput, FilterChipGroup, type FilterChipItem } from '@/components/shared';
 import {
   MOCK_INTERVIEW_QUESTIONS,
   MOCK_BUG_HUNT_CHALLENGES,
@@ -38,6 +38,8 @@ export default function InterviewPage() {
   const [selectedLevel, setSelectedLevel] = React.useState<string>('all');
   const [onlyBookmarked, setOnlyBookmarked] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const deferredSearchQuery = React.useDeferredValue(searchQuery);
+  const isPendingSearch = searchQuery !== deferredSearchQuery;
 
   const [isJsonModalOpen, setIsJsonModalOpen] = React.useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
@@ -101,8 +103,35 @@ export default function InterviewPage() {
     };
   }, [allQuestions, selectedCategory]);
 
+  const levelFilterItems: FilterChipItem[] = React.useMemo(
+    () => [
+      { id: 'all', label: 'Tất cả', count: levelCounts.all },
+      {
+        id: 'junior',
+        label: '🟢 Cơ bản (Junior)',
+        count: levelCounts.junior,
+        activeColorClass: 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/20',
+      },
+      {
+        id: 'middle',
+        label: '🟡 Trung bình (Middle)',
+        count: levelCounts.middle,
+        activeColorClass: 'bg-amber-600 text-white shadow-xs shadow-amber-600/20',
+      },
+      {
+        id: 'senior',
+        label: '🔴 Nâng cao (Senior)',
+        count: levelCounts.senior,
+        activeColorClass: 'bg-rose-600 text-white shadow-xs shadow-rose-600/20',
+      },
+    ],
+    [levelCounts]
+  );
+
   const filteredQuestions = React.useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = deferredSearchQuery.trim().toLowerCase();
+    const bookmarkSet = onlyBookmarked ? new Set(bookmarkedQuestionIds) : null;
+
     return allQuestions.filter((q) => {
       const matchCategory =
         selectedCategory === 'all'
@@ -123,7 +152,7 @@ export default function InterviewPage() {
                       : q.category === selectedCategory;
 
       const matchLevel = selectedLevel === 'all' || q.level === selectedLevel;
-      const matchBookmark = !onlyBookmarked || bookmarkedQuestionIds.includes(q.id);
+      const matchBookmark = !bookmarkSet || bookmarkSet.has(q.id);
 
       const matchSearch =
         !query ||
@@ -139,7 +168,7 @@ export default function InterviewPage() {
     selectedCategory,
     selectedLevel,
     onlyBookmarked,
-    searchQuery,
+    deferredSearchQuery,
     bookmarkedQuestionIds,
   ]);
 
@@ -238,8 +267,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('react')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'react' || selectedCategory === 'react-19'
-                      ? 'bg-cyan-500 text-white shadow-sm shadow-cyan-500/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-cyan-600 text-white shadow-xs shadow-cyan-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="react" className="h-3.5 w-3.5" />
@@ -254,8 +283,8 @@ export default function InterviewPage() {
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'nextjs' ||
                     selectedCategory === 'next-app-router'
-                      ? 'bg-zinc-800 text-white shadow-sm dark:bg-zinc-200 dark:text-zinc-900'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-zinc-800 text-white shadow-xs dark:bg-zinc-200 dark:text-zinc-900'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="nextjs" className="h-3.5 w-3.5" />
@@ -269,8 +298,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('typescript')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'typescript'
-                      ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-blue-600 text-white shadow-xs shadow-blue-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="typescript" className="h-3.5 w-3.5" />
@@ -284,8 +313,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('javascript')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'javascript'
-                      ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-amber-600 text-white shadow-xs shadow-amber-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="javascript" className="h-3.5 w-3.5" />
@@ -299,8 +328,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('go')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'go'
-                      ? 'bg-sky-500 text-white shadow-sm shadow-sky-500/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-sky-600 text-white shadow-xs shadow-sky-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="go" className="h-3.5 w-3.5" />
@@ -314,8 +343,8 @@ export default function InterviewPage() {
                   onClick={() => setSelectedCategory('nestjs')}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     selectedCategory === 'nestjs'
-                      ? 'bg-red-500 text-white shadow-sm shadow-red-500/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
+                      ? 'bg-rose-600 text-white shadow-xs shadow-rose-600/20'
+                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
                   }`}
                 >
                   <TechIcon name="nestjs" className="h-3.5 w-3.5" />
@@ -449,75 +478,20 @@ export default function InterviewPage() {
                 <span className="text-muted-foreground mr-1 text-[11px] font-semibold">
                   Level:
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('all')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    selectedLevel === 'all'
-                      ? 'bg-foreground text-background shadow-sm'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <span>Tất cả</span>
-                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {levelCounts.all}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('junior')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    selectedLevel === 'junior'
-                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <span>🟢 Cơ bản (Junior)</span>
-                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {levelCounts.junior}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('middle')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    selectedLevel === 'middle'
-                      ? 'bg-amber-600 text-white shadow-sm shadow-amber-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <span>🟡 Trung bình (Middle)</span>
-                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {levelCounts.middle}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedLevel('senior')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                    selectedLevel === 'senior'
-                      ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <span>🔴 Nâng cao (Senior)</span>
-                  <span className="bg-background/20 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {levelCounts.senior}
-                  </span>
-                </button>
+                <FilterChipGroup
+                  items={levelFilterItems}
+                  selectedId={selectedLevel}
+                  onChange={setSelectedLevel}
+                />
               </div>
 
               {/* Search bar */}
-              <div className="relative">
-                <Search className="text-muted-foreground absolute top-2.5 left-3 h-4 w-4" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm câu hỏi, từ khóa kỹ thuật (VD: RSC, Hydration, useOptimistic...)"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="border-input bg-background text-foreground placeholder:text-muted-foreground focus:ring-primary w-full rounded-xl border py-2 pr-4 pl-9 text-xs focus:ring-2 focus:outline-none"
-                />
-              </div>
+              <SearchInput
+                placeholder="Tìm kiếm câu hỏi, từ khóa kỹ thuật (VD: RSC, Hydration, useOptimistic...)"
+                value={searchQuery}
+                onChange={setSearchQuery}
+                isPending={isPendingSearch}
+              />
 
               {/* Filters row */}
               <div className="border-border/40 flex flex-wrap items-center justify-between gap-3 border-t pt-1">

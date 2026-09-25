@@ -53,17 +53,42 @@ export function VirtualQuestionList({
   React.useEffect(() => {
     updateScrollMargin();
 
-    const handleScrollAndResize = () => {
-      setShowScrollTop(window.scrollY > 400);
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && listRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        updateScrollMargin();
+      });
+      resizeObserver.observe(listRef.current);
+    }
+
+    const handleResize = () => {
       updateScrollMargin();
     };
 
-    window.addEventListener('scroll', handleScrollAndResize, { passive: true });
-    window.addEventListener('resize', handleScrollAndResize, { passive: true });
+    let ticking = false;
+    let lastShow = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentShow = window.scrollY > 400;
+          if (currentShow !== lastShow) {
+            lastShow = currentShow;
+            setShowScrollTop(currentShow);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-      window.removeEventListener('scroll', handleScrollAndResize);
-      window.removeEventListener('resize', handleScrollAndResize);
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, [updateScrollMargin]);
 

@@ -1191,7 +1191,7 @@ export function NextPlayground({
 
           <div className="flex items-center gap-3">
             <span className="font-mono text-[10px] text-slate-400">
-              Next.js v15.4 · React v19.2 · WebContainer
+              Next 15.4 Runtime + React 19 · WebContainer
             </span>
             {layout.isFullscreen && (
               <button

@@ -46,12 +46,22 @@ export function AppShell({ children }: AppShellProps) {
     };
 
     checkMobileRoute();
-    window.addEventListener('resize', checkMobileRoute);
-    return () => window.removeEventListener('resize', checkMobileRoute);
+
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedCheckMobile = () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(checkMobileRoute, 150);
+    };
+
+    window.addEventListener('resize', debouncedCheckMobile);
+    return () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      window.removeEventListener('resize', debouncedCheckMobile);
+    };
   }, [pathname, router]);
 
   const footer = (
-    <footer className="border-border/30 text-muted-foreground/70 bg-background/80 border-t py-6 text-xs backdrop-blur-xs">
+    <footer className="border-border/30 text-muted-foreground/70 bg-background/90 border-t py-6 text-xs">
       <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 sm:flex-row sm:px-6">
         <div className="flex items-center gap-2">
           <span className="text-foreground font-semibold">dev-pro</span>

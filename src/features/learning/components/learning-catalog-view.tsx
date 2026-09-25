@@ -130,7 +130,7 @@ export function LearningCatalogView({
           <div className="flex items-center justify-between">
             <h3 className="text-foreground flex items-center gap-2 text-base font-extrabold tracking-tight">
               <BookOpen
-                className={`h-4 w-4 ${isReact ? 'text-cyan-500' : 'text-indigo-500'}`}
+                className={`h-4 w-4 ${isReact ? 'text-cyan-600 dark:text-cyan-400' : 'text-indigo-600 dark:text-indigo-400'}`}
               />
               <span>Danh Sách Lộ Trình Học</span>
             </h3>
@@ -154,7 +154,7 @@ export function LearningCatalogView({
             <div className="space-y-0.5">
               <h3 className="text-foreground flex items-center gap-2 text-base font-extrabold tracking-tight">
                 <Terminal
-                  className={`h-4 w-4 ${isReact ? 'text-cyan-500' : 'text-indigo-500'}`}
+                  className={`h-4 w-4 ${isReact ? 'text-cyan-600 dark:text-cyan-400' : 'text-indigo-600 dark:text-indigo-400'}`}
                 />
                 <span>
                   Kho Bài Tập Thực Hành{' '}
@@ -170,8 +170,8 @@ export function LearningCatalogView({
               variant="outline"
               className={`font-mono text-xs ${
                 isReact
-                  ? 'border-cyan-500/40 text-cyan-600 dark:text-cyan-300'
-                  : 'border-indigo-500/40 text-indigo-600 dark:text-indigo-300'
+                  ? 'border-cyan-500/40 text-cyan-700 dark:text-cyan-300'
+                  : 'border-indigo-500/40 text-indigo-700 dark:text-indigo-300'
               }`}
             >
               {currentCompleted}/{currentExercises.length} hoàn thành

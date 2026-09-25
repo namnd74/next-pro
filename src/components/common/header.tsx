@@ -83,13 +83,38 @@ export function Header() {
     };
 
     checkState();
-    const onScroll = () => setScrolled(window.scrollY > 16);
+
+    let scrollTicking = false;
+    let lastScrolled = false;
+
+    const onScroll = () => {
+      if (!scrollTicking) {
+        window.requestAnimationFrame(() => {
+          const isScrolled = window.scrollY > 16;
+          if (isScrolled !== lastScrolled) {
+            lastScrolled = isScrolled;
+            setScrolled(isScrolled);
+          }
+          scrollTicking = false;
+        });
+        scrollTicking = true;
+      }
+    };
+
     onScroll();
+
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const debouncedCheckState = () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(checkState, 150);
+    };
+
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', checkState);
+    window.addEventListener('resize', debouncedCheckState);
     return () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
       window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', checkState);
+      window.removeEventListener('resize', debouncedCheckState);
     };
   }, []);
 

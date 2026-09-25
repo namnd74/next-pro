@@ -103,9 +103,9 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
           className={`overflow-hidden rounded-xl border transition-all duration-200 ${
             isActive
               ? isReact
-                ? 'border-cyan-500/50 bg-cyan-950/20 shadow-sm shadow-cyan-500/10'
-                : 'border-indigo-500/50 bg-indigo-950/20 shadow-sm shadow-indigo-500/10'
-              : 'border-border/60 bg-secondary/15 hover:border-border/90 hover:bg-secondary/30'
+                ? 'border-cyan-500/40 bg-cyan-50/70 shadow-xs shadow-cyan-500/10 dark:border-cyan-500/50 dark:bg-cyan-950/30'
+                : 'border-indigo-500/40 bg-indigo-50/70 shadow-xs shadow-indigo-500/10 dark:border-indigo-500/50 dark:bg-indigo-950/30'
+              : 'border-border/70 bg-card hover:border-border hover:bg-muted/40'
           }`}
         >
           {/* Track Header Card */}
@@ -118,8 +118,8 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
               <span
                 className={`rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-extrabold ${
                   isReact
-                    ? 'border-cyan-500/20 bg-cyan-500/10 text-cyan-400'
-                    : 'border-indigo-500/20 bg-indigo-500/10 text-indigo-400'
+                    ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-400'
+                    : 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400'
                 }`}
               >
                 T{String(idx + 1).padStart(2, '0')}
@@ -128,7 +128,7 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
                 <span className="text-foreground block truncate text-xs font-semibold">
                   {track.title}
                 </span>
-                <span className="text-muted-foreground/80 block font-mono text-[9px]">
+                <span className="text-muted-foreground block font-mono text-[10px]">
                   {completedInTrack}/{track.lessons.length} hoàn thành
                 </span>
               </div>
@@ -155,8 +155,8 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
 
           {/* Lessons List Underneath (Bài học theo dưới) */}
           {isExpanded && (
-            <ul className="border-border/40 bg-background/40 space-y-1 border-t px-2 py-2">
-              <li className="text-muted-foreground/70 px-2 py-0.5 font-mono text-[9px] tracking-wider uppercase">
+            <ul className="border-border/50 bg-background/60 space-y-1 border-t px-2 py-2">
+              <li className="text-muted-foreground px-2 py-0.5 font-mono text-[10px] font-bold tracking-wider uppercase">
                 Bài học ({track.lessons.length})
               </li>
               {track.lessons.map((lesson) => {
@@ -169,23 +169,33 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
                       href={`/learn/${track.slug}/${lesson.slug}`}
                       onClick={onNavigate}
                       aria-current={isLessonActive ? 'page' : undefined}
-                      className={`flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors ${
+                      className={`flex items-start gap-2 rounded-lg px-2.5 py-2 text-xs transition-colors ${
                         isLessonActive
                           ? isReact
-                            ? 'bg-cyan-500/15 font-semibold text-cyan-300'
-                            : 'bg-indigo-500/15 font-semibold text-indigo-300'
-                          : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'
+                            ? 'bg-cyan-500/15 font-semibold text-cyan-900 shadow-2xs dark:bg-cyan-500/20 dark:text-cyan-200'
+                            : 'bg-indigo-500/15 font-semibold text-indigo-900 shadow-2xs dark:bg-indigo-500/20 dark:text-indigo-200'
+                          : 'text-foreground/85 hover:bg-muted/80 hover:text-foreground'
                       }`}
                     >
                       {isCompleted ? (
-                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                       ) : (
-                        <Circle className="text-muted-foreground/40 mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <Circle
+                          className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${
+                            isLessonActive
+                              ? isReact
+                                ? 'text-cyan-700 dark:text-cyan-400'
+                                : 'text-indigo-700 dark:text-indigo-400'
+                              : 'text-muted-foreground/60'
+                          }`}
+                        />
                       )}
                       <div className="min-w-0 flex-1">
-                        <span className="line-clamp-2 leading-snug">{lesson.title}</span>
-                        <span className="text-muted-foreground/70 flex items-center gap-1.5 pt-0.5 font-mono text-[9px]">
-                          <Clock className="h-2.5 w-2.5" />
+                        <span className="line-clamp-2 leading-snug font-medium">
+                          {lesson.title}
+                        </span>
+                        <span className="text-muted-foreground flex items-center gap-1.5 pt-0.5 font-mono text-[10px]">
+                          <Clock className="h-3 w-3" />
                           <span>{lesson.durationMinutes}m</span>
                           <span>•</span>
                           <span className="capitalize">{lesson.level}</span>
@@ -219,7 +229,7 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
           }}
           className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-bold transition-all ${
             !isNextjs
-              ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/25'
+              ? 'bg-cyan-600 text-white shadow-xs dark:bg-cyan-500 dark:text-slate-950'
               : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
           }`}
         >
@@ -240,7 +250,7 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
           }}
           className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-bold transition-all ${
             isNextjs
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+              ? 'bg-indigo-600 text-white shadow-xs dark:bg-indigo-500 dark:text-white'
               : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
           }`}
         >
@@ -253,15 +263,15 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
       <div
         className={`flex shrink-0 items-center gap-2.5 rounded-xl border p-2.5 transition-colors ${
           isNextjs
-            ? 'border-indigo-500/20 bg-indigo-500/5'
-            : 'border-cyan-500/20 bg-cyan-500/5'
+            ? 'border-indigo-500/30 bg-indigo-50/70 dark:border-indigo-500/20 dark:bg-indigo-500/10'
+            : 'border-cyan-500/30 bg-cyan-50/70 dark:border-cyan-500/20 dark:bg-cyan-500/10'
         }`}
       >
         <span
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white shadow-xs ${
             isNextjs
               ? 'bg-gradient-to-br from-indigo-500 to-purple-600'
-              : 'bg-gradient-to-br from-cyan-500 to-teal-600'
+              : 'bg-gradient-to-br from-cyan-600 to-teal-600'
           }`}
         >
           {isNextjs ? <Layers className="h-4 w-4" /> : <Code2 className="h-4 w-4" />}
@@ -284,13 +294,15 @@ export function LearningSidebar({ tracks, onNavigate }: LearningSidebarProps) {
         <div className="flex items-center justify-between px-1">
           <div
             className={`flex items-center gap-1.5 font-mono text-[10px] font-bold tracking-wider uppercase ${
-              isNextjs ? 'text-indigo-400' : 'text-cyan-400'
+              isNextjs
+                ? 'text-indigo-700 dark:text-indigo-400'
+                : 'text-cyan-700 dark:text-cyan-400'
             }`}
           >
             {isNextjs ? <Layers className="h-3 w-3" /> : <Code2 className="h-3 w-3" />}
             <span>{isNextjs ? 'Seri Next.js Fullstack' : 'Seri React Mastery'}</span>
           </div>
-          <span className="text-muted-foreground/70 font-mono text-[9px]">
+          <span className="text-muted-foreground font-mono text-[10px]">
             {activeTracks.length} tracks
           </span>
         </div>

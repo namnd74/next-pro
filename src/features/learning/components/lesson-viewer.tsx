@@ -20,11 +20,42 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CodeBlock } from '@/components/ui/code-block';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  ReactPlayground,
-  NextPlayground,
-  type PlaygroundFile,
-} from '@/features/playground';
+import dynamic from 'next/dynamic';
+import type { PlaygroundFile } from '@/features/playground';
+
+const ReactPlayground = dynamic(
+  () => import('@/features/playground').then((mod) => mod.ReactPlayground),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-96 w-full items-center justify-center rounded-xl border border-slate-800 bg-slate-950/50 p-8 text-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
+          <span className="text-muted-foreground font-mono text-xs">
+            Đang khởi động React Playground Environment...
+          </span>
+        </div>
+      </div>
+    ),
+  }
+);
+
+const NextPlayground = dynamic(
+  () => import('@/features/playground').then((mod) => mod.NextPlayground),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-96 w-full items-center justify-center rounded-xl border border-slate-800 bg-slate-950/50 p-8 text-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
+          <span className="text-muted-foreground font-mono text-xs">
+            Đang khởi tạo WebContainer & Node.js Runtime...
+          </span>
+        </div>
+      </div>
+    ),
+  }
+);
 import { NEXTJS_SERIES_TRACK_SLUGS } from '../data/curriculum';
 import {
   generateDynamicLabFiles,
@@ -179,8 +210,8 @@ export function LessonViewer({ track, lesson }: LessonViewerProps) {
             variant="outline"
             className={
               isNextJsTrack
-                ? 'border-indigo-500/30 bg-indigo-500/5 font-mono text-[11px] text-indigo-500'
-                : 'border-cyan-500/30 bg-cyan-500/5 font-mono text-[11px] text-cyan-600 dark:text-cyan-400'
+                ? 'border-indigo-500/30 bg-indigo-500/10 font-mono text-[11px] text-indigo-700 dark:text-indigo-400'
+                : 'border-cyan-500/30 bg-cyan-500/10 font-mono text-[11px] text-cyan-700 dark:text-cyan-400'
             }
           >
             {isNextJsTrack

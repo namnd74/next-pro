@@ -165,7 +165,7 @@ function highlightLine(line: string): React.ReactNode {
   return <>{tokens}</>;
 }
 
-export function CodeBlock({
+export const CodeBlock = React.memo(function CodeBlock({
   code,
   language = 'tsx',
   className = '',
@@ -227,4 +227,4 @@ export function CodeBlock({
       </pre>
     </div>
   );
-}
+});

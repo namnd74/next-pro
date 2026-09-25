@@ -37,10 +37,7 @@ export function LessonTabsView({
   };
 
   return (
-    <Tabs
-      defaultValue={hasInteractiveLab ? 'interactive-lab' : 'theory'}
-      className="w-full"
-    >
+    <Tabs defaultValue="theory" className="w-full">
       <TabsList className={`grid h-auto w-full p-1 ${getGridColsClass()}`}>
         <TabsTrigger value="theory" className="gap-1.5 px-2 py-2 text-xs sm:px-3">
           <BookOpen className="h-3.5 w-3.5" />

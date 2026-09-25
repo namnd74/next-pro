@@ -20,10 +20,10 @@ const TECH_STACK = [
 export default function HomePage() {
   return (
     <div className="relative flex min-h-0 w-full flex-1 flex-col justify-between overflow-hidden">
-      {/* Subtle grid background */}
+      {/* Subtle grid background (Dark mode only to prevent Hermann grid optical strain in light mode) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+        className="pointer-events-none absolute inset-0 opacity-0 dark:opacity-[0.05]"
         style={{
           backgroundImage:
             'linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)',
@@ -31,10 +31,10 @@ export default function HomePage() {
         }}
       />
 
-      {/* Purple radial glow behind laptop on the right */}
+      {/* Purple radial glow behind laptop on the right (Dark mode only) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute top-1/2 -right-24 h-[480px] w-[600px] -translate-y-1/2 rounded-full bg-gradient-to-l from-purple-600/25 via-indigo-600/15 to-transparent blur-[110px]"
+        className="pointer-events-none absolute top-1/2 -right-24 h-[480px] w-[600px] -translate-y-1/2 rounded-full bg-gradient-to-l from-purple-600/20 via-indigo-600/10 to-transparent opacity-0 blur-3xl dark:opacity-100"
       />
 
       {/* Main 2-Column Hero Area (Vertically Centered in remaining space) */}
@@ -42,23 +42,23 @@ export default function HomePage() {
         {/* Left Column (5 cols): Badge, Headline, Subtitle, Buttons */}
         <div className="flex flex-col items-center gap-4 text-center sm:gap-5 lg:col-span-5 lg:items-start lg:text-left xl:gap-6">
           {/* Pill Badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1 text-xs font-medium text-indigo-400 backdrop-blur-md">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
+          <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3.5 py-1 text-xs font-medium">
+            <span className="bg-primary h-1.5 w-1.5 rounded-full" />
             Fast-Track to Production Ready
           </div>
 
           {/* Headline */}
-          <h1 className="text-3xl leading-[1.12] font-extrabold tracking-tight text-white sm:text-4xl lg:text-5xl xl:text-6xl">
+          <h1 className="text-foreground text-3xl leading-[1.12] font-extrabold tracking-tight sm:text-4xl lg:text-5xl xl:text-6xl dark:text-white">
             Làm chủ
             <br />
             React &{' '}
-            <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-sky-400 bg-clip-text text-transparent">
+            <span className="text-primary dark:bg-gradient-to-r dark:from-indigo-400 dark:via-purple-400 dark:to-sky-400 dark:bg-clip-text dark:text-transparent">
               Next.js
             </span>
           </h1>
 
           {/* Subtitle */}
-          <p className="-mt-1 text-xl font-semibold tracking-tight text-slate-400 sm:-mt-2 sm:text-2xl lg:text-3xl">
+          <p className="text-muted-foreground -mt-1 text-xl font-semibold tracking-tight sm:-mt-2 sm:text-2xl lg:text-3xl dark:text-slate-400">
             bằng cách thực sự làm.
           </p>
 
@@ -67,7 +67,7 @@ export default function HomePage() {
             <Link href="/learn">
               <Button
                 size="lg"
-                className="cursor-pointer rounded-xl bg-white px-6 py-5 text-sm font-semibold text-slate-950 shadow-xl shadow-white/5 hover:bg-slate-100 sm:px-7 sm:py-6 sm:text-base"
+                className="bg-foreground text-background cursor-pointer rounded-xl px-6 py-5 text-sm font-semibold shadow-lg shadow-stone-900/10 hover:opacity-90 sm:px-7 sm:py-6 sm:text-base dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100"
               >
                 Bắt đầu học ngay
               </Button>
@@ -76,7 +76,7 @@ export default function HomePage() {
               <Button
                 variant="outline"
                 size="lg"
-                className="cursor-pointer rounded-xl border-slate-700/80 bg-slate-900/50 px-6 py-5 text-sm font-semibold text-slate-200 backdrop-blur-md hover:bg-slate-800 sm:px-7 sm:py-6 sm:text-base"
+                className="border-border bg-card/90 text-foreground hover:bg-muted/70 cursor-pointer rounded-xl border px-6 py-5 text-sm font-semibold shadow-xs sm:px-7 sm:py-6 sm:text-base dark:border-slate-700/80 dark:bg-slate-900/50 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 Luyện phỏng vấn
               </Button>
@@ -97,7 +97,7 @@ export default function HomePage() {
         <Marquee
           pauseOnHover
           gap="2rem"
-          className="border-border/30 bg-background/50 border-t py-2.5 backdrop-blur-xs [--duration:25s] sm:py-3.5"
+          className="border-border/30 bg-background/90 border-t py-2.5 [--duration:25s] sm:py-3.5"
         >
           {TECH_STACK.map((tech) => (
             <span
