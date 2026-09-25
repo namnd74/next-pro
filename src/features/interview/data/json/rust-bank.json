@@ -4,18 +4,31 @@
     "category": "rust",
     "level": "junior",
     "question": "Rust là gì? Triết lý quản lý bộ nhớ của Rust khác C/C++ và Go/Java ở điểm cốt lõi nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["rust", "tri", "c++", "java"],
+    "interviewerIntent": "Đánh giá sự thấu hiểu về bước đột phá của Rust trong kỹ thuật hệ thống: Mô hình Quản lý bộ nhớ dựa trên Quyền sở hữu (Ownership & Borrow Checker) tại compile-time, loại bỏ cả Garbage Collector runtime pauses (Go/Java) lẫn rủi ro Undefined Behavior / rò rỉ bộ nhớ thủ công (C/C++).",
+    "contextOrScenario": "Xây dựng Distributed Reverse Proxy và Edge Gateway (như Cloudflare Pingora): Cần phục vụ hàng triệu kết nối mạng đồng thời với độ trễ P99 cực thấp và tuyệt đối không thể chấp nhận Stop-the-world GC pauses hay lỗ hổng Use-after-free.",
+    "expectedKeywords": [
+      "Ownership",
+      "Borrow Checker",
+      "Zero-cost Abstractions",
+      "Garbage Collection",
+      "Manual Memory Management",
+      "Memory Safety without GC",
+      "Compile-time Verification",
+      "RAII"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Rust là gì? Triết lý quản lý bộ nhớ của Rust khác C/C++ và Go/Java ở điểm cốt lõi nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Rust là ngôn ngữ lập trình hệ thống tập trung vào ba mục tiêu: Hiệu năng tối đa (Performance), An toàn bộ nhớ tuyệt đối (Memory Safety), và Xử lý đồng thời không sợ hãi (Fearless Concurrency). Điểm khác biệt cốt lõi: Rust đạt được an toàn bộ nhớ mà KHÔNG CẦN Garbage Collector (GC như Go/Java gây stop-the-world latency và ngốn RAM) và cũng KHÔNG CẦN lập trình viên phải gọi hàm cấp phát/giải phóng thủ công (`malloc/free` như C/C++ dễ gây Use-After-Free, Double-Free). Thay vào đó, Rust sử dụng mô hình Quyền sở hữu (Ownership) và Trình kiểm tra mượn (Borrow Checker) xác thực tính an toàn 100% tại compile-time.",
+      "deepDive": "So sánh kiến trúc quản lý bộ nhớ ở tầng máy tính: (1) C/C++ giao toàn quyền cho lập trình viên quản lý con trỏ; lỗi nhỏ sẽ dẫn đến Memory Corruption hoặc RCE security exploits. (2) Go/Java/C# sử dụng Tracing Garbage Collector chạy nền: CPU định kỳ phải quét đồ thị tham chiếu trên Heap, gây ra các khoảng dừng độ trễ ngẫu nhiên (GC pauses) và tiêu tốn gấp 2-3 lần dung lượng RAM thực tế. (3) Rust đưa nguyên lý RAII lên cấp độ ngôn ngữ bắt buộc: Bộ nhớ và tài nguyên được gắn chặt với Owner; khi Owner ra khỏi scope, compiler chèn lệnh giải phóng tự động (`Drop::drop`) vào đúng vị trí mã máy mà không tốn runtime overhead, đạt chuẩn 'Zero-cost Abstraction'.",
+      "codeLanguage": "rust",
+      "codeExample": "// Minh họa Zero-cost Ownership và Compile-time Memory Safety\nstruct NetworkConnection {\n    fd: i32,\n}\n\nimpl Drop for NetworkConnection {\n    fn drop(&mut self) {\n        // Tự động giải phóng tài nguyên khi ra khỏi scope mà không cần GC hay gọi free thủ công\n        println!(\"Closing connection socket fd: {}\", self.fd);\n    }\n}\n\nfn handle_connection(conn: NetworkConnection) {\n    println!(\"Processing connection on fd: {}\", conn.fd);\n} // conn ra khỏi scope tại đây -> Drop::drop tự động kích hoạt!\n\nfn main() {\n    let conn = NetworkConnection { fd: 42 };\n    handle_connection(conn); // Quyền sở hữu (Ownership) được chuyển giao (Move)\n    \n    // conn.fd; // LỖI BIÊN DỊCH: Use of moved value: `conn`!\n    // Trình biên dịch Rust ngăn chặn lỗi Use-After-Free ngay lúc compile!\n    println!(\"Main thread finishes cleanly without GC overhead.\");\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Nghĩ rằng Rust có một GC runtime nhỏ ẩn bên trong: Rust hoàn toàn không có runtime GC; mã máy sau khi build trực tiếp tương đương C++.",
+      "Đánh đồng Ownership của Rust với `std::shared_ptr` của C++: Ownership của Rust là mặc định độc quyền (single owner), không tốn chi phí atomic reference counting."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm thế nào mà hệ thống kiểu (Type System) của Rust có thể loại bỏ hoàn toàn các lỗi Data Race trong đa luồng ngay từ thời điểm biên dịch?",
+      "Trình biên dịch LLVM tối ưu hóa việc phân bổ biến của Rust lên Stack thay vì Heap như thế nào khi biết rõ vòng đời của giá trị?"
     ]
   },
   {
@@ -23,18 +36,31 @@
     "category": "rust",
     "level": "junior",
     "question": "Biến `let` trong Rust mặc định là immutable. Tại sao Rust thiết kế như vậy và từ khoá `mut` dùng khi nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["let", "rust", "immutable.", "thi", "kho"],
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu về triết lý thiết kế ngôn ngữ 'Safety by Default': Tính bất biến giúp loại bỏ các tác dụng phụ (side-effects), hỗ trợ trình biên dịch tối ưu hóa thanh ghi (Register Allocation), đảm bảo Thread Safety tự nhiên và vai trò có chủ đích của `mut`.",
+    "contextOrScenario": "Xây dựng Event Stream Processor trong hệ thống phân tích gian lận ngân hàng: Dữ liệu giao dịch đến cần được bảo toàn bất biến tuyệt đối qua các bước xác thực, chỉ có trạng thái tích lũy tổng thể mới được phép `mut`.",
+    "expectedKeywords": [
+      "Immutable by default",
+      "mut",
+      "Safety by Default",
+      "Side-effects",
+      "Register Allocation",
+      "Thread Safety",
+      "In-place Mutation",
+      "Intentional Mutability"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Biến `let` trong Rust mặc định là immutable. Tại sao Rust thiết kế như vậy và từ khoá `mut` dùng khi nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Trong Rust, mọi biến khai báo bằng `let` mặc định là BẤT BIẾN (immutable). Triết lý thiết kế ở đây là 'Safety by Default' (Mặc định an toàn): Tính bất biến ngăn ngừa các tác dụng phụ không mong muốn (unintended side-effects), giúp mã nguồn dễ suy luận hơn, đảm bảo an toàn đa luồng tự nhiên (nhiều luồng có thể đọc dữ liệu bất biến đồng thời mà không cần lock), và cho phép trình biên dịch thực hiện tối ưu hóa sâu hơn. Từ khóa `mut` được sử dụng một cách có chủ đích khi lập trình viên thực sự cần thay đổi giá trị của biến tại chỗ (in-place mutation) nhằm tối ưu hiệu năng hoặc quản lý trạng thái tích lũy.",
+      "deepDive": "Ở góc độ tối ưu hóa phần cứng và trình biên dịch: Khi một biến được đánh dấu là immutable, LLVM có thể thực hiện Constant Propagation, lưu giữ biến trong CPU Registers thay vì phải đồng bộ ngược lại RAM/Stack sau mỗi lệnh, và không phải lo lắng về Memory Aliasing. Khi sử dụng `mut`, nó đóng vai trò như một tài liệu tự giải thích (self-documenting code) và một ranh giới cảnh báo: người đọc mã ngay lập tức nhận biết biến này sẽ có trạng thái thay đổi theo thời gian. Đáng chú ý, Rust hỗ trợ Variable Shadowing (khai báo lại cùng tên biến bằng `let`), cho phép biến đổi dữ liệu tuần tự và thay đổi kiểu mà vẫn giữ được tính bất biến ở mỗi bước.",
+      "codeLanguage": "rust",
+      "codeExample": "fn main() {\n    // 1. Immutable by default: Không thể bị sửa đổi vô ý\n    let transaction_id = 998811;\n    // transaction_id = 998812; // LỖI BIÊN DỊCH: cannot assign twice to immutable variable\n\n    // 2. Mutable: Dùng khi cần thay đổi trạng thái tại chỗ để tối ưu hóa hiệu năng\n    let mut account_balance = 1000;\n    account_balance -= 150; // Hợp lệ\n    println!(\"Updated balance: {}\", account_balance);\n\n    // 3. Variable Shadowing: Biến đổi dữ liệu an toàn mà vẫn giữ tính bất biến\n    let raw_input = \"   42   \";\n    let raw_input: u32 = raw_input.trim().parse().expect(\"Parse error\"); // Đổi kiểu từ &str sang u32\n    // raw_input giờ đây là một u32 bất biến hoàn hảo!\n    println!(\"Parsed number: {}\", raw_input);\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Thêm từ khóa `mut` bừa bãi vào mọi biến theo thói quen lập trình từ ngôn ngữ khác (như JS/Python), làm vô hiệu hóa khả năng kiểm tra an toàn của Borrow Checker.",
+      "Nhầm lẫn giữa việc gán lại giá trị (`re-assignment` cần `mut`) với Variable Shadowing (`let` trùng tên biến cũ để che khuất biến trước đó)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Sự khác biệt căn bản giữa một biến hằng `const` và một biến bất biến `let` trong Rust là gì về mặt thời điểm tính toán và vị trí bộ nhớ?",
+      "Làm thế nào tính năng Variable Shadowing giúp ngăn ngừa lỗi sử dụng lại dữ liệu chưa được làm sạch (unvalidated data) trong luồng xử lý?"
     ]
   },
   {
@@ -42,18 +68,31 @@
     "category": "rust",
     "level": "junior",
     "question": "Quyền sở hữu (Ownership) trong Rust: Nêu 3 quy tắc vàng của Ownership?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["quy", "ownership", "rust"],
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu nền tảng toán học và kỹ thuật của hệ thống bộ nhớ Rust: Ba định luật Ownership bất biến, cơ chế Move Semantics mặc định tại compile-time, và cách Rust loại bỏ hoàn toàn các lỗi giải phóng bộ nhớ hai lần (Double-Free).",
+    "contextOrScenario": "Quản lý File Descriptor và Socket Handles trong High-Performance TCP Server: Đảm bảo socket được đóng tự động và duy nhất đúng một lần khi yêu cầu mạng kết thúc xử lý.",
+    "expectedKeywords": [
+      "Ownership",
+      "Unique Owner",
+      "Move Semantics",
+      "Scope",
+      "Drop Trait",
+      "Double Free Prevention",
+      "Compile-time Tracking",
+      "Affinity"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Quyền sở hữu (Ownership) trong Rust: Nêu 3 quy tắc vàng của Ownership?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Quyền sở hữu (Ownership) là cơ chế quản lý bộ nhớ mang tính cách mạng của Rust được thực thi 100% tại compile-time mà không tốn runtime overhead. Ba quy tắc vàng của Ownership là: (1) Mỗi giá trị trong Rust đều có MỘT và CHỈ MỘT biến được gọi là Chủ sở hữu (Owner) của nó. (2) Chỉ có thể có DUY NHẤT một chủ sở hữu tại một thời điểm xác định. (3) Khi chủ sở hữu đi ra khỏi phạm vi (Out of Scope), giá trị đó sẽ bị HỦY TỰ ĐỘNG và giải phóng bộ nhớ ngay lập tức (thông qua hàm `Drop::drop`).",
+      "deepDive": "Cơ chế máy tính bên dưới: Quy tắc số 2 tạo nên Move Semantics mặc định trong Rust. Khi bạn gán `let s2 = s1;` (với các kiểu không implement trait `Copy`), Rust chỉ thực hiện shallow copy con trỏ 24-byte của `String` (ptr, capacity, len) trên Stack từ `s1` sang `s2`, và VÔ HIỆU HÓA HOÀN TOÀN biến `s1` ngay tại thời điểm biên dịch. Điều này loại bỏ triệt để lỗi Double-Free: vì chỉ còn duy nhất `s2` là chủ sở hữu hợp lệ, hàm `drop()` sẽ chỉ được gọi đúng 1 lần khi `s2` ra khỏi scope. Trình biên dịch theo dõi điều này bằng giải thuật phân tích luồng điều khiển tĩnh (Static Control Flow Analysis) mà không cần thêm bất kỳ metadata hay reference counter nào tại runtime.",
+      "codeLanguage": "rust",
+      "codeExample": "fn main() {\n    // Quy tắc 1 & 2: s1 là chủ sở hữu duy nhất của chuỗi trên Heap\n    let s1 = String::from(\"LSM_Tree_Block_Data\");\n    \n    // Phép gán này là một thao tác MOVE (chuyển giao quyền sở hữu):\n    let s2 = s1;\n    \n    // println!(\"{}\", s1); // LỖI BIÊN DỊCH: borrow of moved value: `s1`!\n    // s1 đã bị vô hiệu hóa hoàn toàn, ngăn chặn lỗi Double-Free!\n\n    println!(\"s2 is now the sole owner: {}\", s2);\n\n    {\n        let s3 = String::from(\"Temporary_Scoped_Data\");\n        println!(\"Inside scope: {}\", s3);\n    } // Quy tắc 3: s3 ra khỏi scope tại đây -> Bộ nhớ của s3 bị hủy tự động tức thì!\n    \n    // s3 không còn tồn tại ở đây\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Cố tình clone dữ liệu bằng `.clone()` ở khắp mọi nơi để lách luật Borrow Checker, làm mất đi lợi thế hiệu năng zero-cost của Rust.",
+      "Nhầm lẫn rằng các kiểu dữ liệu primitive (như `i32`, `bool`, `f64`) cũng bị move: Các kiểu này implement trait `Copy` nên sẽ tự động sao chép bit trên stack mà không chuyển quyền sở hữu."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Trait `Copy` và trait `Clone` trong Rust khác nhau như thế nào về mặt bản chất thực thi và ngữ nghĩa?",
+      "Cơ chế Non-Lexical Lifetimes (NLL) của Rust đã cải tiến việc theo dõi scope của Owner để giảm bớt sự gò bó cho lập trình viên ra sao?"
     ]
   },
   {
@@ -61,18 +100,31 @@
     "category": "rust",
     "level": "junior",
     "question": "Mượn dữ liệu (Borrowing) và Tham chiếu (References): `&T` và `&mut T` khác nhau như thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["borrowing", "tham", "chi", "references", "mut"],
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu về cơ chế Mượn dữ liệu (Borrowing): Phân biệt Shared Reference (`&T`) vs Exclusive Mutable Reference (`&mut T`), tính chất Copy vs Move của tham chiếu, và cách bảo vệ Invariant dữ liệu.",
+    "contextOrScenario": "Thiết kế In-Memory Shared Cache phục vụ truy vấn đồng thời: Nhiều tiến trình đọc dữ liệu cùng lúc (`&T`) mà không cần copy, và chỉ có một tiến trình ghi độc quyền (`&mut T`) khi cập nhật cache.",
+    "expectedKeywords": [
+      "Borrowing",
+      "Shared Reference (&T)",
+      "Exclusive Reference (&mut T)",
+      "Read-only",
+      "Single Writer",
+      "Pointer Dereference",
+      "Aliasing",
+      "Invariant"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Mượn dữ liệu (Borrowing) và Tham chiếu (References): `&T` và `&mut T` khác nhau như thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Trong Rust, `Borrowing` (Mượn) cho phép ta tạo ra các Tham chiếu (References) trỏ tới một giá trị mà không cần chuyển giao quyền sở hữu. Có hai loại tham chiếu cơ bản: (1) `&T` (Shared Reference - Tham chiếu chia sẻ): Cho phép đọc dữ liệu (Read-only); có thể có vô số tham chiếu `&T` cùng trỏ tới một giá trị tại một thời điểm; bản thân `&T` implement trait `Copy`. (2) `&mut T` (Mutable Reference - Tham chiếu có thể thay đổi độc quyền): Cho phép chỉnh sửa dữ liệu; tại một thời điểm xác định chỉ được phép có DUY NHẤT MỘT tham chiếu `&mut T` và KHÔNG ĐƯỢC có bất kỳ tham chiếu `&T` nào khác cùng tồn tại; `&mut T` KHÔNG implement `Copy` mà áp dụng Move hoặc Reborrowing.",
+      "deepDive": "Ở tầng máy tính: Cả `&T` và `&mut T` đều được biểu diễn là một con trỏ thô 8-byte chứa địa chỉ bộ nhớ của đối tượng. Tuy nhiên, sự khác biệt nằm ở lời hứa với trình biên dịch: Khi bạn có một `&mut T`, Rust cam kết với LLVM rằng con trỏ này là ĐỘC QUYỀN (Không có bất kỳ con trỏ nào khác cùng alias tới vùng nhớ này - tương đương từ khóa `__restrict__` trong C). Điều này cho phép LLVM thực hiện các tối ưu hóa tối thượng như Vectorization và loại bỏ các lệnh đọc bộ nhớ trùng lặp mà các ngôn ngữ khác không thể làm được an toàn.",
+      "codeLanguage": "rust",
+      "codeExample": "struct MetricData {\n    value: f64,\n}\n\n// Hàm nhận Shared Reference (&T): Chỉ đọc, an toàn cho nhiều caller\nfn inspect_metric(metric: &MetricData) {\n    println!(\"Current metric value: {:.2}\", metric.value);\n}\n\n// Hàm nhận Mutable Reference (&mut T): Độc quyền sửa đổi\nfn calibrate_metric(metric: &mut MetricData, offset: f64) {\n    metric.value += offset;\n}\n\nfn main() {\n    let mut cpu_metric = MetricData { value: 85.5 };\n\n    // Nhiều Shared References cùng tồn tại hợp lệ\n    let ref1 = &cpu_metric;\n    let ref2 = &cpu_metric;\n    inspect_metric(ref1);\n    inspect_metric(ref2);\n    // ref1 và ref2 kết thúc vòng đời sử dụng tại đây (NLL)\n\n    // Mutable Reference độc quyền được tạo ra\n    let mut_ref = &mut cpu_metric;\n    calibrate_metric(mut_ref, 2.5);\n    \n    println!(\"Calibrated: {:.2}\", cpu_metric.value);\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Cố gắng tạo một `&mut T` trong khi vẫn còn một `&T` đang hoạt động: Borrow Checker sẽ từ chối biên dịch ngay lập tức.",
+      "Trả về tham chiếu trỏ tới biến cục bộ của hàm (Dangling Reference): Rust chặn 100% lỗi này ở compile-time."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Cơ chế Reborrowing hoạt động ra sao khi ta truyền một `&mut T` vào một hàm con mà không làm mất đi tham chiếu ban đầu?",
+      "Tại sao một kiểu dữ liệu chứa `&mut T` không thể implement trait `Copy`?"
     ]
   },
   {
@@ -80,18 +132,30 @@
     "category": "rust",
     "level": "junior",
     "question": "Quy tắc Aliasing XOR Mutability trong Rust là gì? Vì sao không thể có 2 mutable references cùng lúc?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["quy", "aliasing", "xor", "mutability", "rust"],
+    "interviewerIntent": "Đánh giá sự thấu hiểu về Định lý nền tảng nhất của Rust (Aliasing XOR Mutability): Bản chất nguyên nhân gốc rễ của Data Races, lỗi Iterator Invalidation, và cách Borrow Checker loại bỏ hoàn toàn các lỗi bộ nhớ phức tạp này.",
+    "contextOrScenario": "Phát hiện lỗi Iterator Invalidation kinh điển trong C++ khi vừa duyệt mảng vừa thêm phần tử khiến mảng reallocate làm con trỏ iterator trỏ vào vùng nhớ rác: Chứng minh cách Rust ngăn chặn lỗi này ở cấp độ biên dịch.",
+    "expectedKeywords": [
+      "Aliasing XOR Mutability",
+      "Data Race",
+      "Iterator Invalidation",
+      "LLVM noalias",
+      "Pointer Aliasing",
+      "Memory Safety",
+      "Compile-time Guarantee"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Quy tắc Aliasing XOR Mutability trong Rust là gì? Vì sao không thể có 2 mutable references cùng lúc?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Quy tắc Aliasing XOR Mutability (Bí danh HOẶC Đột biến, loại trừ lẫn nhau) là định lý toán học nền tảng tạo nên sự an toàn của Rust: Tại bất kỳ thời điểm nào, đối với một vùng nhớ xác định, bạn có thể có NHIỀU tham chiếu cùng đọc (Aliasing without Mutability) HOẶC chỉ MỘT tham chiếu duy nhất được ghi (Mutability without Aliasing) — nhưng TUYỆT ĐỐI KHÔNG BAO GIỜ CÓ CẢ HAI. Rust cấm có 2 mutable references cùng lúc vì điều đó sẽ phá vỡ tính bất biến của dữ liệu, gây ra lỗi Data Race trong đa luồng và lỗi vô hiệu hóa lặp (Iterator Invalidation) ngay cả trong đơn luồng.",
+      "deepDive": "Hãy xem xét kịch bản Iterator Invalidation: Giả sử bạn đang duyệt qua một `std::vector` (bạn đang giữ tham chiếu đọc tới các phần tử bên trong). Nếu đồng thời bạn có một mutable reference cho phép gọi `vec.push(x)`: Khi dung lượng vector vượt quá capacity, vector sẽ cấp phát vùng nhớ Heap mới lớn hơn và giải phóng vùng nhớ cũ. Nếu cho phép 2 tham chiếu cùng tồn tại, tham chiếu đọc ban đầu sẽ trở thành một Dangling Pointer trỏ vào vùng nhớ đã bị giải phóng (Use-After-Free)! Trong đa luồng, việc 2 luồng cùng ghi hoặc 1 luồng đọc 1 luồng ghi vào cùng một biến mà không có đồng bộ sẽ gây ra Data Race (hành vi làm hỏng dữ liệu hoặc vỡ CPU cache coherence). Quy tắc Aliasing XOR Mutability triệt tiêu toàn bộ các lớp lỗi này ngay tại thời điểm biên dịch.",
+      "codeLanguage": "rust",
+      "codeExample": "fn main() {\n    let mut numbers = vec![1, 2, 3, 4, 5];\n\n    // Thử nghiệm lỗi Iterator Invalidation kinh điển:\n    let first_element = &numbers[0]; // Mượn bất biến (Shared Reference)\n\n    // Nếu cố gắng thay đổi vector trong khi first_element vẫn đang được mượn:\n    // numbers.push(6); \n    // LỖI BIÊN DỊCH: cannot borrow `numbers` as mutable because it is also borrowed as immutable!\n    \n    println!(\"First element safely accessed: {}\", first_element);\n    // first_element kết thúc sử dụng tại đây!\n\n    // Bây giờ mới được phép mượn mutable để thay đổi vector an toàn 100%:\n    numbers.push(6);\n    println!(\"Vector updated cleanly: {:?}\", numbers);\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Tìm cách dùng con trỏ trần trong khối `unsafe` để phá vỡ quy tắc Aliasing XOR Mutability: Dẫn đến Undefined Behavior tức thì vì LLVM tối ưu hóa dựa trên cờ `noalias`.",
+      "Cố tình giữ một tham chiếu đọc dài hơn cần thiết (ví dụ: gán vào biến có scope rộng), vô tình ngăn cản các thao tác mutation tiếp theo."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Thuộc tính `noalias` của LLVM được Rust áp dụng cho các tham chiếu độc quyền mang lại lợi thế tối ưu hóa hiệu năng như thế nào so với mã C++ thông thường?",
+      "Làm thế nào mẫu thiết kế Interior Mutability (`RefCell`, `Mutex`) cho phép thay đổi dữ liệu mà vẫn tuân thủ về mặt ngữ nghĩa quy tắc Aliasing XOR Mutability?"
     ]
   },
   {
@@ -99,18 +163,31 @@
     "category": "rust",
     "level": "junior",
     "question": "Kiểu dữ liệu chuỗi trong Rust: Phân biệt rõ `String` và `&str`?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["chu", "rust", "string", "str"],
+    "interviewerIntent": "Đánh giá sự am hiểu sâu sắc về biểu diễn chuỗi trong bộ nhớ: Phân biệt giữa Heap-allocated Growable Buffer (`String`) vs Borrowed String Slice Fat Pointer (`&str`), ràng buộc UTF-8 Invariant bất biến, và kỹ thuật Zero-copy String Slicing.",
+    "contextOrScenario": "Phát triển Log Parser phân tích hàng terabytes file nhật ký hệ thống SIEM: Sử dụng `&str` để cắt và trích xuất timestamp, log level zero-copy mà không cấp phát bất kỳ byte Heap nào.",
+    "expectedKeywords": [
+      "String",
+      "&str",
+      "Fat Pointer",
+      "UTF-8 Invariant",
+      "Heap Allocation",
+      "String Slice",
+      "Zero-copy Parsing",
+      "Deref Coercion"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Kiểu dữ liệu chuỗi trong Rust: Phân biệt rõ `String` và `&str`?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`String` và `&str` là hai kiểu chuỗi cốt lõi của Rust: (1) `String` là kiểu chuỗi có thể mở rộng (growable), sở hữu dữ liệu (owned), được cấp phát trên Heap, và lưu trữ nội bộ dưới dạng một vector các bytes UTF-8 (`Vec<u8>`). (2) `&str` (string slice) là một tham chiếu quan sát không sở hữu (borrowed view) trỏ vào một chuỗi byte UTF-8 hợp lệ nằm ở bất kỳ đâu trong bộ nhớ (có thể trỏ vào chuỗi hằng trong phân vùng `.rodata`, trỏ vào một `String` trên Heap, hoặc mảng byte trên Stack).",
+      "deepDive": "Cấu trúc bộ nhớ máy tính: `String` là một struct 24-byte trên Stack gồm 3 trường: `ptr` (con trỏ tới vùng nhớ Heap), `capacity` (dung lượng đã cấp phát), và `len` (độ dài byte hiện tại). `&str` là một Fat Pointer 16-byte gồm 2 trường: `ptr` (con trỏ trỏ tới đầu chuỗi) và `len` (độ dài theo số bytes). Điểm then chốt: Cả hai kiểu ĐỀU BẮT BUỘC PHẢI LÀ UTF-8 HỢP LỆ (đây là một Type Invariant được đảm bảo bởi chuẩn ngôn ngữ). Do đó, bạn không thể truy cập ký tự bằng index trực tiếp như `s[0]` trong $O(1)$ vì một ký tự UTF-8 có thể chiếm từ 1 đến 4 bytes. Nhờ tính năng `Deref Coercion`, mọi hàm nhận `&str` đều có thể tự động nhận tham chiếu `&String` mà không tốn chi phí ép kiểu.",
+      "codeLanguage": "rust",
+      "codeExample": "fn parse_log_level(log_line: &str) -> &str {\n    // Cắt chuỗi Zero-copy: Chỉ tạo ra một fat pointer mới trỏ vào buffer có sẵn\n    if let Some(space_idx) = log_line.find(' ') {\n        &log_line[..space_idx]\n    } else {\n        log_line\n    }\n}\n\nfn main() {\n    // 1. &str trỏ vào String Literal nằm trong phân vùng .rodata (tồn tại suốt chương trình 'static)\n    let literal_str: &'static str = \"INFO System booted successfully\";\n\n    // 2. String cấp phát động trên Heap (sở hữu dữ liệu, có thể thay đổi kích thước)\n    let mut dynamic_str = String::from(\"WARN Disk space low\");\n    dynamic_str.push_str(\" on /dev/sda1\");\n\n    // 3. Zero-copy Parsing: Không allocate heap mới\n    let level1 = parse_log_level(literal_str);\n    let level2 = parse_log_level(&dynamic_str); // Tự động Deref Coercion từ &String sang &str\n\n    println!(\"Parsed levels: [{}] and [{}]\", level1, level2);\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Cố tình cắt chuỗi theo byte index không nằm ở ranh giới ký tự UTF-8 (ví dụ cắt giữa chừng ký tự tiếng Việt có dấu), dẫn đến chương trình bị Panic tại runtime.",
+      "Lạm dụng `.to_string()` hoặc `String::from()` khi truyền tham số chỉ đọc, gây ra hàng triệu thao tác cấp phát Heap không cần thiết."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Rust không cho phép truy xuất chỉ mục trực tiếp `s[i]` trên chuỗi mà bắt buộc phải dùng iterator `.chars()` hoặc `.bytes()`?",
+      "Kiểu dữ liệu `Cow<'a, str>` (Clone-on-Write) giải quyết bài toán linh hoạt giữa mượn `&str` và sở hữu `String` như thế nào?"
     ]
   },
   {
@@ -118,18 +195,31 @@
     "category": "rust",
     "level": "junior",
     "question": "Xử lý lỗi trong Rust: Kiểu `Result<T, E>` và `Option<T>` hoạt động thế nào? Toán tử `?` dùng làm gì?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["rust", "result", "option"],
+    "interviewerIntent": "Đánh giá sự thấu hiểu về mô hình xử lý lỗi an toàn không cần Exception: Loại bỏ lỗi Null Pointer ('The Billion Dollar Mistake'), Algebraic Data Types, cơ chế lan truyền lỗi với toán tử `?` và tự động chuyển đổi kiểu lỗi qua trait `From`.",
+    "contextOrScenario": "Xây dựng gRPC Order Processing Microservice: Xử lý chuỗi các thao tác tuần tự (đọc database -> kiểm tra tồn kho -> trừ tiền tài khoản); đảm bảo bắt và xử lý mọi trường hợp lỗi mà không bao giờ để crash tiến trình server.",
+    "expectedKeywords": [
+      "Result<T, E>",
+      "Option<T>",
+      "Operator ?",
+      "Early Return",
+      "From Trait",
+      "Billion Dollar Mistake",
+      "Monadic Error Handling",
+      "No Exceptions"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Xử lý lỗi trong Rust: Kiểu `Result<T, E>` và `Option<T>` hoạt động thế nào? Toán tử `?` dùng làm gì?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Rust hoàn toàn KHÔNG CÓ giá trị `null` và KHÔNG DÙNG cơ chế Exception để xử lý lỗi thông thường. Thay vào đó, Rust sử dụng hai Algebraic Data Types (Enums) tiêu chuẩn: (1) `Option<T>`: Biểu diễn một giá trị có thể tồn tại (`Some(T)`) hoặc không tồn tại (`None`), loại bỏ hoàn toàn lỗi Null Pointer Dereference. (2) `Result<T, E>`: Biểu diễn kết quả của một thao tác có thể thành công (`Ok(T)`) hoặc thất bại với thông tin lỗi cụ thể (`Err(E)`). Toán tử `?` (Try Operator) là cú pháp rút gọn giúp lan truyền lỗi (error propagation): nếu giá trị là `Err`, hàm sẽ thực hiện `early return` ngay lập tức và tự động chuyển đổi kiểu lỗi thông qua trait `From::from`.",
+      "deepDive": "Tại sao mô hình xử lý lỗi của Rust vượt trội về mặt kỹ thuật hệ thống? Trong C++/Java/C#, exceptions là các bước nhảy luồng ẩn (invisible control flow) không xuất hiện trong chữ ký hàm, gây khó khăn cho việc bảo toàn Exception Safety và tiêu tốn chi phí Stack Unwinding đắt đỏ. Trong Rust, mọi khả năng thất bại đều được thể hiện rõ ràng trên Type Signature (`fn do_work() -> Result<Data, Error>`). Trình biên dịch bắt buộc lập trình viên phải xử lý lỗi tường minh (nếu bỏ qua kết quả `Result`, compiler sẽ đưa ra warning `must_use`). Toán tử `?` được hạ cấp (desugared) thành một biểu thức `match` đơn giản, biên dịch thành mã rẽ nhánh trực tiếp với chi phí thực thi tối thiểu.",
+      "codeLanguage": "rust",
+      "codeExample": "use std::num::ParseIntError;\n\n#[derive(Debug)]\nenum OrderError {\n    InvalidFormat(ParseIntError),\n    InsufficientFunds,\n}\n\n// Triển khai From trait để toán tử ? tự động chuyển đổi lỗi\nimpl From<ParseIntError> for OrderError {\n    fn from(err: ParseIntError) -> Self {\n        OrderError::InvalidFormat(err)\n    }\n}\n\n// Hàm xử lý nghiệp vụ với toán tử ? lan truyền lỗi mạch lạc\nfn process_order_payment(amount_str: &str, balance: u32) -> Result<u32, OrderError> {\n    // Toán tử ? tự động parse hoặc early return Err(OrderError::InvalidFormat)\n    let amount: u32 = amount_str.trim().parse()?;\n    \n    if amount > balance {\n        return Err(OrderError::InsufficientFunds);\n    }\n    \n    Ok(balance - amount)\n}\n\nfn main() {\n    let balance = 1000;\n    match process_order_payment(\"250\", balance) {\n        Ok(remaining) => println!(\"Payment success! Remaining: {}\", remaining),\n        Err(err) => eprintln!(\"Transaction failed: {:?}\", err),\n    }\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Lạm dụng `.unwrap()` hoặc `.expect()` trong code production: Khi gặp lỗi, chúng sẽ kích hoạt Panic làm sập luồng/tiến trình ngay lập tức.",
+      "Nuốt lỗi ngầm định bằng cách chuyển đổi vô tội vạ sang `Option` qua `.ok()` mà không ghi log nguyên nhân gốc rễ của lỗi."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Thư viện `thiserror` (dành cho thư viện SDK) và `anyhow` (dành cho ứng dụng backend) chuẩn hóa kiến trúc xử lý lỗi trong hệ sinh thái Rust hiện đại ra sao?",
+      "Cơ chế Niche Optimization của trình biên dịch Rust giúp `Option<NonNull<T>>` có kích thước bộ nhớ đúng bằng kích thước của một con trỏ thô như thế nào?"
     ]
   },
   {
@@ -137,18 +227,31 @@
     "category": "rust",
     "level": "junior",
     "question": "Match expression và Pattern Matching trong Rust: Tính toàn diện (Exhaustiveness) có ý nghĩa gì?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["match", "expression", "pattern", "matching", "rust"],
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu về tính năng Pattern Matching: Tính kiểm tra toàn diện tại compile-time (Exhaustive Checking), khả năng tái cấu trúc an toàn (refactoring safety), Destructuring và Match Guards.",
+    "contextOrScenario": "Phát triển Finite State Machine (FSM) cho thuật toán đồng thuận Raft Consensus: Bổ sung thêm một trạng thái node mới (`PreCandidate`); compiler buộc phải chỉ ra mọi vị trí trong codebase chưa xử lý trạng thái này để tránh lỗi sập mạng.",
+    "expectedKeywords": [
+      "Match Expression",
+      "Pattern Matching",
+      "Exhaustiveness",
+      "Compiler Verification",
+      "Refactoring Safety",
+      "Destructuring",
+      "Match Guards",
+      "Wildcard (_)"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Match expression và Pattern Matching trong Rust: Tính toàn diện (Exhaustiveness) có ý nghĩa gì?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`match` trong Rust là một cấu trúc điều khiển luồng cực kỳ mạnh mẽ dựa trên Pattern Matching. Khác với `switch-case` thông thường trong C/C++/Java, `match` trong Rust bắt buộc phải đạt TÍNH TOÀN DIỆN (Exhaustiveness): Trình biên dịch bắt buộc lập trình viên phải xử lý 100% tất cả các trường hợp có thể xảy ra của kiểu dữ liệu hoặc enum. Nếu bỏ sót dù chỉ một nhánh giá trị mà không có nhánh mặc định (`_`), chương trình sẽ không thể biên dịch. Điều này loại bỏ hoàn toàn các lỗi unhandled cases tại runtime.",
+      "deepDive": "Tính toàn diện mang lại năng lực Tái cấu trúc an toàn (Refactoring Safety) vô giá trong các hệ thống lớn. Ví dụ: Khi bạn có một Enum `ServerState` với 3 variants được xử lý ở 50 file mã nguồn khác nhau. Nếu bạn bổ sung thêm variant thứ 4, trình biên dịch sẽ ngay lập tức báo lỗi tại chính xác 50 vị trí đó, hoạt động như một danh sách việc cần làm (to-do list) hoàn hảo không thể bỏ sót. Ngoài ra, `match` là một biểu thức (expression) trả về giá trị, cho phép thực hiện Destructuring (bóc tách dữ liệu phức tạp từ struct/tuple/enum) và hỗ trợ Match Guards (`if condition`) để lọc dữ liệu trực tiếp trong pattern.",
+      "codeLanguage": "rust",
+      "codeExample": "#[derive(Debug)]\nenum RaftRole {\n    Follower { leader_id: Option<u64> },\n    Candidate,\n    Leader { term: u64 },\n    // Thêm variant mới: Compiler sẽ lập tức bắt buộc toàn bộ codebase phải xử lý!\n    Learner,\n}\n\nfn handle_role_transition(role: RaftRole) -> &'static str {\n    // Match expression bắt buộc phải bao quát 100% các nhánh (Exhaustive)\n    match role {\n        RaftRole::Follower { leader_id: Some(id) } => \"Following active leader\",\n        RaftRole::Follower { leader_id: None } => \"Follower seeking election\",\n        RaftRole::Candidate => \"Running for election campaign\",\n        RaftRole::Leader { term } if term > 10 => \"Senior Cluster Leader\",\n        RaftRole::Leader { .. } => \"Cluster Leader\",\n        RaftRole::Learner => \"Non-voting sync member\", // Thiếu nhánh này sẽ báo lỗi compile ngay!\n    }\n}\n\nfn main() {\n    let node_state = RaftRole::Follower { leader_id: Some(101) };\n    println!(\"State: {}\", handle_role_transition(node_state));\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Lạm dụng wildcard `_ => { ... }` một cách lười biếng trong các match quan trọng: Việc này làm vô hiệu hóa khả năng kiểm tra toàn diện của compiler khi ta bổ sung thêm variant mới vào Enum trong tương lai.",
+      "Không tận dụng Match Guards mà lại lồng nhiều khối `if-else` phức tạp bên trong thân của nhánh match."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Trình biên dịch LLVM tối ưu hóa câu lệnh `match` của Rust thành Jump Tables hoặc Binary Decision Trees ở mức mã máy assembly như thế nào?",
+      "Cú pháp `if let` và `let-else` (Rust 1.65+) giải quyết vấn đề viết code ngắn gọn khi chỉ quan tâm đến một pattern cụ thể ra sao?"
     ]
   },
   {
@@ -156,18 +259,31 @@
     "category": "rust",
     "level": "junior",
     "question": "Struct và Enum trong Rust: Tại sao Enum trong Rust mạnh hơn rất nhiều so với C++/Java (Algebraic Data Types)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["struct", "enum", "rust", "nhi", "c++"],
+    "interviewerIntent": "Đánh giá sự am hiểu sâu sắc về Hệ thống Kiểu dữ liệu Đại số (Algebraic Data Types - ADTs): Phân biệt Product Types (`struct`) vs Sum Types (`enum`), khả năng mang dữ liệu tùy biến của Enum variant, bố cục bộ nhớ (Memory Layout) và tối ưu hóa khoảng trống (Niche Optimization).",
+    "contextOrScenario": "Thiết kế Binary Protocol Parser cho High-Performance Network Appliance: Định nghĩa các loại bản tin mạng (Handshake, KeepAlive, DataPayload) với bộ nhớ tối thiểu và an toàn kiểu tuyệt đối mà không cần dùng `void*` hay kế thừa hướng đối tượng.",
+    "expectedKeywords": [
+      "Algebraic Data Types (ADTs)",
+      "Sum Types",
+      "Product Types",
+      "Tagged Union",
+      "Discriminant",
+      "Niche Optimization",
+      "Memory Layout",
+      "Zero-cost"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Struct và Enum trong Rust: Tại sao Enum trong Rust mạnh hơn rất nhiều so với C++/Java (Algebraic Data Types)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Trong C++ và Java truyền thống, `enum` về cơ bản chỉ là một danh sách các hằng số nguyên được đặt tên. Ngược lại, trong Rust, `Enum` là một Kiểu dữ liệu Đại số thực thụ (Algebraic Data Type - cụ thể là Sum Type / Tagged Union): Mỗi variant của Enum có thể chứa bất kỳ loại dữ liệu nào (không có dữ liệu, kiểu tuple, struct vô danh, hoặc các kiểu dữ liệu phức tạp khác). Điều này cho phép một kiểu dữ liệu duy nhất có thể biểu diễn nhiều hình thái trạng thái hoàn toàn khác biệt nhau một cách an toàn kiểu 100%.",
+      "deepDive": "Bố cục bộ nhớ (Memory Layout): Ở cấp độ nhị phân, một Enum trong Rust bao gồm một chỉ số phân loại (Discriminant / Tag, thường là 1-8 bytes) để ghi nhớ variant hiện tại, và một vùng đệm dữ liệu (Payload) có kích thước bằng kích thước của variant lớn nhất trong enum. Đột phá tối ưu của Rust nằm ở Kỹ thuật Tối ưu hóa Khoảng trống (Niche Filling Optimization): Trình biên dịch nhận biết các kiểu dữ liệu có giá trị bit không bao giờ hợp lệ (ví dụ con trỏ không bao giờ được null trong `&T` hoặc `NonNull<T>`). Khi bọc kiểu này vào `Option<&T>`, Rust tận dụng chính giá trị bit 0x0 để biểu diễn `None`, khiến `Option<&T>` có kích thước đúng bằng 8 bytes (bằng con trỏ thô) mà không tốn thêm byte nào cho discriminant!",
+      "codeLanguage": "rust",
+      "codeExample": "#[derive(Debug)]\nenum NetworkPacket {\n    // Variant không mang dữ liệu\n    Ping,\n    // Variant mang dữ liệu kiểu Tuple\n    Heartbeat(u64),\n    // Variant mang dữ liệu kiểu Struct đóng gói\n    DataPayload {\n        stream_id: u32,\n        payload: Vec<u8>,\n    },\n}\n\nfn main() {\n    let packet = NetworkPacket::DataPayload {\n        stream_id: 1,\n        payload: vec![0xDE, 0xAD, 0xBE, 0xEF],\n    };\n\n    match packet {\n        NetworkPacket::Ping => println!(\"Received Ping\"),\n        NetworkPacket::Heartbeat(ts) => println!(\"Heartbeat at {}\", ts),\n        NetworkPacket::DataPayload { stream_id, payload } => {\n            println!(\"Stream {}: received {} bytes\", stream_id, payload.len());\n        }\n    }\n\n    // Minh chứng Niche Optimization: Option<&i32> có cùng kích thước với tham chiếu thô &i32!\n    println!(\"Size of &i32: {} bytes\", std::mem::size_of::<&i32>());\n    println!(\"Size of Option<&i32>: {} bytes (Zero overhead!)\", std::mem::size_of::<Option<&i32>>());\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Đặt một variant có kích thước quá lớn bên trong một Enum thường dùng (ví dụ: một variant chứa mảng `[u8; 4096]`): Khiến TẤT CẢ các instances của Enum đó đều bị phình to theo (giải pháp: dùng `Box<[u8; 4096]>` để giảm kích thước enum).",
+      "Sử dụng kế thừa class phức tạp để biểu diễn trạng thái đa hình thay vì tận dụng sức mạnh tự nhiên và tốc độ của Enum trong Rust."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Trình biên dịch Rust sắp xếp thứ tự và căn chỉnh (alignment) các trường dữ liệu trong `struct` như thế nào theo mặc định (`repr(Rust)` vs `repr(C)`)?",
+      "Cảnh báo của clippy `large_enum_variant` xuất hiện khi nào và kỹ thuật boxing variant giải quyết bài toán hiệu năng ra sao?"
     ]
   },
   {
@@ -175,18 +291,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Vòng đời (Lifetimes) trong Rust là gì? Ký hiệu `'a` giúp Borrow Checker kiểm tra điều gì lúc compile?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["lifetimes", "rust", "borrow", "checker", "tra"],
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu sâu sắc nhất về hệ thống Lifetimes: Generic Lifetime Parameters, mối liên hệ giữa thời gian sống của dữ liệu và tham chiếu, vai trò của `'a` trong việc hỗ trợ Borrow Checker chứng minh toán học rằng không có Dangling Pointer.",
+    "contextOrScenario": "Xây dựng In-Memory Search Engine Indexer: Lưu trữ các tham chiếu chuỗi từ khóa (`&'a str`) trỏ trực tiếp vào file tài liệu gốc đã được ánh xạ bộ nhớ (mmap) mà không cần cấp phát thêm bộ nhớ sao chép.",
+    "expectedKeywords": [
+      "Lifetimes",
+      "'a (Generic Lifetime Parameter)",
+      "Borrow Checker",
+      "Dangling Pointer Prevention",
+      "Compile-time Verification",
+      "Zero Runtime Cost",
+      "Outlive",
+      "Scope Relationship"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Vòng đời (Lifetimes) trong Rust là gì? Ký hiệu `'a` giúp Borrow Checker kiểm tra điều gì lúc compile?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Lifetimes (Vòng đời) trong Rust là phạm vi thời gian (scope) mà một tham chiếu (reference) đảm bảo trỏ tới một vùng nhớ hợp lệ. Ký hiệu `'a` là một Tham số Vòng đời Tổng quát (Generic Lifetime Parameter). Nó KHÔNG làm thay đổi thời gian sống thực tế của dữ liệu tại runtime; thay vào đó, nó đóng vai trò là một hợp đồng chữ ký kiểu giúp Borrow Checker kiểm tra mối quan hệ ràng buộc giữa các tham chiếu: Dữ liệu gốc BẮT BUỘC phải sống lâu hơn (outlive) tất cả các tham chiếu trỏ tới nó, ngăn ngừa triệt để lỗi Dangling Pointer và Use-After-Free.",
+      "deepDive": "Tại sao cần ký hiệu `'a`? Trong phạm vi một hàm đơn lẻ, Borrow Checker có thể tự động phân tích luồng điều khiển cục bộ để theo dõi vòng đời. Tuy nhiên, khi tham chiếu được truyền qua ranh giới hàm hoặc lưu trữ bên trong một `struct`, trình biên dịch không thể biết hàm sẽ trả về tham chiếu từ tham số nào nếu không có lifetime annotations. Khi ta viết `fn longest<'a>(x: &'a str, y: &'a str) -> &'a str`, ta đang tuyên bố: 'Giá trị trả về sẽ có vòng đời không được dài hơn vòng đời nhỏ nhất giữa `x` và `y`'. Mọi thông tin về lifetime hoàn toàn biến mất sau quá trình biên dịch (Type Erasure) — Lifetimes có chi phí runtime bằng 0 tuyệt đối.",
+      "codeLanguage": "rust",
+      "codeExample": "// Hàm tìm chuỗi dài hơn: 'a chỉ ra rằng chuỗi trả về sống cùng phạm vi với tham số ngắn hơn\nfn longest<'a>(x: &'a str, y: &'a str) -> &'a str {\n    if x.len() > y.len() { x } else { y }\n}\n\n// Struct chứa tham chiếu: Bắt buộc khai báo lifetime để đảm bảo struct không sống lâu hơn dữ liệu nó trỏ tới\nstruct DocumentSnippet<'a> {\n    text: &'a str,\n}\n\nfn main() {\n    let string1 = String::from(\"Long document content\");\n    let result;\n    {\n        let string2 = String::from(\"Short\");\n        // result = longest(string1.as_str(), string2.as_str());\n        // Nếu gán result ở đây và dùng bên ngoài, compiler sẽ chặn đứng vì string2 bị hủy trước!\n        \n        let snippet = DocumentSnippet { text: &string1 };\n        println!(\"Snippet text: {}\", snippet.text);\n    }\n    \n    let string3 = String::from(\"Medium text\");\n    result = longest(string1.as_str(), string3.as_str());\n    println!(\"Longest: {}\", result); // Hợp lệ vì cả string1 và string3 đều còn sống!\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Cố tình gán vòng đời `'static` để sửa lỗi biên dịch: `'static` cam kết dữ liệu sống suốt toàn bộ tiến trình, nếu ép kiểu sai sẽ dẫn đến thiết kế kiến trúc bị khóa chặt.",
+      "Tưởng rằng việc khai báo `'a` có thể 'kéo dài' tuổi thọ của một biến cục bộ trên stack: Lifetimes chỉ mô tả sự ràng buộc hiện có chứ không thể thay đổi thời điểm hủy của biến."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Vòng đời đặc biệt `'static` có hai cách hiểu (tham chiếu `&'static T` vs ràng buộc `T: 'static`) khác nhau như thế nào?",
+      "Khái niệm Subtyping và Variance (Covariance, Invariance, Contravariance) áp dụng cho Lifetimes trong Rust ra sao?"
     ]
   },
   {
@@ -194,18 +323,29 @@
     "category": "rust",
     "level": "middle",
     "question": "Lifetime Elision Rules: Ba quy tắc ngầm định của Rust giúp lập trình viên không phải viết lifetime thủ công?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["lifetime", "elision", "rules", "quy", "rust"],
+    "interviewerIntent": "Đánh giá sự am hiểu về các quy tắc suy diễn cú pháp tự động (Lifetime Elision Rules) của trình biên dịch Rust, giúp giảm thiểu sự rối rắm của mã nguồn mà vẫn duy trì tính an toàn bộ nhớ tuyệt đối.",
+    "contextOrScenario": "Thiết kế Fluent API và String Parser: Viết các hàm tiện ích xử lý chuỗi và phương thức trên Struct mà không cần phải gõ lặp đi lặp lại các ký hiệu `'a` trên từng chữ ký hàm.",
+    "expectedKeywords": [
+      "Lifetime Elision Rules",
+      "Input Lifetimes",
+      "Output Lifetimes",
+      "&self / &mut self",
+      "Compiler Syntactic Sugar",
+      "Borrow Checker"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Lifetime Elision Rules: Ba quy tắc ngầm định của Rust giúp lập trình viên không phải viết lifetime thủ công?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Lifetime Elision Rules (Quy tắc tỉnh lược vòng đời) là tập hợp 3 quy tắc xác định được trình biên dịch Rust áp dụng tự động cho chữ ký hàm để tự suy luận các tham số vòng đời mà không bắt lập trình viên phải viết thủ công: (1) Mỗi tham số tham chiếu đầu vào (input reference) được tự động gán một tham số lifetime riêng biệt (ví dụ: `fn foo(x: &i32, y: &i32)` trở thành `fn foo<'a, 'b>(x: &'a i32, y: &'b i32)`). (2) Nếu chỉ có đúng MỘT tham số tham chiếu đầu vào, lifetime của nó sẽ được tự động gán cho TẤT CẢ các tham chiếu đầu ra (output references). (3) Nếu có nhiều tham chiếu đầu vào nhưng một trong số đó là `&self` hoặc `&mut self` (phương thức của method), lifetime của `self` sẽ được tự động gán cho tất cả các tham chiếu đầu ra.",
+      "deepDive": "Nếu sau khi áp dụng cả 3 quy tắc trên mà vẫn còn bất kỳ tham chiếu đầu ra nào chưa xác định được lifetime (ví dụ: một hàm nhận 2 chuỗi tham chiếu và trả về 1 chuỗi tham chiếu mà không có `&self`), trình biên dịch sẽ dừng lại và báo lỗi compile, yêu cầu lập trình viên phải ghi rõ lifetime annotations tường minh. Quy tắc elision là một thiết kế cú pháp thông minh (syntactic sugar): nó giúp các đoạn mã Rust thông thường trông tự nhiên và trong sáng như các ngôn ngữ khác, nhưng bản chất bên dưới vẫn được kiểm tra chặt chẽ bởi Borrow Checker.",
+      "codeLanguage": "rust",
+      "codeExample": "struct RequestBuffer {\n    data: String,\n}\n\nimpl RequestBuffer {\n    // Quy tắc 3: Có &self -> Output reference tự động lấy lifetime của &self\n    // Tương đương: fn get_header<'a>(&'a self) -> &'a str\n    fn get_header(&self) -> &str {\n        &self.data[..4]\n    }\n}\n\n// Quy tắc 2: Chỉ có 1 input reference -> Output tự động lấy lifetime của input\n// Tương đương: fn first_word<'a>(s: &'a str) -> &'a str\nfn first_word(s: &str) -> &str {\n    s.split_whitespace().next().unwrap_or(\"\")\n}\n\n// BẮT BUỘC PHẢI KHAI BÁO THỦ CÔNG: Có 2 input tham chiếu, không có &self\n// Trình biên dịch không thể đoán output thuộc về s1 hay s2 nếu không có 'a!\nfn pick_longer<'a>(s1: &'a str, s2: &'a str) -> &'a str {\n    if s1.len() >= s2.len() { s1 } else { s2 }\n}\n\nfn main() {\n    let buffer = RequestBuffer { data: String::from(\"POST /api/v1 HTTP/1.1\") };\n    println!(\"Header: {}\", buffer.get_header());\n    println!(\"First word: {}\", first_word(\"High performance systems\"));\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Quên rằng Quy tắc 3 gán lifetime của `&self` cho output: Nếu phương thức nhận thêm một tham chiếu bên ngoài và trả về tham chiếu đó, compiler sẽ hiểu nhầm là trả về từ `self` nếu không khai báo tường minh.",
+      "Tưởng rằng Lifetime Elision làm giảm tính an toàn: Thực tế nó chỉ tự động điền các tham số theo quy tắc cố định, việc kiểm tra borrow checking sau đó vẫn diễn ra 100% nghiêm ngặt."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao trong Rust 2018 Edition, cú pháp `'_` (Anonymous Lifetime) được bổ sung để thể hiện điều gì khi làm việc với struct chứa tham chiếu?",
+      "Điều gì xảy ra nếu một hàm trả về một tham chiếu nhưng không nhận bất kỳ tham chiếu đầu vào nào?"
     ]
   },
   {
@@ -213,18 +353,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Traits trong Rust là gì? Trait Bounds (`T: Display + Clone`) hoạt động tương tự interface thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["traits", "rust", "trait", "bounds", "display"],
+    "interviewerIntent": "Đánh giá sự am hiểu về Hệ thống Trait của Rust: Hợp đồng hành vi (Behavior Contract), Ad-hoc Polymorphism, Static Dispatch, Associated Types, Orphan Rule và sự vượt trội so với Interface truyền thống.",
+    "contextOrScenario": "Thiết kế Lớp trừu tượng lưu trữ (Storage Abstraction Layer) hỗ trợ nhiều nhà cung cấp (AWS S3, Google Cloud Storage, Local Disk): Cung cấp các thao tác `read`, `write` thông qua Trait mà không tốn chi phí vtable.",
+    "expectedKeywords": [
+      "Traits",
+      "Trait Bounds",
+      "Interface",
+      "Static Dispatch",
+      "Ad-hoc Polymorphism",
+      "Monomorphization",
+      "Orphan Rule",
+      "Associated Types"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Traits trong Rust là gì? Trait Bounds (`T: Display + Clone`) hoạt động tương tự interface thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`Trait` trong Rust định nghĩa một tập hợp các phương thức biểu diễn hành vi (behavior contract) mà một kiểu dữ liệu có thể triển khai (implement). Trait tương tự như `Interface` trong Java/C# hoặc `Concepts` trong C++20. `Trait Bounds` (như `T: Display + Clone`) là các ràng buộc kiểu áp dụng cho Generic Types lúc biên dịch, yêu cầu kiểu dữ liệu `T` bắt buộc phải triển khai các trait được chỉ định mới được phép sử dụng trong hàm hoặc struct đó. Khi sử dụng với Generics, Trait áp dụng cơ chế Static Dispatch (Monomorphization) hoàn toàn miễn phí tại runtime.",
+      "deepDive": "Sự vượt trội của Trait so với Interface truyền thống: (1) Tính độc lập và khả năng mở rộng: Trong OOP truyền thống, một class phải khai báo implement interface ngay từ đầu; trong Rust, bạn có thể triển khai một Trait cho một kiểu dữ liệu đã tồn tại từ trước (kể cả kiểu chuẩn như `i32` hay `String`), miễn là tuân thủ Orphan Rule (hoặc Trait hoặc Kiểu dữ liệu phải thuộc về Crate hiện tại). (2) Hỗ trợ Associated Types (kiểu liên kết) và Default Implementations. (3) Marker Traits (như `Send`, `Sync`, `Copy`) không chứa phương thức nào nhưng mang ý nghĩa cam kết thuộc tính hệ thống với compiler.",
+      "codeLanguage": "rust",
+      "codeExample": "use std::fmt::Display;\n\n// Định nghĩa Trait: Hợp đồng lưu trữ dữ liệu\ntrait StorageBackend {\n    fn write_record(&mut self, id: u64, data: &[u8]) -> Result<(), String>;\n    \n    // Default implementation\n    fn flush(&mut self) -> Result<(), String> {\n        println!(\"Default flush executed\");\n        Ok(())\n    }\n}\n\n// Triển khai Trait cho LocalFileStorage\nstruct LocalFileStorage;\nimpl StorageBackend for LocalFileStorage {\n    fn write_record(&mut self, id: u64, data: &[u8]) -> Result<(), String> {\n        println!(\"Writing {} bytes for id {} to Local Disk\", data.len(), id);\n        Ok(())\n    }\n}\n\n// Sử dụng Trait Bounds: Static Dispatch O(0) runtime cost\nfn persist_metrics<S: StorageBackend, D: Display>(storage: &mut S, id: u64, desc: D) {\n    println!(\"Audit log: {}\", desc);\n    let payload = [1, 2, 3, 4];\n    storage.write_record(id, &payload).expect(\"Write failed\");\n    storage.flush().expect(\"Flush failed\");\n}\n\nfn main() {\n    let mut storage = LocalFileStorage;\n    persist_metrics(&mut storage, 1001, \"Financial Market Tick\");\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Vi phạm Orphan Rule: Cố gắng triển khai một Trait bên ngoài (từ thư viện ngoài) cho một Kiểu dữ liệu bên ngoài (từ thư viện ngoài), gây lỗi biên dịch.",
+      "Viết các Trait Bounds quá phức tạp trong chữ ký hàm khiến code khó đọc (nên chuyển sang mệnh đề `where` ở cuối hàm)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Quy tắc Orphan Rule bảo vệ hệ sinh thái Rust khỏi sự xung đột cài đặt Trait (Coherence) giữa các crates độc lập như thế nào?",
+      "Sự khác biệt giữa Associated Types (`trait Iterator { type Item; }`) và Generic Traits (`trait From<T>`) là gì?"
     ]
   },
   {
@@ -232,18 +385,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Dynamic Dispatch với Trait Objects (`dyn Trait`) vs Static Dispatch với Monomorphization (`impl Trait`)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["dynamic", "dispatch", "trait", "objects", "dyn"],
+    "interviewerIntent": "Đánh giá năng lực kiến trúc hệ thống: Phân tích sự đánh đổi chuyên sâu giữa Static Dispatch (Monomorphization qua `impl Trait` / Generics) và Dynamic Dispatch (Trait Objects qua `dyn Trait`), kích thước Fat Pointer, bảng vtable, và ảnh hưởng tới CPU Cache.",
+    "contextOrScenario": "Lựa chọn kiến trúc cho Network Packet Processing Pipeline: Dùng `impl Trait` cho Core Pipeline xử lý triệu gói tin/s (tận dụng inlining tối đa) và dùng `dyn Trait` cho hệ thống Plugin nạp động các bộ lọc mở rộng.",
+    "expectedKeywords": [
+      "Static Dispatch",
+      "Dynamic Dispatch",
+      "Monomorphization",
+      "Trait Objects (`dyn Trait`)",
+      "Fat Pointer",
+      "vtable",
+      "Inlining",
+      "Code Bloat"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Dynamic Dispatch với Trait Objects (`dyn Trait`) vs Static Dispatch với Monomorphization (`impl Trait`)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Trong Rust, bạn có thể gọi phương thức đa hình theo hai cách: (1) `Static Dispatch` (Mã hóa tĩnh qua Generics / `impl Trait`): Trình biên dịch thực hiện Đơn hình hóa (Monomorphization) bằng cách nhân bản mã máy cho từng kiểu dữ liệu cụ thể tại compile-time; phương thức được gọi trực tiếp (direct call), cho phép inlining triệt để và zero runtime overhead, nhưng làm tăng thời gian biên dịch và kích thước file nhị phân (Code Bloat). (2) `Dynamic Dispatch` (Mã hóa động qua Trait Objects `&dyn Trait` hoặc `Box<dyn Trait>`): Sử dụng Fat Pointer chứa con trỏ dữ liệu và con trỏ `vtable`; phương thức được giải quyết tại runtime qua indirect function call, linh hoạt cho phép lưu trữ nhiều kiểu khác nhau trong cùng một mảng, nhưng ngăn cản inlining và tốn chi phí dereference vtable.",
+      "deepDive": "Chi tiết Fat Pointer của Trait Object: Một con trỏ `&dyn Trait` có kích thước 16 bytes (2 con trỏ): (1) `data_ptr`: Trỏ tới đối tượng thực tế trên Stack hoặc Heap. (2) `vptr`: Trỏ tới bảng tra cứu hàm ảo (`vtable`) được compiler sinh ra trong phân vùng read-only `.rodata`. Vtable chứa thông tin kích thước `size`, căn chỉnh `align`, con trỏ hàm hủy `drop`, và danh sách con trỏ hàm của trait. Không phải trait nào cũng tạo được Trait Object: Trait bắt buộc phải thỏa mãn tính chất `Object Safety` (không có phương thức trả về `Self`, không chứa generic methods).",
+      "codeLanguage": "rust",
+      "codeExample": "trait PacketFilter {\n    fn filter(&self, packet_id: u32) -> bool;\n}\n\nstruct AllowAllFilter;\nimpl PacketFilter for AllowAllFilter {\n    fn filter(&self, _id: u32) -> bool { true }\n}\n\nstruct BlockListFilter;\nimpl PacketFilter for BlockListFilter {\n    fn filter(&self, id: u32) -> bool { id != 999 }\n}\n\n// 1. Static Dispatch: Inlining trực tiếp, Zero runtime cost, mã máy chuyên biệt hóa\nfn run_static_pipeline(filter: &impl PacketFilter, id: u32) {\n    let allowed = filter.filter(id); // Direct call\n    println!(\"Static filter result: {}\", allowed);\n}\n\n// 2. Dynamic Dispatch: Trait Object qua Fat Pointer (&dyn Trait)\nfn run_dynamic_pipeline(filters: &[Box<dyn PacketFilter>], id: u32) {\n    for f in filters {\n        // Indirect call qua vtable, cho phép chứa các struct khác nhau trong cùng 1 Vec\n        if !f.filter(id) {\n            println!(\"Packet {} blocked by dynamic filter!\", id);\n            return;\n        }\n    }\n    println!(\"Packet {} passed all dynamic filters\", id);\n}\n\nfn main() {\n    let allow = AllowAllFilter;\n    run_static_pipeline(&allow, 100);\n\n    // Mảng chứa các đối tượng có kiểu cụ thể khác nhau nhờ dyn Trait\n    let dynamic_filters: Vec<Box<dyn PacketFilter>> = vec![\n        Box::new(AllowAllFilter),\n        Box::new(BlockListFilter),\n    ];\n    run_dynamic_pipeline(&dynamic_filters, 999);\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Cố gắng tạo Trait Object từ một Trait không đạt chuẩn `Object Safety` (ví dụ trait có hàm trả về `Self` hoặc hàm generic), khiến compiler báo lỗi `the trait cannot be made into an object`.",
+      "Lạm dụng `Box<dyn Trait>` cho các tác vụ tính toán siêu nhỏ trong hot loop, gây ra chi phí heap allocation và cache miss không đáng có."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Các điều kiện cụ thể để một Trait được coi là 'Object Safe' trong chuẩn Rust là gì?",
+      "Trình biên dịch LLVM tối ưu hóa Devirtualization cho `dyn Trait` trong những kịch bản nào?"
     ]
   },
   {
@@ -251,18 +417,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Smart Pointers trong Rust: `Box<T>`, `Rc<T>` và `Arc<T>` khác nhau thế nào về quyền sở hữu?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["smart", "pointers", "rust", "box", "arc"],
+    "interviewerIntent": "Đánh giá mức độ am hiểu về các cơ chế Con trỏ thông minh (Smart Pointers): Phân biệt Quyền sở hữu độc quyền (Exclusive Ownership) vs Quyền sở hữu chia sẻ đơn luồng (Shared Non-thread-safe) vs Quyền sở hữu chia sẻ đa luồng (Atomic Shared Thread-safe), cùng các chi phí bộ nhớ tương ứng.",
+    "contextOrScenario": "Thiết kế Cấu trúc Dữ liệu Đồ thị Phân tán (Distributed Graph): Cần `Box<T>` cho cấu trúc cây đệ quy, `Rc<T>` cho các nút liên kết đơn luồng và `Arc<T>` để chia sẻ bộ nhớ read-only giữa hàng chục Worker Threads.",
+    "expectedKeywords": [
+      "Box<T>",
+      "Rc<T>",
+      "Arc<T>",
+      "Exclusive Ownership",
+      "Reference Counting",
+      "Atomic Reference Counting",
+      "Thread Safety",
+      "Heap Allocation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Smart Pointers trong Rust: `Box<T>`, `Rc<T>` và `Arc<T>` khác nhau thế nào về quyền sở hữu?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`Box<T>`, `Rc<T>`, và `Arc<T>` là 3 con trỏ thông minh cốt lõi trong Rust dùng để quản lý bộ nhớ Heap với các mô hình sở hữu khác nhau: (1) `Box<T>` biểu thị Quyền sở hữu ĐỘC QUYỀN (Single/Exclusive Ownership): Kích thước bằng 1 con trỏ thô (8 bytes), tự động giải phóng heap khi ra khỏi scope, thường dùng cho cấu trúc dữ liệu đệ quy (recursive types) hoặc chuyển dữ liệu lớn lên heap. (2) `Rc<T>` (Reference Counted) biểu thị Quyền sở hữu CHIA SẺ trong ĐƠN LUỒNG (Single-threaded Shared Ownership): Cho phép nhiều biến cùng sở hữu 1 giá trị, duy trì bộ đếm tham chiếu thông thường; KHÔNG an toàn luồng (`!Send`, `!Sync`). (3) `Arc<T>` (Atomic Reference Counted) biểu thị Quyền sở hữu CHIA SẺ ĐA LUỒNG (Multi-threaded Shared Ownership): Sử dụng các lệnh CPU nguyên tử (atomic instructions) để tăng giảm bộ đếm an toàn luồng, cho phép chia sẻ dữ liệu giữa các tiểu trình.",
+      "deepDive": "Sự đánh đổi về mặt hiệu năng phần cứng: `Box<T>` có chi phí dereference và giải phóng tương đương con trỏ C (`free`). `Rc<T>` tốn thêm một Control Block trên Heap chứa `strong_count` và `weak_count`; mỗi phép clone chỉ tốn một lệnh cộng số nguyên thông thường (rất nhanh). `Arc<T>` cũng có cấu trúc tương tự `Rc` nhưng sử dụng các chỉ thị nguyên tử như `LOCK XADD` / `fetch_add` kèm theo Memory Ordering (`Relaxed` khi clone, `Release/Acquire` khi drop). Lệnh nguyên tử này làm bão hòa bus bộ nhớ (Cache Coherence Bus Traffic) và ngăn cản tối ưu hóa instruction pipeline của CPU, do đó chỉ nên dùng `Arc` khi thực sự cần chia sẻ dữ liệu xuyên luồng.",
+      "codeLanguage": "rust",
+      "codeExample": "use std::rc::Rc;\nuse std::sync::Arc;\nuse std::thread;\n\n// 1. Box<T>: Cần thiết cho kiểu đệ quy có kích thước không xác định tại compile-time\nenum BinaryTree {\n    Leaf,\n    Node(i32, Box<BinaryTree>, Box<BinaryTree>),\n}\n\nfn main() {\n    // Box: Sở hữu độc quyền trên Heap\n    let tree = BinaryTree::Node(10, Box::new(BinaryTree::Leaf), Box::new(BinaryTree::Leaf));\n\n    // 2. Rc<T>: Quyền sở hữu chia sẻ trong ĐƠN LUỒNG\n    let shared_data = Rc::new(vec![1, 2, 3]);\n    let clone_a = Rc::clone(&shared_data); // Tăng strong_count đơn luồng (O(1) CPU non-atomic)\n    println!(\"Rc strong count: {}\", Rc::strong_count(&shared_data)); // 2\n\n    // 3. Arc<T>: Quyền sở hữu chia sẻ ĐA LUỒNG (Atomic)\n    let thread_safe_data = Arc::new(\"Global Read-Only Config\");\n    let thread_data_clone = Arc::clone(&thread_safe_data);\n\n    let handle = thread::spawn(move || {\n        println!(\"Worker thread reading config: {}\", thread_data_clone);\n    });\n    handle.join().unwrap();\n\n    println!(\"Main thread finishes cleanly.\");\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Cố tình gửi `Rc<T>` sang một thread khác: Rust compiler sẽ chặn đứng ngay lập tức với lỗi `Rc cannot be sent between threads safely` (`!Send`).",
+      "Sử dụng `Arc<T>` cho mọi tình huống theo thói quen: Khiến các tác vụ đơn luồng phải chịu chi phí atomic instructions không cần thiết."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Kỹ thuật `Arc::make_mut` hỗ trợ mẫu hình Copy-on-Write (COW) an toàn đa luồng như thế nào?",
+      "Tại sao việc dereference một `Box<T>` trong Rust lại không tốn thêm bất kỳ một chu kỳ CPU nào so với việc dereference con trỏ thô trong C?"
     ]
   },
   {
@@ -270,18 +449,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Interior Mutability Pattern: `RefCell<T>` và `Mutex<T>` cho phép thay đổi dữ liệu bên trong immutable reference ra sao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["interior", "mutability", "pattern", "refcell", "mutex"],
+    "interviewerIntent": "Đánh giá sự thấu hiểu về Mẫu thiết kế Đột biến Nội tại (Interior Mutability Pattern): Cách vượt qua kiểm tra Borrow Checker tĩnh của Rust một cách an toàn, vai trò của `UnsafeCell<T>`, sự khác biệt giữa kiểm tra runtime đơn luồng (`RefCell`) vs đồng bộ đa luồng (`Mutex`).",
+    "contextOrScenario": "Thiết kế Mock Object trong Unit Testing hoặc cấu trúc đồ thị hai chiều (Graph): Cần thay đổi bộ đếm số lần gọi hàm `counter` thông qua một tham chiếu bất biến `&self` mà không làm thay đổi chữ ký public API.",
+    "expectedKeywords": [
+      "Interior Mutability",
+      "RefCell<T>",
+      "Mutex<T>",
+      "UnsafeCell<T>",
+      "Runtime Borrow Checking",
+      "Panic on Violated Borrow",
+      "Thread Synchronization",
+      "&self Mutation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Interior Mutability Pattern: `RefCell<T>` và `Mutex<T>` cho phép thay đổi dữ liệu bên trong immutable reference ra sao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Interior Mutability Pattern (Đột biến nội tại) là một mẫu thiết kế trong Rust cho phép bạn sửa đổi dữ liệu ngay cả khi bạn chỉ đang nắm giữ một Tham chiếu Bất biến (`&T`) trỏ tới nó. Về cơ bản, điều này dường như vi phạm quy tắc Borrow Checker thông thường; tuy nhiên, Rust thực hiện điều đó một cách an toàn bằng cách di chuyển việc kiểm tra quy tắc mượn (Borrow Rules) từ THỜI ĐIỂM BIÊN DỊCH (Compile-time) sang THỜI ĐIỂM THỰC THI (Runtime) thông qua `RefCell<T>` (dành cho đơn luồng) hoặc `Mutex<T>` / `RwLock<T>` (dành cho đa luồng).",
+      "deepDive": "Nguồn cội của mọi cơ chế Interior Mutability trong Rust là struct nguyên thủy `UnsafeCell<T>`. Đây là kiểu duy nhất trong Rust cho phép trình biên dịch bỏ qua tối ưu hóa `noalias` và cho phép mutate dữ liệu qua một con trỏ chia sẻ. (1) `RefCell<T>` duy trì một biến đếm integer nội bộ theo dõi số lượng tham chiếu đang mượn (`borrow()` tăng count, `borrow_mut()` kiểm tra count == 0). Nếu bạn vi phạm quy tắc Aliasing XOR Mutability tại runtime (ví dụ: mượn mutable trong khi đang có tham chiếu đọc), `RefCell` sẽ lập tức gây ra `Panic` để bảo vệ an toàn bộ nhớ. (2) `Mutex<T>` bảo vệ dữ liệu trong môi trường đa luồng: hàm `lock()` chặn (block) luồng đang gọi và trả về một RAII guard (`MutexGuard`) cho phép truy cập mutable độc quyền.",
+      "codeLanguage": "rust",
+      "codeExample": "use std::cell::RefCell;\nuse std::sync::Mutex;\n\n// 1. RefCell trong Đơn luồng: Cho phép sửa đổi trạng thái qua &self\ntrait Logger {\n    fn log(&self, message: &str);\n}\n\nstruct MockLogger {\n    // Dùng RefCell để lưu trữ lịch sử log dù API chỉ có &self\n    logs: RefCell<Vec<String>>,\n};\n\nimpl Logger for MockLogger {\n    fn log(&self, message: &str) {\n        // borrow_mut() thực hiện kiểm tra động tại runtime\n        self.logs.borrow_mut().push(message.to_string());\n    }\n}\n\nfn main() {\n    let logger = MockLogger { logs: RefCell::new(vec![]) };\n    logger.log(\"First telemetry packet\");\n    logger.log(\"Second packet received\");\n    println!(\"Logged items count: {}\", logger.logs.borrow().len()); // 2\n\n    // 2. Mutex trong Đa luồng: Khóa đồng bộ an toàn\n    let thread_safe_counter = Mutex::new(0);\n    {\n        let mut guard = thread_safe_counter.lock().unwrap();\n        *guard += 1; // Mutate dữ liệu an toàn\n    } // Guard tự động unlock khi ra khỏi scope\n    println!(\"Counter: {}\", *thread_safe_counter.lock().unwrap());\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Giữ `RefCell::borrow_mut()` xuyên suốt các hàm lồng nhau vô tình kích hoạt runtime Panic: `already borrowed: BorrowMutError`.",
+      "Sử dụng `RefCell` trong môi trường đa luồng: `RefCell` là `!Sync`, compiler sẽ chặn không cho chia sẻ qua luồng khác."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `UnsafeCell<T>` lại là kiểu dữ liệu cốt lõi duy nhất trong Rust có khả năng chuyển đổi một `*const T` thành `*mut T` một cách hợp lệ?",
+      "Cơ chế Poisoning của `std::sync::Mutex` hoạt động như thế nào khi một luồng nắm giữ khóa bị Panic?"
     ]
   },
   {
@@ -289,18 +481,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Concurrency an toàn trong Rust: `Send` và `Sync` marker traits bảo vệ chương trình khỏi Data Race thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["concurrency", "rust", "send", "sync", "marker"],
+    "interviewerIntent": "Đánh giá sự am hiểu về Khái niệm 'Fearless Concurrency': Hai Marker Traits `Send` và `Sync`, cơ chế tự động suy luận (Auto Traits) của trình biên dịch, và cách Rust ngăn chặn 100% lỗi Data Race ngay từ thời điểm biên dịch.",
+    "contextOrScenario": "Xây dựng Multi-threaded Task Executor cho Database Query Engine: Đảm bảo chỉ những kiểu dữ liệu an toàn mới được gửi qua Channel (`Send`) hoặc chia sẻ tham chiếu giữa các Worker Threads (`Sync`).",
+    "expectedKeywords": [
+      "Send",
+      "Sync",
+      "Marker Traits",
+      "Data Race Freedom",
+      "Auto Traits",
+      "Thread Boundary",
+      "Fearless Concurrency",
+      "Arc<Mutex<T>>"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Concurrency an toàn trong Rust: `Send` và `Sync` marker traits bảo vệ chương trình khỏi Data Race thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`Send` và `Sync` là hai Marker Traits (trait rỗng không có phương thức) cốt lõi của Rust chịu trách nhiệm bảo vệ toàn bộ chương trình khỏi các lỗi tranh chấp dữ liệu (Data Races) trong môi trường xử lý đồng thời (Concurrency): (1) `Send` biểu thị rằng quyền sở hữu của một kiểu dữ liệu có thể được CHUYỂN GIAO AN TOÀN (transferred) từ một luồng sang một luồng khác. (2) `Sync` biểu thị rằng một kiểu dữ liệu có thể được CHIA SẺ THAM CHIẾU AN TOÀN giữa nhiều luồng đồng thời (tức là `&T` là `Send` thì `T` là `Sync`).",
+      "deepDive": "Bản chất tự động (Auto Traits): Trình biên dịch Rust tự động triển khai `Send` và `Sync` cho một struct/enum nếu TẤT CẢ các trường thành viên của nó đều là `Send` và `Sync`. Ngược lại, nếu một kiểu chứa dù chỉ một trường không an toàn (ví dụ `Rc<T>` không an toàn vì thao tác tăng ref-count là non-atomic, hoặc `*const T` là con trỏ thô), thì kiểu đó sẽ tự động bị compiler tước bỏ `Send`/`Sync`. Ví dụ kinh điển: `RefCell<T>` là `Send` (có thể gửi nguyên cả cục sang luồng khác) nhưng `!Sync` (không thể chia sẻ `&RefCell` giữa nhiều luồng vì borrow-count không có atomic lock). Khi bạn cố tình gửi một kiểu `!Send` qua hàm `thread::spawn`, trình biên dịch sẽ từ chối build ngay lập tức.",
+      "codeLanguage": "rust",
+      "codeExample": "use std::sync::{Arc, Mutex};\nuse std::thread;\n\n// Struct tự động implement Send + Sync vì tất cả các trường đều là Send + Sync\nstruct JobPayload {\n    job_id: u64,\n    data: Vec<u8>,\n}\n\nfn main() {\n    // Arc<Mutex<T>> biến một kiểu T (chỉ cần Send) thành Sync để chia sẻ đa luồng\n    let shared_state = Arc::new(Mutex::new(JobPayload {\n        job_id: 1,\n        data: vec![0xAA, 0xBB],\n    }));\n\n    let mut handles = vec![];\n\n    for i in 0..3 {\n        let state_clone = Arc::clone(&shared_state); // Arc là Send + Sync\n        let handle = thread::spawn(move || {\n            let mut guard = state_clone.lock().unwrap();\n            guard.job_id += 1;\n            println!(\"Thread {} updated job_id to: {}\", i, guard.job_id);\n        });\n        handles.push(handle);\n    }\n\n    for h in handles {\n        h.join().unwrap();\n    }\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Tự ý triển khai `unsafe impl Send for MyType {}` mà không hiểu rõ toàn bộ các bất biến đa luồng bên dưới, gây ra Data Race cực kỳ khó debug.",
+      "Nhầm lẫn rằng `Send` và `Sync` ngăn chặn được Race Conditions cấp độ logic nghiệp vụ (Race Condition khác với Data Race: Data Race là Undefined Behavior ở tầng bộ nhớ, còn Race Condition là logic thứ tự thực thi)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao con trỏ thô (`*const T`, `*mut T`) mặc định lại là `!Send` và `!Sync` trong hệ thống kiểu của Rust?",
+      "Mối quan hệ toán học chính xác giữa `T: Sync` và `&T: Send` được thể hiện như thế nào trong Rust Standard Library?"
     ]
   },
   {
@@ -308,18 +513,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Async/Await trong Rust: Tại sao Future trong Rust là dạng \"Pull-based\" (Lazy) thay vì \"Push-based\" như JS/C#?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["async", "await", "rust", "future", "pull-based"],
+    "interviewerIntent": "Đánh giá sự thấu hiểu sâu sắc về Kiến trúc Bất đồng bộ (Async Model) của Rust: Phân biệt Pull-based (Lazy / Polling) vs Push-based (Eager Promises), cơ chế State Machine Transformation tại compile-time, Zero Heap Allocation cho Futures và kỹ thuật Drop-to-Cancel.",
+    "contextOrScenario": "Xây dựng Network Gateway xử lý 500,000 kết nối WebSocket đồng thời: Cần tiết kiệm tối đa bộ nhớ RAM cho mỗi kết nối và hỗ trợ tính năng Hủy tác vụ an toàn tức thì (Cancellation Safety) khi client ngắt kết nối.",
+    "expectedKeywords": [
+      "Pull-based (Lazy)",
+      "Push-based (Eager)",
+      "Future Trait",
+      "Poll Method",
+      "State Machine",
+      "Zero-allocation",
+      "Cancellation Safety",
+      "Waker"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Async/Await trong Rust: Tại sao Future trong Rust là dạng \"Pull-based\" (Lazy) thay vì \"Push-based\" như JS/C#?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Trong Rust, `Future` hoạt động theo mô hình KÉO (Pull-based / Lazy / Demand-driven): Một Future hoàn toàn KHÔNG LÀM BẤT KỲ ĐIỀU GÌ cho đến khi nó được Executor gọi phương thức `.poll()`. Ngược lại, trong JavaScript (Promises) hoặc C# (Tasks), mô hình là ĐẨY (Push-based / Eager): Ngay khi một Promise/Task được tạo ra, nó đã được đẩy vào background scheduler và bắt đầu thực thi ngay lập tức, đòi hỏi phải cấp phát bộ nhớ trên Heap và quản lý callback queues. Thiết kế Pull-based của Rust mang lại hai lợi thế hệ thống khổng lồ: Zero-allocation Futures và Khả năng Hủy bỏ an toàn (Cancellation Safety) hoàn toàn miễn phí chỉ bằng cách dừng gọi `poll()` và hủy Future (Drop-to-Cancel).",
+      "deepDive": "Ở tầng biên dịch: Khi bạn viết một hàm `async fn`, trình biên dịch Rust KHÔNG cấp phát Heap. Thay vào đó, nó tự động biến đổi hàm đó thành một Finite State Machine (FSM) ẩn kiểu `enum` nằm gọn gàng trên Stack frame của caller. Kích thước của state machine đúng bằng kích thước của trạng thái lớn nhất giữa các điểm `await`. Khi một tác vụ bị nghẽn (ví dụ chờ socket I/O), phương thức `poll()` trả về `Poll::Pending` và đăng ký một `Waker` với I/O Reactor (epoll/kqueue). Khi có dữ liệu đến, OS đánh thức Waker, Waker đưa Future vào run-queue để Executor gọi `poll()` lần tiếp theo để chuyển trạng thái.",
+      "codeLanguage": "rust",
+      "codeExample": "use std::future::Future;\nuse std::pin::Pin;\nuse std::task::{Context, Poll};\n\n// Tự triển khai một Future tối giản để thấy rõ cơ chế Pull-based\nstruct CountdownFuture {\n    remaining_polls: usize,\n}\n\nimpl Future for CountdownFuture {\n    type Output = &'static str;\n\n    // Phương thức poll được Executor 'kéo' (Pull) khi có tín hiệu sẵn sàng\n    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {\n        if self.remaining_polls == 0 {\n            Poll::Ready(\"Countdown complete!\")\n        } else {\n            self.remaining_polls -= 1;\n            println!(\"Polled: remaining polls = {}\", self.remaining_polls);\n            \n            // Đánh thức chính mình để Executor poll lần tiếp theo\n            cx.waker().wake_by_ref();\n            Poll::Pending\n        }\n    }\n}\n\n// Trong Rust, gọi hàm async không làm gì cho đến khi có .await (Lazy)\nasync fn run_task() {\n    let future = CountdownFuture { remaining_polls: 2 };\n    println!(\"Future created but nothing has executed yet!\");\n    \n    let result = future.await; // Bắt đầu được Executor kéo và thực thi\n    println!(\"Task finished: {}\", result);\n}\n\nfn main() {\n    // Cần một Executor (như Tokio) để chạy async block\n    tokio::runtime::Builder::new_current_thread()\n        .enable_all()\n        .build()\n        .unwrap()\n        .block_on(run_task());\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Lỗi Cancellation Safety: Dùng `tokio::select!` trên một future không an toàn hủy bỏ (ví dụ: future đang ghi dở nửa chừng một packet ra TCP socket mà bị hủy thì stream bị rách dữ liệu).",
+      "Chạy tác vụ tính toán CPU nặng (CPU-bound blocking task) trực tiếp bên trong luồng async, làm chặn đứng toàn bộ Tokio Worker Thread và gây starvation cho hàng ngàn task khác."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao con trỏ `Pin<&mut Self>` là bắt buộc trong chữ ký của `Future::poll` để ngăn chặn việc di chuyển các con trỏ tự tham chiếu (Self-Referential Structs)?",
+      "Vấn đề Async Cancellation Safety trong `tokio::select!` được giải quyết ra sao trong các hệ thống phân tán?"
     ]
   },
   {
@@ -327,18 +545,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Tokio Runtime: Mô hình thực thi bất đồng bộ đa luồng với Work-Stealing scheduler trong Tokio hoạt động ra sao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["tokio", "runtime", "thi", "work-stealing", "scheduler"],
+    "interviewerIntent": "Đánh giá sự am hiểu về Kiến trúc Runtime Bất đồng bộ trong Production: Mô hình Lập lịch Đánh cắp Công việc (Work-Stealing Scheduler), phân tách giữa Reactor (epoll/kqueue) và Executor, Local Run Queues vs Global Queue, và cách xử lý Starvation.",
+    "contextOrScenario": "Tối ưu hóa máy chủ HTTP API chịu tải 100,000 RPS: Một số Worker Cores bị quá tải trong khi các Cores khác rảnh rỗi; phân tích cơ chế Work-Stealing tự động cân bằng tải công việc giữa các CPU Cores.",
+    "expectedKeywords": [
+      "Tokio Runtime",
+      "Work-Stealing Scheduler",
+      "Reactor-Executor",
+      "epoll / kqueue / IOCP",
+      "Local Run Queue",
+      "Global Injection Queue",
+      "MIO (Metal I/O)",
+      "Starvation Prevention"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Tokio Runtime: Mô hình thực thi bất đồng bộ đa luồng với Work-Stealing scheduler trong Tokio hoạt động ra sao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Tokio Multi-Thread Runtime là một hệ thống thực thi bất đồng bộ hiệu năng cao kết hợp giữa hai thành phần: (1) I/O Reactor (dựa trên thư viện MIO bọc quanh system calls hướng sự kiện của OS như `epoll` trên Linux, `kqueue` trên macOS, `IOCP` trên Windows), và (2) Executor sử dụng thuật toán lập lịch Đánh cắp Công việc (Work-Stealing Scheduler). Trong mô hình này, mỗi CPU Core được gắn với một Worker Thread độc lập sở hữu một Hàng đợi Cục bộ (Local Run Queue dung lượng 256 tasks) và dùng chung một Global Injection Queue.",
+      "deepDive": "Chi tiết luồng hoạt động Work-Stealing: Khi một task mới được sinh ra (`tokio::spawn`), nó được đẩy vào Local Queue của worker hiện tại với chi phí lock-free (nhanh nhất). Khi thực thi: Worker ưu tiên lấy task từ Local Queue của chính nó để tối ưu hóa CPU L1/L2 Cache. Khi Local Queue của một worker bị rỗng (worker bị rảnh rỗi), nó sẽ thực hiện chiến lược Work-Stealing: Thử lấy task từ Global Queue, nếu vẫn rỗng nó sẽ 'đánh cắp' một nửa (50%) số tasks từ Local Queue của một worker ngẫu nhiên khác. Để chống đói tác vụ (Starvation Prevention), cứ sau đúng 61 lần lấy task cục bộ, worker bắt buộc phải kiểm tra Global Queue một lần.",
+      "codeLanguage": "rust",
+      "codeExample": "use tokio::time::{sleep, Duration};\n\n#[tokio::main(flavor = \"multi_thread\", worker_threads = 4)]\nasync fn main() {\n    println!(\"Starting Tokio multi-threaded work-stealing runtime...\");\n\n    let mut task_handles = vec![];\n\n    // Spawn 10 tasks đồng thời: Tokio scheduler sẽ tự động phân phối và work-steal\n    for task_id in 0..10 {\n        let handle = tokio::spawn(async move {\n            println!(\"Task {} running on thread: {:?}\", task_id, std::thread::current().id());\n            // Giả lập I/O chờ không chặn luồng\n            sleep(Duration::from_millis(50)).await;\n            task_id * 2\n        });\n        task_handles.push(handle);\n    }\n\n    for h in task_handles {\n        let res = h.await.unwrap();\n        println!(\"Completed result: {}\", res);\n    }\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Gọi các hàm blocking I/O (như `std::thread::sleep` hoặc đọc file đồng bộ `std::fs`) bên trong Tokio task: Khiến worker thread bị đóng băng (phải dùng `tokio::task::spawn_blocking` thay thế).",
+      "Cấu hình số lượng worker threads quá lớn so với số core thực tế của CPU, gây ra bão context-switching làm sụt giảm thông lượng."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Tokio lại sử dụng một Local Ring Buffer có kích thước cố định là 256 phần tử kết hợp với cơ chế Steal một nửa (50%) số task?",
+      "Cơ chế Handoff và Blocking Thread Pool (`spawn_blocking`) trong Tokio xử lý các tác vụ chặn I/O như thế nào để không làm tê liệt async executor?"
     ]
   },
   {
@@ -346,18 +577,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Crate và Module trong Rust: Hệ sinh thái Cargo và cách tổ chức code với `mod.rs`, `lib.rs`?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["crate", "module", "rust", "sinh", "cargo"],
+    "interviewerIntent": "Đánh giá năng lực tổ chức kiến trúc phần mềm quy mô lớn: Phân biệt Crate (đơn vị biên dịch độc lập) vs Module (ranh giới đóng gói và namespace), ranh giới bảo mật (`pub`, `pub(crate)`), quy ước tổ chức thư mục trong Cargo và loại bỏ lỗi `mod.rs` cổ điển.",
+    "contextOrScenario": "Tái cấu trúc một Backend Monorepo phức tạp gồm Microservices, Core Domain Logic, và Shared Utilities thành các Crates và Modules phân lớp rõ ràng, đảm bảo đóng gói chặt chẽ các chi tiết private nội bộ.",
+    "expectedKeywords": [
+      "Crate",
+      "Module",
+      "Cargo",
+      "lib.rs",
+      "main.rs",
+      "Privacy Boundary (`pub(crate)`)",
+      "mod keyword",
+      "Workspaces"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Crate và Module trong Rust: Hệ sinh thái Cargo và cách tổ chức code với `mod.rs`, `lib.rs`?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`Crate` là đơn vị biên dịch nhỏ nhất (compilation unit) trong Rust, được quản lý bởi công cụ Cargo; Crate có thể là một Thư viện (Library Crate với gốc là `src/lib.rs`) hoặc một Chương trình thực thi (Binary Crate với gốc là `src/main.rs`). `Module` là cơ chế tổ chức mã nguồn bên trong một Crate, dùng để phân vùng namespace và thiết lập ranh giới đóng gói (Privacy Boundaries). Mọi thành viên trong module mặc định là riêng tư (`private`); chỉ khi có từ khóa `pub` (hoặc `pub(crate)` để chỉ công khai trong nội bộ crate hiện tại) thì bên ngoài mới có thể truy cập.",
+      "deepDive": "Sự tiến hóa trong quy ước tổ chức Module (Rust 2018 Edition trở đi): Trước đây, mỗi thư mục module bắt buộc phải có một file `mod.rs` (dễ gây nhầm lẫn khi mở hàng chục file `mod.rs` trong IDE). Từ Rust 2018, ta có thể định nghĩa file cùng tên với thư mục: ví dụ file `src/network.rs` khai báo `pub mod packet;`, và mã nguồn của `packet` nằm ngay tại `src/network/packet.rs`. Đối với các dự án lớn, Cargo hỗ trợ `Cargo Workspaces`: gom nhiều crates độc lập vào một repository duy nhất nhưng chia sẻ chung một thư mục `target` và một file khóa `Cargo.lock`, tối ưu hóa thời gian build và tái sử dụng dependencies tối đa.",
+      "codeLanguage": "rust",
+      "codeExample": "// Cấu trúc thư mục chuẩn Modern Rust:\n// src/\n//   lib.rs          -> Crate root\n//   storage.rs      -> Module storage declaration\n//   storage/        -> Thư mục con của storage module\n//     engine.rs\n\n// Trong src/storage/engine.rs:\n#[derive(Debug)]\npub struct StorageEngine {\n    // pub(crate): Chỉ mở quyền cho các module khác trong cùng Crate này sử dụng,\n    // ngăn chặn rò rỉ ra ngoài public API của thư viện!\n    pub(crate) internal_cache_size: usize,\n}\n\nimpl StorageEngine {\n    pub fn new() -> Self {\n        Self { internal_cache_size: 1024 }\n    }\n}\n\n// Trong src/lib.rs:\npub mod storage {\n    pub mod engine;\n}\n\nfn main() {\n    let engine = storage::engine::StorageEngine::new();\n    println!(\"Storage engine initialized: {:?}\", engine);\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Khai báo `mod foo;` nhiều lần ở các file khác nhau: `mod` không phải là lệnh `#include` của C++; mỗi file nguồn chỉ được khai báo `mod` duy nhất một lần để đưa vào cây module của Crate.",
+      "Lạm dụng `pub` quá mức làm lộ toàn bộ cấu trúc nội bộ của crate ra ngoài, phá vỡ nguyên lý đóng gói thông tin."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Từ khóa `pub(super)` và `pub(in crate::path)` hỗ trợ kiểm soát phạm vi hiển thị hạt mịn (fine-grained visibility) ra sao?",
+      "Cargo Feature Flags (`[features]` trong Cargo.toml) cho phép bật/tắt có điều kiện các module lúc biên dịch để tối ưu kích thước binary như thế nào?"
     ]
   },
   {
@@ -365,18 +609,31 @@
     "category": "rust",
     "level": "middle",
     "question": "Derive macro (`#[derive(Debug, Clone, Serialize)]`) hoạt động thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["derive", "macro", "debug", "clone", "serialize"],
+    "interviewerIntent": "Đánh giá sự hiểu biết về Kỹ thuật Siêu lập trình tại thời điểm biên dịch (Compile-time Metaprogramming): Cách thức hoạt động của Custom Derive Procedural Macros, phân tích Cây cú pháp trừu tượng (AST), sinh mã nguồn tự động không tốn runtime reflection.",
+    "contextOrScenario": "Tự động hóa quá trình Tuần tự hóa / Giải tuần tự hóa (Serialization/Deserialization) hàng triệu gói tin nhị phân và JSON bằng thư viện `serde` trong Microservice Backend: Đảm bảo hiệu năng tối đa mà không tốn chi phí Reflection ở runtime.",
+    "expectedKeywords": [
+      "Derive Macro",
+      "Procedural Macro",
+      "TokenStream",
+      "AST (Abstract Syntax Tree)",
+      "Compile-time Code Generation",
+      "Serde",
+      "No Runtime Reflection",
+      "syn and quote"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Derive macro (`#[derive(Debug, Clone, Serialize)]`) hoạt động thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`Derive Macro` (như `#[derive(Debug, Clone, Serialize)]`) là một dạng Macro Thủ tục (Procedural Macro) đặc biệt trong Rust, hoạt động như một plugin của trình biên dịch tại thời điểm compile-time. Khi compiler bắt gặp thuộc tính `#[derive(Trait)]` trên một struct hoặc enum, nó sẽ chuyển cây cú pháp trừu tượng (AST) của struct đó cho derive macro xử lý. Macro sẽ tự động phân tích các trường dữ liệu và sinh ra mã nguồn Rust hoàn chỉnh cài đặt khối `impl Trait for MyStruct { ... }` gắn kèm vào mã nguồn chương trình trước khi chuyển qua giai đoạn sinh mã máy.",
+      "deepDive": "Sự vượt trội mang tính cách mạng so với Reflection trong Java/C#: Trong Java/C#, các thư viện như Jackson hay JSON.NET phải quét metadata bằng Runtime Reflection, tốn chi phí tra cứu bảng kiểu, kiểm tra an toàn lúc chạy và ngăn cản compiler tối ưu. Trong Rust, toàn bộ logic sinh mã diễn ra 100% tại compile-time thông qua hai crate nền tảng là `syn` (chuyển đổi `TokenStream` thành AST) và `quote` (biến mã Rust template thành `TokenStream`). Kết quả là mã serialize/deserialize được sinh ra chuyên biệt hóa tối ưu cho đúng từng struct cụ thể, cho phép LLVM inlining triệt để và vector hóa SIMD với chi phí runtime bằng 0.",
+      "codeLanguage": "rust",
+      "codeExample": "// Cần thêm dependencies: serde = { version = \"1.0\", features = [\"derive\"] }\nuse serde::{Serialize, Deserialize};\n\n// Derive macro tự động sinh mã cài đặt Debug, Clone, Serialize, Deserialize lúc biên dịch\n#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]\nstruct UserTelemetry {\n    user_id: u64,\n    session_token: String,\n    is_active: bool,\n}\n\nfn main() {\n    let telemetry = UserTelemetry {\n        user_id: 889911,\n        session_token: String::from(\"sec_xyz_token\"),\n        is_active: true,\n    };\n\n    // Clone tự động sinh ra bởi derive(Clone)\n    let telemetry_copy = telemetry.clone();\n    println!(\"Cloned successfully: {:?}\", telemetry_copy);\n\n    // Serialize JSON cực nhanh nhờ mã sinh tự động từ derive(Serialize)\n    let json_output = serde_json::to_string(&telemetry).expect(\"Serialization failed\");\n    println!(\"JSON Payload: {}\", json_output);\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Lạm dụng quá nhiều derive macros phức tạp trên hàng ngàn struct nhỏ có thể làm tăng đáng kể thời gian biên dịch (build time).",
+      "Cố tình derive một Trait mà bên trong struct lại chứa một trường không implement Trait đó (ví dụ: derive `Clone` nhưng struct chứa kiểu không thể clone như file handle)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Hai kiểu dữ liệu `TokenStream` trong crate `proc_macro` và `proc_macro2` khác nhau thế nào trong quy trình xây dựng Custom Derive Macro?",
+      "Thuộc tính Macro Helper Attributes (như `#[serde(rename = \"...\")]`) được derive macro phân tích từ AST của trường dữ liệu ra sao?"
     ]
   },
   {
@@ -384,18 +641,31 @@
     "category": "rust",
     "level": "senior",
     "question": "Unsafe Rust: Tại sao Rust cần khối `unsafe`? 5 siêu năng lực (superpowers) chỉ có trong `unsafe`?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["unsafe", "rust", "superpowers"],
+    "interviewerIntent": "Đánh giá nhận thức sâu sắc nhất về Ranh giới An toàn (Safety Boundaries) của Rust: Tại sao không thể có hệ điều hành hay thư viện hệ thống nào 100% safe, bản chất của hợp đồng Unsafe Invariants, và 5 khả năng độc quyền trong khối `unsafe`.",
+    "contextOrScenario": "Phát triển Custom Lock-Free Ring Buffer hoặc Bare-Metal Operating System Kernel: Cần giao tiếp trực tiếp với thanh ghi phần cứng MMIO và thao tác con trỏ thô mà Borrow Checker không thể tự chứng minh được tính an toàn.",
+    "expectedKeywords": [
+      "Unsafe Rust",
+      "5 Superpowers",
+      "Raw Pointers",
+      "Dereferencing",
+      "Unsafe Traits",
+      "Foreign Function Interface (FFI)",
+      "Mutable Static Variables",
+      "Safety Invariants"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Unsafe Rust: Tại sao Rust cần khối `unsafe`? 5 siêu năng lực (superpowers) chỉ có trong `unsafe`?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Rust bắt buộc phải có khối `unsafe` vì các hệ thống máy tính thực tế về bản chất phần cứng là không an toàn: Phần cứng máy tính, kernel syscalls, giao tiếp FFI với C, và các cấu trúc dữ liệu tối ưu hóa cực đoan (như Memory Allocator, Lock-Free Queues) đòi hỏi các thao tác mà Borrow Checker tĩnh không thể tự động chứng minh là an toàn. Từ khóa `unsafe` KHÔNG tắt bỏ Borrow Checker và cũng KHÔNG biến Rust thành C; nó chỉ mở ra một phạm vi được kiểm soát nghiêm ngặt nơi lập trình viên cam kết với compiler: 'Tôi tự chịu trách nhiệm bảo toàn các Invariants của bộ nhớ'. Khối `unsafe` cấp đúng 5 siêu năng lực (superpowers) độc quyền.",
+      "deepDive": "Năm siêu năng lực (5 Superpowers) chỉ có thể thực hiện bên trong khối `unsafe`: (1) Dereference (giải tham chiếu) con trỏ thô (Raw Pointers: `*const T`, `*mut T`). (2) Gọi một hàm unsafe hoặc hàm FFI bên ngoài (`unsafe fn`, `extern \"C\"`). (3) Triển khai một trait không an toàn (`unsafe impl Trait for Type`, ví dụ tự implement `Send`/`Sync`). (4) Đọc hoặc ghi vào một biến tĩnh có thể thay đổi (`static mut`). (5) Truy cập các trường dữ liệu của một `union` thuần túy. Triết lý của Senior Systems Engineer: Đóng gói mã `unsafe` bên trong một lớp vỏ Safe Abstraction sạch sẽ, sao cho người dùng bên ngoài sử dụng an toàn tuyệt đối mà không cần viết từ khóa `unsafe`.",
+      "codeLanguage": "rust",
+      "codeExample": "// Xây dựng một Safe Abstraction bọc quanh khối Unsafe thao tác con trỏ thô\nstruct CustomBox<T> {\n    ptr: *mut T, // Con trỏ thô (Raw pointer)\n}\n\nimpl<T> CustomBox<T> {\n    pub fn new(val: T) -> Self {\n        let boxed = Box::new(val);\n        Self {\n            ptr: Box::into_raw(boxed),\n        }\n    }\n    \n    // Giao diện Safe 100% cho người dùng bên ngoài\n    pub fn get(&self) -> &T {\n        // Siêu năng lực 1: Dereference con trỏ thô bên trong khối unsafe\n        unsafe { &*self.ptr }\n    }\n}\n\nimpl<T> Drop for CustomBox<T> {\n    fn drop(&mut self) {\n        // Siêu năng lực 2: Gọi hàm unsafe Box::from_raw để thu hồi bộ nhớ Heap sạch sẽ\n        unsafe {\n            drop(Box::from_raw(self.ptr));\n        }\n    }\n}\n\nfn main() {\n    let safe_box = CustomBox::new(42);\n    println!(\"Value safely accessed from custom box: {}\", safe_box.get());\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Nghĩ rằng trong khối `unsafe` thì Borrow Checker bị tắt: Mọi quy tắc về mượn tham chiếu thông thường (`&` và `&mut`) VẪN ĐƯỢC KIỂM TRA ĐẦY ĐỦ trong khối unsafe.",
+      "Tạo ra hai `&mut T` trỏ cùng vào một địa chỉ thông qua ép kiểu con trỏ thô: Vi phạm tức thì quy tắc Aliasing Invariant của LLVM dẫn đến Undefined Behavior ngay cả khi không dereference."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Công cụ Miri (Miri interpreter) giúp phát hiện các lỗi Undefined Behavior tinh vi bên trong mã Unsafe Rust như thế nào?",
+      "Mẫu thiết kế Safe Abstraction đóng gói ranh giới Unsafe (Soundness Guarantee) được kiểm chứng qua các tiêu chí nào?"
     ]
   },
   {
@@ -403,18 +673,31 @@
     "category": "rust",
     "level": "senior",
     "question": "Foreign Function Interface (FFI): Cách gọi hàm C từ Rust và xuất hàm Rust sang C với `extern \"C\"` và `#[no_mangle]`?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["foreign", "function", "interface", "ffi", "rust"],
+    "interviewerIntent": "Đánh giá năng lực tích hợp hệ thống đa ngôn ngữ (Polyglot Systems): Khả năng giao tiếp nhị phân qua C ABI chuẩn, kiểm soát Name Mangling, chuyển đổi an toàn giữa Rust `String/&str` và C `char*` kết thúc bằng null (`CString`, `CStr`), và quản lý bộ nhớ xuyên biên giới FFI.",
+    "contextOrScenario": "Tích hợp Thư viện Mật mã học viết bằng C (như OpenSSL / libsodium) vào Rust Backend, đồng thời xuất Core Trading Engine của Rust thành Dynamic Library (.so/.dll) để ứng dụng giao dịch C++ gọi trực tiếp.",
+    "expectedKeywords": [
+      "FFI (Foreign Function Interface)",
+      "extern \"C\"",
+      "#[no_mangle]",
+      "C ABI",
+      "CStr",
+      "CString",
+      "Raw Pointers",
+      "Cross-boundary Memory"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Foreign Function Interface (FFI): Cách gọi hàm C từ Rust và xuất hàm Rust sang C với `extern \"C\"` và `#[no_mangle]`?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Foreign Function Interface (FFI) cho phép Rust giao tiếp hai chiều với các ngôn ngữ khác (chủ yếu là C/C++) dựa trên C ABI tiêu chuẩn: (1) Gọi hàm C từ Rust: Khai báo chữ ký hàm bên trong khối `extern \"C\" { ... }`, liên kết với thư viện qua `build.rs`, và gọi hàm đó bên trong khối `unsafe` (vì trình biên dịch Rust không thể đảm bảo an toàn cho mã ngoài). (2) Xuất hàm Rust sang C: Thêm thuộc tính `#[no_mangle]` để tắt tính năng biến đổi tên ký hiệu (Name Mangling) của Rust, và thêm chỉ định `pub extern \"C\"` để tuân thủ Calling Convention chuẩn của C.",
+      "deepDive": "Hai thách thức sống còn trong FFI: (1) Chuỗi ký tự (String Boundaries): Chuỗi trong Rust là mảng byte kèm độ dài không có ký tự null ở cuối; chuỗi C là con trỏ kết thúc bằng `\\0`. Do đó, khi nhận chuỗi từ C phải dùng `CStr::from_ptr()`, khi tạo chuỗi gửi sang C phải dùng `CString::new()`. (2) Bộ nhớ xuyên biên giới (Cross-boundary Allocations): Tuyệt đối KHÔNG ĐƯỢC cấp phát bộ nhớ bằng Rust allocator (`Box::new`) rồi giải phóng bằng C `free()`, hoặc ngược lại. Mỗi bên phải tự cung cấp hàm giải phóng tương ứng (ví dụ: cung cấp hàm `my_rust_free()` để C gọi khi dùng xong dữ liệu).",
+      "codeLanguage": "rust",
+      "codeExample": "use std::ffi::{CStr, CString};\nuse std::os::raw::{c_char, c_int};\n\n// 1. GỌI HÀM C TỪ RUST: Khai báo extern \"C\"\nextern \"C\" {\n    fn puts(s: *const c_char) -> c_int;\n}\n\n// 2. XUẤT HÀM RUST SANG C: #[no_mangle] giữ nguyên tên symbol cho Linker C\n#[no_mangle]\npub extern \"C\" fn add_numbers(a: c_int, b: c_int) -> c_int {\n    a + b\n}\n\n#[no_mangle]\npub extern \"C\" fn process_c_string(input: *const c_char) -> c_int {\n    if input.is_null() {\n        return -1;\n    }\n    \n    // Chuyển đổi an toàn từ C const char* sang Rust &str\n    let c_str = unsafe { CStr::from_ptr(input) };\n    match c_str.to_str() {\n        Ok(rust_str) => {\n            println!(\"Rust received string from C: {}\", rust_str);\n            rust_str.len() as c_int\n        }\n        Err(_) => -2,\n    }\n}\n\nfn main() {\n    // Gọi hàm C puts an toàn từ Rust bằng CString\n    let message = CString::new(\"Calling C puts from Rust FFI!\").unwrap();\n    unsafe {\n        puts(message.as_ptr());\n    }\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Quên kiểm tra con trỏ `null` khi nhận tham số từ C: Gây Segmentation Fault ngay khi dereference trong Rust.",
+      "Để Panic lọt qua biên giới FFI (Unwinding across FFI boundary): Trong chuẩn Rust, để một Panic unwind qua hàm `extern \"C\"` là Undefined Behavior làm sập toàn bộ tiến trình (bắt buộc dùng `std::panic::catch_unwind`)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Panic Unwinding xuyên qua ranh giới FFI lại là Undefined Behavior và cách sử dụng `catch_unwind` để trả về error code cho C như thế nào?",
+      "Công cụ `bindgen` (tự động sinh Rust FFI từ C header) và `cbindgen` (tự sinh C header từ Rust) hoạt động ra sao trong quy trình CI/CD?"
     ]
   },
   {
@@ -422,18 +705,31 @@
     "category": "rust",
     "level": "senior",
     "question": "Zero-Cost Abstractions trong Rust: Trình biên dịch LLVM tối ưu hóa Iterators và Generics thành mã máy tối ưu ra sao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["zero-cost", "abstractions", "rust", "llvm", "iterators"],
+    "interviewerIntent": "Đánh giá mức độ am hiểu về Triết lý Trừu tượng hóa Không Tốn Phí (Zero-Cost Abstraction): Cơ chế kết chuỗi Iterators (`map().filter().fold()`), Monomorphization, loại bỏ Bounds Checking, Loop Unrolling và SIMD Auto-vectorization.",
+    "contextOrScenario": "Benchmark thuật toán tính toán tích vô hướng (Dot Product) hoặc xử lý ma trận trong Machine Learning Tensor Library: Viết bằng chuỗi functional Iterators cấp cao nhưng sinh ra mã máy assembly tương đương hoặc nhanh hơn vòng lặp C viết tay.",
+    "expectedKeywords": [
+      "Zero-Cost Abstractions",
+      "LLVM Optimization",
+      "Inlining",
+      "Loop Unrolling",
+      "SIMD Auto-vectorization",
+      "Bounds Check Elimination",
+      "Monomorphization",
+      "Iterator Chains"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Zero-Cost Abstractions trong Rust: Trình biên dịch LLVM tối ưu hóa Iterators và Generics thành mã máy tối ưu ra sao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Triết lý 'Zero-Cost Abstractions' của Bjarne Stroustrup được hiện thực hóa ở mức hoàn hảo nhất trong Rust: 'Những gì bạn không dùng thì không phải trả giá; những gì bạn dùng thì bạn không thể tự viết tay bằng mã máy tốt hơn'. Trình biên dịch Rust kết hợp với LLVM tối ưu hóa các trừu tượng hóa bậc cao (như Generics, Iterators, Closures) bằng cách: (1) Đơn hình hóa (Monomorphization) loại bỏ hoàn toàn tính gián tiếp của con trỏ hàm; (2) Inlining toàn bộ các bước kết chuỗi iterator (`map`, `filter`, `fold`) thành một vòng lặp phẳng duy nhất; (3) Tự động loại bỏ kiểm tra chỉ mục mảng (Bounds Check Elimination); và (4) Áp dụng Loop Unrolling và Vector hóa SIMD trực tiếp vào thanh ghi CPU.",
+      "deepDive": "So sánh thực tế: Khi bạn duyệt mảng bằng vòng lặp chỉ mục truyền thống `for i in 0..len { sum += arr[i]; }`, trình biên dịch bắt buộc phải chèn một lệnh kiểm tra biên (`cmp` và `jge panic`) trong mỗi lần lặp để đảm bảo an toàn bộ nhớ. Ngược lại, khi bạn dùng chuỗi Iterator `arr.iter().map(...).sum()`, cấu trúc Iterator nội tại đảm bảo toán học rằng nó không bao giờ vượt quá dung lượng mảng. Trình biên dịch LLVM nhận biết điều này và LOẠI BỎ 100% CÁC LỆNH BOUNDS CHECKING! Hơn thế nữa, LLVM nhận diện mẫu tính toán song song độc lập và phát sinh các lệnh SIMD (như AVX2/AVX-512 `vaddps`, `vmulps`), tính toán đồng thời 8 đến 16 phần tử trong 1 chu kỳ CPU.",
+      "codeLanguage": "rust",
+      "codeExample": "// Thuật toán tính tích vô hướng của 2 vector: Trừu tượng bậc cao nhưng tối ưu mã máy tối đa\npub fn dot_product(a: &[f32], b: &[f32]) -> f32 {\n    // Chuỗi Iterator này được LLVM inline phẳng hoàn toàn,\n    // loại bỏ bounds check và tự động vector hóa thành các lệnh AVX/SIMD vector instructions!\n    a.iter()\n     .zip(b.iter())\n     .map(|(&x, &y)| x * y)\n     .sum()\n}\n\nfn main() {\n    let vec_a = [1.0, 2.0, 3.0, 4.0];\n    let vec_b = [0.5, 1.5, 2.5, 3.5];\n    \n    let result = dot_product(&vec_a, &vec_b);\n    println!(\"Dot product: {}\", result); // In ra 25.0\n    \n    // Khi biên dịch với flag: RUSTFLAGS=\"-C target-cpu=native -O\"\n    // Hàm trên biên dịch thẳng thành một lệnh SIMD nhân cộng (FMA/AVX) duy nhất!\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Thu thập iterator quá sớm bằng `.collect::<Vec<_>>()`: Thao tác này kích hoạt cấp phát Heap trung gian không cần thiết, phá hủy khả năng inline và tối ưu hóa vòng lặp của LLVM.",
+      "Viết các logic rẽ nhánh điều kiện phức tạp bên trong closure của iterator làm mất khả năng tự động Vector hóa (Auto-vectorization) của LLVM."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm thế nào để sử dụng công cụ `cargo-asm` hoặc Compiler Explorer (Godbolt) để kiểm chứng rằng một chuỗi Iterator đã được LLVM vector hóa thành lệnh SIMD?",
+      "Cơ chế TrustedLen Trait trong Standard Library giúp các thuật toán iterator phân bổ trước dung lượng chính xác cho vector đích ra sao?"
     ]
   },
   {
@@ -441,18 +737,31 @@
     "category": "rust",
     "level": "senior",
     "question": "Macros trong Rust: Phân biệt Declarative Macros (`macro_rules!`) và Procedural Macros (Custom Derive, Attribute, Function-like)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["macros", "rust", "declarative", "macro_rules", "procedural"],
+    "interviewerIntent": "Đánh giá trình độ Siêu lập trình (Metaprogramming) cấp Senior: Phân biệt rõ ràng giữa Declarative Macros (Pattern matching trên cú pháp, mang tính hygienic) và Procedural Macros (Chạy như compiler plugin, thao tác trực tiếp trên TokenStream), cùng 3 phân loại Procedural Macros.",
+    "contextOrScenario": "Thiết kế Web Routing Framework (như Actix-Web / Axum): Viết Attribute Macro `#[get(\"/api/v1/users\")]` để tự động đăng ký endpoint HTTP hoặc tạo Function-like Macro `sql!(\"SELECT * FROM users\")` để xác thực cú pháp SQL lúc compile-time.",
+    "expectedKeywords": [
+      "Declarative Macros (`macro_rules!`)",
+      "Procedural Macros",
+      "Custom Derive",
+      "Attribute-like Macro",
+      "Function-like Macro",
+      "TokenStream",
+      "Macro Hygiene",
+      "AST Transformation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Macros trong Rust: Phân biệt Declarative Macros (`macro_rules!`) và Procedural Macros (Custom Derive, Attribute, Function-like)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Hệ thống Macro trong Rust được chia thành hai họ chính: (1) `Declarative Macros` (Macro khai báo qua `macro_rules!`): Hoạt động dựa trên so khớp mẫu cú pháp (pattern matching trên các mảnh cú pháp code AST) tương tự `match`. Chúng mang tính 'Hygienic' (vệ sinh cú pháp - không làm rò rỉ biến cục bộ ra ngoài), dễ viết và biên dịch nhanh, phù hợp cho việc viết code ngắn gọn lặp lại. (2) `Procedural Macros` (Macro thủ tục): Là các chương trình Rust độc lập chạy như một Compiler Plugin tại thời điểm biên dịch, nhận vào một `TokenStream` mã nguồn thô và trả về một `TokenStream` mã nguồn mới. Procedural Macros có 3 loại: Custom Derive, Attribute-like, và Function-like.",
+      "deepDive": "Chi tiết 3 loại Procedural Macros: (1) Custom Derive: Gắn trên struct/enum bằng `#[derive(MyTrait)]` để tự động sinh mã cài đặt trait (ví dụ `serde::Serialize`). (2) Attribute-like: Cho phép tạo các thuộc tính tùy chỉnh trên hàm, struct hoặc module (ví dụ `#[tokio::main]`, `#[get(\"/items\")]`), có khả năng can thiệp và sửa đổi toàn bộ phần thân của mục được gắn thuộc tính. (3) Function-like: Có cú pháp gọi giống hàm nhưng có dấu chấm than (ví dụ `sql!(\"SELECT * FROM users WHERE id = $1\")`), cho phép viết các Domain Specific Languages (DSL) tùy biến hoàn toàn và kiểm tra cú pháp ngay tại compile-time.",
+      "codeLanguage": "rust",
+      "codeExample": "// 1. Declarative Macro: macro_rules! tạo cú pháp ngắn gọn xây dựng HashMap\nmacro_rules! map_builder {\n    ( $( $key:expr => $val:expr ),* $(,)? ) => {{\n        let mut map = std::collections::HashMap::new();\n        $(\n            map.insert($key, $val);\n        )*\n        map\n    }};\n}\n\nfn main() {\n    // Sử dụng Declarative Macro trực quan\n    let status_codes = map_builder! {\n        200 => \"OK\",\n        404 => \"Not Found\",\n        500 => \"Internal Server Error\",\n    };\n    \n    println!(\"Status 200: {}\", status_codes[&200]);\n\n    // 2. Minh họa sử dụng Attribute-like Procedural Macro (như trong Tokio/Axum):\n    // #[tokio::main]\n    // async fn main() { ... }\n    // Macro trên sẽ bọc hàm main thành code khởi tạo Tokio Runtime hoàn chỉnh!\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Quên rằng Procedural Macro bắt buộc phải được khai báo trong một Crate riêng biệt với cờ `proc-macro = true` trong `Cargo.toml`.",
+      "Lạm dụng Macro quá mức cho các tác vụ có thể giải quyết bằng Generic Functions hoặc Traits, làm tăng thời gian build và khiến IDE khó cung cấp tính năng auto-complete."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khái niệm 'Macro Hygiene' (Tính vệ sinh cú pháp) trong `macro_rules!` ngăn chặn hiện tượng che khuất biến (Variable Shadowing) ngoài ý muốn ra sao?",
+      "Crate `proc-macro2` và `quote` hỗ trợ viết Unit Tests cho Procedural Macro độc lập với trình biên dịch `rustc` như thế nào?"
     ]
   },
   {
@@ -460,18 +769,31 @@
     "category": "rust",
     "level": "senior",
     "question": "Memory Leaks trong Rust: Rust có hoàn toàn ngăn ngừa được memory leak không? Cho ví dụ rò rỉ bộ nhớ với `Rc` chu trình.",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Rust Programming ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Rust Programming.",
-    "expectedKeywords": ["memory", "leaks", "rust", "leak", "chu"],
+    "interviewerIntent": "Đánh giá nhận thức sâu sắc về Ranh giới Bảo đảm An toàn của Rust: Hiểu rõ Memory Safety KHÔNG ĐỒNG NGHĨA với Leak-free (Memory Leak KHÔNG PHẢI là Undefined Behavior trong chuẩn Rust), cơ chế hình thành Vòng lặp Tham chiếu (Cyclic Reference) với `Rc/Arc` và giải pháp dùng `Weak`.",
+    "contextOrScenario": "Thiết kế Cấu trúc Đồ thị (Graph Network) hoặc Hệ thống Reactive Observer trong dịch vụ xử lý dữ liệu chạy liên tục 24/7: Tránh rò rỉ bộ nhớ âm thầm do các con trỏ cha-con giữ chặt tham chiếu của nhau khiến dung lượng RAM tăng mãi mãi.",
+    "expectedKeywords": [
+      "Memory Leak",
+      "Reference Cycle",
+      "Rc<RefCell<T>>",
+      "Arc<Mutex<T>>",
+      "Weak References",
+      "std::mem::forget",
+      "Box::leak",
+      "Not Undefined Behavior"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Memory Leaks trong Rust: Rust có hoàn toàn ngăn ngừa được memory leak không? Cho ví dụ rò rỉ bộ nhớ với `Rc` chu trình.'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Rust KHÔNG HOÀN TOÀN ngăn ngừa được rò rỉ bộ nhớ (Memory Leaks). Theo định nghĩa chính thức của tài liệu Rust Nomicon: 'Memory Leaking KHÔNG PHẢI là Undefined Behavior'. Cam kết an toàn bộ nhớ (Memory Safety) của Rust là ngăn chặn việc truy cập bộ nhớ không hợp lệ (như Use-After-Free, Double-Free, Data Races); nhưng việc bỏ quên bộ nhớ trên Heap mà không giải phóng là hành vi an toàn về mặt vật lý (Safe) đối với hệ điều hành. Rò rỉ bộ nhớ trong Safe Rust thường xảy ra nhất khi tạo ra Vòng lặp Tham chiếu (Reference Cycles) giữa các con trỏ đếm tham chiếu (`Rc` hoặc `Arc`) kết hợp với Interior Mutability (`RefCell` hoặc `Mutex`), hoặc sử dụng có chủ đích các hàm như `Box::leak()` hay `std::mem::forget()`.",
+      "deepDive": "Cơ chế hình thành Reference Cycle: Giả sử Nút A giữ một `Rc<RefCell<Node>>` trỏ tới Nút B (khiến strong count của B = 1). Sau đó, Nút B lại giữ một `Rc<RefCell<Node>>` trỏ ngược lại Nút A (khiến strong count của A = 2). Khi biến ban đầu ở hàm `main` ra khỏi scope, strong count của A giảm từ 2 xuống 1, và strong count của B vẫn là 1. Vì strong count của cả hai không bao giờ giảm về 0, hàm `Drop::drop` sẽ KHÔNG BAO GIỜ được gọi, dẫn đến toàn bộ dữ liệu của cả hai node bị rò rỉ vĩnh viễn trên Heap! Giải pháp chuẩn: Phá vỡ chu trình bằng cách sử dụng `std::rc::Weak` (hoặc `std::sync::Weak` cho `Arc`), tạo ra một tham chiếu yếu không làm tăng `strong_count`.",
+      "codeLanguage": "rust",
+      "codeExample": "use std::cell::RefCell;\nuse std::rc::{Rc, Weak};\n\nstruct Node {\n    id: usize,\n    // DÙNG WEAK ĐỂ PHÒNG TRÁNH LEAK:\n    // Thay vì Rc<RefCell<Option<Rc<Node>>>> (gây reference cycle),\n    // ta dùng Weak trỏ ngược về cha!\n    parent: RefCell<Weak<Node>>,\n    children: RefCell<Vec<Rc<Node>>>,\n}\n\nfn main() {\n    // Node cha\n    let leaf = Rc::new(Node {\n        id: 1,\n        parent: RefCell::new(Weak::new()),\n        children: RefCell::new(vec![]),\n    });\n\n    let branch = Rc::new(Node {\n        id: 2,\n        parent: RefCell::new(Weak::new()),\n        children: RefCell::new(vec![Rc::clone(&leaf)]),\n    });\n\n    // Gán parent bằng Weak reference: Không tăng strong count của branch!\n    *leaf.parent.borrow_mut() = Rc::downgrade(&branch);\n\n    println!(\"Branch strong count: {}\", Rc::strong_count(&branch)); // 1\n    println!(\"Leaf strong count: {}\", Rc::strong_count(&leaf));     // 2\n\n    // Truy cập parent an toàn qua .upgrade()\n    if let Some(parent_rc) = leaf.parent.borrow().upgrade() {\n        println!(\"Leaf's parent ID is: {}\", parent_rc.id);\n    }\n\n    // Khi branch và leaf ra khỏi scope, toàn bộ bộ nhớ được giải phóng 100% sạch sẽ!\n}"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Rust Programming."
+      "Tin rằng 'viết code trong Safe Rust thì 100% không bao giờ bị leak RAM', dẫn đến việc không giám sát Resident Set Size (RSS) của tiến trình trong production.",
+      "Sử dụng `std::mem::forget` trên các kiểu dữ liệu RAII quản lý tài nguyên hệ thống (như Mutex Guard hoặc File Descriptor), khiến lock không bao giờ được nhả và gây ra Deadlock hệ thống."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Hàm `Box::leak()` được ứng dụng một cách có chủ đích trong tình huống nào để biến đổi một Heap object thành tham chiếu `'static`?",
+      "Cơ chế đếm `weak_count` bên trong Control Block của `Rc/Arc` hoạt động ra sao và khi nào thì bản thân Control Block mới thực sự bị giải phóng khỏi Heap?"
     ]
   }
 ]
