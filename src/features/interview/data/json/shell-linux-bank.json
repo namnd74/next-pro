@@ -4,18 +4,31 @@
     "category": "shell-linux",
     "level": "junior",
     "question": "Shebang `#!/bin/bash` ở đầu file script có ý nghĩa gì? Khác gì với `#!/bin/sh`?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["shebang", "bin", "bash", "file", "script"],
+    "interviewerIntent": "Kiểm tra ứng viên có hiểu kernel thực thi script thế nào, không chỉ ghi nhớ cú pháp.",
+    "contextOrScenario": "Script chạy tốt trên máy dev (bash) nhưng bị lỗi syntax trên server CI/CD dùng dash làm /bin/sh.",
+    "expectedKeywords": [
+      "shebang",
+      "interpreter",
+      "execve",
+      "bash",
+      "dash",
+      "POSIX",
+      "env"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Shebang `#!/bin/bash` ở đầu file script có ý nghĩa gì? Khác gì với `#!/bin/sh`?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Shebang là dòng đầu tiên của script, bắt đầu bằng `#!`, cho kernel biết interpreter nào sẽ thực thi file. Khi bạn chạy `./script.sh`, kernel đọc 2 byte đầu `#!`, rồi execve() interpreter được chỉ định. `#!/bin/bash` chỉ định Bash cụ thể, còn `#!/bin/sh` dùng POSIX shell (thường là dash trên Debian/Ubuntu) — nhẹ hơn nhưng không có array, `[[...]]`, hoặc nhiều tiện ích của Bash.",
+      "deepDive": "Kernel Linux xử lý shebang qua binfmt_script trong fs/binfmt_script.c. Nếu bỏ shebang, terminal sẽ chạy với shell hiện tại (thường bash), nhưng cron hoặc systemd sẽ gọi /bin/sh — dẫn đến lỗi khó reproduce. `#!/usr/bin/env bash` là cách portable nhất vì nó tìm bash trong PATH thay vì hardcode đường dẫn. Trade-off: trên Docker Alpine, bash không được cài mặc định, cần `apk add bash` hoặc viết POSIX-only script. Trong CI/CD pipeline (GitHub Actions runner dùng bash), nên luôn explicit chỉ định interpreter.",
+      "codeExample": "#!/usr/bin/env bash\n# Dùng env để portable (tìm bash trong PATH thay vì hardcode /bin/bash)\n# Trên Alpine Linux, /bin/sh là busybox ash — không có [[ ... ]] hay array\n\n# ❌ Script này sẽ lỗi nếu chạy với /bin/sh (dash)\nif [[ -z \"$APP_ENV\" ]]; then\n  echo \"APP_ENV is not set\"\nfi\n\n# ✅ Cách viết POSIX-compatible (chạy được với /bin/sh)\nif [ -z \"$APP_ENV\" ]; then\n  echo \"APP_ENV is not set\"\nfi\n\n# Kiểm tra interpreter đang dùng\necho \"Running with: $SHELL\"\nreadlink -f /proc/$$/exe   # In ra absolute path của shell đang chạy script",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Hardcode `/bin/bash` trong image Alpine sẽ gây 'Exec format error' vì bash không tồn tại.",
+      "Dùng bash syntax (`[[`, arrays) trong file có shebang `#!/bin/sh` — chạy được trên máy có bash symlink sh, nhưng fail trên hệ thống dùng dash.",
+      "Quên shebang khi script được gọi từ cron hoặc systemd ExecStart — chạy với /bin/sh và break."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `#!/usr/bin/env bash` tốt hơn `#!/bin/bash` trong môi trường production đa nền tảng?",
+      "Làm sao kiểm tra script có POSIX-compatible không trước khi deploy lên Alpine-based container?"
     ]
   },
   {
@@ -23,18 +36,31 @@
     "category": "shell-linux",
     "level": "junior",
     "question": "Khai báo và dùng biến trong Bash: Tại sao không được có khoảng trắng quanh dấu bằng (`VAR=value`)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["khai", "bash", "kho", "quanh", "var"],
+    "interviewerIntent": "Hiểu cơ chế parsing của Bash và tránh lỗi phổ biến nhất của người mới học scripting.",
+    "contextOrScenario": "Script deploy bị lỗi `command not found: APP_NAME` khi developer viết `APP_NAME = myapp`.",
+    "expectedKeywords": [
+      "word splitting",
+      "expansion",
+      "quoting",
+      "local",
+      "readonly",
+      "export",
+      "IFS"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Khai báo và dùng biến trong Bash: Tại sao không được có khoảng trắng quanh dấu bằng (`VAR=value`)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Bash parser xử lý `VAR = value` như một command tên `VAR` với argument `=` và `value`. Không có space là vì Bash phân biệt assignment (không space) và command (có space). Luôn quote biến bằng dấu nháy kép để tránh word splitting và glob expansion.",
+      "deepDive": "Bash thực hiện các bước expansion theo thứ tự: brace → tilde → parameter → arithmetic → command substitution → word splitting → pathname. Nếu không quote, `$FILENAME` chứa `'my file.txt'` sẽ bị word split thành 2 argument. IFS (Internal Field Separator) quyết định delimiter của word splitting, mặc định là space/tab/newline. Dùng `local` trong function tránh vô tình ghi đè biến global — pattern này quan trọng trong script dài. `readonly` và `declare -r` ngăn overwrite accidental. `export` chỉ cần thiết khi cần truyền biến cho child process.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\n# ❌ SAI: bash hiểu 'APP_NAME' là command, '=' và 'myapp' là arguments\n# APP_NAME = myapp  # → bash: APP_NAME: command not found\n\n# ✅ ĐÚNG: không có space\nAPP_NAME=\"my-web-service\"\nAPP_VERSION=\"1.2.3\"\nAPP_PORT=8080\n\n# Luôn quote biến để tránh word splitting với giá trị có khoảng trắng\nDEPLOY_ENV=\"production us-east-1\"\necho \"Deploying to: $DEPLOY_ENV\"   # in đúng\n\n# Biến local trong function (tránh leak ra ngoài)\nbuild_docker_image() {\n  local IMAGE_TAG=\"${APP_NAME}:${APP_VERSION}\"\n  local BUILD_ARGS=\"--no-cache --platform linux/amd64\"\n  echo \"Building: ${IMAGE_TAG}\"\n  # docker build ${BUILD_ARGS} -t \"${IMAGE_TAG}\" .\n}\n\n# readonly để tránh vô tình ghi đè\nreadonly CONFIG_PATH=\"/etc/app/config.yaml\"\n\n# Giá trị mặc định khi biến chưa được set\nDB_HOST=\"${DATABASE_HOST:-localhost}\"\nDB_PORT=\"${DATABASE_PORT:-5432}\"\n\nexport APP_NAME APP_VERSION  # Truyền sang child process",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Quên quote `\"$VAR\"` khi biến có khoảng trắng hoặc ký tự đặc biệt dẫn đến word splitting.",
+      "Dùng `$VAR` trong mệnh đề test mà không quote: `[ $VAR == x ]` lỗi khi VAR rỗng → `[ == x ]`.",
+      "Không dùng `local` trong function, ghi đè biến global cùng tên — lỗi khó debug."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Sự khác nhau giữa `VAR=value command` (inline assignment) và `export VAR=value` là gì?",
+      "Tại sao `set -u` (hoặc `set -o nounset`) quan trọng trong production script?"
     ]
   },
   {
@@ -42,18 +68,30 @@
     "category": "shell-linux",
     "level": "junior",
     "question": "Phân biệt dấu nháy đơn (`'...'`), dấu nháy kép (`\"...\"`) và backticks (`` `...` `` / `$(...)`) trong Bash?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["...", "backticks", "bash", "shell"],
+    "interviewerIntent": "Hiểu expansion rules của Bash để tránh lỗi quoting, injection và command substitution.",
+    "contextOrScenario": "Script monitoring lấy sai timestamp vì dùng nháy đơn bao `$(date)`, hoặc SQL query bị lỗi vì nháy kép không escape đúng.",
+    "expectedKeywords": [
+      "single quote",
+      "double quote",
+      "command substitution",
+      "expansion",
+      "escape",
+      "heredoc"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Phân biệt dấu nháy đơn (`'...'`), dấu nháy kép (`\"...\"`) và backticks (`` `...` `` / `$(...)`) trong Bash?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Nháy đơn tắt mọi expansion (literal string). Nháy kép cho phép `$VAR`, `$(cmd)`, `${var}` nhưng giữ nguyên ký tự khác. `$(...)` là command substitution, ưu tiên hơn backtick vì dễ nest và đọc. Luôn double-quote biến trừ khi cần word splitting có chủ đích.",
+      "deepDive": "Bash expansion thực hiện theo thứ tự: brace `{a,b}` → tilde `~` → parameter `$VAR` → arithmetic `$(( ))` → command substitution `$(...)` → process substitution `<()` → word splitting → pathname `*`. Nháy kép ngăn word splitting và pathname expansion nhưng cho phép các expansion khác. Trong heredoc, quote delimiter (`<< 'EOF'`) ngăn expansion — dùng khi muốn in script template hoặc SQL query có `$`. Security implication: không bao giờ dùng `eval \"$USER_INPUT\"` — dễ inject.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\nSERVER_NAME=\"prod-web-01\"\nCURRENT_DATE=$(date +%Y-%m-%d)   # Command substitution: ưu tiên $(...) hơn backticks\n\n# Single quote: không có expansion nào xảy ra\necho 'Server: $SERVER_NAME, Date: $(date)'  # In nguyên văn, không expand\n# → Server: $SERVER_NAME, Date: $(date)\n\n# Double quote: expand $VAR và $(...), nhưng KHÔNG glob\necho \"Server: $SERVER_NAME, Date: $CURRENT_DATE\"\n# → Server: prod-web-01, Date: 2024-01-15\n\n# $(...)  vs backticks: $() dễ nest, backticks khó escape\nGIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')\nNESTED=$(echo \"Hash: $(git log --oneline -1 | cut -d' ' -f1)\")\n\n# Heredoc với expansion (ứng dụng: generate config)\ncat > /tmp/app-config.yaml << EOF\napp:\n  name: ${SERVER_NAME}\n  version: ${GIT_HASH}\n  deployed_at: ${CURRENT_DATE}\nEOF\n\n# Heredoc không expansion (truyền literal string vào file)\ncat > /tmp/script-template.sh << 'HEREDOC'\n#!/bin/bash\necho \"This is \\$HOME: $HOME\"  # $HOME sẽ NOT expand khi HEREDOC là quoted\nHEREDOC",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Dùng backtick thay vì `$()` khi cần nest: `` `echo `date`` `` không hoạt động đúng.",
+      "Quên quote command substitution: `FILES=$(ls *.log)` rồi dùng `$FILES` không quote bị word split khi tên file có space.",
+      "Heredoc với delimiter không quote (`<< EOF`) thực hiện expansion — lỗi khi template có `$` hoặc backtick."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `$(cat file)` kém hiệu quả hơn `< file` trong nhiều trường hợp?",
+      "Làm thế nào để truyền một SQL query có `$` và nháy đơn vào psql qua heredoc an toàn?"
     ]
   },
   {
@@ -61,18 +99,31 @@
     "category": "shell-linux",
     "level": "junior",
     "question": "Các biến đặc biệt trong Bash: `$0`, `$1..$9`, `$#`, `$@`, `$*`, `$?`, `$$` có ý nghĩa gì?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["bash", "1..", "ngh", "shell"],
+    "interviewerIntent": "Kiểm tra khả năng viết script nhận tham số và xử lý kết quả command một cách đúng đắn.",
+    "contextOrScenario": "Script deploy nhận environment và version làm argument, cần validate và propagate error codes.",
+    "expectedKeywords": [
+      "positional parameter",
+      "exit status",
+      "PID",
+      "shift",
+      "getopts",
+      "$@",
+      "$*"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Các biến đặc biệt trong Bash: `$0`, `$1..$9`, `$#`, `$@`, `$*`, `$?`, `$$` có ý nghĩa gì?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`$0`=tên script, `$1-$9`=positional args, `$#`=số arg, `$@`=tất cả arg (separate words), `$*`=tất cả arg (một string), `$?`=exit code của lệnh trước, `$$`=PID hiện tại. Luôn dùng `\"$@\"` thay vì `\"$*\"` khi forward args vì nó bảo toàn argument boundaries.",
+      "deepDive": "`$@` và `$*` khác nhau quan trọng: trong nháy kép, `\"$@\"` expand thành `\"arg1\" \"arg2\" \"arg3\"` (giữ nguyên boundary), còn `\"$*\"` thành `\"arg1 arg2 arg3\"` (join bằng IFS). Dùng sai `$*` sẽ break khi arg có khoảng trắng. `$?` chỉ giữ exit code của command ngay trước — nếu cần giữ lâu hơn, lưu vào biến: `status=$?`. `$$` hữu ích để tạo unique temp file, nhưng có thể bị race condition — trong Bash 5+, nên dùng `mktemp`.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\n# $0 = tên script, $1..$n = positional arguments\nSCRIPT_NAME=\"$(basename \"$0\")\"\n\nusage() {\n  echo \"Usage: $SCRIPT_NAME <environment> <version>\"\n  echo \"  environment: staging|production\"\n  echo \"  version:     e.g. 1.2.3\"\n  exit 1\n}\n\n# $# = số lượng argument\nif [[ $# -lt 2 ]]; then\n  echo \"ERROR: Expected 2 arguments, got $#\" >&2\n  usage\nfi\n\nDEPLOY_ENV=\"$1\"    # First positional argument\nAPP_VERSION=\"$2\"   # Second positional argument\nshift 2            # Xóa $1 và $2, những gì còn lại là optional flags\n\n# $@ = tất cả arguments dưới dạng separate strings (an toàn hơn $*)\necho \"Deploying ${APP_VERSION} to ${DEPLOY_ENV}\"\necho \"Extra flags: $@\"  # Hiển thị các flag còn lại\n\n# Truyền tất cả arguments qua hàm (PHẢI dùng \"$@\" chứ không phải $*)\ndeploy_app() {\n  local ENV=\"$1\" VERSION=\"$2\"\n  echo \"kubectl set image deployment/app app=myrepo/app:${VERSION} -n ${ENV}\"\n}\ndeploy_app \"$DEPLOY_ENV\" \"$APP_VERSION\"\n\n# $? = exit code của lệnh trước (0 = success, non-zero = error)\nif ! kubectl get ns \"$DEPLOY_ENV\" &>/dev/null; then\n  echo \"Namespace '${DEPLOY_ENV}' not found\" >&2\n  exit 1  # Non-zero exit để CI/CD biết có lỗi\nfi\necho \"Last command exit code: $?\"\n\n# $$ = PID của shell hiện tại (dùng để tạo unique temp file)\nTEMP_FILE=\"/tmp/deploy_lock_$$.json\"\ntrap 'rm -f \"$TEMP_FILE\"' EXIT  # Dọn dẹp khi script kết thúc",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Dùng `$*` thay vì `$@` khi truyền arguments có khoảng trắng — bị word split, mất boundary giữa args.",
+      "Dùng `$?` sau một `if` statement — `$?` là exit code của `if` chứ không phải command bên trong.",
+      "Không validate `$#` trước khi truy cập `$1`, gây lỗi 'unbound variable' khi chạy không có argument."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `\"$@\"` trong double quote lại an toàn hơn `$@` không quote khi forward arguments?",
+      "Làm thế nào dùng `shift` để viết script xử lý optional flags (`--env`, `--version`)?"
     ]
   },
   {
@@ -80,18 +131,32 @@
     "category": "shell-linux",
     "level": "junior",
     "question": "Exit code ($?) trong Linux: Mã 0 có ý nghĩa gì? Quy ước mã lỗi từ 1 đến 255?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["exit", "code", "linux", "ngh", "quy"],
+    "interviewerIntent": "Hiểu exit code là ngôn ngữ giao tiếp giữa process cha và con — cơ bản của mọi shell script và CI/CD.",
+    "contextOrScenario": "CI pipeline báo success mặc dù test thực ra fail, vì developer quên propagate exit code đúng.",
+    "expectedKeywords": [
+      "exit code",
+      "exit status",
+      "POSIX",
+      "trap",
+      "pipefail",
+      "||",
+      "&&",
+      "set -e"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Exit code ($?) trong Linux: Mã 0 có ý nghĩa gì? Quy ước mã lỗi từ 1 đến 255?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Exit code 0 = success, 1-255 = failure. Đây là ngôn ngữ giao tiếp duy nhất giữa shell parent và child process. CI/CD (GitHub Actions, Jenkins) dùng exit code để quyết định pass/fail. `$?` lấy exit code của command vừa chạy. `set -e` tự exit khi có non-zero, `pipefail` đảm bảo lỗi trong pipe không bị nuốt.",
+      "deepDive": "Kernel giới hạn exit code trong 8 bits (0-255). Mã 128+N là signal termination: exit 137 = SIGKILL (OOMKiller, `kill -9`), 143 = SIGTERM (graceful shutdown). Quan trọng trong K8s: khi container bị OOMKilled, exit code là 137. Khi `set -e` active, mệnh đề điều kiện (`if cmd; then`) không abort ngay cả khi `cmd` fail — `set -e` chỉ trigger khi command đứng độc lập. `pipefail` quan trọng vì `cmd1 | cmd2` mặc định trả exit code của `cmd2`, có thể ẩn lỗi của `cmd1`.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n# 'set -e' → exit ngay khi có command fail (exit code != 0)\n# 'pipefail' → exit code của pipe = exit code của command FAIL đầu tiên trong pipe\n\n# === Exit Code Convention ===\n# 0   = Success\n# 1   = General error\n# 2   = Misuse of shell builtins\n# 126 = Command found but not executable\n# 127 = Command not found\n# 128 = Invalid exit argument\n# 128+N = Killed by signal N (137 = SIGKILL, 143 = SIGTERM)\n# 1-125 = Application-defined errors\n\nrun_health_check() {\n  local SERVICE_URL=\"$1\"\n  local HTTP_CODE\n  HTTP_CODE=$(curl -s -o /dev/null -w \"%{http_code}\" --max-time 5 \"$SERVICE_URL\")\n  if [[ \"$HTTP_CODE\" != \"200\" ]]; then\n    echo \"Health check failed: HTTP $HTTP_CODE\" >&2\n    return 1  # Non-zero = failure\n  fi\n  return 0  # Explicit success\n}\n\n# Dùng || để handle lỗi mà không abort script\nrun_health_check \"https://api.example.com/health\" || {\n  echo \"Service unhealthy, aborting deploy\" >&2\n  exit 1\n}\n\n# Dùng && để chain commands\ngit pull origin main && docker build -t myapp:latest . && echo \"Build success\"\n\n# Lưu exit code trước khi mất\nrm -rf /tmp/build_artifacts 2>/dev/null\nRM_STATUS=$?  # Lưu ngay — $? sẽ bị ghi đè bởi lệnh tiếp theo\n\n# Trap EXIT để đảm bảo cleanup và report exit code\ncleanup() {\n  local exit_code=$?\n  echo \"Script exited with code: $exit_code\"\n  rm -f /tmp/deploy_lock.pid\n  exit \"$exit_code\"  # Re-propagate exit code gốc\n}\ntrap cleanup EXIT",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Không dùng `pipefail`: `grep 'ERROR' app.log | wc -l` trả 0 (success) kể cả khi grep không tìm thấy gì.",
+      "Kiểm tra `$?` sau khi đã chạy thêm lệnh khác — `$?` đã bị ghi đè.",
+      "Dùng `exit` không có argument trong trap — sẽ override exit code gốc của script."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao container trong K8s bị restart với exit code 137 và cách phân biệt OOMKill với ứng dụng crash?",
+      "Cách giữ nguyên exit code gốc khi dùng `trap EXIT` để cleanup?"
     ]
   },
   {
@@ -99,18 +164,32 @@
     "category": "shell-linux",
     "level": "junior",
     "question": "Chuyển hướng I/O (Redirection): `>`, `>>`, `<`, và `2>&1` (redirect stderr sang stdout) hoạt động ra sao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["chuy", "redirection", "redirect", "stderr", "sang"],
+    "interviewerIntent": "Hiểu file descriptor model của Unix, biết cách capture và route output đúng trong script.",
+    "contextOrScenario": "Log của cron job không ghi được lỗi vì chỉ redirect stdout, stderr bị mất vào /dev/null.",
+    "expectedKeywords": [
+      "file descriptor",
+      "stdout",
+      "stderr",
+      "stdin",
+      "2>&1",
+      "tee",
+      "/dev/null",
+      "heredoc"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Chuyển hướng I/O (Redirection): `>`, `>>`, `<`, và `2>&1` (redirect stderr sang stdout) hoạt động ra sao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Mọi process Unix có 3 file descriptor mặc định: 0 (stdin), 1 (stdout), 2 (stderr). `>` ghi đè stdout vào file, `>>` append, `2>&1` duplicate FD2 sang FD1. Thứ tự redirect quan trọng: `> file 2>&1` khác với `2>&1 > file`.",
+      "deepDive": "`2>&1` nghĩa là 'FD2 trỏ đến chỗ FD1 đang trỏ tại thời điểm đó'. Khi viết `cmd 2>&1 > file`: FD2 được set thành FD1 (lúc đó là terminal), rồi FD1 mới được redirect vào file — nên stderr vẫn ra terminal. `&>` là Bash shorthand cho `> file 2>&1`. Trong script production, dùng `exec > >(tee -a $LOG) 2>&1` ở đầu để tự động log mọi output. Chú ý: `/proc/N/fd/` để inspect file descriptors của process đang chạy — hữu ích khi debug.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\nLOG_FILE=\"/var/log/app/deploy-$(date +%Y%m%d).log\"\n\n# File descriptors: 0=stdin, 1=stdout, 2=stderr\n\n# '>' ghi đè file, '>>' append\necho \"Deploy started at $(date)\" > \"$LOG_FILE\"    # Tạo mới / ghi đè\necho \"Git hash: $(git rev-parse HEAD)\" >> \"$LOG_FILE\"  # Append\n\n# Redirect stderr sang stdout (thứ tự quan trọng!)\n# ✅ ĐÚNG: stdout vào file, stderr theo stdout vào file\nmake build > \"$LOG_FILE\" 2>&1\n\n# ❌ SAI: stderr vào terminal, stdout vào file (2>&1 đọc FD1 NGAY LÚC ĐÓ = terminal)\n# make build 2>&1 > \"$LOG_FILE\"\n\n# Redirect cả stderr và stdout vào file (Bash 4+ shorthand)\nmake test &>> \"$LOG_FILE\"  # Equivalent to >> file 2>&1\n\n# /dev/null: nuốt output không muốn\nif kubectl get pod myapp-xxx &>/dev/null; then\n  echo \"Pod exists\"\nfi\n\n# tee: ghi ra file VÀ stdout cùng lúc (dùng trong CI để xem log realtime)\ndocker build . 2>&1 | tee \"$LOG_FILE\"\n\n# Process substitution với tee để log nhiều nơi\nexec > >(tee -a \"$LOG_FILE\") 2>&1  # Redirect mọi output của script vào log\necho \"This goes to both terminal and log file\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Đảo ngược thứ tự: `cmd 2>&1 > file` — stderr vẫn ra terminal, không vào file.",
+      "Dùng `>` thay vì `>>` trong cron job — log bị truncate mỗi lần chạy.",
+      "Không capture stderr trong pipe: `cmd1 | cmd2` — stderr của cmd1 ra terminal, không qua pipe."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm thế nào để log riêng stdout vào một file và stderr vào file khác cùng lúc?",
+      "Giải thích `exec 3>&1` và cách dùng custom file descriptor trong script?"
     ]
   },
   {
@@ -118,18 +197,32 @@
     "category": "shell-linux",
     "level": "junior",
     "question": "Piping (`|`): Dữ liệu truyền từ stdout của tiến trình này sang stdin của tiến trình khác như thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["piping", "truy", "stdout", "sang", "stdin"],
+    "interviewerIntent": "Hiểu Unix Philosophy và cách kết hợp các tool nhỏ để xử lý dữ liệu hiệu quả.",
+    "contextOrScenario": "DevOps cần phân tích access log Nginx để tìm top 10 IP có nhiều request nhất trong giờ qua.",
+    "expectedKeywords": [
+      "pipe",
+      "anonymous pipe",
+      "stdout",
+      "stdin",
+      "subshell",
+      "pipeline",
+      "xargs",
+      "tee"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Piping (`|`): Dữ liệu truyền từ stdout của tiến trình này sang stdin của tiến trình khác như thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Pipe tạo anonymous pipe trong kernel buffer. Stdout của command bên trái nối với stdin của command bên phải — các process chạy đồng thời (parallel), kernel buffer (~64KB) điều phối. Đây là Unix Philosophy: chain nhiều tool đơn giản để xử lý phức tạp.",
+      "deepDive": "Pipe là anonymous pipe (kernel IPC). Mỗi command trong pipe chạy trong subshell, nên biến thay đổi trong pipe không persist ra ngoài — đây là gotcha cổ điển. `set -o pipefail` quan trọng: mặc định exit code của `cmd1 | cmd2` là exit code của `cmd2`, ẩn lỗi. Với pipefail, là exit code của command fail đầu tiên. `tee` cho phép 'tap' vào pipe để log song song. Khi pipe buffer đầy, process ghi bị block (backpressure). Dùng `pv` để monitor throughput của pipe trong production.",
+      "codeExample": "#!/usr/bin/env bash\nset -eo pipefail\n\n# Pipe tạo anonymous pipe (kernel buffer ~64KB)\n# stdout của cmd bên trái → stdin của cmd bên phải\n# Các command chạy đồng thời (concurrent), không phải tuần tự!\n\n# Ví dụ thực tế: Top 10 IP tấn công từ Nginx access log\nONE_HOUR_AGO=$(date -d '1 hour ago' '+%d/%b/%Y:%H' 2>/dev/null || date -v-1H '+%d/%b/%Y:%H')\n\ngrep \"$ONE_HOUR_AGO\" /var/log/nginx/access.log \\\n  | awk '{print $1}' \\\n  | sort \\\n  | uniq -c \\\n  | sort -rn \\\n  | head -10 \\\n  | awk '{printf \"%-20s %s requests\\n\", $2, $1}'\n\n# Pipeline với error handling: pipefail đảm bảo lỗi propagate\n# Nếu grep thất bại (không có log), script sẽ exit\n\n# xargs: kết nối pipe với commands nhận argument (không phải stdin)\nfind /var/log/app -name '*.log' -mtime +7 | xargs rm -f\n\n# Cẩn thận với xargs khi filename có space:\nfind /tmp/uploads -name '*.tmp' -print0 | xargs -0 rm -f\n\n# Pipe và subshell: biến trong pipe không persist\nCOUNT=0\necho -e \"a\\nb\\nc\" | while IFS= read -r line; do\n  ((COUNT++)) || true  # COUNT thay đổi chỉ trong subshell!\ndone\necho \"COUNT: $COUNT\"  # Vẫn là 0!\n\n# Fix: dùng process substitution hoặc lastpipe (Bash 4.2+)\nshopt -s lastpipe  # Bash 4.2+: last command trong pipe chạy trong shell hiện tại\necho -e \"a\\nb\\nc\" | while IFS= read -r line; do ((COUNT++)) || true; done\necho \"COUNT: $COUNT\"  # Giờ đúng: 3",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Biến modified trong while-loop qua pipe không persist ra ngoài (subshell isolation).",
+      "Không dùng `pipefail`: lỗi ở đầu pipe bị ẩn vì exit code là của command cuối.",
+      "Dùng `cat file | grep pattern` thay vì `grep pattern file` — UUOC (Useless Use of Cat), kém hiệu quả."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `cat file | wc -l` chậm hơn `wc -l < file` về mặt process overhead?",
+      "Giải thích backpressure trong pipe và tình huống nào nó gây ra deadlock?"
     ]
   },
   {
@@ -137,18 +230,32 @@
     "category": "shell-linux",
     "level": "junior",
     "question": "Các lệnh thao tác file và văn bản cốt lõi: find, grep, xargs, tar, chmod, chown dùng thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["thao", "file", "find", "grep", "xargs"],
+    "interviewerIntent": "Kiểm tra kỹ năng thực chiến — Linux command-line là công cụ hàng ngày của DevOps engineer.",
+    "contextOrScenario": "Cần tìm tất cả file config có chứa `DB_PASSWORD` trong plaintext để audit bảo mật, rồi backup chúng.",
+    "expectedKeywords": [
+      "find",
+      "grep",
+      "xargs",
+      "tar",
+      "chmod",
+      "chown",
+      "regex",
+      "null-terminated"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Các lệnh thao tác file và văn bản cốt lõi: find, grep, xargs, tar, chmod, chown dùng thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`find` tìm file theo metadata (tên, size, time, permission), `grep` tìm theo nội dung, `xargs` chuyển stdin thành arguments, `tar` archive/compress, `chmod`/`chown` quản lý permission/owner. Kết hợp chúng với `-print0`/`-0` để xử lý an toàn filename có khoảng trắng.",
+      "deepDive": "`find -exec {} \\;` fork process mỗi file, `find | xargs` hiệu quả hơn vì batch nhiều file. `find -print0 | xargs -0` là cách duy nhất an toàn với filename có newline hoặc space. `grep -P` dùng PCRE, `-E` là ERE, cả 2 đều nhanh hơn `-G` (BRE). Với file lớn, `grep -l` (chỉ in tên file) nhanh hơn nhiều vì dừng sau lần match đầu. `tar` với `-C` (change directory before) tránh absolute path trong archive — best practice cho backup portable.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\n# === find: tìm file theo điều kiện ===\n# Tìm tất cả .env file trong project, bỏ qua node_modules\nfind /opt/app -name '*.env' \\\n  -not -path '*/node_modules/*' \\\n  -not -path '*/.git/*' \\\n  -type f\n\n# Tìm file lớn hơn 100MB (để cleanup)\nfind /var/log -type f -size +100M -mtime +30\n\n# === grep: tìm kiếm nội dung ===\n# Audit: tìm plaintext secret trong config files\ngrep -r \\\n  --include='*.yaml' --include='*.json' --include='*.env' \\\n  -l \\\n  -P '(DB_PASSWORD|AWS_SECRET|API_KEY)\\s*=\\s*[^$]' \\\n  /opt/app/config/\n# -r: recursive, -l: in tên file (không in dòng), -P: Perl regex\n\n# === find + xargs (an toàn với filename có space) ===\nfind /opt/app -name '*.log' -mtime +7 -print0 | xargs -0 rm -f\n\n# Audit bảo mật: tìm file có world-writable permission\nfind /etc /opt/app -perm -o+w -type f -print0 | \\\n  xargs -0 ls -la 2>/dev/null\n\n# === tar: backup ===\nBACKUP_DIR=\"/backup/configs\"\nDATESTAMP=$(date +%Y%m%d_%H%M%S)\n\nmkdir -p \"$BACKUP_DIR\"\n# Create compressed tarball\ntar czf \"${BACKUP_DIR}/config-${DATESTAMP}.tar.gz\" \\\n  --exclude='*.log' \\\n  --exclude='node_modules' \\\n  -C /opt/app config/\n\n# Extract\n# tar xzf config-20240115.tar.gz -C /opt/app/\n\n# === chmod / chown ===\n# Private key permissions (SSH sẽ refuse nếu sai)\nchmod 600 /home/deploy/.ssh/id_rsa\nchmod 700 /home/deploy/.ssh/\n\n# Batch fix web root permissions\nfind /var/www/html -type f -exec chmod 644 {} \\;\nfind /var/www/html -type d -exec chmod 755 {} \\;\n\n# Đổi owner toàn bộ app directory\nchown -R www-data:www-data /var/www/html",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Dùng `find | xargs rm` mà không có `-print0 | xargs -0` — xóa nhầm nếu filename có space.",
+      "Dùng `chmod -R 777 /var/www` — tạo security hole, file nhạy cảm trở nên world-readable.",
+      "Dùng `find /` mà không giới hạn depth (`-maxdepth`) trên hệ thống production — cực kỳ chậm."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khi nào dùng `find -exec {} +` thay vì `find ... | xargs`? Có sự khác nhau về hiệu năng không?",
+      "Làm thế nào audit tất cả file SUID/SGID trên hệ thống và tại sao đây là bước quan trọng trong security hardening?"
     ]
   },
   {
@@ -156,18 +263,31 @@
     "category": "shell-linux",
     "level": "middle",
     "question": "Câu điều kiện trong Bash: So sánh cú pháp test đơn `[ ... ]` và test kép `[[ ... ]]`? Vì sao `[[ ... ]]` an toàn hơn?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["bash", "test", "...", "shell"],
+    "interviewerIntent": "Hiểu sự khác biệt giữa POSIX test builtin và Bash-specific conditional, tránh lỗi quoting phổ biến.",
+    "contextOrScenario": "Script fail khi biến `$FILENAME` chứa space hoặc khi so sánh string rỗng với `[ $VAR = 'x' ]`.",
+    "expectedKeywords": [
+      "test builtin",
+      "word splitting",
+      "pattern matching",
+      "regex",
+      "=~",
+      "&&",
+      "||"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Câu điều kiện trong Bash: So sánh cú pháp test đơn `[ ... ]` và test kép `[[ ... ]]`? Vì sao `[[ ... ]]` an toàn hơn?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`[ ]` là POSIX test builtin, có word splitting bên trong, cần quote nghiêm ngặt. `[[ ]]` là Bash keyword, không có word splitting, hỗ trợ pattern matching (`=~`, `==` với glob), `&&`/`||` bên trong. Dùng `[[ ]]` cho mọi script bash-specific vì an toàn hơn đáng kể.",
+      "deepDive": "`[ ]` thực ra là lệnh (symlink đến /usr/bin/[), nên bash thực hiện word splitting và globbing trước khi pass arguments. `[[ ]]` là keyword của Bash parser, được xử lý trước word splitting — nên an toàn với unquoted variables (dù best practice vẫn là quote). `=~` trong `[[ ]]` dùng POSIX ERE, kết quả match lưu trong `$BASH_REMATCH`. Chú ý: regex trong `=~` KHÔNG được quote (sẽ literal), hoặc lưu vào biến rồi dùng. `(( ))` dùng cho arithmetic — nên dùng thay vì `[ $A -gt $B ]`.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\nFILENAME=\"my config file.txt\"\nAPP_VERSION=\"2.3.1\"\nHTTP_STATUS=404\n\n# === [ ] (test builtin / POSIX) ===\n# Cần quote biến bắt buộc — word splitting vẫn xảy ra\n# Không có &&/|| bên trong, phải viết ngoài\nif [ -f \"$FILENAME\" ]; then  # Đúng vì có quote\n  echo \"File exists\"\nfi\n\n# ❌ Nguy hiểm khi không quote: [ $FILENAME = 'x' ] → [ my config file.txt = x ] → syntax error\n\n# === [[ ]] (Bash keyword — KHÔNG là builtin hay external command) ===\n# Không có word splitting bên trong [[ ]]\n# Hỗ trợ &&, ||, pattern matching với =~\n\n# So sánh string an toàn (không cần quote bên trong)\nif [[ $FILENAME == *.txt ]]; then   # Glob pattern matching\n  echo \"Is a text file\"\nfi\n\n# Regex matching với =~\nif [[ $APP_VERSION =~ ^([0-9]+)\\.([0-9]+)\\.([0-9]+)$ ]]; then\n  MAJOR=\"${BASH_REMATCH[1]}\"\n  MINOR=\"${BASH_REMATCH[2]}\"\n  PATCH=\"${BASH_REMATCH[3]}\"\n  echo \"Version: major=$MAJOR minor=$MINOR patch=$PATCH\"\nfi\n\n# Compound conditions trong [[ ]]\nif [[ $HTTP_STATUS -ge 400 && $HTTP_STATUS -lt 500 ]]; then\n  echo \"Client error: $HTTP_STATUS\"\nelif [[ $HTTP_STATUS -ge 500 ]]; then\n  echo \"Server error: $HTTP_STATUS\"\nfi\n\n# Test file, directory, empty string\nDEPLOY_DIR=\"/opt/app\"\n[[ -d \"$DEPLOY_DIR\" ]] || mkdir -p \"$DEPLOY_DIR\"\n[[ -z \"${DATABASE_URL:-}\" ]] && { echo \"DATABASE_URL required\" >&2; exit 1; }\n[[ -n \"${DOCKER_REGISTRY:-}\" ]] || export DOCKER_REGISTRY=\"docker.io\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Quote regex trong `[[ $var =~ 'regex' ]]` — regex trở thành literal string, matching sai.",
+      "Dùng `[[ ]]` trong script có shebang `#!/bin/sh` — chỉ bash/zsh support, sh/dash không có.",
+      "Dùng `[ $VAR ]` không quote khi VAR rỗng — lệnh `[ ]` không có argument, return exit code khác mong muốn."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khi nào nên dùng `(( ))` thay vì `[[ ]]` cho điều kiện so sánh số?",
+      "Giải thích `$BASH_REMATCH` và cách dùng capture groups trong regex matching?"
     ]
   },
   {
@@ -175,18 +295,31 @@
     "category": "shell-linux",
     "level": "middle",
     "question": "Vòng lặp trong Bash: Cách duyệt qua danh sách file và cách đọc an toàn từng dòng của file text bằng `while IFS= read -r line`?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["bash", "duy", "qua", "danh", "file"],
+    "interviewerIntent": "Kiểm tra khả năng xử lý dữ liệu theo dòng, tránh lỗi với filename có space/newline.",
+    "contextOrScenario": "Script xử lý danh sách server từ file hosts.txt, mỗi dòng là một server name — cần deploy song song.",
+    "expectedKeywords": [
+      "IFS",
+      "read -r",
+      "glob",
+      "for loop",
+      "while loop",
+      "null-terminated",
+      "parallel"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Vòng lặp trong Bash: Cách duyệt qua danh sách file và cách đọc an toàn từng dòng của file text bằng `while IFS= read -r line`?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Dùng glob (`for f in /path/*.ext`) thay vì `for f in $(ls)` để tránh word splitting. Dùng `while IFS= read -r line < file` để đọc từng dòng — `IFS=` giữ nguyên whitespace, `-r` không interpret backslash. Redirect file vào while loop (`< file`) thay vì dùng pipe để biến persist.",
+      "deepDive": "Vấn đề core của `$(ls)` là command substitution + word splitting: filename có space bị tách thành nhiều argument. Glob expansion xảy ra trước word splitting, nên `for f in /path/*.log` an toàn với space. `|| [[ -n \"$server_host\" ]]` trong while condition xử lý trường hợp file không có newline cuối. Dùng `< file` thay vì `cat file | while read` vì pipe tạo subshell — biến modified trong while không persist. Array declaration `declare -a` explicit, và `${array[@]}` với quote bảo toàn element với space.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\n# === For loop duyệt file (KHÔNG an toàn với space) ===\n# ❌ SAI: bị word split nếu tên file có space\n# for f in $(ls /var/log/nginx/); do ...\n\n# ✅ ĐÚNG: Glob expansion an toàn\nfor log_file in /var/log/nginx/*.log; do\n  [[ -f \"$log_file\" ]] || continue  # Skip nếu không có file\n  echo \"Processing: $log_file\"\ndone\n\n# === While + read: đọc từng dòng của file ===\n# IFS=: ngăn strip leading/trailing whitespace\n# -r: không interpret backslash escape\nHOSTS_FILE=\"/etc/app/deploy-targets.txt\"\ndeclare -a SERVER_LIST=()\n\nwhile IFS= read -r server_host || [[ -n \"$server_host\" ]]; do\n  # Skip blank lines và comment\n  [[ -z \"$server_host\" || \"$server_host\" == \\#* ]] && continue\n  SERVER_LIST+=(\"$server_host\")\ndone < \"$HOSTS_FILE\"  # Redirect FILE vào stdin của while loop (không dùng pipe!)\n\necho \"Deploying to ${#SERVER_LIST[@]} servers: ${SERVER_LIST[*]}\"\n\n# === Parallel deployment với wait ===\nMAX_PARALLEL=5\ndeploy_to_server() {\n  local host=\"$1\"\n  echo \"[$(date +%H:%M:%S)] Deploying to $host...\"\n  ssh -o StrictHostKeyChecking=no \"deploy@$host\" \\\n    'cd /opt/app && git pull && systemctl restart app' \\\n    2>&1 | sed \"s/^/[$host] /\"\n}\n\nrunning_jobs=0\nfor host in \"${SERVER_LIST[@]}\"; do\n  deploy_to_server \"$host\" &  # Chạy background\n  ((++running_jobs))\n  if ((running_jobs >= MAX_PARALLEL)); then\n    wait -n 2>/dev/null || wait  # Bash 4.3+: đợi bất kỳ job nào xong\n    ((--running_jobs))\n  fi\ndone\nwait  # Đợi tất cả job còn lại",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Dùng `for line in $(cat file)` — bị word splitting, mỗi từ thành một iteration.",
+      "Pipe vào while: `cat file | while read line; do VAR=$line; done; echo $VAR` — VAR rỗng vì subshell.",
+      "Quên `|| [[ -n \"$line\" ]]` trong while condition — bỏ sót dòng cuối nếu file không kết thúc bằng newline."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `mapfile` (hay `readarray`) được ưu tiên hơn while loop khi load file vào array?",
+      "Làm thế nào giới hạn số parallel job và collect exit code của từng background job?"
     ]
   },
   {
@@ -194,18 +327,34 @@
     "category": "shell-linux",
     "level": "middle",
     "question": "Xử lý văn bản nâng cao: Phân biệt use case của `awk`, `sed` và `cut` khi phân tích file log máy chủ?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["cao", "use", "case", "awk", "sed"],
+    "interviewerIntent": "Kiểm tra khả năng chọn đúng tool cho bài toán text processing — kỹ năng core của SRE/DevOps.",
+    "contextOrScenario": "Phân tích Nginx access log để tính average response time, tìm endpoint chậm và extract IP bị ban.",
+    "expectedKeywords": [
+      "awk",
+      "sed",
+      "cut",
+      "column",
+      "BEGIN",
+      "END",
+      "NR",
+      "NF",
+      "regex",
+      "field separator"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Xử lý văn bản nâng cao: Phân biệt use case của `awk`, `sed` và `cut` khi phân tích file log máy chủ?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`cut`: extract field đơn giản theo delimiter cố định — đơn giản, nhanh. `awk`: stream processing, arithmetic, associative array — dùng khi cần tính toán, aggregate, conditional. `sed`: stream edit, regex substitution, transformation — dùng khi cần modify text. Rule of thumb: cut < sed < awk về power, tỷ lệ nghịch với simplicity.",
+      "deepDive": "`awk` thực sự là ngôn ngữ lập trình nhỏ: `BEGIN{}` chạy trước khi đọc file, `END{}` sau khi xong, pattern actions xử lý từng dòng. `$NF` = field cuối (NF = number of fields), `NR` = number of records (dòng hiện tại). `FS` (field separator, mặc định space/tab). Dùng `awk -F','` cho CSV. `sed -E` là extended regex (ERE), `sed -i` edit in-place (cẩn thận trên macOS cần `sed -i ''`). Với file log lớn (GB), awk và sed stream processing hiệu quả hơn load vào Python — không cần memory bằng file size.",
+      "codeExample": "#!/usr/bin/env bash\n# Phân tích Nginx access log format:\n# 192.168.1.1 - - [15/Jan/2024:10:30:45 +0700] \"GET /api/users HTTP/1.1\" 200 1234 0.045\n\nACCESS_LOG=\"/var/log/nginx/access.log\"\n\n# === cut: extract field đơn giản theo delimiter ===\n# Extract IP address (field 1, delimiter space)\ncut -d' ' -f1 \"$ACCESS_LOG\" | sort | uniq -c | sort -rn | head -10\n\n# Nhược điểm cut: không handle delimiter liên tiếp, không tính toán được\n\n# === awk: stream processing với arithmetic ===\n# Tính average response time (field cuối) theo endpoint\nawk '\n  /\\/api\\// {                          # Chỉ xử lý dòng có /api/\n    match($0, /\"(GET|POST|PUT|DELETE) ([^ ]+)/, arr)  # Regex capture\n    endpoint = arr[2]\n    total[endpoint] += $NF            # $NF = field cuối (response time)\n    count[endpoint]++\n  }\n  END {                               # Sau khi xử lý hết file\n    print \"Endpoint\\t\\tAvg Response Time\"\n    for (ep in total) {\n      if (count[ep] > 10) {           # Chỉ report endpoint có >= 10 requests\n        printf \"%-40s %.3fs\\n\", ep, total[ep]/count[ep]\n      }\n    }\n  }\n' \"$ACCESS_LOG\" | sort -k2 -rn\n\n# === sed: stream edit, transform text ===\n# Mask IP addresses trong log trước khi share\nsed -E 's/^([0-9]{1,3}\\.){3}[0-9]{1,3}/[MASKED-IP]/g' \"$ACCESS_LOG\"\n\n# Thêm header vào CSV report\nsed -i '1i\\endpoint,avg_response_time,request_count' report.csv\n\n# === Kết hợp awk + sed: extract slow endpoints và format report ===\nSLOW_THRESHOLD=2.0  # 2 seconds\nawk -v threshold=\"$SLOW_THRESHOLD\" '\n  $NF > threshold {                   # Dòng có response time > threshold\n    print $1, $7, $9, $NF           # IP, endpoint, status, time\n  }\n' \"$ACCESS_LOG\" | \\\nsed 's/ /,/g' | \\\nsort -t',' -k4 -rn | \\\nhead -20 > slow-requests.csv\n\necho \"Slow requests (>${SLOW_THRESHOLD}s): $(wc -l < slow-requests.csv) found\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Dùng `sed -i` trên macOS mà không có backup suffix — cú pháp khác Linux, gây lỗi.",
+      "Dùng `cut` với delimiter variable-length (multiple spaces) — cut không handle, phải dùng awk.",
+      "Awk: `print $0` trong pipe mất newline — dùng `printf \"%s\\n\", $0` thay thế."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khi nào nên dùng Python/jq thay vì awk để phân tích log JSON?",
+      "Làm thế nào dùng awk để join 2 file dựa trên common field (tương tự SQL JOIN)?"
     ]
   },
   {
@@ -213,18 +362,31 @@
     "category": "shell-linux",
     "level": "middle",
     "question": "Viết Function trong Bash: Cách truyền tham số và trả về kết quả (qua echo/stdout hay qua return exit code)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["function", "bash", "truy", "tham", "qua"],
+    "interviewerIntent": "Kỹ năng tổ chức code script — function là đơn vị reuse cơ bản, cần hiểu scoping và return convention.",
+    "contextOrScenario": "Script deploy lớn cần được refactor thành các function reusable để test và maintain dễ hơn.",
+    "expectedKeywords": [
+      "local",
+      "return",
+      "stdout capture",
+      "nameref",
+      "declare -n",
+      "echo",
+      "subshell cost"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Viết Function trong Bash: Cách truyền tham số và trả về kết quả (qua echo/stdout hay qua return exit code)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Function trong Bash truyền tham số qua positional arguments (`$1`, `$2`). Return value: (1) qua stdout + command substitution `$(func)` — tạo subshell, có overhead; (2) qua exit code 0/1 cho boolean; (3) qua nameref (`declare -n`) — pass by reference, không tạo subshell. Luôn dùng `local` cho biến trong function.",
+      "deepDive": "Mỗi `$(func)` tạo subshell — fork() một process. Trong loop lớn, điều này có thể ảnh hưởng performance. Nameref (Bash 4.3+) giải quyết vấn đề này: `declare -n ref_var=$1` tạo reference đến tên biến được pass. Bash không có typed return — chỉ có integer 0-255 qua `return`. Hàm có thể `echo` nhiều dòng — tất cả captured vào `$(func)`. `local -r` = readonly local, `local -a` = local array, `local -A` = local associative array. Trap trong function: `trap 'cleanup' RETURN` chạy cleanup khi function return.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\n# === Pattern 1: Return value qua echo (stdout capture) ===\n# Caller dùng $() — tạo subshell, có overhead nhỏ\nget_git_hash() {\n  local branch=\"${1:-HEAD}\"\n  git rev-parse --short \"$branch\" 2>/dev/null || echo 'unknown'\n  # 'return' ở cuối là redundant — function return exit code của lệnh cuối\n}\n\nCURRENT_HASH=$(get_git_hash)           # Gọi function, capture stdout\nMENU_HASH=$(get_git_hash 'origin/main')\necho \"Deploy: ${CURRENT_HASH} → ${MENU_HASH}\"\n\n# === Pattern 2: Return via exit code (0/non-zero = boolean) ===\nis_service_healthy() {\n  local service_name=\"$1\"\n  local max_retries=\"${2:-3}\"\n  local retry=0\n\n  while ((retry < max_retries)); do\n    if systemctl is-active --quiet \"$service_name\"; then\n      return 0  # Healthy\n    fi\n    ((retry++))\n    sleep 2\n  done\n  return 1  # Unhealthy after retries\n}\n\n# Dùng như boolean\nif is_service_healthy \"postgresql\" 5; then\n  echo \"DB ready, proceeding with migration\"\nelse\n  echo \"DB unhealthy after retries\" >&2\n  exit 1\nfi\n\n# === Pattern 3: Nameref (Bash 4.3+) — return complex value không qua subshell ===\nbuild_deploy_config() {\n  local -n result_ref=\"$1\"  # nameref: reference to caller's variable\n  local environment=\"$2\"\n\n  declare -A config\n  config[image]=\"myapp:$(get_git_hash)\"\n  config[replicas]=$([[ \"$environment\" == 'production' ]] && echo 3 || echo 1)\n  config[namespace]=\"$environment\"\n\n  # Assign back via nameref — no subshell!\n  result_ref[image]=\"${config[image]}\"\n  result_ref[replicas]=\"${config[replicas]}\"\n  result_ref[namespace]=\"${config[namespace]}\"\n}\n\ndeclare -A deploy_config\nbuild_deploy_config deploy_config 'production'\necho \"Deploying: ${deploy_config[image]} with ${deploy_config[replicas]} replicas\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Không dùng `local`: biến trong function ghi đè biến global cùng tên — bug khó tìm.",
+      "Dùng `return` với giá trị > 255 — Bash wrap-around về 0 (255+1=0 = success!).",
+      "Echo debug output trong function được dùng với `$()` — debug output bị capture, không ra terminal."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khi nào nên dùng nameref thay vì stdout capture? Trade-off là gì?",
+      "Làm thế nào viết unit test cho Bash function bằng bats (Bash Automated Testing System)?"
     ]
   },
   {
@@ -232,18 +394,32 @@
     "category": "shell-linux",
     "level": "middle",
     "question": "Bash Strict Mode: Tại sao nên luôn đặt `set -euo pipefail` ở đầu mọi script production?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["bash", "strict", "mode", "set", "-euo"],
+    "interviewerIntent": "Hiểu các failure mode của Bash và cách strict mode biến lỗi silent thành lỗi explicit — quan trọng cho reliability.",
+    "contextOrScenario": "Script backup chạy tiếp dù `rsync` fail, ghi đè backup tốt bằng backup trống — không ai biết vì không có error.",
+    "expectedKeywords": [
+      "set -e",
+      "errexit",
+      "set -u",
+      "nounset",
+      "pipefail",
+      "set -x",
+      "xtrace",
+      "SHELLOPTS"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Bash Strict Mode: Tại sao nên luôn đặt `set -euo pipefail` ở đầu mọi script production?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`set -e`: exit khi command fail (thay vì tiếp tục). `set -u`: exit khi dùng unbound variable (thay vì empty string). `set -o pipefail`: exit code pipe = exit code command fail đầu tiên. Ba option này cùng nhau biến 'fail silently' thành 'fail loudly' — cần thiết cho bất kỳ script production nào.",
+      "deepDive": "`set -e` không trigger trong: điều kiện `if`/`while`, sau `!`, trong `&&`/`||` chain (trừ lệnh cuối), trong subshell. Đây là điểm tinh tế khó nhớ. `${VAR:?msg}` vừa check unset vừa check empty string, còn `${VAR?msg}` chỉ check unset. `set -x` in mỗi command với `+` prefix — vô giá khi debug production script, nhưng cần filter ra credential trước khi enable trong CI. `set -E` đảm bảo `ERR` trap được inherit bởi function và subshell. Combine: `set -eEuo pipefail` + `trap 'echo ERR at line $LINENO' ERR` là setup mạnh nhất cho production.",
+      "codeExample": "#!/usr/bin/env bash\n# === Bash Strict Mode ===\nset -euo pipefail\n# -e (errexit): exit ngay khi command return non-zero (trừ trong if/while/until/&&/||)\n# -u (nounset): exit khi dùng biến chưa được set (thay vì dùng empty string)\n# -o pipefail: exit code của pipe = exit code của command fail đầu tiên\n# Thêm cho debug:\n# set -x  # In mỗi command trước khi execute (xtrace)\n\n# === Ví dụ: Tại sao từng option quan trọng ===\n\n# --- set -e ---\n# ❌ Không có set -e: rsync fail nhưng script tiếp tục\n# rsync -av /data/ /backup/  # Failed!\n# tar czf backup.tar.gz /backup/  # Chạy tiếp với /backup/ trống!\n\n# ✅ Với set -e: script dừng tại rsync fail → backup an toàn\n\n# --- set -u ---\n# ❌ Không có set -u:\n# rm -rf \"$UNDEFINED_VAR/\"  # → rm -rf \"/\" !!! (catastrophic)\n\n# ✅ Với set -u: \"bash: UNDEFINED_VAR: unbound variable\" → exit\n\n# Cách dùng giá trị mặc định với set -u:\nDEPLOY_ENV=\"${ENVIRONMENT:-staging}\"  # Giá trị mặc định khi ENVIRONMENT chưa set\nDB_HOST=\"${DATABASE_HOST:?'DATABASE_HOST must be set'}\"\n# ':?' exit với error message nếu biến rỗng hoặc unset\n\n# --- pipefail ---\n# ❌ Không có pipefail:\n# grep 'ERROR' nonexistent.log | wc -l  # grep fail (exit 2), wc vẫn chạy, kết quả: 0\n# $? = 0 (exit code của wc!) → script nghĩ không có lỗi\n\n# ✅ Với pipefail: $? = 2 (exit code của grep) → script exit\n\n# === Vô hiệu hoá tạm thời khi cần ===\ncheck_optional_service() {\n  local service=\"$1\"\n  # set +e tắt tạm thời để command fail không exit script\n  set +e\n  systemctl is-active --quiet \"$service\"\n  local status=$?\n  set -e  # Bật lại\n  return \"$status\"\n}\n\n# Hoặc dùng || để handle error tại chỗ\nDB_PING_RESULT=$(pg_isready -h \"$DB_HOST\" 2>&1) || true  # '|| true' ngăn -e exit\necho \"DB status: $DB_PING_RESULT\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "`set -e` không protect trong `if cmd; then` — `cmd` fail không exit script vì nằm trong conditional.",
+      "Dùng `${VAR:-}` làm empty default với `set -u` — ổn, nhưng ẩn lỗi khi quên set biến thực sự quan trọng.",
+      "Dùng `set +e` rồi quên `set -e` lại — strict mode bị tắt cho phần còn lại của script."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Giải thích tại sao `set -e` không trigger khi command nằm trong mệnh đề `if`?",
+      "Cách kết hợp `trap ERR` với `set -e` để in stack trace khi script fail?"
     ]
   },
   {
@@ -251,18 +427,31 @@
     "category": "shell-linux",
     "level": "middle",
     "question": "Crontab: Cú pháp định thời và các bẫy hay gặp khiến script chạy tay được nhưng chạy cron bị lỗi (thiếu PATH, sai working directory)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["crontab", "hay", "script", "tay", "cron"],
+    "interviewerIntent": "Hiểu environment khác biệt của cron so với interactive shell — lỗi phổ biến nhất trong DevOps.",
+    "contextOrScenario": "Script backup chạy tốt thủ công nhưng cron job fail silently vì thiếu PATH và không có MAILTO config.",
+    "expectedKeywords": [
+      "cron environment",
+      "PATH",
+      "MAILTO",
+      "SHELL",
+      "working directory",
+      "crontab -e",
+      "systemd timer"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Crontab: Cú pháp định thời và các bẫy hay gặp khiến script chạy tay được nhưng chạy cron bị lỗi (thiếu PATH, sai working directory)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Cron chạy trong minimal environment: PATH chỉ có `/usr/bin:/bin`, không có `~/.bashrc`, working directory là `/`. Ba lỗi phổ biến: (1) command không tìm thấy vì thiếu PATH, (2) relative path sai vì working directory khác, (3) lỗi không được log vì không redirect stderr. Fix: set PATH explicit, dùng absolute path, redirect output vào log file.",
+      "deepDive": "Cron không đọc `.bashrc` hay `.bash_profile` — chỉ có minimal shell environment. Dùng `SHELL=/bin/bash` ở đầu crontab để đảm bảo dùng bash. `MAILTO=''` tắt email notification (tránh spam sysadmin). Với systemd timer: `Persistent=true` đảm bảo timer chạy bù khi máy tắt nguồn trong scheduled time (cron không có tính năng này). Để debug, chạy `env -i /bin/sh -c 'crontab -l | grep script | bash'` để simulate cron environment. Dùng `run-parts` cho `/etc/cron.daily`, `cron.weekly`.",
+      "codeExample": "#!/usr/bin/env bash\n# /opt/scripts/backup.sh - Designed for cron execution\nset -euo pipefail\n\n# === Luôn set PATH explicit trong script chạy bởi cron ===\n# Cron chạy với PATH tối thiểu: /usr/bin:/bin\nPATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"\nexport PATH\n\n# === Luôn dùng absolute path cho mọi thứ ===\nBACKUP_SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\nCONFIG_FILE=\"${BACKUP_SCRIPT_DIR}/../config/backup.conf\"\nLOG_FILE=\"/var/log/app/backup-$(date +%Y%m%d).log\"\n\n# === Redirect log từ đầu script ===\nexec >> \"$LOG_FILE\" 2>&1\necho \"=== Backup started: $(date) ===\"\n\n# Script content\n/usr/bin/pg_dump -h localhost -U app_user mydb | \\\n  /usr/bin/gzip > \"/backup/db-$(date +%Y%m%d_%H%M%S).sql.gz\"\n\necho \"=== Backup completed: $(date) ===\"\n\n# === Crontab format và best practices ===\n# Crontab của root: /etc/crontab\n# Crontab user: crontab -e\n\n# # Format: minute hour day month weekday user command\n# # ┌─────── minute (0-59)\n# # │ ┌───── hour (0-23)\n# # │ │ ┌─── day of month (1-31)\n# # │ │ │ ┌─ month (1-12)\n# # │ │ │ │ ┌ weekday (0-7, 0=Sunday=7)\n# # │ │ │ │ │\n# # * * * * *\n\n# Backup DB lúc 2:30 AM mỗi ngày:\n# 30 2 * * * root /opt/scripts/backup.sh\n\n# Cleanup logs mỗi Chủ nhật lúc 00:00:\n# 0 0 * * 0 root find /var/log/app -name '*.log' -mtime +30 -delete\n\n# === systemd timer (alternative modern to cron) ===\n# /etc/systemd/system/backup.timer\n# [Timer]\n# OnCalendar=*-*-* 02:30:00\n# Persistent=true  # Chạy lại nếu máy tắt trong khoảng thời gian đó\n\n# === Thiết lập MAILTO để nhận error email ===\n# MAILTO=devops@company.com  # Thêm vào đầu crontab file",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Dùng relative path trong script — cron chạy từ `/`, relative path sai.",
+      "Không redirect stderr — lỗi biến mất, job fail silently.",
+      "Script có `source ~/.bashrc` — cron không có HOME set đúng, script fail."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao systemd timer được coi là replacement tốt hơn cron cho production workload?",
+      "Làm thế nào test script trong cron-like environment mà không cần đợi đến scheduled time?"
     ]
   },
   {
@@ -270,18 +459,32 @@
     "category": "shell-linux",
     "level": "middle",
     "question": "Quản lý tiến trình nền: Chạy lệnh với `&`, kiểm tra với `jobs`, `nohup` và `disown` khác nhau thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["tra", "jobs", "nohup", "disown", "nhau"],
+    "interviewerIntent": "Hiểu job control, signal propagation và cách keep process running sau khi terminal đóng.",
+    "contextOrScenario": "DevOps cần chạy script migrate DB lớn mà không bị interrupt khi SSH session timeout.",
+    "expectedKeywords": [
+      "background job",
+      "SIGHUP",
+      "nohup",
+      "disown",
+      "jobs",
+      "wait",
+      "screen",
+      "tmux"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Quản lý tiến trình nền: Chạy lệnh với `&`, kiểm tra với `jobs`, `nohup` và `disown` khác nhau thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`&` chạy background nhưng vẫn bị SIGHUP khi terminal đóng. `nohup` immune to SIGHUP và redirect output. `disown` chỉ remove khỏi shell's job table — không protect khỏi SIGHUP. Cho production long-running tasks: dùng `nohup ... &` hoặc tốt hơn là `tmux`/`screen`/systemd service.",
+      "deepDive": "SIGHUP lifecycle: terminal đóng → kernel gửi SIGHUP đến session leader (shell) → shell gửi SIGHUP đến job group. `nohup` intercept SIGHUP, đặt disposition thành SIG_IGN. `disown` remove process khỏi job table nhưng không thay đổi signal disposition. Process sau `disown` vẫn nhận SIGHUP từ kernel. `tmux`/`screen` tạo pseudo-terminal trong detached session — process không nhận SIGHUP khi disconnect. Systemd service là cách đúng nhất cho daemon — quản lý PID, restart policy, log, dependency.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\n# === & : chạy background, nhận SIGHUP khi terminal đóng ===\nlong_running_migration.sh &\nMIGRATION_PID=$!  # $! = PID của background job vừa start\necho \"Migration PID: $MIGRATION_PID\"\n\n# jobs: liệt kê background jobs của shell hiện tại\n# jobs -l: hiển thị PID\n\n# === Vấn đề: SIGHUP ===\n# Khi terminal đóng, shell gửi SIGHUP đến tất cả job\n# → background process bị kill\n\n# === nohup: immune to SIGHUP ===\n# nohup redirect stdin từ /dev/null, stdout/stderr vào nohup.out\nnohup /opt/scripts/db-migrate.sh > /var/log/migration.log 2>&1 &\nNOHUP_PID=$!\necho \"Migration running as PID $NOHUP_PID, log: /var/log/migration.log\"\necho \"$NOHUP_PID\" > /var/run/migration.pid  # Save PID để monitor/kill sau\n\n# === disown: remove job từ shell's job table ===\n# Cho phép process tiếp tục sau khi shell thoát\n# Khác nohup: không protect khỏi SIGHUP (kernel vẫn gửi)\nsome_daemon &\ndisown $!  # Chỉ remove khỏi job table, không protect SIGHUP\n\n# === wait: đợi background jobs hoàn thành ===\nstart_workers() {\n  local PIDS=()\n  for i in {1..5}; do\n    process_shard.sh \"shard_${i}\" &\n    PIDS+=(\"$!\")\n  done\n\n  local exit_code=0\n  for pid in \"${PIDS[@]}\"; do\n    wait \"$pid\" || { echo \"Worker PID $pid failed\"; exit_code=1; }\n  done\n  return \"$exit_code\"\n}\n\n# === Best practice: tmux/screen cho long-running SSH tasks ===\n# tmux new -d -s migration '/opt/scripts/migrate.sh'\n# tmux attach -t migration  # Reconnect sau khi SSH timeout\n\n# === Monitor background job ===\nmonitor_job() {\n  local pid=\"$1\"\n  local interval=\"${2:-10}\"\n  while kill -0 \"$pid\" 2>/dev/null; do  # kill -0: check if process exists\n    echo \"Job $pid still running at $(date)\"\n    sleep \"$interval\"\n  done\n  wait \"$pid\"  # Collect exit code\n  echo \"Job $pid finished with exit code: $?\"\n}",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Dùng `disown` nghĩ rằng process sẽ survive SSH disconnect — sai, vẫn bị SIGHUP.",
+      "Không lưu PID sau `nohup ... &` — không thể monitor hoặc kill sau này.",
+      "Để nhiều background job chạy mà không `wait` — zombie process nếu parent shell exit trước."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao systemd service tốt hơn nohup cho production daemon? Khi nào nên dùng nohup?",
+      "Giải thích `screen -d -m -S session_name command` và khi nào ưu tiên tmux hơn screen?"
     ]
   },
   {
@@ -289,18 +492,31 @@
     "category": "shell-linux",
     "level": "middle",
     "question": "Xử lý tham số dòng lệnh chuyên nghiệp với lệnh `getopts` trong Bash?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["tham", "chuy", "nghi", "getopts", "bash"],
+    "interviewerIntent": "Viết script có CLI interface chuẩn Unix — short flags với getopts, phân biệt với GNU getopt cho long flags.",
+    "contextOrScenario": "Script deploy cần hỗ trợ `-e production`, `-v 1.2.3`, `-d` (dry-run), `-h` (help) như CLI tool chuyên nghiệp.",
+    "expectedKeywords": [
+      "getopts",
+      "OPTARG",
+      "OPTIND",
+      "optstring",
+      "getopt",
+      "long options",
+      "usage"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Xử lý tham số dòng lệnh chuyên nghiệp với lệnh `getopts` trong Bash?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`getopts` là Bash builtin hỗ trợ POSIX short options (`-e`, `-v`, `-d`). `OPTARG` lưu argument của option có `:`, `OPTIND` là index của option tiếp theo. Leading `:` trong optstring = silent mode (tự handle error). `shift $((OPTIND-1))` xóa parsed options, để lại positional args.",
+      "deepDive": "`getopts` khác `getopt` (GNU): `getopts` là builtin, POSIX, chỉ short options; `getopt` là external command, hỗ trợ long options (`--env`, `--version`). Cho long options, dùng `getopt -l env:,version:,dry-run,help --` rồi parse kết quả. `getopts` không support `--` (end of options marker) natively. Pattern `case \"$opt\" in :)` catch option thiếu argument, `?)` catch unknown option — chỉ hoạt động với leading `:`. Sau `shift $((OPTIND-1))`, `$@` chứa positional arguments còn lại, hữu ích cho subcommand pattern.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\n# === Giá trị mặc định ===\nDEPLOY_ENV=\"staging\"\nAPP_VERSION=\"latest\"\nDRY_RUN=false\nVERBOSE=false\n\nusage() {\n  cat <<EOF\nUsage: $(basename \"$0\") [OPTIONS]\n\nOptions:\n  -e <env>      Deploy environment (staging|production) [default: staging]\n  -v <version>  Application version to deploy [default: latest]\n  -d            Dry run — print commands without executing\n  -V            Verbose output\n  -h            Show this help message\n\nExamples:\n  $(basename \"$0\") -e production -v 2.3.1\n  $(basename \"$0\") -e staging -d -V\nEOF\n  exit \"${1:-0}\"\n}\n\n# === getopts: parse short options ===\n# Optstring: colon sau letter = option có argument\n# Leading colon = silent error handling (ta tự xử lý error)\nwhile getopts ':e:v:dVh' opt; do\n  case \"$opt\" in\n    e)\n      DEPLOY_ENV=\"$OPTARG\"\n      if [[ ! \"$DEPLOY_ENV\" =~ ^(staging|production)$ ]]; then\n        echo \"ERROR: Invalid environment '$DEPLOY_ENV'\" >&2\n        usage 1\n      fi\n      ;;\n    v)\n      APP_VERSION=\"$OPTARG\"\n      if [[ ! \"$APP_VERSION\" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ && \"$APP_VERSION\" != 'latest' ]]; then\n        echo \"ERROR: Invalid version format '$APP_VERSION'\" >&2\n        usage 1\n      fi\n      ;;\n    d) DRY_RUN=true ;;\n    V) VERBOSE=true ;;\n    h) usage 0 ;;\n    :) echo \"ERROR: Option -$OPTARG requires an argument\" >&2; usage 1 ;;\n    ?) echo \"ERROR: Unknown option -$OPTARG\" >&2; usage 1 ;;\n  esac\ndone\nshift $((OPTIND - 1))  # Remove parsed options, $@ now = remaining positional args\n\n# === Validation ===\n$VERBOSE && echo \"[DEBUG] ENV=$DEPLOY_ENV VERSION=$APP_VERSION DRY_RUN=$DRY_RUN\"\n\n# === Execute (với dry-run support) ===\nrun_cmd() {\n  if $DRY_RUN; then\n    echo \"[DRY-RUN] $*\"\n  else\n    \"$@\"\n  fi\n}\n\nrun_cmd kubectl set image deployment/app \\\n  \"app=myrepo/app:${APP_VERSION}\" \\\n  -n \"$DEPLOY_ENV\"\n\necho \"✓ Deploy ${APP_VERSION} to ${DEPLOY_ENV} $(${DRY_RUN} && echo '(dry-run)')\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Quên leading `:` trong optstring — getopts print error riêng, không thể control format.",
+      "Quên `shift $((OPTIND-1))` — positional args (`$1`, `$2`) vẫn là options đã parsed.",
+      "Dùng getopts trong function mà không reset OPTIND=1 — getopts nhớ state, có thể skip options."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khi nào cần dùng GNU `getopt` thay vì `getopts`? Cú pháp khác nhau thế nào?",
+      "Làm thế nào implement subcommand pattern (`script.sh deploy|rollback|status`) trong Bash?"
     ]
   },
   {
@@ -308,18 +524,33 @@
     "category": "shell-linux",
     "level": "senior",
     "question": "Bắt tín hiệu hệ thống với lệnh `trap`: Cách dọn dẹp file tạm (cleanup) khi script bị dừng đột ngột (SIGINT, SIGTERM, EXIT)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["trap", "file", "cleanup", "script", "sigint"],
+    "interviewerIntent": "Kỹ năng senior: viết script production-grade với graceful shutdown — quan trọng trong K8s pod lifecycle.",
+    "contextOrScenario": "Script ETL bị SIGTERM từ K8s (khi node drain) để lại temp files GB và lock file → crash khi restart.",
+    "expectedKeywords": [
+      "trap",
+      "SIGINT",
+      "SIGTERM",
+      "SIGHUP",
+      "EXIT",
+      "ERR",
+      "signal handler",
+      "cleanup",
+      "graceful shutdown"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Bắt tín hiệu hệ thống với lệnh `trap`: Cách dọn dẹp file tạm (cleanup) khi script bị dừng đột ngột (SIGINT, SIGTERM, EXIT)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`trap` đăng ký signal handler: `trap 'handler' SIGNAL`. `EXIT` trap chạy khi script thoát bằng bất kỳ cách nào — ideal cho cleanup. Pattern: (1) tạo temp files, (2) register `trap cleanup EXIT`, (3) script chạy bình thường, (4) cleanup luôn được gọi dù success/fail/interrupted. `exit_code=$?` trong cleanup bắt exit code gốc trước khi cleanup overwrite nó.",
+      "deepDive": "K8s gửi SIGTERM và đợi `terminationGracePeriodSeconds` (default 30s) trước khi SIGKILL. Script cần handle SIGTERM để: dừng current work tại checkpoint, cleanup temp files, flush buffer. `trap cleanup EXIT` là safety net — chạy kể cả khi `set -e` trigger exit. Signal priority: trap handler chạy đồng bộ, block signal delivery trong khi handler đang chạy. `trap '' SIGINT` trong subshell ngăn Ctrl+C giết background job. Dùng `kill -0 PID` để check process existence mà không gửi signal thực.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\n# === Production ETL Script với Graceful Shutdown ===\n\n# Temp files và lock\nTEMP_DIR=$(mktemp -d \"/tmp/etl_XXXXXX\")\nLOCK_FILE=\"/var/run/etl_pipeline.lock\"\nPROGRESS_FILE=\"${TEMP_DIR}/progress.json\"\n\n# === cleanup: dọn dẹp mọi thứ ===\ncleanup() {\n  local exit_code=$?   # Capture exit code TRƯỚC KHI chạy cleanup\n  echo \"[$(date '+%H:%M:%S')] Cleanup triggered (exit_code=${exit_code})\" >&2\n\n  # Dừng background jobs nếu có\n  jobs -p | xargs -r kill -SIGTERM 2>/dev/null || true\n\n  # Xóa temp files\n  [[ -d \"$TEMP_DIR\" ]] && rm -rf \"$TEMP_DIR\"\n\n  # Release lock\n  [[ -f \"$LOCK_FILE\" ]] && rm -f \"$LOCK_FILE\"\n\n  # Log final status\n  if [[ $exit_code -eq 0 ]]; then\n    echo \"ETL completed successfully\"\n  else\n    echo \"ETL failed or interrupted (code=${exit_code})\"\n  fi\n\n  exit \"$exit_code\"  # Re-propagate exit code\n}\n\n# === SIGTERM handler: graceful shutdown cho K8s ===\nhandle_sigterm() {\n  echo \"[$(date '+%H:%M:%S')] SIGTERM received — shutting down gracefully\" >&2\n  SHUTDOWN_REQUESTED=true\n  # Gửi SIGTERM đến child processes\n  jobs -p | xargs -r kill -SIGTERM 2>/dev/null || true\n  # cleanup() sẽ được gọi qua EXIT trap\n  exit 143  # 128 + 15 (SIGTERM)\n}\n\n# === Register traps ===\n# EXIT: chạy khi script exit vì bất kỳ lý do gì (kể cả set -e)\ntrap cleanup EXIT\n# Trap specific signals (ghi đè EXIT để có thể set exit code khác)\ntrap handle_sigterm SIGTERM SIGHUP\ntrap 'echo \"SIGINT received\"; exit 130' SIGINT  # 128 + 2\n\n# === Lock file: ngăn concurrent run ===\nSHUTDOWN_REQUESTED=false\n\nif [[ -f \"$LOCK_FILE\" ]]; then\n  OLD_PID=$(cat \"$LOCK_FILE\")\n  if kill -0 \"$OLD_PID\" 2>/dev/null; then\n    echo \"ETL already running (PID: $OLD_PID)\" >&2; exit 1\n  fi\nfi\necho $$ > \"$LOCK_FILE\"  # Write current PID\n\n# === Actual ETL work ===\necho \"ETL started (PID: $$, TEMP: $TEMP_DIR)\"\n\nfor batch in {1..100}; do\n  $SHUTDOWN_REQUESTED && { echo \"Shutdown requested, stopping at batch $batch\"; break; }\n  echo \"Processing batch $batch...\"\n  process_batch \"$batch\" > \"${TEMP_DIR}/batch_${batch}.json\"\n  echo \"{\\\"last_batch\\\": $batch}\" > \"$PROGRESS_FILE\"  # Checkpoint\n  sleep 1  # Simulate work\ndone",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Không capture `exit_code=$?` ngay đầu cleanup — `$?` bị ghi đè bởi lệnh đầu tiên trong cleanup.",
+      "Trap EXIT gọi `exit $exit_code` trong cleanup — OK. Nhưng nếu cleanup fail, exit code là của cleanup, không phải script gốc.",
+      "Không handle SIGTERM trong script chạy trong K8s — pod bị SIGKILL sau grace period, data corruption."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Giải thích tại sao `trap cleanup SIGTERM EXIT` khác với `trap cleanup EXIT` + `trap handle_sigterm SIGTERM`?",
+      "Trong K8s, làm thế nào đảm bảo script Bash hoàn thành checkpoint hiện tại trước khi terminate?"
     ]
   },
   {
@@ -327,18 +558,30 @@
     "category": "shell-linux",
     "level": "senior",
     "question": "Subshell `(...)` và Command Grouping `{...;}` khác nhau thế nào về tiến trình con và biến môi trường?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["subshell", "...", "command", "grouping", "nhau"],
+    "interviewerIntent": "Hiểu process model của Bash — quan trọng khi optimize script performance và debug scoping issues.",
+    "contextOrScenario": "Script thay đổi biến và working directory trong block code nhưng không muốn ảnh hưởng parent context.",
+    "expectedKeywords": [
+      "subshell",
+      "fork",
+      "copy-on-write",
+      "command grouping",
+      "scoping",
+      "environment isolation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Subshell `(...)` và Command Grouping `{...;}` khác nhau thế nào về tiến trình con và biến môi trường?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`(...)` tạo subshell qua fork() — process con với copy của environment parent. Thay đổi biến và `cd` trong subshell KHÔNG ảnh hưởng parent. `{...;}` là command grouping — chạy trong shell hiện tại, biến và cd THAY ĐỔI persist. Subshell: isolation + overhead. Command grouping: shared state + I/O redirect efficiency.",
+      "deepDive": "fork() trong Linux dùng copy-on-write — subshell không copy toàn bộ memory ngay lập tức, chỉ khi có write. Nhưng vẫn có overhead của system call fork() và exec setup. Trong loop lớn, nhiều `$(cmd)` (mỗi cái là subshell) có thể chậm đáng kể. Command grouping dùng cho pattern `{ multiple; commands; } > file` — mở file descriptor một lần, efficient hơn redirect từng lệnh. Pipe cũng tạo subshell: `cmd | { read line; process; }` — biến trong `{}` sau pipe không persist. `coproc` (Bash 4+) tạo coprocess với bidirectional pipe.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n\nDATABASE=\"production_db\"\nWORK_DIR=\"/opt/app\"\n\n# === Subshell (...): fork() một process con ===\n# Variables và cd không leak ra ngoài\n# Có overhead nhỏ do fork\n(\n  cd /tmp\n  DATABASE=\"test_db\"  # Chỉ thay đổi trong subshell\n  echo \"Inside subshell: DATABASE=${DATABASE}, pwd=$(pwd)\"\n  # Nếu fail ở đây, exit code của subshell = exit code của ()\n)\necho \"Outside subshell: DATABASE=${DATABASE}, pwd=$(pwd)\"  # Không thay đổi\n# → DATABASE=production_db, pwd=/opt/app\n\n# === Command Grouping {...;}: chạy trong shell HIỆN TẠI ===\n# Không fork, biến persist, cd persist\n# Cần semicolon trước }\n{\n  cd /tmp                  # cd persist sau block\n  DATABASE=\"changed_db\"    # Biến persist sau block!\n  echo \"Inside group: DATABASE=${DATABASE}, pwd=$(pwd)\"\n}\necho \"Outside group: DATABASE=${DATABASE}, pwd=$(pwd)\"  # ĐÃ THAY ĐỔI\n# → DATABASE=changed_db, pwd=/tmp (!)\n\n# === Use cases ===\n\n# 1. Subshell: chạy trong directory khác mà không ảnh hưởng parent\nbuild_module() {\n  local module=\"$1\"\n  (\n    cd \"${WORK_DIR}/modules/${module}\"\n    npm install --production\n    npm run build\n  )  # Parent vẫn ở $WORK_DIR sau khi subshell xong\n  echo \"Built ${module} successfully\"\n}\n\n# 2. Command grouping: group commands với chung I/O redirect (hiệu quả hơn subshell)\n# Chỉ mở file một lần cho cả block, không fork\n{\n  echo \"=== Deploy Report ===\"\n  date\n  git log --oneline -5\n  echo \"=== End Report ===\"\n} > \"/var/log/deploy-$(date +%Y%m%d).log\"  # Một lần redirect cho toàn bộ block\n\n# 3. Subshell exit code\nif (cd /nonexistent && ls); then\n  echo \"Success\"\nelse\n  echo \"Failed: $?\"  # Exit code của subshell\nfi\n\n# 4. Isolate set -e trong subshell\n(\n  set +e  # Tắt trong subshell, không ảnh hưởng parent\n  risky_command_that_might_fail\n  echo \"Result: $?\"\n)  # Parent vẫn có set -e active",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Quên semicolon trước `}` trong `{...;}` — syntax error.",
+      "Dùng subshell `()` trong loop tight vì tiện — fork overhead nhỏ cộng lại đáng kể.",
+      "Thay đổi IFS hoặc `set` options trong subshell, không nhận ra chúng không persist ra ngoài."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `cat file | while read line; do VAR=$line; done; echo $VAR` in empty string?",
+      "Giải thích khi nào dùng `( set -e; risky_cmd )` thay vì chỉ `risky_cmd || true`?"
     ]
   },
   {
@@ -346,18 +589,31 @@
     "category": "shell-linux",
     "level": "senior",
     "question": "Process Substitution `<(...)` và `>(...)` giải quyết bài toán gì khi không muốn tạo file tạm trung gian?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["process", "substitution", "...", "quy", "file"],
+    "interviewerIntent": "Kỹ năng Bash nâng cao: thay thế temp file bằng named pipe /proc/fd — elegant và efficient.",
+    "contextOrScenario": "Cần compare output của 2 command hoặc pass output của một command làm file input cho lệnh khác mà không muốn tạo temp file.",
+    "expectedKeywords": [
+      "process substitution",
+      "named pipe",
+      "FIFO",
+      "/dev/fd",
+      "tee",
+      "diff",
+      "paste"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Process Substitution `<(...)` và `>(...)` giải quyết bài toán gì khi không muốn tạo file tạm trung gian?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`<(cmd)` tạo named pipe (FIFO) hoặc `/dev/fd/N`, thay thế temp file khi command cần file argument. `>(cmd)` tạo FIFO để command ghi vào, input được pipe đến process con. Cả hai cho phép compose commands mà không cần intermediate files — cleaner, avoid race conditions.",
+      "deepDive": "Bash implement process substitution qua `/dev/fd/N` (Linux) hoặc named FIFO (`/tmp/bash-process-sub-*` trên macOS). `/dev/fd/N` là symbolic link đến file descriptor — command thấy 'file' nhưng thực ra là pipe đến process đang chạy. Điều này nghĩa là seekable file operations (lseek) sẽ fail — `diff <(cmd1) <(cmd2)` hoạt động vì diff đọc sequential. Với `tee >(cmd)`: `tee` mở FIFO write-end, `cmd` đọc từ read-end. Process substitution có thể combine với `wait` để đảm bảo background processes hoàn thành. Không available trong POSIX sh — cần explicit bash shebang.",
+      "codeExample": "#!/usr/bin/env bash\nset -euo pipefail\n# Process substitution: chỉ available với bash/zsh, không phải sh/dash\n\n# === <(...): Biến output của command thành 'file' để lệnh đọc ===\n\n# Use case 1: diff output của 2 command (không cần temp file)\n# So sánh danh sách package deployed vs expected\ndiff \\\n  <(kubectl get pods -n production -o jsonpath='{.items[*].spec.containers[0].image}' | tr ' ' '\\n' | sort) \\\n  <(cat expected-images.txt | sort) \\\n  && echo \"✓ Images match\" || echo \"✗ Image mismatch detected!\"\n\n# Use case 2: Thay thế temp file cho command chỉ nhận file argument\n# 'wc' cần 2 files để compare line count:\nwc -l <(grep 'ERROR' app.log) <(grep 'WARN' app.log)\n# → /dev/fd/63    42 (errors)\n# → /dev/fd/62   156 (warnings)\n\n# Use case 3: join output từ 2 command theo column\npaste \\\n  <(awk '{print $1}' servers.txt) \\\n  <(for host in $(awk '{print $1}' servers.txt); do ping -c1 -W1 \"$host\" &>/dev/null && echo 'UP' || echo 'DOWN'; done)\n\n# === >(...)  : Biến stdin của command thành 'file' để lệnh ghi vào ===\n\n# Use case 4: Log đồng thời vào file VÀ monitoring system\n# Ghi stdout vào 2 nơi khác nhau\ndocker build . 2>&1 | tee >(grep -E 'ERROR|WARN' >> /var/log/build-errors.log)\n\n# Use case 5: Split output của một command vào nhiều processors song song\ngenerate_report() {\n  # Output đi đồng thời vào logger và file\n  my_etl_script 2>&1 \\\n    > >(tee \"/var/log/etl-$(date +%Y%m%d).log\" | logger -t etl-pipeline) \\\n    2> >(grep -E 'ERROR|FATAL' >> /var/log/etl-errors.log)\n}\n\n# Use case 6: Audit — compare file inventory vs database\n# Không tạo temp file — sạch hơn\ncompare_inventories() {\n  local DISK_INVENTORY FILE_DB_INVENTORY\n  DISK_INVENTORY=$(find /opt/uploads -type f -name '*.jpg' | sort)\n  FILE_DB_INVENTORY=$(psql -t -c \"SELECT file_path FROM uploads ORDER BY file_path\")\n\n  comm -23 \\\n    <(echo \"$DISK_INVENTORY\") \\\n    <(echo \"$FILE_DB_INVENTORY\") \\\n    | while IFS= read -r orphan_file; do\n        echo \"Orphan file (not in DB): $orphan_file\"\n      done\n}",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Dùng process substitution trong script với `#!/bin/sh` — syntax error, không portable.",
+      "Race condition với `>(cmd)`: lệnh ngoài kết thúc trước khi process substitution flush buffer.",
+      "Seekable operations trong process substitution fail — commands cần `fseek` sẽ không hoạt động."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `diff <(cmd1) <(cmd2)` không hoạt động đúng khi output của cmd rất lớn (> pipe buffer)?",
+      "Khi nào nên dùng temp file thực sự thay vì process substitution?"
     ]
   },
   {
@@ -365,18 +621,31 @@
     "category": "shell-linux",
     "level": "senior",
     "question": "Viết một Bash script hoàn chỉnh tự động theo dõi tiến trình, tự restart nếu chết và bắn alert kèm log qua Webhook Telegram/Slack?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Shell & Linux CLI ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Shell & Linux CLI.",
-    "expectedKeywords": ["bash", "script", "theo", "restart", "alert"],
+    "interviewerIntent": "Bài toán tích hợp kỹ năng: process monitoring, signal handling, retry logic, external API call — thể hiện được script production-grade.",
+    "contextOrScenario": "Service Node.js thỉnh thoảng crash, cần watchdog script chạy trong cron 1 phút restart và alert team ngay lập tức.",
+    "expectedKeywords": [
+      "watchdog",
+      "curl webhook",
+      "systemd",
+      "pidfile",
+      "retry",
+      "exponential backoff",
+      "alerting"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Viết một Bash script hoàn chỉnh tự động theo dõi tiến trình, tự restart nếu chết và bắn alert kèm log qua Webhook Telegram/Slack?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Watchdog script production-grade cần: (1) idempotent — chạy lại an toàn; (2) state persistence — theo dõi restart count; (3) alerting async — không block monitoring; (4) proper logging — redirect toàn bộ output vào log file; (5) graceful — không restart vô hạn khi có serious issue.",
+      "deepDive": "Pattern này có thể thay thế hoàn toàn bằng systemd với `Restart=always`, `RestartSec=30`, `StartLimitIntervalSec=3600`, `StartLimitBurst=3`. Systemd tốt hơn vì: manage cgroup/memory, auto-restart on OOM, structured logging qua journald. Tuy nhiên watchdog script hữu ích khi: cần logic phức tạp (exponential backoff), cần alert custom, hoặc manage process không phải systemd unit (Docker container, binary). Với K8s, dùng liveness/readiness probe thay vì external watchdog. Alert async với `&` + `wait` tránh block nếu Slack/Telegram API chậm — timeout 10s là best practice với curl.",
+      "codeExample": "#!/usr/bin/env bash\n# /opt/scripts/watchdog.sh - Service Watchdog với Telegram Alert\nset -euo pipefail\n\n# === Config ===\nSERVICE_NAME=\"node-api\"           # systemd service name\nSLACK_WEBHOOK_URL=\"${SLACK_WEBHOOK_URL:?'SLACK_WEBHOOK_URL env var required'}\"\nTELEGRAM_BOT_TOKEN=\"${TELEGRAM_BOT_TOKEN:-}\"\nTELEGRAM_CHAT_ID=\"${TELEGRAM_CHAT_ID:-}\"\nMAX_RESTART_ATTEMPTS=3            # Max restart trong 1 interval\nRESTART_COOLDOWN=30               # Seconds giữa các restart\nLOG_FILE=\"/var/log/watchdog/${SERVICE_NAME}.log\"\nSTATE_FILE=\"/var/run/watchdog_${SERVICE_NAME}.state\"\n\n# === Setup ===\nmkdir -p \"$(dirname \"$LOG_FILE\")\" \"$(dirname \"$STATE_FILE\")\"\nexec >> \"$LOG_FILE\" 2>&1  # Tất cả output vào log\n\nlog() {\n  echo \"[$(date '+%Y-%m-%d %H:%M:%S')] [$1] ${*:2}\"\n}\n\n# === Alert functions ===\nsend_slack_alert() {\n  local message=\"$1\"\n  local color=\"${2:-danger}\"  # good, warning, danger\n  curl -sf -X POST \"$SLACK_WEBHOOK_URL\" \\\n    -H 'Content-Type: application/json' \\\n    -d \"$(jq -n \\\n      --arg text \"$message\" \\\n      --arg color \"$color\" \\\n      --arg service \"$SERVICE_NAME\" \\\n      --arg host \"$(hostname)\" \\\n      '{attachments: [{color: $color, title: (\"Watchdog Alert: \" + $service), text: $text, footer: $host}]}')\"\n}\n\nsend_telegram_alert() {\n  [[ -z \"$TELEGRAM_BOT_TOKEN\" ]] && return 0\n  local message=\"$1\"\n  curl -sf -X POST \"https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage\" \\\n    -d \"chat_id=${TELEGRAM_CHAT_ID}\" \\\n    -d \"parse_mode=Markdown\" \\\n    -d \"text=🚨 *Watchdog*: ${message}\" \\\n    > /dev/null\n}\n\nalert() {\n  local message=\"$1\"\n  local severity=\"${2:-danger}\"\n  log \"ALERT\" \"$message\"\n  send_slack_alert \"$message\" \"$severity\" &  # Async để không block\n  send_telegram_alert \"$message\" &\n  wait  # Đợi cả 2 alert gửi xong\n}\n\n# === State management (đếm restart attempts) ===\nget_restart_count() {\n  if [[ -f \"$STATE_FILE\" ]]; then\n    local last_reset count\n    last_reset=$(jq -r '.last_reset' \"$STATE_FILE\" 2>/dev/null || echo 0)\n    count=$(jq -r '.count' \"$STATE_FILE\" 2>/dev/null || echo 0)\n    # Reset counter sau mỗi giờ\n    if (( $(date +%s) - last_reset > 3600 )); then echo 0; return; fi\n    echo \"$count\"\n  else\n    echo 0\n  fi\n}\n\nincrement_restart_count() {\n  local count=$(($(get_restart_count) + 1))\n  jq -n --argjson count \"$count\" --argjson ts \"$(date +%s)\" \\\n    '{count: $count, last_reset: $ts}' > \"$STATE_FILE\"\n  echo \"$count\"\n}\n\n# === Main monitoring logic ===\ncheck_and_restart_service() {\n  if systemctl is-active --quiet \"$SERVICE_NAME\"; then\n    log \"INFO\" \"${SERVICE_NAME} is running ($(systemctl show \"$SERVICE_NAME\" -p MainPID --value))\"\n    return 0\n  fi\n\n  log \"WARN\" \"${SERVICE_NAME} is NOT running!\"\n  local restart_count\n  restart_count=$(increment_restart_count)\n\n  if ((restart_count > MAX_RESTART_ATTEMPTS)); then\n    alert \"${SERVICE_NAME} on $(hostname) is DOWN and has exceeded max restart attempts (${restart_count}/${MAX_RESTART_ATTEMPTS}). Manual intervention required!\" \"danger\"\n    return 1\n  fi\n\n  log \"INFO\" \"Attempting restart #${restart_count}...\"\n  alert \"${SERVICE_NAME} crashed on $(hostname). Restarting... (attempt ${restart_count}/${MAX_RESTART_ATTEMPTS})\" \"warning\"\n\n  systemctl restart \"$SERVICE_NAME\"\n  sleep \"$RESTART_COOLDOWN\"\n\n  if systemctl is-active --quiet \"$SERVICE_NAME\"; then\n    log \"INFO\" \"${SERVICE_NAME} restarted successfully\"\n    alert \"✅ ${SERVICE_NAME} on $(hostname) restarted successfully\" \"good\"\n  else\n    log \"ERROR\" \"${SERVICE_NAME} failed to restart!\"\n    alert \"${SERVICE_NAME} on $(hostname) FAILED to restart after attempt ${restart_count}!\" \"danger\"\n  fi\n}\n\ncheck_and_restart_service",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Shell & Linux CLI."
+      "Không giới hạn restart attempts — script restart vô hạn, làm trầm trọng sự cố.",
+      "Alert synchronous — nếu Slack API timeout 30s, watchdog không check service trong 30s đó.",
+      "State file không atomic write — race condition nếu watchdog chạy concurrent (dùng flock)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khi nào nên dùng systemd service với `Restart=always` thay vì watchdog script tự viết?",
+      "Làm thế nào thêm exponential backoff (1s, 2s, 4s...) vào watchdog để tránh restart storm?"
     ]
   }
 ]

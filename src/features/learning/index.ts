@@ -8,3 +8,5 @@ export * from './components/blitz-quiz';
 export * from './components/learning-stats';
 export * from './components/api-demo-tester';
 export * from './components/error-boundary-demo';
+export * from './components/learning-home-view';
+export * from './components/track-detail-view';

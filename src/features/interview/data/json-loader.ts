@@ -1,13 +1,10 @@
-import { InterviewQuestion } from '../types';
+import { InterviewCategory, InterviewQuestion } from '../types';
+
+// Core Question Banks
 import reactBankQuestions from './json/react-bank.json';
 import nextjsBankQuestions from './json/nextjs-bank.json';
 import typescriptBankQuestions from './json/typescript-bank.json';
 import javascriptBankQuestions from './json/javascript-bank.json';
-import goBankQuestions from './json/go-bank.json';
-import nestjsBankQuestions from './json/nestjs-bank.json';
-import nodejsBankQuestions from './json/nodejs-bank.json';
-import pythonBankQuestions from './json/python-bank.json';
-import djangoBankQuestions from './json/django-bank.json';
 import nextjsQuestions from './json/nextjs-app-router.json';
 import react19Questions from './json/react19-core.json';
 import jsTsQuestions from './json/javascript-typescript.json';
@@ -56,6 +53,11 @@ import seoBankQuestions from './json/seo-bank.json';
 import backendApiBankQuestions from './json/backend-api-bank.json';
 import frontendCoreBankQuestions from './json/frontend-core-bank.json';
 import backendCoreBankQuestions from './json/backend-core-bank.json';
+import goBankQuestions from './json/go-bank.json';
+import nestjsBankQuestions from './json/nestjs-bank.json';
+import nodejsBankQuestions from './json/nodejs-bank.json';
+import pythonBankQuestions from './json/python-bank.json';
+import djangoBankQuestions from './json/django-bank.json';
 
 export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(reactBankQuestions as InterviewQuestion[]),
@@ -116,6 +118,25 @@ export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(systemDesignQuestions as InterviewQuestion[]),
   ...(perfQuestions as InterviewQuestion[]),
 ];
+
+export const CORE_JSON_QUESTION_BANKS: InterviewQuestion[] = DEFAULT_JSON_QUESTION_BANKS;
+
+/**
+ * Helper to get questions for category synchronously or asynchronously
+ */
+export async function loadCategoryQuestions(
+  category: InterviewCategory | string
+): Promise<InterviewQuestion[]> {
+  if (category === 'all') return DEFAULT_JSON_QUESTION_BANKS;
+  return DEFAULT_JSON_QUESTION_BANKS.filter((q) => q.category === category);
+}
+
+/**
+ * Helper to get all question banks (e.g. for full JSON export in json-manager-modal)
+ */
+export async function loadAllQuestionBanks(): Promise<InterviewQuestion[]> {
+  return DEFAULT_JSON_QUESTION_BANKS;
+}
 
 /**
  * Validate imported JSON data shape
