@@ -158,10 +158,215 @@ function getCategoryBadge(category: string): {
           'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/25 font-semibold',
       };
     case 'state-data':
+    case 'state-management':
       return {
-        label: 'State & Data',
+        label: 'State Management',
         className:
           'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/25',
+      };
+    case 'business-analyst':
+      return {
+        label: 'Business Analyst',
+        className:
+          'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25 font-semibold',
+      };
+    case 'ai':
+      return {
+        label: 'AI & LLM',
+        className:
+          'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/25 font-semibold',
+      };
+    case 'database':
+      return {
+        label: 'Database',
+        className:
+          'bg-amber-500/10 text-amber-800 dark:text-amber-300 border-amber-500/25 font-semibold',
+      };
+    case 'devops-cloud':
+      return {
+        label: 'DevOps & Cloud',
+        className:
+          'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25 font-semibold',
+      };
+    case 'ios':
+      return {
+        label: 'iOS (Swift)',
+        className:
+          'bg-orange-500/10 text-orange-700 dark:text-orange-300 border-orange-500/25 font-semibold',
+      };
+    case 'testing-qa':
+      return {
+        label: 'Testing & QA',
+        className:
+          'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 border-emerald-500/25 font-semibold',
+      };
+    case 'dsa':
+      return {
+        label: 'DSA & Algorithms',
+        className:
+          'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25 font-semibold',
+      };
+    case 'cs-fundamentals':
+      return {
+        label: 'CS Fundamentals',
+        className:
+          'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/25 font-semibold',
+      };
+    case 'data-engineering':
+      return {
+        label: 'Data Engineering',
+        className:
+          'bg-teal-500/10 text-teal-800 dark:text-teal-300 border-teal-500/25 font-semibold',
+      };
+    case 'cybersecurity':
+      return {
+        label: 'Cybersecurity',
+        className:
+          'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/25 font-semibold',
+      };
+    case 'behavioral-hr':
+      return {
+        label: 'Behavioral & STAR',
+        className:
+          'bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/25 font-semibold',
+      };
+    case 'rust':
+      return {
+        label: 'Rust',
+        className:
+          'bg-orange-600/10 text-orange-800 dark:text-orange-300 border-orange-600/25 font-semibold',
+      };
+    case 'shell-linux':
+      return {
+        label: 'Shell & Linux',
+        className:
+          'bg-zinc-600/10 text-zinc-800 dark:text-zinc-300 border-zinc-600/25 font-semibold',
+      };
+    case 'vue':
+      return {
+        label: 'Vue.js',
+        className:
+          'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25 font-semibold',
+      };
+    case 'angular':
+      return {
+        label: 'Angular',
+        className:
+          'bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/25 font-semibold',
+      };
+    case 'java':
+      return {
+        label: 'Java',
+        className:
+          'bg-amber-600/10 text-amber-800 dark:text-amber-300 border-amber-600/25 font-semibold',
+      };
+    case 'spring':
+      return {
+        label: 'Spring Boot',
+        className:
+          'bg-green-600/10 text-green-700 dark:text-green-300 border-green-600/25 font-semibold',
+      };
+    case 'csharp':
+      return {
+        label: 'C# (.NET)',
+        className:
+          'bg-purple-600/10 text-purple-700 dark:text-purple-300 border-purple-600/25 font-semibold',
+      };
+    case 'php':
+      return {
+        label: 'PHP',
+        className:
+          'bg-indigo-600/10 text-indigo-700 dark:text-indigo-300 border-indigo-600/25 font-semibold',
+      };
+    case 'laravel':
+      return {
+        label: 'Laravel',
+        className:
+          'bg-rose-600/10 text-rose-700 dark:text-rose-300 border-rose-600/25 font-semibold',
+      };
+    case 'ruby':
+      return {
+        label: 'Ruby',
+        className:
+          'bg-red-600/10 text-red-700 dark:text-red-300 border-red-600/25 font-semibold',
+      };
+    case 'rails':
+      return {
+        label: 'Ruby on Rails',
+        className:
+          'bg-red-700/10 text-red-800 dark:text-red-300 border-red-700/25 font-semibold',
+      };
+    case 'cpp':
+      return {
+        label: 'C++',
+        className:
+          'bg-blue-600/10 text-blue-700 dark:text-blue-300 border-blue-600/25 font-semibold',
+      };
+    case 'flutter':
+      return {
+        label: 'Flutter',
+        className:
+          'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/25 font-semibold',
+      };
+    case 'android':
+      return {
+        label: 'Android',
+        className:
+          'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25 font-semibold',
+      };
+    case 'react-native':
+      return {
+        label: 'React Native',
+        className:
+          'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/25 font-semibold',
+      };
+    case 'graphql':
+      return {
+        label: 'GraphQL',
+        className:
+          'bg-pink-500/10 text-pink-700 dark:text-pink-300 border-pink-500/25 font-semibold',
+      };
+    case 'fastapi':
+      return {
+        label: 'FastAPI',
+        className:
+          'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25 font-semibold',
+      };
+    case 'performance':
+      return {
+        label: 'Web Performance',
+        className:
+          'bg-lime-500/10 text-lime-700 dark:text-lime-300 border-lime-500/25 font-semibold',
+      };
+    case 'build-tools':
+      return {
+        label: 'Build Tools',
+        className:
+          'bg-yellow-500/10 text-yellow-700 dark:text-yellow-300 border-yellow-500/25 font-semibold',
+      };
+    case 'seo':
+      return {
+        label: 'SEO',
+        className:
+          'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25 font-semibold',
+      };
+    case 'backend-api':
+      return {
+        label: 'Backend API',
+        className:
+          'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25 font-semibold',
+      };
+    case 'frontend-core':
+      return {
+        label: 'Frontend Core',
+        className:
+          'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 border-cyan-500/25 font-semibold',
+      };
+    case 'backend-core':
+      return {
+        label: 'Backend Core',
+        className:
+          'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-500/25 font-semibold',
       };
     default:
       return {

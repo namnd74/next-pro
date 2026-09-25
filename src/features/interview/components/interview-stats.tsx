@@ -174,7 +174,7 @@ export function InterviewStats() {
             </span>
             {languageBreakdown.others > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-md border border-purple-500/30 bg-purple-500/10 px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:text-purple-400">
-                <TechIcon name="architecture" className="h-3.5 w-3.5" /> Architecture:{' '}
+                <TechIcon name="architecture" className="h-3.5 w-3.5" /> Khác & Hệ thống:{' '}
                 {languageBreakdown.others}
               </span>
             )}

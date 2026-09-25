@@ -30,6 +30,268 @@ import { Select } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { TechIcon } from '@/components/common/tech-icon';
 
+interface CategoryFilterItem {
+  id: InterviewCategory;
+  label: string;
+  iconName?: string;
+  activeColor: string;
+}
+
+const CATEGORY_ITEMS: CategoryFilterItem[] = [
+  {
+    id: 'all',
+    label: '🌐 Tất cả',
+    activeColor: 'bg-primary text-primary-foreground shadow-sm',
+  },
+  {
+    id: 'react',
+    label: 'React',
+    iconName: 'react',
+    activeColor: 'bg-cyan-600 text-white shadow-xs shadow-cyan-600/20',
+  },
+  {
+    id: 'nextjs',
+    label: 'Next.js',
+    iconName: 'nextjs',
+    activeColor: 'bg-zinc-800 text-white shadow-xs dark:bg-zinc-200 dark:text-zinc-900',
+  },
+  {
+    id: 'typescript',
+    label: 'TypeScript',
+    iconName: 'typescript',
+    activeColor: 'bg-blue-600 text-white shadow-xs shadow-blue-600/20',
+  },
+  {
+    id: 'javascript',
+    label: 'JavaScript',
+    iconName: 'javascript',
+    activeColor: 'bg-amber-600 text-white shadow-xs shadow-amber-600/20',
+  },
+  {
+    id: 'vue',
+    label: 'Vue.js',
+    activeColor: 'bg-emerald-600 text-white shadow-xs shadow-emerald-600/20',
+  },
+  {
+    id: 'angular',
+    label: 'Angular',
+    activeColor: 'bg-red-600 text-white shadow-xs shadow-red-600/20',
+  },
+  {
+    id: 'html',
+    label: 'HTML5',
+    activeColor: 'bg-orange-600 text-white shadow-sm shadow-orange-600/20',
+  },
+  {
+    id: 'css',
+    label: 'CSS3',
+    activeColor: 'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
+  },
+  {
+    id: 'go',
+    label: 'Go (Golang)',
+    iconName: 'go',
+    activeColor: 'bg-sky-600 text-white shadow-xs shadow-sky-600/20',
+  },
+  {
+    id: 'nestjs',
+    label: 'NestJS',
+    iconName: 'nestjs',
+    activeColor: 'bg-rose-600 text-white shadow-xs shadow-rose-600/20',
+  },
+  {
+    id: 'nodejs',
+    label: 'Node.js',
+    iconName: 'nodejs',
+    activeColor: 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20',
+  },
+  {
+    id: 'python',
+    label: 'Python',
+    iconName: 'python',
+    activeColor: 'bg-yellow-600 text-white shadow-sm shadow-yellow-600/20',
+  },
+  {
+    id: 'django',
+    label: 'Django',
+    iconName: 'django',
+    activeColor: 'bg-teal-600 text-white shadow-sm shadow-teal-600/20',
+  },
+  {
+    id: 'fastapi',
+    label: 'FastAPI',
+    activeColor: 'bg-teal-600 text-white shadow-sm shadow-teal-600/20',
+  },
+  {
+    id: 'java',
+    label: 'Java',
+    activeColor: 'bg-amber-700 text-white shadow-sm shadow-amber-700/20',
+  },
+  {
+    id: 'spring',
+    label: 'Spring Boot',
+    activeColor: 'bg-green-600 text-white shadow-sm shadow-green-600/20',
+  },
+  {
+    id: 'csharp',
+    label: 'C# (.NET)',
+    activeColor: 'bg-purple-600 text-white shadow-sm shadow-purple-600/20',
+  },
+  {
+    id: 'php',
+    label: 'PHP',
+    activeColor: 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20',
+  },
+  {
+    id: 'laravel',
+    label: 'Laravel',
+    activeColor: 'bg-rose-600 text-white shadow-sm shadow-rose-600/20',
+  },
+  {
+    id: 'ruby',
+    label: 'Ruby',
+    activeColor: 'bg-red-600 text-white shadow-sm shadow-red-600/20',
+  },
+  {
+    id: 'rails',
+    label: 'Rails',
+    activeColor: 'bg-red-700 text-white shadow-sm shadow-red-700/20',
+  },
+  {
+    id: 'cpp',
+    label: 'C++',
+    activeColor: 'bg-blue-700 text-white shadow-sm shadow-blue-700/20',
+  },
+  {
+    id: 'rust',
+    label: 'Rust',
+    activeColor: 'bg-orange-700 text-white shadow-sm shadow-orange-700/20',
+  },
+  {
+    id: 'ios',
+    label: 'iOS (Swift)',
+    activeColor: 'bg-orange-600 text-white shadow-sm shadow-orange-600/20',
+  },
+  {
+    id: 'android',
+    label: 'Android',
+    activeColor: 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20',
+  },
+  {
+    id: 'flutter',
+    label: 'Flutter',
+    activeColor: 'bg-sky-500 text-white shadow-sm shadow-sky-500/20',
+  },
+  {
+    id: 'react-native',
+    label: 'React Native',
+    activeColor: 'bg-cyan-600 text-white shadow-sm shadow-cyan-600/20',
+  },
+  {
+    id: 'system-design',
+    label: 'System Design',
+    iconName: 'architecture',
+    activeColor: 'bg-rose-600 text-white shadow-sm shadow-rose-600/20',
+  },
+  {
+    id: 'design-patterns',
+    label: 'Design Patterns',
+    iconName: 'architecture',
+    activeColor: 'bg-violet-600 text-white shadow-sm shadow-violet-600/20',
+  },
+  {
+    id: 'micro-frontend',
+    label: 'Micro-Frontend',
+    iconName: 'architecture',
+    activeColor: 'bg-fuchsia-600 text-white shadow-sm shadow-fuchsia-600/20',
+  },
+  {
+    id: 'ai',
+    label: 'AI & LLM',
+    activeColor: 'bg-purple-600 text-white shadow-sm shadow-purple-600/20',
+  },
+  {
+    id: 'database',
+    label: 'Database',
+    activeColor: 'bg-amber-600 text-white shadow-sm shadow-amber-600/20',
+  },
+  {
+    id: 'devops-cloud',
+    label: 'DevOps & Cloud',
+    activeColor: 'bg-sky-600 text-white shadow-sm shadow-sky-600/20',
+  },
+  {
+    id: 'cs-fundamentals',
+    label: 'CS Fundamentals',
+    activeColor: 'bg-slate-700 text-white shadow-sm shadow-slate-700/20',
+  },
+  {
+    id: 'dsa',
+    label: 'DSA & Algorithms',
+    activeColor: 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20',
+  },
+  {
+    id: 'data-engineering',
+    label: 'Data Engineering',
+    activeColor: 'bg-teal-600 text-white shadow-sm shadow-teal-600/20',
+  },
+  {
+    id: 'cybersecurity',
+    label: 'Cybersecurity',
+    activeColor: 'bg-rose-700 text-white shadow-sm shadow-rose-700/20',
+  },
+  {
+    id: 'testing-qa',
+    label: 'Testing & QA',
+    activeColor: 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20',
+  },
+  {
+    id: 'business-analyst',
+    label: 'Business Analyst',
+    activeColor: 'bg-blue-600 text-white shadow-sm shadow-blue-600/20',
+  },
+  {
+    id: 'behavioral-hr',
+    label: 'Behavioral & STAR',
+    activeColor: 'bg-pink-600 text-white shadow-sm shadow-pink-600/20',
+  },
+  {
+    id: 'graphql',
+    label: 'GraphQL',
+    activeColor: 'bg-pink-600 text-white shadow-sm shadow-pink-600/20',
+  },
+  {
+    id: 'state-management',
+    label: 'State Management',
+    activeColor: 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20',
+  },
+  {
+    id: 'performance',
+    label: 'Web Performance',
+    activeColor: 'bg-lime-600 text-white shadow-sm shadow-lime-600/20',
+  },
+  {
+    id: 'build-tools',
+    label: 'Build Tools',
+    activeColor: 'bg-yellow-600 text-white shadow-sm shadow-yellow-600/20',
+  },
+  {
+    id: 'seo',
+    label: 'SEO',
+    activeColor: 'bg-teal-600 text-white shadow-sm shadow-teal-600/20',
+  },
+  {
+    id: 'backend-api',
+    label: 'Backend API',
+    activeColor: 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/20',
+  },
+  {
+    id: 'shell-linux',
+    label: 'Shell & Linux',
+    activeColor: 'bg-zinc-700 text-white shadow-sm shadow-zinc-700/20',
+  },
+];
+
 export default function InterviewPage() {
   const { bookmarkedQuestionIds, customQuestions } = useInterviewStore();
 
@@ -48,34 +310,21 @@ export default function InterviewPage() {
     return [...MOCK_INTERVIEW_QUESTIONS, ...customQuestions];
   }, [customQuestions]);
 
-  const languageCounts = React.useMemo(() => {
-    return {
-      all: allQuestions.length,
-      react: allQuestions.filter(
-        (q) => q.category === 'react' || q.category === 'react-19'
-      ).length,
-      nextjs: allQuestions.filter(
-        (q) => q.category === 'nextjs' || q.category === 'next-app-router'
-      ).length,
-      typescript: allQuestions.filter(
-        (q) => q.category === 'typescript' || q.category === 'javascript-typescript'
-      ).length,
-      javascript: allQuestions.filter(
-        (q) => q.category === 'javascript' || q.category === 'javascript-typescript'
-      ).length,
-      html: allQuestions.filter((q) => q.category === 'html').length,
-      css: allQuestions.filter((q) => q.category === 'css').length,
-      systemDesign: allQuestions.filter(
-        (q) => q.category === 'system-design' || q.category === 'frontend-system-design'
-      ).length,
-      designPatterns: allQuestions.filter((q) => q.category === 'design-patterns').length,
-      microFrontend: allQuestions.filter((q) => q.category === 'micro-frontend').length,
-      go: allQuestions.filter((q) => q.category === 'go').length,
-      nestjs: allQuestions.filter((q) => q.category === 'nestjs').length,
-      nodejs: allQuestions.filter((q) => q.category === 'nodejs').length,
-      python: allQuestions.filter((q) => q.category === 'python').length,
-      django: allQuestions.filter((q) => q.category === 'django').length,
-    };
+  const categoryCounts = React.useMemo(() => {
+    const counts: Record<string, number> = { all: allQuestions.length };
+    for (const q of allQuestions) {
+      counts[q.category] = (counts[q.category] || 0) + 1;
+      if (q.category === 'react-19') counts.react = (counts.react || 0) + 1;
+      if (q.category === 'next-app-router') counts.nextjs = (counts.nextjs || 0) + 1;
+      if (q.category === 'javascript-typescript') {
+        counts.typescript = (counts.typescript || 0) + 1;
+        counts.javascript = (counts.javascript || 0) + 1;
+      }
+      if (q.category === 'frontend-system-design') {
+        counts['system-design'] = (counts['system-design'] || 0) + 1;
+      }
+    }
+    return counts;
   }, [allQuestions]);
 
   const levelCounts = React.useMemo(() => {
@@ -248,229 +497,35 @@ export default function InterviewPage() {
             <Card className="glass-card relative z-20 space-y-3.5 p-4">
               {/* Language Classification Quick Filter Pills */}
               <div className="flex flex-wrap items-center gap-1.5 pb-1">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('all')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'all'
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <span>🌐 Tất cả</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.all}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('react')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'react' || selectedCategory === 'react-19'
-                      ? 'bg-cyan-600 text-white shadow-xs shadow-cyan-600/20'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <TechIcon name="react" className="h-3.5 w-3.5" />
-                  <span>React</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.react}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('nextjs')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'nextjs' ||
-                    selectedCategory === 'next-app-router'
-                      ? 'bg-zinc-800 text-white shadow-xs dark:bg-zinc-200 dark:text-zinc-900'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <TechIcon name="nextjs" className="h-3.5 w-3.5" />
-                  <span>Next.js</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.nextjs}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('typescript')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'typescript'
-                      ? 'bg-blue-600 text-white shadow-xs shadow-blue-600/20'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <TechIcon name="typescript" className="h-3.5 w-3.5" />
-                  <span>TypeScript</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.typescript}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('javascript')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'javascript'
-                      ? 'bg-amber-600 text-white shadow-xs shadow-amber-600/20'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <TechIcon name="javascript" className="h-3.5 w-3.5" />
-                  <span>JavaScript</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.javascript}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('go')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'go'
-                      ? 'bg-sky-600 text-white shadow-xs shadow-sky-600/20'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <TechIcon name="go" className="h-3.5 w-3.5" />
-                  <span>Go (Golang)</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.go}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('nestjs')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'nestjs'
-                      ? 'bg-rose-600 text-white shadow-xs shadow-rose-600/20'
-                      : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                  }`}
-                >
-                  <TechIcon name="nestjs" className="h-3.5 w-3.5" />
-                  <span>NestJS</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.nestjs}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('nodejs')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'nodejs'
-                      ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <TechIcon name="nodejs" className="h-3.5 w-3.5" />
-                  <span>Node.js</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.nodejs}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('python')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'python'
-                      ? 'bg-yellow-600 text-white shadow-sm shadow-yellow-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <TechIcon name="python" className="h-3.5 w-3.5" />
-                  <span>Python</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.python}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('django')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'django'
-                      ? 'bg-teal-600 text-white shadow-sm shadow-teal-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <TechIcon name="django" className="h-3.5 w-3.5" />
-                  <span>Django</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.django}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('html')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'html'
-                      ? 'bg-orange-600 text-white shadow-sm shadow-orange-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <span>HTML</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.html}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('css')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'css'
-                      ? 'bg-sky-600 text-white shadow-sm shadow-sky-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <span>CSS</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.css}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('system-design')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'system-design'
-                      ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <TechIcon name="architecture" className="h-3.5 w-3.5" />
-                  <span>System Design</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.systemDesign}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('design-patterns')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'design-patterns'
-                      ? 'bg-violet-600 text-white shadow-sm shadow-violet-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <TechIcon name="architecture" className="h-3.5 w-3.5" />
-                  <span>Design Patterns</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.designPatterns}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory('micro-frontend')}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    selectedCategory === 'micro-frontend'
-                      ? 'bg-fuchsia-600 text-white shadow-sm shadow-fuchsia-600/20'
-                      : 'bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <TechIcon name="architecture" className="h-3.5 w-3.5" />
-                  <span>Micro-Frontend</span>
-                  <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
-                    {languageCounts.microFrontend}
-                  </span>
-                </button>
+                {CATEGORY_ITEMS.map((item) => {
+                  const isSelected =
+                    selectedCategory === item.id ||
+                    (item.id === 'react' && selectedCategory === 'react-19') ||
+                    (item.id === 'nextjs' && selectedCategory === 'next-app-router') ||
+                    (item.id === 'system-design' &&
+                      selectedCategory === 'frontend-system-design');
+                  const count = categoryCounts[item.id] || 0;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setSelectedCategory(item.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                        isSelected
+                          ? item.activeColor
+                          : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
+                      }`}
+                    >
+                      {item.iconName && (
+                        <TechIcon name={item.iconName} className="h-3.5 w-3.5" />
+                      )}
+                      <span>{item.label}</span>
+                      <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Level Classification Quick Filter Pills */}
@@ -504,43 +559,11 @@ export default function InterviewPage() {
                   <Select
                     value={selectedCategory}
                     onValueChange={(val) => setSelectedCategory(val as InterviewCategory)}
-                    options={[
-                      { value: 'all', label: 'Tất cả chủ đề' },
-                      { value: 'react', label: 'React Interview Bank' },
-                      { value: 'nextjs', label: 'Next.js Interview Bank' },
-                      { value: 'typescript', label: 'TypeScript Bank' },
-                      { value: 'javascript', label: 'JavaScript Core Bank' },
-                      { value: 'html', label: 'HTML5 & Web Bank' },
-                      { value: 'css', label: 'CSS3 & Styling Bank' },
-                      { value: 'system-design', label: 'System Design Bank' },
-                      { value: 'design-patterns', label: 'Design Patterns & SOLID' },
-                      { value: 'micro-frontend', label: 'Micro-Frontend Bank' },
-                      { value: 'go', label: 'Go (Golang) Bank' },
-                      { value: 'nestjs', label: 'NestJS Enterprise Bank' },
-                      { value: 'nodejs', label: 'Node.js Backend Bank' },
-                      { value: 'python', label: 'Python & FastAPI Bank' },
-                      { value: 'django', label: 'Django & DRF Bank' },
-                      { value: 'react-19', label: 'React Core' },
-                      { value: 'next-app-router', label: 'Next.js App Router' },
-                      {
-                        value: 'javascript-typescript',
-                        label: 'JavaScript & TypeScript',
-                      },
-                      {
-                        value: 'browser-runtime-workers',
-                        label: 'Browser Runtime & Workers',
-                      },
-                      { value: 'state-data', label: 'State & Data Query' },
-                      {
-                        value: 'performance-optimization',
-                        label: 'Performance & Security',
-                      },
-                      {
-                        value: 'frontend-system-design',
-                        label: 'Frontend System Design',
-                      },
-                    ]}
-                    className="w-48"
+                    options={CATEGORY_ITEMS.map((item) => ({
+                      value: item.id,
+                      label: `${item.label} (${categoryCounts[item.id] || 0})`,
+                    }))}
+                    className="w-56"
                   />
 
                   <Select
