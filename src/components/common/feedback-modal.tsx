@@ -189,7 +189,7 @@ export function FeedbackModal() {
           />
 
           {/* Modal Box */}
-          <div className="animate-in fade-in zoom-in-95 border-border bg-card relative w-full max-w-lg rounded-2xl border p-6 text-left shadow-2xl duration-150 dark:border-slate-700/60 dark:bg-[#0d121f] dark:shadow-indigo-950/40">
+          <div className="animate-in fade-in zoom-in-95 border-border bg-card relative max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl border p-4 text-left shadow-2xl duration-150 sm:p-6 dark:border-slate-700/60 dark:bg-[#0d121f] dark:shadow-indigo-950/40">
             {/* Close button */}
             <button
               onClick={handleClose}
@@ -343,10 +343,10 @@ export function FeedbackModal() {
                 </div>
 
                 {/* Submit & direct mail link */}
-                <div className="flex items-center justify-between pt-2">
+                <div className="flex flex-col-reverse items-stretch justify-between gap-3 pt-2 sm:flex-row sm:items-center">
                   <a
                     href="mailto:contact@dev-pro.online"
-                    className="text-muted-foreground hover:text-primary flex items-center gap-1.5 text-xs transition-colors dark:hover:text-indigo-400"
+                    className="text-muted-foreground hover:text-primary flex items-center justify-center gap-1.5 text-xs transition-colors sm:justify-start dark:hover:text-indigo-400"
                   >
                     <Mail className="h-3.5 w-3.5" />
                     <span>Gửi trực tiếp qua email client</span>
@@ -355,7 +355,7 @@ export function FeedbackModal() {
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="cursor-pointer gap-1.5 bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-500"
+                    className="w-full cursor-pointer gap-1.5 bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-500 sm:w-auto"
                   >
                     {isSubmitting ? (
                       <>

@@ -90,18 +90,20 @@ export const CalloutBox = React.memo(function CalloutBox({
     >
       {(title || icon || action) && (
         <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 font-bold">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 font-bold">
             {icon ? (
               <span className="shrink-0">{icon}</span>
             ) : (
               <IconComponent className={cn('h-3.5 w-3.5 shrink-0', config.titleClass)} />
             )}
-            {title && <span className={config.titleClass}>{title}</span>}
+            {title && (
+              <span className={cn(config.titleClass, 'break-words')}>{title}</span>
+            )}
           </div>
           {action && <div className="shrink-0">{action}</div>}
         </div>
       )}
-      <div className="leading-relaxed">{children}</div>
+      <div className="leading-relaxed break-words">{children}</div>
     </div>
   );
 });

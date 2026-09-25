@@ -305,7 +305,7 @@ export function RichTextEditor({
         {isPreview ? (
           <div
             style={{ minHeight }}
-            className="border-border/40 bg-secondary/20 rounded-xl border p-4 font-sans text-xs sm:text-sm"
+            className="border-border/40 bg-secondary/20 rounded-xl border p-4 font-sans text-xs break-words sm:text-sm"
           >
             {renderPreviewHtml(value)}
           </div>
@@ -325,10 +325,10 @@ export function RichTextEditor({
 
       {/* Footer Stats Bar */}
       <div className="border-border/40 bg-muted/20 text-muted-foreground flex items-center justify-between border-t px-3 py-1.5 text-[10px] font-medium">
-        <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-2 sm:flex">
           <span>Phím tắt: Ctrl+B (In đậm), Ctrl+I (In nghiêng), Tab (Lùi dòng)</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex w-full items-center justify-between gap-3 sm:w-auto sm:justify-end">
           <Badge variant="outline" className="font-mono text-[10px]">
             {wordCount} words
           </Badge>

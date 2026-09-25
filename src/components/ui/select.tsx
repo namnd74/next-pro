@@ -42,10 +42,15 @@ export function Select({
   const updateCoords = React.useCallback(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
+      const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 360;
+      const targetWidth = Math.min(Math.max(rect.width, 320), viewportWidth - 24);
+      const maxLeft = Math.max(12, viewportWidth - targetWidth - 12);
+      const clampedLeft = Math.max(12, Math.min(rect.left, maxLeft));
+
       setCoords({
         top: rect.bottom + window.scrollY + 6,
-        left: rect.left + window.scrollX,
-        width: Math.max(rect.width, 320),
+        left: clampedLeft + window.scrollX,
+        width: targetWidth,
       });
     }
   }, []);
@@ -134,7 +139,7 @@ export function Select({
               top: `${coords.top}px`,
               left: `${coords.left}px`,
               width: `${coords.width}px`,
-              maxWidth: '90vw',
+              maxWidth: 'calc(100vw - 24px)',
               zIndex: 99999,
             }}
             className="animate-in fade-in-50 zoom-in-95 border-border bg-popover text-popover-foreground max-h-64 overflow-y-auto rounded-xl border p-1.5 opacity-100 shadow-xl ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-950 dark:ring-white/10"

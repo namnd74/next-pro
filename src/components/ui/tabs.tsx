@@ -59,7 +59,7 @@ export function TabsList({ className, ...props }: React.HTMLAttributes<HTMLDivEl
   return (
     <div
       className={cn(
-        'bg-secondary/80 text-muted-foreground inline-flex h-11 items-center justify-center rounded-xl p-1 backdrop-blur-sm',
+        'bg-secondary/80 text-muted-foreground inline-flex h-auto min-h-11 items-center justify-center rounded-xl p-1 backdrop-blur-sm',
         className
       )}
       {...props}
@@ -82,7 +82,7 @@ export function TabsTrigger({ value, className, children, ...props }: TabsTrigge
       aria-selected={isActive}
       onClick={() => onValueChange(value)}
       className={cn(
-        'ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center rounded-lg px-3.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
+        'ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-center text-xs leading-snug font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 sm:px-3.5 sm:whitespace-nowrap',
         isActive
           ? 'bg-card text-foreground shadow-xs shadow-black/5 dark:shadow-black/20'
           : 'text-muted-foreground hover:bg-card/40 hover:text-foreground',

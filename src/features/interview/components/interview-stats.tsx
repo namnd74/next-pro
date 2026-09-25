@@ -62,57 +62,65 @@ export function InterviewStats() {
   return (
     <div className="space-y-4">
       {/* 4 Stats Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card className="glass-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500">
-              <ShieldCheck className="h-5 w-5" />
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 sm:gap-3">
+        <Card className="glass-card p-3 sm:p-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500 sm:h-10 sm:w-10">
+              <ShieldCheck className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <p className="text-muted-foreground text-xs font-medium">
-                Interview Readiness
+            <div className="min-w-0 flex-1">
+              <p className="text-muted-foreground truncate text-[11px] font-medium sm:text-xs">
+                Readiness
               </p>
-              <p className="text-foreground text-xl font-extrabold">{readinessScore}%</p>
+              <p className="text-foreground text-lg font-extrabold sm:text-xl">
+                {readinessScore}%
+              </p>
             </div>
           </div>
         </Card>
 
-        <Card className="glass-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500">
-              <Trophy className="h-5 w-5" />
+        <Card className="glass-card p-3 sm:p-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-500 sm:h-10 sm:w-10">
+              <Trophy className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <p className="text-muted-foreground text-xs font-medium">Mock Avg Score</p>
-              <p className="text-foreground text-xl font-extrabold">
+            <div className="min-w-0 flex-1">
+              <p className="text-muted-foreground truncate text-[11px] font-medium sm:text-xs">
+                Mock Score
+              </p>
+              <p className="text-foreground text-lg font-extrabold sm:text-xl">
                 {averageMockScore}/100
               </p>
             </div>
           </div>
         </Card>
 
-        <Card className="glass-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
-              <Bug className="h-5 w-5" />
+        <Card className="glass-card p-3 sm:p-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 sm:h-10 sm:w-10">
+              <Bug className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <p className="text-muted-foreground text-xs font-medium">Bugs Solved</p>
-              <p className="text-foreground text-xl font-extrabold">
+            <div className="min-w-0 flex-1">
+              <p className="text-muted-foreground truncate text-[11px] font-medium sm:text-xs">
+                Bugs Solved
+              </p>
+              <p className="text-foreground text-lg font-extrabold sm:text-xl">
                 {solvedBugCount}/{totalBugHunts}
               </p>
             </div>
           </div>
         </Card>
 
-        <Card className="glass-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500">
-              <Bookmark className="h-5 w-5" />
+        <Card className="glass-card p-3 sm:p-4">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 text-purple-500 sm:h-10 sm:w-10">
+              <Bookmark className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
             </div>
-            <div>
-              <p className="text-muted-foreground text-xs font-medium">Bookmarked</p>
-              <p className="text-foreground text-xl font-extrabold">
+            <div className="min-w-0 flex-1">
+              <p className="text-muted-foreground truncate text-[11px] font-medium sm:text-xs">
+                Bookmarked
+              </p>
+              <p className="text-foreground text-lg font-extrabold sm:text-xl">
                 {bookmarkedCount}/{totalQuestions}
               </p>
             </div>
@@ -121,13 +129,13 @@ export function InterviewStats() {
       </div>
 
       {/* Progress Bar */}
-      <Card className="glass-card space-y-1.5 p-4">
-        <div className="flex items-center justify-between text-xs font-semibold">
-          <span className="text-foreground flex items-center gap-1.5">
-            <Sparkles className="text-primary h-3.5 w-3.5" />
-            Senior Next.js Candidate Readiness Index
+      <Card className="glass-card space-y-1.5 p-3.5 sm:p-4">
+        <div className="flex items-center justify-between gap-2 text-xs font-semibold">
+          <span className="text-foreground flex min-w-0 items-center gap-1.5 truncate">
+            <Sparkles className="text-primary h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">Senior Candidate Readiness Index</span>
           </span>
-          <span className="text-primary">{readinessScore}%</span>
+          <span className="text-primary shrink-0">{readinessScore}%</span>
         </div>
         <Progress value={readinessScore} />
 

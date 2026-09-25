@@ -75,7 +75,7 @@ export const ModalDialog = React.memo(function ModalDialog({
         role="dialog"
         aria-modal="true"
         className={cn(
-          'border-border bg-card relative w-full rounded-2xl border p-6 text-left shadow-2xl transition-all',
+          'border-border bg-card relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl border p-4 text-left shadow-2xl transition-all sm:p-6',
           'animate-in fade-in zoom-in-95 duration-150',
           MAX_WIDTH_MAP[maxWidth] ?? 'max-w-lg',
           className
@@ -97,13 +97,13 @@ export const ModalDialog = React.memo(function ModalDialog({
             <div className="flex items-center gap-2">
               {icon && <span className="shrink-0">{icon}</span>}
               {title && (
-                <h2 className="text-foreground text-lg font-bold tracking-tight sm:text-xl">
+                <h2 className="text-foreground text-lg font-bold tracking-tight break-words sm:text-xl">
                   {title}
                 </h2>
               )}
             </div>
             {description && (
-              <p className="text-muted-foreground text-xs leading-relaxed">
+              <p className="text-muted-foreground text-xs leading-relaxed break-words">
                 {description}
               </p>
             )}
