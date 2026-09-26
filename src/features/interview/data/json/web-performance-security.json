@@ -17,13 +17,21 @@
     "seniorAnswer": {
       "summary": "INP đo lường độ trễ từ lúc người dùng tương tác (click, gõ phím) đến khi khung hình tiếp theo được vẽ lên màn hình. Tối ưu bằng cách bọc các state update nặng trong startTransition, chia nhỏ Long Tasks, và giảm kích thước JavaScript hydration.",
       "deepDive": "startTransition đánh dấu update là non-urgent (độ ưu tiên thấp). React sẽ cho phép trình duyệt ngắt (interrupt) quá trình render để phản hồi ngay các input của user, tránh làm đơ UI. Kết hợp với RSC để giảm tải JS hydration trên Main Thread.",
-      "codeExample": "const [isPending, startTransition] = useTransition();\n\nconst handleFilterChange = (value: string) => {\n  // Input phản hồi tức thì:\n  setText(value);\n\n  // Lọc 10,000 items được xếp vào transition (không block main thread):\n  startTransition(() => {\n    setFilteredList(hugeList.filter(item => item.includes(value)));\n  });\n};"
+      "codeExample": "const [isPending, startTransition] = useTransition();\n\nconst handleFilterChange = (value: string) => {\n  // Input phản hồi tức thì:\n  setText(value);\n\n  // Lọc 10,000 items được xếp vào transition (không block main thread):\n  startTransition(() => {\n    setFilteredList(hugeList.filter(item => item.includes(value)));\n  });\n};",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Phân Tích Cấu Trúc Độ Trễ Chỉ Số INP (Interaction to Next Paint)",
+        "caption": "INP = Input Delay (Độ trễ chờ Main Thread rảnh) + Processing Time (Thời gian chạy hàm xử lý) + Presentation Delay (Thời gian vẽ lại màn hình)",
+        "code": "flowchart LR\n    User[\"Người dùng Click Nút\"] --> Part1[\"1. Input Delay\n(Chờ Main Thread hoàn thành các Long Task trước đó)\"]\n    Part1 --> Part2[\"2. Processing Time\n(Thực thi callback JavaScript: onClick handler)\"]\n    Part2 --> Part3[\"3. Presentation Delay\n(Trình duyệt tính toán Layout, Paint và Composite lên màn hình)\"]\n    Part3 --> Done[\"Điểm ảnh mới xuất hiện trên màn hình (Next Paint)\"]\n\n    Explain[\"Mục tiêu Core Web Vitals: Tổng thời gian cả 3 phần phải nhỏ hơn 200 mili-giây!\"]"
+      }
     },
     "pitfalls": [
       "Nhầm lẫn INP với LCP hoặc FID.",
       "Sử dụng setTimeout để hoãn tác vụ thay vì dùng useTransition chuẩn của React."
     ],
-    "followUpQuestions": ["useDeferredValue khác gì so với useTransition trong React?"]
+    "followUpQuestions": [
+      "useDeferredValue khác gì so với useTransition trong React?"
+    ]
   },
   {
     "id": "int-03",

@@ -358,7 +358,13 @@
       "summary": "Các loại JOIN quy định cách kết hợp các hàng giữa 2 bảng dựa trên điều kiện ghép `ON`: 1) `INNER JOIN`: Chỉ trả về những hàng có sự trùng khớp ở CẢ HAI bảng; 2) `LEFT JOIN`: Giữ lại toàn bộ hàng ở bảng bên trái, nếu bảng bên phải không có hàng khớp thì điền `NULL`; 3) `RIGHT JOIN`: Giữ lại toàn bộ hàng ở bảng bên phải, bảng bên trái điền `NULL` (thực tế luôn khuyến nghị đảo vị trí để dùng `LEFT JOIN` cho dễ đọc từ trái qua phải); 4) `FULL JOIN`: Giữ lại toàn bộ hàng ở cả hai bảng, bên nào thiếu thì điền `NULL`; 5) `CROSS JOIN`: Tích Descartes (Cartesian product), ghép mỗi hàng của bảng A với toàn bộ hàng của bảng B (ra N * M dòng).",
       "deepDive": "Ở tầng vật lý, Database Optimizer chọn 1 trong 3 thuật toán JOIN chính tùy theo kích thước dữ liệu và index: 1) `Nested Loop Join`: Tối ưu khi 1 bảng rất nhỏ và bảng kia có Index trên cột Join (O(N * log M)); 2) `Hash Join`: Tối ưu cho dữ liệu lớn không có index, engine dựng Hash Table trong RAM trên bảng nhỏ hơn rồi scan bảng lớn để tra cứu (O(N + M)); 3) `Merge Join`: Cực nhanh khi cả 2 bảng đều ĐÃ ĐƯỢC SẮP XẾP theo khóa join (dựa vào B-Tree Index).",
       "codeExample": "-- Minh họa trực quan các loại JOIN giữa Bảng Customers và Orders\n\n-- 1. INNER JOIN: Chỉ lấy khách hàng ĐÃ TỪNG mua hàng\nSELECT c.customer_id, c.full_name, o.order_id, o.total_amount\nFROM customers c\nINNER JOIN orders o ON c.customer_id = o.customer_id;\n\n-- 2. LEFT JOIN: Lấy TẤT CẢ khách hàng, kể cả người CHƯA TỪNG mua hàng (o.order_id sẽ là NULL)\nSELECT c.customer_id, c.full_name, o.order_id, o.total_amount\nFROM customers c\nLEFT JOIN orders o ON c.customer_id = o.customer_id;\n\n-- 3. Kỹ thuật Anti-Join: Tìm khách hàng CHƯA TỪNG mua bất kỳ đơn hàng nào\nSELECT c.customer_id, c.full_name\nFROM customers c\nLEFT JOIN orders o ON c.customer_id = o.customer_id\nWHERE o.order_id IS NULL;\n\n-- 4. CROSS JOIN: Sinh ma trận kích cỡ sản phẩm x màu sắc\nSELECT p.product_name, s.size_code, c.color_name\nFROM products p\nCROSS JOIN product_sizes s\nCROSS JOIN product_colors c;",
-      "codeLanguage": "sql"
+      "codeLanguage": "sql",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Trực Quan Hóa Các Loại SQL JOIN Trong Quan Hệ Dữ Liệu",
+        "caption": "Sự khác biệt về tập kết quả giữa INNER, LEFT OUTER, RIGHT OUTER và FULL OUTER JOIN",
+        "code": "flowchart TD\n    subgraph InnerJoin [\"INNER JOIN (Phần giao nhau)\"]\n        A1[\"Table A (Users)\"] ---|\"Khóa chính = Khóa ngoại\"| B1[\"Table B (Orders)\"]\n        Res1[\"Chỉ lấy các dòng có mặt ở cả 2 bảng\"]\n    end\n\n    subgraph LeftJoin [\"LEFT JOIN (Lấy trọn bảng Trái)\"]\n        A2[\"Table A (Users)\"] -->|\"Lấy toàn bộ A\"| Res2[\"Users không có order sẽ mang giá trị NULL ở cột B\"]\n        B2[\"Table B (Orders)\"] -.-> Res2\n    end\n\n    subgraph FullJoin [\"FULL OUTER JOIN (Hợp nhất toàn bộ)\"]\n        Res3[\"Lấy tất cả các dòng từ cả A và B\nĐiền NULL cho các trường không khớp\"]\n    end"
+      }
     },
     "codeExample": "-- Minh họa trực quan các loại JOIN giữa Bảng Customers và Orders\n\n-- 1. INNER JOIN: Chỉ lấy khách hàng ĐÃ TỪNG mua hàng\nSELECT c.customer_id, c.full_name, o.order_id, o.total_amount\nFROM customers c\nINNER JOIN orders o ON c.customer_id = o.customer_id;\n\n-- 2. LEFT JOIN: Lấy TẤT CẢ khách hàng, kể cả người CHƯA TỪNG mua hàng (o.order_id sẽ là NULL)\nSELECT c.customer_id, c.full_name, o.order_id, o.total_amount\nFROM customers c\nLEFT JOIN orders o ON c.customer_id = o.customer_id;\n\n-- 3. Kỹ thuật Anti-Join: Tìm khách hàng CHƯA TỪNG mua bất kỳ đơn hàng nào\nSELECT c.customer_id, c.full_name\nFROM customers c\nLEFT JOIN orders o ON c.customer_id = o.customer_id\nWHERE o.order_id IS NULL;\n\n-- 4. CROSS JOIN: Sinh ma trận kích cỡ sản phẩm x màu sắc\nSELECT p.product_name, s.size_code, c.color_name\nFROM products p\nCROSS JOIN product_sizes s\nCROSS JOIN product_colors c;",
     "codeLanguage": "sql",
@@ -725,7 +731,82 @@
       "summary": "Index làm chậm thao tác ghi (INSERT/UPDATE/DELETE) vì mỗi khi dữ liệu trong bảng thay đổi, Database Engine không chỉ ghi vào bảng chính (Heap table) mà còn BẮT BUỘC PHẢI CẬP NHẬT TẤT CẢ CÁC CÂY B-TREE INDEX liên quan. Với mỗi index, database phải duyệt cây, tìm node lá thích hợp, chèn giá trị và có thể gây phân tách trang (Page Split) tiêu tốn nhiều I/O đĩa. Không có con số cứng nhắc \"bao nhiêu là quá nhiều\", nhưng thông thường từ 5-7 indexes trên một bảng OLTP ghi nhiều đã là ngưỡng cần cân nhắc kỹ lưỡng; bảng ghi siêu nhanh (Log/Event) chỉ nên có 1-2 index (hoặc chỉ Primary Key).",
       "deepDive": "Chi phí ngầm của việc lạm dụng Index: 1) Phân tách trang (Page Split): Khi chèn một khóa mới vào trang lá B-tree đã đầy, RDBMS phải cấp phát trang mới, chuyển 50% dữ liệu sang và cập nhật liên kết node cha (nhân đôi I/O); 2) Tiêu tốn bộ đệm RAM: Tất cả các index đều cạnh tranh dung lượng Buffer Pool với bảng dữ liệu chính; 3) Trong PostgreSQL: Nếu cập nhật một cột không có index, Postgres có thể dùng cơ chế HOT (Heap-Only Tuples) siêu nhanh không cần chạm vào index; nhưng nếu cột đó dính index, bắt buộc phải cập nhật index và ghi log WAL đầy đủ.",
       "codeExample": "-- Truy vấn kiểm tra các Index không bao giờ được sử dụng (Unused Indexes) trong PostgreSQL\n-- Giúp Senior DB Architect loại bỏ index thừa để tăng tốc độ ghi ngay lập tức\nSELECT \n    schemaname || '.' || relname AS table_name,\n    indexrelname AS index_name,\n    idx_scan AS times_used,\n    pg_size_pretty(pg_relation_size(indexrelid)) AS index_size\nFROM pg_stat_user_indexes\nWHERE idx_scan = 0 -- Index chưa từng được sử dụng để quét dữ liệu kể từ lần reset thống kê\n  AND indexrelname NOT LIKE '%_pkey' -- Không xóa Primary Key\nORDER BY pg_relation_size(indexrelid) DESC;\n\n-- Xóa index thừa an toàn không gây lock bảng trên Production:\n-- DROP INDEX CONCURRENTLY idx_orders_unused_field;",
-      "codeLanguage": "sql"
+      "codeLanguage": "sql",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cấu Trúc Cây Chỉ Mục B+ Tree (Root -> Branch -> Leaf Pages)",
+        "caption": "Tìm kiếm O(log N) cực nhanh nhờ các con trỏ trang và danh sách liên kết hai chiều ở tầng lá",
+        "code": "flowchart TD\n    Root[\"Root Page (Chỉ mục cấp 1)\n[Keys: 20 | 50]\"]\n    \n    Root --> Branch1[\"Branch Page 1\n[Keys: 5 | 12]\"]\n    Root --> Branch2[\"Branch Page 2\n[Keys: 28 | 40]\"]\n    Root --> Branch3[\"Branch Page 3\n[Keys: 65 | 80]\"]\n\n    Branch1 --> Leaf1[\"Leaf Page 1\n(Data Rows: 1..4)\"]\n    Branch1 --> Leaf2[\"Leaf Page 2\n(Data Rows: 5..11)\"]\n    \n    Leaf1 <===>|\"Doubly Linked List (Quét Range Scan O(1))\"| Leaf2"
+      },
+      "benchmark": {
+        "title": "Đánh Đổi Kỹ Thuật: Chi Phí Thêm Index B+ Tree",
+        "caption": "Index tăng tốc độ đọc dữ liệu nhưng làm suy giảm thông lượng ghi do Page Split",
+        "options": [
+          {
+            "name": "Truy Vấn Đọc Có Index Phù Hợp",
+            "badge": "Đọc Cực Nhanh",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tốc độ tìm kiếm (Read Latency)",
+                "value": 99,
+                "displayValue": "< 1ms (Index Seek)",
+                "color": "emerald"
+              },
+              {
+                "label": "Số khối IO đọc đĩa",
+                "value": 95,
+                "displayValue": "3-4 Pages (O(log N))",
+                "color": "emerald"
+              },
+              {
+                "label": "Tốn RAM Buffer Pool",
+                "value": 70,
+                "displayValue": "Cần cache index pages",
+                "color": "blue"
+              }
+            ],
+            "pros": [
+              "Tránh Table Full Scan hàng triệu dòng",
+              "Hỗ trợ sắp xếp ORDER BY và lọc WHERE cực nhanh"
+            ],
+            "cons": [
+              "Chiếm dụng thêm dung lượng lưu trữ trên SSD"
+            ]
+          },
+          {
+            "name": "Chi Phí Ghi Khi Có Quá Nhiều Index (Over-indexing)",
+            "badge": "Ghi Chậm",
+            "metrics": [
+              {
+                "label": "Tốc độ ghi (Write Latency)",
+                "value": 25,
+                "displayValue": "Giảm 5-10 lần",
+                "color": "rose"
+              },
+              {
+                "label": "Hiện tượng Page Split",
+                "value": 85,
+                "displayValue": "Thường xuyên xảy ra",
+                "color": "rose"
+              },
+              {
+                "label": "Áp lực ghi đĩa WAL",
+                "value": 90,
+                "displayValue": "Gấp N lần số lượng index",
+                "color": "rose"
+              }
+            ],
+            "pros": [
+              "Không có ưu điểm cho thao tác INSERT/UPDATE"
+            ],
+            "cons": [
+              "Mỗi lệnh INSERT buộc DB phải cập nhật đồng thời vào N cây B-Tree",
+              "Gây phân mảnh trang đĩa (Index Fragmentation)"
+            ]
+          }
+        ]
+      }
     },
     "codeExample": "-- Truy vấn kiểm tra các Index không bao giờ được sử dụng (Unused Indexes) trong PostgreSQL\n-- Giúp Senior DB Architect loại bỏ index thừa để tăng tốc độ ghi ngay lập tức\nSELECT \n    schemaname || '.' || relname AS table_name,\n    indexrelname AS index_name,\n    idx_scan AS times_used,\n    pg_size_pretty(pg_relation_size(indexrelid)) AS index_size\nFROM pg_stat_user_indexes\nWHERE idx_scan = 0 -- Index chưa từng được sử dụng để quét dữ liệu kể từ lần reset thống kê\n  AND indexrelname NOT LIKE '%_pkey' -- Không xóa Primary Key\nORDER BY pg_relation_size(indexrelid) DESC;\n\n-- Xóa index thừa an toàn không gây lock bảng trên Production:\n-- DROP INDEX CONCURRENTLY idx_orders_unused_field;",
     "codeLanguage": "sql",
@@ -758,7 +839,21 @@
       "summary": "Nguyên nhân: Cây chỉ mục B-tree lưu trữ giá trị THÔ của cột `created_at` theo thứ tự sắp xếp sẵn. Khi bạn bọc hàm `DATE(created_at)`, Database Engine không thể biết trước kết quả của hàm trên từng node lá của B-tree nếu không gọi hàm đó trên TỪNG DÒNG của bảng. Do đó, nó bị vô hiệu hóa khả năng tìm kiếm nhị phân (Index Seek) và buộc phải quét toàn bộ bảng hoặc toàn bộ cây index (Full Scan). Cách viết lại chuẩn (Sargable): Chuyển thành khoảng thời gian nửa mở (Half-open interval) với cột thô đứng độc lập: `created_at >= '2026-01-01 00:00:00' AND created_at < '2026-01-02 00:00:00'.",
       "deepDive": "Tại sao nên dùng khoảng nửa mở `[>= start AND < end)` thay vì `BETWEEN`? Vì `BETWEEN` bao gồm cả 2 đầu mút (`<= 2026-01-01 23:59:59`). Nếu dữ liệu timestamp có độ phân giải microsecond (như `23:59:59.999999`), việc dùng BETWEEN rất dễ bỏ sót các giao dịch phát sinh ở mili-giây cuối cùng hoặc lẹm sang ngày hôm sau. Nếu bắt buộc phải query thường xuyên bằng hàm `DATE(created_at)`, giải pháp thay thế là tạo một \"Expression Index\" (Functional Index): `CREATE INDEX idx_orders_date ON orders(DATE(created_at));`.",
       "codeExample": "-- Giả sử bảng orders có index: CREATE INDEX idx_orders_created_at ON orders(created_at);\n\n-- ❌ KHÔNG KHẢ DỤNG INDEX (Non-Sargable): Ép bọc hàm lên cột\n-- Query Plan: Seq Scan / Full Table Scan (Quét 100 triệu dòng và tính hàm DATE() 100 triệu lần)\nEXPLAIN ANALYZE\nSELECT id, total_amount \nFROM orders \nWHERE DATE(created_at) = '2026-01-01';\n\n-- ✅ KHẢ DỤNG INDEX TUYỆT ĐỐI (Sargable): Cột thô đứng độc lập với khoảng nửa mở\n-- Query Plan: Index Range Scan / Index Seek (Chỉ nhảy thẳng đến node 2026-01-01 trong vài mili-giây)\nEXPLAIN ANALYZE\nSELECT id, total_amount \nFROM orders \nWHERE created_at >= '2026-01-01 00:00:00+00' \n  AND created_at <  '2026-01-02 00:00:00+00';\n\n-- 💡 NẾU BẮT BUỘC DÙNG HÀM: Tạo Expression Index (Functional Index)\nCREATE INDEX idx_orders_created_date ON orders (DATE(created_at));",
-      "codeLanguage": "sql"
+      "codeLanguage": "sql",
+      "codeDiff": {
+        "title": "Lỗi Bọc Hàm Khiến Mất Index (Non-SARGable) vs Câu Lệnh Chuẩn Senior",
+        "language": "sql",
+        "antiPattern": {
+          "title": "❌ Anti-Pattern: Bọc hàm DATE() lên cột có Index (Dẫn đến Table Scan toàn bộ bảng)",
+          "code": "-- THẢM HỌA HIỆU NĂNG: Cột created_at có B-Tree index nhưng Database BỎ QUA INDEX!\n-- Database buộc phải chạy hàm DATE() cho 50,000,000 dòng để so sánh!\nSELECT id, user_id, total_amount \nFROM orders \nWHERE DATE(created_at) = '2026-09-26';",
+          "explanation": "Khi áp dụng hàm toán học hoặc chuyển đổi kiểu lên cột trong mệnh đề WHERE, trình tối ưu hóa truy vấn (Query Optimizer) không thể thực hiện Index Seek theo cây B-Tree mà buộc phải Full Table Scan toàn bộ hàng chục triệu bản ghi."
+        },
+        "seniorSolution": {
+          "title": "✅ Senior Solution: Sử dụng cú pháp SARGable với khoảng so sánh Range",
+          "code": "-- CHUẨN SENIOR (SARGable): Tận dụng 100% B-Tree Index Seek O(log N)\n-- Trả kết quả dưới 2 mili-giây trên bảng 50,000,000 dòng\nSELECT id, user_id, total_amount \nFROM orders \nWHERE created_at >= '2026-09-26 00:00:00' \n  AND created_at <  '2026-09-27 00:00:00';",
+          "explanation": "Giữ nguyên cột thuần túy ở vế trái và so sánh theo khoảng (Range Condition). Trình tối ưu hóa sẽ nhảy trực tiếp tới vị trí đầu ngày và quét tuần tự tới cuối ngày trên tầng lá của B+Tree chỉ trong vài mili-giây."
+        }
+      }
     },
     "codeExample": "-- Giả sử bảng orders có index: CREATE INDEX idx_orders_created_at ON orders(created_at);\n\n-- ❌ KHÔNG KHẢ DỤNG INDEX (Non-Sargable): Ép bọc hàm lên cột\n-- Query Plan: Seq Scan / Full Table Scan (Quét 100 triệu dòng và tính hàm DATE() 100 triệu lần)\nEXPLAIN ANALYZE\nSELECT id, total_amount \nFROM orders \nWHERE DATE(created_at) = '2026-01-01';\n\n-- ✅ KHẢ DỤNG INDEX TUYỆT ĐỐI (Sargable): Cột thô đứng độc lập với khoảng nửa mở\n-- Query Plan: Index Range Scan / Index Seek (Chỉ nhảy thẳng đến node 2026-01-01 trong vài mili-giây)\nEXPLAIN ANALYZE\nSELECT id, total_amount \nFROM orders \nWHERE created_at >= '2026-01-01 00:00:00+00' \n  AND created_at <  '2026-01-02 00:00:00+00';\n\n-- 💡 NẾU BẮT BUỘC DÙNG HÀM: Tạo Expression Index (Functional Index)\nCREATE INDEX idx_orders_created_date ON orders (DATE(created_at));",
     "codeLanguage": "sql",
@@ -892,7 +987,76 @@
       "summary": "Bốn cấp độ cô lập và các hiện tượng bất thường bị ngăn chặn: 1) `Read Uncommitted`: Cho phép đọc dữ liệu chưa commit của transaction khác -> Bị dính Dirty Read (rất nguy hiểm, hiếm khi dùng); 2) `Read Committed`: Chỉ đọc dữ liệu đã commit -> Chặn được Dirty Read, nhưng vẫn bị Non-repeatable Read (cùng 1 câu SELECT trong 1 transaction cho ra giá trị khác nhau) và Phantom Read; 3) `Repeatable Read`: Đảm bảo đọc cùng một snapshot dữ liệu trong suốt transaction -> Chặn Dirty Read và Non-repeatable Read; 4) `Serializable`: Cấp độ cao nhất, mô phỏng các transaction chạy tuần tự -> Chặn toàn bộ mọi bất thường kể cả Write Skew và Phantom Read.",
       "deepDive": "Sự khác biệt mặc định quan trọng: 1) PostgreSQL mặc định là `Read Committed`: Mỗi câu lệnh SQL trong transaction nhìn thấy snapshot dữ liệu tại thời điểm CÂU LỆNH ĐÓ BẮT ĐẦU; 2) MySQL InnoDB mặc định là `Repeatable Read`: Toàn bộ transaction nhìn thấy snapshot dữ liệu tại thời điểm CÂU LỆNH SELECT ĐẦU TIÊN CỦA TRANSACTION bắt đầu. Đặc biệt, MySQL InnoDB ở mức Repeatable Read sử dụng cơ chế Next-Key Locking (kết hợp Record lock và Gap lock) để ngăn chặn hầu hết hiện tượng Phantom Read ngay ở mức Repeatable Read mà không cần lên tới Serializable!",
       "codeExample": "-- Minh họa chuyển đổi Isolation Level trong PostgreSQL / MySQL\n\n-- 1. Thiết lập mức cô lập cho toàn bộ Transaction hiện tại\nBEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;\n\n-- Transaction này được đảm bảo: Dù các transaction khác có UPDATE và COMMIT bao nhiêu lần,\n-- thì câu lệnh SELECT này vẫn luôn luôn trả về cùng một kết quả duy nhất (Consistent Snapshot)\nSELECT SUM(balance) FROM bank_accounts;\n\n-- Giả sử bên ngoài có transaction khác nạp thêm tiền và COMMIT...\n\n-- Đọc lại lần 2: Vẫn ra chính xác con số như lần 1 (Chặn Non-repeatable Read)\nSELECT SUM(balance) FROM bank_accounts;\n\nCOMMIT;",
-      "codeLanguage": "sql"
+      "codeLanguage": "sql",
+      "benchmark": {
+        "title": "Ma trận Bốn Cấp Độ Cô Lập Giao Dịch ACID (Isolation Levels)",
+        "caption": "Đánh giá khả năng ngăn chặn các hiện tượng dị thường (Anomalies) và chi phí khóa",
+        "options": [
+          {
+            "name": "Read Committed (Mặc định PostgreSQL)",
+            "badge": "Cân bằng nhất",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Chống Đọc Rác (Dirty Read)",
+                "value": 100,
+                "displayValue": "Ngăn chặn 100%",
+                "color": "emerald"
+              },
+              {
+                "label": "Chống Đọc Lại Sai (Non-Repeatable)",
+                "value": 0,
+                "displayValue": "Vẫn có thể bị",
+                "color": "rose"
+              },
+              {
+                "label": "Thông lượng giao dịch (TPS)",
+                "value": 95,
+                "displayValue": "Rất cao (Ít lock)",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Không bao giờ đọc dữ liệu chưa commit của giao dịch khác",
+              "Hiệu năng cao, sử dụng cơ chế MVCC snapshot mượt mà"
+            ],
+            "cons": [
+              "Trong cùng 1 transaction, gọi 2 lần SELECT cùng 1 dòng có thể thấy 2 kết quả khác nhau nếu có commit xen giữa"
+            ]
+          },
+          {
+            "name": "Serializable (Cấp độ cao nhất)",
+            "badge": "Nghiêm ngặt tuyệt đối",
+            "metrics": [
+              {
+                "label": "Chống Mọi Hiện Tượng Dị Thường",
+                "value": 100,
+                "displayValue": "An toàn tuyệt đối",
+                "color": "emerald"
+              },
+              {
+                "label": "Nguy cơ Serialization Failure (40001)",
+                "value": 85,
+                "displayValue": "Cao (Phải retry)",
+                "color": "rose"
+              },
+              {
+                "label": "Thông lượng giao dịch (TPS)",
+                "value": 35,
+                "displayValue": "Thấp (Dễ xung đột)",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Kết quả thực thi tương đương như khi chạy tuần tự từng giao dịch đơn lẻ",
+              "Loại bỏ hoàn toàn Phantom Read và Write Skew"
+            ],
+            "cons": [
+              "Các giao dịch ghi đồng thời thường xuyên bị ném lỗi abort/conflict, ứng dụng bắt buộc phải viết mã retry"
+            ]
+          }
+        ]
+      }
     },
     "codeExample": "-- Minh họa chuyển đổi Isolation Level trong PostgreSQL / MySQL\n\n-- 1. Thiết lập mức cô lập cho toàn bộ Transaction hiện tại\nBEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ;\n\n-- Transaction này được đảm bảo: Dù các transaction khác có UPDATE và COMMIT bao nhiêu lần,\n-- thì câu lệnh SELECT này vẫn luôn luôn trả về cùng một kết quả duy nhất (Consistent Snapshot)\nSELECT SUM(balance) FROM bank_accounts;\n\n-- Giả sử bên ngoài có transaction khác nạp thêm tiền và COMMIT...\n\n-- Đọc lại lần 2: Vẫn ra chính xác con số như lần 1 (Chặn Non-repeatable Read)\nSELECT SUM(balance) FROM bank_accounts;\n\nCOMMIT;",
     "codeLanguage": "sql",
@@ -1718,11 +1882,15 @@
     "seniorAnswer": {
       "summary": "ER Diagram (Sơ đồ Thực thể - Quan hệ) là mô hình đồ họa biểu diễn cấu trúc dữ liệu ở mức ý niệm (Conceptual Model), mô tả thế giới thực của bài toán trước khi ánh xạ thành các bảng SQL vật lý. Ba thành phần cốt lõi: 1) `Entity` (Thực thể): Đối tượng hoặc khái niệm trong thế giới thực cần quản lý dữ liệu (hình chữ nhật, ví dụ: Sinh viên, Khóa học). Thực thể yếu (Weak Entity) là thực thể không thể tồn tại nếu thiếu thực thể cha (ví dụ: Người phụ thuộc của nhân viên); 2) `Attribute` (Thuộc tính): Đặc điểm mô tả thực thể (hình elip, gồm: Khóa chính, Thuộc tính đơn, Đa trị, Dẫn xuất); 3) `Relationship` (Mối quan hệ): Mối liên kết giữa các thực thể (hình thoi, gồm quan hệ 1-1, 1-N, N-M).",
       "deepDive": "Ký hiệu chân quạ (Crow's Foot Notation) trong thiết kế hiện đại: Sơ đồ ER hiện đại thường dùng ký hiệu Chân quạ để thể hiện cả Lực lượng (Cardinality: One or Many) và Tính bắt buộc (Modality: Optional 0 or Mandatory 1). Ví dụ: Một Khách hàng có thể có \"0 hoặc nhiều\" Đơn hàng (Vòng tròn + Chân quạ `0..*`), nhưng một Đơn hàng bắt buộc phải thuộc về \"chính xác 1\" Khách hàng (Hai vạch đứng `1..1`).",
-      "codeExample": "// Mô hình ER dạng Mermaid trực quan (Chuẩn Crow's Foot Notation)\n/*\nerDiagram\n    CUSTOMER ||--o{ ORDER : \"places (1 to 0..N)\"\n    ORDER ||--|{ ORDER_ITEM : \"contains (1 to 1..N)\"\n    PRODUCT ||--o{ ORDER_ITEM : \"ordered_in (1 to 0..N)\"\n    \n    CUSTOMER {\n        bigint customer_id PK\n        string full_name\n        string email UK\n    }\n    ORDER {\n        bigint order_id PK\n        bigint customer_id FK\n        datetime order_date\n        decimal grand_total\n    }\n    ORDER_ITEM {\n        bigint item_id PK\n        bigint order_id FK\n        bigint product_id FK\n        int quantity\n        decimal unit_price\n    }\n    PRODUCT {\n        bigint product_id PK\n        string name\n        decimal current_price\n    }\n*/",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mô hình ERD (Crow's Foot Notation)",
+        "caption": "Quan hệ 1-N giữa Khách hàng, Đơn hàng và Chi tiết đơn hàng theo chuẩn Crow's Foot.",
+        "code": "erDiagram\n    CUSTOMER ||--o{ ORDER : \"places (1 to 0..N)\"\n    ORDER ||--|{ ORDER_ITEM : \"contains (1 to 1..N)\"\n    PRODUCT ||--o{ ORDER_ITEM : \"ordered_in (1 to 0..N)\"\n    \n    CUSTOMER {\n        bigint customer_id PK\n        string full_name\n        string email UK\n    }\n    ORDER {\n        bigint order_id PK\n        bigint customer_id FK\n        datetime order_date\n        decimal grand_total\n    }\n    ORDER_ITEM {\n        bigint item_id PK\n        bigint order_id FK\n        bigint product_id FK\n        int quantity\n        decimal unit_price\n    }\n    PRODUCT {\n        bigint product_id PK\n        string name\n        decimal current_price\n    }"
+      },
+      "codeExample": "-- Ánh xạ DDL vật lý tương ứng từ sơ đồ ERD trên\nCREATE TABLE customers (\n    customer_id BIGSERIAL PRIMARY KEY,\n    full_name VARCHAR(100) NOT NULL,\n    email VARCHAR(255) UNIQUE NOT NULL\n);\n\nCREATE TABLE orders (\n    order_id BIGSERIAL PRIMARY KEY,\n    customer_id BIGINT NOT NULL REFERENCES customers(customer_id),\n    order_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n    grand_total DECIMAL(12, 2) NOT NULL\n);\n\nCREATE TABLE order_items (\n    item_id BIGSERIAL PRIMARY KEY,\n    order_id BIGINT NOT NULL REFERENCES orders(order_id) ON DELETE CASCADE,\n    product_id BIGINT NOT NULL,\n    quantity INT NOT NULL CHECK (quantity > 0),\n    unit_price DECIMAL(12, 2) NOT NULL\n);",
       "codeLanguage": "sql"
     },
-    "codeExample": "// Mô hình ER dạng Mermaid trực quan (Chuẩn Crow's Foot Notation)\n/*\nerDiagram\n    CUSTOMER ||--o{ ORDER : \"places (1 to 0..N)\"\n    ORDER ||--|{ ORDER_ITEM : \"contains (1 to 1..N)\"\n    PRODUCT ||--o{ ORDER_ITEM : \"ordered_in (1 to 0..N)\"\n    \n    CUSTOMER {\n        bigint customer_id PK\n        string full_name\n        string email UK\n    }\n    ORDER {\n        bigint order_id PK\n        bigint customer_id FK\n        datetime order_date\n        decimal grand_total\n    }\n    ORDER_ITEM {\n        bigint item_id PK\n        bigint order_id FK\n        bigint product_id FK\n        int quantity\n        decimal unit_price\n    }\n    PRODUCT {\n        bigint product_id PK\n        string name\n        decimal current_price\n    }\n*/",
-    "codeLanguage": "sql",
     "pitfalls": [
       "Nhầm lẫn giữa Thực thể (Entity - danh từ chỉ đối tượng) và Thuộc tính (Attribute - đặc điểm của đối tượng), ví dụ tạo thực thể \"Địa chỉ\" riêng biệt khi nó chỉ là thuộc tính đơn thuần của User.",
       "Không xác định rõ Modality (Tính bắt buộc hay tùy chọn), dẫn đến việc khai báo cột `NOT NULL` sai lệch trong schema vật lý.",

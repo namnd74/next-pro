@@ -46,7 +46,13 @@
     "seniorAnswer": {
       "summary": "Kiến trúc 3 lớp: (1) Container ngoài có chiều cao ảo khổng lồ (`totalHeight = items.length * estimatedHeight`) để giữ thanh cuộn thật; (2) Binary Search tính toán index hiển thị dựa trên `scrollTop`; (3) Viewport trượt chỉ render các items nằm trong khung nhìn cộng thêm vùng đệm (Overscan 5 items) định vị bằng `transform: translateY()`.",
       "deepDive": "Với Dynamic Row Heights (chiều cao mỗi dòng không bằng nhau): Dùng `ResizeObserver` để đo chiều cao thực tế của item sau khi render, cập nhật vào mảng `heightMap` và tính lại mảng `cumulativeOffsets`. Dùng Binary Search trên `cumulativeOffsets` để tìm `startIndex` và `endIndex` trong thời gian $O(\\log N)$.",
-      "codeExample": "// Virtualizer core logic\nconst startIndex = binarySearchOffsets(cumulativeOffsets, scrollTop);\nconst endIndex = binarySearchOffsets(cumulativeOffsets, scrollTop + viewportHeight) + overscan;\nconst visibleItems = items.slice(startIndex, endIndex);"
+      "codeExample": "// Virtualizer core logic\nconst startIndex = binarySearchOffsets(cumulativeOffsets, scrollTop);\nconst endIndex = binarySearchOffsets(cumulativeOffsets, scrollTop + viewportHeight) + overscan;\nconst visibleItems = items.slice(startIndex, endIndex);",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Cuộn Ảo (Virtualized List / Windowing) Cho 100,000 Bản Ghi",
+        "caption": "Chỉ render đúng số lượng phần tử hiển thị trong khung nhìn (Viewport) cộng thêm vùng đệm (Buffer padding)",
+        "code": "flowchart TD\n    subgraph WholeData [\"Dữ Liệu Khổng Lồ Trong Bộ Nhớ (100,000 Items)\"]\n        TopHidden[\"Phần khuất phía trên (99,980 items - KHÔNG ĐƯỢC TẠO DOM)\"]\n    end\n\n    subgraph VirtualScrollContainer [\"Thùng Chứa Cuộn (Scroll Container: Chiều cao ảo = 100,000 * 50px = 5,000,000px)\"]\n        PaddingTop[\"Div đệm phía trên (height = startIndex * itemHeight)\"]\n        \n        subgraph ViewportDOM [\"DOM Thực Tế (Chỉ duy trì ~20 Thẻ DOM)\"]\n            Item1[\"Visible Item 41\"]\n            Item2[\"Visible Item 42\"]\n            Item3[\"Visible Item 43\"]\n            ItemN[\"Visible Item 60\"]\n        end\n\n        PaddingBottom[\"Div đệm phía dưới (height = (total - endIndex) * itemHeight)\"]\n    end\n\n    TopHidden -.->|\"Chỉ tạo DOM khi người dùng cuộn tới\"| ViewportDOM"
+      }
     },
     "pitfalls": [
       "Dùng `top` thay vì `transform: translateY()` để định vị item làm kích hoạt layout reflow liên tục khi cuộn.",

@@ -16,7 +16,84 @@
     "seniorAnswer": {
       "summary": "Định lý CAP phát biểu: Trong một hệ thống dữ liệu phân tán khi xảy ra phân vùng mạng (Network Partition - P), hệ thống chỉ có thể chọn tính nhất quán dữ liệu (Consistency - C) HOẶC tính sẵn sàng phục vụ (Availability - A), không thể có cả hai cùng lúc.",
       "deepDive": "Vì lỗi mạng là không thể tránh khỏi trên thực tế (Partition Tolerance là bắt buộc), ta thực chất chỉ chọn giữa CP (từ chối phục vụ hoặc trả về lỗi để đảm bảo không sai lệch số dư tài khoản) hoặc AP (vẫn trả lời dù dữ liệu có thể cũ một chút - Eventual Consistency, như bài post trên Facebook).",
-      "codeExample": "// CP System: Nếu không sync được sang replica -> Thao tác Write bị reject (Error 500)\n// AP System: Write vào local node thành công ngay, sync sang replica sau (Eventual Consistency)"
+      "codeExample": "// CP System: Nếu không sync được sang replica -> Thao tác Write bị reject (Error 500)\n// AP System: Write vào local node thành công ngay, sync sang replica sau (Eventual Consistency)",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Định lý CAP: Network Partition và Sự Đánh Đổi CP vs AP",
+        "caption": "Khi phân vùng mạng (P) xảy ra, hệ thống buộc phải chọn giữa Nhất quán (CP) hoặc Sẵn sàng (AP)",
+        "code": "flowchart TD\n    subgraph NetPartition [\"⚠️ Phân vùng Mạng Xảy Ra (Network Partition)\"]\n        NodeA[\"Node A (Datacenter US)\"]\n        NodeB[\"Node B (Datacenter EU)\"]\n        NodeA -.-x|\"Mạng đứt (Cut)\"| NodeB\n    end\n\n    Client[\"Client Gửi Request\"] --> LB{\"Router / Load Balancer\"}\n    LB -->|\"Chọn mô hình\"| Dec{{\"Lựa chọn Kiến trúc\"}}\n\n    Dec -->|\"Lựa chọn CP (Consistency)\"| CPPath[\"CP System (HBase, CockroachDB, Etcd)\"]\n    CPPath -->|\"Không thể đồng bộ giữa Node A & B\"| Reject[\"Từ chối Write (Error 500) để bảo toàn số dư\"]\n\n    Dec -->|\"Lựa chọn AP (Availability)\"| APPath[\"AP System (Cassandra, DynamoDB, CouchDB)\"]\n    APPath -->|\"Ghi tạm vào Node A\"| Accept[\"200 OK ngay, chấp nhận đọc dữ liệu cũ tạm thời (Eventual)\"]"
+      },
+      "benchmark": {
+        "title": "Ma trận So sánh: Hệ Thống CP vs Hệ Thống AP",
+        "caption": "Đánh giá định lượng về tính toàn vẹn dữ liệu, độ sẵn sàng và độ trễ P99",
+        "options": [
+          {
+            "name": "Hệ thống CP (CockroachDB / Etcd / Raft)",
+            "badge": "Bảo mật tài chính",
+            "metrics": [
+              {
+                "label": "Tính toàn vẹn (Consistency)",
+                "value": 100,
+                "displayValue": "Tuyệt đối",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ sẵn sàng khi đứt mạng (Availability)",
+                "value": 35,
+                "displayValue": "Hạn chế (Fail-fast)",
+                "color": "rose"
+              },
+              {
+                "label": "Độ trễ ghi (Write Latency)",
+                "value": 45,
+                "displayValue": "Cao (Quorum chờ đồng thuận)",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Không bao giờ đọc hoặc ghi dữ liệu xung đột",
+              "Phù hợp giao dịch tài chính, thanh toán, khóa phân tán"
+            ],
+            "cons": [
+              "Dễ bị từ chối phục vụ (downtime cục bộ) khi mạng phân vùng",
+              "Throughput ghi bị giới hạn bởi độ trễ mạng liên vùng"
+            ]
+          },
+          {
+            "name": "Hệ thống AP (Apache Cassandra / DynamoDB)",
+            "badge": "Siêu quy mô (Hyperscale)",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tính toàn vẹn (Consistency)",
+                "value": 65,
+                "displayValue": "Eventual Consistency",
+                "color": "amber"
+              },
+              {
+                "label": "Độ sẵn sàng khi đứt mạng (Availability)",
+                "value": 99,
+                "displayValue": "99.999% SLA",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ trễ ghi (Write Latency)",
+                "value": 95,
+                "displayValue": "< 5ms (Append-only)",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Ghi siêu tốc, không bao giờ từ chối khách hàng",
+              "Scale ngang không giới hạn qua nhiều Datacenter"
+            ],
+            "cons": [
+              "Có nguy cơ đọc dữ liệu cũ (Dirty/Stale read)",
+              "Cần cơ chế giải quyết xung đột (Last-Write-Wins, CRDT)"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Tuyên bố hệ thống của mình đạt cả 'CA' trong môi trường mạng phân tán (Network Partition luôn có thể xảy ra)."
@@ -45,7 +122,84 @@
     "seniorAnswer": {
       "summary": "ACID (RDBMS: PostgreSQL, MySQL) tập trung vào tính toàn vẹn và nhất quán tuyệt đối (Atomicity, Consistency, Isolation, Durability). BASE (NoSQL: Cassandra, DynamoDB) ưu tiên tính sẵn sàng cao và khả năng scale ngang (Basically Available, Soft state, Eventual consistency).",
       "deepDive": "Giao dịch tiền bạc, đơn hàng bắt buộc phải dùng ACID để chống thất thoát hoặc ghi đè đồng thời. Dữ liệu lớn, thông báo, trạng thái online, chat history chấp nhận BASE để đổi lấy khả năng mở rộng lên hàng triệu request/giây mà không bị khóa (lock) dữ liệu.",
-      "codeExample": "// ACID: BEGIN TRANSACTION -> UPDATE balances -> COMMIT (Nếu fail thì ROLLBACK)\n// BASE: Ghi vào local node, trả về 200 OK ngay, cơ chế gossip sync dần sang các node khác"
+      "codeExample": "// ACID: BEGIN TRANSACTION -> UPDATE balances -> COMMIT (Nếu fail thì ROLLBACK)\n// BASE: Ghi vào local node, trả về 200 OK ngay, cơ chế gossip sync dần sang các node khác",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mô hình ACID vs BASE trong Lưu Trữ Dữ Liệu Phân Tán",
+        "caption": "So sánh luồng cam kết 2 pha nghiêm ngặt (ACID) với luồng Gossip lan truyền dần (BASE)",
+        "code": "flowchart LR\n    subgraph ACID [\"Mô hình ACID (RDBMS)\"]\n        Tx[\"Giao dịch Bắt đầu (Begin Tx)\"] --> Lock[\"Khóa hàng (Row-level Lock)\"]\n        Lock --> Exec[\"Thực thi ghi (Execute)\"]\n        Exec --> Flush[\"Ghi WAL + Commit\"]\n        Flush --> Unlock[\"Mở khóa dữ liệu\"]\n    end\n\n    subgraph BASE [\"Mô hình BASE (NoSQL)\"]\n        Write[\"Write Request\"] --> Mem[\"Ghi MemTable + CommitLog\"]\n        Mem --> Resp[\"Trả về 200 OK ngay\"]\n        Resp --> Gossip[\"Gossip Protocol đồng bộ nền\"]\n        Gossip --> Eventual[\"Eventual Consistency trên toàn Cluster\"]\n    end"
+      },
+      "benchmark": {
+        "title": "Đánh giá Kỹ thuật: ACID (PostgreSQL) vs BASE (ScyllaDB/Cassandra)",
+        "caption": "Trade-off cốt lõi giữa tính toàn vẹn khắt khe và tốc độ ghi dữ liệu khối lượng lớn",
+        "options": [
+          {
+            "name": "ACID Model (PostgreSQL / MySQL InnoDB)",
+            "badge": "Core Banking",
+            "metrics": [
+              {
+                "label": "Toàn vẹn dữ liệu",
+                "value": 100,
+                "displayValue": "100% Strict",
+                "color": "emerald"
+              },
+              {
+                "label": "Thông lượng ghi (Throughput)",
+                "value": 55,
+                "displayValue": "~15k TPS/node",
+                "color": "amber"
+              },
+              {
+                "label": "Độ phức tạp vận hành",
+                "value": 70,
+                "displayValue": "Trung bình",
+                "color": "blue"
+              }
+            ],
+            "pros": [
+              "Hỗ trợ JOIN phức tạp, Foreign Keys, constraints",
+              "Không lo sợ tình trạng phantom write hay mất dữ liệu"
+            ],
+            "cons": [
+              "Khó scale ngang ghi (cần Sharding thủ công phức tạp)",
+              "Lock contention khi nhiều tiến trình update cùng 1 row"
+            ]
+          },
+          {
+            "name": "BASE Model (Cassandra / DynamoDB)",
+            "badge": "High Throughput",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Toàn vẹn dữ liệu",
+                "value": 70,
+                "displayValue": "Eventual",
+                "color": "amber"
+              },
+              {
+                "label": "Thông lượng ghi (Throughput)",
+                "value": 98,
+                "displayValue": "> 250k TPS/cluster",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ phức tạp vận hành",
+                "value": 85,
+                "displayValue": "Cao (Compaction, Repair)",
+                "color": "rose"
+              }
+            ],
+            "pros": [
+              "Không có Single Point of Failure (Masterless ring)",
+              "Thêm node mới là tăng tuyến tính throughput"
+            ],
+            "cons": [
+              "Không hỗ trợ Foreign Key và ACID Transaction xuyên bảng",
+              "Ứng dụng phải tự chịu trách nhiệm xử lý stale data"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Áp dụng BASE (Eventual Consistency) cho chức năng trừ tiền ví điện tử dẫn đến lỗi Double Spending."
@@ -71,7 +225,83 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Vertical Scaling và Horizontal Scaling là gì? Ưu nhược điểm của từng loại?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Vertical Scaling và Horizontal Scaling là gì? Ưu nhược điểm của từng loại?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Vertical Scaling và Horizontal Scaling là gì? Ưu nhược điểm của từng loại?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Vertical Scaling và Horizontal Scaling là gì? Ưu nhược điểm của từng loại?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "So sánh Mô hình Vertical Scaling (Scale Up) vs Horizontal Scaling (Scale Out)",
+        "caption": "Sự khác biệt về khả năng mở rộng phần cứng và tính sẵn sàng cao",
+        "code": "flowchart TD\n    subgraph Vertical [\"Scale Up (Vertical Scaling)\"]\n        V1[\"Server 4 Cores / 16GB\"] -->|\"Nâng cấp phần cứng\"| V2[\"Server 64 Cores / 512GB (Chạm trần chi phí)\"]\n        V2 -.->|\"Rủi ro\"| SPOF[\"Single Point of Failure (Sập là chết toàn bộ)\"]\n    end\n\n    subgraph Horizontal [\"Scale Out (Horizontal Scaling)\"]\n        LB[\"Load Balancer (Nginx / ALB)\"]\n        LB --> N1[\"App Node 1 (Stateless)\"]\n        LB --> N2[\"App Node 2 (Stateless)\"]\n        LB --> N3[\"App Node 3 (Stateless)\"]\n        LB --> Nn[\"App Node N (Tự động Autoscale theo CPU/RAM)\"]\n    end"
+      },
+      "benchmark": {
+        "title": "Ma trận So sánh Chi phí & Năng lực: Scale Up vs Scale Out",
+        "caption": "Định lượng các khía cạnh mở rộng kiến trúc hệ thống backend",
+        "options": [
+          {
+            "name": "Scale Up (Vertical)",
+            "metrics": [
+              {
+                "label": "Độ đơn giản triển khai",
+                "value": 95,
+                "displayValue": "Rất dễ",
+                "color": "emerald"
+              },
+              {
+                "label": "Giới hạn trần mở rộng",
+                "value": 40,
+                "displayValue": "Có giới hạn phần cứng",
+                "color": "rose"
+              },
+              {
+                "label": "Hiệu quả chi phí ở quy mô lớn",
+                "value": 30,
+                "displayValue": "Rất đắt đỏ",
+                "color": "rose"
+              }
+            ],
+            "pros": [
+              "Không cần cấu hình mạng phân tán, RPC phức tạp",
+              "Zero network hop giữa các tiến trình"
+            ],
+            "cons": [
+              "Yêu cầu downtime khi nâng cấp RAM/CPU",
+              "SPOF: Toàn bộ dịch vụ gián đoạn nếu phần cứng cháy hỏng"
+            ]
+          },
+          {
+            "name": "Scale Out (Horizontal)",
+            "isRecommended": true,
+            "badge": "Chuẩn Cloud-Native",
+            "metrics": [
+              {
+                "label": "Độ đơn giản triển khai",
+                "value": 60,
+                "displayValue": "Cần CI/CD, Container",
+                "color": "amber"
+              },
+              {
+                "label": "Giới hạn trần mở rộng",
+                "value": 99,
+                "displayValue": "Gần như vô hạn",
+                "color": "emerald"
+              },
+              {
+                "label": "Hiệu quả chi phí ở quy mô lớn",
+                "value": 90,
+                "displayValue": "Tối ưu với Spot/Autoscaling",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Không có Downtime (Rolling update từng node)",
+              "Chịu lỗi tuyệt đối (1 node chết, các node khác gánh tải)"
+            ],
+            "cons": [
+              "Bắt buộc ứng dụng phải thiết kế Stateless",
+              "Cần quản lý session phân tán qua Redis hoặc JWT"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -97,7 +327,83 @@
     "seniorAnswer": {
       "summary": "Load Balancer phân phối lưu lượng truy cập mạng đồng đều đến cụm server phía sau để tối đa hóa thông lượng, giảm độ trễ và tránh quá tải cho một server đơn lẻ. Các thuật toán phổ biến: Round Robin, Weighted Round Robin, Least Connections, Least Response Time, IP Hash.",
       "deepDive": "Phân biệt Layer 4 (Transport: TCP/UDP - định tuyến nhanh dựa trên IP/Port) và Layer 7 (Application: HTTP/HTTPS - đọc được URL, Headers, Cookies để định tuyến thông minh theo path `/api/users` hoặc theo Header token).",
-      "codeExample": "# Nginx Layer 7 Load Balancer\nupstream backend_cluster {\n    least_conn;\n    server backend1.internal:3000 weight=3;\n    server backend2.internal:3000;\n}"
+      "codeExample": "# Nginx Layer 7 Load Balancer\nupstream backend_cluster {\n    least_conn;\n    server backend1.internal:3000 weight=3;\n    server backend2.internal:3000;\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cân bằng tải L4 (Transport Level) vs L7 (Application Level)",
+        "caption": "L4 định tuyến nhanh dựa trên IP:Port; L7 định tuyến thông minh theo Path, Header và SSL Termination",
+        "code": "flowchart TD\n    Client[\"Client Request\"] --> Ingress{\"Load Balancer\"}\n\n    subgraph L4 [\"Layer 4 (NLB / IPVS / HAProxy L4)\"]\n        Ingress -->|\"Chỉ đọc TCP/UDP Packet Header (IP:Port)\"| L4Route[\"Định tuyến cực nhanh, zero payload inspection\"]\n        L4Route --> PodA[\"Backend Instance 1\"]\n        L4Route --> PodB[\"Backend Instance 2\"]\n    end\n\n    subgraph L7 [\"Layer 7 (ALB / Envoy / Nginx)\"]\n        Ingress -->|\"Phân tích HTTP Request (Path, Headers, Cookies)\"| L7Inspect[\"Đọc path: /api/v1/checkout vs /static/*\"]\n        L7Inspect -->|\"Path: /api/v1/orders\"| SvcOrders[\"Order Service\"]\n        L7Inspect -->|\"Path: /api/v1/auth\"| SvcAuth[\"Auth Service (SSL Offloaded)\"]\n    end"
+      },
+      "benchmark": {
+        "title": "So sánh Hiệu năng: Layer 4 vs Layer 7 Load Balancing",
+        "caption": "Trade-off giữa thông lượng xử lý cực đại và tính năng định tuyến thông minh",
+        "options": [
+          {
+            "name": "Layer 4 Load Balancer (AWS NLB / IPVS)",
+            "badge": "Ultra High Performance",
+            "metrics": [
+              {
+                "label": "Thông lượng (Throughput)",
+                "value": 99,
+                "displayValue": "> 10M RPS",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ trễ gia tăng (Latency Overhead)",
+                "value": 98,
+                "displayValue": "< 0.5ms",
+                "color": "emerald"
+              },
+              {
+                "label": "Tính năng định tuyến thông minh",
+                "value": 20,
+                "displayValue": "Chỉ IP/Port hash",
+                "color": "rose"
+              }
+            ],
+            "pros": [
+              "Tải hàng triệu kết nối đồng thời với CPU tiêu hao tối thiểu",
+              "Bảo toàn kết nối TCP gốc (không giải mã payload)"
+            ],
+            "cons": [
+              "Không thể định tuyến theo URL path hoặc Header HTTP",
+              "Không hỗ trợ WebSocket protocol inspection"
+            ]
+          },
+          {
+            "name": "Layer 7 Load Balancer (Envoy / Traefik / AWS ALB)",
+            "badge": "Smart Routing",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Thông lượng (Throughput)",
+                "value": 75,
+                "displayValue": "~100k RPS/node",
+                "color": "amber"
+              },
+              {
+                "label": "Độ trễ gia tăng (Latency Overhead)",
+                "value": 70,
+                "displayValue": "~2-5ms (SSL + Parser)",
+                "color": "amber"
+              },
+              {
+                "label": "Tính năng định tuyến thông minh",
+                "value": 99,
+                "displayValue": "Path, Header, Auth, Canary",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Hỗ trợ Path-based routing, Canary deployments, gRPC multiplexing",
+              "Tích hợp xác thực JWT, WAF, Rate limit ngay tại cửa vào"
+            ],
+            "cons": [
+              "Tiêu hao CPU và RAM cao hơn do phải giải mã SSL và parse header HTTP"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Dùng Round Robin khi các request có thời gian xử lý chênh lệch nhau quá lớn (gây dồn ứ cho server bốc trúng việc nặng)."
@@ -696,7 +1002,81 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Database Sharding là gì? Các chiến lược sharding phổ biến và khi nào nên dùng?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Database Sharding là gì? Các chiến lược sharding phổ biến và khi nào nên dùng?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Database Sharding là gì? Các chiến lược sharding phổ biến và khi nào nên dùng?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Database Sharding là gì? Các chiến lược sharding phổ biến và khi nào nên dùng?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến trúc Phân vùng Cơ sở Dữ liệu (Database Sharding Strategies)",
+        "caption": "Phân phối dữ liệu trên nhiều DB Shards độc lập để vượt qua giới hạn dung lượng và IOPS đơn máy",
+        "code": "flowchart TD\n    Client[\"Client Query: SELECT * WHERE user_id = 94821\"] --> Router[\"Sharding Proxy / Application Router\"]\n    Router --> HashAlgo[\"Thuật toán Hash: MurmurHash3(user_id) % 3\"]\n\n    HashAlgo -->|\"Shard 0 (user_id % 3 == 0)\"| DB0[(\"Shard 0 (Node A)\nData: ID 3, 6, 9...\")]\n    HashAlgo -->|\"Shard 1 (user_id % 3 == 1)\"| DB1[(\"Shard 1 (Node B)\nData: ID 1, 4, 7...\")]\n    HashAlgo -->|\"Shard 2 (user_id % 3 == 2)\"| DB2[(\"Shard 2 (Node C)\nData: ID 2, 5, 8...\")]"
+      },
+      "benchmark": {
+        "title": "So sánh Các Chiến Lược Sharding Cơ Sở Dữ Liệu",
+        "caption": "Đánh giá rủi ro Hotspot và độ phức tạp khi bổ sung Shard mới (Re-sharding)",
+        "options": [
+          {
+            "name": "Hash-based Sharding (Consistent Hashing)",
+            "badge": "Phổ biến nhất",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Cân bằng tải phân bổ",
+                "value": 95,
+                "displayValue": "Rất đều",
+                "color": "emerald"
+              },
+              {
+                "label": "Hỗ trợ Range Query",
+                "value": 20,
+                "displayValue": "Kém (phải scan all shards)",
+                "color": "rose"
+              },
+              {
+                "label": "Độ phức tạp di chuyển data",
+                "value": 65,
+                "displayValue": "Trung bình (nhờ Virtual Nodes)",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Dữ liệu được rải đều ngẫu nhiên, hạn chế tối đa Hotspot",
+              "Dễ dàng cài đặt logic ở tầng application hoặc proxy"
+            ],
+            "cons": [
+              "Các câu truy vấn theo khoảng (Range Queries) buộc phải phát tán tới tất cả các shard (Scatter-Gather)"
+            ]
+          },
+          {
+            "name": "Range-based Sharding (Theo ID hoặc Ngày)",
+            "metrics": [
+              {
+                "label": "Cân bằng tải phân bổ",
+                "value": 45,
+                "displayValue": "Dễ dồn tải vào Shard mới nhất",
+                "color": "rose"
+              },
+              {
+                "label": "Hỗ trợ Range Query",
+                "value": 95,
+                "displayValue": "Rất nhanh (chỉ 1 Shard)",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ phức tạp di chuyển data",
+                "value": 80,
+                "displayValue": "Dễ chia partition",
+                "color": "blue"
+              }
+            ],
+            "pros": [
+              "Truy vấn ngày tháng (ví dụ: Orders tháng 9/2026) chỉ chạm vào đúng 1 Shard",
+              "Data archiving (xóa dữ liệu cũ) cực kỳ đơn giản"
+            ],
+            "cons": [
+              "Hotspot nguy hiểm: Tất cả đơn hàng mới được tạo đều đè lên Shard hiện tại"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -748,7 +1128,81 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Rate Limiting là gì? Các thuật toán rate limiting phổ biến và cách implement?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Rate Limiting là gì? Các thuật toán rate limiting phổ biến và cách implement?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Rate Limiting là gì? Các thuật toán rate limiting phổ biến và cách implement?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Rate Limiting là gì? Các thuật toán rate limiting phổ biến và cách implement?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Máy trạng thái và Luồng Xử Lý Token Bucket Rate Limiter",
+        "caption": "Thuật toán Token Bucket cho phép chịu đột biến lưu lượng (Burst traffic) trong giới hạn dung lượng bình chứa",
+        "code": "flowchart TD\n    Clock[\"Refill Timer (Định kỳ nạp r token/giây)\"] --> Bucket[\"Thùng Token (Dung lượng tối đa = C)\"]\n    Req[\"Incoming Request đến API\"] --> Check{\"Trong thùng còn Token không?\"}\n\n    Check -->|\"Có (Tokens >= 1)\"| Allow[\"Trừ 1 Token & Cho phép Request đi tiếp\"]\n    Allow --> Backend[\"Chuyển tiếp đến Backend Service (200 OK)\"]\n\n    Check -->|\"Hết (Tokens == 0)\"| Deny[\"Chặn Request ngay lập tức\"]\n    Deny --> Err[\"Trả mã 429 Too Many Requests kèm Retry-After Header\"]"
+      },
+      "benchmark": {
+        "title": "Đánh giá Kỹ thuật: Các Thuật toán Rate Limiting",
+        "caption": "Lựa chọn thuật toán dựa trên dung lượng bộ nhớ Redis và độ chính xác ở ranh giới thời gian",
+        "options": [
+          {
+            "name": "Token Bucket",
+            "badge": "Khuyên dùng cho API Gateway",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Hiệu quả bộ nhớ",
+                "value": 95,
+                "displayValue": "Cực nhỏ (2 keys/user)",
+                "color": "emerald"
+              },
+              {
+                "label": "Hỗ trợ Burst Traffic",
+                "value": 90,
+                "displayValue": "Tốt (bằng size thùng)",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ chính xác ranh giới",
+                "value": 85,
+                "displayValue": "Tốt",
+                "color": "blue"
+              }
+            ],
+            "pros": [
+              "Chỉ cần lưu timestamp và token count, tiết kiệm bộ nhớ Redis",
+              "Cho phép người dùng gửi request burst khi rảnh"
+            ],
+            "cons": [
+              "Cần tính toán math chính xác khi nhiều thread cập nhật đồng thời"
+            ]
+          },
+          {
+            "name": "Sliding Window Log",
+            "metrics": [
+              {
+                "label": "Hiệu quả bộ nhớ",
+                "value": 30,
+                "displayValue": "Tốn kém (Lưu all timestamps)",
+                "color": "rose"
+              },
+              {
+                "label": "Hỗ trợ Burst Traffic",
+                "value": 60,
+                "displayValue": "Nghiêm ngặt",
+                "color": "amber"
+              },
+              {
+                "label": "Độ chính xác ranh giới",
+                "value": 100,
+                "displayValue": "Tuyệt đối 100%",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Không bao giờ bị lỗi vượt ngưỡng gấp đôi ở ranh giới phút (Boundary spike)",
+              "Độ chính xác vi mô tuyệt đối"
+            ],
+            "cons": [
+              "Bộ nhớ Redis tăng theo số lượng request (mỗi request là 1 phần tử trong Sorted Set)"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -800,7 +1254,13 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'CQRS Pattern là gì? Khi nào nên áp dụng và những thách thức gì khi implement?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'CQRS Pattern là gì? Khi nào nên áp dụng và những thách thức gì khi implement?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: CQRS Pattern là gì? Khi nào nên áp dụng và những thách thức gì khi implement?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: CQRS Pattern là gì? Khi nào nên áp dụng và những thách thức gì khi implement?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến trúc CQRS (Command Query Responsibility Segregation)",
+        "caption": "Phân tách hoàn toàn đường truyền Write (Command) và đường truyền Read (Query) được tối ưu hóa riêng biệt",
+        "code": "flowchart LR\n    Client[\"Client / Frontend\"]\n\n    subgraph CommandSide [\"Command Side (Ghi Dữ Liệu)\"]\n        Client -->|\"1. POST/PUT Command\"| CmdHandler[\"Command Handler\"]\n        CmdHandler -->|\"2. Write Model\"| WriteDB[(\"Write Database (PostgreSQL Relational - Normalized)\")]\n        WriteDB -->|\"3. Transaction Outbox / CDC\"| MsgBus[\"Message Broker (Kafka / RabbitMQ)\"]\n    end\n\n    subgraph QuerySide [\"Query Side (Đọc Dữ Liệu)\"]\n        MsgBus -->|\"4. Async Event Sync\"| Projector[\"Read Model Projector\"]\n        Projector -->|\"5. Update View\"| ReadDB[(\"Read Database (Elasticsearch / Redis / MongoDB)\")]\n        Client -->|\"6. GET Query\"| QueryHandler[\"Query Handler\"]\n        QueryHandler -->|\"7. Fast Read\"| ReadDB\n    end"
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -956,7 +1416,13 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Circuit Breaker Pattern là gì? Nó ngăn chặn cascading failures như thế nào?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Circuit Breaker Pattern là gì? Nó ngăn chặn cascading failures như thế nào?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Circuit Breaker Pattern là gì? Nó ngăn chặn cascading failures như thế nào?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Circuit Breaker Pattern là gì? Nó ngăn chặn cascading failures như thế nào?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Máy Trạng Thái Circuit Breaker (Ngăn Chặn Cascading Failures)",
+        "caption": "Chuyển đổi linh hoạt giữa Closed, Open và Half-Open để bảo vệ hệ thống hạ tầng không bị sập dây chuyền",
+        "code": "stateDiagram-v2\n    [*] --> Closed : Khởi tạo ban đầu\n    Closed --> Closed : Requests thành công (Normal)\n    Closed --> Open : Tỷ lệ lỗi vượt ngưỡng Failure Threshold (> 50% trong 10s)\n    \n    state Open {\n        desc: Chặn đứng request lập tức\nTrả về Fallback / Error 503 ngay\nZero network call tới upstream service\n    }\n\n    Open --> HalfOpen : Hết thời gian chờ Sleep Window (ví dụ sau 30 giây)\n\n    state HalfOpen {\n        desc: Cho phép một lượng nhỏ request thử nghiệm (Trial Requests)\n    }\n\n    HalfOpen --> Closed : Các request thử nghiệm thành công mỹ mãn\n    HalfOpen --> Open : Vẫn còn phát hiện lỗi (Tiếp tục cách ly)"
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -982,7 +1448,81 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Saga Pattern giải quyết vấn đề gì trong microservices? Choreography vs Orchestration?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Saga Pattern giải quyết vấn đề gì trong microservices? Choreography vs Orchestration?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Saga Pattern giải quyết vấn đề gì trong microservices? Choreography vs Orchestration?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Saga Pattern giải quyết vấn đề gì trong microservices? Choreography vs Orchestration?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Saga Pattern: Choreography vs Orchestration Trong Microservices",
+        "caption": "Giải quyết bài toán giao dịch phân tán xuyên qua nhiều cơ sở dữ liệu độc lập",
+        "code": "flowchart TD\n    subgraph Orchestration [\"Mô hình Saga Orchestrator (Khuyên dùng cho quy trình phức tạp)\"]\n        Client[\"Khách đặt hàng\"] --> Orch[\"Order Saga Orchestrator\"]\n        Orch -->|\"1. Hold Inventory\"| SvcStock[\"Stock Service\"]\n        SvcStock -->>|\"Stock OK\"| Orch\n        Orch -->|\"2. Charge Card\"| SvcPay[\"Payment Service\"]\n        SvcPay -->>|\"Payment Failed!\"| Orch\n        Orch -->|\"3. Compensating Tx: Release Stock\"| SvcStock\n    end"
+      },
+      "benchmark": {
+        "title": "So sánh: Saga Choreography vs Saga Orchestration",
+        "caption": "Đánh giá về tính ghép nối lỏng lẻo, khả năng theo dõi và quy mô dịch vụ",
+        "options": [
+          {
+            "name": "Saga Orchestration (Điều phối tập trung)",
+            "badge": "Enterprise Standard",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Khả năng quan sát & Trace",
+                "value": 95,
+                "displayValue": "Rất rõ ràng",
+                "color": "emerald"
+              },
+              {
+                "label": "Tránh phụ thuộc vòng tròn",
+                "value": 90,
+                "displayValue": "Tuyệt đối",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ phụ thuộc vào điều phối viên",
+                "value": 45,
+                "displayValue": "Tập trung ở Orchestrator",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Toàn bộ trạng thái và luồng hoàn bù (compensation) được quản lý tập trung ở một nơi",
+              "Dễ dàng debug và xử lý edge cases"
+            ],
+            "cons": [
+              "Orchestrator có nguy cơ trở thành điểm nghẽn logic nếu ôm đồm quá nhiều nghiệp vụ"
+            ]
+          },
+          {
+            "name": "Saga Choreography (Giao tiếp phi tập trung qua Event)",
+            "metrics": [
+              {
+                "label": "Khả năng quan sát & Trace",
+                "value": 40,
+                "displayValue": "Khó debug",
+                "color": "rose"
+              },
+              {
+                "label": "Tránh phụ thuộc vòng tròn",
+                "value": 50,
+                "displayValue": "Dễ dính cyclic events",
+                "color": "amber"
+              },
+              {
+                "label": "Ghép nối lỏng lẻo (Decoupling)",
+                "value": 95,
+                "displayValue": "Tuyệt vời",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Không cần tạo một coordinator service riêng",
+              "Cực kỳ phù hợp cho các quy trình ngắn 2-3 bước"
+            ],
+            "cons": [
+              "Khi quy trình có > 5 service, ma trận lắng nghe event trở thành ác mộng không thể kiểm soát"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -1034,7 +1574,83 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Kafka và RabbitMQ khác nhau như thế nào? Khi nào dùng mỗi loại?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Kafka và RabbitMQ khác nhau như thế nào? Khi nào dùng mỗi loại?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Kafka và RabbitMQ khác nhau như thế nào? Khi nào dùng mỗi loại?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Kafka và RabbitMQ khác nhau như thế nào? Khi nào dùng mỗi loại?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến trúc Cốt lõi: Apache Kafka (Distributed Log) vs RabbitMQ (Smart Broker)",
+        "caption": "Sự khác biệt cơ bản giữa cơ chế Pull từ Offset Log và cơ chế Push từ hàng đợi thông minh",
+        "code": "flowchart LR\n    subgraph Kafka [\"Apache Kafka (Append-Only Commit Log)\"]\n        P1[\"Producer\"] --> Topic[\"Topic: orders (Partitions)\"]\n        Topic --> L0[\"P0: [0][1][2][3][4]...\"]\n        L0 -->|\"Consumer tự quản lý Offset (Pull)\"| C1[\"Consumer Group A\"]\n        L0 -->|\"Replay được dữ liệu cũ\"| C2[\"Consumer Group B\"]\n    end\n\n    subgraph RabbitMQ [\"RabbitMQ (Smart Broker & Routing)\"]\n        P2[\"Producer\"] --> Ex[\"Exchange (Direct/Topic/Fanout)\"]\n        Ex --> Q1[\"Queue 1\"]\n        Ex --> Q2[\"Queue 2\"]\n        Q1 -->|\"Broker chủ động Push message\"| W1[\"Worker\"]\n        W1 -->|\"Ack message -> Xóa khỏi Queue\"| Q1\n    end"
+      },
+      "benchmark": {
+        "title": "So sánh Kỹ thuật: Apache Kafka vs RabbitMQ",
+        "caption": "Đánh giá thông lượng, độ trễ và độ linh hoạt định tuyến tin nhắn",
+        "options": [
+          {
+            "name": "Apache Kafka",
+            "badge": "Event Streaming & Big Data",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Thông lượng (Throughput)",
+                "value": 98,
+                "displayValue": "> 1M msg/s",
+                "color": "emerald"
+              },
+              {
+                "label": "Khả năng Replay tin nhắn cũ",
+                "value": 100,
+                "displayValue": "Lưu trữ theo Retention",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ linh hoạt định tuyến (Routing)",
+                "value": 50,
+                "displayValue": "Chỉ dựa trên Partition Key",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Bền bỉ cao, xử lý hàng triệu stream dữ liệu mỗi giây không tụt hiệu năng",
+              "Cho phép replay sự kiện từ 7 ngày trước để huấn luyện model hoặc khôi phục lỗi"
+            ],
+            "cons": [
+              "Độ trễ cao hơn RabbitMQ vài mili-giây (do batching)",
+              "Vận hành cụm (Cluster, Zookeeper/KRaft) phức tạp"
+            ]
+          },
+          {
+            "name": "RabbitMQ",
+            "badge": "Complex Routing & Fast Task Queue",
+            "metrics": [
+              {
+                "label": "Thông lượng (Throughput)",
+                "value": 70,
+                "displayValue": "~40k msg/s",
+                "color": "amber"
+              },
+              {
+                "label": "Độ trễ tức thì (Latency)",
+                "value": 95,
+                "displayValue": "< 1ms",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ linh hoạt định tuyến (Routing)",
+                "value": 99,
+                "displayValue": "Topic, Headers, Fanout",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Độ trễ siêu thấp dưới 1ms, phù hợp cho background worker tức thời",
+              "Hỗ trợ tính năng Dead Letter Queue, Message TTL, Priority Queues natively"
+            ],
+            "cons": [
+              "Message bị xóa vĩnh viễn ngay sau khi Consumer gửi ACK, không thể Replay dữ liệu"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -1190,7 +1806,13 @@
     "seniorAnswer": {
       "summary": "Với Modulo Hashing (`hash(key) % N`): Khi số node $N$ thay đổi (thêm hoặc chết 1 node), gần như **100% các key bị đổi vị trí**, gây ra đợt sụp đổ cache (Cache Stampede/Miss Storm) làm sập database. **Consistent Hashing** đặt các node và key trên một vòng tròn băm (Hash Ring 0 to $2^{32}-1$): Khi thêm/xóa node, chỉ có trung bình $1/N$ số key bị di chuyển.",
       "deepDive": "Để giải quyết vấn đề phân bổ tải không đều (Non-uniform distribution hoặc Hotspot), Consistent Hashing sử dụng kỹ thuật **Virtual Nodes (Node ảo)**: Mỗi node vật lý được gán hàng trăm vị trí ảo rải đều trên vòng băm, giúp dữ liệu được chia đều hoàn hảo giữa các máy chủ.",
-      "codeExample": "// Key đi theo chiều kim đồng hồ trên vòng băm để tìm node đầu tiên lớn hơn hoặc bằng hash của nó."
+      "codeExample": "// Key đi theo chiều kim đồng hồ trên vòng băm để tìm node đầu tiên lớn hơn hoặc bằng hash của nó.",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Vòng Tròn Băm Nhất Quán (Consistent Hashing Ring Với Virtual Nodes)",
+        "caption": "Phân bổ dữ liệu đều đặn trên vòng 2^32 và giảm thiểu tối đa dữ liệu cần di chuyển khi thêm/bớt Server",
+        "code": "flowchart TD\n    subgraph Ring [\"Vòng Tròn Băm Nhất Quán (0 đến 2^32 - 1)\"]\n        direction TB\n        NodeA1[\"Node A (Virtual 1)\"] --> Key1[\"Key: user_101\"]\n        Key1 --> NodeB1[\"Node B (Virtual 1)\"]\n        NodeB1 --> Key2[\"Key: user_582\"]\n        Key2 --> NodeC1[\"Node C (Virtual 1)\"]\n        NodeC1 --> NodeA2[\"Node A (Virtual 2)\"]\n    end\n    Explain[\"Quy tắc định tuyến: Key được gán vào Node đầu tiên xuất hiện theo chiều kim đồng hồ\"]"
+      }
     },
     "pitfalls": [
       "Không dùng Virtual Nodes khiến các node có dung lượng tải chênh lệch nhau rất lớn."
@@ -1918,7 +2540,13 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Thiết kế chat 1-1 và chat nhóm: đảm bảo thứ tự tin nhắn, trạng thái đã đọc và nhận tin khi offline?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Thiết kế chat 1-1 và chat nhóm: đảm bảo thứ tự tin nhắn, trạng thái đã đọc và nhận tin khi offline?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Thiết kế chat 1-1 và chat nhóm: đảm bảo thứ tự tin nhắn, trạng thái đã đọc và nhận tin khi offline?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Thiết kế chat 1-1 và chat nhóm: đảm bảo thứ tự tin nhắn, trạng thái đã đọc và nhận tin khi offline?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến trúc Hệ thống Chat Realtime Quy mô Hàng Triệu Người Dùng",
+        "caption": "Kết hợp WebSocket Gateway cho kết nối 2 chiều và Redis Pub/Sub Session Router để định tuyến tin nhắn",
+        "code": "flowchart TD\n    UserA[\"User A (Sender)\"] -->|\"WebSocket Frame\"| WS1[\"WebSocket Gateway 1\"]\n    UserB[\"User B (Receiver)\"] -->|\"WebSocket Frame\"| WS2[\"WebSocket Gateway 2\"]\n\n    WS1 -->|\"1. Publish Message\"| RedisPubSub[\"Message Broker / Redis PubSub\"]\n    WS1 -->|\"2. Lưu tin nhắn bất đồng bộ\"| Kafka[\"Kafka Queue\"]\n    Kafka --> MsgDB[(\"Cassandra / ScyllaDB Message Store\")]\n\n    RedisPubSub -->|\"3. Định tuyến tới đúng Server đang giữ kết nối User B\"| WS2\n    WS2 -->|\"4. Push trực tiếp tới thiết bị\"| UserB"
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -2282,7 +2910,42 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Change Data Capture (CDC) là gì? Cách hoạt động và use cases? (What is Change Data Capture (CDC)? How it works and use cases?)'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Change Data Capture (CDC) là gì? Cách hoạt động và use cases? (What is Change Data Capture (CDC)? How it works and use cases?)' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Change Data Capture (CDC) là gì? Cách hoạt động và use cases? (What is Change Data Capture (CDC)? How it works and use cases?)\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Change Data Capture (CDC) là gì? Cách hoạt động và use cases? (What is Change Data Capture (CDC)? How it works and use cases?)\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Pipeline Dữ liệu: Change Data Capture (CDC) Với Debezium và Kafka",
+        "caption": "Thu thập thay đổi dữ liệu theo thời gian thực từ Database WAL mà không gây chậm hệ thống",
+        "stages": [
+          {
+            "name": "1. Giao dịch Cơ sở dữ liệu",
+            "tool": "PostgreSQL / MySQL",
+            "icon": "Database",
+            "description": "Ứng dụng thực hiện UPDATE/INSERT. Database ghi nhận thay đổi vào Write-Ahead Log (WAL / Binlog).",
+            "metric": "< 1ms"
+          },
+          {
+            "name": "2. Debezium CDC Engine",
+            "tool": "Debezium Connector",
+            "icon": "Radio",
+            "description": "Đọc luồng nhị phân trực tiếp từ replication stream của Database, chuyển đổi thành JSON event có cấu trúc schema.",
+            "metric": "Zero DB Lock"
+          },
+          {
+            "name": "3. Kafka Distributed Stream",
+            "tool": "Apache Kafka",
+            "icon": "Cpu",
+            "description": "Lưu trữ event log vào Topic có phân vùng theo Primary Key, đảm bảo thứ tự tuyệt đối.",
+            "metric": "> 100k events/s"
+          },
+          {
+            "name": "4. Hạ tầng Đọc Đa Năng",
+            "tool": "Elasticsearch & Redis",
+            "icon": "Zap",
+            "description": "Consumer tự động cập nhật Search Index và xóa Cache tương ứng ngay lập tức.",
+            "metric": "< 50ms Lag"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -2308,7 +2971,80 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Thiết kế hệ thống URL Shortener (như bit.ly). Các thành phần chính và quyết định kỹ thuật?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Thiết kế hệ thống URL Shortener (như bit.ly). Các thành phần chính và quyết định kỹ thuật?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Thiết kế hệ thống URL Shortener (như bit.ly). Các thành phần chính và quyết định kỹ thuật?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Thiết kế hệ thống URL Shortener (như bit.ly). Các thành phần chính và quyết định kỹ thuật?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến trúc Hệ thống Rút Gọn Link (URL Shortener - Bit.ly)",
+        "caption": "Thiết kế quy mô hàng tỷ liên kết với thuật toán Base62 và Bộ phát sinh ID phân tán",
+        "code": "flowchart TD\n    Client[\"User / Client\"] -->|\"POST /shorten (Long URL)\"| API[\"API Gateway\"]\n    API --> IDGen[\"Distributed ID Generator (Snowflake / Redis Atomic)\"]\n    IDGen -->|\"Sinh số nguyên duy nhất: 12519342\"| Base62[\"Base62 Encoding\"]\n    Base62 -->|\"Sinh slug: 7k9Q\"| Cache[\"Redis Cache (Hot Links)\"]\n    Cache --> DB[(\"NoSQL DB (DynamoDB / Cassandra)\nMapping: 7k9Q -> https://superlongurl.com/...\")]\n    \n    Client2[\"User Click: bit.ly/7k9Q\"] --> API2[\"Redirect Service\"]\n    API2 -->|\"Tra cứu Cache trước\"| Cache\n    Cache -->|\"Cache Hit (99% trường hợp)\"| Ret[\"Trả HTTP 302 / 301 Redirect\"]"
+      },
+      "benchmark": {
+        "title": "So sánh Thuật toán Tạo Mã Rút Gọn URL",
+        "caption": "Độ dài URL, nguy cơ đụng độ hash (collision) và hiệu năng tính toán",
+        "options": [
+          {
+            "name": "Distributed ID + Base62 Encoding",
+            "badge": "Tối ưu tuyệt đối",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Nguy cơ trùng lặp (Collision Risk)",
+                "value": 100,
+                "displayValue": "0% Tuyệt đối",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ dài URL ngắn gọn",
+                "value": 95,
+                "displayValue": "Chỉ 6-7 ký tự",
+                "color": "emerald"
+              },
+              {
+                "label": "Hiệu năng mã hóa",
+                "value": 98,
+                "displayValue": "O(1) Siêu nhanh",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Không bao giờ xảy ra đụng độ vì dựa trên dãy số nguyên duy nhất tự tăng",
+              "Độ dài ký tự dự đoán được chính xác"
+            ],
+            "cons": [
+              "Cần hệ thống cấp phát số nguyên phân tán (Twitter Snowflake hoặc Redis Counter)"
+            ]
+          },
+          {
+            "name": "MD5 / SHA-256 Hash Cắt Ngắn",
+            "metrics": [
+              {
+                "label": "Nguy cơ trùng lặp (Collision Risk)",
+                "value": 35,
+                "displayValue": "Có đụng độ (Cần check DB)",
+                "color": "rose"
+              },
+              {
+                "label": "Độ dài URL ngắn gọn",
+                "value": 75,
+                "displayValue": "Cắt 6-8 bytes",
+                "color": "amber"
+              },
+              {
+                "label": "Hiệu năng mã hóa",
+                "value": 60,
+                "displayValue": "Tốn CPU băm mật mã",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Không cần cụm ID generator, mã hóa trực tiếp từ URL gốc"
+            ],
+            "cons": [
+              "Khi cắt ngắn chuỗi băm thì xác suất đụng độ tăng vọt, buộc phải truy vấn DB để kiểm tra trùng lặp"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."
@@ -2386,7 +3122,27 @@
     "seniorAnswer": {
       "summary": "Câu hỏi kiểm tra kiến thức về 'Thiết kế Rate Limiter phân tán cho API. Các yêu cầu và giải pháp kỹ thuật?'. Khi thiết kế hệ thống thực tế, giải pháp đòi hỏi phải phân tích rõ ràng giữa Read/Write throughput, mức độ chịu lỗi (Fault Tolerance), độ trễ (Latency) và chi phí hạ tầng phần cứng.",
       "deepDive": "Về mặt kiến trúc, giải quyết 'Thiết kế Rate Limiter phân tán cho API. Các yêu cầu và giải pháp kỹ thuật?' cần áp dụng các nguyên lý phân tán: Phân vùng dữ liệu (Partitioning/Sharding), cơ chế Caching đa tầng, bất đồng bộ hóa qua Message Queue (Kafka/RabbitMQ) và giám sát chặt chẽ qua Observability (Metrics, Traces).",
-      "codeExample": "// Mô hình kiến trúc cho: Thiết kế Rate Limiter phân tán cho API. Các yêu cầu và giải pháp kỹ thuật?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards"
+      "codeExample": "// Mô hình kiến trúc cho: Thiết kế Rate Limiter phân tán cho API. Các yêu cầu và giải pháp kỹ thuật?\n// Client -> Load Balancer -> API Gateway -> Distributed Cache (Redis) -> Database Shards",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến trúc Rate Limiter Phân Tán với Redis Cluster và Lua Script",
+        "caption": "Đảm bảo tính nguyên tử (Atomicity) và ngăn chặn Race Condition khi hàng nghìn API Gateway cùng kiểm tra giới hạn",
+        "code": "flowchart TD\n    Client[\"Client Request\"] --> GW1[\"API Gateway Instance 1\"]\n    Client2[\"Client Request\"] --> GW2[\"API Gateway Instance 2\"]\n\n    GW1 -->|\"Chạy Atomic Lua Script\"| Redis[(\"Redis Cluster\")]\n    GW2 -->|\"Chạy Atomic Lua Script\"| Redis\n\n    subgraph Lua [\"Xử Lý Trong Một Giao Dịch Nguyên Tử (Atomic)\"]\n        Check[\"Lấy số lượng request hiện tại\"] --> Verify{\"Vượt quá Limit?\"}\n        Verify -->|\"Chưa vượt\"| Incr[\"Tăng Counter + Gia hạn TTL\"]\n        Verify -->|\"Đã vượt\"| Block[\"Trả về cờ REJECT\"]\n    end\n\n    Redis -->|\"Kết quả trả về\"| Decision{\"Kết quả Lua\"}\n    Decision -->|\"ACCEPT\"| Backend[\"Forward request vào Microservice\"]\n    Decision -->|\"REJECT\"| Error429[\"Trả lỗi 429 Too Many Requests\"]"
+      },
+      "codeDiff": {
+        "title": "Anti-pattern Race Condition vs Giải Pháp Redis Lua Script Senior",
+        "language": "typescript",
+        "antiPattern": {
+          "title": "❌ Anti-Pattern: Tách rời thao tác GET và INCR (Dễ bị race condition)",
+          "code": "// SAI LẦM: Hai request đến cùng 1 mili-giây sẽ đọc cùng giá trị count!\nasync function isRateLimited(userId: string): Promise<boolean> {\n  const current = await redis.get(`ratelimit:${userId}`);\n  if (current && parseInt(current) >= 100) {\n    return true; // Chặn\n  }\n  // Race condition: Cả 2 request cùng chạy lệnh incr, dẫn đến vượt quá giới hạn\n  await redis.incr(`ratelimit:${userId}`);\n  await redis.expire(`ratelimit:${userId}`, 60);\n  return false;\n}",
+          "explanation": "Thao tác GET, INCR, EXPIRE là các round-trip riêng biệt. Dưới tải cao, hàng chục request có thể đọc cùng một giá trị cũ trước khi INCR kịp chạy, phá vỡ giới hạn rate limit."
+        },
+        "seniorSolution": {
+          "title": "✅ Senior Solution: Thực thi nguyên tử bằng Redis Lua Script trong 1 Round-Trip",
+          "code": "// CHUẨN SENIOR: Đóng gói toàn bộ logic vào Lua Script chạy nguyên tử trên Redis server\nconst RATELIMIT_LUA = `\n  local key = KEYS[1]\n  local limit = tonumber(ARGV[1])\n  local ttl = tonumber(ARGV[2])\n  \n  local current = redis.call('INCR', key)\n  if current == 1 then\n    redis.call('EXPIRE', key, ttl)\n  end\n  \n  if current > limit then\n    return 0 -- Bị chặn\n  end\n  return 1 -- Cho phép\n`;\n\nasync function isRateLimited(userId: string): Promise<boolean> {\n  const result = await redis.eval(RATELIMIT_LUA, 1, `rl:${userId}`, 100, 60);\n  return result === 0;\n}",
+          "explanation": "Redis đơn luồng (single-threaded) sẽ thực thi Lua script mà không bị xen ngang bởi bất kỳ thao tác nào khác, đảm bảo tính nguyên tử tuyệt đối và chỉ tiêu tốn đúng 1 network round-trip."
+        }
+      }
     },
     "pitfalls": [
       "Thiết kế giải pháp đơn điểm (Single Point of Failure - SPOF) hoặc bỏ qua bài toán mở rộng dữ liệu dài hạn."

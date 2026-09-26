@@ -145,7 +145,13 @@
       "summary": "Garbage Collector trong .NET là Tracing Generational Garbage Collector chia bộ nhớ Managed Heap thành 3 thế hệ (Gen 0: đối tượng ngắn hạn mới sinh; Gen 1: vùng đệm chuyển tiếp; Gen 2: đối tượng sống lâu) cùng với Large Object Heap (LOH cho đối tượng >= 85,000 bytes) và Pinned Object Heap (POH cho đối tượng bị ghim). GC hoạt động qua 3 pha: (1) Mark (đánh dấu đối tượng còn sống từ GC Roots); (2) Plan & Sweep (xác định vùng trống); (3) Compact (dồn bộ nhớ để chống phân mảnh). GC tự động chạy khi: Gen 0 đầy vượt ngưỡng budget, hệ thống báo cạn RAM (low memory OS notification), hoặc gọi tường minh `GC.Collect()`.",
       "deepDive": "Dưới góc độ kiến trúc máy ảo: Giả định thế hệ (Generational Hypothesis) chỉ ra rằng 'đối tượng càng mới tạo càng dễ chết sớm'. Gen 0 và 1 nằm trong Ephemeral Segment có kích thước nhỏ, cho phép dọn dẹp cực nhanh chỉ trong vài microsecond (thường không cần dồn bộ nhớ toàn diện). Để quét Gen 0/1 mà không phải quét ngược lại toàn bộ Gen 2, CLR dùng cấu trúc mảng bit gọi là Card Table: mỗi khi một đối tượng Gen 2 được gán trỏ tới một đối tượng Gen 0, JIT Write Barrier sẽ đánh dấu bit tương ứng trong Card Table, biến nó thành GC root bổ sung. Trong môi trường Server, Server GC phân bổ 1 Heap độc lập và 1 Dedicated GC Thread cho mỗi CPU Core, giúp tối đa hóa throughput song song.",
       "codeLanguage": "csharp",
-      "codeExample": "// C# 12 / .NET 8 - Chẩn đoán và quan sát thông số GC trong Enterprise Microservice\nusing System;\n\npublic static class GcMetricsDiagnostics\n{\n    public static void PrintGcHealthReport()\n    {\n        // Thu thập thông tin chi tiết từ GC Engine trong .NET 8\n        GCMemoryInfo memInfo = GC.GetGCMemoryInfo();\n\n        Console.WriteLine($\"Heap Size: {memInfo.HeapSizeBytes / (1024 * 1024)} MB\");\n        Console.WriteLine($\"Fragmented Bytes: {memInfo.FragmentedBytes / 1024} KB\");\n        Console.WriteLine($\"Memory Load: {memInfo.MemoryLoadBytes / (1024 * 1024)} MB\");\n        Console.WriteLine($\"Gen 0 Collections: {GC.CollectionCount(0)}\");\n        Console.WriteLine($\"Gen 1 Collections: {GC.CollectionCount(1)}\");\n        Console.WriteLine($\"Gen 2 Collections: {GC.CollectionCount(2)}\");\n        Console.WriteLine($\"Last GC Pause Duration: {memInfo.PauseDurations[0].TotalMilliseconds} ms\");\n    }\n}"
+      "codeExample": "// C# 12 / .NET 8 - Chẩn đoán và quan sát thông số GC trong Enterprise Microservice\nusing System;\n\npublic static class GcMetricsDiagnostics\n{\n    public static void PrintGcHealthReport()\n    {\n        // Thu thập thông tin chi tiết từ GC Engine trong .NET 8\n        GCMemoryInfo memInfo = GC.GetGCMemoryInfo();\n\n        Console.WriteLine($\"Heap Size: {memInfo.HeapSizeBytes / (1024 * 1024)} MB\");\n        Console.WriteLine($\"Fragmented Bytes: {memInfo.FragmentedBytes / 1024} KB\");\n        Console.WriteLine($\"Memory Load: {memInfo.MemoryLoadBytes / (1024 * 1024)} MB\");\n        Console.WriteLine($\"Gen 0 Collections: {GC.CollectionCount(0)}\");\n        Console.WriteLine($\"Gen 1 Collections: {GC.CollectionCount(1)}\");\n        Console.WriteLine($\"Gen 2 Collections: {GC.CollectionCount(2)}\");\n        Console.WriteLine($\"Last GC Pause Duration: {memInfo.PauseDurations[0].TotalMilliseconds} ms\");\n    }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc .NET CLR Garbage Collector: Các Thế Hệ Vùng Nhớ (Generations)",
+        "caption": "Phân vùng Gen 0, Gen 1, Gen 2, Large Object Heap (LOH > 85KB) và Pinned Object Heap (POH)",
+        "code": "flowchart LR\n    subgraph SOH [\"Small Object Heap (SOH - Đối tượng < 85,000 bytes)\"]\n        Gen0[\"Gen 0 (Cấp phát mới)\nGC chạy cực nhanh (< 1ms)\"] -->|\"Sống sót\"| Gen1[\"Gen 1 (Vùng đệm phân tích)\"]\n        Gen1 -->|\"Sống sót lâu\"| Gen2[\"Gen 2 (Dài hạn: Singletons, Caches)\"]\n    end\n\n    subgraph SpecialHeaps [\"Specialized Heaps\"]\n        LOH[\"Large Object Heap (LOH)\nĐối tượng >= 85KB (Mảng byte, chuỗi lớn)\nKhông bị compact mặc định (Dễ phân mảnh)\"]\n        POH[\"Pinned Object Heap (POH)\nĐối tượng cố định địa chỉ cho Native P/Invoke\"]\n    end"
+      }
     },
     "pitfalls": [
       "Tự ý gọi `GC.Collect()` định kỳ trong code production: Phá vỡ cơ chế tự học (self-tuning heuristics) của GC, đẩy nhầm các đối tượng tạm thời lên Gen 2 gây Full GC tốn kém.",
@@ -1168,7 +1174,21 @@
       "summary": "Nên tránh tuyệt đối các lệnh chặn đồng bộ như `.Result`, `.Wait()`, hay `.GetAwaiter().GetResult()` (mô hình Sync-over-Async) vì hai thảm họa kiến trúc: (1) DEADLOCK: Trong các môi trường có `SynchronizationContext` (WPF, WinForms, ASP.NET cũ), luồng chính bị block chờ Task hoàn thành, trong khi Task cần quay lại chính luồng đó để tiếp tục, dẫn tới bế tắc vĩnh viễn; (2) THREAD POOL STARVATION: Trong ASP.NET Core, việc block luồng khiến các worker thread bị giữ chặt lãng phí. Khi lưu lượng request tăng, Thread Pool cạn kiệt luồng rảnh rỗi và thuật toán mở rộng luồng của .NET chỉ có thể tạo thêm ~1-2 luồng mới mỗi giây, khiến toàn bộ hệ thống tê liệt.",
       "deepDive": "Dưới tầng ThreadPool Heuristics: CLR ThreadPool sử dụng thuật toán 'Hill Climbing' để điều chỉnh số lượng worker threads tối ưu. Khi bạn gọi `.Result`, một worker thread bị khóa cứng ở trạng thái `WaitSleepJoin`. Nếu có 500 request đồng thời đều gọi `.Result`, 500 threads sẽ bị khóa. Lúc này các request mới đến phải nằm chờ trong hàng đợi toàn cục (Global Queue). Mặc dù CPU chỉ ở mức 10-20%, Thread Pool không dám tạo ồ ạt hàng ngàn luồng ngay vì sợ sập bộ nhớ và nghẽn CPU do context switching. Tốc độ bù luồng cực chậm (~1-2 luồng/giây) khiến độ trễ của toàn bộ API tăng vọt theo hàm mũ (Latency Spike) và dẫn tới Gateway Timeout 504 diện rộng.",
       "codeLanguage": "csharp",
-      "codeExample": "// C# 12 / .NET 8 - Phòng chống Sync-over-Async và Thread Pool Starvation\nusing System;\nusing System.Threading.Tasks;\n\npublic static class AntiPatternShowcase\n{\n    // ANTIPATTERN NGUY HIỂM: Gây nghẽn Thread Pool hoặc Deadlock\n    public static string BadSyncOverAsync()\n    {\n        // Worker thread bị chiếm dụng thụ động, không thể phục vụ việc khác\n        return FetchDataAsync().GetAwaiter().GetResult(); \n    }\n\n    // CHUẨN MỰC HIỆN ĐẠI: Async All The Way - Thấm nhuần từ Controller tới Database\n    public static async Task<string> GoodAsyncAllTheWay()\n    {\n        return await FetchDataAsync(); // Giải phóng luồng hoàn toàn trong khi chờ\n    }\n\n    private static async Task<string> FetchDataAsync()\n    {\n        await Task.Delay(100); // Giả lập I/O database\n        return \"Payload\";\n    }\n}"
+      "codeExample": "// C# 12 / .NET 8 - Phòng chống Sync-over-Async và Thread Pool Starvation\nusing System;\nusing System.Threading.Tasks;\n\npublic static class AntiPatternShowcase\n{\n    // ANTIPATTERN NGUY HIỂM: Gây nghẽn Thread Pool hoặc Deadlock\n    public static string BadSyncOverAsync()\n    {\n        // Worker thread bị chiếm dụng thụ động, không thể phục vụ việc khác\n        return FetchDataAsync().GetAwaiter().GetResult(); \n    }\n\n    // CHUẨN MỰC HIỆN ĐẠI: Async All The Way - Thấm nhuần từ Controller tới Database\n    public static async Task<string> GoodAsyncAllTheWay()\n    {\n        return await FetchDataAsync(); // Giải phóng luồng hoàn toàn trong khi chờ\n    }\n\n    private static async Task<string> FetchDataAsync()\n    {\n        await Task.Delay(100); // Giả lập I/O database\n        return \"Payload\";\n    }\n}",
+      "codeDiff": {
+        "title": "Nguy Hiểm Của Blocking .Result/.Wait() vs Async/Await Không Gây Deadlock",
+        "language": "csharp",
+        "antiPattern": {
+          "title": "❌ Anti-Pattern: Chặn luồng bằng .Result hoặc .Wait() (Gây Deadlock và Thread Starvation)",
+          "code": "// NGUY HIỂM CHẾT NGƯỜI: Chặn đồng bộ trên Task bất đồng bộ\n[HttpGet(\"user/{id}\")]\npublic IActionResult GetUser(int id)\n{\n    // LỖI: .Result chặn main thread trong khi Task.Run chờ thread pool\n    // Trên ASP.NET cũ hoặc môi trường có SynchronizationContext, code này DEADLOCK ngay lập tức!\n    var user = _userService.GetUserAsync(id).Result;\n    return Ok(user);\n}",
+          "explanation": "Calling `.Result` or `.Wait()` blocks the caller thread synchronously. When the async operation completes and attempts to resume on the captured `SynchronizationContext`, that context is occupied by the blocked thread, creating a classic circular deadlock."
+        },
+        "seniorSolution": {
+          "title": "✅ Senior Solution: Sử dụng async/await xuyên suốt (Async All The Way Down)",
+          "code": "// CHUẨN SENIOR: Không block thread, giải phóng tài nguyên cho hệ thống\n[HttpGet(\"user/{id}\")]\npublic async Task<IActionResult> GetUserAsync(int id, CancellationToken ct)\n{\n    // Thread hiện tại được trả về ThreadPool để phục vụ request khác trong khi chờ I/O Database!\n    var user = await _userService.GetUserAsync(id, ct);\n    return Ok(user);\n}",
+          "explanation": "Async/await tạo ra một State Machine ngầm (IAsyncStateMachine). Khi gặp từ khóa await, thread được trả về ThreadPool để phục vụ khách hàng khác, tăng thông lượng hệ thống lên gấp 10 lần."
+        }
+      }
     },
     "pitfalls": [
       "Nghĩ rằng dùng `.GetAwaiter().GetResult()` là an toàn hơn `.Result`: Thực chất cả hai đều block luồng 100% như nhau; điểm khác biệt duy nhất là `.GetAwaiter().GetResult()` bóc tách (unwrap) exception thay vì ném ra `AggregateException`.",
@@ -1603,7 +1623,75 @@
       "summary": "ASP.NET Core cung cấp 3 loại Service Lifetime: (1) `Transient`: Được tạo mới MỖI LẦN ĐƯỢC YÊU CẦU. Phù hợp cho các service nhỏ, phi trạng thái (Stateless), nhẹ nhàng (như Validation, Helper calculations); (2) `Scoped`: Được tạo MỘT LẦN DUY NHẤT TRONG MỖI PHẠM VI (thường tương ứng với 1 HTTP Request). Phù hợp cho các service lưu trữ ngữ cảnh của request hoặc quản lý transaction (như `DbContext`, Unit of Work); (3) `Singleton`: Được tạo MỘT LẦN DUY NHẤT KHI ĐƯỢC GỌI LẦN ĐẦU và sống suốt vòng đời của ứng dụng. Phù hợp cho các dịch vụ dùng chung có chi phí khởi tạo nặng hoặc quản lý cache toàn cục (như In-Memory Cache, IOptionsMonitor, Kafka Producer).",
       "deepDive": "Dưới tầng quản lý bộ nhớ của DI Container: Container duy trì danh sách tham chiếu tới tất cả các đối tượng có implement `IDisposable` mà nó đã tạo ra. Với `Transient`: nếu được resolve từ Root Provider, Container sẽ giữ tham chiếu của nó vĩnh viễn cho tới khi app tắt, gây ra RÒ RỈ BỘ NHỚ nghiêm trọng. Với `Scoped`: Khi HTTP Request kết thúc, ASP.NET Core gọi `scope.Dispose()`, toàn bộ các service Scoped được khởi tạo trong request đó (kể cả DbContext) sẽ được gọi phương thức `Dispose()` để giải phóng kết nối socket và trả RAM về cho GC. Hiểm họa lớn nhất là 'Captive Dependency': Một Singleton Service vô tình nhận vào một Scoped Service trong constructor, khiến Scoped Service đó bị 'bắt cóc' và sống mãi mãi cùng Singleton, dẫn tới lỗi Concurrency và dữ liệu rác.",
       "codeLanguage": "csharp",
-      "codeExample": "// C# 12 / .NET 8 - Đăng ký chuẩn xác 3 loại Lifetime trong Web API\nusing System;\nusing Microsoft.Extensions.DependencyInjection;\n\npublic static class DependencyLifetimeConfiguration\n{\n    public static void RegisterServices(IServiceCollection services)\n    {\n        // 1. TRANSIENT: Cực nhẹ, hoàn toàn stateless, tạo mới liên tục\n        services.AddTransient<IOrderCalculationService, OrderCalculationService>();\n\n        // 2. SCOPED: Gắn liền với vòng đời của 1 HTTP Request, tự động Dispose khi request xong\n        services.AddScoped<IOrderRepository, SqlOrderRepository>();\n\n        // 3. SINGLETON: Sống vĩnh viễn cùng tiến trình, bắt buộc phải THREAD-SAFE tuyệt đối\n        services.AddSingleton<IMemoryCacheMetrics, MemoryCacheMetrics>();\n    }\n}\n\npublic interface IOrderCalculationService { decimal CalculateTax(decimal amount); }\npublic sealed class OrderCalculationService : IOrderCalculationService { public decimal CalculateTax(decimal amount) => amount * 0.1m; }\npublic interface IOrderRepository { }\npublic sealed class SqlOrderRepository : IOrderRepository { }\npublic interface IMemoryCacheMetrics { }\npublic sealed class MemoryCacheMetrics : IMemoryCacheMetrics { }"
+      "codeExample": "// C# 12 / .NET 8 - Đăng ký chuẩn xác 3 loại Lifetime trong Web API\nusing System;\nusing Microsoft.Extensions.DependencyInjection;\n\npublic static class DependencyLifetimeConfiguration\n{\n    public static void RegisterServices(IServiceCollection services)\n    {\n        // 1. TRANSIENT: Cực nhẹ, hoàn toàn stateless, tạo mới liên tục\n        services.AddTransient<IOrderCalculationService, OrderCalculationService>();\n\n        // 2. SCOPED: Gắn liền với vòng đời của 1 HTTP Request, tự động Dispose khi request xong\n        services.AddScoped<IOrderRepository, SqlOrderRepository>();\n\n        // 3. SINGLETON: Sống vĩnh viễn cùng tiến trình, bắt buộc phải THREAD-SAFE tuyệt đối\n        services.AddSingleton<IMemoryCacheMetrics, MemoryCacheMetrics>();\n    }\n}\n\npublic interface IOrderCalculationService { decimal CalculateTax(decimal amount); }\npublic sealed class OrderCalculationService : IOrderCalculationService { public decimal CalculateTax(decimal amount) => amount * 0.1m; }\npublic interface IOrderRepository { }\npublic sealed class SqlOrderRepository : IOrderRepository { }\npublic interface IMemoryCacheMetrics { }\npublic sealed class MemoryCacheMetrics : IMemoryCacheMetrics { }",
+      "benchmark": {
+        "title": "Ma trận So sánh: ASP.NET Core Dependency Injection Lifetimes",
+        "caption": "Lựa chọn Transient, Scoped, hoặc Singleton để tránh rủi ro Captive Dependency",
+        "options": [
+          {
+            "name": "Scoped Lifetime (AddScoped)",
+            "badge": "Chuẩn Web Request & EF Core",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tính an toàn theo Request",
+                "value": 100,
+                "displayValue": "1 Instance / 1 HTTP Request",
+                "color": "emerald"
+              },
+              {
+                "label": "Tương thích Entity Framework Core",
+                "value": 100,
+                "displayValue": "Hoàn hảo",
+                "color": "emerald"
+              },
+              {
+                "label": "Nguy cơ rò rỉ dữ liệu giữa người dùng",
+                "value": 0,
+                "displayValue": "Zero Cross-user Leak",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Dữ liệu trong DbContext được cô lập hoàn toàn giữa các HTTP request độc lập",
+              "Tự động gọi Dispose() khi kết thúc request"
+            ],
+            "cons": [
+              "Dễ gặp lỗi Captive Dependency nếu vô tình inject Scoped service vào một Singleton service"
+            ]
+          },
+          {
+            "name": "Singleton Lifetime (AddSingleton)",
+            "badge": "Dữ liệu toàn cục & Caches",
+            "metrics": [
+              {
+                "label": "Tiết kiệm tài nguyên cấp phát",
+                "value": 99,
+                "displayValue": "Chỉ 1 instance duy nhất",
+                "color": "emerald"
+              },
+              {
+                "label": "Yêu cầu Thread-Safe",
+                "value": 100,
+                "displayValue": "Bắt buộc tuyệt đối",
+                "color": "rose"
+              },
+              {
+                "label": "Tương thích Entity Framework Core",
+                "value": 10,
+                "displayValue": "Không được dùng!",
+                "color": "rose"
+              }
+            ],
+            "pros": [
+              "Cực kỳ tiết kiệm bộ nhớ, thích hợp cho In-memory Cache, Metric Collectors, Socket Manager"
+            ],
+            "cons": [
+              "Phải đảm bảo Thread-Safe 100% vì hàng trăm thread sẽ truy cập vào cùng lúc"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Inject một Scoped Service (như `DbContext`) vào một Singleton Service: Gây ra lỗi Captive Dependency làm hỏng tính toàn vẹn dữ liệu đa luồng.",

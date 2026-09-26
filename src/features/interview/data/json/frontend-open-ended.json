@@ -62,8 +62,14 @@
         "title": "W3C Performance Timeline and PerformanceObserver",
         "url": "https://w3c.github.io/performance-timeline/"
       },
-      { "title": "W3C Long Tasks API", "url": "https://w3c.github.io/longtasks/" },
-      { "title": "W3C Event Timing API", "url": "https://w3c.github.io/event-timing/" }
+      {
+        "title": "W3C Long Tasks API",
+        "url": "https://w3c.github.io/longtasks/"
+      },
+      {
+        "title": "W3C Event Timing API",
+        "url": "https://w3c.github.io/event-timing/"
+      }
     ],
     "pitfalls": [
       "Tối ưu component có nhiều render nhất mà chưa nối nó với freeze.",
@@ -116,7 +122,42 @@
         "Correctness test snapshot+delta không mất/duplicate projection qua reconnect và stale worker result không commit.",
         "RUM event-lag p95, queue depth, dropped/coalesced count, Worker time, long tasks, memory và reconnect success.",
         "Capacity model nêu rõ max sustainable rate/device; degradation được test và hiển thị trạng thái cho user."
-      ]
+      ],
+      "diagram": {
+        "type": "pipeline",
+        "title": "Kiến Trúc Dashboard Realtime Hàng Chục Nghìn Sự Kiện/Giây Không Gây Đơ Màn Hình",
+        "caption": "Kỹ thuật gom nhóm (Batching) bằng Ring Buffer và cập nhật giao diện theo tần số quét màn hình requestAnimationFrame",
+        "stages": [
+          {
+            "name": "1. Nhận Luồng Dữ Liệu Cực Đại",
+            "tool": "WebSocket / gRPC-Web",
+            "icon": "Radio",
+            "description": "Hàng chục nghìn gói tin sự kiện giá cổ phiếu / IoT gửi về mỗi giây.",
+            "metric": "> 20,000 msg/s"
+          },
+          {
+            "name": "2. Bộ Đệm Vòng Tròn (Ring Buffer)",
+            "tool": "TypedArray / Circular Buffer",
+            "icon": "Layers",
+            "description": "Không gọi setState() ngay lập tức. Dữ liệu được đưa vào Circular Buffer trong bộ nhớ để triệt tiêu việc cấp phát rác GC.",
+            "metric": "Zero Alloc"
+          },
+          {
+            "name": "3. Gom Nhóm Theo Nhịp Màn Hình (RAF Throttle)",
+            "tool": "requestAnimationFrame",
+            "icon": "Cpu",
+            "description": "Chỉ rút dữ liệu tổng hợp ra vẽ đúng 1 lần trong mỗi 16.6ms (chu kỳ 60 FPS) của màn hình.",
+            "metric": "60 FPS Lock"
+          },
+          {
+            "name": "4. Kết Xuất Tối Ưu Bằng WebGL / Canvas",
+            "tool": "HTML5 Canvas / PixiJS",
+            "icon": "Zap",
+            "description": "Vẽ đồ thị bằng GPU thay vì tạo hàng chục nghìn thẻ DOM div gây nghẽn Layout/Reflow của trình duyệt.",
+            "metric": "GPU Render"
+          }
+        ]
+      }
     },
     "evaluationRubric": {
       "baseline": [

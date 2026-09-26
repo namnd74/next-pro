@@ -260,7 +260,27 @@
       "summary": "Triển khai chiến lược phòng thủ 3 lớp (Defense in Depth): 1) Lớp Client: Disable nút submit ngay sau khi bấm và sinh ra một `client_request_id` (UUID); 2) Lớp API Gateway / Backend: Dùng Redis `SET lock:order:{userId}:{orderToken} EX 30 NX` để chặn ngay request thứ hai đến đồng thời; 3) Lớp Database: Đặt Unique Constraint trên cột `client_idempotency_key` trong bảng orders, kết hợp State Machine chỉ cho phép chuyển trạng thái một chiều.",
       "deepDive": "Nếu chỉ dựa vào frontend disable nút, hacker hoặc mạng retry tự động của browser vẫn có thể bắn nhiều request. Khi request 1 đến: Server giành được Redis lock trong 30s. Nếu request 2 đến trong lúc request 1 đang chạy: Server thấy lock đã tồn tại -> trả về `409 Conflict` kèm thông báo 'Đơn hàng đang được xử lý'. Nếu request 1 hoàn tất: Lưu trạng thái và kết quả đơn hàng vào DB kèm `client_idempotency_key`. Khi request 2 đến muộn hơn: Backend query thấy key đã tồn tại trong DB -> trả về luôn kết quả đơn hàng cũ đã tạo mà không trừ tiền lần 2.",
       "codeExample": "import express, { Request, Response } from 'express';\nimport Redis from 'ioredis';\nimport { Pool } from 'pg';\n\nconst redis = new Redis();\nconst pool = new Pool();\nconst app = express();\napp.use(express.json());\n\napp.post('/api/v1/orders', async (req: Request, res: Response) => {\n  const { orderToken, items, userId } = req.body;\n  if (!orderToken) return res.status(400).json({ error: 'orderToken is required' });\n\n  const lockKey = `lock:order:${userId}:${orderToken}`;\n\n  // 1. LỚP 1: Distributed Lock qua Redis\n  const locked = await redis.set(lockKey, 'IN_PROGRESS', 'EX', 30, 'NX');\n  if (!locked) {\n    return res.status(409).json({ error: 'Order is currently being processed. Please do not re-submit.' });\n  }\n\n  const client = await pool.connect();\n  try {\n    await client.query('BEGIN');\n\n    // 2. LỚP 2: Database Unique Constraint trên client_idempotency_token\n    const insertQuery = `\n      INSERT INTO orders (id, user_id, idempotency_token, status, created_at)\n      VALUES ($1, $2, $3, 'CREATED', NOW())\n      RETURNING id, status;\n    `;\n    const { rows } = await client.query(insertQuery, [crypto.randomUUID(), userId, orderToken]);\n\n    await client.query('COMMIT');\n    return res.status(201).json(rows[0]);\n  } catch (err: any) {\n    await client.query('ROLLBACK');\n    if (err.code === '23505') { // Postgres Unique Violation\n      return res.status(409).json({ error: 'Order has already been created.' });\n    }\n    return res.status(500).json({ error: 'Failed to create order.' });\n  } finally {\n    client.release();\n    await redis.del(lockKey); // Giải phóng lock\n  }\n});",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Luồng Xử Lý Chống Double-Submit Bằng Idempotency Key",
+        "caption": "Bảo vệ giao dịch tài chính không bị trừ tiền hai lần khi người dùng bấm liên tiếp hoặc mạng bị ngắt quãng",
+        "code": "sequenceDiagram\n    autonumber\n    actor User as Khách Hàng (App)\n    participant GW as API Gateway / Server\n    participant Redis as Redis (Distributed Lock & Cache)\n    participant DB as Database (Order & Balance)\n\n    User->>GW: POST /orders (Header: Idempotency-Key: uuid-123)\n    GW->>Redis: SETNX lock:uuid-123 \"PROCESSING\" EX 30\n    alt Khóa đã tồn tại (Đang xử lý hoặc đã hoàn tất)\n        Redis-->>GW: Fail (Key exists)\n        GW->>Redis: GET result:uuid-123\n        Redis-->>GW: Trả lại kết quả đơn hàng đã tạo trước đó\n        GW-->>User: 200 OK (Kết quả cũ - Không tạo đơn trùng)\n    else Khóa mới hoàn toàn (Lần đầu tiên bấm)\n        Redis-->>GW: Success (Acquired Lock)\n        GW->>DB: Trừ tiền + Tạo Order trong 1 Transaction\n        DB-->>GW: Commit Thành Công\n        GW->>Redis: SET result:uuid-123 JSON_DATA EX 86400\n        GW->>Redis: DEL lock:uuid-123\n        GW-->>User: 201 Created (Đơn hàng mới tạo)\n    end"
+      },
+      "codeDiff": {
+        "title": "Xử lý Đặt Hàng Thiếu Khóa vs Chuẩn Idempotent Transaction",
+        "language": "typescript",
+        "antiPattern": {
+          "title": "❌ Anti-Pattern: Trừ tiền trực tiếp không có cơ chế khóa phân tán",
+          "code": "app.post('/api/checkout', async (req, res) => {\n  // Nguy hiểm: Nếu khách bấm 2 lần nhanh, cả 2 request cùng chạy song song\n  const balance = await db.getBalance(req.user.id);\n  if (balance >= req.body.amount) {\n    await db.deductBalance(req.user.id, req.body.amount);\n    const order = await db.createOrder(req.body);\n    return res.json(order);\n  }\n  return res.status(400).send('Số dư không đủ');\n});",
+          "explanation": "Không có cơ chế dedup key hay lock. Khi mạng chập chờn client tự động retry, tài khoản khách hàng sẽ bị trừ tiền nhiều lần cho cùng một món đồ."
+        },
+        "seniorSolution": {
+          "title": "✅ Senior Solution: Sử dụng Idempotency Key kết hợp Redis Mutex Lock",
+          "code": "app.post('/api/checkout', async (req, res) => {\n  const idemKey = req.headers['idempotency-key'] as string;\n  if (!idemKey) return res.status(400).send('Thiếu Idempotency-Key Header');\n\n  const lockKey = `idem:lock:${idemKey}`;\n  const cached = await redis.get(`idem:res:${idemKey}`);\n  if (cached) return res.status(200).json(JSON.parse(cached));\n\n  const acquired = await redis.set(lockKey, '1', 'PX', 5000, 'NX');\n  if (!acquired) return res.status(409).send('Yêu cầu đang được xử lý, vui lòng chờ');\n\n  try {\n    const order = await db.transaction(async (trx) => {\n      await trx.deductBalanceWithLock(req.user.id, req.body.amount);\n      return await trx.createOrder({ ...req.body, idempotencyKey: idemKey });\n    });\n\n    await redis.set(`idem:res:${idemKey}`, JSON.stringify(order), 'EX', 86400);\n    return res.status(201).json(order);\n  } finally {\n    await redis.del(lockKey);\n  }\n});",
+          "explanation": "Kết hợp Redis SetNX làm Distributed Mutex và lưu Cache kết quả theo Idempotency-Key trong 24h, bảo vệ tuyệt đối khỏi lỗi Double-spending."
+        }
+      }
     },
     "codeExample": "import express, { Request, Response } from 'express';\nimport Redis from 'ioredis';\nimport { Pool } from 'pg';\n\nconst redis = new Redis();\nconst pool = new Pool();\nconst app = express();\napp.use(express.json());\n\napp.post('/api/v1/orders', async (req: Request, res: Response) => {\n  const { orderToken, items, userId } = req.body;\n  if (!orderToken) return res.status(400).json({ error: 'orderToken is required' });\n\n  const lockKey = `lock:order:${userId}:${orderToken}`;\n\n  // 1. LỚP 1: Distributed Lock qua Redis\n  const locked = await redis.set(lockKey, 'IN_PROGRESS', 'EX', 30, 'NX');\n  if (!locked) {\n    return res.status(409).json({ error: 'Order is currently being processed. Please do not re-submit.' });\n  }\n\n  const client = await pool.connect();\n  try {\n    await client.query('BEGIN');\n\n    // 2. LỚP 2: Database Unique Constraint trên client_idempotency_token\n    const insertQuery = `\n      INSERT INTO orders (id, user_id, idempotency_token, status, created_at)\n      VALUES ($1, $2, $3, 'CREATED', NOW())\n      RETURNING id, status;\n    `;\n    const { rows } = await client.query(insertQuery, [crypto.randomUUID(), userId, orderToken]);\n\n    await client.query('COMMIT');\n    return res.status(201).json(rows[0]);\n  } catch (err: any) {\n    await client.query('ROLLBACK');\n    if (err.code === '23505') { // Postgres Unique Violation\n      return res.status(409).json({ error: 'Order has already been created.' });\n    }\n    return res.status(500).json({ error: 'Failed to create order.' });\n  } finally {\n    client.release();\n    await redis.del(lockKey); // Giải phóng lock\n  }\n});",
     "codeLanguage": "typescript",
@@ -366,7 +386,109 @@
       "summary": "Chọn REST cho Public API phục vụ bên thứ ba hoặc Web client đơn giản (tận dụng tối đa HTTP Caching, phổ biến toàn cầu); Chọn GraphQL cho Frontend-facing APIs phức tạp (Mobile/Web có nhiều views khác nhau, giải quyết triệt để Over-fetching và Under-fetching, gom nhiều request thành 1); Chọn gRPC cho giao tiếp nội bộ giữa các Microservices (East-West traffic) đòi hỏi độ trễ cực thấp, throughput cao và strongly-typed contract (Protobuf trên nền HTTP/2).",
       "deepDive": "So sánh hiệu năng: gRPC sử dụng Protocol Buffers mã hóa nhị phân siêu nhẹ, nén dữ liệu tốt hơn JSON 5-10 lần và parse nhanh hơn 7 lần, kết hợp HTTP/2 multiplexing (hàng ngàn request trên 1 TCP connection). Tuy nhiên gRPC khó debug bằng trình duyệt thông thường. GraphQL cực kỳ mạnh cho client-side linh hoạt nhưng rất khó cache ở tầng CDN/HTTP (vì hầu hết là POST vào 1 endpoint duy nhất) và đối mặt với nguy cơ N+1 query nghiêm trọng ở backend. REST đơn giản nhất, caching tốt nhất qua HTTP headers nhưng payload JSON cồng kềnh.",
       "codeExample": "// Ma trận quyết định lựa chọn giao thức truyền tải:\nexport interface ApiProtocolStrategy {\n  type: 'REST' | 'GraphQL' | 'gRPC';\n  trafficFlow: 'North-South (Client-Server)' | 'East-West (Inter-service)';\n  transport: 'HTTP/1.1 or HTTP/2' | 'HTTP/2 only';\n  serialization: 'JSON (Text)' | 'Protobuf (Binary)';\n  bestSuitedFor: string;\n}\n\nexport const comparisonTable: Record<string, ApiProtocolStrategy> = {\n  gRPC: {\n    type: 'gRPC',\n    trafficFlow: 'East-West (Inter-service)',\n    transport: 'HTTP/2 only',\n    serialization: 'Protobuf (Binary)',\n    bestSuitedFor: 'Giao tiếp giữa microservices nội bộ, high-throughput, low-latency, polyglot services'\n  },\n  GraphQL: {\n    type: 'GraphQL',\n    trafficFlow: 'North-South (Client-Server)',\n    transport: 'HTTP/1.1 or HTTP/2',\n    serialization: 'JSON (Text)',\n    bestSuitedFor: 'Mobile apps, Dashboard phức tạp, gom dữ liệu từ nhiều microservices thành 1 query'\n  },\n  REST: {\n    type: 'REST',\n    trafficFlow: 'North-South (Client-Server)',\n    transport: 'HTTP/1.1 or HTTP/2',\n    serialization: 'JSON (Text)',\n    bestSuitedFor: 'Public APIs, Tích hợp đối tác thứ 3, File upload/download, Hệ thống cần HTTP CDN caching'\n  }\n};",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "benchmark": {
+        "title": "Ma trận So sánh Toàn Diện: REST vs GraphQL vs gRPC",
+        "caption": "Đánh giá định lượng về thông lượng, độ trễ và sự phù hợp trong kiến trúc hệ thống hiện đại",
+        "options": [
+          {
+            "name": "gRPC (HTTP/2 + Protocol Buffers)",
+            "badge": "Chuẩn Microservices Nội Bộ",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Thông lượng (Throughput)",
+                "value": 99,
+                "displayValue": "> 150k RPS",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ trễ tuần tự hóa (Serialization)",
+                "value": 95,
+                "displayValue": "Siêu nhỏ (Binary)",
+                "color": "emerald"
+              },
+              {
+                "label": "Tiết kiệm băng thông mạng",
+                "value": 95,
+                "displayValue": "Giảm 70% so với JSON",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Serialization nhị phân cực nhanh, hỗ trợ Streaming 2 chiều trên HTTP/2",
+              "Sinh code Client/Server tự động đa ngôn ngữ từ file .proto"
+            ],
+            "cons": [
+              "Không thân thiện với trình duyệt web trực tiếp (cần gRPC-Web proxy)",
+              "Payload nhị phân khó đọc bằng mắt thường khi debug cURL"
+            ]
+          },
+          {
+            "name": "GraphQL (Apollo / Yoga)",
+            "badge": "BFF & Client Phức Tạp",
+            "metrics": [
+              {
+                "label": "Thông lượng (Throughput)",
+                "value": 65,
+                "displayValue": "~20k RPS",
+                "color": "amber"
+              },
+              {
+                "label": "Tránh Over/Under-fetching",
+                "value": 100,
+                "displayValue": "Tuyệt đối",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ trễ gia tăng (Query Parsing)",
+                "value": 55,
+                "displayValue": "Parse AST tốn CPU",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Client tự định nghĩa đúng các trường cần lấy trong 1 request duy nhất",
+              "Phù hợp làm tầng Backend-for-Frontend (BFF) gom nhiều API"
+            ],
+            "cons": [
+              "Khó khăn khi thiết lập Caching ở tầng HTTP/CDN",
+              "Nguy cơ bị tấn công DDoS thông qua các truy vấn lồng sâu (Deeply Nested Queries)"
+            ]
+          },
+          {
+            "name": "RESTful API (JSON over HTTP/1.1 or HTTP/2)",
+            "badge": "Public API Chuẩn Mực",
+            "metrics": [
+              {
+                "label": "Thông lượng (Throughput)",
+                "value": 80,
+                "displayValue": "~50k RPS",
+                "color": "blue"
+              },
+              {
+                "label": "Khả năng Caching ở Gateway/CDN",
+                "value": 100,
+                "displayValue": "Chuẩn HTTP native",
+                "color": "emerald"
+              },
+              {
+                "label": "Tính phổ quát trong cộng đồng",
+                "value": 100,
+                "displayValue": "Phổ biến nhất",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Dễ học, cURL debug trực tiếp, tận dụng triệt để HTTP Status Code và CDN Caching",
+              "Tài liệu OpenAPI/Swagger cực kỳ phong phú"
+            ],
+            "cons": [
+              "Dễ bị Over-fetching hoặc Under-fetching (buộc client gọi nhiều API liên tiếp)"
+            ]
+          }
+        ]
+      }
     },
     "codeExample": "// Ma trận quyết định lựa chọn giao thức truyền tải:\nexport interface ApiProtocolStrategy {\n  type: 'REST' | 'GraphQL' | 'gRPC';\n  trafficFlow: 'North-South (Client-Server)' | 'East-West (Inter-service)';\n  transport: 'HTTP/1.1 or HTTP/2' | 'HTTP/2 only';\n  serialization: 'JSON (Text)' | 'Protobuf (Binary)';\n  bestSuitedFor: string;\n}\n\nexport const comparisonTable: Record<string, ApiProtocolStrategy> = {\n  gRPC: {\n    type: 'gRPC',\n    trafficFlow: 'East-West (Inter-service)',\n    transport: 'HTTP/2 only',\n    serialization: 'Protobuf (Binary)',\n    bestSuitedFor: 'Giao tiếp giữa microservices nội bộ, high-throughput, low-latency, polyglot services'\n  },\n  GraphQL: {\n    type: 'GraphQL',\n    trafficFlow: 'North-South (Client-Server)',\n    transport: 'HTTP/1.1 or HTTP/2',\n    serialization: 'JSON (Text)',\n    bestSuitedFor: 'Mobile apps, Dashboard phức tạp, gom dữ liệu từ nhiều microservices thành 1 query'\n  },\n  REST: {\n    type: 'REST',\n    trafficFlow: 'North-South (Client-Server)',\n    transport: 'HTTP/1.1 or HTTP/2',\n    serialization: 'JSON (Text)',\n    bestSuitedFor: 'Public APIs, Tích hợp đối tác thứ 3, File upload/download, Hệ thống cần HTTP CDN caching'\n  }\n};",
     "codeLanguage": "typescript",
@@ -402,7 +524,13 @@
       "summary": "HTTP/1.1: Giao thức dạng văn bản (Plain-text), mỗi request chiếm 1 kết nối TCP (hoặc dùng pipelining nhưng dễ bị lỗi), bị nghẽn Head-of-Line Blocking ở tầng ứng dụng; HTTP/2: Dùng Binary Framing, Multiplexing (hàng trăm request/response chạy đồng thời trên 1 kết nối TCP duy nhất), nén header bằng HPACK, nhưng VẪN BỊ Head-of-Line Blocking ở tầng TCP (nếu mất 1 gói packet, toàn bộ luồng phải dừng lại chờ); HTTP/3: Chuyển đổi toàn diện từ TCP sang chạy trên giao thức QUIC (nền UDP), giải quyết triệt để HoL blocking ở mọi tầng, hỗ trợ 0-RTT Connection Handshake và chuyển mạng không ngắt kết nối (Connection Migration).",
       "deepDive": "Sự đột phá lớn nhất của HTTP/3 là QUIC qua UDP: Khi người dùng đang dùng Wifi bước ra khỏi nhà chuyển sang mạng 4G, địa chỉ IP thay đổi. Với HTTP/1.1 và HTTP/2 (dùng TCP), kết nối bị đứt hoàn toàn và phải thực hiện lại 3-way handshake + TLS handshake (mất 2-3 round trips). Với HTTP/3 (QUIC), kết nối được định danh bằng Connection ID độc lập với IP; điện thoại chuyển mạng mượt mà không bị gián đoạn (Zero downtime connection migration). Ngoài ra, cơ chế mã hóa TLS 1.3 được tích hợp sẵn từ nhân của QUIC.",
       "codeExample": "// Bảng tóm tắt so sánh tiến hóa giao thức HTTP:\nexport const HttpEvolutionSummary = {\n  \"HTTP/1.1 (1997)\": {\n    transport: \"TCP\",\n    format: \"Plain-text\",\n    concurrency: \"1 request per connection (Trình duyệt mở tối đa 6 TCP sockets/domain)\",\n    headOfLineBlocking: \"Bị ở tầng Application (Request sau phải đợi request trước xong)\",\n    handshakeLatency: \"1x TCP RTT + 1-2x TLS RTT = 2-3 RTTs\"\n  },\n  \"HTTP/2 (2015)\": {\n    transport: \"TCP\",\n    format: \"Binary Framing (Streams & Frames)\",\n    concurrency: \"Multiplexing trên 1 TCP connection duy nhất\",\n    headOfLineBlocking: \"Hết ở tầng App, nhưng VẪN BỊ ở tầng TCP (Packet loss làm kẹt cả luồng)\",\n    headerCompression: \"HPACK\"\n  },\n  \"HTTP/3 (2022)\": {\n    transport: \"QUIC (chạy trên UDP)\",\n    format: \"Binary Streams\",\n    concurrency: \"Independent Streams (Gói packet của stream A mất KHÔNG ảnh hưởng stream B)\",\n    headOfLineBlocking: \"LOẠI BỎ HOÀN TOÀN ở cả tầng App và Transport\",\n    connectionMigration: \"Hỗ trợ đổi IP mạng (Wifi <-> 4G) mà không bị drop socket\",\n    handshakeLatency: \"0-RTT hoặc 1-RTT kết hợp QUIC + TLS 1.3\"\n  }\n};",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Tiến Hóa Giao Thức HTTP: HTTP/1.1 vs HTTP/2 vs HTTP/3 (QUIC)",
+        "caption": "Khắc phục triệt để hiện tượng Head-of-Line Blocking từ tầng Application xuống tầng Transport UDP",
+        "code": "flowchart TD\n    subgraph HTTP1 [\"HTTP/1.1 (TCP)\"]\n        H1[\"1 Request tại 1 thời điểm trên mỗi TCP Socket\"]\n        H1 --> HOL1[\"Bị nghẽn Head-of-Line Blocking ở tầng HTTP\"]\n    end\n\n    subgraph HTTP2 [\"HTTP/2 (TCP Multiplexing)\"]\n        H2[\"Nhiều Stream lồng ghép trên 1 kết nối TCP duy nhất\"]\n        H2 --> HOL2[\"Nếu rớt 1 packet TCP: Toàn bộ các stream khác đều bị khựng lại\"]\n    end\n\n    subgraph HTTP3 [\"HTTP/3 (QUIC over UDP)\"]\n        H3[\"Các Stream hoàn toàn độc lập chạy trên nền giao thức QUIC (UDP)\"]\n        H3 --> Fix[\"1 Stream mất gói tin: Các stream khác vẫn chạy bình thường không bị block!\"]\n    end"
+      }
     },
     "codeExample": "// Bảng tóm tắt so sánh tiến hóa giao thức HTTP:\nexport const HttpEvolutionSummary = {\n  \"HTTP/1.1 (1997)\": {\n    transport: \"TCP\",\n    format: \"Plain-text\",\n    concurrency: \"1 request per connection (Trình duyệt mở tối đa 6 TCP sockets/domain)\",\n    headOfLineBlocking: \"Bị ở tầng Application (Request sau phải đợi request trước xong)\",\n    handshakeLatency: \"1x TCP RTT + 1-2x TLS RTT = 2-3 RTTs\"\n  },\n  \"HTTP/2 (2015)\": {\n    transport: \"TCP\",\n    format: \"Binary Framing (Streams & Frames)\",\n    concurrency: \"Multiplexing trên 1 TCP connection duy nhất\",\n    headOfLineBlocking: \"Hết ở tầng App, nhưng VẪN BỊ ở tầng TCP (Packet loss làm kẹt cả luồng)\",\n    headerCompression: \"HPACK\"\n  },\n  \"HTTP/3 (2022)\": {\n    transport: \"QUIC (chạy trên UDP)\",\n    format: \"Binary Streams\",\n    concurrency: \"Independent Streams (Gói packet của stream A mất KHÔNG ảnh hưởng stream B)\",\n    headOfLineBlocking: \"LOẠI BỎ HOÀN TOÀN ở cả tầng App và Transport\",\n    connectionMigration: \"Hỗ trợ đổi IP mạng (Wifi <-> 4G) mà không bị drop socket\",\n    handshakeLatency: \"0-RTT hoặc 1-RTT kết hợp QUIC + TLS 1.3\"\n  }\n};",
     "codeLanguage": "typescript",
@@ -471,7 +599,76 @@
       "summary": "Long-polling: Client gửi HTTP request và server giữ kết nối mở cho đến khi có dữ liệu mới trả về, tốn tài nguyên và độ trễ cao (chỉ dùng làm fallback khi mạng cũ); SSE (Server-Sent Events): Kết nối 1 chiều (Server -> Client) trên nền HTTP chuẩn (`text/event-stream`), nhẹ, tự reconnect, cực kỳ tối ưu cho dashboard, live log, AI streaming; WebSocket: Kết nối 2 chiều toàn phần (Full-duplex) trên nền TCP, độ trễ cực thấp, tối ưu cho ứng dụng tương tác cao từ cả hai phía (game, chat room, collaborative editing).",
       "deepDive": "Nếu bài toán chỉ là server đẩy dữ liệu xuống client (như thông báo hệ thống, giá cổ phiếu, phản hồi từng chữ của LLM ChatGPT): Dùng WebSocket là Over-engineering và lãng phí tài nguyên! SSE vượt trội vì chạy trên HTTP/2 multiplexing, tự động vượt qua mọi tường lửa/corporate proxy, và trình duyệt có sẵn API `EventSource` tự động xử lý kết nối lại mượt mà. Chỉ dùng WebSocket khi client cũng liên tục gửi message lên server với tần suất cao (ví dụ: tọa độ di chuyển của nhân vật trong game multiplayer).",
       "codeExample": "// Ma trận quyết định lựa chọn công nghệ Real-time:\nexport interface RealtimeTechMatrix {\n  protocol: 'WebSocket' | 'SSE' | 'LongPolling';\n  direction: 'Bi-directional (Full-duplex)' | 'Server-to-Client only' | 'Half-duplex emulation';\n  transport: 'TCP Socket (Upgrade)' | 'HTTP/1.1 or HTTP/2' | 'Standard HTTP';\n  overhead: 'Rất thấp (2-10 bytes frame)' | 'Thấp (HTTP headers 1 lần)' | 'Rất cao (Gửi lại toàn bộ HTTP headers mỗi lần)';\n  bestFor: string;\n}\n\nexport const realtimeSelection: Record<string, RealtimeTechMatrix> = {\n  WebSocket: {\n    protocol: 'WebSocket',\n    direction: 'Bi-directional (Full-duplex)',\n    transport: 'TCP Socket (Upgrade)',\n    overhead: 'Rất thấp (2-10 bytes frame)',\n    bestFor: 'Chat 2 chiều, Game nhiều người chơi, Bảng vẽ cộng tác Figma'\n  },\n  SSE: {\n    protocol: 'SSE',\n    direction: 'Server-to-Client only',\n    transport: 'HTTP/1.1 or HTTP/2',\n    overhead: 'Thấp (HTTP headers 1 lần)',\n    bestFor: 'AI Token Streaming (ChatGPT), Giá chứng khoán, Live Notifications'\n  },\n  LongPolling: {\n    protocol: 'LongPolling',\n    direction: 'Half-duplex emulation',\n    transport: 'Standard HTTP',\n    overhead: 'Rất cao (Gửi lại toàn bộ HTTP headers mỗi lần)',\n    bestFor: 'Môi trường legacy không hỗ trợ WebSocket hoặc SSE'\n  }\n};",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "benchmark": {
+        "title": "So sánh Kỹ thuật Giao Tiếp Realtime: Polling vs SSE vs WebSocket",
+        "caption": "Đánh giá chi phí tài nguyên server, độ trễ và chiều truyền tải dữ liệu",
+        "options": [
+          {
+            "name": "WebSocket (Full-Duplex TCP)",
+            "badge": "Tương tác 2 chiều",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Độ trễ gói tin (Latency)",
+                "value": 99,
+                "displayValue": "< 2ms",
+                "color": "emerald"
+              },
+              {
+                "label": "Giao tiếp 2 chiều (Bidirectional)",
+                "value": 100,
+                "displayValue": "Full-duplex",
+                "color": "emerald"
+              },
+              {
+                "label": "Tiêu hao Header Overhead",
+                "value": 95,
+                "displayValue": "Chỉ 2-10 bytes/frame",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Truyền tin 2 chiều tức thời với overhead cực nhỏ sau cú bắt tay HTTP Upgrade",
+              "Rất phù hợp cho Chat, Game multiplayer, Bảng giá chứng khoán"
+            ],
+            "cons": [
+              "Không tự động reconnect natively, cần quản lý heartbeat (ping/pong) và load balancing trạng thái"
+            ]
+          },
+          {
+            "name": "Server-Sent Events (SSE - HTTP/2 Stream)",
+            "badge": "1 chiều Server -> Client",
+            "metrics": [
+              {
+                "label": "Độ trễ gói tin (Latency)",
+                "value": 95,
+                "displayValue": "< 5ms",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ đơn giản triển khai",
+                "value": 90,
+                "displayValue": "Chuẩn HTTP đơn giản",
+                "color": "emerald"
+              },
+              {
+                "label": "Tự động phục hồi kết nối",
+                "value": 100,
+                "displayValue": "Native browser retry",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Chạy trên giao thức HTTP chuẩn, tự động kết nối lại khi mất mạng, tương thích 100% với HTTP/2",
+              "Lựa chọn số 1 cho Stream phản hồi AI ChatGPT / LLM Token Streaming"
+            ],
+            "cons": [
+              "Chỉ hỗ trợ truyền dữ liệu 1 chiều từ Server xuống Client"
+            ]
+          }
+        ]
+      }
     },
     "codeExample": "// Ma trận quyết định lựa chọn công nghệ Real-time:\nexport interface RealtimeTechMatrix {\n  protocol: 'WebSocket' | 'SSE' | 'LongPolling';\n  direction: 'Bi-directional (Full-duplex)' | 'Server-to-Client only' | 'Half-duplex emulation';\n  transport: 'TCP Socket (Upgrade)' | 'HTTP/1.1 or HTTP/2' | 'Standard HTTP';\n  overhead: 'Rất thấp (2-10 bytes frame)' | 'Thấp (HTTP headers 1 lần)' | 'Rất cao (Gửi lại toàn bộ HTTP headers mỗi lần)';\n  bestFor: string;\n}\n\nexport const realtimeSelection: Record<string, RealtimeTechMatrix> = {\n  WebSocket: {\n    protocol: 'WebSocket',\n    direction: 'Bi-directional (Full-duplex)',\n    transport: 'TCP Socket (Upgrade)',\n    overhead: 'Rất thấp (2-10 bytes frame)',\n    bestFor: 'Chat 2 chiều, Game nhiều người chơi, Bảng vẽ cộng tác Figma'\n  },\n  SSE: {\n    protocol: 'SSE',\n    direction: 'Server-to-Client only',\n    transport: 'HTTP/1.1 or HTTP/2',\n    overhead: 'Thấp (HTTP headers 1 lần)',\n    bestFor: 'AI Token Streaming (ChatGPT), Giá chứng khoán, Live Notifications'\n  },\n  LongPolling: {\n    protocol: 'LongPolling',\n    direction: 'Half-duplex emulation',\n    transport: 'Standard HTTP',\n    overhead: 'Rất cao (Gửi lại toàn bộ HTTP headers mỗi lần)',\n    bestFor: 'Môi trường legacy không hỗ trợ WebSocket hoặc SSE'\n  }\n};",
     "codeLanguage": "typescript",

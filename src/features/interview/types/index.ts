@@ -59,6 +59,62 @@ export type InterviewCategory =
   | 'frontend-core'
   | 'backend-core';
 
+export type DiagramType = 'mermaid' | 'pipeline' | 'svg';
+
+export interface PipelineStage {
+  name: string;
+  tool?: string;
+  icon?: string;
+  description: string;
+  metric?: string;
+  rollback?: string;
+}
+
+export interface InterviewDiagramSpec {
+  type: DiagramType;
+  title?: string;
+  caption?: string;
+  code?: string;
+  stages?: PipelineStage[];
+}
+
+export interface BenchmarkMetricSpec {
+  label: string;
+  value: number;
+  displayValue?: string;
+  color?: 'emerald' | 'blue' | 'amber' | 'rose' | 'purple';
+}
+
+export interface BenchmarkOptionSpec {
+  name: string;
+  badge?: string;
+  isRecommended?: boolean;
+  metrics: BenchmarkMetricSpec[];
+  pros?: string[];
+  cons?: string[];
+}
+
+export interface BenchmarkSpec {
+  title?: string;
+  caption?: string;
+  options: BenchmarkOptionSpec[];
+}
+
+export interface CodeDiffSpec {
+  title?: string;
+  language?: string;
+  antiPattern: {
+    title?: string;
+    code: string;
+    explanation?: string;
+  };
+  seniorSolution: {
+    title?: string;
+    code: string;
+    explanation?: string;
+  };
+}
+
 export interface InterviewSeniorAnswer {
   summary: string;
   mentalModel?: string;
@@ -68,6 +124,9 @@ export interface InterviewSeniorAnswer {
   verification?: string[];
   codeExample?: string;
   codeLanguage?: string;
+  diagram?: InterviewDiagramSpec;
+  benchmark?: BenchmarkSpec;
+  codeDiff?: CodeDiffSpec;
 }
 
 export interface InterviewEvaluationRubric {
