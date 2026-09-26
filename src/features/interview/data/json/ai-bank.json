@@ -309,7 +309,117 @@
       "summary": "RAG (Retrieval-Augmented Generation - Tạo văn bản tăng cường truy xuất) là kiến trúc kết hợp giữa Hệ thống tìm kiếm thông tin (Information Retrieval) và Mô hình sinh ngôn ngữ lớn (LLM). Khi người dùng đặt câu hỏi, hệ thống sẽ truy vấn các tài liệu liên quan nhất từ kho dữ liệu nội bộ (Vector DB), sau đó đính kèm các đoạn trích đó vào prompt làm ngữ cảnh (Context) để LLM đọc và tổng hợp câu trả lời chính xác, có dẫn nguồn.",
       "deepDive": "Tại sao RAG quan trọng và vượt trội hơn Fine-tuning cho bài toán tri thức: (1) Giải quyết triệt để vấn đề Kiến thức giới hạn (Knowledge Cutoff date) và Tri thức nội bộ độc quyền (Private Enterprise Data) mà LLM không được train trước; (2) Triệt tiêu ảo giác (Hallucination): Ép LLM chỉ trả lời dựa trên dẫn chứng cụ thể; (3) Khả năng cập nhật tức thì (Data Freshness): Khi chính sách công ty thay đổi, chỉ cần cập nhật 1 dòng trong DB là RAG trả lời đúng ngay, trong khi Fine-tuning tốn hàng ngàn USD và mất nhiều ngày huấn luyện lại; (4) Khả năng kiểm chứng nguồn (Citation/Grounding): Cung cấp trích dẫn chính xác trang sách hoặc số điều khoản cho người dùng kiểm chứng.",
       "codeExample": "import os\nfrom openai import OpenAI\n\nclient = OpenAI(api_key=os.environ.get(\"OPENAI_API_KEY\", \"mock-key\"))\n\n# Giả lập cơ sở tri thức nội bộ đã được truy xuất thành công (Retrieved Context)\nMOCK_RETRIEVED_CHUNKS = [\n    \"Chính sách nghỉ phép 2024: Nhân viên chính thức có 14 ngày phép năm có lương.\",\n    \"Trường hợp kết hôn: Nhân viên được nghỉ thêm 03 ngày nguyên lương theo quy định công ty.\"\n]\n\ndef rag_query(user_question: str) -> str:\n    \"\"\"Mô phỏng bước Generation trong kiến trúc RAG với context dẫn chứng.\"\"\"\n    context_text = \"\\n\".join(f\"- {chunk}\" for chunk in MOCK_RETRIEVED_CHUNKS)\n    \n    prompt = f\"\"\"Hãy trả lời câu hỏi của người dùng CHỈ dựa vào tài liệu được cung cấp dưới đây. \nNếu không có thông tin trong tài liệu, hãy trả lời 'Tài liệu không đề cập'.\n\nTài liệu tham khảo:\n{context_text}\n\nCâu hỏi: {user_question}\nCâu trả lời:\"\"\"\n\n    res = client.chat.completions.create(\n        model=\"gpt-4o-mini\",\n        messages=[{\"role\": \"user\", \"content\": prompt}],\n        temperature=0.0\n    )\n    return res.choices[0].message.content or \"\"\n\nif __name__ == \"__main__\":\n    print(rag_query(\"Nhân viên kết hôn được nghỉ mấy ngày phép?\"))",
-      "codeLanguage": "python"
+      "codeLanguage": "python",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Kiến Trúc Pipeline RAG Doanh Nghiệp Hoàn Chỉnh (Retrieval-Augmented Generation)",
+        "caption": "Từ thu nạp tài liệu (Ingestion), tạo vector, tìm kiếm lai (Hybrid Search), Re-ranking đến sinh câu trả lời",
+        "stages": [
+          {
+            "name": "1. Thu Nạp & Phân Đoạn (Chunking)",
+            "tool": "Semantic Chunking",
+            "icon": "FileText",
+            "description": "Tài liệu PDF/Doc được làm sạch và cắt nhỏ thành các đoạn văn bản (chunks) 300-500 tokens có ngữ cảnh gối đầu (overlap).",
+            "metric": "Chunking"
+          },
+          {
+            "name": "2. Vector Embedding & Indexing",
+            "tool": "Text-Embedding-3 / BGE",
+            "icon": "Layers",
+            "description": "Mô hình Embedding biến văn bản thành vector đa chiều và nạp vào Vector Database (Qdrant, Pinecone, Milvus).",
+            "metric": "1536 dims"
+          },
+          {
+            "name": "3. Tìm Kiếm Lai (Hybrid Search)",
+            "tool": "Dense Vector + Sparse BM25",
+            "icon": "Search",
+            "description": "Kết hợp tìm kiếm ngữ nghĩa vector đa chiều với tìm kiếm từ khóa chính xác BM25 (Reciprocal Rank Fusion - RRF).",
+            "metric": "< 25ms"
+          },
+          {
+            "name": "4. Tái Xếp Hạng (Cross-Encoder Re-ranker)",
+            "tool": "Cohere Rerank / BGE-Reranker",
+            "icon": "Shield",
+            "description": "Chấm điểm lại Top 20 tài liệu tìm được để chọn ra Top 3-5 đoạn văn bản thực sự trả lời đúng câu hỏi người dùng.",
+            "metric": "Precision +40%"
+          },
+          {
+            "name": "5. LLM Sinh Câu Trả Lời (Generation)",
+            "tool": "Claude 3.5 / GPT-4o",
+            "icon": "Zap",
+            "description": "Bơm tài liệu ngữ cảnh vào System Prompt để LLM trả lời kèm trích dẫn nguồn, chống hiện tượng Hallucination.",
+            "metric": "Grounding 100%"
+          }
+        ]
+      },
+      "benchmark": {
+        "title": "So sánh Các Chiến Lược Tìm Kiếm Ngữ Cảnh Trong RAG",
+        "caption": "Hiệu quả tìm đúng tài liệu (Retrieval Recall) và chi phí độ trễ xử lý",
+        "options": [
+          {
+            "name": "Hybrid Search + Cross-Encoder Re-ranking",
+            "badge": "Chuẩn Enterprise RAG",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Độ chính xác truy xuất (Recall@5)",
+                "value": 96,
+                "displayValue": "96% Tìm đúng",
+                "color": "emerald"
+              },
+              {
+                "label": "Khả năng tìm từ khóa chính xác (Mã SKU, Mã lỗi)",
+                "value": 95,
+                "displayValue": "Rất xuất sắc",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ trễ gia tăng (Latency)",
+                "value": 65,
+                "displayValue": "~120ms",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Không bị trượt các thuật ngữ chuyên ngành hay mã số định danh",
+              "Re-ranker lọc sạch các tài liệu gây nhiễu trước khi đưa vào LLM"
+            ],
+            "cons": [
+              "Cần duy trì 2 loại chỉ mục (Vector và Inverted Index)",
+              "Re-ranker tiêu tốn thêm tài nguyên GPU inference"
+            ]
+          },
+          {
+            "name": "Pure Vector Search (Chỉ dùng Cosine Similarity)",
+            "metrics": [
+              {
+                "label": "Độ chính xác truy xuất (Recall@5)",
+                "value": 68,
+                "displayValue": "~68%",
+                "color": "amber"
+              },
+              {
+                "label": "Khả năng tìm từ khóa chính xác",
+                "value": 35,
+                "displayValue": "Kém (Dễ ảo giác)",
+                "color": "rose"
+              },
+              {
+                "label": "Độ trễ gia tăng (Latency)",
+                "value": 95,
+                "displayValue": "< 15ms",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Thiết lập đơn giản, chi phí hạ tầng thấp"
+            ],
+            "cons": [
+              "Thường xuyên lấy nhầm tài liệu khi người dùng tìm kiếm theo tên riêng, số điện thoại, hoặc mã định danh kỹ thuật"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Ngộ nhận rằng RAG có thể sửa đổi phong cách hành văn của mô hình (RAG cung cấp tri thức, muốn đổi giọng điệu văn phong sâu cần Fine-tuning).",
@@ -406,7 +516,13 @@
       "summary": "Một lệnh gọi LLM thông thường (LLM Call) chỉ là tương tác 1 chiều không trạng thái (Stateless input-output): Nhận prompt và sinh ra câu trả lời dựa trên tri thức sẵn có. AI Agent là hệ thống tự chủ (Autonomous System) sử dụng LLM làm 'bộ não' điều khiển trung tâm, kết hợp với: (1) Lập kế hoạch (Planning), (2) Bộ nhớ (Memory), (3) Khả năng sử dụng công cụ (Tool Use), và (4) Vòng lặp phản hồi (Feedback/Execution Loop) để độc lập thực hiện chuỗi hành động phức tạp đạt được mục tiêu đề ra.",
       "deepDive": "Sự khác biệt cốt lõi nằm ở Vòng lặp tự chủ (Autonomous Loop): Trong LLM call thông thường, nếu dữ liệu thiếu hoặc có lỗi, LLM chỉ có thể trả lời 'Tôi không biết'. Trong AI Agent (vận hành theo mô hình ReAct: Reason -> Act -> Observe): Agent tự suy luận mình cần làm gì (Thought), gọi một công cụ bên ngoài như truy vấn SQL hoặc tìm kiếm Google (Action), đọc kết quả trả về từ môi trường (Observation). Nếu công cụ ném ra lỗi hoặc dữ liệu chưa đủ, Agent tự động điều chỉnh kế hoạch, thử công cụ khác hoặc sửa tham số cho đến khi hoàn thành mục tiêu mà không cần con người can thiệp từng bước.",
       "codeExample": "import os\nfrom openai import OpenAI\n\nclient = OpenAI(api_key=os.environ.get(\"OPENAI_API_KEY\", \"mock-key\"))\n\n# Công cụ thực tế của Agent\ndef get_current_stock_price(symbol: str) -> str:\n    # Giả lập gọi API sàn chứng khoán\n    stocks = {\"AAPL\": \"180.5 USD\", \"VNM\": \"68,000 VND\"}\n    return stocks.get(symbol.upper(), \"Không tìm thấy mã\")\n\n# Khai báo schema công cụ chuẩn mực cho LLM Agent\ntools_schema = [\n    {\n        \"type\": \"function\",\n        \"function\": {\n            \"name\": \"get_current_stock_price\",\n            \"description\": \"Lấy giá cổ phiếu hiện tại theo mã chứng khoán\",\n            \"parameters\": {\n                \"type\": \"object\",\n                \"properties\": {\n                    \"symbol\": {\"type\": \"string\", \"description\": \"Mã cổ phiếu ví dụ AAPL, VNM\"}\n                },\n                \"required\": [\"symbol\"]\n            }\n        }\n    }\n]\n\ndef run_simple_agent(user_goal: str):\n    \"\"\"Mô phỏng 1 chu trình ReAct của AI Agent: Quyết định gọi tool và phản hồi.\"\"\"\n    messages = [{\"role\": \"user\", \"content\": user_goal}]\n    \n    # Bước 1: Agent suy luận và quyết định hành động (Tool Call)\n    response = client.chat.completions.create(\n        model=\"gpt-4o-mini\",\n        messages=messages,\n        tools=tools_schema,\n        tool_choice=\"auto\"\n    )\n    \n    msg = response.choices[0].message\n    if msg.tool_calls:\n        tool_call = msg.tool_calls[0]\n        fn_name = tool_call.function.name\n        # Giả lập thực thi tool\n        tool_result = get_current_stock_price(\"VNM\")\n        print(f\"[Agent Action] Gọi công cụ '{fn_name}' -> Kết quả: {tool_result}\")\n\nif __name__ == \"__main__\":\n    run_simple_agent(\"Giá cổ phiếu VNM hôm nay thế nào?\")",
-      "codeLanguage": "python"
+      "codeLanguage": "python",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Vòng Lặp Nhận Thức & Hành Động Của AI Agent (ReAct: Reason + Act Pattern)",
+        "caption": "Agent tự suy luận trạng thái hiện tại, chọn công cụ thực thi, quan sát kết quả và lặp lại cho đến khi hoàn thành mục tiêu",
+        "code": "stateDiagram-v2\n    [*] --> NhậnMụcTiêu : Người dùng gửi yêu cầu\n    NhậnMụcTiêu --> SuyLuận : Phân tích và lập kế hoạch\n\n    state SuyLuận {\n        desc: Thought (Suy nghĩ: Cần gọi API nào hoặc đọc DB nào?)\n    }\n\n    SuyLuận --> HànhĐộng : Quyết định gọi Tool\n    \n    state HànhĐộng {\n        desc: Action (Chạy SQL, Gọi Web Search, Đọc File)\n    }\n\n    HànhĐộng --> QuanSát : Nhận kết quả từ Tool\n\n    state QuanSát {\n        desc: Observation (Phân tích dữ liệu phản hồi)\n    }\n\n    QuanSát --> SuyLuận : Chưa đủ thông tin -> Tiếp tục suy luận bước tiếp\n    QuanSát --> HoànThành : Đã có đủ câu trả lời chính xác\n    HoànThành --> [*] : Trả kết quả cuối cùng cho người dùng"
+      }
     },
     "pitfalls": [
       "Để AI Agent chạy vòng lặp vô tận (Infinite Loop) do không đặt giới hạn số bước thực thi tối đa (`max_iterations = 10`), làm đốt sạch ngân sách token trong vài phút.",
@@ -820,7 +936,13 @@
       "summary": "Self-Attention cho phép mỗi token trong câu tương tác và đánh giá mức độ liên quan với TẤT CẢ các token khác trong cùng một câu. Ẩn dụ từ Cơ sở dữ liệu: (1) Query (Q) là câu truy vấn tìm kiếm của token hiện tại; (2) Key (K) là tiêu đề/thẻ nhãn của tất cả các token khác để so khớp; (3) Value (V) là nội dung thông tin thực tế. Công thức: `Attention(Q, K, V) = Softmax((Q * K^T) / sqrt(d_k)) * V`.",
       "deepDive": "Chi tiết toán học: (1) Tích vô hướng `Q * K^T`: Đo lường độ tương đồng ngữ nghĩa giữa Query của token `i` và Key của token `j` (giống như tính góc cosine). (2) Hệ số co tỷ lệ `1 / sqrt(d_k)`: CỰC KỲ QUAN TRỌNG. Khi số chiều $d_k$ lớn (ví dụ 128), tích vô hướng có phương sai tăng lên $d_k$, làm giá trị ma trận điểm vọt lên rất lớn. Khi đưa qua hàm Softmax, các giá trị quá lớn sẽ rơi vào vùng bão hòa cực đoan (gradient tiệm cận 0), làm gradient bị triệt tiêu khiến mô hình không thể học được; chia cho `sqrt(d_k)` đưa phương sai trở về 1 chuẩn tắc. (3) Phép nhân với V: Tính tổng có trọng số (weighted sum) của các vector Value dựa trên ma trận xác suất Softmax, tạo ra vector biểu diễn mới mang đậm ngữ cảnh của các từ liên quan nhất.",
       "codeExample": "import numpy as np\n\ndef manual_scaled_dot_product_attention(Q: np.ndarray, K: np.ndarray, V: np.ndarray) -> np.ndarray:\n    \"\"\"Minh họa chi tiết thuật toán Scaled Dot-Product Attention bằng NumPy thuần túy.\"\"\"\n    d_k = Q.shape[-1]\n    \n    # 1. Tính toán ma trận Attention Scores: (Seq_Len x Seq_Len)\n    scores = np.dot(Q, K.T) / np.sqrt(d_k)\n    \n    # 2. Áp dụng hàm Softmax trên từng hàng để có phân phối xác suất tổng = 1\n    exp_scores = np.exp(scores - np.max(scores, axis=-1, keepdims=True)) # Chống tràn số\n    attention_weights = exp_scores / np.sum(exp_scores, axis=-1, keepdims=True)\n    \n    # 3. Tính tổng có trọng số với ma trận Value\n    output = np.dot(attention_weights, V)\n    return output, attention_weights\n\nif __name__ == \"__main__\":\n    # Giả lập câu có 3 tokens, mỗi token có chiều d_k = 4\n    np.random.seed(42)\n    Q = np.random.randn(3, 4)\n    K = np.random.randn(3, 4)\n    V = np.random.randn(3, 4)\n    \n    out, weights = manual_scaled_dot_product_attention(Q, K, V)\n    print(\"Ma trận trọng số Attention Weights (3x3):\\n\", np.round(weights, 3))",
-      "codeLanguage": "python"
+      "codeLanguage": "python",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cơ Chế Self-Attention Trong Transformer (Query, Key, Value)",
+        "caption": "Tính toán ma trận tương quan giữa các từ trong câu: Attention(Q, K, V) = softmax(QK^T / sqrt(d_k)) * V",
+        "code": "flowchart TD\n    Input[\"Input Token Embeddings (X)\"] --> Q[\"Query Matrix (Q = X * W_Q)\n'Tôi đang tìm kiếm điều gì?'\"]\n    Input --> K[\"Key Matrix (K = X * W_K)\n'Tôi chứa đựng thông tin gì?'\"]\n    Input --> V[\"Value Matrix (V = X * W_V)\n'Nội dung thông tin thực tế'\"]\n\n    Q & K --> Dot[\"Scaled Dot-Product (Q * K^T / sqrt(d_k))\"]\n    Dot --> Mask[\"Attention Masking (Tùy chọn cho Causal Decoder)\"]\n    Mask --> Softmax[\"Hàm Softmax (Chuẩn hóa thành phân phối trọng số chú ý 0 - 100%)\"]\n    Softmax & V --> MatMul[\"Nhân với Value Matrix (Weights * V)\"]\n    MatMul --> Output[\"Contextual Output Representation (Vector giàu ngữ cảnh)\"]"
+      }
     },
     "pitfalls": [
       "Quên chia cho hệ số căn bậc hai `sqrt(d_k)`, khiến hàm Softmax bị bão hòa và gradient biến mất hoàn toàn trong quá trình backpropagation.",
@@ -3348,7 +3470,80 @@
       "summary": "Trong hệ thống LLM Serving truyền thống, KV Cache của mỗi request bắt buộc phải được cấp phát một vùng nhớ VRAM liên tục (Contiguous memory) dựa trên độ dài tối đa lý thuyết (ví dụ: 2048 tokens). Điều này gây lãng phí 60-80% VRAM do phân mảnh bộ nhớ (Memory Fragmentation) và cấp phát thừa (Over-allocation). PagedAttention giải quyết triệt để vấn đề này bằng cách lấy cảm hứng từ Phân trang bộ nhớ ảo (OS Paging): chia KV Cache thành các khối vật lý không liên tục (Physical Blocks, ví dụ 16 tokens/block) và dùng Bảng trang (Block Table) để ánh xạ các token logic vào các khối vật lý đó.",
       "deepDive": "Chi tiết cơ chế PagedAttention: (1) Cấp phát theo nhu cầu (On-demand Allocation): Khi request sinh thêm token, hệ thống chỉ cấp phát block vật lý mới khi block hiện tại đã đầy 16 tokens; (2) Bộ nhớ không cần liền kề: Các block có thể nằm rải rác ở bất kỳ đâu trên VRAM của GPU, triệt tiêu hoàn toàn hiện tượng Phân mảnh ngoài (External Fragmentation) và giảm phân mảnh trong xuống dưới 4%; (3) Chia sẻ bộ nhớ (Memory Sharing): Cho phép các request khác nhau (ví dụ kỹ thuật Beam Search hoặc Parallel Sampling) dùng chung các khối KV Cache tiền tố (Prefix blocks) thông qua cơ chế Copy-on-Write mà không cần nhân bản dữ liệu trong VRAM, giúp tăng thông lượng phục vụ lên 2x - 4x.",
       "codeExample": "# Mô phỏng trực quan cơ chế ánh xạ Block Table trong PagedAttention của vLLM\nclass BlockTable:\n    def __init__(self, block_size: int = 16):\n        self.block_size = block_size\n        self.logical_to_physical = {}  # {logical_block_idx: physical_block_id}\n        self.free_physical_blocks = list(range(1000, 2000))  # Giả lập các pool ô nhớ VRAM\n\n    def allocate_token(self, token_idx: int) -> int:\n        logical_block_idx = token_idx // self.block_size\n        offset = token_idx % self.block_size\n        \n        # Nếu chưa cấp phát block vật lý cho block logic này\n        if logical_block_idx not in self.logical_to_physical:\n            physical_block_id = self.free_physical_blocks.pop(0)\n            self.logical_to_physical[logical_block_idx] = physical_block_id\n            print(f\"[PagedAttention] Cấp phát ô nhớ vật lý VRAM #{physical_block_id} cho Logical Block #{logical_block_idx}\")\n            \n        physical_id = self.logical_to_physical[logical_block_idx]\n        return physical_id, offset\n\n# Giả lập request sinh 35 tokens:\nbt = BlockTable(block_size=16)\nfor t in [0, 15, 16, 31, 32]:\n    p_id, off = bt.allocate_token(t)\n    print(f\"Token #{t:02d} -> Physical Block VRAM: {p_id}, Offset: {off}\")",
-      "codeLanguage": "python"
+      "codeLanguage": "python",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc vLLM: PagedAttention Giải Quyết Phân Mảnh Bộ Nhớ KV Cache",
+        "caption": "Mô phỏng cơ chế Virtual Memory Paging của Hệ điều hành để quản lý KV Cache không liên tục trên VRAM",
+        "code": "flowchart TD\n    subgraph Logical [\"Không Gian Logic Của Request (Các Tokens Liên Tục)\"]\n        Req[\"Request: 'Thời tiết Hà Nội hôm nay thế nào?'\"]\n        Req --> L0[\"Logical Block 0 (Tokens 0-3)\"]\n        Req --> L1[\"Logical Block 1 (Tokens 4-7)\"]\n        Req --> L2[\"Logical Block 2 (Tokens 8-11)\"]\n    end\n\n    subgraph BlockTable [\"Bảng Ánh Xạ Khối (Block Table của vLLM)\"]\n        L0 -->|\"Map tới\"| P3[\"Physical Block #3\"]\n        L1 -->|\"Map tới\"| P7[\"Physical Block #7\"]\n        L2 -->|\"Map tới\"| P1[\"Physical Block #1\"]\n    end\n\n    subgraph PhysicalVRAM [\"Bộ Nhớ Vật Lý VRAM GPU (Phân Bổ Tùy Ý, Không Cần Liên Tục)\"]\n        P1[\"Physical Block 1\"]\n        P3[\"Physical Block 3\"]\n        P7[\"Physical Block 7\"]\n    end"
+      },
+      "benchmark": {
+        "title": "So sánh Hiệu Năng Phục Vụ LLM: Native HuggingFace vs vLLM (PagedAttention)",
+        "caption": "Đo lường thông lượng Serving và tỷ lệ lãng phí VRAM dưới tải đồng thời cao",
+        "options": [
+          {
+            "name": "vLLM với PagedAttention",
+            "badge": "Chuẩn High Throughput Serving",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Thông lượng xử lý (Tokens/giây)",
+                "value": 98,
+                "displayValue": "Gấp 10-24 lần",
+                "color": "emerald"
+              },
+              {
+                "label": "Tỷ lệ lãng phí bộ nhớ VRAM",
+                "value": 96,
+                "displayValue": "< 4% Lãng phí",
+                "color": "emerald"
+              },
+              {
+                "label": "Hỗ trợ Continuous Batching",
+                "value": 100,
+                "displayValue": "Native Batching",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Loại bỏ hoàn toàn phân mảnh bộ nhớ KV Cache, cho phép chạy batch size lớn hơn 4-8 lần",
+              "Chia sẻ bộ nhớ tức thì cho kỹ thuật Parallel Sampling và Beam Search"
+            ],
+            "cons": [
+              "Cần GPU hỗ trợ CUDA kiến trúc Ampere trở lên để đạt tốc độ tối đa"
+            ]
+          },
+          {
+            "name": "HuggingFace Transformers Native",
+            "metrics": [
+              {
+                "label": "Thông lượng xử lý (Tokens/giây)",
+                "value": 20,
+                "displayValue": "Cơ bản",
+                "color": "rose"
+              },
+              {
+                "label": "Tỷ lệ lãng phí bộ nhớ VRAM",
+                "value": 30,
+                "displayValue": "Lãng phí 60-80% VRAM",
+                "color": "rose"
+              },
+              {
+                "label": "Hỗ trợ Continuous Batching",
+                "value": 10,
+                "displayValue": "Không có (Padding tĩnh)",
+                "color": "rose"
+              }
+            ],
+            "pros": [
+              "Dễ cài đặt thử nghiệm nhanh với thư viện chuẩn PyTorch"
+            ],
+            "cons": [
+              "Phải cấp phát trước bộ nhớ liên tục cho độ dài tối đa max_seq_len, gây cạn kiệt VRAM (OOM) nhanh chóng"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Nhầm lẫn rằng PagedAttention làm tăng tốc độ tính toán của nhân CUDA (thực chất nó tăng thông lượng nhờ nhồi được batch size lớn hơn vào VRAM).",

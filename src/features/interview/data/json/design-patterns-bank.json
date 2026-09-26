@@ -47,7 +47,9 @@
     "pitfalls": [
       "Tạo interface trừu tượng quá sớm (Premature Abstraction) khi nghiệp vụ chưa có dấu hiệu thay đổi."
     ],
-    "followUpQuestions": ["Làm thế nào để áp dụng OCP trong React components?"]
+    "followUpQuestions": [
+      "Làm thế nào để áp dụng OCP trong React components?"
+    ]
   },
   {
     "id": "dp-003",
@@ -108,7 +110,12 @@
     "question": "Bốn trụ cột của lập trình hướng đối tượng (OOP) là gì?",
     "interviewerIntent": "Kiểm tra kiến thức nền tảng về Lập trình hướng đối tượng (OOP).",
     "contextOrScenario": "Phỏng vấn kiểm tra kiến thức khoa học máy tính cơ bản.",
-    "expectedKeywords": ["encapsulation", "abstraction", "inheritance", "polymorphism"],
+    "expectedKeywords": [
+      "encapsulation",
+      "abstraction",
+      "inheritance",
+      "polymorphism"
+    ],
     "seniorAnswer": {
       "summary": "4 trụ cột OOP gồm: (1) Encapsulation: Gom dữ liệu và hàm xử lý vào class, che giấu state nội bộ qua private/protected; (2) Abstraction: Chỉ hiển thị interface cần thiết, giấu chi tiết cài đặt; (3) Inheritance: Tái sử dụng thuộc tính/phương thức từ class cha; (4) Polymorphism: Cùng một interface/hàm nhưng các đối tượng con thực thi theo các cách khác nhau.",
       "deepDive": "Trong JavaScript hiện đại, kế thừa (Inheritance) thường bị hạn chế theo nguyên lý 'Composition over Inheritance' để tránh phân cấp lớp sâu (deep inheritance hierarchies) gây cứng nhắc.",
@@ -139,7 +146,9 @@
       "deepDive": "Giải pháp này loại bỏ hoàn toàn chuỗi if/else. Khi có thêm nhà vận chuyển mới, ta chỉ tạo thêm 1 file strategy mới và đăng ký vào Strategy Map, tuân thủ tuyệt đối OCP.",
       "codeExample": "interface ShippingStrategy {\n  calculate(weight: number): number;\n}\nclass GHNStrategy implements ShippingStrategy {\n  calculate(weight: number) { return weight * 15000; }\n}\nconst shippingStrategies: Record<string, ShippingStrategy> = {\n  ghn: new GHNStrategy(),\n};\nexport function getShippingFee(carrier: string, weight: number) {\n  const strategy = shippingStrategies[carrier];\n  if (!strategy) throw new Error('Unsupported carrier');\n  return strategy.calculate(weight);\n}"
     },
-    "pitfalls": ["Không tạo fallback/default strategy khi gặp mã carrier không hợp lệ."],
+    "pitfalls": [
+      "Không tạo fallback/default strategy khi gặp mã carrier không hợp lệ."
+    ],
     "followUpQuestions": [
       "Nếu logic tính phí ship cần gọi API từ server của đối tác thì Strategy Pattern kết hợp async/await như thế nào?"
     ]
@@ -186,7 +195,13 @@
     "seniorAnswer": {
       "summary": "Refactor bằng **Domain Events / Observer Pattern**: Hàm `markPaid()` chỉ tập trung thay đổi trạng thái đơn hàng và phát ra sự kiện `OrderPaidEvent`. Các nghiệp vụ gửi mail, trừ kho, ghi audit log sẽ là các Event Listeners/Handlers độc lập lắng nghe sự kiện này.",
       "deepDive": "Giải pháp này giúp: (1) Tuân thủ SRP; (2) Nếu một side-effect (như gửi email) bị lỗi hoặc chậm, nó không làm rollback giao dịch thanh toán chính (có thể đẩy vào message queue xử lý async); (3) Dễ dàng bổ sung hành vi mới (như cộng điểm tích lũy) mà không đụng vào `markPaid()`.",
-      "codeExample": "class OrderService {\n  async markPaid(orderId: string) {\n    await this.orderRepo.updateStatus(orderId, 'PAID');\n    eventBus.emit('ORDER_PAID', { orderId, timestamp: Date.now() });\n  }\n}\neventBus.on('ORDER_PAID', sendEmailReceipt);\neventBus.on('ORDER_PAID', deductInventory);\neventBus.on('ORDER_PAID', writeAuditLog);"
+      "codeExample": "class OrderService {\n  async markPaid(orderId: string) {\n    await this.orderRepo.updateStatus(orderId, 'PAID');\n    eventBus.emit('ORDER_PAID', { orderId, timestamp: Date.now() });\n  }\n}\neventBus.on('ORDER_PAID', sendEmailReceipt);\neventBus.on('ORDER_PAID', deductInventory);\neventBus.on('ORDER_PAID', writeAuditLog);",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mẫu Thiết Kế Quan Sát (Observer Pattern / Event-Driven) Trong Xử Lý Đơn Hàng",
+        "caption": "Tách rời khớp nối logic: OrderService chỉ phát ra sự kiện OrderPaidEvent; các Listener tự động phản ứng độc lập",
+        "code": "flowchart TD\n    Client[\"Khách hàng thanh toán thành công\"] --> Subject[\"OrderService (Subject / Event Publisher)\"]\n    Subject -->|\"Bắn sự kiện: OrderPaidEvent\"| Bus[\"Event Bus / EventDispatcher\"]\n\n    subgraph Listeners [\"Các Observer Lắng Nghe Độc Lập (Decoupled)\"]\n        Bus --> L1[\"EmailNotificationListener (Gửi hóa đơn VAT)\"]\n        Bus --> L2[\"InventoryListener (Trừ số lượng hàng trong kho)\"]\n        Bus --> L3[\"LoyaltyPointsListener (Cộng điểm tích lũy)\"]\n        Bus --> L4[\"AuditLogListener (Ghi vết kiểm toán bảo mật)\"]\n    end\n\n    Note[\"Ưu điểm: Muốn thêm chức năng gửi tin nhắn Zalo? Chỉ cần tạo thêm 1 Listener mới, KHÔNG CẦN SỬA 1 DÒNG CODE NÀO TRONG OrderService! (Tuân thủ Open/Closed Principle)\"]"
+      }
     },
     "pitfalls": [
       "Không xử lý tính phân tán của giao dịch (Distributed Transaction): Trừ kho lỗi sau khi đã thanh toán thành công."
@@ -267,7 +282,9 @@
     "pitfalls": [
       "Tạo quá nhiều interface mỗi cái chỉ có 1 method gây phân mảnh không cần thiết."
     ],
-    "followUpQuestions": ["Làm thế nào để áp dụng ISP cho React component props?"]
+    "followUpQuestions": [
+      "Làm thế nào để áp dụng ISP cho React component props?"
+    ]
   },
   {
     "id": "dp-012",
@@ -367,7 +384,9 @@
       "deepDive": "Factory Method tuân thủ OCP: Khi có sản phẩm mới, ta tạo class con mới kế thừa Creator mà không sửa đổi class Creator cũ. Simple Factory vi phạm OCP vì mỗi lần thêm sản phẩm phải vào sửa switch/case.",
       "codeExample": "abstract class ReportGenerator {\n  abstract createDocument(): Document; // Factory Method\n  generate() {\n    const doc = this.createDocument();\n    doc.export();\n  }\n}\nclass PdfReportGenerator extends ReportGenerator {\n  createDocument() { return new PdfDocument(); }\n}"
     },
-    "pitfalls": ["Gọi nhầm bất kỳ hàm nào trả về object là Factory Method."],
+    "pitfalls": [
+      "Gọi nhầm bất kỳ hàm nào trả về object là Factory Method."
+    ],
     "followUpQuestions": [
       "Khi nào dùng Simple Factory là đủ mà không cần Factory Method?"
     ]
@@ -419,7 +438,9 @@
     "pitfalls": [
       "Quên gọi phương thức kết thúc `.build()`, làm việc với đối tượng Builder dở dang."
     ],
-    "followUpQuestions": ["Director class trong Builder pattern đóng vai trò gì?"]
+    "followUpQuestions": [
+      "Director class trong Builder pattern đóng vai trò gì?"
+    ]
   },
   {
     "id": "dp-018",
@@ -469,7 +490,9 @@
     "pitfalls": [
       "Quên trả đối tượng về pool (pool leakage), dẫn đến cạn kiệt tài nguyên và treo toàn bộ server."
     ],
-    "followUpQuestions": ["`sync.Pool` trong Go khác gì so với connection pool tự viết?"]
+    "followUpQuestions": [
+      "`sync.Pool` trong Go khác gì so với connection pool tự viết?"
+    ]
   },
   {
     "id": "dp-020",
@@ -543,7 +566,9 @@
     "pitfalls": [
       "Cố nhồi thêm logic nghiệp vụ mới vào Adapter thay vì chỉ làm nhiệm vụ dịch interface."
     ],
-    "followUpQuestions": ["Adapter khác Proxy và Facade ở điểm mấu chốt nào?"]
+    "followUpQuestions": [
+      "Adapter khác Proxy và Facade ở điểm mấu chốt nào?"
+    ]
   },
   {
     "id": "dp-023",
@@ -644,7 +669,9 @@
     "pitfalls": [
       "Biến Facade thành God Object biết tuốt và ôm đồm quá nhiều logic nghiệp vụ."
     ],
-    "followUpQuestions": ["Facade khác Adapter ở điểm nào khi cả hai đều là wrapper?"]
+    "followUpQuestions": [
+      "Facade khác Adapter ở điểm nào khi cả hai đều là wrapper?"
+    ]
   },
   {
     "id": "dp-027",
@@ -1153,7 +1180,9 @@
     "pitfalls": [
       "Viết Repository pattern chỉ với mục đích 'đề phòng sau này đổi từ MySQL sang MongoDB' (99% không bao giờ xảy ra)."
     ],
-    "followUpQuestions": ["Data Mapper pattern khác gì so với Active Record pattern?"]
+    "followUpQuestions": [
+      "Data Mapper pattern khác gì so với Active Record pattern?"
+    ]
   },
   {
     "id": "dp-047",

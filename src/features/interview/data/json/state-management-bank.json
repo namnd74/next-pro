@@ -19,7 +19,82 @@
       "summary": "Zustand là thư viện quản lý state tối giản, unopinionated dựa trên mô hình Closure và Pub/Sub. So với Redux, Zustand loại bỏ hầu hết boilerplate (không cần reducers, actions types, dispatch, hay Context Provider bao bọc app) mà chỉ cần một hook duy nhất được khởi tạo qua `create()`.",
       "deepDive": "Về mặt kiến trúc, Redux tuân thủ nghiêm ngặt Flux pattern: Unidirectional Data Flow, single store tree, và state update bắt buộc thông qua Dispatching Actions -> Pure Reducers. Điều này mang lại sự dự đoán tuyệt đối (predictability) nhưng sinh ra nhiều boilerplate. Ngược lại, Zustand là một store bên ngoài React (external store) dựa trên closures. Bên dưới, Zustand sử dụng `useSyncExternalStore` của React 18+ để subscribe vào store, giúp trigger re-render cục bộ mà không cần bao bọc component bằng Context Provider. Zustand cho phép đọc/ghi state trực tiếp ngoài React lifecycle thông qua `getState()` và `setState()`, giảm đáng kể độ phức tạp nhận thức (cognitive load).",
       "codeExample": "// 1. Zustand: Khởi tạo cực kỳ tinh gọn, không cần Provider\nimport { create } from 'zustand';\n\ninterface CartState {\n  itemsCount: number;\n  addItem: () => void;\n  reset: () => void;\n}\n\nexport const useCartStore = create<CartState>((set) => ({\n  itemsCount: 0,\n  addItem: () => set((state) => ({ itemsCount: state.itemsCount + 1 })),\n  reset: () => set({ itemsCount: 0 }),\n}));\n\n// Trong Component: dùng trực tiếp như custom hook\nexport const CartBadge = () => {\n  const count = useCartStore((state) => state.itemsCount);\n  return <span>Giỏ hàng: {count}</span>;\n};",
-      "codeLanguage": "tsx"
+      "codeLanguage": "tsx",
+      "diagram": {
+        "type": "mermaid",
+        "title": "So Sánh Luồng Dữ Liệu: Redux Tập Trung vs Zustand Phân Mảnh Tinh Gọn",
+        "caption": "Redux bắt buộc luồng một chiều nghiêm ngặt (Action ➔ Middleware ➔ Reducer ➔ Store); Zustand sử dụng atomic hook proxy",
+        "code": "flowchart TD\n    subgraph ReduxFlow [\"Redux Architecture (Nghiêm ngặt, Boilerplate)\"]\n        UI1[\"React View\"] -->|\"dispatch(action)\"| Mid[\"Middleware (Thunk / Saga)\"]\n        Mid --> Reducer[\"Pure Reducer Function\"]\n        Reducer --> Store1[\"Single Immutable Store\"]\n        Store1 -->|\"useSelector subscription\"| UI1\n    end\n\n    subgraph ZustandFlow [\"Zustand Architecture (Tinh gọn, Không Boilerplate)\"]\n        UI2[\"React View\"] -->|\"Gọi trực tiếp: useStore.getState().action()\"| Store2[\"Zustand Store Hook (Proxy)\"]\n        Store2 -->|\"Chỉ re-render component đăng ký selector\"| UI2\n    end"
+      },
+      "benchmark": {
+        "title": "Đánh Giá Thư Viện State Management Trong Ứng Dụng Quy Mô Lớn",
+        "caption": "Kích thước bundle, lượng boilerplate và độ phức tạp khi quản lý state bất đồng bộ",
+        "options": [
+          {
+            "name": "Zustand + TanStack Query",
+            "badge": "Combo Chuẩn Hiện Đại 2026",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Kích thước Bundle Size",
+                "value": 98,
+                "displayValue": "~1.5 KB",
+                "color": "emerald"
+              },
+              {
+                "label": "Tối ưu hóa Re-render tự động",
+                "value": 95,
+                "displayValue": "Chọn lọc qua Selector",
+                "color": "emerald"
+              },
+              {
+                "label": "Lượng mã nguồn Boilerplate",
+                "value": 95,
+                "displayValue": "Cực kỳ ít",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Tách biệt hoàn toàn giữa Server Cache (TanStack Query) và Client State (Zustand)",
+              "Không cần Provider bao bọc ngoài app"
+            ],
+            "cons": [
+              "Cần kỷ luật phân chia store rõ ràng trong dự án có hàng trăm lập trình viên"
+            ]
+          },
+          {
+            "name": "Redux Toolkit (RTK)",
+            "badge": "Enterprise Classic",
+            "metrics": [
+              {
+                "label": "Kích thước Bundle Size",
+                "value": 50,
+                "displayValue": "~12 KB",
+                "color": "amber"
+              },
+              {
+                "label": "Hệ thống DevTools Time-travel",
+                "value": 100,
+                "displayValue": "Đỉnh cao",
+                "color": "emerald"
+              },
+              {
+                "label": "Lượng mã nguồn Boilerplate",
+                "value": 40,
+                "displayValue": "Vẫn tốn action/slice",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Redux DevTools hỗ trợ tua ngược thời gian (Time-travel debugging) tốt nhất ngành",
+              "Cấu trúc slice quy củ cho doanh nghiệp ngân hàng"
+            ],
+            "cons": [
+              "Cồng kềnh cho các tác vụ lưu trữ trạng thái đơn giản như modal hay sidebar"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Lầm tưởng Zustand chỉ là biến global thông thường mà quên rằng nó có selector subscription tối ưu re-render.",

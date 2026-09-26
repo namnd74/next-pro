@@ -109,7 +109,82 @@
       "summary": "Bộ nhớ Stack là vùng nhớ riêng biệt của từng Thread (Thread-private), tự động cấp phát và giải phóng theo nguyên lý LIFO cùng vòng đời của các method (mỗi lời gọi tạo một Stack Frame chứa Local Variables, Operand Stack, Frame Data). Stack có tốc độ truy xuất cực nhanh và không có GC. Ngược lại, Heap là vùng nhớ chung chia sẻ cho toàn bộ ứng dụng (Thread-shared), nơi lưu trữ toàn bộ các Object thực tế và mảng. Heap được quản lý và thu gom bởi Garbage Collector, tiềm ẩn chi phí đồng bộ hóa và GC pause.",
       "deepDive": "Mỗi Stack Frame trong JVM có kích thước xác định tại compile-time và giới hạn bởi `-Xss` (mặc định 1MB trên 64-bit JVM). Khi đệ quy quá sâu hoặc biến cục bộ vượt giới hạn, JVM ném `StackOverflowError`. Trên Heap, việc cấp phát đối tượng thông thường có chi phí quản lý bộ nhớ, nhưng HotSpot tối ưu bằng 2 kỹ thuật: (1) TLAB (Thread Local Allocation Buffer) cấp cho mỗi thread một lát cắt riêng trên Eden để `new` object bằng con trỏ bump-the-pointer mà không cần lock; (2) JIT Escape Analysis: nếu C2 Compiler chứng minh được một object không bị thoát (escaped) ra khỏi method, nó sẽ thực hiện Scalar Replacement — tách nhỏ object thành các biến nguyên thủy và gán trực tiếp lên Stack/CPU registers, triệt tiêu 100% chi phí cấp phát trên Heap.",
       "codeLanguage": "java",
-      "codeExample": "package com.bank.memory;\n\npublic class StackVsHeapDemo {\n\n    // Immutable Point: Ứng viên hoàn hảo cho Escape Analysis\n    record GeoPoint(double lat, double lon) {}\n\n    public double calculateDistance() {\n        // point chỉ tồn tại trong phạm vi method này (No Escape!)\n        // C2 Compiler sẽ loại bỏ 'new' trên Heap và map lat, lon trực tiếp vào CPU registers\n        GeoPoint point = new GeoPoint(10.762622, 106.660172); \n        return point.lat() * 2 + point.lon();\n    }\n\n    public static void main(String[] args) {\n        StackVsHeapDemo demo = new StackVsHeapDemo();\n        \n        // JVM Warm-up để kích hoạt JIT C2 Compiler (-XX:+DoEscapeAnalysis)\n        double sum = 0;\n        for (int i = 0; i < 100_000; i++) {\n            sum += demo.calculateDistance();\n        }\n        System.out.println(\"Computed total: \" + sum);\n    }\n}"
+      "codeExample": "package com.bank.memory;\n\npublic class StackVsHeapDemo {\n\n    // Immutable Point: Ứng viên hoàn hảo cho Escape Analysis\n    record GeoPoint(double lat, double lon) {}\n\n    public double calculateDistance() {\n        // point chỉ tồn tại trong phạm vi method này (No Escape!)\n        // C2 Compiler sẽ loại bỏ 'new' trên Heap và map lat, lon trực tiếp vào CPU registers\n        GeoPoint point = new GeoPoint(10.762622, 106.660172); \n        return point.lat() * 2 + point.lon();\n    }\n\n    public static void main(String[] args) {\n        StackVsHeapDemo demo = new StackVsHeapDemo();\n        \n        // JVM Warm-up để kích hoạt JIT C2 Compiler (-XX:+DoEscapeAnalysis)\n        double sum = 0;\n        for (int i = 0; i < 100_000; i++) {\n            sum += demo.calculateDistance();\n        }\n        System.out.println(\"Computed total: \" + sum);\n    }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Bộ Nhớ JVM: Phân Tách Stack Memory vs Heap Memory",
+        "caption": "Stack quản lý luồng thực thi hàm và biến nguyên thủy cục bộ; Heap quản lý vòng đời của tất cả các Object",
+        "code": "flowchart TD\n    subgraph ThreadStack [\"Thread Stack (Lưu trữ cục bộ cho từng Thread)\"]\n        Frame1[\"Stack Frame (main method)\n- int x = 10\n- User userRef (Tham chiếu con trỏ)\"]\n        Frame2[\"Stack Frame (calculate method)\n- double tempRate = 1.5\"]\n    end\n\n    subgraph JVMHeap [\"JVM Heap Memory (Bộ nhớ dùng chung toàn ứng dụng)\"]\n        Obj[\"User Object Instance\n- id: 101\n- name: 'Nguyen Van A'\"]\n        Str[\"String Object in Heap\"]\n    end\n\n    Frame1 -->|\"userRef lưu địa chỉ bộ nhớ Heap\"| Obj"
+      },
+      "benchmark": {
+        "title": "So sánh Kỹ thuật: Stack Memory vs Heap Memory trong JVM",
+        "caption": "Đánh giá tốc độ truy xuất, cơ chế giải phóng bộ nhớ và nguy cơ tràn bộ nhớ",
+        "options": [
+          {
+            "name": "Stack Memory",
+            "badge": "Siêu tốc độ",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tốc độ cấp phát & giải phóng",
+                "value": 100,
+                "displayValue": "O(1) LIFO",
+                "color": "emerald"
+              },
+              {
+                "label": "Nguy cơ Thread-Safe",
+                "value": 100,
+                "displayValue": "100% An toàn (Cô lập)",
+                "color": "emerald"
+              },
+              {
+                "label": "Dung lượng lưu trữ",
+                "value": 25,
+                "displayValue": "Thường chỉ 1MB/thread",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Giải phóng tức thời khi kết thúc hàm mà không cần GC can thiệp",
+              "Không bao giờ xảy ra xung đột đồng thời (Thread-Safe tuyệt đối)"
+            ],
+            "cons": [
+              "Dễ bị StackOverflowError nếu đệ quy vô hạn hoặc lồng hàm quá sâu"
+            ]
+          },
+          {
+            "name": "Heap Memory",
+            "badge": "Dung lượng lớn",
+            "metrics": [
+              {
+                "label": "Tốc độ cấp phát & giải phóng",
+                "value": 60,
+                "displayValue": "Phụ thuộc GC Sweep",
+                "color": "amber"
+              },
+              {
+                "label": "Nguy cơ Thread-Safe",
+                "value": 40,
+                "displayValue": "Cần Synchronized/Lock",
+                "color": "rose"
+              },
+              {
+                "label": "Dung lượng lưu trữ",
+                "value": 95,
+                "displayValue": "Hàng chục GB theo cấu hình -Xmx",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Chia sẻ dữ liệu xuyên suốt giữa các luồng trong cùng ứng dụng",
+              "Lưu trữ đối tượng kích thước lớn và vòng đời dài"
+            ],
+            "cons": [
+              "GC Stop-The-World gây giật lag độ trễ P99 nếu cấp phát object rác quá nhiều"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Tăng `-Xss` quá lớn để sửa lỗi `StackOverflowError` trong đệ quy: điều này làm cạn kiệt Native Memory của OS, khiến JVM không thể tạo thêm luồng mới (`OutOfMemoryError: unable to create new native thread`).",
@@ -679,7 +754,13 @@
       "summary": "Trong JVM, một Thread tại bất kỳ thời điểm nào chỉ có thể ở một trong **6 trạng thái** được định nghĩa bởi enum `java.lang.Thread.State`: (1) **NEW**: Luồng đã được tạo nhưng chưa gọi `start()`; (2) **RUNNABLE**: Luồng đang thực thi trong JVM (bao gồm cả đang chạy trên CPU hoặc đang chờ OS phân phối timeslice CPU); (3) **BLOCKED**: Luồng bị chặn và đang chờ lấy khóa giám sát nội tại (Intrinsic Monitor Lock - `synchronized`); (4) **WAITING**: Luồng chờ vô thời hạn tín hiệu từ luồng khác (`wait()`, `join()`, `LockSupport.park()`); (5) **TIMED_WAITING**: Luồng chờ có giới hạn thời gian (`sleep(ms)`, `wait(ms)`, `parkNanos()`); (6) **TERMINATED**: Luồng đã hoàn thành việc thực thi phương thức `run()` hoặc bị crash do ngoại lệ.",
       "deepDive": "Cần lưu ý sự khác biệt giữa JVM State và OS Kernel State: Ở trạng thái `RUNNABLE`, JVM coi các thao tác I/O blocking (như đọc dữ liệu từ Socket mạng) vẫn là `RUNNABLE`, mặc dù ở tầng OS luồng có thể đang ở trạng thái `Waiting/Sleeping` để chờ phần cứng. Trạng thái `BLOCKED` trong Java chỉ xảy ra **duy nhất** khi tranh chấp từ khóa `synchronized`. Khi tranh chấp `ReentrantLock` hay các khóa thuộc `java.util.concurrent`, luồng sử dụng `LockSupport.park()` nên trạng thái hiển thị trong Thread Dump sẽ là `WAITING` hoặc `TIMED_WAITING` chứ không phải `BLOCKED`.",
       "codeLanguage": "java",
-      "codeExample": "package com.bank.concurrency;\n\nimport java.util.concurrent.locks.LockSupport;\n\npublic class ThreadLifecycleDemo {\n    public static void main(String[] args) throws InterruptedException {\n        Object lock = new Object();\n\n        // 1. Trạng thái NEW\n        Thread worker = new Thread(() -> {\n            synchronized (lock) {\n                try {\n                    // 4. Trạng thái TIMED_WAITING\n                    Thread.sleep(100);\n                    // 5. Trạng thái WAITING (nhường lock)\n                    lock.wait();\n                } catch (InterruptedException e) {\n                    Thread.currentThread().interrupt();\n                }\n            }\n        });\n        System.out.println(\"State 1: \" + worker.getState()); // NEW\n\n        // 2. Chuyển sang RUNNABLE\n        worker.start();\n        System.out.println(\"State 2: \" + worker.getState()); // RUNNABLE\n\n        Thread.sleep(20); // Chờ worker vào sleep\n        System.out.println(\"State 3: \" + worker.getState()); // TIMED_WAITING\n\n        Thread.sleep(150); // Chờ worker gọi wait()\n        System.out.println(\"State 4: \" + worker.getState()); // WAITING\n\n        // Đánh thức worker để kết thúc\n        synchronized (lock) { lock.notify(); }\n        worker.join();\n        System.out.println(\"State 5: \" + worker.getState()); // TERMINATED\n    }\n}"
+      "codeExample": "package com.bank.concurrency;\n\nimport java.util.concurrent.locks.LockSupport;\n\npublic class ThreadLifecycleDemo {\n    public static void main(String[] args) throws InterruptedException {\n        Object lock = new Object();\n\n        // 1. Trạng thái NEW\n        Thread worker = new Thread(() -> {\n            synchronized (lock) {\n                try {\n                    // 4. Trạng thái TIMED_WAITING\n                    Thread.sleep(100);\n                    // 5. Trạng thái WAITING (nhường lock)\n                    lock.wait();\n                } catch (InterruptedException e) {\n                    Thread.currentThread().interrupt();\n                }\n            }\n        });\n        System.out.println(\"State 1: \" + worker.getState()); // NEW\n\n        // 2. Chuyển sang RUNNABLE\n        worker.start();\n        System.out.println(\"State 2: \" + worker.getState()); // RUNNABLE\n\n        Thread.sleep(20); // Chờ worker vào sleep\n        System.out.println(\"State 3: \" + worker.getState()); // TIMED_WAITING\n\n        Thread.sleep(150); // Chờ worker gọi wait()\n        System.out.println(\"State 4: \" + worker.getState()); // WAITING\n\n        // Đánh thức worker để kết thúc\n        synchronized (lock) { lock.notify(); }\n        worker.join();\n        System.out.println(\"State 5: \" + worker.getState()); // TERMINATED\n    }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Vòng Đời Trạng Thái Của Java Thread (Thread Lifecycle State Machine)",
+        "caption": "Sự chuyển dịch giữa các trạng thái NEW, RUNNABLE, WAITING, BLOCKED và TERMINATED",
+        "code": "stateDiagram-v2\n    [*] --> NEW : new Thread()\n    NEW --> RUNNABLE : thread.start()\n    \n    RUNNABLE --> BLOCKED : Chờ lấy synchronized lock\n    BLOCKED --> RUNNABLE : Giành được lock thành công\n\n    RUNNABLE --> WAITING : Object.wait(), Thread.join()\n    WAITING --> RUNNABLE : Object.notify(), notifyAll()\n\n    RUNNABLE --> TIMED_WAITING : Thread.sleep(ms), wait(ms)\n    TIMED_WAITING --> RUNNABLE : Hết thời gian timeout\n\n    RUNNABLE --> TERMINATED : Kết thúc thực thi run() method\n    TERMINATED --> [*]"
+      }
     },
     "pitfalls": [
       "Hiểu nhầm rằng khi một luồng bị block ở Socket I/O (chờ dữ liệu mạng) thì trạng thái trong Java là `BLOCKED`: Thực tế trong JVM Thread Dump nó vẫn hiển thị là `RUNNABLE`.",
@@ -1671,7 +1752,13 @@
       "summary": "Garbage Collection (GC) trong JVM là tiến trình tự động giải phóng vùng nhớ Heap bị chiếm giữ bởi các đối tượng không còn được sử dụng. Quy trình GC kinh điển trải qua 3 giai đoạn cốt lõi: (1) **Mark (Đánh dấu)**: Bắt đầu từ các GC Roots, GC quét qua toàn bộ đồ thị tham chiếu và đánh dấu tất cả các đối tượng còn sống; (2) **Sweep (Dọn dẹp)**: Quét qua Heap và thu hồi bộ nhớ của các đối tượng không được đánh dấu; (3) **Compact (Dồn nén)**: Dịch chuyển các đối tượng còn sống về một đầu của vùng nhớ để xóa bỏ hiện tượng phân mảnh bộ nhớ (Memory Fragmentation), tạo khoảng trống liên tục cho các lần cấp phát tiếp theo.",
       "deepDive": "Chi phí lớn nhất của GC là các khoảng dừng **Stop-The-World (STW)**: JVM yêu cầu toàn bộ các luồng ứng dụng phải dừng lại tại các điểm kiểm tra an toàn (**Safepoints**) để GC di chuyển đối tượng mà không sợ bị sai lệch con trỏ. Trong các GC thế hệ mới như **ZGC** (Z Garbage Collector), quá trình Mark và Compact diễn ra **hoàn toàn đồng thời (Concurrent)** song song với luồng ứng dụng mà không cần STW dài (độ trễ P99 < 1ms bất kể Heap 16TB). ZGC đạt được điều kỳ diệu này nhờ hai kỹ thuật đỉnh cao: **Colored Pointers** (dùng 4-bit siêu dữ liệu nằm ngay trên con trỏ 64-bit) và **Load Barriers** (JIT chèn một đoạn mã kiểm tra con trỏ cực nhẹ mỗi khi ứng dụng dereference một tham chiếu).",
       "codeLanguage": "java",
-      "codeExample": "package com.bank.gc;\n\npublic class GarbageCollectionMetricsDemo {\n    public static void main(String[] args) {\n        System.out.println(\"=== JVM GC Engine Inspection ===\");\n        \n        // Lấy danh sách các GC Collector đang vận hành trong JVM instance\n        var gcMxBeans = java.lang.management.ManagementFactory.getGarbageCollectorMXBeans();\n        for (var gcBean : gcMxBeans) {\n            System.out.printf(\"GC Name: %s | Collections: %d | Total Time: %d ms%n\",\n                gcBean.getName(), gcBean.getCollectionCount(), gcBean.getCollectionTime());\n        }\n\n        // Cấu hình JVM khuyến nghị cho Production Low-Latency (Java 21):\n        // -XX:+UseZGC -XX:+ZGenerational -Xmx8g -Xlog:gc*:file=gc.log:time,uptime,tags\n    }\n}"
+      "codeExample": "package com.bank.gc;\n\npublic class GarbageCollectionMetricsDemo {\n    public static void main(String[] args) {\n        System.out.println(\"=== JVM GC Engine Inspection ===\");\n        \n        // Lấy danh sách các GC Collector đang vận hành trong JVM instance\n        var gcMxBeans = java.lang.management.ManagementFactory.getGarbageCollectorMXBeans();\n        for (var gcBean : gcMxBeans) {\n            System.out.printf(\"GC Name: %s | Collections: %d | Total Time: %d ms%n\",\n                gcBean.getName(), gcBean.getCollectionCount(), gcBean.getCollectionTime());\n        }\n\n        // Cấu hình JVM khuyến nghị cho Production Low-Latency (Java 21):\n        // -XX:+UseZGC -XX:+ZGenerational -Xmx8g -Xlog:gc*:file=gc.log:time,uptime,tags\n    }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cơ Chế Phân Vùng Thế Hệ JVM Garbage Collection (Generational GC)",
+        "caption": "Quy luật Weak Generational Hypothesis: 95% object chết trẻ trong Eden Space",
+        "code": "flowchart LR\n    subgraph YoungGen [\"Young Generation (Đối tượng mới tạo)\"]\n        Eden[\"Eden Space (Cấp phát mới)\"] -->|\"Minor GC sống sót\"| S0[\"Survivor From (S0)\"]\n        S0 <-->|\"Copy qua lại\"| S1[\"Survivor To (S1)\"]\n    end\n\n    subgraph OldGen [\"Old Generation (Tenured - Đối tượng sống thọ)\"]\n        S1 -->|\"Vượt qua Tenuring Threshold (Thường là 15 lần GC)\"| Old[\"Tenured Old Space (Major / Full GC)\"]\n    end\n\n    subgraph NonHeap [\"Non-Heap Space\"]\n        Meta[\"Metaspace (Class Metadata, Native Memory)\"]\n    end"
+      }
     },
     "pitfalls": [
       "Chỉ quan tâm tới thời gian thu dọn mà bỏ qua hiện tượng Phân mảnh bộ nhớ (Fragmentation): Thuật toán Sweep không Compact sẽ khiến Heap bị chia cắt thành các lỗ hổng nhỏ; khi cần cấp phát một mảng lớn sẽ lập tức bị ném `OutOfMemoryError` dù tổng dung lượng trống vẫn còn nhiều.",
@@ -1856,7 +1943,81 @@
       "summary": "**Virtual Threads (Luồng ảo)**, được chính thức hoàn thiện trong Java 21 (JEP 444 - Project Loom), là các luồng cấp người dùng (User-mode Threads) siêu nhẹ được quản lý hoàn toàn bởi máy ảo JVM thay vì hệ điều hành. Virtual Threads giải quyết triệt để nút thắt cổ chai lớn nhất của mô hình **Thread-per-request** trong Java: Trước Java 21, mỗi luồng là một Platform Thread ánh xạ 1:1 với OS Kernel Thread, tốn cố định ~1MB RAM cho Stack và chi phí context switch khổng lồ, khiến máy chủ chỉ chịu được vài ngàn luồng đồng thời. Virtual Threads chỉ tốn vài trăm bytes trên Heap, cho phép ứng dụng mở hàng triệu luồng đồng thời mà không làm sập RAM.",
       "deepDive": "Cơ chế vận hành bên dưới: JVM duy trì một nhóm nhỏ các **Carrier Threads** (mặc định là `ForkJoinPool` với số luồng bằng số CPU core). Khi một Virtual Thread đang chạy và gặp một thao tác I/O blocking (như đọc Socket, truy vấn JDBC, `Thread.sleep`), JVM tự động **Unmount (tháo gỡ)** Virtual Thread đó khỏi Carrier Thread, đóng gói toàn bộ Call Stack của nó vào đối tượng **Continuation** nằm trên Java Heap. Carrier Thread lập tức rảnh tay để phục vụ Virtual Thread khác. Khi hệ điều hành báo dữ liệu mạng đã sẵn sàng (qua `epoll/kqueue`), JVM sẽ **Mount** lại Virtual Thread đó lên một Carrier Thread bất kỳ để chạy tiếp. Toàn bộ quá trình diễn ra trong suốt với lập trình viên.",
       "codeLanguage": "java",
-      "codeExample": "package com.bank.loom;\n\nimport java.util.concurrent.Executors;\nimport java.util.stream.IntStream;\n\npublic class VirtualThreadsEnterpriseDemo {\n    public static void main(String[] args) {\n        long startTime = System.currentTimeMillis();\n\n        // Khởi tạo Executor với Virtual Thread cho mỗi tác vụ (Java 21 standard)\n        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {\n            // Khởi chạy 50,000 tác vụ I/O đồng thời một cách nhẹ nhàng!\n            IntStream.range(0, 50_000).forEach(i -> {\n                executor.submit(() -> {\n                    try {\n                        // Giả lập I/O Blocking: JVM sẽ unmount virtual thread khỏi carrier thread ngay lập tức!\n                        Thread.sleep(100);\n                    } catch (InterruptedException e) {\n                        Thread.currentThread().interrupt();\n                    }\n                });\n            });\n        } // Khối try-with-resources tự động gọi shutdown() và đợi toàn bộ 50k luồng hoàn thành\n\n        long elapsed = System.currentTimeMillis() - startTime;\n        System.out.println(\"Successfully executed 50,000 Virtual Tasks in: \" + elapsed + \" ms\");\n    }\n}"
+      "codeExample": "package com.bank.loom;\n\nimport java.util.concurrent.Executors;\nimport java.util.stream.IntStream;\n\npublic class VirtualThreadsEnterpriseDemo {\n    public static void main(String[] args) {\n        long startTime = System.currentTimeMillis();\n\n        // Khởi tạo Executor với Virtual Thread cho mỗi tác vụ (Java 21 standard)\n        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {\n            // Khởi chạy 50,000 tác vụ I/O đồng thời một cách nhẹ nhàng!\n            IntStream.range(0, 50_000).forEach(i -> {\n                executor.submit(() -> {\n                    try {\n                        // Giả lập I/O Blocking: JVM sẽ unmount virtual thread khỏi carrier thread ngay lập tức!\n                        Thread.sleep(100);\n                    } catch (InterruptedException e) {\n                        Thread.currentThread().interrupt();\n                    }\n                });\n            });\n        } // Khối try-with-resources tự động gọi shutdown() và đợi toàn bộ 50k luồng hoàn thành\n\n        long elapsed = System.currentTimeMillis() - startTime;\n        System.out.println(\"Successfully executed 50,000 Virtual Tasks in: \" + elapsed + \" ms\");\n    }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Java 21 Virtual Threads (Project Loom) vs Platform Threads",
+        "caption": "Mô hình M:N phân tách hàng triệu Virtual Threads nhẹ trên một lượng nhỏ OS Carrier Threads",
+        "code": "flowchart TD\n    subgraph OSThreads [\"OS Platform Threads (Tốn 1MB RAM/thread)\"]\n        CT1[\"Carrier Thread 1 (OS Kernel)\"]\n        CT2[\"Carrier Thread 2 (OS Kernel)\"]\n    end\n\n    subgraph LoomThreads [\"Java Virtual Threads (Chỉ tốn ~1KB RAM/thread)\"]\n        VT1[\"Virtual Thread 1 (I/O Blocked)\"] -.->|\"Unmount khi chờ I/O\"| CT1\n        VT2[\"Virtual Thread 2 (Running)\"] ===>|\"Mount thực thi\"| CT1\n        VT3[\"Virtual Thread 3 (Running)\"] ===>|\"Mount thực thi\"| CT2\n        VTN[\"...Hàng triệu Virtual Threads khác\"]\n    end"
+      },
+      "benchmark": {
+        "title": "So sánh: Platform Threads vs Virtual Threads (Java 21)",
+        "caption": "Khả năng chịu tải đồng thời (High Concurrency) với các tác vụ I/O Network",
+        "options": [
+          {
+            "name": "Java 21 Virtual Threads (Loom)",
+            "badge": "Đột phá hiệu năng I/O",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Số lượng Thread tối đa",
+                "value": 99,
+                "displayValue": "> 1,000,000 threads",
+                "color": "emerald"
+              },
+              {
+                "label": "Bộ nhớ tiêu hao mỗi Thread",
+                "value": 98,
+                "displayValue": "~1 KB (Heap allocated)",
+                "color": "emerald"
+              },
+              {
+                "label": "Chi phí Context Switching",
+                "value": 95,
+                "displayValue": "Cực thấp (User space)",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Viết code đồng bộ tuần tự (imperative) nhưng đạt hiệu năng bất đồng bộ của Reactive/WebFlux",
+              "Giải phóng hoàn toàn hiện tượng Thread Starvation"
+            ],
+            "cons": [
+              "Không tăng tốc độ cho tác vụ CPU-intensive (chỉ tối ưu cho tác vụ I/O bound)",
+              "Cần tránh synchronized block cũ để không làm ghim (pin) Carrier Thread"
+            ]
+          },
+          {
+            "name": "Platform Threads (Truyền thống)",
+            "metrics": [
+              {
+                "label": "Số lượng Thread tối đa",
+                "value": 35,
+                "displayValue": "~5,000 threads (Chạm ngưỡng OOM)",
+                "color": "rose"
+              },
+              {
+                "label": "Bộ nhớ tiêu hao mỗi Thread",
+                "value": 30,
+                "displayValue": "~1,024 KB (Stack cố định)",
+                "color": "rose"
+              },
+              {
+                "label": "Chi phí Context Switching",
+                "value": 40,
+                "displayValue": "Tốn kém (Kernel mode switch)",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Phù hợp tuyệt đối cho tác vụ tính toán nặng CPU (Machine Learning, mã hóa dữ liệu)"
+            ],
+            "cons": [
+              "Khi thread bị block chờ Database I/O, 1MB bộ nhớ OS bị giam cầm lãng phí"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Đưa Virtual Threads vào một Thread Pool (`pool.submit()`): Virtual Threads sinh ra là để tạo và vứt đi (Discardable), tuyệt đối không bao giờ được pool Virtual Threads.",
@@ -2609,7 +2770,21 @@
       "summary": "Nối chuỗi bằng toán tử `+` bên trong một vòng lặp là một trong những Antipattern tàn phá hiệu năng tồi tệ nhất trong Java: Do tính bất biến (Immutability) của `String`, mỗi lần gọi `+` trong vòng lặp, JVM bắt buộc phải tạo ra một đối tượng trung gian mới, cấp phát mảng byte mới và sao chép lại toàn bộ nội dung chuỗi cũ vào chuỗi mới. Điều này biến độ phức tạp thời gian của thuật toán từ O(N) thành **thảm họa O(N^2)**, đồng thời xả ra hàng triệu đối tượng rác trên Heap gây quá tải Garbage Collector. Giải pháp bắt buộc là **khai báo một `StringBuilder` duy nhất bên ngoài vòng lặp** và gọi `.append()`.",
       "deepDive": "Compiler dịch `a + b` thành gì? (1) Trong **Java 8 trở về trước**: Compiler tự động dịch `a + b` thành `new StringBuilder().append(a).append(b).toString()`. Nếu đặt trong vòng lặp, mỗi bước lặp sẽ tạo một `new StringBuilder` mới tinh, hoàn toàn không tái sử dụng được; (2) **Từ Java 9+ (JEP 280)**: Với các biểu thức nối chuỗi đơn lẻ, compiler dịch thành chỉ lệnh **`invokedynamic`** trỏ tới `StringConcatFactory.makeConcatWithConstants(...)`. Kỹ thuật này tính toán trước chính xác kích thước mảng byte cần cấp phát tại runtime và dùng Unsafe copy trong native C, tối ưu hơn cả `StringBuilder` đơn. Tuy nhiên, **trong vòng lặp thì `invokedynamic` cũng không thể cứu được**, vì nó không thể nhìn xuyên qua các bước lặp độc lập, nên `StringBuilder` tường minh ngoài vòng lặp vẫn là chuẩn mực bất biến.",
       "codeLanguage": "java",
-      "codeExample": "package com.bank.strings;\n\npublic class StringConcatLoopBenchmark {\n    public static void main(String[] args) {\n        int count = 30_000;\n\n        // 1. CÁCH LÀM SAI THẢM HỌA: Nối chuỗi bằng + trong vòng lặp (O(N^2) và ngốn RAM)\n        long startBad = System.currentTimeMillis();\n        String badResult = \"\";\n        for (int i = 0; i < count; i++) {\n            badResult += i; // Mỗi bước lặp tạo StringBuilder mới và copy lại toàn bộ chuỗi cũ!\n        }\n        long durationBad = System.currentTimeMillis() - startBad;\n\n        // 2. CÁCH LÀM CHUẨN SENIOR ARCHITECT: Khởi tạo StringBuilder 1 lần ngoài vòng lặp (O(N))\n        long startGood = System.currentTimeMillis();\n        StringBuilder sb = new StringBuilder(count * 6); // Pre-size capacity tối ưu\n        for (int i = 0; i < count; i++) {\n            sb.append(i);\n        }\n        String goodResult = sb.toString();\n        long durationGood = System.currentTimeMillis() - startGood;\n\n        System.out.printf(\"Concatenation with '+' loop: %d ms%n\", durationBad);\n        System.out.printf(\"Optimized StringBuilder loop: %d ms%n\", durationGood);\n    }\n}"
+      "codeExample": "package com.bank.strings;\n\npublic class StringConcatLoopBenchmark {\n    public static void main(String[] args) {\n        int count = 30_000;\n\n        // 1. CÁCH LÀM SAI THẢM HỌA: Nối chuỗi bằng + trong vòng lặp (O(N^2) và ngốn RAM)\n        long startBad = System.currentTimeMillis();\n        String badResult = \"\";\n        for (int i = 0; i < count; i++) {\n            badResult += i; // Mỗi bước lặp tạo StringBuilder mới và copy lại toàn bộ chuỗi cũ!\n        }\n        long durationBad = System.currentTimeMillis() - startBad;\n\n        // 2. CÁCH LÀM CHUẨN SENIOR ARCHITECT: Khởi tạo StringBuilder 1 lần ngoài vòng lặp (O(N))\n        long startGood = System.currentTimeMillis();\n        StringBuilder sb = new StringBuilder(count * 6); // Pre-size capacity tối ưu\n        for (int i = 0; i < count; i++) {\n            sb.append(i);\n        }\n        String goodResult = sb.toString();\n        long durationGood = System.currentTimeMillis() - startGood;\n\n        System.out.printf(\"Concatenation with '+' loop: %d ms%n\", durationBad);\n        System.out.printf(\"Optimized StringBuilder loop: %d ms%n\", durationGood);\n    }\n}",
+      "codeDiff": {
+        "title": "Nối Chuỗi Bằng Toán Tử + Trong Vòng Lặp vs StringBuilder",
+        "language": "java",
+        "antiPattern": {
+          "title": "❌ Anti-Pattern: Nối chuỗi bằng dấu + trong vòng lặp lớn (Gây GC Pressure khủng khiếp)",
+          "code": "// TẠO RA N OBJECT RÁC TRONG HEAP: O(N^2) Time Complexity!\npublic String buildReport(List<String> records) {\n    String result = \"\";\n    for (String record : records) {\n        // Mỗi lần cộng chuỗi, JVM phải cấp phát 1 StringBuilder mới và copy toàn bộ mảng char cũ!\n        result += record + \", \";\n    }\n    return result;\n}",
+          "explanation": "Do String trong Java là Immutable, mỗi phép `+=` tạo ra một instance String mới và copy dữ liệu cũ. Với 100,000 phần tử, nó tạo ra 100,000 object rác làm GC chạy quá tải dẫn đến CPU 100%."
+        },
+        "seniorSolution": {
+          "title": "✅ Senior Solution: Dùng StringBuilder với Capacity khởi tạo trước",
+          "code": "// O(N) TỐI ƯU BỘ NHỚ: Cấp phát đúng một buffer có thể mở rộng\npublic String buildReport(List<String> records) {\n    // Dự đoán kích thước trước để tránh realloc mảng char nội bộ\n    StringBuilder sb = new StringBuilder(records.size() * 32);\n    for (String record : records) {\n        sb.append(record).append(\", \");\n    }\n    return sb.toString();\n}",
+          "explanation": "StringBuilder duy trì một mảng char nội bộ có thể mở rộng (mutable buffer), chỉ cấp phát đúng 1 lần và biến độ phức tạp từ O(N^2) về O(N), giảm 99% áp lực lên Garbage Collector."
+        }
+      }
     },
     "pitfalls": [
       "Tự tin rằng Java 9 `invokedynamic` đã tự động tối ưu hóa việc nối chuỗi bằng `+` trong vòng lặp: Hoàn toàn sai lầm, `invokedynamic` chỉ tối ưu biểu thức nối chuỗi tĩnh tại một dòng lệnh cụ thể.",

@@ -622,7 +622,13 @@
     "seniorAnswer": {
       "summary": "Event Loop trong Node.js được cung cấp bởi thư viện libuv, điều phối việc thực thi bất đồng bộ trên một single thread qua một vòng lặp tuần tự gồm 6 phases: Timers -> Pending Callbacks -> Idle/Prepare -> Poll -> Check -> Close Callbacks. Giữa mỗi phase và sau mỗi callback, Node luôn ưu tiên vét sạch Microtask queue (`process.nextTick` trước, rồi đến Promise microtasks) trước khi bước sang phase tiếp theo.",
       "deepDive": "Chi tiết các phase chính:\n1. Timers: Thực thi callback của `setTimeout()` và `setInterval()` đã hết hạn.\n2. Pending Callbacks: Xử lý I/O callbacks bị hoãn từ vòng lặp trước (ví dụ lỗi TCP).\n3. Poll: Phase quan trọng nhất — thăm dò và đón nhận I/O events mới; nếu không có timer nào đến hạn, loop có thể block tại đây để chờ I/O mới.\n4. Check: Thực thi các callback được lên lịch bởi `setImmediate()`.\n5. Close: Xử lý sự kiện đóng tài nguyên (ví dụ `socket.on('close')`).\nĐặc biệt, `process.nextTick` và Promise callbacks KHÔNG thuộc phase nào của libuv mà chạy ngay lập tức khi V8 call stack rỗng (microtask checkpoint).",
-      "codeExample": "// Dự đoán thứ tự log:\nconsole.log('1. Sync Start');\n\nsetTimeout(() => console.log('2. Timers phase (setTimeout)'), 0);\nsetImmediate(() => console.log('3. Check phase (setImmediate)'));\n\nPromise.resolve().then(() => console.log('4. Microtask: Promise'));\nprocess.nextTick(() => console.log('5. Microtask: nextTick'));\n\nconsole.log('6. Sync End');\n// Output: 1 -> 6 -> 5 -> 4 -> 2 hoặc 3 (tùy khởi tạo) hoặc 2 -> 3"
+      "codeExample": "// Dự đoán thứ tự log:\nconsole.log('1. Sync Start');\n\nsetTimeout(() => console.log('2. Timers phase (setTimeout)'), 0);\nsetImmediate(() => console.log('3. Check phase (setImmediate)'));\n\nPromise.resolve().then(() => console.log('4. Microtask: Promise'));\nprocess.nextTick(() => console.log('5. Microtask: nextTick'));\n\nconsole.log('6. Sync End');\n// Output: 1 -> 6 -> 5 -> 4 -> 2 hoặc 3 (tùy khởi tạo) hoặc 2 -> 3",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Sơ Đồ Vòng Tròn 6 Pha Của Node.js Libuv Event Loop",
+        "caption": "Thứ tự ưu tiên xử lý các hàng đợi sự kiện và sự xen ngang của Microtask Queue (nextTick & Promise)",
+        "code": "flowchart TD\n    Start([\"Khởi động Script (Sync Code)\"]) --> LoopInit{\"Event Loop Bắt Đầu\"}\n\n    subgraph Phases [\"6 Pha Tuần Tự Của Libuv\"]\n        P1[\"1. Timers\n(setTimeout, setInterval callbacks)\"]\n        P2[\"2. Pending Callbacks\n(I/O callbacks bị hoãn)\"]\n        P3[\"3. Idle, Prepare\n(Hệ thống nội bộ Libuv)\"]\n        P4[\"4. Poll\n(Chờ và đọc sự kiện I/O mới: Socket, File)\"]\n        P5[\"5. Check\n(setImmediate callbacks)\"]\n        P6[\"6. Close Callbacks\n(socket.on('close'))\"]\n        \n        P1 --> P2 --> P3 --> P4 --> P5 --> P6 --> P1\n    end\n\n    subgraph Microtasks [\"Hàng Đợi Vi Tác Vụ (Ưu Tiên Số 1 - Chạy Giữa Mọi Pha)\"]\n        M1[\"process.nextTick Queue (Chạy trước nhất)\"]\n        M2[\"Promise Microtask Queue (.then, async/await)\"]\n    end"
+      }
     },
     "pitfalls": [
       "Nghĩ rằng Event Loop của Node.js giống hệt Event Loop của trình duyệt (trình duyệt không có các phase chuyên biệt như Timers, Poll, Check của libuv).",
@@ -2075,7 +2081,76 @@
     "seniorAnswer": {
       "summary": "`worker_threads` (module `node:worker_threads`) cho phép chạy nhiều luồng JavaScript song song bên trong CÙNG MỘT TIẾN TRÌNH Node.js. Khác biệt cốt lõi với Cluster: Cluster tạo ra các TIẾN TRÌNH ĐỘC LẬP (OS Processes) với bộ nhớ hoàn toàn cô lập để scale I/O web server; trong khi Worker Threads tạo ra các LUỒNG (Threads) nhẹ hơn, chạy chung trong 1 tiến trình và có khả năng chia sẻ trực tiếp bộ nhớ (Shared Memory qua `SharedArrayBuffer`) để giải quyết các tác vụ tính toán CPU nặng.",
       "deepDive": "Mỗi Worker Thread sở hữu một V8 Isolate riêng và Event Loop riêng, nhưng chia sẻ cùng một OS Process. Dữ liệu giữa main thread và worker có thể truyền theo 3 cách: 1. Structured Clone (copy dữ liệu, tốn công serialization); 2. `transferList` (chuyển quyền sở hữu `ArrayBuffer` tức thời với O(1) time complexity); 3. `SharedArrayBuffer` kết hợp `Atomics` (chia sẻ vùng nhớ thật sự không cần copy, dùng cho tính toán hiệu năng cực cao).",
-      "codeExample": "// main.ts\nimport { Worker } from 'node:worker_threads';\n\nexport function executeCpuTask(data: number[]): Promise<number> {\n  return new Promise((resolve, reject) => {\n    const worker = new Worker('./dist/worker.js', { workerData: data });\n    worker.on('message', resolve);\n    worker.on('error', reject);\n    worker.on('exit', (code) => {\n      if (code !== 0) reject(new Error(`Worker stopped with code ${code}`));\n    });\n  });\n}\n\n// worker.ts\n// import { parentPort, workerData } from 'node:worker_threads';\n// const sum = (workerData as number[]).reduce((a, b) => a + b, 0);\n// parentPort?.postMessage(sum);"
+      "codeExample": "// main.ts\nimport { Worker } from 'node:worker_threads';\n\nexport function executeCpuTask(data: number[]): Promise<number> {\n  return new Promise((resolve, reject) => {\n    const worker = new Worker('./dist/worker.js', { workerData: data });\n    worker.on('message', resolve);\n    worker.on('error', reject);\n    worker.on('exit', (code) => {\n      if (code !== 0) reject(new Error(`Worker stopped with code ${code}`));\n    });\n  });\n}\n\n// worker.ts\n// import { parentPort, workerData } from 'node:worker_threads';\n// const sum = (workerData as number[]).reduce((a, b) => a + b, 0);\n// parentPort?.postMessage(sum);",
+      "benchmark": {
+        "title": "So sánh Đa Nhiệm Node.js: Cluster vs Worker Threads vs Child Process",
+        "caption": "Giải pháp xử lý tác vụ nặng CPU mà không làm treo Event Loop chính",
+        "options": [
+          {
+            "name": "Worker Threads (module worker_threads)",
+            "badge": "Tác vụ nặng CPU trong cùng Process",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tốc độ chia sẻ bộ nhớ (SharedArrayBuffer)",
+                "value": 98,
+                "displayValue": "Zero-Copy Cực Nhanh",
+                "color": "emerald"
+              },
+              {
+                "label": "Bộ nhớ tiêu hao",
+                "value": 85,
+                "displayValue": "~20-30MB / Worker",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ cô lập an toàn",
+                "value": 65,
+                "displayValue": "Chung Process OS",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Hỗ trợ chia sẻ bộ nhớ thực sự qua SharedArrayBuffer mà không tốn công serialization",
+              "Rất phù hợp cho xử lý ảnh, tính toán mã hóa, phân tích cú pháp JSON nặng"
+            ],
+            "cons": [
+              "Nếu một worker bị crash do lỗi native C++ segmentation fault, toàn bộ process mẹ có thể chết theo"
+            ]
+          },
+          {
+            "name": "Cluster Mode (module cluster / PM2)",
+            "badge": "Tận dụng đa nhân CPU cho Web API",
+            "metrics": [
+              {
+                "label": "Tốc độ chia sẻ bộ nhớ",
+                "value": 30,
+                "displayValue": "Phải qua IPC Serialization",
+                "color": "rose"
+              },
+              {
+                "label": "Bộ nhớ tiêu hao",
+                "value": 50,
+                "displayValue": "~100MB / Instance",
+                "color": "amber"
+              },
+              {
+                "label": "Độ cô lập an toàn",
+                "value": 100,
+                "displayValue": "Độc lập tuyệt đối",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Mỗi worker là 1 OS process độc lập hoàn toàn, 1 con chết không ảnh hưởng con khác",
+              "Chia sẻ cùng 1 port HTTP (ví dụ port 3000) qua master load balancer"
+            ],
+            "cons": [
+              "Không thể chia sẻ bộ nhớ chung trực tiếp, mỗi instance tốn một bản sao V8 Heap riêng"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Khởi tạo (spawn) một Worker Thread mới cho mỗi request HTTP gửi đến (chi phí khởi tạo V8 isolate là ~20-50ms và tốn RAM, bắt buộc phải dùng Thread Pool như `piscina`).",

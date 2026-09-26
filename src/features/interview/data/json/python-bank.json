@@ -35,7 +35,14 @@
     "question": "list, tuple, set, dict — khi nào dùng cái nào?",
     "interviewerIntent": "Kiểm tra kiến thức cấu trúc dữ liệu tích hợp sẵn (built-in data structures), độ phức tạp thời gian (time complexity) và khả năng chọn data structure tối ưu theo use-case.",
     "contextOrScenario": "Lựa chọn cấu trúc dữ liệu lưu cache in-memory, xử lý deduplication danh sách user ID, hoặc định nghĩa constant/metadata trong API backend.",
-    "expectedKeywords": ["list", "tuple", "set", "dict", "hash table", "O(1) lookup"],
+    "expectedKeywords": [
+      "list",
+      "tuple",
+      "set",
+      "dict",
+      "hash table",
+      "O(1) lookup"
+    ],
     "seniorAnswer": {
       "summary": "Dùng list khi cần mảng có thứ tự, cho phép trùng lặp và cần append/mutate; tuple cho dữ liệu cố định không đổi hoặc nhóm giá trị liên quan (nhẹ hơn list); set khi cần loại trừ trùng lặp và tra cứu O(1); dict khi cần ánh xạ key-value với O(1) average lookup/insert.",
       "deepDive": "List là dynamic array (con trỏ các PyObject*), tốn thêm capacity over-allocation để hỗ trợ amortized O(1) append. Tuple có fixed size, CPython tối ưu bộ nhớ bằng freelist nhỏ. Dict và set dùng Hash Table với open addressing và perturbation indexing, lookup O(1) nhưng tốn ram hơn 3-4 lần so với tuple/list và đòi hỏi key phải hashable. Dict từ Python 3.7+ bảo đảm giữ nguyên thứ tự chèn (insertion order).",
@@ -850,7 +857,81 @@
     "seniorAnswer": {
       "summary": "GIL (Global Interpreter Lock) là một mutex lock trong CPython đảm bảo chỉ duy nhất một OS thread được thực thi mã bytecode Python tại một thời điểm. Do đó, Python threading không thể tận dụng đa nhân CPU cho các tác vụ CPU-bound, nhưng hoạt động rất tốt cho các tác vụ I/O-bound vì GIL được tự động nhả ra khi chờ I/O.",
       "deepDive": "Mục đích ban đầu của GIL là giúp việc quản lý bộ nhớ (reference counting) an toàn tuyệt đối mà không cần đặt lock trên từng object đơn lẻ (tránh race condition và overhead khóa). 1) Với I/O-bound (network, disk, DB), khi một thread thực hiện system call chờ I/O, GIL được giải phóng để thread khác chạy. 2) Với CPU-bound (mã hóa, xử lý ảnh, machine learning), dùng threading chỉ làm chậm hơn do chi phí tranh chấp GIL (context switching overhead); giải pháp là dùng `multiprocessing` để tạo nhiều process riêng biệt với Python interpreter và memory space độc lập.",
-      "codeExample": "# Minh họa GIL chỉ chạy 1 nhân cho CPU-bound\nfrom concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor\nimport time\n\ndef cpu_heavy_task(n: int) -> int:\n    return sum(i * i for i in range(n))\n\n# CPU-bound: ProcessPoolExecutor tận dụng 100% tất cả các CPU cores\nif __name__ == '__main__':\n    with ProcessPoolExecutor() as executor:\n        results = list(executor.map(cpu_heavy_task, [10_000_000] * 4))"
+      "codeExample": "# Minh họa GIL chỉ chạy 1 nhân cho CPU-bound\nfrom concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor\nimport time\n\ndef cpu_heavy_task(n: int) -> int:\n    return sum(i * i for i in range(n))\n\n# CPU-bound: ProcessPoolExecutor tận dụng 100% tất cả các CPU cores\nif __name__ == '__main__':\n    with ProcessPoolExecutor() as executor:\n        results = list(executor.map(cpu_heavy_task, [10_000_000] * 4))",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cơ Chế Global Interpreter Lock (GIL) Trong CPython",
+        "caption": "Tại một thời điểm chỉ duy nhất 1 Thread được thực thi mã bytecode Python, dù máy tính có 64 Cores CPU",
+        "code": "flowchart TD\n    subgraph MultiThreads [\"Nhiều Python Threads Chạy Đồng Thời\"]\n        T1[\"Thread 1\"]\n        T2[\"Thread 2\"]\n        T3[\"Thread 3\"]\n    end\n\n    Lock{\"Khóa GIL (Global Interpreter Lock)\"}\n    CPU[\"1 CPU Core Duy Nhất Thực Thi\"]\n\n    T1 -->|\"Giữ GIL\"| Lock --> CPU\n    T2 -.->|\"Bị chặn, phải chờ GIL\"| Lock\n    T3 -.->|\"Bị chặn, phải chờ GIL\"| Lock\n\n    Explain[\"Giải pháp cho tác vụ nặng CPU: Dùng module 'multiprocessing' để sinh nhiều Process độc lập (mỗi process có 1 GIL riêng)!\"]"
+      },
+      "benchmark": {
+        "title": "So Sánh Concurrency Trong Python: Threading vs Multiprocessing vs Asyncio",
+        "caption": "Lựa chọn mô hình tối ưu theo tính chất công việc I/O-bound hay CPU-bound",
+        "options": [
+          {
+            "name": "Asyncio (Single-thread Event Loop)",
+            "badge": "Chuẩn Web API (FastAPI)",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tối ưu tác vụ I/O (Database, HTTP)",
+                "value": 99,
+                "displayValue": "Cực nhanh, chịu tải lớn",
+                "color": "emerald"
+              },
+              {
+                "label": "Bộ nhớ tiêu hao",
+                "value": 95,
+                "displayValue": "Rất thấp (1 Process)",
+                "color": "emerald"
+              },
+              {
+                "label": "Tối ưu tác vụ nặng CPU",
+                "value": 10,
+                "displayValue": "Gây block Event Loop!",
+                "color": "rose"
+              }
+            ],
+            "pros": [
+              "Không có chi phí Context Switch của OS",
+              "Phù hợp xử lý hàng chục nghìn kết nối WebSocket hoặc API I/O"
+            ],
+            "cons": [
+              "Nếu vô tình chạy hàm tính toán CPU nặng đồng bộ, toàn bộ server sẽ bị đơ"
+            ]
+          },
+          {
+            "name": "Multiprocessing (Tách Process)",
+            "badge": "Tác vụ nặng CPU & Data",
+            "metrics": [
+              {
+                "label": "Tối ưu tác vụ I/O",
+                "value": 60,
+                "displayValue": "Tốn RAM không cần thiết",
+                "color": "amber"
+              },
+              {
+                "label": "Bộ nhớ tiêu hao",
+                "value": 35,
+                "displayValue": "Mỗi process tốn 50-100MB",
+                "color": "rose"
+              },
+              {
+                "label": "Tối ưu tác vụ nặng CPU",
+                "value": 100,
+                "displayValue": "Chạy 100% full đa nhân CPU",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Vượt qua hoàn toàn rào cản GIL, tận dụng trọn vẹn 32/64 CPU Cores"
+            ],
+            "cons": [
+              "Chi phí khởi tạo process cao và truyền dữ liệu qua IPC (Pipes/Queues) tốn kém serialization"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Dùng `threading.Thread` để tối ưu tác vụ tính toán toán học nặng trên nhiều core CPU và ngạc nhiên khi thấy thời gian chạy tăng lên.",
