@@ -71,6 +71,29 @@ for (const file of files) {
       totalDiagrams++;
       bankDiagramCount++;
     }
+
+    if (senior.benchmark) {
+      const bm = senior.benchmark;
+      if (!Array.isArray(bm.options) || bm.options.length < 2) {
+        errors.push(`[${bankName}:${q.id}] Benchmark requires at least 2 options.`);
+      } else {
+        for (const opt of bm.options) {
+          if (!opt.name || !Array.isArray(opt.metrics) || opt.metrics.length === 0) {
+            errors.push(`[${bankName}:${q.id}] Benchmark option "${opt.name || 'unnamed'}" missing name or metrics.`);
+          }
+        }
+      }
+    }
+
+    if (senior.codeDiff) {
+      const cd = senior.codeDiff;
+      if (!cd.antiPattern || typeof cd.antiPattern.code !== 'string') {
+        errors.push(`[${bankName}:${q.id}] CodeDiff missing antiPattern.code.`);
+      }
+      if (!cd.seniorSolution || typeof cd.seniorSolution.code !== 'string') {
+        errors.push(`[${bankName}:${q.id}] CodeDiff missing seniorSolution.code.`);
+      }
+    }
   }
 
   if (bankDiagramCount > 0) {

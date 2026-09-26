@@ -162,7 +162,27 @@
       "summary": "Dual write xảy ra khi một business logic phải ghi vào 2 storage độc lập (ví dụ RDBMS và Message Broker/Kafka) mà không có distributed transaction chung. Nếu commit DB thành công nhưng server crash/network down trước khi publish message, downstream service sẽ không bao giờ nhận được event. Ngược lại, nếu publish message trước rồi commit DB thất bại (rollback), downstream service lại xử lý một dữ liệu rác không hề tồn tại.",
       "deepDive": "Database và Message Broker là hai distributed system khác nhau, không thể dùng ACID transaction cục bộ để commit cả hai cùng lúc trừ phi dùng 2PC (Two-Phase Commit) - nhưng 2PC làm tắc nghẽn hiệu năng và gây single point of failure. Giải pháp chuẩn production hiện đại là Transactional Outbox Pattern: bảng `outbox` nằm cùng DB schema với bảng nghiệp vụ (`orders`). Cả đơn hàng và event message đều được INSERT trong cùng một local database transaction (đảm bảo tính nguyên tử 100%). Sau đó, một tiến trình publisher độc lập (dùng Polling hoặc Change Data Capture / Debezium đọc WAL log của Postgres) sẽ đọc từ bảng outbox và đẩy lên Kafka với bảo đảm At-Least-Once delivery.",
       "codeExample": "import { Pool, PoolClient } from 'pg';\n\ninterface CreateOrderInput {\n  userId: string;\n  totalAmount: number;\n}\n\nexport async function createOrderWithOutbox(pool: Pool, input: CreateOrderInput) {\n  const client: PoolClient = await pool.connect();\n  try {\n    // Bắt đầu Local Database Transaction\n    await client.query('BEGIN');\n\n    // 1. Ghi dữ liệu nghiệp vụ chính\n    const orderId = crypto.randomUUID();\n    const insertOrderQuery = `\n      INSERT INTO orders (id, user_id, total_amount, status, created_at)\n      VALUES ($1, $2, $3, 'PENDING', NOW())\n      RETURNING *;\n    `;\n    const orderResult = await client.query(insertOrderQuery, [orderId, input.userId, input.totalAmount]);\n    const createdOrder = orderResult.rows[0];\n\n    // 2. Ghi Event vào bảng Outbox TRONG CÙNG TRANSACTION (Đảm bảo All-or-Nothing)\n    const outboxEvent = {\n      id: crypto.randomUUID(),\n      aggregateType: 'ORDER',\n      aggregateId: orderId,\n      eventType: 'OrderCreated',\n      payload: JSON.stringify(createdOrder),\n    };\n\n    const insertOutboxQuery = `\n      INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, payload, status, created_at)\n      VALUES ($1, $2, $3, $4, $5, 'UNPUBLISHED', NOW());\n    `;\n    await client.query(insertOutboxQuery, [\n      outboxEvent.id,\n      outboxEvent.aggregateType,\n      outboxEvent.aggregateId,\n      outboxEvent.eventType,\n      outboxEvent.payload\n    ]);\n\n    // Commit cả 2 thao tác nguyên tử\n    await client.query('COMMIT');\n    return createdOrder;\n  } catch (error) {\n    await client.query('ROLLBACK');\n    throw error;\n  } finally {\n    client.release();\n  }\n}",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Giải Pháp Transactional Outbox Pattern Cho Bài Toán Dual-Write",
+        "caption": "Ngăn chặn sai lệch dữ liệu: Ghi Database và Bắn Kafka Message trong cùng 1 Giao Dịch ACID",
+        "code": "flowchart TD\n    App[\"Application Service\"]\n\n    subgraph AtomicTx [\"Giao Dịch CSDL Nguyên Tử (Single ACID Transaction)\"]\n        App -->|\"1. INSERT Order\"| OrdersTbl[(\"Orders Table\")]\n        App -->|\"2. INSERT Event payload\"| OutboxTbl[(\"Outbox Table\")]\n    end\n\n    subgraph CDC [\"Bộ Chuyển Tiếp Tin Cậy (Outbox Relay)\"]\n        OutboxTbl -->|\"3. Đọc dữ liệu qua Debezium CDC hoặc Polling\"| Relay[\"Message Relay Engine\"]\n        Relay -->|\"4. Xuất bản tin nhắn\"| Kafka[(\"Kafka Broker\")]\n        Kafka -->|\"5. Gửi ACK thành công\"| Relay\n        Relay -->|\"6. Đánh dấu đã gửi (processed = true)\"| OutboxTbl\n    end"
+      },
+      "codeDiff": {
+        "title": "Lỗi Nguy Hiểm Dual-Write vs Transactional Outbox Pattern",
+        "language": "typescript",
+        "antiPattern": {
+          "title": "❌ Anti-Pattern: Ghi Database rồi gọi Message Broker trực tiếp",
+          "code": "async function createOrder(data: OrderData) {\n  // BƯỚC 1: Ghi CSDL thành công\n  const order = await db.orders.create({ data });\n\n  // NGUY HIỂM: Nếu server crash tại đây hoặc Kafka bị nghẽn mạng:\n  // CSDL đã tạo đơn nhưng không ai giao hàng -> Sai lệch hệ thống!\n  await kafka.send('order-created-topic', { orderId: order.id });\n  \n  return order;\n}",
+          "explanation": "Thao tác gọi Database và Message Broker không nằm chung một transaction quản lý bởi 2PC. Sự cố mạng ở giữa sẽ tạo ra trạng thái dữ liệu Zombie không thể đồng nhất."
+        },
+        "seniorSolution": {
+          "title": "✅ Senior Solution: Ghi kèm bảng Outbox trong 1 DB Transaction duy nhất",
+          "code": "async function createOrder(data: OrderData) {\n  return await db.$transaction(async (tx) => {\n    // 1. Tạo đơn hàng nghiệp vụ\n    const order = await tx.orders.create({ data });\n\n    // 2. Ghi sự kiện vào bảng Outbox cùng lúc (ACID 100%)\n    await tx.outboxEvents.create({\n      data: {\n        aggregateType: 'ORDER',\n        aggregateId: order.id,\n        eventType: 'OrderCreated',\n        payload: JSON.stringify(order),\n        status: 'PENDING'\n      }\n    });\n\n    return order;\n  });\n  // Worker chạy ngầm (hoặc Debezium CDC) sẽ đọc bảng Outbox và publish sang Kafka an toàn\n}",
+          "explanation": "Tính chất ACID của Database đảm bảo: Hoặc cả đơn hàng lẫn sự kiện cùng được lưu, hoặc cả hai cùng rollback. Hệ thống miễn nhiễm hoàn toàn với lỗi mạng giữa chừng."
+        }
+      }
     },
     "pitfalls": [
       "Bắn message lên RabbitMQ/Kafka bên trong try/catch sau lệnh `await db.commit()`, nghĩ rằng try/catch là an toàn mà không tính trường hợp node server bị OOM kill hoặc đứt mạng đúng mili-giây giữa 2 lệnh.",
@@ -367,7 +387,80 @@
       "summary": "Offset pagination (`LIMIT 20 OFFSET 100000`) dựa vào số dòng bỏ qua; càng về trang sâu DB càng phải scan và discard nhiều dòng gây chậm kinh hoàng (O(N)), đồng thời dễ bị mất dòng hoặc trùng dòng khi có bản ghi mới chèn vào. Cursor pagination (`WHERE (created_at, id) < (cursor_time, cursor_id) ORDER BY created_at DESC LIMIT 20`) dùng giá trị của bản ghi cuối cùng làm con trỏ mốc để nhảy thẳng vào B-Tree index (O(log N)), tốc độ không đổi dù bảng có hàng trăm triệu dòng.",
       "deepDive": "Với Offset pagination: `OFFSET 1000000 LIMIT 20` buộc MySQL/Postgres phải đọc 1.000.020 dòng từ đĩa, sắp xếp rồi bỏ 1.000.000 dòng đầu tiên. Ngoài ra hiện tượng 'pagination drift' xảy ra khi user đang xem trang 1, có 5 bài viết mới chèn vào đầu bảng -> user chuyển sang trang 2 sẽ thấy lại 5 bài viết cũ từ trang 1. Cursor pagination giải quyết triệt để vấn đề này vì nó cố định điểm neo (anchor). Nên chọn Cursor pagination khi: bảng dữ liệu lớn (> 50.000 dòng), dữ liệu biến động liên tục (realtime feeds, logs), hoặc UI là Infinite Scroll. Giữ lại Offset pagination khi: hệ thống Admin Dashboard cần tính năng nhảy cóc đến trang cụ thể (Jump to page 15).",
       "codeExample": "import express, { Request, Response } from 'express';\nimport { Pool } from 'pg';\n\nconst pool = new Pool();\nconst app = express();\n\ninterface CursorPayload {\n  createdAt: string;\n  id: string;\n}\n\n// Cursor-based Pagination Endpoint\napp.get('/api/v1/posts', async (req: Request, res: Response) => {\n  const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);\n  const cursor = req.query.cursor as string | undefined;\n\n  let query = '';\n  let params: any[] = [];\n\n  if (!cursor) {\n    // Trang đầu tiên\n    query = `\n      SELECT id, title, created_at\n      FROM posts\n      ORDER BY created_at DESC, id DESC\n      LIMIT $1;\n    `;\n    params = [limit + 1]; // Lấy thêm 1 bản ghi để biết có next page hay không\n  } else {\n    // Giải mã cursor từ Base64: \"createdAt_id\"\n    const decoded = Buffer.from(cursor, 'base64').toString('utf8');\n    const [lastCreatedAt, lastId] = decoded.split('_');\n\n    // Keyset pagination sử dụng Tuple so sánh index: (created_at, id) < ($1, $2)\n    query = `\n      SELECT id, title, created_at\n      FROM posts\n      WHERE (created_at, id) < ($1, $2)\n      ORDER BY created_at DESC, id DESC\n      LIMIT $3;\n    `;\n    params = [lastCreatedAt, lastId, limit + 1];\n  }\n\n  const result = await pool.query(query, params);\n  const hasMore = result.rows.length > limit;\n  const items = hasMore ? result.rows.slice(0, limit) : result.rows;\n\n  let nextCursor: string | null = null;\n  if (hasMore) {\n    const lastItem = items[items.length - 1];\n    nextCursor = Buffer.from(`${lastItem.created_at.toISOString()}_${lastItem.id}`).toString('base64');\n  }\n\n  return res.json({\n    data: items,\n    pagination: {\n      hasMore,\n      nextCursor\n    }\n  });\n});",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "diagram": {
+        "type": "mermaid",
+        "title": "So Sánh Cơ Chế Phân Trang: Offset Pagination vs Cursor Pagination",
+        "caption": "Cursor-based Pagination tận dụng chỉ mục B-Tree (Index Seek) đạt hiệu năng O(1) bất kể trang sâu đến đâu",
+        "code": "flowchart TD\n    subgraph Offset [\"Offset Pagination (OFFSET 1000000 LIMIT 20)\"]\n        Scan[\"Quét và duyệt qua 1,000,000 dòng đầu tiên\"] --> Drop[\"Bỏ qua (Discard) 1,000,000 dòng\"]\n        Drop --> Take[\"Chỉ lấy 20 dòng cuối (Cực kỳ chậm, tiêu hao IOPS khủng khiếp)\"]\n    end\n\n    subgraph Cursor [\"Cursor Pagination (WHERE id > 948102 LIMIT 20)\"]\n        Seek[\"Nhảy trực tiếp đến vị trí con trỏ thông qua B-Tree Index Seek O(log N)\"]\n        Seek --> Fetch[\"Lấy ngay lập tức 20 bản ghi kế tiếp (Độ trễ luôn < 2ms)\"]\n    end"
+      },
+      "benchmark": {
+        "title": "So sánh Hiệu Năng Phân Trang Ở Quy Mô Lớn",
+        "caption": "Đánh giá độ trễ truy vấn khi số lượng bản ghi vượt qua 10,000,000 dòng",
+        "options": [
+          {
+            "name": "Cursor-based Pagination (Keyset)",
+            "badge": "Chuẩn Big Data",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tốc độ ở trang sâu (Page 10,000)",
+                "value": 99,
+                "displayValue": "< 3ms (Index Seek)",
+                "color": "emerald"
+              },
+              {
+                "label": "Chống nhảy trang / lặp bản ghi khi có insert",
+                "value": 100,
+                "displayValue": "Tuyệt đối",
+                "color": "emerald"
+              },
+              {
+                "label": "Hỗ trợ nhảy trang tùy ý (Page number)",
+                "value": 10,
+                "displayValue": "Chỉ Next/Previous",
+                "color": "rose"
+              }
+            ],
+            "pros": [
+              "Độ trễ đồng nhất O(1) dù ở trang đầu hay trang thứ một triệu",
+              "Không bị hiện tượng trùng lặp hoặc bỏ sót dữ liệu khi có đơn hàng mới chèn vào giữa"
+            ],
+            "cons": [
+              "Không thể cung cấp giao diện nhảy nhanh tới một số trang cụ thể (ví dụ: Trang 42)"
+            ]
+          },
+          {
+            "name": "Offset-based Pagination (LIMIT & OFFSET)",
+            "metrics": [
+              {
+                "label": "Tốc độ ở trang sâu (Page 10,000)",
+                "value": 15,
+                "displayValue": "> 8,500ms (O(N) Scan)",
+                "color": "rose"
+              },
+              {
+                "label": "Chống nhảy trang / lặp bản ghi khi có insert",
+                "value": 20,
+                "displayValue": "Dễ bị lệch dữ liệu",
+                "color": "rose"
+              },
+              {
+                "label": "Hỗ trợ nhảy trang tùy ý (Page number)",
+                "value": 95,
+                "displayValue": "Rất dễ hiển thị",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Dễ lập trình giao diện phân trang cổ điển có danh sách số trang 1, 2, 3..."
+            ],
+            "cons": [
+              "Làm sập cơ sở dữ liệu khi người dùng hoặc bot cào dữ liệu ở các trang sâu hàng triệu dòng"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Chỉ dùng một cột `created_at` làm cursor mà không kèm `id`. Khi nhiều bản ghi có cùng timestamp đến mili-giây, query sẽ bị sót hoặc lặp bản ghi (phải dùng composite cursor `(created_at, id)`).",

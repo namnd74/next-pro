@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CodeBlock } from '@/components/ui/code-block';
 import { TechIcon } from '@/components/common/tech-icon';
-import { MermaidViewer, PipelineTracker } from './visual';
+import { MermaidViewer, PipelineTracker, BenchmarkMatrix, CodeDiffViewer } from './visual';
 import { resolveFollowUp } from '../data/followup-resolver';
 import { getCategoryBadge } from '../config/categories.config';
 import { cn } from '@/lib/utils';
@@ -304,6 +304,17 @@ export const QuestionCard = React.memo(function QuestionCard({
                   </div>
                 )}
 
+                {/* Quantitative Benchmark & Trade-off Matrix */}
+                {question.seniorAnswer.benchmark && (
+                  <div className="mt-2">
+                    <BenchmarkMatrix
+                      title={question.seniorAnswer.benchmark.title}
+                      caption={question.seniorAnswer.benchmark.caption}
+                      options={question.seniorAnswer.benchmark.options}
+                    />
+                  </div>
+                )}
+
                 {/* Visual Pipeline or Mermaid diagram if defined */}
                 {diagramSpec?.type === 'pipeline' && diagramSpec.stages && (
                   <div className="mt-2">
@@ -338,6 +349,18 @@ export const QuestionCard = React.memo(function QuestionCard({
                         language={question.seniorAnswer.codeLanguage ?? 'tsx'}
                       />
                     )}
+                  </div>
+                )}
+
+                {/* Side-by-Side Code Diff: Anti-pattern vs Senior Fix */}
+                {question.seniorAnswer.codeDiff && (
+                  <div className="mt-2">
+                    <CodeDiffViewer
+                      title={question.seniorAnswer.codeDiff.title}
+                      language={question.seniorAnswer.codeDiff.language}
+                      antiPattern={question.seniorAnswer.codeDiff.antiPattern}
+                      seniorSolution={question.seniorAnswer.codeDiff.seniorSolution}
+                    />
                   </div>
                 )}
 

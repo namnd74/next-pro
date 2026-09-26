@@ -78,6 +78,43 @@ export interface InterviewDiagramSpec {
   stages?: PipelineStage[];
 }
 
+export interface BenchmarkMetricSpec {
+  label: string;
+  value: number;
+  displayValue?: string;
+  color?: 'emerald' | 'blue' | 'amber' | 'rose' | 'purple';
+}
+
+export interface BenchmarkOptionSpec {
+  name: string;
+  badge?: string;
+  isRecommended?: boolean;
+  metrics: BenchmarkMetricSpec[];
+  pros?: string[];
+  cons?: string[];
+}
+
+export interface BenchmarkSpec {
+  title?: string;
+  caption?: string;
+  options: BenchmarkOptionSpec[];
+}
+
+export interface CodeDiffSpec {
+  title?: string;
+  language?: string;
+  antiPattern: {
+    title?: string;
+    code: string;
+    explanation?: string;
+  };
+  seniorSolution: {
+    title?: string;
+    code: string;
+    explanation?: string;
+  };
+}
+
 export interface InterviewSeniorAnswer {
   summary: string;
   mentalModel?: string;
@@ -88,6 +125,8 @@ export interface InterviewSeniorAnswer {
   codeExample?: string;
   codeLanguage?: string;
   diagram?: InterviewDiagramSpec;
+  benchmark?: BenchmarkSpec;
+  codeDiff?: CodeDiffSpec;
 }
 
 export interface InterviewEvaluationRubric {
