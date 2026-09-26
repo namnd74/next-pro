@@ -4,4 +4,6 @@ export * from './components/ai-track-card';
 export * from './components/ai-topic-viewer';
 export * from './components/ai-shell';
 export * from './components/ai-interactive-lab';
+export * from './components/ai-hub-view';
+export * from './components/ai-track-detail-view';
 export * from './stores/use-ai-learning-store';

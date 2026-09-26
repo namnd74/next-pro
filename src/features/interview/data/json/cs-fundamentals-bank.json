@@ -4,18 +4,37 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "Mô hình OSI 7 tầng gồm những tầng nào? Nhiệm vụ chính và đơn vị dữ liệu (PDU) của từng tầng?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["osi", "nhi", "pdu", "cs"],
+    "interviewerIntent": "Kiểm tra kiến thức nền tảng về mạng máy tính, khả năng phân cấp trừu tượng hóa dữ liệu từ tầng vật lý đến ứng dụng.",
+    "contextOrScenario": "Khi debug sự cố mạng giữa microservices hoặc cấu hình proxy/firewall, kỹ sư cần xác định vấn đề nằm ở tầng nào (L3, L4 hay L7).",
+    "expectedKeywords": [
+      "OSI 7 layers",
+      "Physical",
+      "Data Link",
+      "Network",
+      "Transport",
+      "Session",
+      "Presentation",
+      "Application",
+      "PDU",
+      "Frame",
+      "Packet",
+      "Segment",
+      "Bit"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Mô hình OSI 7 tầng gồm những tầng nào? Nhiệm vụ chính và đơn vị dữ liệu (PDU) của từng tầng?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Mô hình OSI chia truyền thông mạng thành 7 tầng trừu tượng: L1 Physical (Bit), L2 Data Link (Frame - MAC), L3 Network (Packet - IP routing), L4 Transport (Segment - TCP/UDP port), L5 Session (quản lý phiên), L6 Presentation (mã hóa, nén SSL/TLS, JSON), L7 Application (HTTP, DNS). Mỗi tầng đóng gói (encapsulate) thêm header của tầng đó vào PDU khi gửi xuống, và gỡ gói (decapsulate) khi nhận lên.",
+      "deepDive": "Trong kỹ thuật thực tế, OSI là mô hình tham chiếu tư duy trong khi TCP/IP là mô hình triển khai thực tế (gộp L5-L7 thành Application). Hiểu OSI cực kỳ quan trọng khi làm việc với Load Balancers (L4 NLB cân bằng theo TCP/IP tuple vs L7 ALB phân tích HTTP header/path), Web Application Firewall (WAF lọc L7 payload), MTU/MSS fragmentation (L2 Frame giới hạn 1500 bytes MTU; trừ 20B IP header và 20B TCP header còn 1460B MSS). Nếu MTU không khớp giữa các hop, hiện tượng Path MTU Discovery (PMTUD) failure xảy ra làm nghẽn kết nối HTTPS handshake.",
+      "codeExample": "// Mô phỏng quá trình Encapsulation / Decapsulation qua các tầng OSI trong TypeScript\ninterface PacketHeader {\n  l7Payload: string;          // L7 Application: HTTP GET /api/v1/users\n  l6Encoding?: string;        // L6 Presentation: UTF-8, gzip, TLS\n  l4Transport: {              // L4 Transport: Segment (TCP/UDP)\n    srcPort: number;\n    dstPort: number;\n    protocol: 'TCP' | 'UDP';\n  };\n  l3Network: {                // L3 Network: Packet (IP routing)\n    srcIp: string;\n    dstIp: string;\n    ttl: number;\n  };\n  l2DataLink: {               // L2 Data Link: Frame (MAC address)\n    srcMac: string;\n    dstMac: string;\n  };\n}\n\nclass NetworkStackSimulator {\n  // Quá trình gửi: Encapsulation từ L7 xuống L2\n  static encapsulate(httpData: string, srcIp: string, dstIp: string): PacketHeader {\n    return {\n      l7Payload: httpData,\n      l6Encoding: \"application/json; charset=utf-8\",\n      l4Transport: { srcPort: 54321, dstPort: 443, protocol: \"TCP\" },\n      l3Network: { srcIp, dstIp, ttl: 64 },\n      l2DataLink: { srcMac: \"00:1A:2B:3C:4D:5E\", dstMac: \"00:50:56:C0:00:08\" }\n    };\n  }\n\n  // Quá trình nhận: Decapsulation từ L2 lên L7\n  static decapsulate(frame: PacketHeader): string {\n    console.log(`[L2 Frame] MAC ${frame.l2DataLink.srcMac} -> ${frame.l2DataLink.dstMac}`);\n    console.log(`[L3 Packet] IP ${frame.l3Network.srcIp} -> ${frame.l3Network.dstIp}, TTL=${frame.l3Network.ttl}`);\n    console.log(`[L4 Segment] Port ${frame.l4Transport.srcPort} -> ${frame.l4Transport.dstPort} (${frame.l4Transport.protocol})`);\n    return frame.l7Payload;\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Nhầm lẫn PDU giữa các tầng: gọi dữ liệu L3 là Segment thay vì Packet, hoặc gọi L2 là Packet thay vì Frame.",
+      "Cố gắng cấu hình routing domain name ở L4 Load Balancer (L4 chỉ hiểu IP + Port, không đọc được Host header HTTP).",
+      "Quên rằng TLS/SSL handshake hiện đại diễn ra ở Application/Presentation (L6/L7) sau khi L4 TCP 3-way handshake hoàn tất."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Sự khác biệt cốt lõi về latency và throughput giữa Layer 4 Proxy (HAProxy TCP mode/AWS NLB) và Layer 7 Proxy (Envoy/Nginx/AWS ALB) là gì?",
+      "Tại sao hiện tượng 'Black Hole Router' xảy ra khi ICMP Type 3 Code 4 (Fragmentation Needed) bị firewall chặn trong Path MTU Discovery?"
     ]
   },
   {
@@ -23,18 +42,33 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "Mô hình TCP/IP khác gì mô hình OSI 7 tầng?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["tcp", "osi", "cs"],
+    "interviewerIntent": "Đánh giá việc áp dụng lý thuyết mạng vào thực tiễn Internet, phân biệt mô hình lý thuyết (OSI) và mô hình triển khai thực tế (TCP/IP).",
+    "contextOrScenario": "Thiết kế kiến trúc hệ thống mạng, debug gói tin mạng bằng Wireshark hoặc cấu hình firewall Linux iptables/nftables.",
+    "expectedKeywords": [
+      "TCP/IP 4 layers",
+      "OSI 7 layers",
+      "Application",
+      "Transport",
+      "Internet",
+      "Network Access",
+      "Link layer",
+      "RFC 1122",
+      "DoD model"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Mô hình TCP/IP khác gì mô hình OSI 7 tầng?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Mô hình OSI (7 tầng) là chuẩn lý thuyết học thuật được ISO đề xuất; mô hình TCP/IP (4 tầng theo RFC 1122: Network Access, Internet, Transport, Application) là kiến trúc thực dụng tạo nên Internet. TCP/IP gộp tầng 5, 6, 7 của OSI thành 1 tầng duy nhất là Application layer, và gộp tầng 1, 2 thành Network Access / Link layer.",
+      "deepDive": "TCP/IP thành công vì đi theo triết lý 'End-to-End Principle': mạng lõi (core routers) chỉ cần đơn giản và làm tốt một việc là chuyển tiếp packet ở Internet layer (IP vô hướng, best-effort), trong khi tính tin cậy, kiểm soát lỗi và trạng thái phiên được đẩy hoàn toàn ra hai đầu mút (endpoints - Transport/Application layer). Ngược lại, OSI cố gắng nhồi nhét quá nhiều kiểm soát trạng thái ở các tầng dưới làm overhead quá lớn. Về mặt kernel Linux: Network Access do Network Interface Card (NIC) driver xử lý, Internet (IP) và Transport (TCP/UDP) nằm trực tiếp trong Linux Kernel network stack, còn Application layer chạy trong user-space process.",
+      "codeExample": "// Kiểm tra socket info ở tầng Transport & Network trong Node.js (TCP/IP stack)\nimport net from 'node:net';\n\nconst server = net.createServer((socket) => {\n  // L4 Transport info (Ports) & L3 Internet info (IP addresses)\n  const clientInfo = {\n    remoteAddress: socket.remoteAddress, // L3 IP\n    remotePort: socket.port,             // L4 Port\n    localAddress: socket.localAddress,   // L3 Local IP\n    localPort: socket.localPort,         // L4 Listening Port\n    bytesRead: socket.bytesRead,\n    bytesWritten: socket.bytesWritten,\n  };\n  console.log('New TCP connection established:', clientInfo);\n\n  socket.on('data', (buffer) => {\n    // Data này đã được Kernel decapsulate qua Network Access -> IP -> TCP\n    // Giờ Application layer (User-space) trực tiếp đọc buffer payload\n    console.log(`Received ${buffer.length} bytes at Application Layer`);\n    socket.write('ACK\\r\\n');\n  });\n});\n\nserver.listen(8080, '0.0.0.0', () => {\n  console.log('TCP Server listening on port 8080 (Kernel TCP socket)');\n});",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Tìm kiếm giao thức tương ứng trực tiếp cho Session và Presentation layer trong mã nguồn ứng dụng web hiện đại.",
+      "Hiểu nhầm IP layer trong TCP/IP đảm bảo độ tin cậy giao hàng (IP là connectionless và unreliable; chỉ TCP ở L4 mới đảm bảo reliability).",
+      "Nghĩ rằng HTTP/2 hay HTTP/3 là các tầng riêng biệt thay vì đều nằm ở Application layer."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao QUIC (nền tảng của HTTP/3) lại chọn chạy trên UDP thay vì tạo ra một giao thức L4 mới cạnh TCP/UDP trong Linux kernel?",
+      "Kernel bypass networking (như DPDK) tối ưu hiệu năng TCP/IP stack bằng cách nào?"
     ]
   },
   {
@@ -42,18 +76,34 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "So sánh chi tiết TCP và UDP: Đóng gói, kiểm soát lỗi, tin cậy và các trường hợp sử dụng tiêu biểu?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["chi", "tcp", "udp", "tin", "cs"],
+    "interviewerIntent": "Kiểm tra sự hiểu biết sâu sắc về hai giao thức Transport Layer quan trọng nhất, nguyên lý đánh đổi giữa độ tin cậy (reliability) và độ trễ (latency).",
+    "contextOrScenario": "Chọn giao thức mạng khi xây dựng dịch vụ video streaming thời gian thực, voice call (WebRTC), gaming nhiều người chơi so với truyền file, REST API và thanh toán.",
+    "expectedKeywords": [
+      "TCP",
+      "UDP",
+      "Connection-oriented",
+      "Connectionless",
+      "3-way handshake",
+      "Head-of-Line Blocking",
+      "Checksum",
+      "Flow Control",
+      "Congestion Control",
+      "Packet Loss"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'So sánh chi tiết TCP và UDP: Đóng gói, kiểm soát lỗi, tin cậy và các trường hợp sử dụng tiêu biểu?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "TCP là connection-oriented, đảm bảo 100% dữ liệu đến nơi theo đúng thứ tự (in-order delivery) thông qua Sequence/ACK numbers, tự động truyền lại gói tin mất (Retransmission) và kiểm soát tốc độ (Flow & Congestion Control). UDP là connectionless, không bắt tay, không đảm bảo đến nơi hay đúng thứ tự, header siêu nhẹ (8 bytes so với 20-60 bytes của TCP), tối ưu cho độ trễ thấp.",
+      "deepDive": "Header TCP tối thiểu 20 bytes chứa Sequence Number, Acknowledgment Number, Flags (SYN, ACK, FIN, RST...), Window Size cho flow control. Header UDP chỉ có 8 bytes: Source Port, Dest Port, Length, Checksum. Sự đánh đổi lớn nhất của TCP là Head-of-Line (HoL) Blocking: nếu 1 packet bị rớt trên đường đi, toàn bộ byte stream phía sau bị chặn trong TCP buffer chờ retransmission dù chúng đã đến nơi. UDP không bị HoL blocking nên là lựa chọn tuyệt đối cho WebRTC, DNS query, DNS-over-HTTPS (DoH), video call, live streaming, game tick rate. Để khắc phục nhược điểm mất mát của UDP, các giao thức hiện đại (QUIC, KCP, SRT) implement reliability có kiểm soát ngay trên tầng ứng dụng chạy trên nền UDP.",
+      "codeExample": "// So sánh TCP Client (đảm bảo tin cậy) vs UDP Client (tối ưu độ trễ) trong Node.js\nimport net from 'node:net';\nimport dgram from 'node:dgram';\n\n// 1. TCP Client: Bắt tay 3 bước, đảm bảo byte stream toàn vẹn\nexport function sendReliableTcpPayload(data: string, host: string, port: number): Promise<string> {\n  return new Promise((resolve, reject) => {\n    const client = net.createConnection({ host, port }, () => {\n      client.write(data);\n    });\n    client.setTimeout(3000);\n    client.on('data', (response) => {\n      resolve(response.toString());\n      client.end();\n    });\n    client.on('error', reject);\n    client.on('timeout', () => { client.destroy(); reject(new Error('TCP timeout')); });\n  });\n}\n\n// 2. UDP Client: Fire and forget, không connection handshake, zero HoL blocking\nexport function sendFastUdpTelemetry(metric: Buffer, host: string, port: number): void {\n  const socket = dgram.createSocket('udp4');\n  socket.send(metric, 0, metric.length, port, host, (err) => {\n    if (err) console.error('UDP send error:', err);\n    socket.close();\n  });\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Nghĩ rằng UDP hoàn toàn không có kiểm tra lỗi (UDP có trường Checksum 16-bit để verify dữ liệu không bị bit corruption, nhưng không retransmit).",
+      "Dùng TCP cho các bài toán real-time video/gaming trong mạng chập chờn dẫn đến lag spike do TCP retransmission & exponential backoff.",
+      "Gửi datagram UDP vượt quá Path MTU (1500 bytes) khiến IP packet bị phân mảnh (fragmentation), nếu mất 1 mảnh là mất toàn bộ datagram."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao HTTP/3 lại giải quyết được bài toán TCP Head-of-Line Blocking bằng cách triển khai multiplexing trên nền UDP?",
+      "TCP Nagle's algorithm (TCP_NODELAY) ảnh hưởng thế nào đến độ trễ của các ứng dụng real-time RPC?"
     ]
   },
   {
@@ -61,18 +111,32 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "Địa chỉ IP (IPv4 vs IPv6), Subnet Mask và Default Gateway là gì?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["ipv4", "ipv6", "subnet", "mask", "default"],
+    "interviewerIntent": "Đánh giá kiến thức về định tuyến địa chỉ mạng L3, cách chia mạng con (CIDR subnetting) và vai trò của Gateway trong việc chuyển tiếp lưu lượng ra ngoài Internet.",
+    "contextOrScenario": "Thiết kế hạ tầng mạng đám mây (AWS VPC, GCP VPC, Kubernetes Pod CIDR), cấu hình subnet công khai (Public) và riêng tư (Private).",
+    "expectedKeywords": [
+      "IPv4 32-bit",
+      "IPv6 128-bit",
+      "CIDR notation",
+      "Subnet Mask",
+      "Default Gateway",
+      "Routing Table",
+      "Broadcast Address",
+      "Network ID"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Địa chỉ IP (IPv4 vs IPv6), Subnet Mask và Default Gateway là gì?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "IPv4 là địa chỉ 32-bit (~4.3 tỷ địa chỉ), IPv6 là 128-bit giải quyết triệt để vấn đề cạn kiệt IP. Subnet Mask (hoặc CIDR prefix /24) xác định phần nào trong IP là Network ID (mạng) và phần nào là Host ID (thiết bị). Default Gateway là router chuyển tiếp các gói tin có IP đích nằm ngoài mạng cục bộ (không cùng subnet) đi ra bên ngoài.",
+      "deepDive": "Phép toán bitwise AND giữa IP và Subnet Mask cho ra Network Address. Ví dụ: IP 192.168.1.50 với mask 255.255.255.0 (/24) -> Network là 192.168.1.0, Broadcast là 192.168.1.255, dải host khả dụng từ .1 đến .254. Trong AWS VPC hoặc GCP Subnet, cloud provider luôn bảo lưu 4-5 địa chỉ đầu và cuối cho router, DNS, broadcast. Khi máy host muốn gửi gói tin đến IP đích: (1) Nó tính 'Dest_IP & Mask'. Nếu kết quả trùng Network ID của nó, nó dùng ARP broadcast tìm MAC đích rồi gửi trực tiếp qua switch L2. (2) Nếu khác Network ID, nó gửi frame đến MAC của Default Gateway để router L3 định tuyến tiếp.",
+      "codeExample": "// Thuật toán kiểm tra 2 IP có cùng Subnet không bằng Bitwise AND trong TypeScript\nexport function isSameSubnet(ip1: string, ip2: string, cidrMaskBits: number): boolean {\n  const ipToLong = (ip: string): number => {\n    return ip.split('.').reduce((acc, octet) => ((acc << 8) + parseInt(octet, 10)) >>> 0, 0);\n  };\n\n  const num1 = ipToLong(ip1);\n  const num2 = ipToLong(ip2);\n  // Tạo mask: ví dụ /24 -> 24 bit 1, 8 bit 0\n  const mask = cidrMaskBits === 0 ? 0 : (~0 << (32 - cidrMaskBits)) >>> 0;\n\n  const network1 = (num1 & mask) >>> 0;\n  const network2 = (num2 & mask) >>> 0;\n\n  return network1 === network2;\n}\n\n// Test: 192.168.1.15 và 192.168.1.200 với /24 -> True (Cùng LAN, không cần Gateway)\nconsole.log(isSameSubnet('192.168.1.15', '192.168.1.200', 24)); // true\n// Test: 192.168.1.15 và 192.168.2.10 với /24 -> False (Khác subnet, PHẢI gửi qua Default Gateway)\nconsole.log(isSameSubnet('192.168.1.15', '192.168.2.10', 24)); // false",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Quên trừ 2 địa chỉ đặc biệt (Network ID và Broadcast ID) khi tính số lượng host khả dụng trong một subnet: 2^(32-n) - 2.",
+      "Thiết kế CIDR block quá nhỏ cho Kubernetes Pod Subnet khiến cạn kiệt IP khi cluster auto-scaling.",
+      "Nhầm lẫn rằng Default Gateway phải nằm ở một subnet khác (Default Gateway BẮT BUỘC phải nằm cùng subnet cục bộ với thiết bị)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao AWS VPC lại bảo lưu chính xác 5 địa chỉ IP trong mỗi subnet thay vì 2 địa chỉ như mạng vật lý thông thường?",
+      "IPv6 loại bỏ hoàn toàn giao thức ARP và Broadcast, vậy các node trong cùng link-local tìm MAC của nhau bằng cơ chế gì?"
     ]
   },
   {
@@ -80,18 +144,33 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "DNS (Domain Name System) hoạt động thế nào? Phân biệt Recursive Resolver, Root Server, TLD Server và Authoritative Server.",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["dns", "domain", "name", "system", "recursive"],
+    "interviewerIntent": "Đánh giá sự am hiểu về hệ thống phân giải tên miền phân tán toàn cầu, cơ chế phân cấp (hierarchy) và chiến lược caching để tối ưu tốc độ kết nối web.",
+    "contextOrScenario": "Người dùng gõ 'example.com' trên trình duyệt hoặc vi dịch vụ gọi API bên ngoài, tối ưu hóa latency và xử lý sự cố DNS lookup timeout.",
+    "expectedKeywords": [
+      "DNS hierarchy",
+      "Recursive Resolver",
+      "Root Server",
+      "TLD Server",
+      "Authoritative Name Server",
+      "TTL caching",
+      "A Record",
+      "CNAME",
+      "Anycast"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'DNS (Domain Name System) hoạt động thế nào? Phân biệt Recursive Resolver, Root Server, TLD Server và Authoritative Server.'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "DNS là hệ thống cơ sở dữ liệu phân tán phân giải domain thành địa chỉ IP. Trình tự truy vấn gồm 4 bên: (1) Recursive Resolver (nhận request từ client, kiểm tra cache), (2) Root Server (13 cụm root server định hướng TLD như .com, .vn), (3) TLD Server (quản lý đuôi tên miền, trỏ về authoritative server), (4) Authoritative Name Server (nắm giữ bản ghi chính thức A, AAAA, CNAME của domain).",
+      "deepDive": "Quy trình phân giải khi cache rỗng: Browser -> OS Cache -> Local Resolver (như 8.8.8.8, 1.1.1.1). Resolver hỏi Root Server (.) -> Root trả về địa chỉ IP của TLD Server (.com). Resolver hỏi TLD Server -> TLD trả về địa chỉ IP của Authoritative NS (ví dụ Route53 của công ty). Cuối cùng Resolver hỏi Authoritative NS -> nhận về IP (A record) kèm TTL. Resolver lưu cache theo TTL và trả về cho client. Mọi giao dịch thường diễn ra qua UDP port 53. Khi response vượt quá 512 bytes (EDNS0), DNS fallback sang TCP port 53. Tối ưu: Dùng DNS prefetching, keep-alive connections, Anycast routing cho nameserver để giảm Round Trip Time (RTT).",
+      "codeExample": "// Đo thời gian phân giải DNS (DNS lookup latency) chi tiết bằng Node.js\nimport dns from 'node:dns/promises';\nimport { performance } from 'node:perf_hooks';\n\nasync function benchmarkDnsResolution(domain: string) {\n  console.log(`Benchmarking DNS lookup for: ${domain}`);\n  \n  // 1. Phân giải bằng system resolver mặc định (có thể ăn OS cache)\n  const startCached = performance.now();\n  const cachedLookup = await dns.lookup(domain);\n  const timeCached = (performance.now() - startCached).toFixed(2);\n  console.log(`System Resolver (Cached): ${cachedLookup.address} (${timeCached} ms)`);\n\n  // 2. Phân giải trực tiếp qua Resolver chuyên dụng không dùng cache hệ điều hành\n  const resolver = new dns.Resolver();\n  resolver.setServers(['1.1.1.1', '8.8.8.8']); // Cloudflare & Google Public DNS\n  \n  const startDirect = performance.now();\n  const directRecords = await resolver.resolve4(domain, { ttl: true });\n  const timeDirect = (performance.now() - startDirect).toFixed(2);\n  console.log(`Authoritative Query via 1.1.1.1:`, directRecords);\n  console.log(`Lookup Latency: ${timeDirect} ms`);\n}\n\nbenchmarkDnsResolution('google.com');",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Đặt DNS TTL quá dài (ví dụ 86400s) khiến việc switch IP khi deploy hoặc failover khẩn cấp bị nghẽn trong nhiều giờ.",
+      "Đặt DNS TTL quá ngắn (0s hoặc 1s) làm tăng vọt số lượng DNS query, tăng latency cho từng request và có thể bị rate-limit bởi DNS provider.",
+      "Sử dụng CNAME trên root domain (Apex / Zone Apex domain như 'domain.com'), vi phạm chuẩn RFC 1912 (phải dùng ALIAS / ANAME record)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm thế nào DNS Anycast giúp các Root DNS server và CDN chịu tải hàng tỷ request mà vẫn có latency cực thấp?",
+      "Cơ chế DNS Poisoning / Cache Snooping hoạt động ra sao và DNSSEC giải quyết nguy cơ này như thế nào?"
     ]
   },
   {
@@ -99,18 +178,36 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "Port mạng là gì? Ý nghĩa của các cổng mặc định: 80, 443, 22, 53, 3306, 5432, 6379?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["port", "ngh", "443", "3306", "5432"],
+    "interviewerIntent": "Kiểm tra kiến thức cơ bản về định danh endpoint ở tầng Transport, quy ước port tiêu chuẩn và kỹ năng phân tích cấu hình firewall/security group.",
+    "contextOrScenario": "Mở cổng firewall cho server, cấu hình Docker port mapping `-p 8080:80` hoặc phân loại dịch vụ đang chạy trên server production.",
+    "expectedKeywords": [
+      "Port 16-bit",
+      "0-65535",
+      "Well-known ports",
+      "Registered ports",
+      "Ephemeral ports",
+      "HTTP 80",
+      "HTTPS 443",
+      "SSH 22",
+      "DNS 53",
+      "MySQL 3306",
+      "Postgres 5432",
+      "Redis 6379"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Port mạng là gì? Ý nghĩa của các cổng mặc định: 80, 443, 22, 53, 3306, 5432, 6379?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Port là số nguyên 16-bit (0 đến 65535) ở L4 Transport Layer giúp hệ điều hành phân phối dữ liệu từ card mạng đến đúng tiến trình (process/socket). Dải 0-1023 là Well-known ports (yêu cầu root/admin privileges): 80 (HTTP), 443 (HTTPS), 22 (SSH), 53 (DNS). Dải Registered ports phổ biến cho database: 3306 (MySQL), 5432 (PostgreSQL), 6379 (Redis).",
+      "deepDive": "Một kết nối TCP được định danh duy nhất bởi 5-tuple: {Protocol, Source IP, Source Port, Dest IP, Dest Port}. Nhờ 5-tuple, một server web lắng nghe trên port 443 có thể phục vụ hàng trăm nghìn client cùng lúc: tất cả đều có chung Dest IP và Dest Port (443), nhưng khác nhau ở Source IP hoặc Source Port (được cấp phát từ dải Ephemeral ports 32768-60999 của client). Khi mở port dịch vụ nội bộ (DB, Redis, Elasticsearch) trực tiếp ra Internet mà không có VPC peering / Bastion host, botnet sẽ tự động scan và tấn công brute-force hoặc exploit zero-day trong vòng vài phút.",
+      "codeExample": "// Script kiểm tra nhanh trạng thái cổng dịch vụ (Port Scanner / Health Check) bằng TypeScript\nimport net from 'node:net';\n\ninterface PortCheckResult {\n  port: number;\n  service: string;\n  isOpen: boolean;\n  latencyMs: number;\n}\n\nconst standardPorts: Record<number, string> = {\n  22: 'SSH',\n  53: 'DNS',\n  80: 'HTTP',\n  443: 'HTTPS',\n  3306: 'MySQL',\n  5432: 'PostgreSQL',\n  6379: 'Redis',\n};\n\nexport async function checkPort(host: string, port: number, timeout = 1000): Promise<PortCheckResult> {\n  const start = Date.now();\n  return new Promise((resolve) => {\n    const socket = new net.Socket();\n    socket.setTimeout(timeout);\n\n    socket.connect(port, host, () => {\n      const latencyMs = Date.now() - start;\n      socket.destroy();\n      resolve({ port, service: standardPorts[port] || 'Unknown', isOpen: true, latencyMs });\n    });\n\n    socket.on('error', () => {\n      resolve({ port, service: standardPorts[port] || 'Unknown', isOpen: false, latencyMs: Date.now() - start });\n    });\n\n    socket.on('timeout', () => {\n      socket.destroy();\n      resolve({ port, service: standardPorts[port] || 'Unknown', isOpen: false, latencyMs: Date.now() - start });\n    });\n  });\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Hardcode port dịch vụ trong code thay vì đọc từ environment variable, gây xung đột port khi chạy multi-instance.",
+      "Phơi trực tiếp các cổng cơ sở dữ liệu (3306, 5432, 6379) ra ngoài public IP (0.0.0.0/0) thay vì bind vào 127.0.0.1 hoặc private VPC subnet.",
+      "Quên dọn dẹp kết nối TCP khiến server bị cạn kiệt Ephemeral Ports (Port Exhaustion) khi gọi outbound API tải cao."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Linux yêu cầu quyền root/superuser (hoặc capability CAP_NET_BIND_SERVICE) để bind các port nhỏ hơn 1024?",
+      "Cơ chế socket SO_REUSEPORT trong Linux kernel giúp nhiều worker processes lắng nghe trên cùng một port thế nào?"
     ]
   },
   {
@@ -118,18 +215,34 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "Tiến trình (Process) và Luồng (Thread) trong Hệ điều hành khác nhau thế nào về không gian địa chỉ và tài nguyên?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["process", "thread", "nhau", "gian", "nguy"],
+    "interviewerIntent": "Kiểm tra kiến thức cốt lõi về concurrency, mô hình bộ nhớ hệ điều hành và nguyên lý thiết kế ứng dụng đa tiến trình (multi-process) vs đa luồng (multi-threaded).",
+    "contextOrScenario": "Lựa chọn kiến trúc thực thi: Cluster mode trong Node.js (multi-process) vs Worker Threads (multi-threaded), hoặc multiprocessing vs threading trong Python.",
+    "expectedKeywords": [
+      "Process",
+      "Thread",
+      "Address Space",
+      "Virtual Memory",
+      "Heap",
+      "Stack",
+      "File Descriptors",
+      "IPC",
+      "Race Condition",
+      "Context Switch Overhead"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Tiến trình (Process) và Luồng (Thread) trong Hệ điều hành khác nhau thế nào về không gian địa chỉ và tài nguyên?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Process là một chương trình đang thực thi, sở hữu không gian địa chỉ ảo (Virtual Address Space) độc lập và tài nguyên riêng (Heap, File Descriptors, PID). Thread là đơn vị thực thi nhỏ nhất bên trong một Process. Các Thread trong cùng một Process chia sẻ chung Text, Data, Heap và File Descriptors, nhưng mỗi Thread có Call Stack và tập thanh ghi (Registers / PC) riêng biệt.",
+      "deepDive": "Do cô lập không gian bộ nhớ: 1 Thread bị segfault/crash có thể làm sập toàn bộ Process chứa nó; ngược lại 1 Process crash không ảnh hưởng đến các Process khác. Về hiệu năng: Tạo Thread nhanh và nhẹ hơn tạo Process (không phải tạo Page Table mới). Giao tiếp giữa các Thread diễn ra tức thì thông qua chia sẻ RAM (Shared Memory) nhưng đòi hỏi cơ chế đồng bộ hóa (Mutex, Lock) để tránh Data Race. Giao tiếp giữa các Process (IPC) an toàn hơn nhưng tốn kém (chuyển qua Kernel Pipe, Socket, hoặc Shared Memory segment). Trong Linux kernel, cả process và thread đều được biểu diễn bởi struct `task_struct` thông qua system call `clone()` với các flags chia sẻ tài nguyên tương ứng (`CLONE_VM`, `CLONE_FILES`).",
+      "codeExample": "// Minh họa: Worker Threads chia sẻ SharedArrayBuffer vs cô lập bộ nhớ trong Node.js\nimport { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';\n\nif (isMainThread) {\n  // Tạo vùng nhớ chia sẻ (Shared Memory) giữa các luồng\n  const sharedBuffer = new SharedArrayBuffer(4); // 4 bytes Int32\n  const sharedInt32 = new Int32Array(sharedBuffer);\n  sharedInt32[0] = 100;\n\n  console.log('[Main Thread] Khởi tạo shared value:', sharedInt32[0]);\n\n  const worker = new Worker(__filename, { workerData: { sharedBuffer } });\n  worker.on('message', (msg) => {\n    console.log('[Main Thread] Nhận thông báo từ worker:', msg);\n    console.log('[Main Thread] Giá trị sau khi worker sửa trực tiếp:', sharedInt32[0]);\n  });\n} else {\n  // Luồng con: truy cập trực tiếp cùng địa chỉ RAM với luồng chính\n  const { sharedBuffer } = workerData;\n  const sharedInt32 = new Int32Array(sharedBuffer);\n\n  // Thao tác atomic để tránh data race giữa các CPU cores\n  Atomics.add(sharedInt32, 0, 50); // 100 + 50 = 150\n  parentPort?.postMessage('Đã cập nhật SharedArrayBuffer thành công');\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Chia sẻ biến toàn cục (global variables) giữa nhiều threads mà không có cơ chế Mutex/Lock dẫn đến Data Race âm thầm làm sai lệch dữ liệu.",
+      "Tạo hàng ngàn threads mà không dùng Thread Pool gây kiệt quệ RAM (mỗi thread tiêu tốn stack 1MB-8MB) và quá tải CPU do Context Switching.",
+      "Nhầm lẫn rằng Node.js là single-threaded hoàn toàn (JavaScript runtime chạy single-threaded trên event loop, nhưng libuv bên dưới dùng C++ thread pool cho file I/O và crypto)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Linux kernel coi cả Thread và Process đều là một 'task' và system call `clone()` điều khiển sự khác biệt này ra sao?",
+      "Green Threads / Coroutines (như Go Goroutines hoặc Kotlin Coroutines) khác OS Threads (Kernel Threads) ở điểm nào về mặt cấp phát Stack?"
     ]
   },
   {
@@ -137,18 +250,33 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "Bộ nhớ ảo (Virtual Memory) là gì? Tại sao OS không cho chương trình truy cập trực tiếp vào RAM vật lý?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["virtual", "memory", "truy", "ram", "cs"],
+    "interviewerIntent": "Kiểm tra kiến thức về quản lý bộ nhớ hệ điều hành, cơ chế bảo vệ phân quyền phần cứng (MMU) và khả năng tối ưu hóa memory footprint của ứng dụng.",
+    "contextOrScenario": "Xử lý lỗi `Out of Memory (OOM)` trong Linux server, phân tích Resident Set Size (RSS) vs Virtual Memory Size (VMS) của container.",
+    "expectedKeywords": [
+      "Virtual Memory",
+      "Physical RAM",
+      "MMU",
+      "Page Table",
+      "Isolation",
+      "Security",
+      "Swap space",
+      "OOM Killer",
+      "RSS vs VMS"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Bộ nhớ ảo (Virtual Memory) là gì? Tại sao OS không cho chương trình truy cập trực tiếp vào RAM vật lý?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Bộ nhớ ảo (Virtual Memory) là kỹ thuật trừu tượng hóa cho phép mỗi tiến trình có cảm giác mình sở hữu toàn bộ không gian địa chỉ phẳng liên tục (ví dụ 128TB trên x86_64). OS không cho truy cập RAM vật lý trực tiếp nhằm 3 mục đích: (1) Bảo vệ và cô lập (Isolation - không process nào đọc/ghi đè được bộ nhớ của process khác hoặc kernel), (2) Tối ưu sử dụng RAM (Demand Paging và Swap), (3) Đơn giản hóa việc biên dịch và nạp code.",
+      "deepDive": "Phần cứng MMU (Memory Management Unit) phối hợp với OS Page Tables để chuyển đổi Virtual Address thành Physical Address theo từng khối cố định gọi là Page (mặc định 4KB). Nếu một process cố truy cập vào địa chỉ ảo không thuộc quyền quản lý của nó, MMU kích hoạt exception bắn tín hiệu `SIGSEGV` (Segmentation Fault). Nhờ bộ nhớ ảo, dung lượng Virtual Memory (VMS) có thể lớn hơn nhiều RAM vật lý thực tế vì OS chỉ nạp các page cần thiết vào RAM (Resident Set Size - RSS); các page ít dùng được đẩy xuống đĩa (Swap). Cơ chế Copy-on-Write (CoW) khi gọi `fork()` cũng dựa trên bộ nhớ ảo để nhân bản process mà không cần sao chép ngay lập tức toàn bộ RAM.",
+      "codeExample": "// Đọc thông số bộ nhớ Resident Set Size (RSS) vs Virtual Memory (VMS) trong Node.js\nimport process from 'node:process';\n\nfunction inspectProcessMemory() {\n  const mem = process.memoryUsage();\n  \n  // Chuyển đổi byte sang Megabytes\n  const toMB = (bytes: number) => (bytes / 1024 / 1024).toFixed(2);\n\n  console.log({\n    // RSS: RAM vật lý thực tế đang bị process chiếm dụng\n    rss: `${toMB(mem.rss)} MB`,\n    // Heap Total: Bộ nhớ ảo V8 engine đã xin từ OS\n    heapTotal: `${toMB(mem.heapTotal)} MB`,\n    // Heap Used: Bộ nhớ thực tế JavaScript objects đang dùng\n    heapUsed: `${toMB(mem.heapUsed)} MB`,\n    // External: C++ objects bên ngoài V8 (Node Buffers...)\n    external: `${toMB(mem.external)} MB`,\n  });\n}\n\ninspectProcessMemory();\n// Cấp phát Buffer lớn (V8 sẽ gọi mmap để yêu cầu OS cấp thêm Virtual Pages)\nconst bigBuffer = Buffer.alloc(50 * 1024 * 1024); // 50MB\ninspectProcessMemory();",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Đánh đồng Virtual Memory Size (VMS) với lượng RAM vật lý đang dùng: ứng dụng có VMS 2GB hoàn toàn có thể chỉ chiếm 50MB RAM vật lý (RSS).",
+      "Tắt hoàn toàn Swap space trên Linux server khiến Kernel OOM Killer lập tức hạ gục tiến trình ngay khi RAM vật lý vừa chạm ngưỡng 100%.",
+      "Không nhận ra cơ chế Memory Fragmentation khi cấp phát và giải phóng liên tục các biến kích thước nhỏ trên Heap."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khi nào Linux Kernel kích hoạt cơ chế OOM Killer và nó dựa trên tiêu chí (oom_score) nào để chọn process cần terminate?",
+      "Cơ chế Copy-on-Write (CoW) trong lệnh fork() của Linux tiết kiệm RAM và tăng tốc khởi tạo tiến trình mới như thế nào?"
     ]
   },
   {
@@ -156,18 +284,32 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "Phân biệt tác vụ CPU-bound và I/O-bound? Kiến trúc phần cứng/phần mềm tối ưu từng loại ra sao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["cpu-bound", "o-bound", "cs"],
+    "interviewerIntent": "Đánh giá khả năng nhận diện nút thắt cổ chai (bottleneck) của hệ thống và chọn giải pháp kiến trúc tối ưu (Async Event Loop vs Multi-threading / Multiprocessing).",
+    "contextOrScenario": "Tối ưu hóa backend xử lý ảnh/video, mã hóa crypto, huấn luyện AI (CPU-bound) so với backend đọc database, gọi HTTP API, đọc file (I/O-bound).",
+    "expectedKeywords": [
+      "CPU-bound",
+      "I/O-bound",
+      "Event Loop",
+      "Non-blocking I/O",
+      "Worker Pool",
+      "Multi-processing",
+      "Hardware Acceleration",
+      "Context Switching"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Phân biệt tác vụ CPU-bound và I/O-bound? Kiến trúc phần cứng/phần mềm tối ưu từng loại ra sao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Tác vụ CPU-bound bị giới hạn bởi tốc độ tính toán của CPU (xử lý thuật toán phức tạp, nén dữ liệu, mã hóa, render video). Tác vụ I/O-bound bị giới hạn bởi tốc độ vào/ra dữ liệu (đọc đĩa SSD, truy vấn database, network request). CPU-bound tối ưu bằng đa nhân song song (multiprocessing, worker threads) và SIMD/GPU; I/O-bound tối ưu bằng mô hình bất đồng bộ không chặn (Non-blocking I/O, Async/Await, epoll).",
+      "deepDive": "Trong ứng dụng I/O-bound, CPU dành phần lớn thời gian rảnh rỗi chờ đợi dữ liệu mạng hoặc đĩa. Kiến trúc Single-threaded Event Loop (như Node.js, Nginx, Redis) cực kỳ mạnh mẽ cho I/O-bound vì một luồng có thể quản lý hàng chục ngàn kết nối đồng thời với bộ nhớ tối thiểu và không bị tốn chi phí Context Switching. Tuy nhiên, nếu ném một tác vụ CPU-bound vào Event Loop, toàn bộ server sẽ bị block không thể phục vụ request khác. Với CPU-bound, số lượng luồng thực thi song song tối ưu nên bằng số CPU Cores thực tế (`os.cpus().length`) để tận dụng 100% compute mà không gây tranh chấp CPU.",
+      "codeExample": "// Chiến lược xử lý song song đúng đắn cho CPU-bound vs I/O-bound trong Node.js\nimport os from 'node:os';\nimport { Worker } from 'node:worker_threads';\n\n// 1. Tác vụ I/O-bound: Sử dụng Non-blocking Async I/O thuần túy (Không cần Worker Thread)\nexport async function handleIoBoundTask(urls: string[]): Promise<string[]> {\n  // Hàng ngàn I/O requests chạy đồng thời trên single-thread event loop cực kỳ nhẹ\n  return Promise.all(urls.map(async (url) => {\n    const res = await fetch(url);\n    return res.text();\n  }));\n}\n\n// 2. Tác vụ CPU-bound (Ví dụ mã hóa hash nặng): Đẩy sang Worker Pool để không block Event Loop\nexport function handleCpuBoundComputation(data: number[]): Promise<number> {\n  return new Promise((resolve, reject) => {\n    // Worker chạy trên OS Thread riêng biệt trên core CPU khác\n    const workerScript = `\n      const { parentPort, workerData } = require('node:worker_threads');\n      // Mô phỏng tính toán nặng tiêu tốn chu kỳ CPU\n      let sum = 0;\n      for (const n of workerData) {\n        sum += Math.sqrt(n) * Math.sin(n);\n      }\n      parentPort.postMessage(sum);\n    `;\n    const worker = new Worker(workerScript, { eval: true, workerData: data });\n    worker.on('message', resolve);\n    worker.on('error', reject);\n  });\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Chạy tác vụ CPU-bound (như tính toán crypto, hash bcrypt sync, zip file lớn) ngay trên Main Thread của Node.js làm tê liệt toàn bộ ứng dụng.",
+      "Tạo quá nhiều OS threads cho tác vụ CPU-bound vượt xa số lượng physical CPU cores, gây phản tác dụng do CPU bận rộn swap context.",
+      "Dùng kiến trúc đa tiến trình (multi-process) nặng nề cho các tác vụ I/O-bound đơn giản dẫn đến phung phí RAM."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Redis lựa chọn kiến trúc đơn luồng (single-threaded) cho lệnh thực thi cốt lõi mà vẫn đạt hàng trăm ngàn OPS?",
+      "Cơ chế I/O Completion Ports (IOCP) trên Windows khác gì với epoll trên Linux khi xử lý hàng triệu I/O-bound events?"
     ]
   },
   {
@@ -175,18 +317,31 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "System Call là gì? Chuyển đổi giữa User Mode và Kernel Mode (Ring 3 vs Ring 0) diễn ra như thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["system", "call", "chuy", "user", "mode"],
+    "interviewerIntent": "Đánh giá hiểu biết về ranh giới bảo mật hệ điều hành, cơ chế tương tác với phần cứng và chi phí hiệu năng khi gọi System Call.",
+    "contextOrScenario": "Phân tích profiling hiệu năng hệ thống Linux khi thấy chỉ số CPU %system (sy) tăng đột biến so với CPU %user (us).",
+    "expectedKeywords": [
+      "System Call (syscall)",
+      "User Mode (Ring 3)",
+      "Kernel Mode (Ring 0)",
+      "Trap / Software Interrupt",
+      "Context Switch",
+      "syscall / sysenter",
+      "Privilege Boundary"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'System Call là gì? Chuyển đổi giữa User Mode và Kernel Mode (Ring 3 vs Ring 0) diễn ra như thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "System Call (syscall) là giao diện lập trình cho phép ứng dụng ở không gian người dùng (User Mode - Ring 3) yêu cầu dịch vụ đặc quyền từ nhân hệ điều hành (Kernel Mode - Ring 0), chẳng hạn như truy cập đĩa, mạng, quản lý bộ nhớ hoặc tạo tiến trình. CPU sử dụng ngắt mềm (software interrupt) hoặc lệnh chuyên dụng (lệnh `syscall` trên x86_64) để chuyển đổi đặc quyền.",
+      "deepDive": "Kiến trúc CPU x86 chia thành các cấp độ đặc quyền (Rings). User application chạy ở Ring 3 (hạn chế truy cập phần cứng); Linux kernel chạy ở Ring 0 (toàn quyền). Khi code gọi syscall (ví dụ `read()`, `write()`): (1) Tham số syscall được nạp vào thanh ghi CPU (`rax`, `rdi`...), (2) CPU thực thi lệnh `syscall` làm phát sinh trap chuyển đổi từ Ring 3 sang Ring 0, (3) CPU lưu lại trạng thái con trỏ lệnh (`rip`) và stack của user, chuyển sang Kernel Stack, (4) Kernel tra cứu bảng `sys_call_table` và thực thi kernel function, (5) Kernel dùng lệnh `sysret` phục hồi context và trả CPU về Ring 3. Quá trình này tiêu tốn từ vài chục đến hàng trăm nanosecond, do đó gọi syscall liên tục trong vòng lặp kín sẽ làm %system CPU vọt cao.",
+      "codeExample": "// Bash script minh họa đo đếm số lượng System Call bằng lệnh strace trên Linux\n// strace theo dõi toàn bộ các syscall từ User Space xuống Kernel Space\n/*\n# 1. Chạy lệnh Node.js và đếm thống kê thời gian tiêu tốn cho từng syscall\n$ strace -c node -e \"console.log('Hello System Call')\"\n\n% time     seconds  usecs/call     calls    errors syscall\n------ ----------- ----------- --------- --------- ----------------\n 35.12    0.002845          15       185           mmap\n 22.40    0.001815          12       148        12 openat\n 15.20    0.001232          14        88           mprotect\n  8.50    0.000689          11        62           read\n  5.10    0.000413          20        20           write\n------ ----------- ----------- --------- --------- ----------------\n100.00    0.008103                   642        12 total\n*/\n\nimport fs from 'node:fs';\n\n// Tối ưu hóa: Giảm syscall bằng cách ghi đệm (Buffer write) thay vì ghi từng byte rời rạc\nexport function writeWithMinimalSyscalls(filePath: string, chunks: string[]): void {\n  // Thay vì gọi fs.writeSync (gọi syscall write liên tục 10,000 lần)\n  // Ta gộp dữ liệu vào Buffer trong RAM rồi gọi syscall write 1 lần duy nhất\n  const combinedBuffer = Buffer.from(chunks.join(''));\n  fs.writeFileSync(filePath, combinedBuffer); // 1 syscall write duy nhất\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Ghi log hoặc ghi file bằng cách gọi syscall ghi dữ liệu từng dòng nhỏ lẻ trong vòng lặp lớn khiến CPU nghẽn ở Kernel Mode (%system CPU).",
+      "Nghĩ rằng các hàm thư viện C (như `printf`, `malloc`) là syscall trực tiếp (`printf` là user-space buffer, chỉ khi buffer đầy mới gọi syscall `write()`).",
+      "Bỏ qua rủi ro bảo mật Spectre/Meltdown vốn khai thác cơ chế speculative execution vượt qua ranh giới giữa User Mode và Kernel Mode."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao bản vá KPTI (Kernel Page Table Isolation) chống lỗ hổng Meltdown lại làm giảm hiệu năng của các ứng dụng gọi nhiều syscall?",
+      "Cơ chế vDSO (virtual Dynamic Shared Object) trong Linux giúp ứng dụng lấy thời gian `gettimeofday()` mà không cần context switch sang Kernel Mode ra sao?"
     ]
   },
   {
@@ -194,18 +349,33 @@
     "category": "cs-fundamentals",
     "level": "junior",
     "question": "Trạng thái của một Process trong hệ điều hành: New, Ready, Running, Waiting/Blocked, Terminated?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["process", "new", "ready", "running", "waiting"],
+    "interviewerIntent": "Kiểm tra kiến thức về vòng đời tiến trình, cơ chế lập lịch của OS Scheduler và khả năng debug các trạng thái tiến trình bị treo (Blocked, Zombie, D-state).",
+    "contextOrScenario": "Phân tích trạng thái tiến trình server qua lệnh `top` / `ps aux` khi hệ thống bị nghẽn (trạng thái 'D' Uninterruptible Sleep vs 'Z' Zombie).",
+    "expectedKeywords": [
+      "Process Lifecycle",
+      "New",
+      "Ready",
+      "Running",
+      "Waiting / Blocked",
+      "Terminated",
+      "Zombie Process",
+      "Orphan Process",
+      "D-state (Uninterruptible Sleep)"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Trạng thái của một Process trong hệ điều hành: New, Ready, Running, Waiting/Blocked, Terminated?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Tiến trình trải qua 5 trạng thái cơ bản: New (đang được khởi tạo), Ready (nằm trong hàng đợi Ready Queue chờ CPU cấp phát time slice), Running (đang chiếm giữ CPU core thực thi lệnh), Waiting/Blocked (chờ sự kiện I/O, lock, hoặc tín hiệu mạng), Terminated (đã kết thúc, chờ giải phóng hoàn toàn).",
+      "deepDive": "Sự chuyển dịch trạng thái: Ready -> Running do CPU Scheduler quyết định khi đến lượt (Dispatch). Running -> Ready xảy ra khi hết time-slice (Timer Interrupt preemptive) hoặc bị ngắt bởi tiến trình ưu tiên cao hơn. Running -> Waiting xảy ra khi gọi syscall blocking I/O (chờ đọc đĩa, mạng). Khi I/O hoàn tất, phần cứng bắn ngắt chuyển trạng thái từ Waiting về Ready (không được nhảy thẳng lên Running). Hai trạng thái nguy hiểm trong Linux: (1) Zombie (Z): process con đã kết thúc nhưng process cha chưa gọi syscall `wait()` để đọc exit code, giữ chỗ trong process table; (2) Uninterruptible Sleep (D): process bị kẹt chờ hardware I/O (như đĩa NFS hỏng), không thể bị kill bởi cả lệnh `kill -9`.",
+      "codeExample": "// Bash script kiểm tra và phát hiện Zombie Processes và D-state Processes trên Linux\n/*\n#!/usr/bin/env bash\n\necho \"=== Kiếm tra trạng thái Processes trên hệ thống ===\"\n\n# 1. Liệt kê các tiến trình Zombie (STAT có chữ Z)\necho \"--- Danh sách Zombie Processes ---\"\nps -eo pid,ppid,stat,cmd | awk '$3 ~ /^Z/ { print \"Zombie PID: \" $1 \" | PPID: \" $2 \" | Cmd: \" $4 }'\n\n# 2. Liệt kê các tiến trình kẹt I/O không thể ngắt (STAT có chữ D)\necho \"--- Danh sách Uninterruptible Sleep (D-state) ---\"\nps -eo pid,ppid,stat,cmd | awk '$3 ~ /^D/ { print \"D-state PID: \" $1 \" | PPID: \" $2 \" | Cmd: \" $4 }'\n*/\n\nimport { execSync } from 'node:child_process';\n\nexport function getSystemProcessStats(): { total: number; zombies: number } {\n  try {\n    const output = execSync('ps -eo stat', { encoding: 'utf8' });\n    const stats = output.split('\\n');\n    let zombies = 0;\n    for (const s of stats) {\n      if (s.trim().startsWith('Z')) zombies++;\n    }\n    return { total: stats.length, zombies };\n  } catch {\n    return { total: 0, zombies: 0 };\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Cố gắng dùng lệnh `kill -9` lên Zombie process (Zombie đã chết rồi, nó chỉ là một entry trong process table; muốn xóa phải kill process cha của nó).",
+      "Nhầm lẫn trạng thái Blocked và Ready: tiến trình Blocked không thể được CPU thực thi dù CPU rảnh 100% cho đến khi I/O event hoàn thành.",
+      "Không xử lý tín hiệu SIGCHLD trong ứng dụng đa tiến trình (như C/C++ fork) khiến hệ điều hành tích lũy hàng ngàn zombie processes làm cạn kiệt PID pool."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khi process cha bị terminate trước process con, process con trở thành Orphan process thì ai sẽ nhận làm cha nuôi (reparenting) của nó?",
+      "Trạng thái Uninterruptible Sleep ('D') trong Linux gây nguy hiểm gì cho việc khởi động lại hoặc shutdown server?"
     ]
   },
   {
@@ -213,18 +383,33 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Cơ chế bắt tay 3 bước (3-way handshake) của TCP diễn ra thế nào? Mục đích của SYN, SYN-ACK, ACK?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["tay", "3-way", "handshake", "tcp", "syn"],
+    "interviewerIntent": "Đánh giá sự am hiểu tường tận về giao thức TCP, cơ chế khởi tạo kết nối tin cậy và khả năng phòng thủ trước các cuộc tấn công từ chối dịch vụ (SYN Flood).",
+    "contextOrScenario": "Thiết kế hệ thống mạng chịu tải cao, tối ưu độ trễ TTFT/TLS handshake và chống tấn công DDoS SYN Flood tại tầng L4.",
+    "expectedKeywords": [
+      "3-way handshake",
+      "SYN",
+      "SYN-ACK",
+      "ACK",
+      "ISN (Initial Sequence Number)",
+      "SYN Queue",
+      "Accept Queue",
+      "SYN Cookies",
+      "TCP Half-open"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Cơ chế bắt tay 3 bước (3-way handshake) của TCP diễn ra thế nào? Mục đích của SYN, SYN-ACK, ACK?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "TCP 3-way handshake là quá trình đồng bộ hóa số thứ tự khởi tạo (Initial Sequence Number - ISN) giữa Client và Server trước khi truyền dữ liệu. Gồm 3 bước: (1) Client gửi SYN (ISN_c), (2) Server phản hồi SYN-ACK (ISN_s, ACK=ISN_c + 1), (3) Client gửi ACK (ACK=ISN_s + 1). Mục đích là đảm bảo cả 2 chiều truyền/nhận đều hoạt động bình thường và thống nhất bộ đếm sequence bytes.",
+      "deepDive": "Tại sao phải là 3 bước mà không phải 2? Nếu chỉ có 2 bước (SYN -> SYN-ACK), server không thể biết client có thực sự nhận được gói SYN-ACK hay không. Nếu gói SYN cũ bị trễ trong mạng bất ngờ đến server, server sẽ mở kết nối ảo gây lãng phí tài nguyên. ISN được sinh ngẫu nhiên theo thời gian để chống tấn công TCP Sequence Prediction. Trong Linux kernel: khi nhận SYN, server đặt kết nối vào SYN Queue (half-open). Khi nhận ACK cuối cùng, kết nối được chuyển sang Accept Queue để ứng dụng gọi `accept()`. Nếu hacker gửi hàng loạt SYN giả mạo IP (SYN Flood attack), SYN Queue sẽ đầy tràn làm server từ chối kết nối hợp lệ. Giải pháp cứu cánh ở cấp kernel là kích hoạt `tcp_syncookies`.",
+      "codeExample": "// Giả lập trạng thái TCP 3-Way Handshake bằng TypeScript State Machine\ntype TcpState = 'CLOSED' | 'SYN_SENT' | 'SYN_RECEIVED' | 'ESTABLISHED';\n\nclass TcpHandshakeSimulator {\n  private state: TcpState = 'CLOSED';\n  private clientIsn = 0;\n  private serverIsn = 0;\n\n  // Bước 1: Client gửi SYN\n  clientSendSyn(): { flag: 'SYN'; seq: number } {\n    this.clientIsn = Math.floor(Math.random() * 100000);\n    this.state = 'SYN_SENT';\n    console.log(`[Step 1] Client -> Server: SYN (seq=${this.clientIsn})`);\n    return { flag: 'SYN', seq: this.clientIsn };\n  }\n\n  // Bước 2: Server nhận SYN, cấp phát ISN và trả lời SYN-ACK\n  serverReceiveSyn(clientSeq: number): { flag: 'SYN-ACK'; seq: number; ack: number } {\n    this.serverIsn = Math.floor(Math.random() * 200000);\n    this.state = 'SYN_RECEIVED';\n    const ackNumber = clientSeq + 1;\n    console.log(`[Step 2] Server -> Client: SYN-ACK (seq=${this.serverIsn}, ack=${ackNumber})`);\n    return { flag: 'SYN-ACK', seq: this.serverIsn, ack: ackNumber };\n  }\n\n  // Bước 3: Client nhận SYN-ACK, gửi ACK hoàn tất kết nối\n  clientCompleteHandshake(serverSeq: number): { flag: 'ACK'; ack: number } {\n    const ackNumber = serverSeq + 1;\n    this.state = 'ESTABLISHED';\n    console.log(`[Step 3] Client -> Server: ACK (ack=${ackNumber}) -> Trạng thái: ESTABLISHED`);\n    return { flag: 'ACK', ack: ackNumber };\n  }\n}\n\nconst sim = new TcpHandshakeSimulator();\nconst syn = sim.clientSendSyn();\nconst synAck = sim.serverReceiveSyn(syn.seq);\nsim.clientCompleteHandshake(synAck.seq);",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Nhầm lẫn rằng dữ liệu (payload) không thể đi kèm trong gói tin handshake (thực tế gói ACK ở bước 3 CÓ THỂ mang theo dữ liệu application payload; TCP Fast Open còn cho phép gửi data ngay trong gói SYN đầu tiên).",
+      "Cấu hình kích thước listen backlog quá nhỏ khiến Accept Queue bị tràn khi có traffic spike, dẫn đến rớt kết nối TCP.",
+      "Tắt cờ `net.ipv4.tcp_syncookies` trên các server công khai đối mặt với Internet."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Cơ chế SYN Cookies chống tấn công từ chối dịch vụ SYN Flood hoạt động như thế nào mà không cần cấp phát bộ nhớ cho SYN Queue?",
+      "TCP Fast Open (TFO) giảm latency cho lần kết nối tiếp theo giữa client và server từ 1 RTT xuống 0 RTT bằng cách nào?"
     ]
   },
   {
@@ -232,18 +417,32 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Quá trình đóng kết nối TCP 4 bước (4-way handshake): Trạng thái TIME_WAIT sinh ra để làm gì?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["tcp", "4-way", "handshake", "time_wait", "sinh"],
+    "interviewerIntent": "Kiểm tra kiến thức về cơ chế đóng kết nối TCP, mục đích sống còn của trạng thái TIME_WAIT và cách khắc phục khi server bị nghẽn port do quá nhiều TIME_WAIT sockets.",
+    "contextOrScenario": "Microservice gọi hàng chục ngàn HTTP request đến database hoặc upstream service mỗi phút nhưng không dùng Connection Pooling, làm server sập vì cạn kiệt port.",
+    "expectedKeywords": [
+      "4-way handshake",
+      "FIN",
+      "ACK",
+      "TIME_WAIT",
+      "2MSL (Maximum Segment Lifetime)",
+      "Active Close vs Passive Close",
+      "TCP Port Exhaustion",
+      "SO_REUSEADDR"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Quá trình đóng kết nối TCP 4 bước (4-way handshake): Trạng thái TIME_WAIT sinh ra để làm gì?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "TCP đóng kết nối theo 4 bước vì TCP là song công toàn phần (Full-duplex): (1) Bên chủ động đóng gửi FIN, (2) Bên nhận gửi ACK (chiều gửi đóng, chiều nhận vẫn mở - Half-closed), (3) Bên nhận hoàn tất dữ liệu gửi tiếp FIN, (4) Bên chủ động gửi ACK cuối và rơi vào trạng thái TIME_WAIT kéo dài 2MSL (thường là 60s). TIME_WAIT sinh ra để: (a) Đảm bảo gói ACK cuối đến được bên kia, (b) Ngăn chặn các gói tin cũ đi lạc làm ô nhiễm kết nối mới trùng IP/Port.",
+      "deepDive": "Bên thực hiện Active Close (bên chủ động gọi `close()`) là bên duy nhất phải vào trạng thái TIME_WAIT. Trong 2MSL (Maximum Segment Lifetime), nếu gói ACK cuối bị rơi trên đường truyền, bên Passive Close sẽ gửi lại gói FIN; bên ở trạng thái TIME_WAIT có thể gửi lại ACK thay vì phản hồi RST. Đồng thời, 2MSL đảm bảo mọi gói tin tồn đọng trong mạng của phiên cũ bị drop hết trước khi một socket mới dùng lại cùng cặp IP/Port. Vấn đề nghiêm trọng: nếu ứng dụng backend liên tục mở và đóng kết nối HTTP/1.0 hoặc không dùng Connection Pool, hàng chục ngàn socket rơi vào TIME_WAIT làm cạn kiệt dải Ephemeral Ports, gây lỗi `EADDRNOTAVAIL` hoặc `Cannot assign requested address`.",
+      "codeExample": "// Minh họa: Tái sử dụng socket bằng HTTP Keep-Alive Agent để TRÁNH tình trạng TIME_WAIT bùng nổ\nimport http from 'node:http';\n\n// 1. SAI LẦM: Tạo Agent mới hoặc disable keep-alive -> Mỗi request sinh 1 TCP connection -> 4-way close -> TIME_WAIT\nexport function badRequestWithoutPool(url: string) {\n  return new Promise((resolve) => {\n    http.get(url, { agent: false }, (res) => { // agent: false buộc đóng socket sau mỗi request\n      res.on('data', () => {});\n      res.on('end', resolve);\n    });\n  });\n}\n\n// 2. CHUẨN MỰC SENIOR: Sử dụng Connection Pooling (Keep-Alive) -> Tái sử dụng socket, không bao giờ vào TIME_WAIT\nconst keepAliveAgent = new http.Agent({\n  keepAlive: true,\n  maxSockets: 100,       // Tối đa 100 concurrent sockets cho mỗi origin\n  maxFreeSockets: 10,    // Duy trì 10 idle sockets sẵn sàng nhận việc\n  timeout: 60000,\n});\n\nexport function goodRequestWithPool(url: string) {\n  return new Promise((resolve) => {\n    http.get(url, { agent: keepAliveAgent }, (res) => {\n      res.on('data', () => {});\n      res.on('end', resolve);\n    });\n  });\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Bật thông số nguy hiểm `net.ipv4.tcp_tw_recycle` trên Linux (đã bị xóa bỏ hoàn toàn từ kernel 4.12 vì phá hỏng kết nối khi đi qua NAT router).",
+      "Server web tự đóng kết nối với client thay vì để client đóng, khiến chính server phải gánh hàng triệu TIME_WAIT sockets.",
+      "Nghĩ rằng TIME_WAIT là một lỗi/bug của hệ điều hành thay vì hiểu đây là tính năng thiết yếu bảo đảm tính toàn vẹn của TCP protocol."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao tùy chọn `SO_LINGER` với timeout bằng 0 có thể cưỡng ép đóng TCP bằng cờ RST để bỏ qua TIME_WAIT, và tại sao cách này cực kỳ nguy hiểm?",
+      "Cấu hình kernel `net.ipv4.tcp_tw_reuse` hoạt động an toàn như thế nào dựa trên TCP Timestamps (RFC 1323)?"
     ]
   },
   {
@@ -251,18 +450,34 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Kiểm soát luồng (Flow Control) với Sliding Window và Kiểm soát tắc nghẽn (Congestion Control - Slow Start, Congestion Avoidance) trong TCP?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["flow", "control", "sliding", "window", "ngh"],
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu về cơ chế tự điều chỉnh thông minh của TCP để tránh tràn bộ đệm máy nhận (Flow Control) và tránh sập băng thông mạng Internet (Congestion Control).",
+    "contextOrScenario": "Tối ưu hóa throughput cho đường truyền khoảng cách xa nhưng băng thông lớn (Long Fat Networks - LFN), debug hiện tượng throughput giảm đột ngột.",
+    "expectedKeywords": [
+      "Flow Control",
+      "Receive Window (rwnd)",
+      "Congestion Window (cwnd)",
+      "Sliding Window",
+      "Slow Start",
+      "Congestion Avoidance",
+      "Fast Retransmit",
+      "Fast Recovery",
+      "BBR",
+      "CUBIC"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Kiểm soát luồng (Flow Control) với Sliding Window và Kiểm soát tắc nghẽn (Congestion Control - Slow Start, Congestion Avoidance) trong TCP?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Flow Control bảo vệ máy nhận không bị tràn bộ đệm (Receiver Buffer) bằng cơ chế Sliding Window thông qua thông số `rwnd`. Congestion Control bảo vệ toàn bộ mạng trung gian không bị nghẽn thông qua cửa sổ tắc nghẽn `cwnd`. Tốc độ truyền thực tế bị chặn bởi: `Min(rwnd, cwnd)`.",
+      "deepDive": "Flow Control: Máy nhận gửi trường `Window Size` trong TCP header để báo cho máy gửi biết còn trống bao nhiêu byte trong buffer. Nếu window = 0, máy gửi ngừng phát dữ liệu và định kỳ gửi probe packet để kiểm tra. Congestion Control gồm 4 giai đoạn kinh điển: (1) Slow Start: bắt đầu với cwnd nhỏ (thường 10 MSS), tăng gấp đôi theo cấp số nhân mỗi RTT (cwnd *= 2); (2) Congestion Avoidance: khi cwnd chạm ngưỡng `ssthresh`, chuyển sang tăng tuyến tính (cwnd += 1 mỗi RTT); (3) Fast Retransmit: khi nhận 3 Duplicate ACKs liên tiếp, máy gửi nhận biết gói tin bị mất và truyền lại ngay mà không chờ retransmission timer timeout; (4) Fast Recovery: giảm ssthresh xuống một nửa và tiếp tục tăng từ đó. Thuật toán hiện đại như Google BBR đo lường nút thắt băng thông (Bottleneck Bandwidth) và độ trễ tối thiểu (Min RTT) thay vì dựa vào packet loss như CUBIC hay Reno.",
+      "codeExample": "// Mô phỏng thuật toán TCP Slow Start và Congestion Avoidance bằng TypeScript\nclass TcpCongestionControlSimulator {\n  private cwnd = 1;        // Khởi tạo Congestion Window = 1 MSS\n  private ssthresh = 16;   // Ngưỡng Slow Start Threshold = 16 MSS\n  private rttRound = 0;\n\n  simulateTransmission(totalRtt: number) {\n    console.log(`Bắt đầu mô phỏng: Initial cwnd=${this.cwnd}, ssthresh=${this.ssthresh}`);\n    \n    for (let rtt = 1; rtt <= totalRtt; rtt++) {\n      this.rttRound = rtt;\n      \n      if (rtt === 8) {\n        // Giả lập sự kiện mất gói tin (Packet Loss phát hiện qua 3 Dup ACKs)\n        console.log(`---> [RTT ${rtt}] PHÁT HIỆN MẤT GÓI TIN! Kích hoạt Fast Retransmit & Recovery`);\n        this.ssthresh = Math.max(2, Math.floor(this.cwnd / 2));\n        this.cwnd = this.ssthresh; // Chuyển sang Congestion Avoidance\n      } else if (this.cwnd < this.ssthresh) {\n        // Giai đoạn Slow Start: Tăng theo cấp số nhân (x2 mỗi RTT)\n        this.cwnd *= 2;\n        console.log(`[RTT ${rtt}] Slow Start: cwnd = ${this.cwnd} MSS`);\n      } else {\n        // Giai đoạn Congestion Avoidance: Tăng tuyến tính (+1 mỗi RTT)\n        this.cwnd += 1;\n        console.log(`[RTT ${rtt}] Congestion Avoidance: cwnd = ${this.cwnd} MSS`);\n      }\n    }\n  }\n}\n\nconst tcpSim = new TcpCongestionControlSimulator();\ntcpSim.simulateTransmission(12);",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Nhầm lẫn giữa Flow Control (bảo vệ máy nhận - end to end) và Congestion Control (bảo vệ toàn bộ router trên đường truyền mạng).",
+      "Sử dụng thuật toán mất gói cổ điển (Loss-based như Reno/CUBIC) trên mạng vệ tinh / 5G có tỷ lệ packet loss tự nhiên cao làm throughput bị suy giảm nghiêm trọng.",
+      "Bufferbloat: Router mạng trung gian có hàng đợi bộ đệm quá lớn khiến gói tin không bị drop nhưng latency tăng vọt lên hàng nghìn ms."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Thuật toán BBR (Bottleneck Bandwidth and RTT) của Google khác biệt căn bản thế nào so với các thuật toán loss-based truyền thống như CUBIC?",
+      "Thông số TCP Window Scale (RFC 1323) giải quyết giới hạn 64KB của trường Window Size gốc trong TCP header ra sao?"
     ]
   },
   {
@@ -270,18 +485,32 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "TLS/SSL Handshake hoạt động ra sao? Phân biệt mã hoá đối xứng (Symmetric) và bất đối xứng (Asymmetric) trong phiên bảo mật.",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["tls", "ssl", "handshake", "symmetric", "asymmetric"],
+    "interviewerIntent": "Đánh giá kiến thức về mật mã học ứng dụng, kiến trúc bảo mật HTTPS, chu trình bắt tay TLS 1.2 vs TLS 1.3 và cách tối ưu hóa hiệu năng mã hóa.",
+    "contextOrScenario": "Thiết lập bảo mật API, cấu hình TLS Termination tại Reverse Proxy / Load Balancer và phân tích độ trễ kết nối HTTPS.",
+    "expectedKeywords": [
+      "TLS 1.2 vs TLS 1.3",
+      "Asymmetric Encryption",
+      "Symmetric Encryption",
+      "RSA",
+      "Diffie-Hellman (ECDHE)",
+      "AES-GCM",
+      "Certificate Authority (CA)",
+      "0-RTT Resumption"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'TLS/SSL Handshake hoạt động ra sao? Phân biệt mã hoá đối xứng (Symmetric) và bất đối xứng (Asymmetric) trong phiên bảo mật.'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "TLS Handshake dùng mã hóa bất đối xứng (Public/Private Key - RSA, ECDHE) để xác thực danh tính server qua chứng chỉ số (CA Certificate) và trao đổi khóa bí mật an toàn; sau đó phiên làm việc chuyển hoàn toàn sang mã hóa đối xứng (AES-GCM, ChaCha20) bằng khóa chung (Session Key) vì mã hóa đối xứng nhanh hơn hàng ngàn lần.",
+      "deepDive": "Trong TLS 1.2 cần 2 RTT: ClientHello -> ServerHello + Certificate -> Client Key Exchange + CipherSpec -> Finished. Trong TLS 1.3 được tối ưu chỉ còn 1 RTT: Client đoán trước thuật toán trao đổi khóa và gửi luôn ECDHE Key Share ngay trong ClientHello; Server phản hồi ServerHello + Certificate + Finished. TLS 1.3 loại bỏ hoàn toàn các cipher suites lỗi thời (RSA key exchange không có Forward Secrecy, RC4, MD5, SHA-1). Forward Secrecy (PFS) đảm bảo rằng ngay cả khi hacker đánh cắp được Private Key của server trong tương lai, họ vẫn không thể giải mã các session traffic đã thu thập trong quá khứ nhờ cơ chế sinh khóa phiên ephemeral (ECDHE) dùng một lần rồi hủy.",
+      "codeExample": "// Tạo HTTPS Server với cấu hình TLS 1.3 chuẩn Enterprise trong Node.js\nimport https from 'node:https';\nimport fs from 'node:fs';\n\nconst tlsOptions: https.ServerOptions = {\n  key: fs.readFileSync('server.key'),\n  cert: fs.readFileSync('server.crt'),\n  \n  // Ràng buộc bảo mật tối thiểu TLS 1.2 hoặc tốt nhất là TLS 1.3\n  minVersion: 'TLSv1.2',\n  maxVersion: 'TLSv1.3',\n  \n  // Chỉ chấp nhận các Cipher Suites an toàn có Perfect Forward Secrecy (PFS)\n  ciphers: [\n    'TLS_AES_256_GCM_SHA384',\n    'TLS_CHACHA20_POLY1305_SHA256',\n    'ECDHE-ECDSA-AES256-GCM-SHA384',\n    'ECDHE-RSA-AES256-GCM-SHA384'\n  ].join(':'),\n  honorCipherOrder: true,\n};\n\nconst server = https.createServer(tlsOptions, (req, res) => {\n  // Lấy thông tin phiên TLS đã thương lượng thành công\n  const socket = req.socket as any;\n  console.log(`TLS Protocol: ${socket.getProtocol()}, Cipher: ${socket.getCipher().name}`);\n  res.writeHead(200, { 'Content-Type': 'text/plain' });\n  res.end('Kênh truyền bảo mật TLS an toàn!');\n});\n\nserver.listen(443);",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Dùng phương thức trao đổi khóa RSA truyền thống thay vì ECDHE, đánh mất tính chất sống còn Perfect Forward Secrecy (PFS).",
+      "Bỏ qua Certificate Revocation check (OCSP Stapling) khiến client phải tự query CA làm tăng thêm 1 RTT và rò rỉ thông tin duyệt web.",
+      "Lạm dụng tính năng 0-RTT của TLS 1.3 cho các request POST/PUT khiến ứng dụng đối mặt nguy cơ bị tấn công Replay Attack."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao tính năng TLS 1.3 0-RTT Early Data lại dễ bị tấn công Replay Attack và lập trình viên backend cần thiết kế idempotent request thế nào để phòng chống?",
+      "Cơ chế Mutual TLS (mTLS) hoạt động khác biệt thế nào so với standard TLS một chiều trong bảo mật giữa các microservices?"
     ]
   },
   {
@@ -289,18 +518,35 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Sự tiến hóa HTTP: HTTP/1.1 (Pipelining) → HTTP/2 (Multiplexing, Header compression HPACK) → HTTP/3 (QUIC trên nền UDP)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["http", "1.1", "pipelining", "multiplexing", "header"],
+    "interviewerIntent": "Đánh giá hiểu biết sâu về sự tiến hóa của giao thức Web, các hạn chế vật lý của TCP và cách các kỹ sư hiện đại giải quyết bài toán độ trễ mạng.",
+    "contextOrScenario": "Tối ưu hóa chỉ số Web Vitals (FCP, LCP), cấu hình Gateway/CDN để hỗ trợ HTTP/2 và HTTP/3 cho ứng dụng di động mạng yếu.",
+    "expectedKeywords": [
+      "HTTP/1.1",
+      "Pipelining",
+      "HTTP/2",
+      "Multiplexing",
+      "Binary Framing",
+      "HPACK",
+      "Head-of-Line Blocking",
+      "HTTP/3",
+      "QUIC",
+      "UDP",
+      "Connection Migration"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Sự tiến hóa HTTP: HTTP/1.1 (Pipelining) → HTTP/2 (Multiplexing, Header compression HPACK) → HTTP/3 (QUIC trên nền UDP)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "HTTP/1.1 dùng text-based và bị nghẽn Head-of-Line (HoL) ở tầng HTTP (mỗi kết nối chỉ xử lý 1 request tại 1 thời điểm). HTTP/2 giải quyết bằng Binary Framing và Multiplexing (hàng trăm stream trên 1 kết nối TCP) kèm nén header HPACK, nhưng vẫn bị HoL ở tầng TCP. HTTP/3 thay thế TCP bằng QUIC chạy trên UDP, loại bỏ hoàn toàn HoL ở mọi tầng, cho phép bắt tay 0-RTT và Connection Migration khi đổi mạng Wi-Fi sang 4G.",
+      "deepDive": "Trong HTTP/1.1, trình duyệt phải mở 6 kết nối TCP song song đến mỗi domain để tải tài nguyên. Kỹ thuật HTTP Pipelining thất bại trên thực tế vì router trung gian không hỗ trợ tốt. HTTP/2 chuyển toàn bộ dữ liệu thành các binary frame (DATA, HEADERS, SETTINGS) có gắn Stream ID, truyền xen kẽ nhau trên cùng 1 kết nối TCP. Tuy nhiên, nếu 1 TCP packet bị rớt, toàn bộ các stream trên HTTP/2 đều bị treo (TCP HoL Blocking). HTTP/3 dùng QUIC chạy trên UDP: mỗi stream là độc lập tuyệt đối; nếu stream A rớt gói tin thì stream B, C vẫn tiếp tục truyền nhận bình thường. Ngoài ra, QUIC dùng Connection ID 64-bit thay vì IP/Port tuple, nên khi người dùng chuyển từ Wi-Fi sang 4G, video call hoặc download vẫn tiếp tục mà không bị đứt kết nối.",
+      "codeExample": "// Khởi tạo HTTP/2 Server với Multiplexing và Server Push trong Node.js\nimport http2 from 'node:http2';\nimport fs from 'node:fs';\n\nconst server = http2.createSecureServer({\n  key: fs.readFileSync('server.key'),\n  cert: fs.readFileSync('server.crt'),\n});\n\nserver.on('stream', (stream, headers) => {\n  const path = headers[':path'];\n  const streamId = stream.id; // Định danh Stream độc lập trên cùng 1 kết nối TCP\n\n  console.log(`Đang phục vụ request: ${path} trên Stream ID: ${streamId}`);\n\n  if (path === '/') {\n    // Phản hồi HTML chính\n    stream.respond({\n      ':status': 200,\n      'content-type': 'text/html; charset=utf-8',\n    });\n    stream.end('<h1>HTTP/2 Multiplexing Server</h1>');\n  } else {\n    stream.respond({ ':status': 404 });\n    stream.end('Not Found');\n  }\n});\n\nserver.listen(8443, () => {\n  console.log('HTTP/2 Server running on port 8443 (Binary Framing & Multiplexing)');\n});",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Áp dụng các kỹ thuật tối ưu cổ điển của HTTP/1.1 (domain sharding, gom file CSS/JS thành 1 file khổng lồ, sprite image) lên HTTP/2/3 gây phản tác dụng làm giảm hiệu năng caching.",
+      "Bật Server Push trong HTTP/2 bừa bãi khiến client nhận dữ liệu thừa thãi mà nó đã có trong browser cache.",
+      "Quên rằng UDP port 443 (HTTP/3 QUIC) thường bị chặn bởi một số firewall mạng công ty, do đó hệ thống bắt buộc phải hỗ trợ fallback về HTTP/2 qua TCP."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Thuật toán nén header HPACK trong HTTP/2 và QPACK trong HTTP/3 khác nhau thế nào để thích ứng với đặc tính của QUIC?",
+      "Tính năng Connection Migration của QUIC duy trì phiên kết nối khi thiết bị di động đổi địa chỉ IP như thế nào?"
     ]
   },
   {
@@ -308,18 +554,32 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Socket Programming: Trình tự các system call để thiết lập kết nối TCP giữa Client và Server (socket, bind, listen, accept, connect)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["socket", "programming", "system", "call", "thi"],
+    "interviewerIntent": "Đánh giá mức độ hiểu biết bản chất Network I/O ở tầng Kernel, khả năng giải thích chi tiết chuỗi system calls nền tảng của mọi web server hiện đại.",
+    "contextOrScenario": "Phân tích kiến trúc của các high-performance network engine như Nginx, Node.js libuv, Netty hoặc debug lỗi 'Connection Refused' vs 'Connection Timeout'.",
+    "expectedKeywords": [
+      "socket()",
+      "bind()",
+      "listen()",
+      "accept()",
+      "connect()",
+      "File Descriptor",
+      "Backlog Queue",
+      "Blocking vs Non-blocking Socket"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Socket Programming: Trình tự các system call để thiết lập kết nối TCP giữa Client và Server (socket, bind, listen, accept, connect)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Để thiết lập TCP Server: (1) `socket()` tạo endpoint file descriptor, (2) `bind()` gắn socket vào IP và Port cụ thể, (3) `listen()` đưa socket vào trạng thái lắng nghe và xác định kích thước hàng đợi backlog, (4) `accept()` chặn chờ kết nối từ client và trả về một file descriptor mới đại diện cho kết nối riêng biệt đó. Phía Client: (1) `socket()`, (2) `connect()` kích hoạt TCP 3-way handshake đến Server.",
+      "deepDive": "Sự phân biệt giữa Listening Socket và Connected Socket là cốt lõi: Listening Socket (tạo bởi `socket()` ban đầu) chỉ làm nhiệm vụ đón khách; khi một client kết nối thành công, `accept()` sinh ra một Connected Socket mới có file descriptor riêng để đọc/ghi dữ liệu (`read()`/`write()`). Việc này cho phép Listening Socket tiếp tục lắng nghe các kết nối mới mà không bị nghẽn. Nếu Client gọi `connect()` đến một IP/Port mà không có process nào gọi `listen()`, Kernel của Server sẽ lập tức phản hồi cờ RST (gây lỗi 'Connection Refused'). Nếu server có firewall chặn gói SYN mà không phản hồi, Client sẽ bị treo đến khi hết timeout ('Connection Timed Out').",
+      "codeExample": "// Mô phỏng luồng Socket Programming chuẩn POSIX trong TypeScript / Node.js\nimport net from 'node:net';\n\n// 1. Phía Server: Tương ứng socket() -> bind() -> listen() -> accept()\nexport function startTcpServer(port: number, host: string) {\n  // socket() + bind() + listen() được đóng gói trong net.createServer().listen()\n  const server = net.createServer((connectedSocket) => {\n    // accept() đã thành công, trả về 'connectedSocket' riêng biệt cho client này\n    console.log(`[Server] Accept connection mới từ: ${connectedSocket.remoteAddress}:${connectedSocket.remotePort}`);\n\n    connectedSocket.on('data', (buffer) => {\n      // read() syscall từ socket file descriptor\n      console.log(`[Server] Đọc dữ liệu: ${buffer.toString().trim()}`);\n      // write() syscall xuống socket file descriptor\n      connectedSocket.write('Echo: ' + buffer.toString());\n    });\n\n    connectedSocket.on('end', () => {\n      // close() syscall\n      console.log('[Server] Client đã đóng kết nối');\n    });\n  });\n\n  server.listen(port, host, 511, () => {\n    // 511 là kích thước tham số backlog truyền vào syscall listen()\n    console.log(`[Server] Đang listen trên ${host}:${port} với backlog=511`);\n  });\n}\n\n// 2. Phía Client: Tương ứng socket() -> connect()\nexport function startTcpClient(port: number, host: string) {\n  const client = net.createConnection({ port, host }, () => {\n    // connect() syscall thành công (3-way handshake hoàn tất)\n    console.log('[Client] Đã kết nối thành công đến server!');\n    client.write('Xin chào từ Socket Client!\\n');\n  });\n\n  client.on('data', (data) => {\n    console.log('[Client] Nhận phản hồi:', data.toString().trim());\n    client.end();\n  });\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Nhầm lẫn rằng hàm `accept()` thực hiện quá trình 3-way handshake (thực tế 3-way handshake diễn ra hoàn toàn tự động trong Linux kernel; `accept()` chỉ bốc kết nối đã ESTABLISHED từ accept queue ra).",
+      "Quên set cờ `O_NONBLOCK` trên socket khi triển khai Event Loop tùy biến dẫn đến một lời gọi `read()` làm treo cứng toàn bộ tiến trình.",
+      "Không đóng file descriptor (`close()`) sau khi ngắt kết nối gây rò rỉ bộ nhớ và cạn kiệt giới hạn `ulimit -n` (Too many open files)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Hàng đợi `SYN Queue` và `Accept Queue` trong Linux Kernel tương tác với tham số `backlog` của system call `listen()` như thế nào?",
+      "Điều gì xảy ra ở tầng socket khi một tiến trình fork ra nhiều tiến trình con cùng kế thừa listening socket file descriptor?"
     ]
   },
   {
@@ -327,18 +587,32 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "NAT (Network Address Translation) và Port Forwarding là gì? Giúp khắc phục cạn kiệt địa chỉ IPv4 thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["nat", "network", "address", "translation", "port"],
+    "interviewerIntent": "Đánh giá kiến thức về kỹ thuật chuyển dịch địa chỉ mạng, phân biệt Private IP vs Public IP và nguyên lý đục lỗ mạng (NAT Traversal) trong các hệ thống phân tán P2P / WebRTC.",
+    "contextOrScenario": "Cấu hình router văn phòng, kết nối từ Internet vào máy chủ nội bộ hoặc thiết lập kết nối WebRTC audio/video xuyên qua tường lửa.",
+    "expectedKeywords": [
+      "NAT",
+      "PAT / NAPT",
+      "Port Forwarding",
+      "Private IP (RFC 1918)",
+      "Public IP",
+      "NAT Table",
+      "STUN / TURN / ICE",
+      "IPv4 Exhaustion"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'NAT (Network Address Translation) và Port Forwarding là gì? Giúp khắc phục cạn kiệt địa chỉ IPv4 thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "NAT là kỹ thuật cho phép nhiều thiết bị trong mạng cục bộ (sử dụng dải Private IP theo RFC 1918) chia sẻ chung một địa chỉ Public IP duy nhất để truy cập Internet. Kỹ thuật phổ biến nhất là PAT (Port Address Translation / NAPT) dùng số cổng để phân biệt lưu lượng. Port Forwarding là cấu hình mở đường cố định trên NAT router để chuyển tiếp traffic từ một cổng Public vào thẳng IP và Cổng của một máy chủ nội bộ.",
+      "deepDive": "Các dải Private IP chuẩn: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16. Khi máy A (192.168.1.10:5000) gửi packet ra Internet: NAT Router thay Source IP thành Public IP của Router (203.0.113.5) và thay Source Port thành một cổng tạm (ví dụ 45000), đồng thời ghi một dòng vào NAT Translation Table. Khi server bên ngoài phản hồi về 203.0.113.5:45000, Router tra bảng NAT, biến đổi Dest IP/Port ngược lại thành 192.168.1.10:5000 rồi chuyển tiếp vào LAN. Nhược điểm: Phía ngoài Internet không thể chủ động khởi tạo kết nối đến máy nội bộ (End-to-End connectivity bị phá vỡ). Với WebRTC hoặc P2P, ta phải sử dụng kỹ thuật NAT Traversal (STUN để tìm Public IP/Port phản chiếu, TURN server làm relay dự phòng).",
+      "codeExample": "// Giả lập bảng dịch địa chỉ NAT (NAT Translation Table) trong TypeScript\ninterface NatTableEntry {\n  internalIp: string;\n  internalPort: number;\n  externalPort: number;\n  destinationIp: string;\n  destinationPort: number;\n  createdAt: number;\n}\n\nclass NatRouterSimulator {\n  private publicIp = '203.0.113.5';\n  private natTable = new Map<number, NatTableEntry>();\n  private nextEphemeralPort = 40000;\n\n  // Chiều ra: Chuyển dịch IP/Port nội bộ thành Public IP/Port\n  outboundTranslate(internalIp: string, internalPort: number, dstIp: string, dstPort: number) {\n    const externalPort = this.nextEphemeralPort++;\n    const entry: NatTableEntry = {\n      internalIp,\n      internalPort,\n      externalPort,\n      destinationIp: dstIp,\n      destinationPort: dstPort,\n      createdAt: Date.now(),\n    };\n    this.natTable.set(externalPort, entry);\n    console.log(`[NAT Outbound] Dịch ${internalIp}:${internalPort} -> ${this.publicIp}:${externalPort} (Đích: ${dstIp}:${dstPort})`);\n    return { srcIp: this.publicIp, srcPort: externalPort, dstIp, dstPort };\n  }\n\n  // Chiều vào: Phản hồi từ Internet trở về, tra bảng NAT chuyển vào LAN\n  inboundTranslate(externalPort: number, payload: string) {\n    const entry = this.natTable.get(externalPort);\n    if (!entry) {\n      console.log(`[NAT Inbound] DROP: Không tìm thấy mapping cho port ${externalPort}`);\n      return null;\n    }\n    console.log(`[NAT Inbound] Chuyển tiếp payload về máy đích nội bộ: ${entry.internalIp}:${entry.internalPort}`);\n    return { targetIp: entry.internalIp, targetPort: entry.internalPort, payload };\n  }\n}\n\nconst router = new NatRouterSimulator();\nconst outboundPacket = router.outboundTranslate('192.168.1.100', 8080, '8.8.8.8', 53);\nrouter.inboundTranslate(outboundPacket.srcPort, 'DNS_RESPONSE_DATA');",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Quên rằng NAT phá vỡ tính đối xứng của kết nối ngang hàng (P2P), khiến hai máy tính cùng ở sau 2 router NAT khác nhau không thể kết nối trực tiếp nếu không có STUN/ICE.",
+      "Bảng NAT (NAT Table) của router có giới hạn số lượng entries và timeout; nếu có hàng chục ngàn kết nối đồng thời, router sẽ bị nghẽn làm drop kết nối.",
+      "Nhầm lẫn giữa SNAT (Source NAT - che giấu IP nguồn) và DNAT (Destination NAT / Port Forwarding - chuyển hướng IP đích)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Giao thức STUN và TURN giải quyết bài toán đục lỗ NAT (NAT Hole Punching) cho WebRTC thế nào khi gặp Symmetric NAT?",
+      "Cơ chế Carrier-Grade NAT (CGNAT / 100.64.0.0/10) của các nhà mạng ISP ảnh hưởng thế nào đến việc host server tại nhà?"
     ]
   },
   {
@@ -346,18 +620,32 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Các phương thức giao tiếp giữa các tiến trình (IPC): Pipe, Named Pipe, Shared Memory, Message Queue, Unix Domain Socket?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["giao", "ipc", "pipe", "named", "shared"],
+    "interviewerIntent": "Đánh giá khả năng lựa chọn cơ chế giao tiếp liên tiến trình phù hợp nhất với yêu cầu về độ trễ, throughput và kiến trúc phân tán.",
+    "contextOrScenario": "Giao tiếp giữa Nginx và Node.js upstream, kiến trúc microservices cùng host, hoặc chia sẻ tensor lớn giữa các tiến trình Python AI/ML.",
+    "expectedKeywords": [
+      "IPC",
+      "Anonymous Pipe",
+      "Named Pipe (FIFO)",
+      "Shared Memory (shm)",
+      "Message Queue",
+      "Unix Domain Socket (UDS)",
+      "Throughput",
+      "Latency"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Các phương thức giao tiếp giữa các tiến trình (IPC): Pipe, Named Pipe, Shared Memory, Message Queue, Unix Domain Socket?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "IPC cho phép các tiến trình trao đổi dữ liệu. Anonymous Pipe truyền một chiều giữa cha-con; Named Pipe (FIFO) truyền qua file descriptor trên filesystem; Message Queue truyền message có cấu trúc bất đồng bộ; Unix Domain Socket (UDS) truyền byte-stream/datagram cực nhanh trên cùng host không qua card mạng; Shared Memory (shm) là phương thức nhanh nhất vì truy cập trực tiếp RAM không cần copy dữ liệu qua Kernel.",
+      "deepDive": "So sánh hiệu năng: Shared Memory nhanh nhất (độ trễ ~nanoseconds, zero copy), nhưng đòi hỏi lập trình viên phải tự quản lý đồng bộ hóa (Mutex/Semaphore) để tránh race condition. Unix Domain Socket (UDS) là lựa chọn phổ biến nhất cho backend (Nginx <-> PHP-FPM / Node.js, Docker daemon) vì có API giống hệt TCP Socket (`AF_UNIX` thay vì `AF_INET`), hỗ trợ stream, kiểm soát quyền truy cập theo file permission và bỏ qua toàn bộ TCP/IP checksum, routing, packetization overhead (nhanh hơn TCP Loopback 127.0.0.1 từ 2-3 lần). Pipe và FIFO bị giới hạn bởi dung lượng kernel buffer (thường 64KB trên Linux); nếu buffer đầy, tiến trình ghi sẽ bị block cho đến khi tiến trình đọc tiêu thụ dữ liệu.",
+      "codeExample": "// Minh họa: Giao tiếp giữa 2 tiến trình bằng Unix Domain Socket (UDS) trong Node.js\nimport net from 'node:net';\nimport fs from 'node:fs';\n\nconst SOCKET_PATH = '/tmp/app_ipc.sock';\n\n// 1. IPC Server (Lắng nghe trên Unix Domain Socket file)\nexport function startIpcServer() {\n  if (fs.existsSync(SOCKET_PATH)) fs.unlinkSync(SOCKET_PATH); // Xóa socket cũ\n\n  const server = net.createServer((client) => {\n    console.log('[IPC Server] Tiến trình con đã kết nối qua UDS!');\n    \n    client.on('data', (data) => {\n      console.log(`[IPC Server] Nhận message: ${data.toString()}`);\n      client.write('OK: Dữ liệu đã được tiếp nhận');\n    });\n  });\n\n  server.listen(SOCKET_PATH, () => {\n    // Đặt quyền truy cập file socket chỉ cho user hiện tại (bảo mật IPC)\n    fs.chmodSync(SOCKET_PATH, '0700');\n    console.log(`[IPC Server] Đang lắng nghe trên UDS: ${SOCKET_PATH}`);\n  });\n}\n\n// 2. IPC Client (Kết nối vào file socket để truyền dữ liệu không qua TCP/IP stack)\nexport function sendIpcMessage(msg: string) {\n  const client = net.createConnection(SOCKET_PATH, () => {\n    client.write(msg);\n  });\n  client.on('data', (res) => {\n    console.log(`[IPC Client] Server phản hồi: ${res.toString()}`);\n    client.end();\n  });\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Dùng TCP Loopback (127.0.0.1) thay vì Unix Domain Socket cho các tiến trình chạy cùng server vật lý, lãng phí tài nguyên CPU cho việc tính checksum và TCP state machine.",
+      "Sử dụng Shared Memory mà quên cơ chế đồng bộ (Mutex/Lock) dẫn đến hiện tượng đọc dữ liệu rách (Torn Reads) và race condition thảm khốc.",
+      "Quên dọn dẹp file socket (`unlinkSync`) trước khi khởi động lại IPC server khiến server crash vì lỗi `EADDRINUSE`."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Unix Domain Socket có thể truyền được cả File Descriptors (qua system call `sendmsg()` với `SCM_RIGHTS`) giữa 2 tiến trình hoàn toàn độc lập?",
+      "Bộ nhớ chia sẻ POSIX (`shm_open`) khác gì với bộ nhớ chia sẻ SysV (`shmget`) trong lập trình Linux hiện đại?"
     ]
   },
   {
@@ -365,18 +653,32 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Context Switch là gì? Chi phí của context switch giữa 2 tiến trình khác gì giữa 2 luồng trong cùng tiến trình?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["context", "switch", "chi", "cs"],
+    "interviewerIntent": "Đánh giá kiến thức về chi phí thực thi ở mức CPU/Kernel, cơ chế bảo vệ phần cứng và lý do tại sao ứng dụng đa luồng/event-driven được thiết kế để giảm thiểu context switch.",
+    "contextOrScenario": "Profiling hệ thống khi CPU đạt 100% nhưng Throughput thấp, lệnh `vmstat` hiển thị chỉ số `cs` (context switches) lên tới hàng triệu lần mỗi giây.",
+    "expectedKeywords": [
+      "Context Switch",
+      "Registers",
+      "Program Counter (PC)",
+      "Page Table Switch",
+      "TLB Flush",
+      "Cache Invalidation",
+      "Process vs Thread",
+      "cswch / vmstat"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Context Switch là gì? Chi phí của context switch giữa 2 tiến trình khác gì giữa 2 luồng trong cùng tiến trình?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Context Switch là quá trình CPU dừng thực thi một task (tiến trình hoặc luồng), lưu lại trạng thái (thanh ghi, Program Counter, Stack Pointer) vào PCB/TCB trong RAM, và nạp trạng thái của task khác để tiếp tục thực thi. Context switch giữa 2 luồng trong cùng tiến trình rẻ hơn nhiều so với giữa 2 tiến trình khác nhau vì các luồng dùng chung không gian địa chỉ bộ nhớ ảo, không phải đổi Page Table và không bị xả (flush) bộ nhớ đệm TLB.",
+      "deepDive": "Chi phí chi tiết: (1) Thread Context Switch: Lưu/nạp thanh ghi CPU (vài chục nanosecond). (2) Process Context Switch: Ngoài lưu thanh ghi, Kernel phải đổi thanh ghi con trỏ Page Table (`CR3` trên x86). Khi đổi CR3, toàn bộ Translation Lookaside Buffer (TLB - cache chuyển đổi địa chỉ ảo sang vật lý) bị vô hiệu hóa (TLB Flush). Sau đó, CPU bị hàng loạt TLB Misses và L1/L2/L3 Cache Misses để nạp lại dữ liệu của tiến trình mới vào cache (gọi là Cold Cache penalty), tiêu tốn từ 1-10 microsecond. Do đó, việc có quá nhiều tiến trình cạnh tranh CPU sẽ dẫn đến hiện tượng 'Context Switching Storm' làm CPU tiêu tốn hơn 50% thời gian chỉ để đổi việc thay vì làm việc có ích.",
+      "codeExample": "// Script Bash giám sát tần suất Context Switches và CPU Context Cost trên Linux\n/*\n#!/usr/bin/env bash\n\necho \"=== Giám sát Context Switches theo thời gian thực (mỗi 1 giây) ===\"\n# Cột 'cs' trong vmstat đại diện cho số lượng Context Switches mỗi giây\n# Cột 'sy' đại diện cho % thời gian CPU ở Kernel Space\nvmstat 1 5\n\n# Kiểm tra chi tiết Context Switch tự nguyện (voluntary) và cưỡng bức (involuntary) của 1 PID cụ thể:\n# PID=12345\n# cat /proc/$PID/status | grep ctxt\n# voluntary_ctxt_switches:    15200   (Tự nhường CPU do chờ I/O, lock)\n# nonvoluntary_ctxt_switches:  340    (Bị OS preempt do hết time slice)\n*/\n\nimport os from 'node:os';\n\n// Nguyên tắc Senior: Giới hạn số lượng Worker Threads song song tối đa bằng số CPU Cores\n// để hạn chế tối đa chi phí nonvoluntary context switching\nexport const OPTIMAL_THREAD_POOL_SIZE = os.cpus().length;\nconsole.log(`Cấu hình ThreadPool khuyến nghị: ${OPTIMAL_THREAD_POOL_SIZE} threads để tối thiểu hóa Context Switch`);",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Khởi tạo hàng ngàn threads trong ứng dụng (Thread-per-request pattern) khiến CPU sụp đổ vì chi phí Context Switching và RAM cạn kiệt.",
+      "Bỏ qua sự khác biệt giữa Voluntary Context Switch (task chủ động nhường CPU chờ I/O) và Involuntary Context Switch (bị Kernel ngắt do hết time slice - báo hiệu CPU quá tải).",
+      "Nghĩ rằng Context Switch giữa 2 luồng là hoàn toàn miễn phí (vẫn tốn chi phí ngắt Kernel, lưu thanh ghi và có thể bị gián đoạn L1 Cache)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tính năng PCID (Process-Context Identifiers) trên CPU x86 hiện đại giúp giảm bớt chi phí TLB Flush khi chuyển đổi giữa các tiến trình như thế nào?",
+      "Mô hình Coroutine / Fiber trong user-space (như Go runtime hay async/await) loại bỏ hoàn toàn Kernel Context Switch ra sao?"
     ]
   },
   {
@@ -384,18 +686,34 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Paging và Page Table: Translation Lookaside Buffer (TLB) là gì? Page Fault xảy ra khi nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["paging", "page", "table", "translation", "lookaside"],
+    "interviewerIntent": "Kiểm tra kiến thức về cơ chế quản lý bộ nhớ phân trang của phần cứng máy tính và nhân OS, cách CPU tăng tốc tra cứu địa chỉ và xử lý nạp trang theo yêu cầu.",
+    "contextOrScenario": "Phân tích hiệu năng truy cập mảng lớn trong C/C++/Go/Rust hoặc debug hiện tượng giật lag do Major Page Faults khi đọc file lớn.",
+    "expectedKeywords": [
+      "Paging",
+      "Page Table",
+      "Page (4KB)",
+      "Frame",
+      "TLB",
+      "TLB Hit / Miss",
+      "Page Fault",
+      "Minor Page Fault",
+      "Major Page Fault",
+      "Demand Paging"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Paging và Page Table: Translation Lookaside Buffer (TLB) là gì? Page Fault xảy ra khi nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Paging chia bộ nhớ ảo thành các Page và RAM vật lý thành các Frame (thường 4KB). Page Table lưu ánh xạ từ Page sang Frame. TLB là bộ nhớ cache phần cứng siêu nhanh nằm ngay trên CPU lưu các cặp ánh xạ gần nhất để tránh tra cứu Page Table nhiều cấp trong RAM. Page Fault xảy ra khi CPU truy cập vào một địa chỉ bộ nhớ ảo mà trang tương ứng chưa được nạp sẵn vào RAM vật lý.",
+      "deepDive": "Phân biệt 2 loại Page Fault: (1) Minor Page Fault: Trang dữ liệu đã có trong RAM (ví dụ trang của thư viện chia sẻ hoặc vừa được cấp phát nhưng chưa map), OS chỉ cần cập nhật Page Table mà không cần đọc đĩa; chi phí rất nhẹ (~vài microsecond). (2) Major Page Fault: Trang dữ liệu đang nằm trên đĩa (Swap file hoặc file trên ổ cứng), OS phải treo tiến trình để đọc dữ liệu từ SSD/HDD nạp vào RAM; chi phí cực nặng (từ vài millisecond, làm tụt hiệu năng hàng ngàn lần). TLB là chìa khóa sống còn của hiệu năng: TLB Hit mất ~1 chu kỳ CPU, TLB Miss phải thực hiện Page Table Walk qua 4-5 cấp trong RAM mất hàng chục chu kỳ.",
+      "codeExample": "// Minh họa: Tác động của CPU Cache & Paging locality (Row-major vs Column-major traversal)\nimport { performance } from 'node:perf_hooks';\n\nconst ROWS = 4096;\nconst COLS = 4096;\n// Mảng 2D kích thước 16 triệu phần tử (chiếm ~64MB bộ nhớ)\nconst matrix = new Int32Array(ROWS * COLS);\n\n// 1. Duyệt tuần tự theo hàng (Sequential Locality) -> Tận dụng tối đa TLB Hit và L1 Cache\nfunction traverseRowMajor() {\n  const start = performance.now();\n  let sum = 0;\n  for (let i = 0; i < ROWS; i++) {\n    for (let j = 0; j < COLS; j++) {\n      sum += matrix[i * COLS + j];\n    }\n  }\n  return { duration: performance.now() - start, sum };\n}\n\n// 2. Duyệt nhảy cóc theo cột (Strided Traversal) -> Gây liên tục TLB Misses & Cache Misses\nfunction traverseColumnMajor() {\n  const start = performance.now();\n  let sum = 0;\n  for (let j = 0; j < COLS; j++) {\n    for (let i = 0; i < ROWS; i++) {\n      sum += matrix[i * COLS + j];\n    }\n  }\n  return { duration: performance.now() - start, sum };\n}\n\nconst rowResult = traverseRowMajor();\nconst colResult = traverseColumnMajor();\nconsole.log(`Row-major (Sequential / High TLB Hit): ${rowResult.duration.toFixed(2)} ms`);\nconsole.log(`Col-major (Stride 4096 / High TLB Miss): ${colResult.duration.toFixed(2)} ms`);\n// Col-major thường chậm hơn từ 5 đến 10 lần do liên tục trượt TLB cache!",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Tưởng rằng Page Fault luôn là lỗi nghiêm trọng làm crash chương trình (Page Fault là cơ chế bình thường của Demand Paging; chỉ khi truy cập vùng nhớ cấm mới sinh lỗi Segmentation Fault).",
+      "Viết thuật toán duyệt mảng dữ liệu lớn nhảy cóc (non-contiguous memory access) làm bùng nổ TLB Misses và Major Page Faults.",
+      "Không nhận ra ứng dụng đang bị sập hiệu năng do Major Page Faults khi bộ nhớ RAM vật lý bắt đầu bị tràn xuống Swap đĩa."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Linux kernel sử dụng Multi-level Page Tables (như 4-level hoặc 5-level paging trên x86_64) thay vì dùng một bảng phân trang phẳng duy nhất?",
+      "Kỹ thuật HugePages (2MB hoặc 1GB) giảm tải cho TLB như thế nào trong các hệ thống cơ sở dữ liệu lớn?"
     ]
   },
   {
@@ -403,18 +721,32 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Hiện tượng Thrashing trong hệ điều hành là gì và cách phòng tránh?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["thrashing", "cs", "architecture", "performance"],
+    "interviewerIntent": "Đánh giá hiểu biết sâu về quản lý bộ nhớ ảo dưới áp lực cao, nhận diện triệu chứng hệ thống chết đứng khi RAM cạn kiệt và các phương án xử lý cấp hệ thống.",
+    "contextOrScenario": "Server production bất ngờ có CPU I/O wait (wa) đạt 95-100%, server hoàn toàn không phản hồi SSH hay API dù CPU usage thực tế của app rất thấp.",
+    "expectedKeywords": [
+      "Thrashing",
+      "Virtual Memory",
+      "Page In / Page Out",
+      "Swap space",
+      "Working Set Model",
+      "Locality of Reference",
+      "I/O wait",
+      "OOM Killer"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Hiện tượng Thrashing trong hệ điều hành là gì và cách phòng tránh?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Thrashing là trạng thái suy sụp của hệ điều hành khi tổng kích thước Working Set của các tiến trình vượt quá dung lượng RAM vật lý khả dụng. Hệ điều hành dành phần lớn thời gian CPU chỉ để tráo đổi các trang nhớ ra vào giữa RAM và đĩa Swap (Paging in / Paging out liên tục) thay vì thực thi lệnh của ứng dụng, khiến hệ thống gần như đóng băng hoàn toàn.",
+      "deepDive": "Nguyên nhân gốc rễ: Mỗi tiến trình cần một tập hợp các trang nhớ hoạt động tại thời điểm hiện tại gọi là Working Set. Khi RAM đầy, thuật toán thay thế trang (Page Replacement - như LRU) đẩy bớt trang của Process A xuống đĩa để nhường chỗ cho Process B. Ngay tức khắc sau đó, Process A cần lại trang đó, gây ra Major Page Fault. OS lại phải đẩy trang của Process B xuống đĩa để nạp lại trang cho Process A. Vòng luẩn quẩn này làm I/O đĩa bị nghẽn 100%, CPU bị kẹt ở trạng thái iowait (`%wa`), thông lượng hệ thống rớt về 0. Phòng tránh: (1) Cấu hình Working Set Model hạn chế số lượng tiến trình đồng thời (admission control), (2) Điều chỉnh `vm.swappiness` (giảm xuống 10 hoặc 1), (3) Tăng RAM vật lý hoặc cấu hình Kubernetes Resource Limits dứt khoát để kill process tràn RAM thay vì để cả node sập vào thrashing.",
+      "codeExample": "// Script Bash phát hiện sớm nguy cơ Thrashing trên máy chủ Linux\n/*\n#!/usr/bin/env bash\n\n# 1. Kiểm tra tốc độ Swap In (si) và Swap Out (so) qua vmstat\n# Nếu si và so liên tục > 0 với giá trị hàng nghìn KB/s, hệ thống ĐANG RƠI VÀO THRASHING!\necho \"=== Giám sát Swap Activity (si/so) ===\"\nvmstat 1 5\n\n# 2. Điều chỉnh độ tích cực dùng Swap của Linux Kernel (vm.swappiness)\n# Giá trị mặc định là 60. Đối với server CSDL và high-throughput backend, khuyến nghị đặt 10 hoặc 1.\necho \"=== Cấu hình giảm swappiness chống thrashing ===\"\nsudo sysctl -w vm.swappiness=10\necho \"vm.swappiness=10\" | sudo tee -a /etc/sysctl.conf\n*/\n\nimport fs from 'node:fs';\n\nexport function checkMemoryPressure(): { isThrashingRisk: boolean; swapUsedRatio: number } {\n  try {\n    const meminfo = fs.readFileSync('/proc/meminfo', 'utf8');\n    const getVal = (key: string) => {\n      const match = meminfo.match(new RegExp(`${key}:\\\\s+(\\\\d+)`));\n      return match ? parseInt(match[1], 10) : 0;\n    };\n    \n    const swapTotal = getVal('SwapTotal');\n    const swapFree = getVal('SwapFree');\n    const swapUsed = swapTotal - swapFree;\n    const swapRatio = swapTotal > 0 ? swapUsed / swapTotal : 0;\n\n    return {\n      isThrashingRisk: swapRatio > 0.8, // Swap bị chiếm dụng trên 80%\n      swapUsedRatio: swapRatio\n    };\n  } catch {\n    return { isThrashingRisk: false, swapUsedRatio: 0 };\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Tăng kích thước Swap partition lên quá lớn khi RAM vật lý không đủ; điều này chỉ kéo dài thêm thời gian hệ thống rơi vào trạng thái 'chết lâm sàng' do thrashing trước khi sập.",
+      "Để giá trị mặc định `vm.swappiness=60` trên các server chạy Database (PostgreSQL/MySQL/Elasticsearch) khiến OS đẩy cache vào swap không cần thiết.",
+      "Không đặt giới hạn bộ nhớ (Memory Limits) trong Docker/K8s khiến một container rò rỉ RAM kéo sập toàn bộ node do thrashing I/O."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Nguyên lý mô hình 'Working Set' của Peter Denning ngăn chặn hiện tượng Thrashing trong thiết kế hệ điều hành như thế nào?",
+      "Tính năng PSI (Pressure Stall Information) trong Linux kernel hiện đại giúp nhận diện áp lực bộ nhớ và I/O trước khi xảy ra thrashing ra sao?"
     ]
   },
   {
@@ -422,18 +754,33 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Đồng bộ hoá tiến trình: Phân biệt Mutex, Counting Semaphore, Binary Semaphore và Spinlock.",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["mutex", "counting", "semaphore", "binary", "spinlock."],
+    "interviewerIntent": "Đánh giá hiểu biết sâu về kỹ thuật đồng bộ hóa, cơ chế bảo vệ Critical Section và lựa chọn primitive phù hợp để tối ưu giữa CPU usage và độ trễ chờ đợi.",
+    "contextOrScenario": "Phát triển hệ thống đa luồng có tài nguyên dùng chung giới hạn (Connection Pool, Rate Limiter) hoặc tối ưu code kernel/driver độ trễ siêu thấp.",
+    "expectedKeywords": [
+      "Synchronization",
+      "Critical Section",
+      "Mutex (Ownership)",
+      "Binary Semaphore",
+      "Counting Semaphore",
+      "Spinlock",
+      "Busy-waiting",
+      "Futex",
+      "Deadlock"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Đồng bộ hoá tiến trình: Phân biệt Mutex, Counting Semaphore, Binary Semaphore và Spinlock.'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Mutex (Mutual Exclusion) là khóa sở hữu độc quyền (chỉ luồng lock mới được quyền unlock). Binary Semaphore có giá trị 0 hoặc 1 dùng để báo hiệu (signaling - luồng này có thể unlock cho luồng kia). Counting Semaphore có giá trị N dùng để quản lý một tập tài nguyên giới hạn (ví dụ Connection Pool có N kết nối). Spinlock thực hiện vòng lặp bận (busy-waiting) liên tục kiểm tra cờ khóa trên CPU core mà không đưa luồng vào giấc ngủ (sleep).",
+      "deepDive": "Sự đánh đổi: Khi Mutex bị khóa, luồng chờ sẽ bị Kernel đưa vào trạng thái Blocked/Sleep (thông qua cơ chế Linux `futex`), nhường CPU cho task khác nhưng tốn chi phí 2 lần Context Switch khi ngủ và khi được đánh thức. Spinlock không nhường CPU, nó quay vòng lặp liên tục đốt chu kỳ CPU; do đó Spinlock chỉ được phép dùng khi Critical Section cực kỳ ngắn (vài nanosecond, phổ biến trong Interrupt Handler của Kernel nơi luồng không được phép ngủ) và trên hệ thống đa nhân (Multiprocessor). Trên hệ thống đơn nhân, Spinlock bị cấm vì luồng quay vòng sẽ chiếm luôn CPU làm luồng giữ khóa không bao giờ chạy được để mở khóa.",
+      "codeExample": "// Triển khai Counting Semaphore trong TypeScript để kiểm soát tài nguyên đồng thời giới hạn\nclass AsyncCountingSemaphore {\n  private permits: number;\n  private waitingQueue: Array<() => void> = [];\n\n  constructor(permits: number) {\n    this.permits = permits;\n  }\n\n  // Xin cấp phép (Acquire): Nếu hết permit, trả về Promise treo và đẩy vào hàng đợi\n  async acquire(): Promise<void> {\n    if (this.permits > 0) {\n      this.permits--;\n      return Promise.resolve();\n    }\n    return new Promise<void>((resolve) => {\n      this.waitingQueue.push(resolve);\n    });\n  }\n\n  // Trả giấy phép (Release): Đánh thức task tiếp theo trong hàng đợi\n  release(): void {\n    if (this.waitingQueue.length > 0) {\n      const nextTask = this.waitingQueue.shift()!;\n      nextTask(); // Báo hiệu cho task đang chờ tiếp tục thực thi\n    } else {\n      this.permits++;\n    }\n  }\n}\n\n// Áp dụng: Giới hạn tối đa 3 tác vụ I/O chạy song song cùng lúc\nconst poolLimiter = new AsyncCountingSemaphore(3);\n\nasync function runTask(id: number) {\n  await poolLimiter.acquire();\n  try {\n    console.log(`Task ${id} bắt đầu xử lý tài nguyên`);\n    await new Promise(r => setTimeout(r, 100)); // Giả lập xử lý\n  } finally {\n    console.log(`Task ${id} hoàn tất, giải phóng slot`);\n    poolLimiter.release();\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Nhầm lẫn Mutex với Binary Semaphore: Mutex có khái niệm Ownership (chỉ thread khóa mới được mở); Semaphore là Signaling (thread A có thể signal mở khóa cho thread B).",
+      "Sử dụng Spinlock cho đoạn code thực hiện thao tác I/O hoặc tính toán lâu khiến CPU core bị thiêu đốt 100% vô ích.",
+      "Quên giải phóng Lock trong khối `finally` khi hàm ném ngoại lệ (Exception) dẫn đến Deadlock vĩnh viễn."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Cơ chế Linux Futex (Fast Userspace Mutex) tối ưu hóa việc acquire lock trong trường hợp không có tranh chấp (uncontended) mà không cần gọi syscall như thế nào?",
+      "Hiện tượng Priority Inversion là gì và giao thức Priority Inheritance giải quyết vấn đề này ra sao?"
     ]
   },
   {
@@ -441,18 +788,33 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Deadlock: 4 điều kiện Coffman gây ra deadlock? Chiến lược ngăn chặn, phòng tránh (Thuật toán Banker) và phát hiện deadlock?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["deadlock", "coffman", "chi", "thu", "banker"],
+    "interviewerIntent": "Đánh giá năng lực thiết kế hệ thống đa luồng/phân tán an toàn, phòng ngừa lỗi tắc nghẽn tài nguyên và hiểu rõ thuật toán phân bổ an toàn của Dijkstra.",
+    "contextOrScenario": "Phát hiện hệ thống database gặp Deadlock giữa 2 transaction cập nhật chéo bảng, hoặc 2 worker threads tranh chấp lock lẫn nhau.",
+    "expectedKeywords": [
+      "Deadlock",
+      "Coffman Conditions",
+      "Mutual Exclusion",
+      "Hold and Wait",
+      "No Preemption",
+      "Circular Wait",
+      "Lock Ordering",
+      "Banker's Algorithm",
+      "Resource Allocation Graph"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Deadlock: 4 điều kiện Coffman gây ra deadlock? Chiến lược ngăn chặn, phòng tránh (Thuật toán Banker) và phát hiện deadlock?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Deadlock là tình trạng hai hoặc nhiều tiến trình bị chặn vĩnh viễn vì mỗi tiến trình đang giữ một tài nguyên và chờ tài nguyên mà tiến trình khác đang nắm giữ. 4 điều kiện Coffman: (1) Mutual Exclusion (loại trừ lẫn nhau), (2) Hold and Wait (giữ và chờ), (3) No Preemption (không cưỡng chế thu hồi), (4) Circular Wait (chờ vòng tròn). Chỉ cần phá vỡ 1 trong 4 điều kiện là triệt tiêu được deadlock.",
+      "deepDive": "Trong kỹ thuật thực tế, cách phổ biến nhất để ngăn chặn Deadlock là phá vỡ điều kiện Circular Wait bằng quy ước 'Lock Ordering' (luôn acquire các lock theo một thứ tự toàn cục cố định, ví dụ sắp xếp theo Resource ID). Chiến lược phòng tránh dùng Thuật toán Banker của Dijkstra: hệ thống chỉ cấp phát tài nguyên nếu trạng thái sau cấp phát là 'An toàn' (Safe State - tồn tại một chuỗi thứ tự hoàn thành cho tất cả các process). Phát hiện và xử lý: Database Engine (như Postgres/MySQL) định kỳ quét Đồ thị cấp phát tài nguyên (Resource Allocation Graph) để tìm chu trình (Cycle Detection); khi phát hiện, hệ thống chủ động hủy (Abort/Rollback) một Transaction có chi phí thấp nhất để giải phóng lock.",
+      "codeExample": "// Giải pháp ngăn ngừa Deadlock bằng cơ chế Lock Ordering trong TypeScript\nclass Account {\n  constructor(public id: number, public balance: number) {}\n}\n\nclass TransferService {\n  // Chiến lược: Luôn khóa tài khoản có ID nhỏ hơn trước (Lock Ordering)\n  // Bẻ gãy hoàn toàn điều kiện 'Circular Wait' của Coffman\n  static async transferMoney(from: Account, to: Account, amount: number): Promise<boolean> {\n    const firstLock = from.id < to.id ? from : to;\n    const secondLock = from.id < to.id ? to : from;\n\n    console.log(`Quy tắc Lock Ordering: Khóa Account ${firstLock.id} trước, sau đó khóa Account ${secondLock.id}`);\n    \n    // Giả lập acquire lock tuần tự\n    // acquireLock(firstLock);\n    // acquireLock(secondLock);\n    \n    try {\n      if (from.balance < amount) return false;\n      from.balance -= amount;\n      to.balance += amount;\n      console.log(`Chuyển tiền thành công: ${amount} từ ID:${from.id} sang ID:${to.id}`);\n      return true;\n    } finally {\n      // releaseLock(secondLock);\n      // releaseLock(firstLock);\n    }\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Acquire nhiều locks mà không có quy ước thứ tự sắp xếp cố định (ví dụ Luồng 1: Lock A -> Lock B; Luồng 2: Lock B -> Lock A gây deadlock 100%).",
+      "Giữ Lock trong khi đang thực hiện tác vụ gọi mạng (Network RPC / HTTP call) khiến thời gian giữ khóa kéo dài, dễ biến thành thảm họa deadlock.",
+      "Livelock: Hai luồng liên tục phát hiện xung đột và cùng lùi lại (backoff) nhường nhau cùng một khoảng thời gian cố định, làm cả hai cùng kẹt mà không luồng nào tiến triển."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Thuật toán Banker (Banker's Algorithm) của Dijkstra rất hiếm khi được áp dụng trong các hệ điều hành thông dụng hiện đại?",
+      "Cơ chế Deadlock Detector trong InnoDB của MySQL phát hiện và chọn Transaction nào làm 'Victim' để rollback dựa trên tiêu chí gì?"
     ]
   },
   {
@@ -460,18 +822,32 @@
     "category": "cs-fundamentals",
     "level": "middle",
     "question": "Các thuật toán định thời CPU (CPU Scheduling): FCFS, SJF, Round Robin, Priority Scheduling, Multi-level Feedback Queue?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["thu", "cpu", "scheduling", "fcfs", "sjf"],
+    "interviewerIntent": "Kiểm tra kiến thức về cơ chế lập lịch của OS Scheduler, sự cân bằng giữa Fairness, Throughput, Turnaround Time và Response Time.",
+    "contextOrScenario": "Hiểu cơ chế vận hành của Linux CFS (Completely Fair Scheduler), thiết kế job scheduler trong hàng đợi phân tán (RabbitMQ, Celery, BullMQ).",
+    "expectedKeywords": [
+      "CPU Scheduling",
+      "FCFS",
+      "SJF / SRTF",
+      "Round Robin (RR)",
+      "Quantum / Time-slice",
+      "Priority Inversion",
+      "MLFQ (Multi-level Feedback Queue)",
+      "Starvation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Các thuật toán định thời CPU (CPU Scheduling): FCFS, SJF, Round Robin, Priority Scheduling, Multi-level Feedback Queue?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "FCFS (First-Come, First-Served) đơn giản nhưng bị hiệu ứng Convoy; SJF (Shortest Job First) tối ưu Turnaround Time nhưng dễ gây đói tài nguyên (Starvation) cho task dài; Round Robin (RR) chia time-slice công bằng cho interactive systems; Priority Scheduling ưu tiên task quan trọng (cần aging chống starvation); Multi-level Feedback Queue (MLFQ) là đỉnh cao thực tế: tự động phân loại task I/O-bound và CPU-bound để ưu tiên tương ứng.",
+      "deepDive": "Nguyên lý của MLFQ (được áp dụng trong BSD, Windows, macOS): Có nhiều hàng đợi với mức độ ưu tiên từ cao xuống thấp. Task mới nạp được đưa vào queue ưu tiên cao nhất với quantum nhỏ. Nếu task dùng hết toàn bộ time-slice mà chưa xong (CPU-bound), nó bị giáng cấp xuống queue dưới có quantum lớn hơn. Nếu task tự nhường CPU trước khi hết quantum (I/O-bound interactive), nó được giữ nguyên ở mức ưu tiên cao. Để chống Starvation cho task CPU-bound, sau một khoảng thời gian cố định (Priority Boost), toàn bộ task được đưa ngược lại lên queue cao nhất. Trong Linux hiện đại, bộ lập lịch mặc định là CFS (Completely Fair Scheduler) dùng Red-Black Tree sắp xếp theo thời gian chạy ảo (`vruntime`).",
+      "codeExample": "// Mô phỏng thuật toán Round Robin CPU Scheduling với Time Quantum bằng TypeScript\ninterface Task {\n  id: string;\n  burstTime: number;      // Thời gian CPU cần để hoàn thành\n  remainingTime: number;\n}\n\nfunction simulateRoundRobin(tasks: Task[], timeQuantum: number) {\n  const queue: Task[] = tasks.map(t => ({ ...t }));\n  let currentTime = 0;\n  console.log(`Bắt đầu lập lịch Round Robin (Time Quantum = ${timeQuantum}ms):`);\n\n  while (queue.length > 0) {\n    const currentTask = queue.shift()!;\n    const executionTime = Math.min(currentTask.remainingTime, timeQuantum);\n    \n    currentTask.remainingTime -= executionTime;\n    currentTime += executionTime;\n    console.log(`[T=${currentTime}ms] Task ${currentTask.id} thực thi ${executionTime}ms (Còn lại: ${currentTask.remainingTime}ms)`);\n\n    if (currentTask.remainingTime > 0) {\n      // Hết time-slice mà chưa xong -> Đẩy về cuối hàng đợi\n      queue.push(currentTask);\n    } else {\n      console.log(`===> Task ${currentTask.id} ĐÃ HOÀN THÀNH tại thời điểm ${currentTime}ms`);\n    }\n  }\n}\n\nsimulateRoundRobin([\n  { id: 'T1', burstTime: 10, remainingTime: 10 },\n  { id: 'T2', burstTime: 4, remainingTime: 4 },\n  { id: 'T3', burstTime: 6, remainingTime: 6 },\n], 3);",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Chọn Time Quantum quá nhỏ trong Round Robin khiến CPU lãng phí phần lớn thời gian cho Context Switching overhead.",
+      "Chọn Time Quantum quá lớn biến Round Robin suy biến thành FCFS, làm tăng vọt Response Time của người dùng.",
+      "Không áp dụng kỹ thuật Kéo dài tuổi thọ (Aging) trong Priority Scheduling khiến các tiến trình ưu tiên thấp bị chết đói (Starvation) vĩnh viễn."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Bộ lập lịch Linux Completely Fair Scheduler (CFS) sử dụng cây đỏ đen (Red-Black Tree) và biến `vruntime` để đảm bảo tính công bằng ra sao?",
+      "Real-time Scheduling policies trong Linux (SCHED_FIFO và SCHED_RR) khác gì so với SCHED_OTHER thông thường?"
     ]
   },
   {
@@ -479,18 +855,34 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "I/O Multiplexing trong Linux: So sánh sự khác nhau về độ phức tạp và hiệu năng giữa select(), poll() và epoll()?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["multiplexing", "linux", "nhau", "select", "poll"],
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu sâu sắc về kiến trúc mạng hiệu năng cao giải quyết bài toán C10K/C1000K, cách thức hoạt động của Linux kernel event notification và mô hình Edge-triggered vs Level-triggered.",
+    "contextOrScenario": "Thiết kế web server hiệu năng cực cao như Nginx, Envoy hoặc giải thích cơ chế bên dưới của Node.js libuv / Netty.",
+    "expectedKeywords": [
+      "I/O Multiplexing",
+      "select() O(n)",
+      "poll() O(n)",
+      "epoll() O(1)",
+      "File Descriptors (FD)",
+      "Red-Black Tree",
+      "Ready List",
+      "Level-Triggered (LT)",
+      "Edge-Triggered (ET)",
+      "C10K problem"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'I/O Multiplexing trong Linux: So sánh sự khác nhau về độ phức tạp và hiệu năng giữa select(), poll() và epoll()?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`select()` và `poll()` có độ phức tạp O(N) vì mỗi lần gọi đều phải sao chép toàn bộ danh sách File Descriptors (FD) từ user-space sang kernel-space và duyệt tuyến tính để kiểm tra; `select` bị giới hạn cứng 1024 FDs. `epoll()` đạt độ phức tạp O(1) nhờ duy trì cấu trúc cây đỏ đen (Red-Black Tree) trong kernel để theo dõi FDs và một Ready List (Doubly Linked List) chứa các FD có sự kiện thông qua callback ngắt phần cứng, chỉ trả về đúng các socket đã sẵn sàng.",
+      "deepDive": "Hạn chế chí mạng của `select()`/`poll()` là khi quản lý 100,000 kết nối đồng thời nhưng chỉ có 100 kết nối có dữ liệu: application vẫn phải truyền mảng 100,000 FDs vào Kernel, Kernel duyệt kiểm tra cả 100,000 FDs rồi trả về; application lại phải duyệt vòng lặp 100,000 phần tử để tìm 100 socket sẵn sàng. `epoll` chia thành 3 system calls: (1) `epoll_create()` tạo context trong kernel; (2) `epoll_ctl()` thêm/sửa/xóa FD vào RB-Tree (chỉ gọi 1 lần khi socket mở, không copy lại mỗi vòng lặp); (3) `epoll_wait()` chặn chờ và chỉ copy đúng các active events vào buffer người dùng. Hỗ trợ 2 chế độ: Level-Triggered (LT - tiếp tục báo nếu buffer còn data) và Edge-Triggered (ET - chỉ báo 1 lần khi trạng thái chuyển từ không có sang có data, yêu cầu application phải đọc cạn buffer trong vòng lặp non-blocking).",
+      "codeExample": "// Kiến trúc trừu tượng mô phỏng epoll event-loop (như libuv / Node.js) trong TypeScript\ninterface EpollEvent {\n  fd: number;\n  events: 'EPOLLIN' | 'EPOLLOUT';\n}\n\nclass EpollEngineMock {\n  // Kernel duy trì Red-Black tree theo dõi toàn bộ FDs đăng ký\n  private monitoredFds = new Set<number>();\n  // Kernel duy trì Ready List chứa các FD có dữ liệu sẵn sàng\n  private readyList: EpollEvent[] = [];\n\n  // epoll_ctl(epfd, EPOLL_CTL_ADD, fd, event)\n  ctlAdd(fd: number) {\n    this.monitoredFds.add(fd);\n    console.log(`[Kernel RB-Tree] Đăng ký theo dõi FD=${fd} (Total: ${this.monitoredFds.size})`);\n  }\n\n  // Card mạng (NIC) bắn ngắt hardware interrupt -> Kernel đẩy FD vào readyList O(1)\n  onNetworkPacketArrived(fd: number) {\n    if (this.monitoredFds.has(fd)) {\n      this.readyList.push({ fd, events: 'EPOLLIN' });\n    }\n  }\n\n  // epoll_wait(epfd, events, maxevents, timeout) -> Độ phức tạp O(k) với k là số event sẵn sàng\n  waitEvents(): EpollEvent[] {\n    const firedEvents = [...this.readyList];\n    this.readyList = []; // Reset ready list\n    return firedEvents;  // User application CHỈ duyệt qua đúng các FD có event!\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Sử dụng Edge-Triggered (ET) mode trong epoll nhưng không dùng non-blocking socket hoặc không đọc hết dữ liệu bằng vòng lặp `while(read > 0)`, khiến dữ liệu tồn đọng bị kẹt vĩnh viễn không bao giờ được báo lại.",
+      "Nhầm lẫn rằng epoll luôn nhanh hơn select/poll trong mọi trường hợp (nếu chỉ có vài kết nối (N nhỏ) và tất cả đều liên tục active, select/poll có thể nhanh hơn vì không mất chi phí quản lý cấu trúc dữ liệu kernel của epoll).",
+      "Gặp lỗi 'Thundering Herd' khi nhiều worker processes cùng chờ `epoll_wait` trên cùng một listening socket (khắc phục bằng cờ `EPOLLEXCLUSIVE` từ Linux 4.5+)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Giao thức io_uring mới trong Linux kernel vượt trội hơn epoll ở điểm nào khi thực hiện I/O bất đồng bộ thực sự (True Async I/O) cho cả File I/O và Network I/O?",
+      "Tại sao Node.js trên Windows không dùng epoll mà phải dựa vào I/O Completion Ports (IOCP) của NT Kernel?"
     ]
   },
   {
@@ -498,18 +890,32 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "Zero-copy là gì? Lệnh `sendfile()` và `splice()` trong Linux tối ưu truyền file qua mạng ra sao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["zero-copy", "sendfile", "splice", "linux", "truy"],
+    "interviewerIntent": "Đánh giá sự am hiểu về luồng di chuyển dữ liệu trong phần cứng và OS, kỹ thuật loại bỏ copy bộ đệm dư thừa và giảm thiểu context switch để đạt throughput tối đa của card mạng 10GbE/40GbE.",
+    "contextOrScenario": "Tối ưu hóa máy chủ truyền file tĩnh (Nginx/CDN), kiến trúc truyền dữ liệu log dung lượng hàng terabyte của Apache Kafka.",
+    "expectedKeywords": [
+      "Zero-copy",
+      "sendfile()",
+      "splice()",
+      "DMA (Direct Memory Access)",
+      "Page Cache",
+      "Socket Buffer",
+      "Context Switch reduction",
+      "Kafka performance"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Zero-copy là gì? Lệnh `sendfile()` và `splice()` trong Linux tối ưu truyền file qua mạng ra sao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Zero-copy là kỹ thuật loại bỏ việc sao chép dữ liệu thừa thãi giữa Kernel Space và User Space khi truyền dữ liệu từ thiết bị lưu trữ (đĩa) sang card mạng (NIC). Thay vì tốn 4 lần context switch và 4 lần copy dữ liệu (gọi `read()` rồi `write()`), lệnh `sendfile()` chuyển dữ liệu trực tiếp trong Kernel Space từ Page Cache sang Socket Buffer bằng DMA (Direct Memory Access), chỉ tốn 2 lần context switch và zero CPU copy.",
+      "deepDive": "Luồng truyền file truyền thống: (1) `read()` syscall: DMA copy từ Disk vào Kernel Page Cache (Switch 1 & 2), (2) CPU copy từ Kernel Page Cache sang User Buffer, (3) `write()` syscall: CPU copy từ User Buffer sang Kernel Socket Buffer (Switch 3 & 4), (4) DMA copy từ Socket Buffer ra card mạng (NIC). Tổng cộng: 4 Context Switches + 4 Copies (2 DMA + 2 CPU). Lệnh `sendfile()`: Ứng dụng chỉ truyền file descriptor đĩa và socket descriptor vào Kernel. Kernel ra lệnh DMA copy từ Disk vào Page Cache, sau đó nếu NIC hỗ trợ Scatter-Gather DMA, Kernel chỉ truyền con trỏ và độ dài (descriptors) sang Socket Buffer; NIC tự gom dữ liệu trực tiếp từ Page Cache. Tổng cộng: 2 Context Switches + 2 DMA Copies + ZERO CPU COPY. Apache Kafka đạt throughput hàng triệu msg/sec chính nhờ tận dụng `sendfile()` truyền log từ Page Cache thẳng ra Network socket.",
+      "codeExample": "// Minh họa: Truyền file lớn bằng Zero-Copy Stream vs nạp Buffer vào User Space trong Node.js\nimport fs from 'node:fs';\nimport http from 'node:http';\n\nconst server = http.createServer((req, res) => {\n  const filePath = '/var/data/large_video.mp4';\n  \n  // 1. PHƯƠNG PHÁP TỒI: Đọc toàn bộ file vào User-space RAM rồi mới ghi ra response\n  // fs.readFile(filePath, (err, data) => { res.end(data); }); // Tốn hàng GB RAM, 4 lần copy\n\n  // 2. PHƯƠNG PHÁP SENIOR: Dùng Stream pipeline (bên dưới libuv sẽ dùng sendfile syscall trên Linux)\n  const stat = fs.statSync(filePath);\n  res.writeHead(200, {\n    'Content-Type': 'video/mp4',\n    'Content-Length': stat.size,\n  });\n\n  const readStream = fs.createReadStream(filePath);\n  // Pipe trực tiếp File Descriptor sang Socket Descriptor -> Kích hoạt Zero-copy tại Kernel\n  readStream.pipe(res);\n});\n\nserver.listen(3000);",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Cố gắng áp dụng `sendfile()` khi dữ liệu cần phải bị biến đổi, nén (gzip) hoặc mã hóa trong ứng dụng (vì zero-copy không đưa dữ liệu lên user space nên CPU app không thể chỉnh sửa dữ liệu).",
+      "Gặp lỗi `SIGBUS` khi file đang được truyền qua `sendfile()` bất ngờ bị một tiến trình khác cắt cụt (truncate) kích thước.",
+      "Nghĩ rằng Zero-copy nghĩa là dữ liệu không bị copy lần nào (thực tế dữ liệu vẫn được copy bởi phần cứng DMA controller, zero-copy nghĩa là ZERO CPU copy)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Lệnh `splice()` trong Linux khác gì với `sendfile()` khi cần chuyển dữ liệu giữa 2 file descriptors bất kỳ thông qua Pipe?",
+      "Apache Kafka tận dụng sự kết hợp giữa Linux Page Cache và `sendfile()` như thế nào để phục vụ dữ liệu cho nhiều consumer cùng lúc mà không tốn RAM JVM?"
     ]
   },
   {
@@ -517,18 +923,33 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "Memory-mapped I/O (`mmap`) là gì? Tại sao Kafka và các CSDL nhúng (RocksDB, LMDB) tận dụng mmap để đạt hiệu năng cực cao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["memory-mapped", "mmap", "kafka", "csdl", "rocksdb"],
+    "interviewerIntent": "Kiểm tra sự hiểu biết chuyên sâu về kiến trúc lưu trữ, cơ chế tích hợp giữa Virtual Memory và File System, khả năng đọc/ghi file với tốc độ RAM.",
+    "contextOrScenario": "Xây dựng database engine lưu trữ thời gian thực (Time-series DB, Embeddings Vector Store, Key-Value store như RocksDB/LMDB).",
+    "expectedKeywords": [
+      "mmap()",
+      "Memory-mapped I/O",
+      "Page Cache",
+      "Virtual Address Space",
+      "Dirty Pages",
+      "msync()",
+      "Zero-copy",
+      "LMDB B+ Tree",
+      "Kafka Index"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Memory-mapped I/O (`mmap`) là gì? Tại sao Kafka và các CSDL nhúng (RocksDB, LMDB) tận dụng mmap để đạt hiệu năng cực cao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "`mmap()` là system call ánh xạ trực tiếp nội dung của một file trên đĩa vào không gian địa chỉ bộ nhớ ảo của tiến trình. Sau khi map, tiến trình có thể đọc và ghi file bằng các thao tác con trỏ bộ nhớ (pointer dereference) thông thường như truy cập RAM, bỏ qua hoàn toàn các system call `read()` và `write()`. Kafka dùng mmap để ghi index file; RocksDB và LMDB dùng mmap để đọc ghi cây B+ Tree với hiệu năng siêu tốc.",
+      "deepDive": "Cơ chế hoạt động: Khi gọi `mmap()`, OS chưa nạp ngay dữ liệu vào RAM mà chỉ tạo một entry trong bảng quản lý vùng nhớ ảo (`vm_area_struct`). Khi tiến trình đọc một byte tại địa chỉ đó, phần cứng MMU kích hoạt Page Fault (Demand Paging), Kernel tự động nạp 4KB chứa dữ liệu từ đĩa vào Page Cache và cập nhật Page Table. Các lần đọc sau diễn ra với tốc độ bus RAM (vài nanosecond). Khi ghi dữ liệu, tiến trình ghi trực tiếp vào Page Cache trong RAM (trang nhớ trở thành 'Dirty Page'), hệ điều hành sẽ định kỳ flush dữ liệu xuống đĩa ngầm ở background (hoặc chủ động gọi `msync()`). Lợi ích to lớn: Dữ liệu nằm trong Kernel Page Cache, nên nếu tiến trình bị crash đột ngột, dữ liệu đã ghi vẫn không bị mất và được Kernel bảo đảm sync xuống đĩa.",
+      "codeExample": "// Minh họa: Khái niệm ánh xạ file vào bộ nhớ (mmap concept) và thao tác trực tiếp qua Buffer\nimport fs from 'node:fs';\n\n// Mô phỏng cách CSDL nhúng (LMDB/RocksDB) đọc ghi bản ghi nhị phân cố định qua mapped memory\ninterface DatabaseRecord {\n  id: number;\n  score: number;\n}\n\nexport class MmapSimulator {\n  private buffer: Buffer;\n\n  constructor(filePath: string, sizeBytes: number) {\n    // Khởi tạo file với kích thước cố định nếu chưa có\n    if (!fs.existsSync(filePath)) {\n      const fd = fs.openSync(filePath, 'w+');\n      fs.ftruncateSync(fd, sizeBytes);\n      fs.closeSync(fd);\n    }\n    // Đọc file thành Buffer (trong C/C++ là gọi mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0))\n    this.buffer = fs.readFileSync(filePath);\n  }\n\n  // Đọc trực tiếp tại offset O(1) không qua syscall read()\n  getRecord(index: number): DatabaseRecord {\n    const offset = index * 8; // Mỗi record 8 bytes (4B id + 4B score)\n    const id = this.buffer.readInt32LE(offset);\n    const score = this.buffer.readFloatLE(offset + 4);\n    return { id, score };\n  }\n\n  // Ghi trực tiếp vào memory O(1)\n  writeRecord(index: number, id: number, score: number) {\n    const offset = index * 8;\n    this.buffer.writeInt32LE(id, offset);\n    this.buffer.writeFloatLE(score, offset + 4);\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Quên rằng không gian địa chỉ ảo 32-bit (chỉ có 4GB) sẽ không thể mmap được các file lớn hơn vài GB (bắt buộc phải chạy trên kiến trúc 64-bit).",
+      "Tiến trình bị sập ngay lập tức bởi tín hiệu `SIGBUS` nếu một tiến trình khác bên ngoài thu hẹp (truncate) kích thước file trong khi đang map.",
+      "Ghi quá nhiều dữ liệu dirty pages qua mmap mà không kiểm soát có thể khiến Kernel I/O subsystem bị nghẽn tắc khi xả dữ liệu xuống đĩa."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao LMDB (Lightning Memory-Mapped Database) có thể đạt hiệu năng đọc cao gấp hàng chục lần LevelDB/RocksDB nhờ kiến trúc thuần mmap?",
+      "Cờ `MAP_SHARED` và `MAP_PRIVATE` trong system call `mmap()` khác nhau cơ bản thế nào khi thực hiện thao tác ghi?"
     ]
   },
   {
@@ -536,18 +957,33 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "Bố cục bộ nhớ của một tiến trình Linux (Process Memory Layout): Text, Data, BSS, Heap, Memory Mapping, Stack?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["linux", "process", "memory", "layout", "text"],
+    "interviewerIntent": "Kiểm tra kiến thức vững chắc về kiến trúc máy tính và tổ chức bộ nhớ thực thi, nguồn gốc của các lỗi bảo mật kinh điển như Buffer Overflow hay Stack Overflow.",
+    "contextOrScenario": "Phân tích crash dump, debug lỗi rò rỉ bộ nhớ, tối ưu hóa kích thước binary hoặc phân tích lỗ hổng an toàn thông tin.",
+    "expectedKeywords": [
+      "Process Memory Layout",
+      "Text Segment (.text)",
+      "Data Segment (.data)",
+      "BSS (.bss)",
+      "Heap (brk/sbrk)",
+      "Memory Mapping (mmap)",
+      "Stack",
+      "Stack Overflow",
+      "ASLR"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Bố cục bộ nhớ của một tiến trình Linux (Process Memory Layout): Text, Data, BSS, Heap, Memory Mapping, Stack?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Bố cục không gian địa chỉ ảo của tiến trình Linux (từ địa chỉ thấp đến cao): (1) Text Segment (chứa mã máy biên dịch, read-only), (2) Data Segment (biến toàn cục/static đã khởi tạo giá trị), (3) BSS Segment (biến toàn cục/static chưa khởi tạo, mặc định zero), (4) Heap (cấp phát động qua `malloc`, phát triển từ thấp lên cao), (5) Memory Mapping Segment (chứa thư viện chia sẻ .so và mmap), (6) Stack (chứa biến cục bộ, con trỏ frame và return address, phát triển từ địa chỉ cao xuống thấp).",
+      "deepDive": "Giữa Heap và Stack là khoảng trống khổng lồ (trên hệ thống 64-bit là hàng chục Terabyte). Heap phát triển lên bằng cách di chuyển con trỏ program break thông qua syscall `brk()` hoặc cấp phát các chunk lớn bằng `mmap()`. Stack phát triển xuống mỗi khi một hàm được gọi (push stack frame) và tự động thu hồi khi return. Nếu đệ quy vô tận hoặc cấp phát mảng cục bộ quá lớn trên Stack, Stack sẽ đâm xuyên qua vùng bảo vệ (Guard Page) gây ra lỗi `Stack Overflow` (`SIGSEGV`). Kỹ thuật bảo mật ASLR (Address Space Layout Randomization) của Linux sẽ xáo trộn ngẫu nhiên địa chỉ cơ sở của Stack, Heap và Libraries mỗi lần chạy để chống các cuộc tấn công khai thác tràn bộ đệm (Buffer Overflow / Return-Oriented Programming).",
+      "codeExample": "// Chương trình TypeScript/C concept phân loại dữ liệu vào đúng các phân vùng bộ nhớ\n// 1. Data Segment: Biến toàn cục ĐÃ khởi tạo giá trị cụ thể\nconst GLOBAL_INITIALIZED_CONFIG = { timeout: 5000, version: '2.0.0' };\n\n// 2. BSS Segment: Biến toàn cục CHƯA khởi tạo (hoặc gán null/zero)\nlet globalUninitializedCounter: number;\n\nexport function inspectStackAndHeap() {\n  // 3. Stack: Biến nguyên thủy cục bộ nằm trực tiếp trên Call Stack của hàm\n  const localPrimitiveValue = 42;\n  const localFloat = 3.14159;\n\n  // 4. Heap: Đối tượng phức tạp được cấp phát động trên V8 / OS Heap\n  // Biến 'dynamicObject' trên Stack chỉ giữ con trỏ địa chỉ 64-bit trỏ tới Heap\n  const dynamicObject = {\n    user: 'Senior Engineer',\n    allocatedAt: new Date().toISOString(),\n    largeBuffer: new Array(100000).fill(1), // Mảng lớn nằm trên Heap\n  };\n\n  return { localPrimitiveValue, dynamicObject };\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Cấp phát các cấu trúc dữ liệu kích thước lớn (như buffer vài megabyte) bên trong hàm trên Stack thay vì Heap gây tràn Stack (Stack Overflow).",
+      "Hiểu nhầm rằng BSS segment chiếm dung lượng tương ứng trong file thực thi ELF trên đĩa (BSS chỉ lưu metadata kích thước, khi nạp vào RAM OS mới cấp phát trang zero).",
+      "Quên rằng biến con trỏ (pointer/reference) nằm trên Stack, nhưng vùng dữ liệu mà nó trỏ tới có thể nằm trên Heap."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Cơ chế ASLR (Address Space Layout Randomization) và Stack Canaries bảo vệ tiến trình chống lại các cuộc tấn công Buffer Overflow như thế nào?",
+      "Sự khác biệt giữa system call `brk()` và `mmap()` khi triển khai hàm `malloc()` trong thư viện glibc là gì?"
     ]
   },
   {
@@ -555,18 +991,32 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "Giao thức định tuyến BGP (Border Gateway Protocol) và Anycast IP hoạt động thế nào trong mạng lưới CDN và DNS toàn cầu?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["giao", "tuy", "bgp", "border", "gateway"],
+    "interviewerIntent": "Đánh giá kiến thức kiến trúc mạng diện rộng toàn cầu, cơ chế định tuyến Internet giữa các nhà mạng viễn thông (AS) và giải pháp giảm độ trễ tối đa cho hạ tầng Cloud/CDN toàn cầu.",
+    "contextOrScenario": "Thiết kế hạ tầng DNS (Cloudflare 1.1.1.1, Google 8.8.8.8) hoặc Multi-region CDN với mục tiêu định tuyến user đến PoP gần nhất về mặt mạng lưới.",
+    "expectedKeywords": [
+      "BGP (Border Gateway Protocol)",
+      "Autonomous System (AS)",
+      "Anycast",
+      "Unicast",
+      "CDN",
+      "PoP (Point of Presence)",
+      "BGP Route Poisoning",
+      "BGP Hijacking"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Giao thức định tuyến BGP (Border Gateway Protocol) và Anycast IP hoạt động thế nào trong mạng lưới CDN và DNS toàn cầu?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "BGP là giao thức định tuyến liên miền kết nối các Hệ tự trị (Autonomous Systems - AS) tạo nên xương sống Internet. Anycast IP là kỹ thuật mạng trong đó nhiều máy chủ vật lý ở các PoP khác nhau trên toàn cầu cùng chia sẻ chung một địa chỉ IP duy nhất. Khi client gửi packet đến IP Anycast, BGP sẽ tự động định tuyến gói tin đến PoP gần nhất theo số lượng AS hop ngắn nhất.",
+      "deepDive": "Trong Unicast truyền thống: 1 IP chỉ trỏ đến đúng 1 máy chủ duy nhất trên thế giới. Trong Anycast: Hàng trăm edge servers tại Tokyo, Singapore, Frankfurt, San Jose cùng thông báo (BGP Announcement) rằng: 'Tôi sở hữu IP 1.1.1.1'. Router Internet của ISP sẽ dựa vào bảng định tuyến BGP (AS-Path length, routing policies) để chuyển tiếp request của người dùng Việt Nam sang server Singapore hoặc Hong Kong có độ trễ thấp nhất. Nếu PoP tại Singapore gặp sự cố sập nguồn, router BGP lập tức rút lại quảng bá (withdraw announcement), lưu lượng sẽ tự động hội tụ chuyển hướng sang PoP Hong Kong mà người dùng không hề hay biết. Anycast cũng là vũ khí tối thượng chống DDoS: đợt tấn công 10Tbps sẽ bị chia nhỏ và phân tán hấp thụ tại hàng chục PoP trên toàn cầu thay vì đánh sập 1 server duy nhất.",
+      "codeExample": "// Minh họa: Phân tích đường đi của gói tin mạng qua các AS hops bằng traceroute parser\ninterface RouteHop {\n  hopIndex: number;\n  ip: string;\n  rttMs: number;\n  autonomousSystem?: string;\n}\n\nexport function parseTracerouteOutput(rawOutput: string): RouteHop[] {\n  const lines = rawOutput.split('\\n');\n  const hops: RouteHop[] = [];\n\n  for (const line of lines) {\n    // Regex parse định dạng traceroute chuẩn POSIX: 1  192.168.1.1 (192.168.1.1)  1.234 ms\n    const match = line.trim().match(/^(\\d+)\\s+([a-zA-Z0-9.-]+)\\s+\\(([0-9.]+)\\)\\s+([0-9.]+)\\s*ms/);\n    if (match) {\n      hops.push({\n        hopIndex: parseInt(match[1], 10),\n        ip: match[3],\n        rttMs: parseFloat(match[4]),\n        autonomousSystem: match[3].startsWith('1.1.1') ? 'AS13335 (Cloudflare Anycast)' : undefined,\n      });\n    }\n  }\n  return hops;\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Hiểu nhầm Anycast định tuyến theo khoảng cách địa lý (khoảng cách BGP là độ dài chuỗi AS hop và chính sách kinh tế peering giữa các ISP, đôi khi user ở Việt Nam lại bị route sang Mỹ thay vì Singapore).",
+      "Sử dụng Anycast cho các kết nối TCP Stateful dài hạn mà không có giải pháp duy trì session; nếu BGP flapping (đổi hướng đường truyền giữa chừng), TCP connection sẽ bị gãy do packet bị chuyển sang một PoP khác không giữ session state.",
+      "Bỏ qua rủi ro BGP Hijacking: kẻ xấu có thể quảng bá dải IP giả mạo để cướp toàn bộ lưu lượng của doanh nghiệp nếu không kích hoạt RPKI (Resource Public Key Infrastructure)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Anycast cực kỳ hoàn hảo cho DNS (UDP) nhưng lại đòi hỏi kỹ thuật phức tạp (như Maglev hash load balancing) khi áp dụng cho TCP Stateful traffic?",
+      "Cơ chế xác thực RPKI và BGPsec ngăn chặn tấn công BGP Hijacking trên Internet như thế nào?"
     ]
   },
   {
@@ -574,18 +1024,32 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "Tối ưu hóa TCP Stack ở cấp Kernel Linux: TCP Fast Open (TFO), TCP BBR congestion control algorithm?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["tcp", "stack", "kernel", "linux", "fast"],
+    "interviewerIntent": "Đánh giá khả năng tối ưu hóa hệ điều hành chuyên sâu ở cấp độ hạt nhân (Kernel Tuning), tối đa hóa throughput mạng cho microservices và CDN quy mô lớn.",
+    "contextOrScenario": "Tối ưu hóa máy chủ Linux chịu tải 500,000 requests/second, giảm chỉ số TTFT (Time To First Token) cho dịch vụ AI Streaming hoặc giảm độ trễ API.",
+    "expectedKeywords": [
+      "TCP Fast Open (TFO)",
+      "TCP BBR",
+      "CUBIC",
+      "sysctl",
+      "tcp_fastopen",
+      "Bottleneck Bandwidth",
+      "Bufferbloat",
+      "Kernel Tuning"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Tối ưu hóa TCP Stack ở cấp Kernel Linux: TCP Fast Open (TFO), TCP BBR congestion control algorithm?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "TCP Fast Open (TFO) cho phép gửi dữ liệu application ngay trong gói tin SYN đầu tiên ở các lần kết nối tiếp theo thông qua TFO Cookie, giảm độ trễ bắt tay từ 1 RTT xuống 0 RTT. Thuật toán kiểm soát tắc nghẽn TCP BBR (Bottleneck Bandwidth and RTT) của Google từ bỏ mô hình mất gói truyền thống (loss-based như CUBIC), đo lường trực tiếp tốc độ truyền tối đa và RTT tối thiểu để tối đa hóa băng thông và triệt tiêu Bufferbloat.",
+      "deepDive": "Chi tiết TFO (RFC 7413): Trong lần kết nối đầu, client xin một cookie mã hóa từ server. Ở lần kết nối sau, client gửi gói SYN chứa cả Cookie và HTTP Request payload. Server xác thực cookie hợp lệ sẽ gửi lại SYN-ACK kèm HTTP Response ngay lập tức. Client tiết kiệm trọn vẹn 1 RTT trước khi bắt đầu tải data. Chi tiết BBR: Các thuật toán cũ (Reno, CUBIC) coi mất gói (packet loss) là tín hiệu tắc nghẽn, nên chúng sẽ bơm dữ liệu cho đến khi router trung gian bị tràn bộ đệm làm rớt gói rồi mới cắt giảm cửa sổ cwnd xuống 50% (gây Bufferbloat và giật lag). BBR liên tục mô hình hóa mạng bằng cách đo Max Delivery Rate và Min Round Trip Time để bơm dữ liệu đúng bằng dung lượng đường ống (BDP = Bw * RTT), giữ hàng đợi router luôn rỗng, tăng throughput lên gấp nhiều lần trên mạng có packet loss cao.",
+      "codeExample": "// Script Bash cấu hình Kernel Tuning cho TCP Stack trên Linux Production\n/*\n#!/usr/bin/env bash\n\necho \"=== Tối ưu hóa TCP Stack với TCP Fast Open và Google BBR ===\"\n\n# 1. Kích hoạt BBR Congestion Control\nsudo modprobe tcp_bbr\necho \"net.core.default_qdisc = fq\" | sudo tee -a /etc/sysctl.conf\necho \"net.ipv4.tcp_congestion_control = bbr\" | sudo tee -a /etc/sysctl.conf\n\n# 2. Bật TCP Fast Open (giá trị 3 = bật cho cả Client và Server)\necho \"net.ipv4.tcp_fastopen = 3\" | sudo tee -a /etc/sysctl.conf\n\n# 3. Tăng kích thước bộ đệm TCP Read/Write Buffer cho mạng băng thông cao\necho \"net.ipv4.tcp_rmem = 4096 87380 16777216\" | sudo tee -a /etc/sysctl.conf\necho \"net.ipv4.tcp_wmem = 4096 65536 16777216\" | sudo tee -a /etc/sysctl.conf\n\n# Áp dụng cấu hình ngay lập tức\nsudo sysctl -p\n\n# Kiểm tra thuật toán congestion control đang hoạt động\nsysctl net.ipv4.tcp_congestion_control\n*/\n\nimport { execSync } from 'node:child_process';\n\nexport function verifyKernelBbrEnabled(): boolean {\n  try {\n    const output = execSync('sysctl net.ipv4.tcp_congestion_control', { encoding: 'utf8' });\n    return output.includes('bbr');\n  } catch {\n    return false;\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Bật TCP Fast Open cho các HTTP POST request không idempotent mà không có cơ chế chống Replay Attack tại ứng dụng.",
+      "Kích hoạt BBR nhưng quên đổi Queueing Discipline sang `fq` (`net.core.default_qdisc = fq`), khiến BBR không thể định nhịp gói tin (pacing) chính xác.",
+      "Tăng kích thước bộ đệm `tcp_rmem` và `tcp_wmem` quá lớn trên server có hàng triệu kết nối gây cạn kiệt RAM vật lý (Kernel Socket Memory exhaustion)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "BBRv2 và BBRv3 giải quyết nhược điểm cạnh tranh băng thông không công bằng (unfairness) với các luồng CUBIC cũ như thế nào?",
+      "Tại sao một số middlebox/firewall cũ trên Internet có thể drop các gói TCP mang cờ TFO và cách client fallback an toàn ra sao?"
     ]
   },
   {
@@ -593,18 +1057,32 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "Hiện tượng Port Exhaustion khi mở hàng chục nghìn outbound connection: Nguyên nhân và cách cấu hình `SO_REUSEADDR`, `ip_local_port_range`?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["port", "exhaustion", "ngh", "outbound", "connection"],
+    "interviewerIntent": "Đánh giá năng lực xử lý sự cố cấp độ cao trong các hệ thống Reverse Proxy, API Gateway hoặc crawler khi gửi lưu lượng ra ngoài với tần suất khủng khiếp.",
+    "contextOrScenario": "Reverse Proxy (Envoy/Nginx) hoặc Microservice liên tục ném lỗi `connect() failed (99: Cannot assign requested address)` khi gửi request sang upstream.",
+    "expectedKeywords": [
+      "Port Exhaustion",
+      "Ephemeral Ports",
+      "5-tuple",
+      "ip_local_port_range",
+      "SO_REUSEADDR",
+      "SO_REUSEPORT",
+      "tcp_tw_reuse",
+      "Connection Pooling"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Hiện tượng Port Exhaustion khi mở hàng chục nghìn outbound connection: Nguyên nhân và cách cấu hình `SO_REUSEADDR`, `ip_local_port_range`?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Port Exhaustion xảy ra khi một máy chủ mở quá nhiều kết nối outbound ngắn hạn (short-lived) đến cùng một IP và Port đích, làm cạn kiệt toàn bộ dải cổng tạm thời (Ephemeral Ports thường chỉ có ~28,000 cổng mặc định) do các socket cũ bị kẹt ở trạng thái TIME_WAIT. Khắc phục bằng cách mở rộng `ip_local_port_range`, bật `tcp_tw_reuse`, cấu hình `SO_REUSEADDR` và bắt buộc dùng Connection Pooling.",
+      "deepDive": "Một kết nối TCP ra ngoài được xác định bởi: {Protocol, Local IP, Local Port, Remote IP, Remote Port}. Vì Remote IP và Remote Port cố định (ví dụ gọi sang MySQL 10.0.0.5:3306), Local IP cũng cố định, nên hệ điều hành chỉ còn đúng 1 biến số là Local Port (cấp từ `ip_local_port_range`). Mặc định Linux chỉ mở dải 32768 đến 60999 (~28,231 ports). Nếu ứng dụng tạo 1,000 requests/s và đóng kết nối ngay, các socket rơi vào trạng thái TIME_WAIT kéo dài 60s -> sau 30 giây, toàn bộ 28,000 ports bị khóa chặt, Kernel không thể cấp port mới và trả lỗi `EADDRNOTAVAIL` (`Cannot assign requested address`). Giải pháp triệt để: (1) Mở rộng dải port: `net.ipv4.ip_local_port_range = 10240 65535` (~55,000 ports), (2) Bật `net.ipv4.tcp_tw_reuse = 1` cho phép tái sử dụng an toàn các socket TIME_WAIT nếu timestamp hợp lệ, (3) Dùng nhiều Local IP (IP aliasing), (4) Kiến trúc: Bắt buộc dùng Persistent Connection Pooling (Keep-Alive).",
+      "codeExample": "// Script Bash tối ưu hoá Kernel Linux chống cạn kiệt Ephemeral Ports\n/*\n#!/usr/bin/env bash\n\necho \"=== Khắc phục lỗi Port Exhaustion trên High-load Gateway ===\"\n\n# 1. Mở rộng dải Ephemeral Ports từ 10240 đến 65535 (cung cấp hơn 55,000 cổng khả dụng)\nsudo sysctl -w net.ipv4.ip_local_port_range=\"10240 65535\"\n\n# 2. Cho phép Kernel tái sử dụng socket ở trạng thái TIME_WAIT cho outgoing connections mới\nsudo sysctl -w net.ipv4.tcp_tw_reuse=1\n\n# 3. Giảm bớt thời gian chờ FIN timeout từ 60s xuống 15s\nsudo sysctl -w net.ipv4.tcp_fin_timeout=15\n\n# Lưu cấu hình vĩnh viễn vào /etc/sysctl.conf\ncat <<EOF | sudo tee -a /etc/sysctl.conf\nnet.ipv4.ip_local_port_range = 10240 65535\nnet.ipv4.tcp_tw_reuse = 1\nnet.ipv4.tcp_fin_timeout = 15\nEOF\n\nsudo sysctl -p\n*/\n\nimport net from 'node:net';\n\n// Cấu hình Socket options trong code để tái sử dụng địa chỉ\nexport function createHighThroughputClientSocket(port: number, host: string) {\n  const socket = new net.Socket();\n  // Cho phép socket bind cùng local port nếu kết nối cũ đang ở trạng thái TIME_WAIT\n  // (Trong C/C++ là setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)))\n  socket.setKeepAlive(true, 5000); // Bật TCP Keep-Alive để tránh đóng mở socket liên tục\n  socket.connect(port, host);\n  return socket;\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Tưởng rằng một máy tính chỉ có thể mở tối đa 65,535 kết nối mạng (thực tế 65,535 chỉ là giới hạn port trên một cặp Remote IP:Port; nếu kết nối đến nhiều IP đích khác nhau, một máy chủ hoàn toàn có thể mở hàng trăm ngàn kết nối cùng lúc).",
+      "Kích hoạt cờ nguy hiểm `tcp_tw_recycle` (đã bị khai tử trên Linux) làm lỗi mạng diện rộng khi đi qua router NAT.",
+      "Không sửa mã nguồn (vẫn mở đóng kết nối liên tục) mà chỉ tăng cấu hình sysctl: điều này chỉ dời thời điểm sập server chậm lại vài chục giây."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Sự khác biệt cốt lõi giữa tùy chọn socket `SO_REUSEADDR` và `SO_REUSEPORT` trong Linux kernel là gì?",
+      "Làm thế nào để sử dụng kỹ thuật gán nhiều địa chỉ IP ảo (Secondary IPs) lên cùng một card mạng để vượt qua giới hạn 65,535 ports?"
     ]
   },
   {
@@ -612,18 +1090,31 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "CPU Cache Coherence và MESI protocol: False Sharing là gì và nó ảnh hưởng thế nào đến code đa luồng hiệu năng cao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["cpu", "cache", "coherence", "mesi", "protocol"],
+    "interviewerIntent": "Đánh giá kiến thức phần cứng máy tính cấp độ chuyên gia, hiểu sâu về kiến trúc CPU L1/L2/L3 cache, đường truyền bus bộ nhớ và kỹ thuật lập trình đa luồng không khóa (lock-free).",
+    "contextOrScenario": "Tối ưu hóa các hệ thống tài chính độ trễ thấp (HFT - High Frequency Trading), game engine hoặc thư viện concurrency hiệu năng cao.",
+    "expectedKeywords": [
+      "Cache Line (64 bytes)",
+      "Cache Coherence",
+      "MESI Protocol",
+      "Modified, Exclusive, Shared, Invalid",
+      "False Sharing",
+      "Cache Padding",
+      "Bus Invalidation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'CPU Cache Coherence và MESI protocol: False Sharing là gì và nó ảnh hưởng thế nào đến code đa luồng hiệu năng cao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "CPU không đọc ghi từng byte đơn lẻ mà thao tác theo từng khối 64 bytes gọi là Cache Line. Giao thức MESI đảm bảo tính nhất quán (Cache Coherence) giữa các core CPU. Hiện tượng False Sharing xảy ra khi hai luồng chạy trên hai CPU core khác nhau sửa đổi hai biến hoàn toàn độc lập, nhưng hai biến đó vô tình nằm chung trên một Cache Line 64 bytes. Thao tác ghi của core này liên tục làm mất hiệu lực (invalidate) cache của core kia, làm hiệu năng tụt dốc thê thảm.",
+      "deepDive": "Giao thức MESI gồm 4 trạng thái cho mỗi Cache Line: Modified (đã sửa, độc quyền), Exclusive (chưa sửa, độc quyền), Shared (nhiều core cùng đọc), Invalid (dữ liệu đã cũ, không hợp lệ). Khi Core 1 ghi vào biến A, toàn bộ Cache Line 64 bytes chứa biến A chuyển sang trạng thái Modified; CPU phát tín hiệu 'Bus Invalidation' qua interconnect bus yêu cầu Core 2 đánh dấu Cache Line của nó là Invalid. Khi Core 2 muốn ghi vào biến B (nằm ngay cạnh biến A trong 64 bytes đó), Core 2 bị Cache Miss, phải dừng lại chờ Core 1 flush dữ liệu ra L3 cache/RAM rồi mới nạp lại Cache Line đó. Hiện tượng này gọi là 'Cache Ping-Pong'. Để giải quyết: Áp dụng kỹ thuật Cache Padding (thêm các byte rác để các biến quan trọng nằm ở các Cache Line khác nhau, ví dụ `@Contended` trong Java hoặc alignment 64 bytes trong C/C++/Rust).",
+      "codeExample": "// Mô phỏng kỹ thuật Cache Line Padding (64-byte alignment) để triệt tiêu False Sharing\n// Giả định kiến trúc CPU phổ biến có Cache Line = 64 bytes\n\n// 1. DẠNG NGUY HIỂM: Hai biến đếm nằm liền kề nhau trong bộ nhớ (Dưới 64 bytes)\n// Hai CPU core chạy song song cập nhật counter1 và counter2 sẽ liên tục hủy cache của nhau\nclass FalseSharingProneCounters {\n  public counter1: number = 0; // 8 bytes\n  public counter2: number = 0; // 8 bytes (Nằm chung 1 cache line 64 bytes!)\n}\n\n// 2. CHUẨN MỰC SENIOR: Áp dụng Padding để tách mỗi biến sang một Cache Line độc lập\nclass FalseSharingFreeCounters {\n  public counter1: number = 0;\n  // Chèn 7 số nguyên 64-bit (56 bytes) để đẩy counter2 sang Cache Line tiếp theo: 8 + 56 = 64 bytes\n  private _pad1: number = 0;\n  private _pad2: number = 0;\n  private _pad3: number = 0;\n  private _pad4: number = 0;\n  private _pad5: number = 0;\n  private _pad6: number = 0;\n  private _pad7: number = 0;\n\n  public counter2: number = 0; // Đảm bảo nằm ở Cache Line riêng biệt 100%!\n}\n\nconsole.log('False Sharing Free Counters initialized with 64-byte cache boundary.');",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Tưởng rằng hai biến độc lập không cần lock thì hai luồng chạy song song sẽ tăng tốc gấp đôi (nếu dính False Sharing, code đa luồng chạy còn chậm hơn chạy đơn luồng).",
+      "Padding vô tội vạ làm phình to kích thước cấu trúc dữ liệu, gây lãng phí dung lượng quý giá của L1/L2 Cache (chỉ nên áp dụng padding cho các biến bị ghi thường xuyên bởi nhiều cores).",
+      "Bỏ qua memory reordering của CPU khi lập trình lock-free đa luồng mà không dùng memory fences/barriers."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Giao thức MOESI (bổ sung trạng thái Owner) trên kiến trúc AMD khác gì với MESI của Intel trong việc chia sẻ dirty cache line?",
+      "Cấu trúc dữ liệu Ring Buffer không khóa LMAX Disruptor đã xử lý False Sharing như thế nào để xử lý 6 triệu lệnh/giây?"
     ]
   },
   {
@@ -631,18 +1122,31 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "Cơ chế quản lý bộ nhớ HugePages trong Linux: Khi nào nên bật cho CSDL tải cao (Postgres, Oracle)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["hugepages", "linux", "csdl", "cao", "postgres"],
+    "interviewerIntent": "Đánh giá khả năng tối ưu hóa bộ nhớ cấp thấp cho các hệ quản trị cơ sở dữ liệu lớn (RDBMS/In-memory DB), hiểu sâu về TLB miss và rủi ro của Transparent Huge Pages (THP).",
+    "contextOrScenario": "Tối ưu hóa máy chủ PostgreSQL / Redis dung lượng RAM 256GB - 1TB, khắc phục hiện tượng thắt cổ chai TLB và độ trễ truy vấn tăng cao bất thường.",
+    "expectedKeywords": [
+      "HugePages (2MB, 1GB)",
+      "Standard Page (4KB)",
+      "TLB Miss",
+      "Page Table Walk",
+      "PostgreSQL shared_buffers",
+      "Transparent Huge Pages (THP)",
+      "Memory Compaction"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Cơ chế quản lý bộ nhớ HugePages trong Linux: Khi nào nên bật cho CSDL tải cao (Postgres, Oracle)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Linux mặc định dùng kích thước trang 4KB. Với máy chủ có 256GB RAM, hệ thống cần quản lý tới 67 triệu trang nhớ, khiến bảng Page Table phình to hàng chục GB và bộ nhớ đệm TLB trên CPU liên tục bị quá tải (TLB Misses). HugePages tăng kích thước trang lên 2MB hoặc 1GB, giảm số lượng trang nhớ cần quản lý đi 512 lần, giúp toàn bộ Page Table nằm gọn trong TLB cache. Nên bật Static HugePages cho PostgreSQL (`shared_buffers`) và Oracle; nhưng TUYỆT ĐỐI NÊN TẮT Transparent Huge Pages (THP) vì THP gây tắc nghẽn I/O khi defragmentation.",
+      "deepDive": "Sự nguy hiểm chết người của Transparent Huge Pages (THP): THP là tính năng tự động gom các trang 4KB thành 2MB ở background. Khi hệ thống chịu tải ghi cao và bộ nhớ bị phân mảnh (fragmented), tiến trình khẩn cấp của kernel (`khugepaged`) sẽ khóa bộ nhớ (take memory lock) để thực hiện Memory Compaction (dồn bộ nhớ để tìm khoảng trống 2MB liên tục). Việc này làm các truy vấn của Database hoặc Redis bị treo đột ngột (latency spike từ vài ms vọt lên vài giây). Do đó, chuẩn công nghiệp cho Production Database là: TẮT hoàn toàn THP (`echo never > /sys/kernel/mm/transparent_hugepage/enabled`) và cấu hình Static HugePages cố định (`vm.nr_hugepages`) dành riêng cho database shared buffers.",
+      "codeExample": "// Script Bash kiểm tra và cấu hình Static HugePages, đồng thời tắt THP cho Database\n/*\n#!/usr/bin/env bash\n\n# 1. TẮT Transparent Huge Pages (THP) - Yêu cầu bắt buộc cho Postgres, MySQL, Redis, MongoDB\necho never | sudo tee /sys/kernel/mm/transparent_hugepage/enabled\necho never | sudo tee /sys/kernel/mm/transparent_hugepage/defrag\n\n# 2. Tính toán số lượng Static HugePages 2MB cho PostgreSQL shared_buffers\n# Giả sử shared_buffers = 32GB = 32768 MB -> Cần: 32768 / 2 = 16384 HugePages\nHUGEPAGES_COUNT=16384\n\necho \"Cấu hình $HUGEPAGES_COUNT Static HugePages (32GB RAM)...\"\nsudo sysctl -w vm.nr_hugepages=$HUGEPAGES_COUNT\n\n# Lưu vào /etc/sysctl.conf để duy trì sau reboot\necho \"vm.nr_hugepages = $HUGEPAGES_COUNT\" | sudo tee -a /etc/sysctl.conf\n\n# 3. Kiểm tra kết quả\ncat /proc/meminfo | grep -i huge\n*/\n\nimport fs from 'node:fs';\n\nexport function checkHugePagesStatus() {\n  try {\n    const meminfo = fs.readFileSync('/proc/meminfo', 'utf8');\n    const getVal = (key: string) => {\n      const m = meminfo.match(new RegExp(`${key}:\\\\s+(\\\\d+)`));\n      return m ? parseInt(m[1], 10) : 0;\n    };\n    return {\n      hugePageSizeKB: getVal('Hugepagesize'),\n      hugePagesTotal: getVal('HugePages_Total'),\n      hugePagesFree: getVal('HugePages_Free'),\n    };\n  } catch {\n    return null;\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Để bật tính năng Transparent Huge Pages (THP) trên máy chủ chạy Redis hoặc MongoDB, gây ra hiện tượng lag spike và latency jitter ngẫu nhiên làm tê liệt ứng dụng.",
+      "Cấp phát Static HugePages quá nhiều vượt quá dung lượng RAM thực tế khiến hệ thống không còn đủ RAM cho các tiến trình OS cơ bản.",
+      "Bật HugePages ở cấp OS nhưng quên cấu hình `huge_pages = on` trong file cấu hình `postgresql.conf`."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao cơ chế Memory Compaction trong Transparent Huge Pages lại gây ra tình trạng Stop-the-world tạm thời cho các tiến trình cơ sở dữ liệu?",
+      "Kích thước 1GB HugePages (thay vì 2MB) phù hợp với những trường hợp sử dụng hạ tầng siêu lớn (HPC / Cloud Hypervisor) như thế nào?"
     ]
   },
   {
@@ -650,18 +1154,33 @@
     "category": "cs-fundamentals",
     "level": "senior",
     "question": "eBPF (Extended Berkeley Packet Filter) là gì? Cách eBPF cách mạng hoá việc giám sát mạng, bảo mật và profiling trong Linux kernel?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến CS Fundamentals ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng CS Fundamentals.",
-    "expectedKeywords": ["ebpf", "extended", "berkeley", "packet", "filter"],
+    "interviewerIntent": "Đánh giá kiến thức công nghệ hiện đại tiên tiến nhất của Linux Kernel, khả năng lập trình can thiệp hệ thống sâu mà không cần viết Kernel Module rủi ro cao.",
+    "contextOrScenario": "Triển khai hạ tầng quan sát Cloud-native (Cilium CNI trong Kubernetes, Pixie, Falco security monitoring, BCC tools profiling).",
+    "expectedKeywords": [
+      "eBPF",
+      "In-kernel Virtual Machine",
+      "JIT Compiler",
+      "eBPF Verifier",
+      "Kprobes / Uprobes",
+      "Tracepoints",
+      "XDP (eXpress Data Path)",
+      "Cilium",
+      "Zero-overhead Observability"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'eBPF (Extended Berkeley Packet Filter) là gì? Cách eBPF cách mạng hoá việc giám sát mạng, bảo mật và profiling trong Linux kernel?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "eBPF là máy ảo chạy trực tiếp bên trong Linux Kernel, cho phép lập trình viên chạy mã bytecode tùy biến an toàn khi có các sự kiện hệ thống (kprobes, tracepoints, network packets) mà không cần sửa đổi mã nguồn kernel hay nạp kernel module rủi ro. eBPF cách mạng hóa mạng lưới (XDP drop DDoS packet ở cấp card mạng), bảo mật (Falco chặn hành vi nguy hiểm tức thì) và giám sát (Cilium theo dõi service mesh với zero overhead).",
+      "deepDive": "Trước khi có eBPF, muốn can thiệp kernel phải viết Kernel Module (LKM) — chỉ cần 1 lỗi con trỏ null sẽ làm sập máy (Kernel Panic). eBPF giải quyết triệt để nhờ 2 thành phần: (1) eBPF Verifier: Kiểm tra tĩnh bytecode trước khi nạp vào kernel, đảm bảo chương trình không bao giờ rơi vào vòng lặp vô tận, không rò rỉ bộ nhớ, chỉ truy cập vùng nhớ hợp lệ; (2) JIT Compiler: Biên dịch bytecode thành mã máy native của CPU để thực thi với hiệu năng tối đa. Trong mạng máy tính, eBPF kết hợp với XDP (eXpress Data Path) cho phép xử lý gói tin ngay tại Network Interface Card (NIC) driver trước khi Linux Network Stack cấp phát `sk_buff`, có thể drop hàng chục triệu gói tin tấn công DDoS mỗi giây trên một server thông thường.",
+      "codeExample": "// Minh họa: Định nghĩa eBPF tracepoint concept để giám sát system call openat() trong Linux\n// Mã C biên dịch sang eBPF bytecode bằng Clang/LLVM\n/*\n#include <linux/bpf.h>\n#include <bpf/bpf_helpers.h>\n\n// Bắt sự kiện mỗi khi bất kỳ tiến trình nào gọi syscall openat (mở file)\nSEC(\"tracepoint/syscalls/sys_enter_openat\")\nint trace_openat(struct trace_event_raw_sys_enter *ctx) {\n    char filename[256];\n    bpf_probe_read_user_str(&filename, sizeof(filename), (void *)ctx->args[1]);\n    \n    // Ghi log vào kernel trace pipe mà không làm chậm ứng dụng\n    bpf_printk(\"eBPF Alert: Process dang mo file: %s\\n\", filename);\n    return 0;\n}\n\nchar LICENSE[] SEC(\"license\") = \"GPL\";\n*/\n\nimport { execSync } from 'node:child_process';\n\n// Đọc log xuất ra từ eBPF ring buffer / trace pipe trong user space\nexport function streamEbpfTraces() {\n  console.log('Theo dõi các sự kiện Kernel thời gian thực qua eBPF:');\n  try {\n    // Đọc kernel trace pipe nơi eBPF bpf_printk đẩy dữ liệu ra\n    const output = execSync('sudo head -n 5 /sys/kernel/debug/tracing/trace_pipe', { encoding: 'utf8' });\n    console.log(output);\n  } catch (err) {\n    console.log('eBPF trace_pipe yêu cầu quyền root / CAP_BPF trên Linux.');\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến CS Fundamentals."
+      "Tưởng rằng eBPF có thể chạy code C tùy ý không giới hạn (eBPF Verifier áp đặt các quy tắc khắt khe: giới hạn số lượng lệnh, cấm vòng lặp không xác định, con trỏ phải được verify).",
+      "Sử dụng kprobes cho các ứng dụng giám sát phụ thuộc lâu dài (kprobes bám vào kernel function nội bộ có thể bị thay đổi hoặc đổi tên giữa các phiên bản Linux kernel; nên ưu tiên dùng Tracepoints).",
+      "Quên rằng eBPF map có giới hạn dung lượng bộ nhớ cố định; nếu không dọn dẹp các key hết hạn, map sẽ đầy và làm rớt các sự kiện giám sát mới."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Cơ chế XDP (eXpress Data Path) kết hợp với eBPF giúp lọc và chống tấn công từ chối dịch vụ (DDoS) ở tốc độ dây (wire speed) như thế nào?",
+      "Tại sao dự án Kubernetes CNI Cilium sử dụng eBPF để thay thế hoàn toàn iptables và IPVS trong việc định tuyến Service Mesh?"
     ]
   }
 ]

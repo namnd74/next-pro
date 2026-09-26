@@ -26,6 +26,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 
+import { useResizableSplit } from '../hooks/use-resizable-split';
+
 export interface ReactPlaygroundProps {
   initialFiles: Record<string, string | PlaygroundFile>;
   entryPath?: string;
@@ -72,88 +74,35 @@ export function ReactPlayground({
   } = usePlayground({ initialFiles, entryPath, platform, scopeId });
 
   const [inlineMode, setInlineMode] = React.useState(false);
-  const [splitPercent, setSplitPercent] = React.useState<number>(50);
-  const [isDraggingSplit, setIsDraggingSplit] = React.useState<boolean>(false);
-  const [sidebarWidth, setSidebarWidth] = React.useState<number>(220);
-  const [isDraggingSidebar, setIsDraggingSidebar] = React.useState<boolean>(false);
-  const [isNarrowViewport, setIsNarrowViewport] = React.useState(false);
-
   const workspaceContainerRef = React.useRef<HTMLDivElement | null>(null);
   const mainSplitBodyRef = React.useRef<HTMLDivElement | null>(null);
   const hasInitializedMobileLayoutRef = React.useRef(false);
 
   const fileList = Object.values(project.files);
   const isHorizontal = layout.orientation === 'horizontal';
-  const effectiveHorizontal = isHorizontal && !isNarrowViewport;
 
-  React.useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 767px)');
-    const syncViewport = () => setIsNarrowViewport(mediaQuery.matches);
-    syncViewport();
-    mediaQuery.addEventListener('change', syncViewport);
-    return () => mediaQuery.removeEventListener('change', syncViewport);
-  }, []);
+  const {
+    splitPercent,
+    setSplitPercent,
+    isDraggingSplit,
+    setIsDraggingSplit,
+    sidebarWidth,
+    setSidebarWidth,
+    isDraggingSidebar,
+    setIsDraggingSidebar,
+    isNarrowViewport,
+    effectiveHorizontal,
+  } = useResizableSplit({
+    containerRef: workspaceContainerRef,
+    bodyRef: mainSplitBodyRef,
+    isHorizontal,
+  });
 
   React.useEffect(() => {
     if (!isNarrowViewport || hasInitializedMobileLayoutRef.current) return;
     hasInitializedMobileLayoutRef.current = true;
     if (layout.showSidebar) toggleSidebar();
   }, [isNarrowViewport, layout.showSidebar, toggleSidebar]);
-
-  // Handle Dragging Split Pane between Editor and Preview
-  React.useEffect(() => {
-    if (!isDraggingSplit) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!workspaceContainerRef.current) return;
-      const rect = workspaceContainerRef.current.getBoundingClientRect();
-
-      if (effectiveHorizontal) {
-        const offset = e.clientX - rect.left;
-        const newPercent = (offset / rect.width) * 100;
-        setSplitPercent(Math.min(Math.max(newPercent, 15), 85));
-      } else {
-        const offset = e.clientY - rect.top;
-        const newPercent = (offset / rect.height) * 100;
-        setSplitPercent(Math.min(Math.max(newPercent, 15), 85));
-      }
-    };
-
-    const handlePointerUp = () => {
-      setIsDraggingSplit(false);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [isDraggingSplit, effectiveHorizontal]);
-
-  // Handle Dragging Sidebar Width
-  React.useEffect(() => {
-    if (!isDraggingSidebar) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (!mainSplitBodyRef.current) return;
-      const rect = mainSplitBodyRef.current.getBoundingClientRect();
-      // 44px is the width of activity bar (w-11)
-      const offset = e.clientX - rect.left - 44;
-      setSidebarWidth(Math.min(Math.max(offset, 160), 450));
-    };
-
-    const handlePointerUp = () => {
-      setIsDraggingSidebar(false);
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [isDraggingSidebar]);
 
   const handleSeparatorKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const step = 5;
