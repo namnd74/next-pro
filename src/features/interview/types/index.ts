@@ -59,6 +59,25 @@ export type InterviewCategory =
   | 'frontend-core'
   | 'backend-core';
 
+export type DiagramType = 'mermaid' | 'pipeline' | 'svg';
+
+export interface PipelineStage {
+  name: string;
+  tool?: string;
+  icon?: string;
+  description: string;
+  metric?: string;
+  rollback?: string;
+}
+
+export interface InterviewDiagramSpec {
+  type: DiagramType;
+  title?: string;
+  caption?: string;
+  code?: string;
+  stages?: PipelineStage[];
+}
+
 export interface InterviewSeniorAnswer {
   summary: string;
   mentalModel?: string;
@@ -68,6 +87,7 @@ export interface InterviewSeniorAnswer {
   verification?: string[];
   codeExample?: string;
   codeLanguage?: string;
+  diagram?: InterviewDiagramSpec;
 }
 
 export interface InterviewEvaluationRubric {

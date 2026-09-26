@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CodeBlock } from '@/components/ui/code-block';
 import { TechIcon } from '@/components/common/tech-icon';
+import { MermaidViewer, PipelineTracker } from './visual';
 import { resolveFollowUp } from '../data/followup-resolver';
 import { getCategoryBadge } from '../config/categories.config';
 import { cn } from '@/lib/utils';
@@ -69,6 +70,27 @@ export const QuestionCard = React.memo(function QuestionCard({
 
   const hasRubric = Boolean(question.evaluationRubric);
   const categoryMeta = getCategoryBadge(question.category);
+
+  const diagramSpec = question.seniorAnswer.diagram;
+  const isMermaidCode = Boolean(
+    question.seniorAnswer.codeLanguage === 'mermaid' ||
+      (question.seniorAnswer.codeExample &&
+        /(sequenceDiagram|flowchart|graph\s+(TD|LR|TB|RL)|erDiagram|stateDiagram|classDiagram)/i.test(
+          question.seniorAnswer.codeExample
+        ))
+  );
+  const hasDiagram = Boolean(diagramSpec || isMermaidCode);
+  const diagramCode =
+    diagramSpec?.code || (isMermaidCode ? question.seniorAnswer.codeExample : undefined);
+
+  const gridColsClass = React.useMemo(() => {
+    let count = 3;
+    if (hasDiagram) count++;
+    if (hasRubric) count++;
+    if (count === 3) return 'max-w-md grid-cols-3';
+    if (count === 4) return 'max-w-xl grid-cols-2 sm:grid-cols-4';
+    return 'max-w-2xl grid-cols-2 sm:grid-cols-5';
+  }, [hasDiagram, hasRubric]);
 
   const toggleFollowUp = (idx: number) => {
     setRevealedFollowUps((prev) => {
@@ -196,12 +218,15 @@ export const QuestionCard = React.memo(function QuestionCard({
         <div className="accordion-overflow">
           {hasBeenExpanded && (
             <Tabs defaultValue="answer" className="w-full">
-              <TabsList
-                className={`grid w-full ${hasRubric ? 'max-w-xl grid-cols-2 sm:grid-cols-4' : 'max-w-md grid-cols-3'}`}
-              >
+              <TabsList className={`grid w-full ${gridColsClass}`}>
                 <TabsTrigger value="answer" className="text-xs">
                   💡 <span className="hidden sm:inline">Deep </span>Answer
                 </TabsTrigger>
+                {hasDiagram && (
+                  <TabsTrigger value="diagram" className="text-xs">
+                    📊 <span className="hidden sm:inline">Kiến trúc / </span>Sơ đồ
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="pitfalls" className="text-xs">
                   ⚠️ <span className="hidden sm:inline">Pitfalls &amp; </span>Traps
                 </TabsTrigger>
@@ -279,12 +304,40 @@ export const QuestionCard = React.memo(function QuestionCard({
                   </div>
                 )}
 
+                {/* Visual Pipeline or Mermaid diagram if defined */}
+                {diagramSpec?.type === 'pipeline' && diagramSpec.stages && (
+                  <div className="mt-2">
+                    <PipelineTracker
+                      stages={diagramSpec.stages}
+                      title={diagramSpec.title}
+                    />
+                  </div>
+                )}
+
+                {diagramCode && !isMermaidCode && (
+                  <div className="mt-2">
+                    <MermaidViewer
+                      code={diagramCode}
+                      title={diagramSpec?.title}
+                      caption={diagramSpec?.caption}
+                    />
+                  </div>
+                )}
+
                 {question.seniorAnswer.codeExample && (
                   <div className="mt-2">
-                    <CodeBlock
-                      code={question.seniorAnswer.codeExample}
-                      language={question.seniorAnswer.codeLanguage ?? 'tsx'}
-                    />
+                    {isMermaidCode ? (
+                      <MermaidViewer
+                        code={question.seniorAnswer.codeExample}
+                        title={diagramSpec?.title || 'Sơ đồ luồng xử lý (Mermaid Diagram)'}
+                        caption={diagramSpec?.caption}
+                      />
+                    ) : (
+                      <CodeBlock
+                        code={question.seniorAnswer.codeExample}
+                        language={question.seniorAnswer.codeLanguage ?? 'tsx'}
+                      />
+                    )}
                   </div>
                 )}
 
@@ -326,6 +379,24 @@ export const QuestionCard = React.memo(function QuestionCard({
                   </div>
                 )}
               </TabsContent>
+
+              {/* Dedicated Diagram Tab */}
+              {hasDiagram && (
+                <TabsContent value="diagram" className="space-y-3 pt-2">
+                  {diagramSpec?.type === 'pipeline' && diagramSpec.stages ? (
+                    <PipelineTracker
+                      stages={diagramSpec.stages}
+                      title={diagramSpec.title}
+                    />
+                  ) : diagramCode ? (
+                    <MermaidViewer
+                      code={diagramCode}
+                      title={diagramSpec?.title || 'Sơ đồ luồng kiến trúc (Architecture Diagram)'}
+                      caption={diagramSpec?.caption}
+                    />
+                  ) : null}
+                </TabsContent>
+              )}
 
               {/* Pitfalls Tab */}
               <TabsContent value="pitfalls" className="space-y-2 pt-2">

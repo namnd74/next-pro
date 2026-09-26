@@ -2299,6 +2299,55 @@
     "seniorAnswer": {
       "summary": "Một pipeline CI/CD chuẩn sản xuất được thiết kế thành 4 giai đoạn rõ ràng: (1) Validation Gate (Lint, Unit Test, SCA Security Scan, SAST chạy song song với dependency caching); (2) Artifact Packaging (Build Docker Image bất biến gắn Git SHA bằng BuildKit cache, quét lỗ hổng image và ký số qua Cosign); (3) Deployment Trigger (Theo triết lý GitOps: cập nhật tag image mới vào repository chứa manifests); (4) Observability & Verification (Theo dõi Canary rollout qua Argo Rollouts, tự động rollback nếu metric lỗi).",
       "deepDive": "Các yếu tố sống còn của một Senior Pipeline Design: (1) Tối ưu hóa thời gian chạy (< 5 phút): Tận dụng triệt để Cache (npm cache, Docker layer cache qua GitHub Actions Cache Backend), chạy song song các job độc lập; (2) Bảo mật chuỗi cung ứng (Supply Chain Security): Không truyền secrets vào Docker build arguments, sử dụng OIDC token (AWS AssumeRoleWithWebIdentity) để CI runner gọi AWS mà không cần lưu Access Key tĩnh; (3) Phân tách trách nhiệm GitOps: CI Pipeline chỉ có quyền ghi vào Git Manifest Repo (đổi version image trong file `kustomization.yaml`), việc deploy thực sự vào cluster do ArgoCD controller bên trong K8s tự động kéo về (Pull-based Deployment).",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Chuỗi Pipeline CI/CD GitOps Chuẩn Production",
+        "caption": "Quy trình phát hành tự động 6 chặng từ Code Commit tới Production Observability kèm cơ chế Auto-Rollback.",
+        "stages": [
+          {
+            "name": "1. Code & PR Gate",
+            "tool": "GitHub / GitLab",
+            "description": "Lập trình viên commit code, kích hoạt Webhook chạy kiểm tra Linting, Formatting và Branch Protection Rules.",
+            "metric": "Lead Time: < 15 phút từ PR",
+            "rollback": "Chặn tự động merge nếu bất kỳ check nào fail"
+          },
+          {
+            "name": "2. SAST & Quality Gate",
+            "tool": "SonarQube & Trivy",
+            "description": "Quét mã tĩnh tìm lỗ hổng bảo mật OWASP, phát hiện secrets bị lộ, kiểm tra code coverage tối thiểu 80%.",
+            "metric": "Gate: 0 Critical Bugs, 0 Vulnerabilities",
+            "rollback": "Dừng pipeline tức thì, gửi cảnh báo Slack"
+          },
+          {
+            "name": "3. Immutable OCI Build",
+            "tool": "Docker & BuildKit",
+            "description": "Đóng gói container multi-stage tối ưu dung lượng, gắn nhãn SHA bất biến và ký số bảo mật bằng Cosign.",
+            "metric": "Artifact: Immutable Image SHA Tag",
+            "rollback": "Không bao giờ dùng tag :latest trên production"
+          },
+          {
+            "name": "4. GitOps Sync",
+            "tool": "ArgoCD Controller",
+            "description": "Cập nhật manifest K8s trong Git. ArgoCD liên tục kiểm tra sự sai khác (drift) và tự động kéo cấu hình về cluster.",
+            "metric": "Sync Status: Healthy & Synced < 30s",
+            "rollback": "ArgoCD tự động revert về Git commit trước"
+          },
+          {
+            "name": "5. Progressive Rollout",
+            "tool": "Kubernetes & Argo Rollouts",
+            "description": "Phát hành Canary hoặc Rolling Update với readinessProbe và preStop hook để đảm bảo không rớt request nào.",
+            "metric": "Downtime: 0s (maxUnavailable: 0)",
+            "rollback": "Giữ nguyên Pod cũ nếu Pod mới crash-loop"
+          },
+          {
+            "name": "6. SLO Monitoring",
+            "tool": "Prometheus & Alertmanager",
+            "description": "Giám sát error rate 5xx và p99 latency. Tự động abort rollout và chuyển hướng traffic nếu vi phạm SLO.",
+            "metric": "MTTR: < 5 giây phục hồi",
+            "rollback": "Tự động hạ tỷ lệ traffic canary về 0%"
+          }
+        ]
+      },
       "codeExample": "# Kiến trúc Pipeline Sản xuất Toàn diện (GitHub Actions)\nname: Production Grade CI/CD Architecture\n\non:\n  push:\n    branches: [ main ]\n  pull_request:\n    branches: [ main ]\n\njobs:\n  # GIAI ĐOẠN 1: Quality & Security Gate (Chạy song song tối ưu tốc độ)\n  validation:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 20\n          cache: 'npm' # Tối ưu thời gian: Cache dependencies\n      - run: npm ci\n      - run: npm run lint\n      - run: npm test -- --coverage\n      - name: Quét lỗ hổng SCA với Trivy\n        uses: aquasecurity/trivy-action@master\n        with:\n          scan-type: 'fs'\n          severity: 'CRITICAL,HIGH'\n          exit-code: '1'\n\n  # GIAI ĐOẠN 2: Build & Push Immutable Artifact (Chỉ chạy trên nhánh main)\n  build-artifact:\n    needs: validation\n    if: github.ref == 'refs/heads/main'\n    runs-on: ubuntu-latest\n    outputs:\n      image_tag: ${{ steps.vars.outputs.tag }}\n    steps:\n      - uses: actions/checkout@v4\n      - id: vars\n        run: echo \"tag=${GITHUB_SHA::8}\" >> $GITHUB_OUTPUT\n      - uses: docker/setup-buildx-action@v3\n      - name: Build and Push Docker Image với BuildKit Cache\n        uses: docker/build-push-action@v5\n        with:\n          push: true\n          tags: myregistry.com/api:${{ steps.vars.outputs.tag }}\n          cache-from: type=gha\n          cache-to: type=gha,mode=max\n\n  # GIAI ĐOẠN 3: GitOps Delivery (Cập nhật manifest repo để ArgoCD tự sync)\n  gitops-deploy:\n    needs: build-artifact\n    runs-on: ubuntu-latest\n    steps:\n      - name: Update Kubernetes Manifest Repo (GitOps Trigger)\n        run: echo \"Updating manifest to tag ${{ needs.build-artifact.outputs.image_tag }}\"",
       "codeLanguage": "yaml"
     },
