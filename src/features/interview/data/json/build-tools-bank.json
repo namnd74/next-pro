@@ -4,18 +4,29 @@
     "category": "build-tools",
     "level": "junior",
     "question": "Vite là gì? Tại sao nhanh hơn Webpack trong development?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["vite", "nhanh", "webpack", "development", "build"],
+    "interviewerIntent": "Đánh giá mức độ hiểu biết về kiến trúc bundler hiện đại, phân biệt cơ chế bundling-based truyền thống (Webpack) với Native ESM dev server + esbuild pre-bundling của Vite.",
+    "contextOrScenario": "Dự án phát triển frontend mở rộng quy mô lên hàng trăm route và hàng nghìn module, thời gian khởi động Webpack dev server lên tới 40-60 giây và HMR có độ trễ lớn.",
+    "expectedKeywords": [
+      "Native ESM",
+      "esbuild",
+      "Pre-bundling dependencies",
+      "On-demand compilation",
+      "No bundle dev server",
+      "HMR via ESM"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Vite là gì? Tại sao nhanh hơn Webpack trong development?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Vite là build tool frontend thế hệ mới gồm hai phần: dev server tận dụng Native ES Modules (ESM) của trình duyệt để nạp code theo nhu cầu (on-demand), kết hợp với Rollup cho production build. Vite khởi động nhanh hơn Webpack vì không phải crawl và gom (bundle) toàn bộ mã nguồn trước khi khởi chạy.",
+      "deepDive": "Trong Webpack Dev Server, bundler phải phân tích toàn bộ cây phụ thuộc (dependency graph) và gom tất cả modules vào bộ nhớ trước khi dev server có thể phục vụ request đầu tiên. Khi codebase phình to, thời gian này tăng tuyến tính (O(n)). Ngược lại, Vite chia module thành hai loại: dependencies (ít thay đổi) được pre-bundle bằng Go-based `esbuild` (nhanh gấp 10-100 lần JS bundlers); và source code (thường xuyên sửa) được trình duyệt yêu cầu qua Native ESM HTTP request. Vite chỉ transpile module thực sự được route hiện tại import. Do đó, thời gian khởi động của Vite gần như hằng số (O(1)) bất kể kích thước ứng dụng.",
+      "codeExample": "// vite.config.ts\nimport { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  // Tối ưu hóa pre-bundling cho các dependency lớn hoặc CommonJS\n  optimizeDeps: {\n    include: ['lodash-es', 'date-fns', 'axios'],\n    exclude: ['@my-company/internal-ui-esm']\n  },\n  server: {\n    port: 3000,\n    open: true,\n    warmup: {\n      // Chủ động compile trước các routes trọng yếu để loại bỏ độ trễ cold-request\n      clientFiles: ['./src/routes/Dashboard.tsx', './src/routes/Checkout.tsx']\n    }\n  }\n});",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Nhầm lẫn rằng Vite dùng esbuild cho cả production. Thực tế Vite dùng Rollup cho production build nhằm tận dụng tree-shaking và plugin ecosystem hoàn chỉnh hơn.",
+      "Gặp lỗi khi dependencies của bên thứ ba chỉ phát hành định dạng CommonJS cũ mà chưa được config trong `optimizeDeps.include` để Vite chuyển đổi sang ESM."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Vite không dùng esbuild cho production build mà lại dùng Rollup?",
+      "Vite xử lý các CommonJS module từ npm trong môi trường Native ESM dev server như thế nào?"
     ]
   },
   {
@@ -23,18 +34,29 @@
     "category": "build-tools",
     "level": "junior",
     "question": "pnpm khác npm và yarn như thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["pnpm", "npm", "yarn", "build"],
+    "interviewerIntent": "Kiểm tra sự hiểu biết về cách quản lý package, cấu trúc thư mục node_modules (flat vs non-flat), cơ chế lưu trữ tiết kiệm ổ đĩa và xử lý vấn đề Phantom Dependencies.",
+    "contextOrScenario": "Quản lý monorepo lớn hoặc CI/CD pipeline nơi npm install tốn quá nhiều dung lượng đĩa và thời gian tải, đồng thời source code vô tình import package không được khai báo trong package.json.",
+    "expectedKeywords": [
+      "Content-addressable store",
+      "Hard links & Symlinks",
+      "Phantom dependencies",
+      "Flat node_modules (hoisting)",
+      "Strict dependency resolution",
+      "Disk space optimization"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'pnpm khác npm và yarn như thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "pnpm khác npm và Yarn v1 ở cơ chế lưu trữ tập trung (Content-Addressable Store) dùng hard links/symlinks thay vì flat node_modules. pnpm tiết kiệm đáng kể dung lượng ổ cứng, tăng tốc độ cài đặt và loại bỏ hoàn toàn lỗi Phantom Dependencies (truy cập package không khai báo trong package.json).",
+      "deepDive": "npm và Yarn v1 áp dụng giải thuật hoisting để làm phẳng (flat) node_modules nhằm tránh lồng nhau sâu. Tuy nhiên, hoisting dẫn đến hai vấn đề lớn: 'Phantom Dependencies' (code có thể `import` một package là dependency gián tiếp mà không khai báo trực tiếp trong package.json) và 'npm doppelgangers' (trùng lặp package khi version xung đột). pnpm giải quyết triệt để bằng cấu trúc thư mục lồng nhau dùng symlinks: thư mục gốc `node_modules` chỉ chứa symlinks tới đúng các package được khai báo trong `package.json`. Tất cả file thực tế được lưu duy nhất một lần tại global content-addressable store (dựa trên hash SHA), và được link vào dự án qua Hard Link.",
+      "codeExample": "// .npmrc cấu hình pnpm cho monorepo enterprise\n// Ngăn chặn hoàn toàn phantom dependencies bằng non-flat node_modules\nauto-install-peers=true\nstrict-peer-dependencies=false\n\n// Mặc định pnpm cô lập hoàn toàn, nhưng có thể điều chỉnh hoist pattern nếu thư viện cũ yêu cầu\npublic-hoist-pattern[]=*eslint*\npublic-hoist-pattern[]=*prettier*\n\n// Đảm bảo toàn bộ developer và CI dùng đúng phiên bản package manager\n// package.json:\n// \"packageManager\": \"pnpm@9.1.0\"",
+      "codeLanguage": "json"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Một số thư viện cũ (như React Native hoặc một số Webpack loader cũ) giả định cấu trúc flat node_modules và cố đọc trực tiếp từ `./node_modules/<nested-pkg>`, gây lỗi runtime khi dùng pnpm.",
+      "Không nhận ra pnpm tạo hard link giữa store và node_modules dự án, chỉnh sửa file trong node_modules cục bộ có thể vô tình làm thay đổi file trong global store nếu không cẩn thận."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Hard link và Symbolic link khác nhau thế nào trong cấu trúc .pnpm folder?",
+      "Làm cách nào cấu hình pnpm tương thích với các công cụ bắt buộc flat node_modules như React Native CLI?"
     ]
   },
   {
@@ -42,18 +64,29 @@
     "category": "build-tools",
     "level": "middle",
     "question": "Webpack là gì? Vai trò trong modern web development?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["webpack", "vai", "modern", "web", "development"],
+    "interviewerIntent": "Đánh giá mức độ thành thạo kiến trúc module bundler, hiểu chu trình build (entry -> AST -> dependency graph -> loaders/plugins -> chunks/assets) và năng lực tối ưu bundle cho web quy mô lớn.",
+    "contextOrScenario": "Xây dựng và duy trì hệ thống frontend enterprise phức tạp cần tùy biến sâu quy trình compile, hỗ trợ legacy browsers, CSS extraction, micro-frontends và tối ưu chunk caching.",
+    "expectedKeywords": [
+      "Static module bundler",
+      "Dependency graph",
+      "Entry, Output, Loaders, Plugins",
+      "Code splitting (SplitChunksPlugin)",
+      "Asset modules",
+      "Long-term caching (contenthash)"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Webpack là gì? Vai trò trong modern web development?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Webpack là một static module bundler xây dựng đồ thị phụ thuộc (dependency graph) từ các entry points, xử lý mọi loại tài nguyên (JS, TS, CSS, hình ảnh, fonts) thông qua Loaders và Plugins để tạo ra các bundle bundles tối ưu cho trình duyệt.",
+      "deepDive": "Quy trình của Webpack bắt đầu từ `entry`, duyệt đệ quy các câu lệnh `import`/`require` để tạo AST và xây dựng Dependency Graph. Trong quá trình đó, `Loaders` nhận input là source code file và chuyển hóa (transform) thành module JavaScript hợp lệ. Sau đó, `Plugins` can thiệp vào các lifecycle hooks của compiler/compilation (thông qua thư viện Tapable) để thực hiện các tác vụ phức tạp như minification, dead-code elimination, bundle analysis và inject asset manifest. Webpack đóng vai trò sống còn trong việc chia nhỏ mã nguồn (code splitting), lazy-loading và tối ưu hóa long-term caching qua [contenthash].",
+      "codeExample": "// webpack.config.js - Cấu hình production chuẩn cho Enterprise Web App\nconst path = require('path');\nconst MiniCssExtractPlugin = require('mini-css-extract-plugin');\n\nmodule.exports = { \n  mode: 'production',\n  entry: { main: './src/index.tsx' },\n  output: {\n    path: path.resolve(__dirname, 'dist'),\n    filename: 'js/[name].[contenthash:8].js',\n    chunkFilename: 'js/[name].[contenthash:8].chunk.js',\n    clean: true,\n  },\n  optimization: {\n    splitChunks: {\n      chunks: 'all',\n      cacheGroups: {\n        vendor: {\n          test: /[\\\\/]node_modules[\\\\/](react|react-dom|react-router-dom)[\\\\/]/,\n          name: 'vendor-react',\n          priority: 20,\n        },\n      },\n    },\n    runtimeChunk: 'single',\n  },\n  plugins: [new MiniCssExtractPlugin({ filename: 'css/[name].[contenthash:8].css' })],\n};",
+      "codeLanguage": "javascript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Quên cấu hình `runtimeChunk: 'single'`, khiến Webpack runtime code bị copy vào từng entry chunk, làm hỏng long-term caching khi các chunks thay đổi hash liên hoàn.",
+      "Lạm dụng quá nhiều loaders/plugins không tối ưu trong development khiến build time tăng vọt."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Sự khác biệt giữa [hash], [chunkhash] và [contenthash] trong Webpack là gì?",
+      "SplitChunksPlugin hoạt động như thế nào và tiêu chí nào để tách vendor bundle tối ưu nhất?"
     ]
   },
   {
@@ -61,18 +94,28 @@
     "category": "build-tools",
     "level": "middle",
     "question": "Loaders và Plugins trong Webpack khác nhau như thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["loaders", "plugins", "webpack", "nhau", "build"],
+    "interviewerIntent": "Phân biệt rạch ròi hai thành phần cốt lõi của Webpack: Loaders (tiền xử lý từng file cụ thể) vs Plugins (can thiệp toàn bộ vòng đời compilation qua hooks).",
+    "contextOrScenario": "Cần xây dựng quy trình build tùy biến: convert file SVG sang React Component (loader) đồng thời tự động nén ảnh PNG/WebP và tạo asset report (plugin).",
+    "expectedKeywords": [
+      "File-level transformation",
+      "Compilation lifecycle hooks",
+      "Tapable event emitter",
+      "Right-to-left execution order",
+      "Module evaluation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Loaders và Plugins trong Webpack khác nhau như thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Loader hoạt động ở cấp độ từng file đơn lẻ (file-level transformer), nhận source string/buffer và trả về JavaScript code. Plugin can thiệp vào toàn bộ vòng đời của Webpack (compilation lifecycle) thông qua hệ thống event hooks của Tapable để thao tác trên bundle, chunk, asset hoặc môi trường build.",
+      "deepDive": "Loaders được thực thi từ phải qua trái (bottom-to-top trong array `use`). Mỗi loader nhận nội dung file từ loader trước đó, xử lý AST/transform và truyền tiếp, ví dụ: `sass-loader` -> `css-loader` -> `mini-css-extract-plugin.loader`. Ngược lại, Plugins là các JavaScript class có phương thức `apply(compiler)`. Chúng đăng ký callback vào các hook cụ thể của Compiler (như `compile`, `emit`, `done`) hoặc Compilation (như `optimizeChunks`, `processAssets`). Do đó, loader không thể can thiệp vào việc tạo chunk hay thay đổi output directory, nhưng plugin có thể làm được hầu như mọi tác vụ.",
+      "codeExample": "// Minh họa: Custom Webpack Plugin can thiệp lifecycle hook để tạo file build metadata\nclass BuildMetadataPlugin {\n  apply(compiler) {\n    compiler.hooks.emit.tapAsync('BuildMetadataPlugin', (compilation, callback) => {\n      const metadata = {\n        buildTime: new Date().toISOString(),\n        chunks: Array.from(compilation.chunks).map(c => ({ name: c.name, size: c.size() })),\n      };\n      const content = JSON.stringify(metadata, null, 2);\n      // Ghi trực tiếp một asset mới vào compilation output\n      compilation.assets['build-meta.json'] = {\n        source: () => content,\n        size: () => content.length,\n      };\n      callback();\n    });\n  }\n}\n\nmodule.exports = BuildMetadataPlugin;",
+      "codeLanguage": "javascript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Cấu hình sai thứ tự của Loaders trong mảng `use` (ví dụ đặt `style-loader` trước `css-loader`), gây lỗi syntax vì output của loader này không tương thích với input loader kế tiếp.",
+      "Cố gắng thực hiện các tác vụ quy mô lớn (như bundle splitting hoặc dead-code extraction) bên trong Loader thay vì dùng Plugin."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Thứ tự thực thi của pitch loader so với normal loader trong Webpack diễn ra như thế nào?",
+      "Tapable là gì và nó cung cấp những loại hooks nào (SyncHook, AsyncParallelHook, AsyncSeriesHook)?"
     ]
   },
   {
@@ -80,18 +123,29 @@
     "category": "build-tools",
     "level": "middle",
     "question": "Sự khác biệt giữa Vite dev server và Webpack dev server?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["vite", "dev", "server", "webpack", "build"],
+    "interviewerIntent": "So sánh chi tiết kiến trúc on-demand compile dựa trên browser Native ESM của Vite dev server với in-memory bundle compilation của Webpack Dev Server (WDS).",
+    "contextOrScenario": "Team kỹ thuật cân nhắc migrate dự án lớn từ Webpack sang Vite để cải thiện Developer Experience (DX) và giảm thời gian chờ đợi phản hồi code.",
+    "expectedKeywords": [
+      "Unbundled vs Bundled",
+      "Native ESM",
+      "In-memory bundle",
+      "O(1) vs O(n) start time",
+      "esbuild pre-bundling",
+      "WebSocket HMR payload"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Sự khác biệt giữa Vite dev server và Webpack dev server?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Webpack Dev Server (WDS) gom toàn bộ ứng dụng thành một bundle ảo trong RAM trước khi chạy server, khiến cold-start và HMR chậm dần theo quy mô dự án. Vite Dev Server là một unbundled server, dựa trên Native ESM của trình duyệt để chỉ biên dịch đúng file được trình duyệt request tại route hiện tại.",
+      "deepDive": "Khi WDS khởi động, nó đọc `entry`, phân tích toàn bộ cây file, biên dịch và tạo bundle trong memory. Khi một file thay đổi, Webpack phải re-bundle module và recalculate graph, gửi HMR patch. Với Vite, server khởi động tức thì vì không compile trước. Trình duyệt gửi HTTP request cho module: `import App from '/src/App.tsx'`. Vite bắt request qua Koa/Connect middleware, biên dịch TypeScript/JSX trên đĩa thành chuẩn JS module và trả về với MIME type `application/javascript`. Khi file thay đổi, Vite gửi WebSocket message cho trình duyệt invalidate module đó; trình duyệt chỉ fetch lại duy nhất file bị sửa và dependencies liên quan.",
+      "codeExample": "// Cấu hình Vite Server so với WDS:\n// vite.config.ts\nimport { defineConfig } from 'vite';\n\nexport default defineConfig({\n  server: {\n    port: 5173,\n    // HMR thông qua WebSocket gọn nhẹ\n    hmr: {\n      overlay: true, // Hiển thị overlay lỗi trực tiếp lên UI\n    },\n    // Proxy API requests tương tự WDS nhưng không cần in-memory recompile\n    proxy: {\n      '/api': {\n        target: 'https://backend.example.com',\n        changeOrigin: true,\n        rewrite: (path) => path.replace(/^\\/api/, ''),\n      },\n    },\n  },\n});",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Không nhận ra trong môi trường dev của Vite, trình duyệt phải tải hàng chục đến hàng trăm HTTP request cho các ESM file. Nếu không có HTTP/2 hoặc chạy trên mạng latency cao, dev remote có thể bị chậm.",
+      "Code phụ thuộc vào biến môi trường `require()` hoặc dynamic import dạng Node.js CommonJS không chạy được trên Vite dev server mà cần config plugin convert."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Vite giải quyết vấn đề waterfall requests do hàng trăm module lồng nhau như thế nào (Dependency Pre-bundling)?",
+      "Tại sao thời gian HMR của Vite không đổi (O(1)) kể cả khi dự án tăng từ 100 lên 10.000 files?"
     ]
   },
   {
@@ -99,18 +153,29 @@
     "category": "build-tools",
     "level": "middle",
     "question": "Babel là gì? Vai trò trong JavaScript toolchain?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["babel", "vai", "javascript", "toolchain", "build"],
+    "interviewerIntent": "Đánh giá hiểu biết về AST manipulation, quá trình transpile syntax mới (ECMAScript ES6+) về phiên bản tương thích (ES5), và cách cấu hình polyfills an toàn.",
+    "contextOrScenario": "Xây dựng ứng dụng web chạy trên nhiều thiết bị và trình duyệt doanh nghiệp cũ (Safari cũ, legacy Chrome) cần cú pháp mới (Optional Chaining, Nullish Coalescing) nhưng phải kiểm soát bundle size.",
+    "expectedKeywords": [
+      "Transpiler",
+      "AST (Abstract Syntax Tree)",
+      "@babel/preset-env",
+      "core-js",
+      "useBuiltIns",
+      "Browserslist"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Babel là gì? Vai trò trong JavaScript toolchain?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Babel là JavaScript transpiler chuyển đổi cú pháp hiện đại (ESNext, TypeScript, JSX) thành mã JavaScript tương thích với các trình duyệt cũ. Babel gồm 3 giai đoạn chính: Parse (sinh AST), Transform (áp dụng plugins/presets sửa AST), và Generate (xuất ra source code mới kèm source maps).",
+      "deepDive": "Babel chỉ chuyển đổi cú pháp (syntax như arrow function, classes, optional chaining) chứ không tự động thêm các API/phương thức mới (như `Promise.allSettled`, `Array.prototype.flat`, `Object.hasOwn`). Để bù đắp API, Babel tích hợp cùng `core-js` qua cấu hình `@babel/preset-env`. Với cấu hình `useBuiltIns: 'usage'`, Babel phân tích AST của từng file để tự động inject duy nhất polyfill cho các method thực tế được sử dụng dựa trên danh sách trình duyệt target trong `.browserslistrc`, tránh việc nạp toàn bộ polyfill gây phình bundle size.",
+      "codeExample": "// babel.config.json - Cấu hình tối ưu Polyfill theo usage thực tế\n{\n  \"presets\": [\n    [\n      \"@babel/preset-env\",\n      {\n        \"targets\": \"> 0.5%, last 2 versions, not dead\",\n        \"useBuiltIns\": \"usage\",\n        \"corejs\": { \"version\": \"3.36\", \"proposals\": true },\n        \"modules\": false // Giữ nguyên ESM để Webpack/Rollup thực hiện tree-shaking\n      }\n    ],\n    [\"@babel/preset-react\", { \"runtime\": \"automatic\" }],\n    \"@babel/preset-typescript\"\n  ],\n  \"plugins\": [\"@babel/plugin-transform-runtime\"]\n}",
+      "codeLanguage": "json"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Đặt `modules: 'commonjs'` trong preset-env khiến Babel biên dịch code về CommonJS trước khi bundler nhận diện, làm tê liệt tính năng Tree Shaking.",
+      "Dùng `useBuiltIns: 'entry'` thay vì `'usage'`, dẫn đến việc import toàn bộ polyfill của core-js làm tăng kích thước bundle thêm hàng trăm KB không cần thiết."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Plugin `@babel/plugin-transform-runtime` giải quyết vấn đề trùng lặp helper functions như thế nào?",
+      "Quy trình xử lý của Babel qua 3 giai đoạn Parse -> Transform -> Generate sử dụng những parser và generator nào bên dưới?"
     ]
   },
   {
@@ -118,18 +183,29 @@
     "category": "build-tools",
     "level": "middle",
     "question": "SWC là gì? So sánh với Babel?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["swc", "babel", "build"],
+    "interviewerIntent": "Đánh giá xu hướng chuyển dịch toolchain từ JavaScript sang native languages (Rust/Go), hiểu ưu nhược điểm về tốc độ, đa luồng và hệ sinh thái plugin.",
+    "contextOrScenario": "Đội ngũ Next.js hoặc monorepo lớn muốn tăng tốc build time từ 5 phút xuống 30 giây bằng việc thay thế Babel loader sang SWC.",
+    "expectedKeywords": [
+      "Speed / Performance",
+      "Rust-based compiler",
+      "Multi-threading",
+      "Next.js compiler",
+      "Wasm plugins",
+      "Ecosystem compatibility"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'SWC là gì? So sánh với Babel?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "SWC (Speedy Web Compiler) là compiler viết bằng Rust có chức năng tương tự Babel (transpile TS/JS/JSX) nhưng nhanh hơn gấp 20-70 lần trên single-thread và nhanh hơn hàng chục lần trên multi-core nhờ tận dụng đa luồng native của Rust mà Node.js không có.",
+      "deepDive": "Babel chạy trên Node.js V8 engine, bị giới hạn bởi garbage collection và single-thread execution khi xử lý AST. SWC được viết bằng Rust, quản lý memory chặt chẽ không qua GC runtime, tận dụng CPU đa nhân qua thư viện `rayon` để xử lý song song các file. SWC hiện là compiler mặc định của Next.js (từ bản 12) và Turbopack. Điểm đánh đổi: hệ sinh thái plugin của Babel viết bằng JavaScript rất phong phú và dễ viết; trong khi plugin cho SWC phải viết bằng Rust và biên dịch ra WebAssembly (WASM), quy trình phức tạp hơn và performance của WASM plugin đôi khi có overhead.",
+      "codeExample": "// .swcrc - Cấu hình thay thế Babel với hiệu năng cao\n{\n  \"jsc\": {\n    \"parser\": {\n      \"syntax\": \"typescript\",\n      \"tsx\": true,\n      \"dynamicImport\": true\n    },\n    \"transform\": {\n      \"react\": {\n        \"runtime\": \"automatic\",\n        \"refresh\": true\n      }\n    },\n    \"target\": \"es2022\",\n    \"loose\": false,\n    \"minify\": {\n      \"compress\": { \"drop_console\": true },\n      \"mangle\": true\n    }\n  },\n  \"module\": {\n    \"type\": \"es6\"\n  }\n}",
+      "codeLanguage": "json"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Nghĩ rằng SWC có thể thay thế 100% tất cả Babel plugin doanh nghiệp viết riêng mà không cần viết lại bằng Rust Wasm.",
+      "SWC và Babel transpile TypeScript nhưng KHÔNG kiểm tra kiểu dữ liệu (type-check); dự án vẫn cần chạy `tsc --noEmit` trong CI pipeline."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "SWC hỗ trợ cơ chế custom plugin thông qua WebAssembly như thế nào?",
+      "Next.js Compiler kế thừa và mở rộng SWC cho những tính năng nào (styled-jsx, emotion, modularizeImports)?"
     ]
   },
   {
@@ -137,24 +213,29 @@
     "category": "build-tools",
     "level": "middle",
     "question": "Microservices vs monolith frontend architecture. Federated module?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
+    "interviewerIntent": "Khảo sát tư duy kiến trúc hệ thống frontend phân tán, hiểu giải pháp Micro-frontends và nguyên lý hoạt động của Webpack 5 Module Federation.",
+    "contextOrScenario": "Doanh nghiệp fintech có nhiều squad phụ trách riêng biệt: Auth, Dashboard, Payment. Cần triển khai và release độc lập mà không phải build lại toàn bộ monolith app.",
     "expectedKeywords": [
-      "microservices",
-      "monolith",
-      "frontend",
-      "architecture.",
-      "federated"
+      "Micro-frontends",
+      "Module Federation",
+      "Host and Remote",
+      "Shared dependencies (singleton)",
+      "Independent deployments",
+      "Runtime code loading"
     ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Microservices vs monolith frontend architecture. Federated module?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Frontend monolith là một codebase duy nhất được build và deploy cùng nhau, dễ quản lý lúc đầu nhưng chậm chạp khi team lớn. Micro-frontends chia UI thành các ứng dụng nhỏ độc lập theo domain. Module Federation (Webpack 5) cho phép các ứng dụng này chia sẻ code và load component từ remote server ở runtime mà không cần đóng gói thành npm package.",
+      "deepDive": "Module Federation định nghĩa vai trò `Host` (app tiêu thụ) và `Remote` (app cung cấp component). Remote build ra một manifest nhỏ (`remoteEntry.js`). Khi Host cần render RemoteComponent, nó tải file JS này qua network và nạp component vào DOM. Tính năng quan trọng nhất là `shared dependencies`: Host và Remote có thể chia sẻ các thư viện nặng như `react` hoặc `react-dom`. Thông qua cờ `singleton: true`, Webpack đảm bảo chỉ một instance React duy nhất chạy trong bộ nhớ, tránh xung đột React Context và hooks rules.",
+      "codeExample": "// Remote App (Checkout Squad) - webpack.config.js\nconst { ModuleFederationPlugin } = require('webpack').container;\n\nmodule.exports = {\n  plugins: [\n    new ModuleFederationPlugin({\n      name: 'checkoutApp',\n      filename: 'remoteEntry.js',\n      exposes: {\n        './PaymentButton': './src/components/PaymentButton.tsx',\n      },\n      shared: {\n        react: { singleton: true, requiredVersion: '^18.2.0' },\n        'react-dom': { singleton: true, requiredVersion: '^18.2.0' },\n      },\n    }),\n  ],\n};\n\n// Host App (Shell) tải component động:\n// const RemotePaymentButton = React.lazy(() => import('checkoutApp/PaymentButton'));",
+      "codeLanguage": "javascript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Không khai báo `singleton: true` cho React khiến Host và Remote nạp 2 bản React khác nhau, gây crash ứng dụng với lỗi 'Invalid hook call'.",
+      "Version mismatch trong shared dependencies dẫn đến Webpack phải tải nhiều phiên bản thư viện cùng lúc, phá hỏng mục tiêu tối ưu hiệu năng."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Xử lý resilience ra sao khi một Remote micro-frontend bị sập server (500 hoặc Timeout)?",
+      "Shared dependencies resolution hoạt động thế nào khi Host dùng React 18.2.0 còn Remote yêu cầu React 18.3.0?"
     ]
   },
   {
@@ -162,18 +243,29 @@
     "category": "build-tools",
     "level": "middle",
     "question": "HMR (Hot Module Replacement) hoạt động như thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["hmr", "hot", "module", "replacement", "build"],
+    "interviewerIntent": "Đánh giá mức độ hiểu sâu về cơ chế cập nhật mã trực tiếp trong runtime: giao tiếp WebSocket, thay thế module graph, và cơ chế giữ state của UI components.",
+    "contextOrScenario": "Developer đang debug một form phức tạp 5 bước; khi sửa file CSS hoặc component con, trang bị full reload làm mất toàn bộ state đã nhập của form.",
+    "expectedKeywords": [
+      "Hot Module Replacement",
+      "WebSocket connection",
+      "Module acceptance boundary",
+      "import.meta.hot.accept",
+      "State preservation",
+      "Bubble up to entry"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'HMR (Hot Module Replacement) hoạt động như thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "HMR (Hot Module Replacement) là cơ chế trao đổi, thêm hoặc xóa modules trong runtime của ứng dụng đang chạy mà không cần reload toàn bộ trang, giúp giữ nguyên state hiện tại của UI và tăng tốc quá trình phát triển.",
+      "deepDive": "Quy trình HMR gồm 4 bước: 1) File watcher (chokidar) phát hiện file thay đổi trên đĩa; 2) Dev server biên dịch lại module bị sửa và tạo ra một update payload (chứa hash mới và đường dẫn module); 3) Server gửi thông điệp qua WebSocket tới client runtime; 4) HMR runtime trên trình duyệt nhận tin và kiểm tra xem module (hoặc component cha của nó) có đăng ký ranh giới chấp nhận (`module.hot.accept` hoặc `import.meta.hot.accept`) hay không. Nếu có, nó fetch module mới qua HTTP/ESM và thực thi lại logic thay thế. Nếu không module nào trong chuỗi cha accept, sự kiện sẽ bubble lên root và buộc trình duyệt kích hoạt Full Page Reload.",
+      "codeExample": "// Tự định nghĩa HMR boundary trong Vite với TypeScript\n// counterService.ts\nexport let appState = { count: 0 };\n\nexport function increment() {\n  appState.count += 1;\n  return appState.count;\n}\n\n// Xử lý giữ state khi module được hot-reloaded\nif (import.meta.hot) {\n  // Chấp nhận bản cập nhật của chính module này\n  import.meta.hot.accept((newModule) => {\n    if (newModule) {\n      console.log('[HMR] Module updated without reload!');\n    }\n  });\n\n  // Dọn dẹp side-effect hoặc timer trước khi module bị thay thế\n  import.meta.hot.dispose((data) => {\n    data.preservedCount = appState.count;\n  });\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Quên dọn dẹp interval, event listener hoặc subscription trong hook dispose của HMR, dẫn đến memory leak và chạy logic trùng lặp sau mỗi lần lưu code.",
+      "Thay đổi các file cấu hình hoặc export ngoài boundary của framework (như React Fast Refresh) khiến HMR fallback thành Full Page Reload."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "React Fast Refresh khác gì so với React Hot Loader trước đây?",
+      "Điều gì quyết định một thay đổi code có thể HMR thành công hay phải fallback sang Full Page Reload?"
     ]
   },
   {
@@ -181,18 +273,29 @@
     "category": "build-tools",
     "level": "middle",
     "question": "Source maps là gì? Cách cấu hình cho development và production?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["source", "maps", "development", "production", "build"],
+    "interviewerIntent": "Đánh giá kiến thức về ánh xạ mã nguồn minified sang source code gốc, cân bằng giữa tốc độ build, trải nghiệm debug và bảo mật mã nguồn doanh nghiệp.",
+    "contextOrScenario": "Phát hiện lỗi runtime nghiêm trọng trên production thông qua Sentry, cần stack trace hiển thị chính xác dòng code TypeScript gốc thay vì `bundle.min.js:1:34215`, nhưng không được để lộ source code cho người dùng bên ngoài.",
+    "expectedKeywords": [
+      "Base64 VLQ",
+      "sourceMappingURL",
+      "hidden-source-map",
+      "eval-cheap-module-source-map",
+      "Sentry / Bugsnag artifacts",
+      "IP protection"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Source maps là gì? Cách cấu hình cho development và production?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Source Map là file JSON ánh xạ từng vị trí (dòng, cột) trong file bundle đã nén/minified về đúng vị trí trong mã nguồn gốc (TypeScript, JSX). Development ưu tiên tốc độ build nhanh và độ chính xác dòng; Production sử dụng 'hidden-source-map' để gửi lên hệ thống giám sát lỗi (như Sentry) mà không công khai link source map trên trình duyệt.",
+      "deepDive": "Source map sử dụng thuật toán nén Base64 VLQ (Variable-Length Quantity) để ghi mapping giữa output và input. Trong development, cấu hình khuyến nghị là `eval-cheap-module-source-map` vì tận dụng `eval()` để cache build theo module cực nhanh, chỉ ánh xạ theo dòng (line-level) đủ để debug. Trong production, tuyệt đối không dùng `source-map` public vì trình duyệt sẽ tải kèm comment `//# sourceMappingURL=app.js.map`, làm lộ toàn bộ logic kinh doanh và cấu trúc dự án. Thay vào đó, dùng `hidden-source-map`: Webpack sinh file `.map` nhưng không gắn comment `sourceMappingURL` vào file `.js`. CI/CD sẽ upload các file `.map` này lên Sentry rồi xóa bỏ khỏi artifact public trước khi deploy lên CDN.",
+      "codeExample": "// webpack.config.js - Cấu hình Source Map phân tầng chuẩn môi trường\nconst isProduction = process.env.NODE_ENV === 'production';\n\nmodule.exports = {\n  // Development: Nhanh, hỗ trợ HMR, debug tốt\n  // Production: Sinh file .map riêng biệt nhưng KHÔNG gắn sourceMappingURL vào JS file\n  devtool: isProduction ? 'hidden-source-map' : 'eval-cheap-module-source-map',\n  output: {\n    filename: '[name].[contenthash:8].js',\n  },\n  // Trong CI/CD pipeline:\n  // 1. webpack --mode production\n  // 2. sentry-cli releases files upload-sourcemaps ./dist\n  // 3. rm ./dist/*.map  <-- Xóa bỏ file map trước khi rsync lên CDN/S3\n};",
+      "codeLanguage": "javascript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Để lộ file source map trên production server, cho phép bất kỳ ai mở DevTools > Sources xem toàn bộ mã nguồn sạch của backend API endpoints và business logic bí mật.",
+      "Dùng `inline-source-map` trong production khiến dung lượng bundle phình to gấp 3-5 lần do source map được mã hóa Base64 gắn trực tiếp vào file JS."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Base64 VLQ hoạt động như thế nào để nén dung lượng file mapping?",
+      "Làm cách nào Sentry giải mã stack trace từ minified JavaScript khi source map không được public trên web server?"
     ]
   },
   {
@@ -200,18 +303,29 @@
     "category": "build-tools",
     "level": "middle",
     "question": "ESM vs CommonJS: tại sao ecosystem đang chuyển sang ESM?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["esm", "commonjs", "ecosystem", "ang", "chuy"],
+    "interviewerIntent": "Đánh giá khả năng phân tích sự khác biệt cốt lõi giữa hai hệ thống module của JavaScript: thời điểm phân tích (compile-time vs runtime), cơ chế import/export và lý do ECMAScript Modules (ESM) là chuẩn tương lai.",
+    "contextOrScenario": "Gặp lỗi `Error [ERR_REQUIRE_ESM]: require() of ES Module not supported` khi import các thư viện hiện đại (như node-fetch v3, chalk v5) vào backend hoặc build script cũ.",
+    "expectedKeywords": [
+      "Static analysis",
+      "Dynamic require",
+      "Live bindings vs value copy",
+      "Top-level await",
+      "Tree-shaking",
+      "Dual package hazard"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'ESM vs CommonJS: tại sao ecosystem đang chuyển sang ESM?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "CommonJS (CJS) dùng `require()` đồng bộ và được nạp ở runtime (đặc trưng của Node.js cũ), trong khi ESM dùng cú pháp tĩnh `import`/`export` được phân tích ở compile-time theo chuẩn ECMAScript. Hệ sinh thái chuyển sang ESM vì nó chạy nhất quán trên cả Browser lẫn Node/Deno/Bun, hỗ trợ Tree Shaking thực sự, Top-level await và tối ưu tải bất đồng bộ.",
+      "deepDive": "Sự khác biệt kỹ thuật mấu chốt nằm ở hai điểm: 1) Static Structure vs Dynamic Loading: `require(path)` là hàm động, có thể gọi bên trong `if/else` hoặc vòng lặp ở runtime, khiến bundler không thể xác định tĩnh các hàm được dùng để tree-shake. ESM bắt buộc khai báo `import` ở top-level, cho phép compiler xây dựng Dependency Graph hoàn chỉnh trước khi chạy code. 2) Live Bindings vs Copy by Value: CommonJS copy giá trị của module exports tại thời điểm require; nếu module gốc thay đổi biến, nơi require không nhận được giá trị mới. Ngược lại, ESM export các tham chiếu sống (live bindings), bất kỳ cập nhật nào trong module gốc đều tự động phản ánh sang module import.",
+      "codeExample": "// Minh họa Live Bindings trong ESM vs Copy trong CommonJS\n\n// counter.mjs (ESM)\nexport let count = 0;\nexport function increment() { count++; }\n\n// main.mjs (ESM)\nimport { count, increment } from './counter.mjs';\nconsole.log(count); // 0\nincrement();\nconsole.log(count); // 1  -> Live binding phản ánh giá trị mới!\n\n// Trong CommonJS (counter.cjs):\n// let count = 0;\n// module.exports = { count, increment: () => count++ };\n// const { count, increment } = require('./counter.cjs');\n// increment(); console.log(count); // 0 -> Vẫn là 0 do chỉ copy giá trị primitive!",
+      "codeLanguage": "javascript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Dùng `require()` để nạp một Pure ESM package dẫn đến crash với mã lỗi `ERR_REQUIRE_ESM`. Giải pháp bắt buộc là dùng dynamic `await import()` hoặc chuyển toàn bộ dự án sang ESM (`\"type\": \"module\"`).",
+      "Hiểu nhầm rằng ESM chậm hơn CommonJS trên server, bỏ qua lợi thế nạp module song song (asynchronous parsing)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Dual Package Hazard là gì và làm thế nào các thư viện npm phát hành hỗ trợ cả CJS và ESM thông qua `exports` map trong package.json?",
+      "Top-level await hoạt động như thế nào trong module graph của ESM?"
     ]
   },
   {
@@ -219,18 +333,29 @@
     "category": "build-tools",
     "level": "senior",
     "question": "Monorepo là gì? Công cụ phổ biến để quản lý monorepo?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["monorepo", "build", "architecture", "performance"],
+    "interviewerIntent": "Đánh giá năng lực thiết kế kiến trúc repository quy mô lớn, kỹ năng quản lý dependency giữa các gói nội bộ, và tối ưu hóa CI/CD build cache với Turborepo/Nx.",
+    "contextOrScenario": "Doanh nghiệp sở hữu 5 ứng dụng (Web, Admin, Mobile, Landing) và 10 thư viện dùng chung (UI components, API clients, TypeScript configs). Thời gian CI build vượt quá 45 phút.",
+    "expectedKeywords": [
+      "Monorepo architecture",
+      "Turborepo & Nx",
+      "pnpm workspaces",
+      "Task orchestration",
+      "Computation caching",
+      "Remote cache"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Monorepo là gì? Công cụ phổ biến để quản lý monorepo?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Monorepo là chiến lược kiến trúc lưu trữ nhiều ứng dụng và thư viện độc lập nhưng có quan hệ với nhau trong cùng một Git repository duy nhất. Các công cụ hàng đầu hiện nay gồm pnpm workspaces (quản lý liên kết gói), kết hợp Turborepo hoặc Nx để điều phối tác vụ (task orchestration) và lưu cache kết quả build (computation caching).",
+      "deepDive": "Thách thức lớn nhất của Monorepo là tốc độ build CI/CD và xung đột phụ thuộc. Turborepo và Nx giải quyết điều này bằng Đồ thị tác vụ (Task Graph Directed Acyclic Graph - DAG). Thay vì build tuần tự mọi package, chúng phân tích file thay đổi thông qua Git hash, môi trường và dependencies để quyết định package nào cần rebuild. Với Computation Caching, nếu mã nguồn của một package không thay đổi, tool sẽ lấy trực tiếp output (thư mục dist, test results) từ cache cục bộ hoặc Remote Cache (S3/Vercel) trong vài mili-giây. Kết hợp pnpm workspaces với giao thức `workspace:*` giúp loại bỏ việc phải publish các private package lên npm registry mỗi khi cập nhật.",
+      "codeExample": "// turbo.json - Cấu hình pipeline thông minh tối ưu hóa CI build\n{\n  \"$schema\": \"https://turbo.build/schema.json\",\n  \"globalDependencies\": [\".env*\"],\n  \"tasks\": {\n    \"build\": {\n      \"dependsOn\": [\"^build\"], // Phải build các packages phụ thuộc trước\n      \"outputs\": [\"dist/**\", \".next/**\", \"!.next/cache/**\"],\n      \"cache\": true\n    },\n    \"lint\": {\n      \"cache\": true\n    },\n    \"test\": {\n      \"dependsOn\": [\"build\"],\n      \"inputs\": [\"src/**/*.tsx\", \"src/**/*.ts\", \"test/**/*.ts\"],\n      \"cache\": true\n    },\n    \"dev\": {\n      \"cache\": false,\n      \"persistent\": true\n    }\n  }\n}",
+      "codeLanguage": "json"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Chuyển sang Monorepo mà không có hệ thống Caching mạnh mẽ, khiến toàn bộ dự án phải build lại từ đầu mỗi khi có một commit sửa file README.",
+      "Thiếu quy chuẩn cô lập version khiến ranh giới giữa các package bị mờ nhạt, tạo ra circular dependencies giữa các package dùng chung."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Remote Cache trong Turborepo/Nx bảo mật dữ liệu mã nguồn doanh nghiệp như thế nào khi lưu trên cloud?",
+      "Cơ chế '^build' trong Turborepo pipeline biểu thị điều gì và nó giải quyết bài toán topological sort ra sao?"
     ]
   },
   {
@@ -238,18 +363,29 @@
     "category": "build-tools",
     "level": "senior",
     "question": "Tree shaking là gì? Điều kiện để tree shaking hoạt động?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["tree", "shaking", "build"],
+    "interviewerIntent": "Đánh giá kiến thức chuyên sâu về Dead Code Elimination (DCE), cơ chế phân tích tĩnh AST của Rollup/Webpack, cờ `sideEffects` và cách viết code thân thiện với bundler.",
+    "contextOrScenario": "Dự án import một hàm tiện ích nhỏ từ thư viện nội bộ nhưng kích thước bundle cuối cùng bị kéo theo hàng chục components và modules không hề sử dụng.",
+    "expectedKeywords": [
+      "Dead Code Elimination",
+      "Static ESM (import/export)",
+      "sideEffects: false",
+      "Terser / Rollup AST pruning",
+      "/*#__PURE__*/ annotation",
+      "Scope hoisting"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Tree shaking là gì? Điều kiện để tree shaking hoạt động?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Tree shaking là kỹ thuật loại bỏ mã không được sử dụng (Dead Code Elimination) trong quá trình đóng gói ứng dụng. Để Tree Shaking hoạt động hiệu quả, bắt buộc phải thỏa mãn 3 điều kiện: mã nguồn sử dụng chuẩn cú pháp ES Modules (ESM), bundler hỗ trợ phân tích tĩnh (như Webpack 5, Rollup, Vite), và package.json khai báo chính xác trường `sideEffects`.",
+      "deepDive": "Tree shaking hoạt động dựa trên việc phân tích đồ thị phụ thuộc tĩnh (Static AST). Khác với CJS, các câu lệnh ESM không thể nằm trong khối lệnh có điều kiện, giúp bundler xác định chính xác export nào được import và export nào bị bỏ rơi. Sau khi gom code (Scope Hoisting), bước minification (Terser, esbuild) sẽ cắt tỉa các hàm và biến không có reference. Tuy nhiên, nếu một module chứa side-effect (ví dụ gọi hàm toàn cục, gắn prototype, import CSS), bundler buộc phải giữ lại toàn bộ module vì sợ xóa đi sẽ làm hỏng ứng dụng. Đặt `\"sideEffects\": false` trong `package.json` là tín hiệu cam kết với bundler rằng các file không được import trực tiếp có thể bị loại bỏ an toàn.",
+      "codeExample": "// package.json của thư viện chuẩn Tree-shakeable\n{\n  \"name\": \"@company/core-ui\",\n  \"version\": \"2.0.0\",\n  \"module\": \"dist/index.esm.js\",\n  \"types\": \"dist/index.d.ts\",\n  // Thông báo cho bundler biết chỉ có file .css mới chứa side effect lúc import\n  \"sideEffects\": [\n    \"**/*.css\",\n    \"**/*.scss\"\n  ]\n}\n\n// Trong mã nguồn TS: Sử dụng PURE annotation cho các hàm khởi tạo đối tượng\nexport const analyticsClient = /*#__PURE__*/ createAnalyticsInstance({\n  apiKey: 'CLIENT_KEY',\n});",
+      "codeLanguage": "json"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Cấu hình Babel compile `modules: 'commonjs'` trước khi chuyển qua Webpack, khiến code biến thành CommonJS và vô hiệu hóa hoàn toàn Tree Shaking.",
+      "Import cả object lớn dạng `import * as Utils from './utils'` hoặc export default một object chứa nhiều hàm, khiến bundler khó phân tích từng property riêng lẻ."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Chú thích `/*#__PURE__*/` thông báo điều gì cho Terser/Rollup và khi nào cần dùng nó?",
+      "Tại sao việc biên dịch class sang hàm ES5 (thêm prototype) lại cản trở Tree Shaking nếu không có annotation?"
     ]
   },
   {
@@ -257,18 +393,29 @@
     "category": "build-tools",
     "level": "senior",
     "question": "Dynamic import() và code splitting: cách implement hiệu quả?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["dynamic", "import", "code", "splitting", "implement"],
+    "interviewerIntent": "Đánh giá kỹ năng tối ưu hóa Critical Rendering Path và First Load JS thông qua việc tách bundle theo route hoặc theo interaction, nắm rõ cơ chế prefetching/preloading chunks.",
+    "contextOrScenario": "Trang chi tiết sản phẩm có một Modal chứa trình chỉnh sửa ảnh nặng 2.5MB và một biểu đồ phân tích số liệu phức tạp; cần đảm bảo người dùng thông thường không phải tải các file này khi mới mở trang.",
+    "expectedKeywords": [
+      "dynamic import() syntax",
+      "Code splitting",
+      "React.lazy & Suspense",
+      "Webpack magic comments",
+      "webpackPrefetch vs webpackPreload",
+      "Chunk naming strategy"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Dynamic import() và code splitting: cách implement hiệu quả?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Dynamic import (`import()`) trả về một Promise phân giải thành module được nạp bất đồng bộ từ server. Kỹ thuật này là nền tảng của Code Splitting, cho phép chia tách bundle thành các file chunk riêng biệt và chỉ tải khi người dùng chuyển trang hoặc thực hiện một tương tác cụ thể (click, hover).",
+      "deepDive": "Khi bundler (Webpack/Vite/Rollup) gặp biểu thức `import('./heavyModule')`, nó tự động tạo ra một entry chunk riêng lẻ. Để đạt hiệu quả tối đa trong production, cần áp dụng 3 chiến lược: 1) Route-based splitting: Tách bundle cho từng trang qua router; 2) Interaction-based splitting: Chỉ nạp thư viện nặng khi người dùng trigger (ví dụ mở modal hoặc hover vào button); 3) Prefetching thông minh: Tận dụng thời gian rảnh của trình duyệt (browser idle time) qua `webpackPrefetch: true` hoặc link rel='prefetch' để tải trước chunk mà không tranh chấp băng thông với render chính.",
+      "codeExample": "// Component tải thư viện nặng khi hover hoặc mở Modal (TypeScript + React)\nimport React, { useState, Suspense } from 'react';\n\n// Khởi tạo dynamic import với Webpack Magic Comments\nconst HeavyChartModal = React.lazy(() =>\n  import(\n    /* webpackChunkName: \"heavy-chart-modal\" */\n    /* webpackPrefetch: true */\n    './components/HeavyChartModal'\n  )\n);\n\nexport const ProductAnalyticsCard: React.FC = () => {\n  const [isOpen, setIsOpen] = useState(false);\n\n  // Chủ động nạp module trước khi click để loại bỏ delay\n  const handleMouseEnter = () => {\n    import('./components/HeavyChartModal');\n  };\n\n  return (\n    <div>\n      <button\n        onMouseEnter={handleMouseEnter}\n        onClick={() => setIsOpen(true)}\n      >\n        Xem phân tích chuyên sâu\n      </button>\n\n      {isOpen && (\n        <Suspense fallback={<div className=\"spinner\">Đang nạp dữ liệu...</div>}>\n          <HeavyChartModal onClose={() => setIsOpen(false)} />\n        </Suspense>\n      )}\n    </div>\n  );\n};",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Chia chunk quá nhỏ (micro-splitting) dẫn đến hiện tượng waterfall requests và lãng phí HTTP request overhead.",
+      "Không bọc `Suspense` hoặc không bắt lỗi `.catch()` khi mạng bị gián đoạn, làm văng Unhandled Rejection khi tải dynamic chunk."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khác biệt mấu chốt giữa `webpackPrefetch` (ưu tiên thấp, tải lúc rảnh) và `webpackPreload` (ưu tiên cao, tải song song với chunk cha)?",
+      "Xử lý lỗi ChunkLoadError khi người dùng mở trang phiên bản cũ sau khi server vừa deploy bản build mới với hash mới ra sao?"
     ]
   },
   {
@@ -276,18 +423,29 @@
     "category": "build-tools",
     "level": "senior",
     "question": "Tree shaking deep dive: tại sao một số packages không tree-shakeable?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Build Tools & Bundlers ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Build Tools & Bundlers.",
-    "expectedKeywords": ["tree", "shaking", "deep", "dive", "packages"],
+    "interviewerIntent": "Khảo sát tư duy sâu về cách JavaScript engine và bundler đánh giá side-effects, các pattern code 'nguy hiểm' vô hiệu hóa dead-code elimination, và cách audit thư viện bên thứ 3.",
+    "contextOrScenario": "Phát hiện một thư viện tiện ích (utility package) chỉ dùng 1 hàm nhưng làm tăng kích thước bundle thêm 80KB, phân tích bundle thấy toàn bộ code của thư viện bị đóng gói vào file production.",
+    "expectedKeywords": [
+      "Module evaluation side-effects",
+      "Object prototype mutation",
+      "IIFE wrapping",
+      "lodash vs lodash-es",
+      "CJS export patterns",
+      "/*#__PURE__*/ flag"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Tree shaking deep dive: tại sao một số packages không tree-shakeable?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Một package không thể tree-shake chủ yếu do 3 nguyên nhân: phát hành dưới dạng CommonJS thay vì ESM, chứa side-effects ở cấp độ module (thực thi code ngay khi import như gán window/prototype), hoặc cấu trúc code khiến bundler không thể chứng minh việc xóa code là an toàn (không có annotation PURE).",
+      "deepDive": "Bundler hoạt động theo nguyên tắc an toàn: nếu không chắc chắn một đoạn code có làm thay đổi trạng thái toàn cục hay không, nó buộc phải giữ lại. Các nguyên nhân cụ thể bao gồm: 1) Thư viện biên dịch ra CommonJS: cú pháp `module.exports = { ... }` xuất ra một object duy nhất ở runtime, bundler không thể xác định tĩnh thuộc tính nào không được dùng; 2) Top-level side effects: code thực hiện các lệnh gọi hàm ngay tại root scope của file (như `window.myPlugin = ...` hoặc gọi các hàm khởi tạo không thuần túy); 3) Prototype mutations: mở rộng các class chuẩn (`Array.prototype.customMethod = ...`); 4) Đóng gói qua IIFE không có chú thích `/*#__PURE__*/`: trình biên dịch không thể biết hàm thực thi ngay có tác động ngoại lai hay không.",
+      "codeExample": "// Ví dụ so sánh giữa Code KHÔNG Tree-shakeable vs Code TỐI ƯU\n\n// ❌ KHÔNG THỂ TREE-SHAKE:\n// 1. Export CommonJS object\nmodule.exports = { add: (a, b) => a + b, subtract: (a, b) => a - b };\n// 2. Chứa side-effect ở top-level file\nwindow.__LAST_ACCESSED__ = Date.now();\n// 3. Class được biên dịch ra ES5 hàm IIFE tự thực thi\nvar Calculator = (function () {\n  function Calculator() {}\n  Calculator.prototype.calc = function () { return 42; };\n  return Calculator;\n})(); // Bundler sợ IIFE này thay đổi biến ngoài nên không dám xóa!\n\n// ✅ HOÀN TOÀN TREE-SHAKEABLE:\n// 1. Sử dụng Named Export tĩnh trong ESM\nexport const add = (a: number, b: number): number => a + b;\nexport const subtract = (a: number, b: number): number => a - b;\n// 2. Đánh dấu hàm không có side-effect bằng annotation PURE\nexport const CalculatorPure = /*#__PURE__*/ (function () {\n  function CalculatorPure() {}\n  return CalculatorPure;\n})();",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Build Tools & Bundlers."
+      "Import nhầm `import { cloneDeep } from 'lodash'` (CommonJS monolithic bundle) thay vì `lodash-es` hoặc `lodash/cloneDeep`, khiến toàn bộ thư viện lodash bị kéo vào bundle.",
+      "Tự động thêm `\"sideEffects\": false` vào `package.json` của thư viện chứa file reset CSS hoặc polyfill, khiến CSS bị bundler xóa sạch lúc build production."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `import 'some-library/style.css'` bị xóa mất nếu khai báo `sideEffects: false` trong root package.json?",
+      "Công cụ nào (như `agadoo` hay `bundlephobia`) giúp kiểm tra nhanh một npm package có hỗ trợ tree-shaking trước khi cài đặt?"
     ]
   }
 ]

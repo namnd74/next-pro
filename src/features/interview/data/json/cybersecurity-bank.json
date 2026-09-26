@@ -4,18 +4,31 @@
     "category": "cybersecurity",
     "level": "junior",
     "question": "Tam giác bảo mật CIA (Confidentiality, Integrity, Availability) là gì?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["tam", "cia", "confidentiality", "integrity", "availability"],
+    "interviewerIntent": "Đánh giá sự hiểu biết về ba trụ cột nền tảng của an toàn thông tin và cách phân bổ nguồn lực bảo mật trong kiến trúc hệ thống.",
+    "contextOrScenario": "Thiết kế kiến trúc hệ thống thương mại điện tử cần cân bằng giữa mã hóa dữ liệu nhạy cảm (C), chống giả mạo đơn hàng (I) và duy trì 99.99% uptime khi flash sale (A).",
+    "expectedKeywords": [
+      "confidentiality",
+      "integrity",
+      "availability",
+      "aes-gcm",
+      "sha-256",
+      "redundancy",
+      "cia triad"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Tam giác bảo mật CIA (Confidentiality, Integrity, Availability) là gì?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "CIA Triad là mô hình chuẩn mực gồm: Confidentiality (chỉ người có thẩm quyền mới đọc được dữ liệu), Integrity (dữ liệu không bị thay đổi trái phép trong lưu trữ hoặc truyền tải), và Availability (hệ thống luôn sẵn sàng phục vụ người dùng hợp lệ).",
+      "deepDive": "Trong thực tế sản xuất, ba yếu tố này thường cạnh tranh lẫn nhau (trade-off). Tăng Confidentiality bằng mã hóa phức tạp nhiều lớp (mTLS, envelope encryption) có thể làm giảm Availability do tăng CPU overhead và latency. Ngược lại, việc caching dữ liệu ở CDN/Edge để tăng Availability có thể vi phạm Confidentiality nếu cache nhầm dữ liệu định danh cá nhân (PII). Về kỹ thuật: Confidentiality dùng AES-256/ChaCha20; Integrity dùng HMAC-SHA256 hoặc AEAD ciphers như AES-GCM (vừa mã hóa vừa xác thực toàn vẹn bằng authentication tag); Availability yêu cầu kiến trúc multi-AZ, auto-scaling, load balancer, circuit breaker và chống DDoS.",
+      "codeExample": "import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';\n\n// Đảm bảo Confidentiality (Mã hóa AES-256-GCM) và Integrity (Auth Tag chống giả mạo)\nexport class DataSecurityVault {\n  private static readonly ALGORITHM = 'aes-256-gcm';\n  private static readonly KEY = Buffer.from(process.env.DATA_VAULT_KEY || '', 'hex'); // 32 bytes\n\n  static encrypt(plaintext: string): { ciphertext: string; iv: string; authTag: string } {\n    const iv = randomBytes(12); // GCM standard IV: 96-bit (12 bytes)\n    const cipher = createCipheriv(this.ALGORITHM, this.KEY, iv);\n    \n    let encrypted = cipher.update(plaintext, 'utf8', 'hex');\n    encrypted += cipher.final('hex');\n    const authTag = cipher.getAuthTag().toString('hex'); // Đảm bảo Integrity\n\n    return { ciphertext: encrypted, iv: iv.toString('hex'), authTag };\n  }\n\n  static decrypt(ciphertext: string, ivHex: string, authTagHex: string): string {\n    const decipher = createDecipheriv(this.ALGORITHM, this.KEY, Buffer.from(ivHex, 'hex'));\n    decipher.setAuthTag(Buffer.from(authTagHex, 'hex')); // Xác minh tính toàn vẹn (Integrity)\n    \n    let decrypted = decipher.update(ciphertext, 'hex', 'utf8');\n    decrypted += decipher.final('utf8'); // Sẽ ném lỗi nếu ciphertext bị chỉnh sửa dù 1 bit\n    return decrypted;\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Chỉ tập trung vào Confidentiality (mã hóa dữ liệu) mà bỏ quên Integrity, dẫn đến rủi ro Bit-flipping attack trên CBC mode không có MAC.",
+      "Tối ưu Availability bằng cách disable các bước xác thực chữ ký số hoặc SSL verification khi server quá tải.",
+      "Không chuẩn bị sẵn kịch bản Disaster Recovery và backup bất biến (Immutable Backup) để bảo đảm Availability khi bị ransomware."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao trong các chuẩn mã hóa hiện đại, chế độ AEAD (như AES-GCM) được bắt buộc sử dụng thay thế hoàn toàn cho AES-CBC?",
+      "Làm thế nào để đo lường và duy trì Availability (ví dụ 99.99%) trong khi vẫn thực thi Zero-Downtime Patching cho các lỗ hổng zero-day?"
     ]
   },
   {
@@ -23,18 +36,31 @@
     "category": "cybersecurity",
     "level": "junior",
     "question": "Phân biệt Authentication (Xác thực) và Authorization (Phân quyền)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["authentication", "authorization", "quy", "cybersecurity"],
+    "interviewerIntent": "Kiểm tra sự thấu hiểu cốt lõi về danh tính (Identity) và quyền hạn (Permissions), tránh các lỗ hổng bypass access control.",
+    "contextOrScenario": "Xây dựng middleware kiểm soát truy cập cho RESTful API đa người dùng (Multi-tenant SaaS application).",
+    "expectedKeywords": [
+      "authentication",
+      "authorization",
+      "401 unauthorized",
+      "403 forbidden",
+      "rbac",
+      "claims",
+      "identity"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Phân biệt Authentication (Xác thực) và Authorization (Phân quyền)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Authentication là quá trình chứng minh 'Bạn là ai?' (Identity verification - trả về HTTP 401 nếu thất bại). Authorization là quá trình kiểm tra 'Bạn được phép làm gì?' (Access control - trả về HTTP 403 nếu danh tính hợp lệ nhưng không đủ quyền hạn).",
+      "deepDive": "Authentication diễn ra trước (chứng minh qua password, OTP, biometric, JWT), xác nhận identity của subject. Authorization diễn ra ngay sau đó dựa trên các mô hình như RBAC (Role-Based Access Control) hoặc ABAC (Attribute-Based Access Control) để kiểm tra subject có quyền thực thi action trên resource hay không. HTTP status code phản ánh rất rõ: 401 Unauthorized thực chất là 'Unauthenticated' (thiếu danh tính), còn 403 Forbidden là chuẩn Authorization (đã biết bạn là ai nhưng bị từ chối truy cập). Trong microservices, Authentication thường được offload ở API Gateway, còn Authorization sâu (fine-grained object level) phải được xử lý ở domain service nội bộ.",
+      "codeExample": "import { Request, Response, NextFunction } from 'express';\nimport jwt from 'jsonwebtoken';\n\nexport interface AuthenticatedUser {\n  id: string;\n  tenantId: string;\n  roles: string[];\n}\n\nexport interface AuthRequest extends Request {\n  user?: AuthenticatedUser;\n}\n\n// 1. Authentication Middleware: Bạn là ai? (Identity Verification)\nexport const authenticateJWT = (req: AuthRequest, res: Response, next: NextFunction) => {\n  const authHeader = req.headers.authorization;\n  if (!authHeader?.startsWith('Bearer ')) {\n    return res.status(401).json({ error: '401 Unauthorized: Thiếu token hoặc định dạng không hợp lệ' });\n  }\n\n  const token = authHeader.split(' ')[1];\n  try {\n    const decoded = jwt.verify(token, process.env.JWT_PUBLIC_KEY!, { algorithms: ['RS256'] }) as AuthenticatedUser;\n    req.user = decoded; // Danh tính được xác thực thành công\n    next();\n  } catch (err) {\n    return res.status(401).json({ error: '401 Unauthorized: Token hết hạn hoặc chữ ký không hợp lệ' });\n  }\n};\n\n// 2. Authorization Middleware: Bạn có quyền làm hành động này không? (Access Control)\nexport const requireRoles = (...allowedRoles: string[]) => {\n  return (req: AuthRequest, res: Response, next: NextFunction) => {\n    if (!req.user) {\n      return res.status(401).json({ error: 'Chưa thực hiện authentication' });\n    }\n    const hasRole = req.user.roles.some(role => allowedRoles.includes(role));\n    if (!hasRole) {\n      return res.status(403).json({ error: '403 Forbidden: Không đủ quyền hạn truy cập tài nguyên này' });\n    }\n    next();\n  };\n};",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Trả về HTTP 401 khi user không có quyền, gây hiểu lầm cho frontend là token hết hạn dẫn đến vòng lặp vô hạn refresh token.",
+      "Gộp chung logic Authn và Authz trong một controller, làm mất tính modular và dễ sót kiểm tra quyền hạn khi viết thêm endpoint mới.",
+      "Chỉ kiểm tra Role (RBAC) mà không kiểm tra Data Ownership (IDOR/BOLA), ví dụ Admin Tenant A lại xem được dữ liệu Tenant B."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao RBAC thường không đủ đáp ứng trong các hệ thống doanh nghiệp lớn và khi nào cần chuyển sang ABAC hoặc ReBAC (Relationship-Based)?",
+      "Làm thế nào để truyền context danh tính an toàn giữa các internal microservices sau khi API Gateway đã authenticate?"
     ]
   },
   {
@@ -42,18 +68,31 @@
     "category": "cybersecurity",
     "level": "junior",
     "question": "Cross-Site Scripting (XSS): Phân biệt Stored XSS, Reflected XSS và DOM-based XSS?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["cross-site", "scripting", "xss", "stored", "reflected"],
+    "interviewerIntent": "Đánh giá mức độ am hiểu về cơ chế tấn công client-side injection và phương pháp phòng thủ nhiều tầng.",
+    "contextOrScenario": "Ứng dụng web hiển thị bình luận của người dùng và nhận search query qua URL parameter.",
+    "expectedKeywords": [
+      "stored xss",
+      "reflected xss",
+      "dom-based xss",
+      "csp",
+      "context-aware encoding",
+      "dompurify",
+      "dangerouslysetinnerhtml"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Cross-Site Scripting (XSS): Phân biệt Stored XSS, Reflected XSS và DOM-based XSS?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Stored XSS: payload lưu trong database và thực thi mỗi khi nạn nhân tải trang. Reflected XSS: payload nằm trong request (URL/query param) và được server phản chiếu ngay vào response. DOM XSS: lỗ hổng xảy ra hoàn toàn ở client khi JS lấy dữ liệu từ source không tin cậy (như location.search) và gán trực tiếp vào sink nguy hiểm (như innerHTML) mà không qua server.",
+      "deepDive": "Hậu quả của XSS gồm: đánh cắp session cookie (nếu thiếu HttpOnly), keylogging, đánh cắp OAuth token từ LocalStorage, thực hiện hành vi mạo danh (CSRF on steroids). Chiến lược phòng thủ hiệu quả nhất gồm: (1) Sử dụng UI framework tự động context-aware escaping như React JSX (`{userInput}`); (2) Không sử dụng các sink nguy hiểm như `eval()`, `document.write()`, `innerHTML`, `dangerouslySetInnerHTML`; (3) Thiết lập Content-Security-Policy (CSP) với `script-src 'self' 'nonce-...'` để chặn inline script kể cả khi payload chui lọt; (4) Đặt cờ `HttpOnly` cho session cookies để ngăn JS truy cập document.cookie.",
+      "codeExample": "import DOMPurify from 'isomorphic-dompurify';\n\n// 1. Phân biệt các loại XSS:\n// - Stored XSS: Mã độc lưu vĩnh viễn trong Database (ví dụ comment, profile bio). Mọi user đọc đều bị tấn công.\n// - Reflected XSS: Mã độc nằm trong URL query params, server phản hồi lại nội dung đó vào HTML mà không escape.\n// - DOM XSS: Mã độc hoàn toàn ở client-side, do JavaScript thao tác không an toàn (location.hash -> innerHTML).\n\n// 2. Phòng thủ nhiều lớp (Defense in Depth)\n\n// Lớp 1: Context-aware HTML sanitization khi bắt buộc phải render HTML\nexport function sanitizeUserHtml(dirtyHtml: string): string {\n  return DOMPurify.sanitize(dirtyHtml, {\n    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a', 'p'],\n    ALLOWED_ATTR: ['href', 'target'],\n    ALLOW_DATA_ATTR: false\n  });\n}\n\n// Lớp 2: Luôn encode text an toàn khi chèn vào DOM (tránh dùng element.innerHTML)\nexport function renderSafeText(container: HTMLElement, userInput: string): void {\n  // ✅ AN TOÀN: textContent tự động escape HTML entities (<, >, &, \", ')\n  container.textContent = userInput;\n  // ❌ NGUY HIỂM: container.innerHTML = userInput; // Dẫn tới DOM-based XSS\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Lưu trữ Access Token nhạy cảm trong `localStorage` thay vì HttpOnly SameSite Cookie, khiến XSS dễ dàng lấy cắp toàn bộ quyền hạn.",
+      "Tự viết regex để blacklist các thẻ `<script>`, dễ dàng bị bypass bởi `<img src=x onerror=alert(1)>` hoặc `<svg onload=...>`.",
+      "Dùng `encodeURI()` hoặc `encodeURIComponent()` để chống XSS trong HTML context (đây là hàm cho URI, không phải HTML entity encoding)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm sao CSP loại bỏ hoàn toàn nguy cơ của inline XSS bằng Nonce-based CSP v3?",
+      "Trusted Types API trong các trình duyệt hiện đại giải quyết triệt để DOM-based XSS như thế nào?"
     ]
   },
   {
@@ -61,18 +100,31 @@
     "category": "cybersecurity",
     "level": "junior",
     "question": "Cross-Site Request Forgery (CSRF): Kịch bản tấn công và cơ chế hoạt động của SameSite cookie?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["cross-site", "request", "forgery", "csrf", "samesite"],
+    "interviewerIntent": "Hiểu rõ cơ chế trình duyệt tự động gửi cookie cross-site và các kỹ thuật phòng thủ hiện đại.",
+    "contextOrScenario": "Bảo vệ endpoint thực hiện giao dịch tài chính `POST /api/transfer` khỏi việc bị gọi lén từ website độc hại.",
+    "expectedKeywords": [
+      "csrf",
+      "samesite",
+      "anti-csrf token",
+      "double submit cookie",
+      "strict",
+      "lax",
+      "credentials"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Cross-Site Request Forgery (CSRF): Kịch bản tấn công và cơ chế hoạt động của SameSite cookie?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "CSRF lợi dụng việc trình duyệt tự động đính kèm cookie xác thực khi người dùng gửi request từ một website độc hại sang trang đích. Thuộc tính `SameSite=Strict|Lax` của cookie giải quyết triệt để vấn đề bằng cách không gửi cookie trong các ngữ cảnh cross-site request.",
+      "deepDive": "Kịch bản tấn công: Nạn nhân đăng nhập Ngân hàng A (có cookie phiên). Sau đó truy cập trang lừa đảo B chứa form ẩn `<form action='https://bank-a.com/transfer' method='POST'>` tự động submit. Do trình duyệt tự động đính kèm cookie của Bank A, request được thực thi hợp lệ. Phòng vệ: (1) `SameSite=Strict` chặn hoàn toàn cookie khi chuyển hướng từ site khác; `SameSite=Lax` chặn cookie với POST/PUT/DELETE nhưng cho phép top-level GET navigation; (2) Anti-CSRF Token (Synchronizer Token Pattern hoặc Double Submit Cookie): Server cấp token độc nhất, frontend phải gửi qua custom header `X-CSRF-Token` (trang độc hại không thể đọc hay giả mạo do Same-Origin Policy); (3) Dùng Authorization header (Bearer Token) thay cho cookie-based auth đối với kiến trúc pure REST API.",
+      "codeExample": "import express, { Request, Response, NextFunction } from 'express';\nimport crypto from 'crypto';\n\nconst app = express();\n\n// 1. Cấu hình Cookie an toàn với thuộc tính SameSite\nexport const sessionCookieConfig = {\n  httpOnly: true,                               // Chống đọc qua XSS\n  secure: process.env.NODE_ENV === 'production', // Chỉ gửi qua HTTPS\n  sameSite: 'lax' as const,                     // Ngăn chặn hầu hết cross-site POST requests\n  maxAge: 3600000\n};\n\n// 2. Triển khai Anti-CSRF Token (Double Submit Cookie Pattern hoặc Synchronizer Token)\nexport const csrfProtection = (req: Request, res: Response, next: NextFunction) => {\n  // Các phương thức an toàn (Safe Methods) không làm thay đổi trạng thái\n  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {\n    return next();\n  }\n\n  const clientCsrfToken = req.headers['x-csrf-token'] || req.body?._csrf;\n  const cookieCsrfToken = req.cookies?.['csrf-token'];\n\n  if (!clientCsrfToken || !cookieCsrfToken || clientCsrfToken !== cookieCsrfToken) {\n    return res.status(403).json({ error: 'CSRF Token missing or mismatch' });\n  }\n\n  next();\n};",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Chỉ dùng CSRF token cho POST mà quên kiểm tra trên PUT, PATCH, DELETE.",
+      "Tin tưởng SameSite=Lax tuyệt đối mà không có CSRF token cho các endpoint quan trọng khi hỗ trợ các trình duyệt cũ hoặc sub-domain takeover.",
+      "Tạo CSRF token cố định cho cả phiên mà không rotate theo form hoặc request."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao API thuần túy sử dụng header `Authorization: Bearer <jwt>` lại miễn nhiễm tự nhiên với CSRF?",
+      "Trong tình huống nào thuộc tính `SameSite=Lax` vẫn có thể bị bypass (ví dụ: HTTP Method Override, window.open GET pop-up)?"
     ]
   },
   {
@@ -80,18 +132,31 @@
     "category": "cybersecurity",
     "level": "junior",
     "question": "SQL Injection: Kịch bản tấn công và tại sao Prepared Statements / Parameterized Queries loại bỏ được hoàn toàn?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["sql", "injection", "prepared", "statements", "parameterized"],
+    "interviewerIntent": "Đánh giá hiểu biết về lỗi phân tách dữ liệu và lệnh thực thi trong database engine.",
+    "contextOrScenario": "Hệ thống tra cứu thông tin khách hàng nhận tham số input từ ô tìm kiếm trên frontend.",
+    "expectedKeywords": [
+      "sql injection",
+      "prepared statement",
+      "parameterized query",
+      "ast",
+      "query plan",
+      "sql parsing",
+      "orm"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'SQL Injection: Kịch bản tấn công và tại sao Prepared Statements / Parameterized Queries loại bỏ được hoàn toàn?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "SQL Injection xảy ra khi input của người dùng bị nối chuỗi trực tiếp vào câu lệnh SQL, khiến parser của CSDL hiểu nhầm dữ liệu là lệnh thực thi. Prepared Statements loại bỏ hoàn toàn bằng cách tách biệt pha biên dịch cú pháp (parsing/query planning) và pha nạp dữ liệu.",
+      "deepDive": "Với Prepared Statement, Database Engine nhận mẫu truy vấn với các placeholder (`$1`, `?`), phân tích cú pháp tạo cây cú pháp trừu tượng (Abstract Syntax Tree - AST) và tạo Query Execution Plan trước. Khi giá trị thực tế được truyền vào ở bước execute, DB engine coi chúng hoàn toàn là dữ liệu thô (string literal), dù input có chứa `' OR 1=1 --` hay `DROP TABLE` thì nó chỉ được đem đi so khớp ký tự, không bao giờ thay đổi được cấu trúc ngữ nghĩa của cây AST ban đầu. Lưu ý: ORM (Prisma, TypeORM) sử dụng parameterized queries ngầm định, nhưng nếu lập trình viên dùng hàm raw query không bind params (như `prisma.$queryRawUnsafe`) thì vẫn dính SQLi bình thường.",
+      "codeExample": "import { Pool } from 'pg';\n\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL });\n\nexport class UserRepository {\n  // ❌ NGUY HIỂM CHẾT NGƯỜI: String concatenation dẫn tới SQL Injection\n  // Input: \"admin' --\" hoặc \"' OR 1=1 --\"\n  static async vulnerableSearch(username: string) {\n    const rawQuery = `SELECT id, username, email FROM users WHERE username = '${username}'`;\n    return await pool.query(rawQuery); // Kẻ tấn công đọc toàn bộ DB hoặc bypass login\n  }\n\n  // ✅ AN TOÀN TUYỆT ĐỐI: Parameterized Query (Prepared Statement)\n  static async secureSearch(username: string) {\n    const query = `\n      SELECT id, username, email, created_at \n      FROM users \n      WHERE username = $1 \n      LIMIT 10\n    `;\n    // DB engine biên dịch cú pháp SQL trước, biến $1 chỉ được coi là literal value (dữ liệu thô)\n    const result = await pool.query(query, [username]);\n    return result.rows;\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Sử dụng ORM nhưng nối chuỗi trong các hàm Raw Query như `db.raw(`SELECT * FROM users WHERE status = '${status}'`)`.",
+      "Parameterize các thành phần không thể bind như Tên bảng (Table name), Tên cột (Column name), hoặc chiều sắp xếp `ORDER BY ASC/DESC`.",
+      "Tự dùng hàm Regex để lọc từ khóa `SELECT`, `UNION`, `DROP` thay vì dùng Prepared Statement — dễ bị bypass bằng comment hoặc case-manipulation."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm thế nào để xử lý an toàn khi người dùng được phép chọn cột để sắp xếp (`ORDER BY $column`) trong SQL?",
+      "Second-Order SQL Injection là gì và tại sao Prepared Statements ở bước INSERT đầu tiên vẫn có thể không cứu được nếu bước đọc sau đó nối chuỗi?"
     ]
   },
   {
@@ -99,18 +164,31 @@
     "category": "cybersecurity",
     "level": "junior",
     "question": "Nguyên tắc Đặc quyền tối thiểu (Principle of Least Privilege - PoLP) áp dụng thế nào trong phân quyền hệ thống?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["nguy", "quy", "thi", "principle", "least"],
+    "interviewerIntent": "Đánh giá tư duy phòng thủ chiều sâu và giới hạn bán kính thiệt hại (blast radius) khi xảy ra sự cố bảo mật.",
+    "contextOrScenario": "Thiết lập quyền hạn cho ứng dụng Backend chạy trong container kết nối CSDL và lưu file trên S3.",
+    "expectedKeywords": [
+      "least privilege",
+      "polp",
+      "blast radius",
+      "iam role",
+      "read-only",
+      "granular permissions",
+      "non-root"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Nguyên tắc Đặc quyền tối thiểu (Principle of Least Privilege - PoLP) áp dụng thế nào trong phân quyền hệ thống?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Principle of Least Privilege (PoLP) quy định bất kỳ đối tượng nào (người dùng, tiến trình, service account) chỉ được cấp quyền hạn tối thiểu vừa đủ để hoàn thành chức năng được giao, và phải thu hồi ngay khi không còn cần thiết.",
+      "deepDive": "PoLP là cốt lõi để giảm thiểu bán kính thiệt hại (Blast Radius). Nếu một container chạy quyền `root` bị khai thác Remote Code Execution (RCE), kẻ tấn công chiếm toàn quyền kiểm soát host node. Áp dụng PoLP đa tầng: (1) OS/Container: Chạy non-root user (`USER node`), set filesystem `read-only`, drop Linux capabilities (`--cap-drop=ALL --cap-add=NET_BIND_SERVICE`); (2) Database: Tách biệt user chạy DB Migration (có quyền DDL `CREATE/DROP/ALTER`) và user của web application runtime (chỉ có quyền DML `SELECT/INSERT/UPDATE` trên đúng các table cần dùng); (3) Cloud IAM: Không dùng Access Keys cố định, gán IAM Role với granular policy, chỉ cho phép `s3:GetObject` trên đúng bucket `bucket/tenant-a/*` thay vì `s3:*`.",
+      "codeExample": "#!/usr/bin/env bash\n# Production Hardening Script: Tuân thủ Principle of Least Privilege (PoLP)\nset -euo pipefail\n\necho \"==> 1. Thiết lập tài nguyên Linux: Tạo non-root user cô lập cho ứng dụng\"\nuseradd -r -s /usr/sbin/nologin -d /nonexistent appuser || true\n\necho \"==> 2. Phân quyền thư mục: Chỉ cấp quyền đọc cho file code, chỉ ghi vào thư mục upload/temp\"\nAPP_DIR=\"/var/www/production-api\"\nchown -R root:root \"$APP_DIR\"\nchmod -R 755 \"$APP_DIR\"\n\n# Chỉ thư mục storage/logs mới cho phép appuser ghi\nmkdir -p \"$APP_DIR/storage/logs\"\nchown -R appuser:appuser \"$APP_DIR/storage/logs\"\nchmod 700 \"$APP_DIR/storage/logs\"\n\necho \"==> 3. CSDL: Ứng dụng nghiệp vụ KHÔNG DÙNG quyền DDL (DROP, ALTER), chỉ cấp DML cần thiết\"\n# Nguyên tắc: User migration riêng biệt (DDL), User runtime riêng biệt (SELECT, INSERT, UPDATE, DELETE)\npsql -U postgres -d ecom_db << 'SQL'\n-- Tạo runtime user không thể xóa bảng\nCREATE USER app_runtime WITH PASSWORD 'StrongRuntimePassword!2026';\nGRANT CONNECT ON DATABASE ecom_db TO app_runtime;\nGRANT USAGE ON SCHEMA public TO app_runtime;\nGRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_runtime;\nREVOKE CREATE, DROP, ALTER ON ALL TABLES IN SCHEMA public FROM app_runtime;\nSQL\n\necho \"==> Đã hoàn tất cấu hình Least Privilege!\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Dùng tài khoản `postgres` hoặc `sa` có quyền superuser trực tiếp trong connection string của Web Server.",
+      "Cấp IAM Policy chứa `Resource: '*'` và `Action: '*'` cho EC2 instance hoặc Pod để 'chạy được trước đã rồi tính'.",
+      "Cho phép developer quyền truy cập write/admin vào Database Production để fix bug nóng thay vì có quy trình approval và temporary elevated access (JIT)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Just-In-Time (JIT) Privileged Access Management giải quyết vấn đề quản trị quyền admin trên production như thế nào?",
+      "Làm sao kiểm soát và tự động audit các quyền IAM thừa thãi (IAM permission drift) trên AWS hoặc GCP?"
     ]
   },
   {
@@ -118,18 +196,32 @@
     "category": "cybersecurity",
     "level": "junior",
     "question": "Lưu trữ mật khẩu an toàn: Tại sao tuyệt đối không dùng MD5 hay SHA-256? Cơ chế của bcrypt, Argon2 và PBKDF2?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["tuy", "md5", "hay", "sha-256", "bcrypt"],
+    "interviewerIntent": "Đánh giá kiến thức về mật mã học ứng dụng, chống brute-force bằng GPU/ASIC và quản lý mật khẩu người dùng.",
+    "contextOrScenario": "Thiết kế module đăng ký và đăng nhập bảo mật cho hệ thống hàng triệu người dùng.",
+    "expectedKeywords": [
+      "argon2id",
+      "bcrypt",
+      "pbkdf2",
+      "salt",
+      "work factor",
+      "memory-hard",
+      "gpu/asic resistance",
+      "hashcat"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Lưu trữ mật khẩu an toàn: Tại sao tuyệt đối không dùng MD5 hay SHA-256? Cơ chế của bcrypt, Argon2 và PBKDF2?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "MD5 và SHA-256 được thiết kế để tính toán cực nhanh, nên hacker có thể dùng GPU/ASIC thử hàng tỷ hash/giây để giải mã bảng Rainbow Table. Mật khẩu bắt buộc phải dùng các thuật toán băm chậm thích ứng (Adaptive Slow KDF) như Argon2id, bcrypt hoặc PBKDF2 có tích hợp Salt ngẫu nhiên và Work Factor điều chỉnh được theo thời gian.",
+      "deepDive": "Một hàm băm mật khẩu an toàn cần 2 yếu tố: (1) Cryptographic Salt (tối thiểu 16 bytes ngẫu nhiên cho mỗi user) để vô hiệu hóa Rainbow Tables; (2) Cost Factor (độ trễ có chủ đích ~200-500ms trên server). MD5/SHA-256 không có cost factor. bcrypt sử dụng thuật toán Eksblowfish tiêu tốn CPU cache nhưng ít tốn RAM. PBKDF2 lặp lại hàm HMAC nhiều nghìn vòng nhưng vẫn có thể bị tối ưu trên GPU. Hiện đại nhất là Argon2id: một thuật toán 'Memory-Hard' đòi hỏi lượng RAM đáng kể (ví dụ 64MB RAM mỗi lần hash), khiến việc xây dựng mạch phần cứng ASIC hoặc dùng GPU để crack mật khẩu hàng loạt trở nên quá tốn kém và bất khả thi về mặt kinh tế.",
+      "codeExample": "import argon2 from 'argon2';\n\nexport class PasswordSecurity {\n  // Argon2id là thuật toán thắng giải Password Hashing Competition (PHC)\n  // Kết hợp chống Side-channel timing attack (Argon2i) và GPU brute-force (Argon2d)\n  private static readonly OPTIONS: argon2.Options = {\n    type: argon2.argon2id,\n    memoryCost: 65536, // 64 MB RAM (Memory-hard: chống ASIC và GPU farms)\n    timeCost: 3,       // 3 iterations\n    parallelism: 2,    // 2 threads\n    saltLength: 16     // 16 bytes cryptographic random salt\n  };\n\n  static async hashPassword(password: string): Promise<string> {\n    // Tự động sinh Salt ngẫu nhiên và nhúng kèm cấu hình vào output string\n    return await argon2.hash(password, this.OPTIONS);\n  }\n\n  static async verifyPassword(hash: string, plainTextAttempt: string): Promise<boolean> {\n    try {\n      // Thực hiện constant-time comparison bên dưới để chống timing attack\n      return await argon2.verify(hash, plainTextAttempt);\n    } catch {\n      return false;\n    }\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Tự chế thuật toán mã hóa hoặc băm lặp nhiều lần SHA-256 (`sha256(sha256(pw) + salt)`) thay vì dùng các thư viện chuẩn đã được peer-reviewed.",
+      "Dùng Salt cố định (hardcoded salt) cho toàn bộ hệ thống thay vì tạo Salt ngẫu nhiên riêng biệt cho từng người dùng.",
+      "Đặt cost factor quá cao làm nghẽn CPU của Web Server khi có traffic đột biến hoặc bị tấn công DoS qua endpoint login."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Khi phần cứng máy chủ nâng cấp mạnh hơn sau vài năm, làm thế nào để migrate toàn bộ hash mật khẩu cũ của người dùng sang cost factor mới mà không bắt họ reset mật khẩu?",
+      "Pepper (Secret key lưu ở HSM hoặc KMS) khác gì với Salt và nó bổ sung lớp phòng vệ nào khi database bị rò rỉ?"
     ]
   },
   {
@@ -137,18 +229,31 @@
     "category": "cybersecurity",
     "level": "junior",
     "question": "HTTPS bảo vệ thông tin người dùng khỏi tấn công Man-in-the-Middle (MitM) trên mạng công cộng như thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ JUNIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["https", "tin", "man-in-the-middle", "mitm", "cybersecurity"],
+    "interviewerIntent": "Đánh giá sự hiểu biết về giao thức TLS, Handshake, vai trò của Certificate Authority (CA) và HSTS.",
+    "contextOrScenario": "Người dùng truy cập ứng dụng web tại quán cafe dùng Wifi công cộng không mật khẩu.",
+    "expectedKeywords": [
+      "https",
+      "tls handshake",
+      "mitm",
+      "certificate authority",
+      "hsts",
+      "asymmetric encryption",
+      "pfs"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'HTTPS bảo vệ thông tin người dùng khỏi tấn công Man-in-the-Middle (MitM) trên mạng công cộng như thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ JUNIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "HTTPS = HTTP + TLS. Nó giải quyết triệt để tấn công MitM thông qua 3 cơ chế: Mã hóa (Encryption - kẻ nghe lén trên wifi chỉ thấy dữ liệu rác), Toàn vẹn (Integrity - dữ liệu không bị sửa đổi trên đường truyền), và Xác thực danh tính (Authentication - chứng chỉ X.509 từ CA uy tín đảm bảo client đang kết nối đúng máy chủ thật).",
+      "deepDive": "Quá trình TLS 1.3 Handshake: (1) Client gửi `ClientHello` kèm danh sách cipher suites và public key share; (2) Server phản hồi certificate và public key share của mình; (3) Client xác minh chứng chỉ dựa trên Trusted Root CAs cài sẵn trong OS/Browser; (4) Cả hai tính toán ra Session Key đối xứng qua thuật toán Diffie-Hellman (PFS - Perfect Forward Secrecy: nếu private key của server bị lộ trong tương lai thì dữ liệu quá khứ vẫn an toàn). Tấn công MitM thường khai thác bước hạ cấp giao thức (SSL Stripping từ https sang http). Để chống triệt để, server phải gửi header HSTS (`Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`) ép browser luôn dùng HTTPS ngay từ request đầu tiên.",
+      "codeExample": "#!/usr/bin/env bash\n# Kiểm tra cấu hình TLS/HTTPS của máy chủ để chống MitM\nset -euo pipefail\n\nTARGET_DOMAIN=\"example.com\"\n\necho \"==> 1. Kiểm tra TLS Handshake, Cipher Suite và Chứng chỉ X.509\"\nopenssl s_client -connect \"${TARGET_DOMAIN}:443\" -servername \"${TARGET_DOMAIN}\" -tls1_3 < /dev/null 2>/dev/null | openssl x509 -noout -issuer -subject -dates\n\necho \"==> 2. Kiểm tra Header HSTS (HTTP Strict Transport Security) chống SSL Stripping\"\ncurl -s -I \"https://${TARGET_DOMAIN}\" | grep -i \"Strict-Transport-Security\" || {\n  echo \"CẢNH BÁO: Thiếu header HSTS! Nạn nhân vẫn có thể bị tấn công SSL Stripping.\"\n  exit 1\n}\n\n# Cấu hình HSTS chuẩn sản xuất:\n# Strict-Transport-Security: max-age=63072000; includeSubDomains; preload",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Thiếu header HSTS, khiến kẻ tấn công trên cùng mạng Wifi có thể dùng công cụ như `sslstrip` ép trình duyệt giao tiếp qua HTTP không mã hóa.",
+      "Bỏ qua lỗi xác thực chứng chỉ (`curl -k` hoặc `rejectUnauthorized: false` trong code NodeJS/Axios), khiến ứng dụng hoàn toàn bị MitM.",
+      "Sử dụng các phiên bản TLS cũ đã lỗi thời và chứa nhiều lỗ hổng như SSLv3, TLS 1.0, TLS 1.1 thay vì chỉ cho phép TLS 1.2 và TLS 1.3."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Perfect Forward Secrecy (PFS) là gì và tại sao cơ chế trao đổi khóa RSA truyền thống lại không đáp ứng được PFS?",
+      "HSTS Preload List hoạt động ra sao để bảo vệ người dùng ngay cả trong lần đầu tiên gõ domain vào trình duyệt?"
     ]
   },
   {
@@ -156,18 +261,31 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "Content Security Policy (CSP): Cấu hình các directives `default-src`, `script-src` với `nonce` hoặc `hash` để chặn XSS?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["content", "security", "policy", "csp", "directives"],
+    "interviewerIntent": "Đánh giá năng lực thiết lập phòng thủ chuyên sâu tầng client (Browser Security Policy) chống injection.",
+    "contextOrScenario": "Website thương mại điện tử cần chặn toàn bộ mã script độc hại từ bên thứ ba nhưng vẫn phải chạy script nội bộ.",
+    "expectedKeywords": [
+      "content-security-policy",
+      "nonce",
+      "hash",
+      "strict-dynamic",
+      "script-src",
+      "default-src",
+      "helmet"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Content Security Policy (CSP): Cấu hình các directives `default-src`, `script-src` với `nonce` hoặc `hash` để chặn XSS?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "CSP là HTTP response header cho phép server khai báo các nguồn tài nguyên hợp lệ mà trình duyệt được phép tải hoặc thực thi. Cấu hình Nonce-based CSP (`script-src 'nonce-<random>'`) tạo một chuỗi ngẫu nhiên chỉ dùng một lần cho mỗi request, trình duyệt chỉ chạy các thẻ script mang đúng giá trị nonce này, vô hiệu hóa hoàn toàn inline XSS.",
+      "deepDive": "Trước đây, CSP thường dùng whitelist domain (`script-src https://trusted.cdn.com`), nhưng dễ bị bypass qua JSONP endpoint hoặc file upload trên CDN đó. Chuẩn CSP Level 3 khuyến nghị Nonce-based CSP kết hợp `'strict-dynamic'`. Khi có `'strict-dynamic'`, một script tin cậy (có nonce) khi tạo thêm script con khác một cách hợp lệ sẽ được browser cho phép mà không cần thêm whitelist domain phức tạp. Directive `default-src 'self'` đóng vai trò fallback cho các loại tài nguyên khác. Để triển khai an toàn không làm sập production, luôn bắt đầu bằng header `Content-Security-Policy-Report-Only` kết hợp `report-to` để thu thập log vi phạm trước khi chuyển sang header chặn thực sự.",
+      "codeExample": "import express, { Request, Response, NextFunction } from 'express';\nimport helmet from 'helmet';\nimport crypto from 'crypto';\n\nconst app = express();\n\n// Middleware sinh Cryptographic Nonce độc nhất cho mỗi request\napp.use((req: Request, res: Response, next: NextFunction) => {\n  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');\n  next();\n});\n\n// Cấu hình Strict CSP qua Helmet\napp.use((req: Request, res: Response, next: NextFunction) => {\n  const nonce = res.locals.cspNonce;\n  \n  helmet.contentSecurityPolicy({\n    directives: {\n      defaultSrc: [\"'self'\"],\n      // Chỉ cho phép script có đúng Nonce được sinh từ server cho request này\n      scriptSrc: [\"'self'\", `'nonce-${nonce}'`, \"'strict-dynamic'\"],\n      styleSrc: [\"'self'\", `'nonce-${nonce}'`],\n      imgSrc: [\"'self'\", 'data:', 'https://images.mycdn.com'],\n      connectSrc: [\"'self'\", 'https://api.mycompany.com'],\n      objectSrc: [\"'none'\"],       // Chặn Flash, Java Applets\n      baseUri: [\"'self'\"],         // Chặn tấn công Base Tag Injection\n      frameAncestors: [\"'none'\"],  // Chống Clickjacking\n    },\n  })(req, res, next);\n});\n\n// Render template HTML đính kèm nonce vào thẻ script\napp.get('/', (req: Request, res: Response) => {\n  const nonce = res.locals.cspNonce;\n  res.send(`\n    <!DOCTYPE html>\n    <html>\n      <head><title>Secure Page</title></head>\n      <body>\n        <h1>Production Application</h1>\n        <!-- Script này hợp lệ và được chạy -->\n        <script nonce=\"${nonce}\">\n          console.log(\"Internal script executed securely with nonce\");\n        </script>\n        <!-- Payload XSS của hacker (không có nonce hợp lệ) sẽ bị browser block ngay lập tức -->\n      </body>\n    </html>\n  `);\n});",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Sử dụng `'unsafe-inline'` trong `script-src` mà không có nonce/hash, làm mất đi 90% giá trị phòng vệ XSS của CSP.",
+      "Tái sử dụng nonce cố định (hardcoded nonce) hoặc sinh nonce theo user thay vì sinh mới ngẫu nhiên ở mỗi HTTP request.",
+      "Bỏ quên directive `object-src 'none'` và `base-uri 'self'`, tạo lỗ hổng cho tấn công Flash/Plugin hoặc Base Tag Injection."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao khi có `'nonce-...'` trong CSP Level 3 thì trình duyệt hiện đại sẽ tự động bỏ qua `'unsafe-inline'`?",
+      "Làm thế nào để tích hợp Nonce-based CSP với kiến trúc Static Site Generation (SSG / Next.js Export) nơi HTML được build sẵn không có server runtime?"
     ]
   },
   {
@@ -175,18 +293,31 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "CORS (Cross-Origin Resource Sharing): Tại sao CORS là cơ chế nới lỏng Same-Origin Policy chứ không phải bảo vệ phía client?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["cors", "cross-origin", "resource", "sharing", "same-origin"],
+    "interviewerIntent": "Làm rõ bản chất của CORS và SOP, xóa bỏ ngộ nhận tai hại rằng cấu hình CORS trên backend là để bảo vệ server khỏi hacker.",
+    "contextOrScenario": "Phát triển Single Page Application (SPA) trên `https://app.example.com` gọi REST API tại `https://api.example.com`.",
+    "expectedKeywords": [
+      "cors",
+      "same-origin policy",
+      "preflight request",
+      "options",
+      "access-control-allow-origin",
+      "origin header",
+      "credentials"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'CORS (Cross-Origin Resource Sharing): Tại sao CORS là cơ chế nới lỏng Same-Origin Policy chứ không phải bảo vệ phía client?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Same-Origin Policy (SOP) là cơ chế bảo mật mặc định rất nghiêm ngặt của trình duyệt: cấm một origin này đọc tài nguyên từ origin khác. CORS KHÔNG PHẢI công cụ bảo vệ backend khỏi hacker (công cụ như curl, Postman không tuân thủ CORS), mà là cơ chế nới lỏng SOP có kiểm soát để cho phép frontend của các domain chỉ định đọc được response từ server.",
+      "deepDive": "SOP ngăn website độc hại A gửi JS request đọc trộm email từ website B. Tuy nhiên điều này gây khó khăn khi tách frontend và API sang subdomain khác nhau. CORS ra đời để server 'bật đèn xanh' cho browser. Với các request phức tạp (có header lạ hoặc method PUT/DELETE/PATCH), trình duyệt sẽ tự động gửi `OPTIONS` Preflight request để hỏi server xem có chấp thuận origin, methods, headers này không trước khi gửi request thật. Rất nhiều lập trình viên hiểu nhầm rằng CORS ngăn chặn request gửi tới server: thực tế, request thường vẫn tới server và được thực thi, chỉ là trình duyệt sẽ giấu response và ném lỗi JS ở client nếu header `Access-Control-Allow-Origin` không hợp lệ.",
+      "codeExample": "import express from 'express';\nimport cors from 'cors';\n\nconst app = express();\n\n// Whitelist các origin được phép gọi API\nconst allowedOrigins = [\n  'https://app.company.com',\n  'https://admin.company.com'\n];\n\nexport const corsOptions: cors.CorsOptions = {\n  origin: (origin, callback) => {\n    // Cho phép server-to-server requests hoặc non-browser clients (origin is undefined)\n    if (!origin || allowedOrigins.includes(origin)) {\n      callback(null, true);\n    } else {\n      callback(new Error('CORS Error: Origin không nằm trong danh sách cho phép'));\n    }\n  },\n  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],\n  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],\n  credentials: true, // Cho phép truyền cookie hoặc Authorization header\n  maxAge: 86400      // Cache preflight OPTIONS request trong 24h để giảm latency\n};\n\n// ❌ TUYỆT ĐỐI KHÔNG DÙNG: origin: '*' kết hợp credentials: true (Browser sẽ block vì vi phạm bảo mật)\napp.use(cors(corsOptions));",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Cấu hình `Access-Control-Allow-Origin: *` kết hợp `Access-Control-Allow-Credentials: true` — vi phạm chuẩn W3C và bị browser block ngay.",
+      "Viết hàm check origin lỏng lẻo bằng `origin.includes('company.com')`, dẫn tới việc bị bypass bởi `https://evil-company.com`.",
+      "Tin rằng cấu hình CORS chặt chẽ sẽ ngăn chặn được web scraping hoặc hacker dùng curl/python tấn công API."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Preflight (OPTIONS) request lại xảy ra trên một số POST request nhưng một số POST khác lại không (Simple Request)?",
+      "Private Network Access (PNA) mở rộng CORS như thế nào để ngăn public website gọi API vào địa chỉ private LAN (192.168.x.x)?"
     ]
   },
   {
@@ -194,18 +325,31 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "Server-Side Request Forgery (SSRF): Kịch bản hacker lợi dụng server để tấn công máy chủ nội bộ (169.254.169.254) và cách chặn?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["server-side", "request", "forgery", "ssrf", "hacker"],
+    "interviewerIntent": "Đánh giá hiểu biết về lỗ hổng SSRF, đặc biệt trong môi trường Cloud (AWS/GCP/K8s) và cách phòng thủ qua network/application layer.",
+    "contextOrScenario": "Tính năng cho phép người dùng nhập URL ảnh avatar để server tự động tải về (fetch avatar from URL).",
+    "expectedKeywords": [
+      "ssrf",
+      "169.254.169.254",
+      "imds",
+      "imdsv2",
+      "dns rebinding",
+      "private ip",
+      "ip-range check"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Server-Side Request Forgery (SSRF): Kịch bản hacker lợi dụng server để tấn công máy chủ nội bộ (169.254.169.254) và cách chặn?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "SSRF xảy ra khi ứng dụng web nhận một URL từ người dùng và gửi request đến URL đó mà không kiểm tra cẩn thận. Kẻ tấn công lợi dụng chính server để gửi request vào các tài nguyên nội bộ sau tường lửa, đặc biệt là endpoint Instance Metadata Service (IMDS: 169.254.169.254) trên AWS để đánh cắp IAM credentials tạm thời của máy chủ.",
+      "deepDive": "Các vector khai thác SSRF điển hình: (1) Đọc metadata AWS/GCP (`http://169.254.169.254/latest/meta-data/iam/security-credentials/`); (2) Quét cổng dịch vụ nội bộ (Redis, Elasticsearch port 9200 không pass); (3) Dùng giao thức lạ (`file:///etc/passwd`, `gopher://`). Phòng thủ ứng dụng: Validate whitelist domain, phân giải DNS và kiểm tra IP không thuộc RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) hay Link-local (169.254.0.0/16); vô hiệu hóa HTTP redirects để chống Redirect Bypass; giải quyết bài toán DNS Rebinding bằng cách pin IP đã resolve khi gửi request. Phòng thủ hạ tầng: Bắt buộc kích hoạt AWS IMDSv2 (yêu cầu session token qua PUT header trước, chặn SSRF do đa số SSRF chỉ gửi được GET/POST đơn giản); dùng Network Security Group cấm egress traffic đến 169.254.169.254.",
+      "codeExample": "import dns from 'dns/promises';\nimport ipaddr from 'ipaddr.js';\nimport axios from 'axios';\n\n// Hàm kiểm tra an toàn URL trước khi fetch để chặn SSRF\nexport async function safeFetchUrl(inputUrl: string): Promise<Buffer> {\n  const parsed = new URL(inputUrl);\n\n  // 1. Chỉ cho phép giao thức HTTP/HTTPS (chặn file:///, gopher://, dict://)\n  if (!['http:', 'https:'].includes(parsed.protocol)) {\n    throw new Error('Giao thức không được phép');\n  }\n\n  // 2. Phân giải DNS ra IP để kiểm tra trước\n  const records = await dns.lookup(parsed.hostname, { all: true });\n  if (records.length === 0) throw new Error('Không phân giải được tên miền');\n\n  for (const record of records) {\n    const addr = ipaddr.parse(record.address);\n    const range = addr.range();\n\n    // 3. Chặn toàn bộ IP Private, Loopback, Link-Local (AWS IMDS: 169.254.169.254)\n    const dangerousRanges = ['loopback', 'private', 'linkLocal', 'uniqueLocal', 'broadcast'];\n    if (dangerousRanges.includes(range)) {\n      throw new Error(`Phát hiện SSRF: IP ${record.address} thuộc dải cấm (${range})`);\n    }\n  }\n\n  // 4. Fetch với timeout và giới hạn dung lượng tải về, tắt tự động follow redirects\n  const response = await axios.get(inputUrl, {\n    timeout: 3000,\n    maxRedirects: 0, // Chặn bypass qua 302 Redirect về IP nội bộ\n    responseType: 'arraybuffer',\n    maxContentLength: 5 * 1024 * 1024 // Tối đa 5MB\n  });\n\n  return Buffer.from(response.data);\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Chỉ kiểm tra chuỗi hostname mà không resolve DNS, bị hacker bypass bằng DNS trỏ về 127.0.0.1 (ví dụ `127.0.0.1.nip.io`).",
+      "Cho phép HTTP client tự động follow redirect (301/302), server kiểm tra URL ban đầu an toàn nhưng domain đó redirect về `169.254.169.254`.",
+      "Không bật IMDSv2 trên AWS EC2, để mặc định IMDSv1 cho phép đọc metadata chỉ bằng một HTTP GET đơn giản."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "DNS Rebinding Attack là gì và tại sao việc kiểm tra IP trước khi gọi hàm `axios.get(url)` vẫn có thể bị race condition (TOCTOU)?",
+      "AWS IMDSv2 chặn đứng SSRF đánh cắp credential như thế nào bằng cơ chế hop limit và PUT session token?"
     ]
   },
   {
@@ -213,18 +357,30 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "IDOR (Insecure Direct Object References) / BOLA là gì? Cách thiết kế kiểm tra quyền sở hữu tài nguyên ở tầng service?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["idor", "insecure", "direct", "object", "references"],
+    "interviewerIntent": "Đánh giá tư duy thiết kế Authorization ở mức dữ liệu (Object-level Access Control) - lỗ hổng #1 trong OWASP API Security.",
+    "contextOrScenario": "Endpoint xem chi tiết đơn hàng `GET /api/orders/:orderId` bị người dùng đổi orderId của người khác để xem trộm hóa đơn.",
+    "expectedKeywords": [
+      "idor",
+      "bola",
+      "broken object level authorization",
+      "data ownership",
+      "tenant isolation",
+      "uuid"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'IDOR (Insecure Direct Object References) / BOLA là gì? Cách thiết kế kiểm tra quyền sở hữu tài nguyên ở tầng service?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "IDOR (Insecure Direct Object Reference) hay BOLA (Broken Object Level Authorization) xảy ra khi ứng dụng sử dụng định danh tham chiếu trực tiếp đến tài nguyên (như ID trong URL) nhưng không xác minh xem người dùng gửi request có quyền sở hữu hoặc quyền truy cập tài nguyên đó hay không.",
+      "deepDive": "BOLA là lỗ hổng đứng đầu bảng OWASP API Top 10 nhiều năm liền vì rất phổ biến và dễ khai thác (chỉ cần đổi ID tuần tự từ 1001 sang 1002). Phòng thủ kiến trúc: (1) Luôn đưa `userId` hoặc `tenantId` từ authenticated session vào mệnh đề `WHERE` của truy vấn CSDL thay vì query riêng biệt rồi check if/else; (2) Sử dụng UUID v4 hoặc ULID thay cho Auto-increment integer để hacker không thể quét tuần tự (enumeration); (3) Thiết kế Policy-based Authorization (ví dụ CASL, OPA) tách rời logic nghiệp vụ; (4) Nếu người dùng không có quyền trên tài nguyên, ưu tiên trả về HTTP 404 Not Found thay vì 403 Forbidden để ngăn chặn việc dò đoán ID tài nguyên đang tồn tại trong hệ thống.",
+      "codeExample": "import { Request, Response } from 'express';\nimport { AuthRequest } from './auth-middleware';\n\ninterface Order {\n  id: string;\n  userId: string;\n  tenantId: string;\n  amount: number;\n}\n\nexport class OrderService {\n  // ❌ SAI LẦM PHỔ BIẾN: Chỉ tìm theo ID mà không quan tâm ai đang gửi request (Dẫn tới IDOR/BOLA)\n  static async vulnerableGetOrder(orderId: string): Promise<Order | null> {\n    return await db.orders.findUnique({ where: { id: orderId } });\n  }\n\n  // ✅ CHUẨN SẢN XUẤT: Luôn kèm Context của Current User (Data Ownership Verification)\n  static async secureGetOrder(orderId: string, currentUserId: string, currentTenantId: string): Promise<Order> {\n    const order = await db.orders.findFirst({\n      where: {\n        id: orderId,\n        tenantId: currentTenantId, // Đảm bảo cô lập multi-tenant\n        userId: currentUserId      // Chỉ chủ sở hữu mới đọc được\n      }\n    });\n\n    if (!order) {\n      // Trả về 404 thay vì 403 để tránh rò rỉ sự tồn tại của orderId (Data Enumeration)\n      throw new Error('ORDER_NOT_FOUND');\n    }\n\n    return order;\n  }\n}\n\n// Controller xử lý an toàn\nexport const getOrderDetailController = async (req: AuthRequest, res: Response) => {\n  try {\n    const { orderId } = req.params;\n    const currentUser = req.user!; // Lấy từ token đã qua Authentication\n\n    const order = await OrderService.secureGetOrder(orderId, currentUser.id, currentUser.tenantId);\n    return res.json(order);\n  } catch (err: any) {\n    if (err.message === 'ORDER_NOT_FOUND') {\n      return res.status(404).json({ error: 'Không tìm thấy đơn hàng' });\n    }\n    return res.status(500).json({ error: 'Internal server error' });\n  }\n};",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Nghĩ rằng dùng UUID v4 là đủ an toàn và không cần kiểm tra quyền sở hữu (UUID chỉ làm khó việc đoán, không ngăn chặn được việc chia sẻ link trái phép).",
+      "Chỉ kiểm tra quyền ở GET endpoint mà quên kiểm tra ở các thao tác ghi dữ liệu như `PUT /api/orders/:id` hay `DELETE /api/orders/:id`.",
+      "Trả về HTTP 403 Forbidden tiết lộ cho kẻ tấn công biết rằng tài nguyên ID đó thực sự tồn tại trên hệ thống."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm thế nào để áp dụng Row-Level Security (RLS) của PostgreSQL để tự động hóa việc chống IDOR/BOLA ngay từ tầng CSDL?",
+      "Sự khác nhau giữa BOLA (Object Level) và BFLA (Function Level Authorization) trong OWASP API Security là gì?"
     ]
   },
   {
@@ -232,18 +388,31 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "Quản lý Secret: Tại sao không commit `.env` vào Git? Triển khai HashiCorp Vault hoặc AWS Secrets Manager cho container production?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["secret", "commit", ".env", "git", "tri"],
+    "interviewerIntent": "Đánh giá khả năng quản lý thông tin nhạy cảm, chống rò rỉ credential và cơ chế secret rotation tự động.",
+    "contextOrScenario": "Quản lý API Keys, Database Password, Private Keys trong quy trình CI/CD và runtime Kubernetes.",
+    "expectedKeywords": [
+      "secrets management",
+      "aws secrets manager",
+      "hashicorp vault",
+      "git history",
+      "rotation",
+      "least privilege",
+      "kms"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Quản lý Secret: Tại sao không commit `.env` vào Git? Triển khai HashiCorp Vault hoặc AWS Secrets Manager cho container production?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Commit `.env` vào Git là thảm họa vì Git lưu toàn bộ lịch sử commit vĩnh viễn, secret sẽ bị rò rỉ khi repository bị lộ hoặc nhân sự rời đi. Production phải dùng Secrets Manager chuyên dụng (AWS Secrets Manager / Vault) kết hợp IAM Role để cấp phát dynamic credentials và tự động xoay vòng secret định kỳ.",
+      "deepDive": "Rủi ro khi commit `.env`: Kể cả khi đã xóa file trong commit sau, secret vẫn nằm trong `.git` history và có thể bị trích xuất bằng git log. Trong hạ tầng hiện đại: (1) Sử dụng AWS Secrets Manager / HashiCorp Vault mã hóa dữ liệu bằng KMS CMK (Customer Managed Key); (2) Ứng dụng xác thực qua IAM Role (AWS IRSA trên K8s) mà không cần hardcode bất kỳ credential nào; (3) Caching secret trong bộ nhớ RAM với TTL ngắn để hỗ trợ Zero-downtime Secret Rotation (tự đổi mật khẩu định kỳ 30 ngày); (4) Sử dụng Git hooks (như `trufflehog`, `gitleaks`) chặn đứng việc commit secret ngay từ máy trạm của lập trình viên.",
+      "codeExample": "import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';\n\nexport class SecretConfigManager {\n  private static client = new SecretsManagerClient({ region: process.env.AWS_REGION || 'ap-southeast-1' });\n  private static cachedSecrets: Record<string, string> = {};\n  private static lastFetchTime = 0;\n  private static readonly TTL_MS = 5 * 60 * 1000; // Cache 5 phút để hỗ trợ Auto-Rotation mà không spam AWS API\n\n  static async getDatabaseSecret(): Promise<{ username: string; password: string; host: string }> {\n    const now = Date.now();\n    const secretName = process.env.DB_SECRET_NAME || 'prod/app/db-credentials';\n\n    if (this.cachedSecrets[secretName] && (now - this.lastFetchTime < this.TTL_MS)) {\n      return JSON.parse(this.cachedSecrets[secretName]);\n    }\n\n    try {\n      const command = new GetSecretValueCommand({ SecretId: secretName });\n      const response = await this.client.send(command);\n\n      if (!response.SecretString) {\n        throw new Error('Secret không chứa dữ liệu dạng chuỗi');\n      }\n\n      this.cachedSecrets[secretName] = response.SecretString;\n      this.lastFetchTime = now;\n\n      return JSON.parse(response.SecretString);\n    } catch (error) {\n      console.error('Không thể lấy secret từ AWS Secrets Manager:', error);\n      throw error;\n    }\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Nghĩ rằng git revert hoặc commit xóa file `.env` là an toàn (secret vẫn tồn tại nguyên vẹn trong git object tree).",
+      "Inject secret vào Dockerfile dạng `ENV DB_PASSWORD=xyz`, khiến secret bị lưu vĩnh viễn trong Docker image layer và ai pull image cũng đọc được.",
+      "Lấy secret một lần duy nhất lúc khởi động app (startup) và lưu vĩnh viễn trong biến global, khiến tính năng Auto-rotation của Secrets Manager làm app crash khi mật khẩu DB đổi."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "External Secrets Operator (ESO) đồng bộ secrets từ AWS Secrets Manager vào Kubernetes Secrets theo cơ chế nào?",
+      "Nếu lỡ commit nhầm Production Private Key lên public GitHub, quy trình phản ứng khẩn cấp gồm những bước gì?"
     ]
   },
   {
@@ -251,18 +420,32 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "Mô hình hoá mối đe doạ (Threat Modeling): Phương pháp STRIDE (Spoofing, Tampering, Repudiation, Info Disclosure, DoS, Elevation of Privilege)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["threat", "modeling", "stride", "spoofing", "tampering"],
+    "interviewerIntent": "Đánh giá tư duy phân tích rủi ro an ninh chủ động ngay từ giai đoạn thiết kế kiến trúc hệ thống (Security by Design).",
+    "contextOrScenario": "Thiết kế kiến trúc hệ thống Payment Gateway xử lý hàng trăm nghìn giao dịch thẻ tín dụng mỗi ngày.",
+    "expectedKeywords": [
+      "threat modeling",
+      "stride",
+      "spoofing",
+      "tampering",
+      "repudiation",
+      "information disclosure",
+      "dos",
+      "elevation of privilege"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Mô hình hoá mối đe doạ (Threat Modeling): Phương pháp STRIDE (Spoofing, Tampering, Repudiation, Info Disclosure, DoS, Elevation of Privilege)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "STRIDE là mô hình phân loại mối đe dọa do Microsoft phát triển gồm 6 chữ cái: Spoofing (giả mạo danh tính), Tampering (sửa đổi dữ liệu trái phép), Repudiation (chối bỏ trách nhiệm hành động), Information Disclosure (rò rỉ thông tin), Denial of Service (từ chối dịch vụ), và Elevation of Privilege (leo thang đặc quyền).",
+      "deepDive": "STRIDE được áp dụng trên Data Flow Diagram (DFD) gồm các Process, Data Store, Data Flow và Trust Boundaries. Từng chữ cái ứng với thuộc tính bảo mật bị phá vỡ và phương pháp giải quyết tương ứng: (1) Spoofing -> Authentication (mTLS, JWT, MFA); (2) Tampering -> Integrity (Digital Signature, HMAC, AEAD ciphers); (3) Repudiation -> Non-repudiation (WORM Immutable Audit Logging, Digital Signature); (4) Information Disclosure -> Confidentiality (TLS 1.3, AES-GCM, Data Masking); (5) DoS -> Availability (Rate Limiting, WAF, CDN, Auto-scaling); (6) Elevation of Privilege -> Authorization (Least Privilege, RBAC/ABAC, Kernel Sandbox, Non-root).",
+      "codeExample": "#!/usr/bin/env bash\n# Kiểm tra tự động các cấu hình hệ thống tương ứng với các mối đe dọa STRIDE\nset -euo pipefail\n\necho \"=== KIỂM TRA PHÒNG THỦ MÔ HÌNH STRIDE TRÊN LINUX HOST ===\"\n\necho \"1. [Spoofing / Tampering] Kiểm tra SSH Root Login và Password Auth:\"\ngrep -E \"^(PermitRootLogin|PasswordAuthentication)\" /etc/ssh/sshd_config || echo \"Dùng SSH key mặc định\"\n\necho \"2. [Repudiation] Kiểm tra xem Auditd daemon có đang chạy để ghi log bất biến không:\"\nsystemctl is-active auditd || echo \"CẢNH BÁO: auditd chưa chạy, có nguy cơ Repudiation (chối bỏ hành vi)!\"\n\necho \"3. [Information Disclosure] Kiểm tra quyền file /etc/shadow:\"\nstat -c \"%a %U:%G\" /etc/shadow | grep -q \"000 root:root\\|640 root:shadow\" && echo \"PASS: /etc/shadow an toàn\" || echo \"FAIL: /etc/shadow sai quyền!\"\n\necho \"4. [Denial of Service] Kiểm tra giới hạn File Descriptor và Process Limits:\"\nulimit -n\nulimit -u\n\necho \"5. [Elevation of Privilege] Tìm các file có cờ SUID nguy hiểm:\"\nfind / -perm -4000 -type f 2>/dev/null | grep -E \"(nmap|vim|bash|find|python)\" || echo \"PASS: Không có binary nguy hiểm set SUID\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Chỉ làm Threat Modeling sau khi hệ thống đã code xong và chuẩn bị release, khiến chi phí sửa đổi kiến trúc tăng vọt.",
+      "Thiếu cơ chế ghi log Non-repudiation (chống chối bỏ), để kẻ xấu hoặc nhân viên nội bộ gian lận rồi xóa log mà không có bằng chứng pháp lý.",
+      "Đánh đồng Threat Modeling với Quét lỗ hổng tự động (Vulnerability Scanning) — Scanner không thể hiểu được business logic."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm thế nào để chấm điểm và ưu tiên khắc phục các mối đe dọa phát hiện từ STRIDE bằng mô hình DREAD hoặc CVSS?",
+      "Trust Boundary (Ranh giới tin cậy) trong kiến trúc Microservices được xác định như thế nào khi chuyển từ Monolith sang Kubernetes?"
     ]
   },
   {
@@ -270,18 +453,31 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "OWASP Top 10 API Security Risks: Kể tên 4 rủi ro hàng đầu trên REST API hiện nay?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["owasp", "top", "api", "security", "risks"],
+    "interviewerIntent": "Đánh giá kiến thức thực chiến về các lỗ hổng chuyên biệt của API hiện đại (REST/GraphQL) khác biệt với Web App truyền thống.",
+    "contextOrScenario": "Auditing bảo mật cho bộ REST API phục vụ Mobile App và Đối tác bên thứ ba (B2B Integration).",
+    "expectedKeywords": [
+      "owasp api top 10",
+      "bola",
+      "broken authentication",
+      "bfla",
+      "mass assignment",
+      "rate limiting",
+      "ssrf"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'OWASP Top 10 API Security Risks: Kể tên 4 rủi ro hàng đầu trên REST API hiện nay?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Bốn rủi ro hàng đầu trong OWASP API Security Top 10 gồm: (1) BOLA (Broken Object Level Authorization - truy cập trái phép object ID của user khác); (2) Broken Authentication (lỗ hổng token, session, credential stuffing); (3) Broken Object Property Level Authorization (BOPLA / Mass Assignment - ghi đè các trường nhạy cảm như role, balance); (4) Unrestricted Resource Consumption (thiếu rate limit, query quá nặng dẫn tới cạn kiệt tài nguyên).",
+      "deepDive": "API hiện đại thường trả về raw data và nhận JSON trực tiếp, dẫn tới những nguy cơ đặc thù: (1) BOLA: Không kiểm tra data ownership ở từng object; (2) Broken Auth: Quản lý JWT lỏng lẻo, secret key yếu, không thu hồi token được; (3) Mass Assignment: Lập trình viên truyền thẳng `req.body` vào ORM update/create, kẻ xấu gửi thêm field `isAdmin: true` hoặc `verified: true` để tự thăng quyền; (4) Unrestricted Resource Consumption: Không phân trang (`limit`), cho phép client query `pageSize=1000000` hoặc upload file kích thước vô hạn gây OOM crash node.",
+      "codeExample": "import express, { Request, Response } from 'express';\n\nconst app = express();\napp.use(express.json());\n\n// Minh họa phòng chống Rủi ro #3: Broken Object Property Level Authorization (Mass Assignment)\ninterface UserProfileUpdateDTO {\n  displayName?: string;\n  avatarUrl?: string;\n  // ❌ Kẻ tấn công cố tình chèn role: 'admin' hoặc isVip: true vào request body\n}\n\napp.patch('/api/users/profile', async (req: Request, res: Response) => {\n  const { id: currentUserId } = (req as any).user;\n  const rawBody = req.body;\n\n  // ❌ NGUY HIỂM (Mass Assignment): db.users.update({ where: { id }, data: rawBody })\n  \n  // ✅ PHÒNG THỦ: Data Transfer Object (DTO) Whitelisting - Chỉ bóc tách các trường hợp lệ\n  const safeUpdateData: UserProfileUpdateDTO = {\n    displayName: typeof rawBody.displayName === 'string' ? rawBody.displayName : undefined,\n    avatarUrl: typeof rawBody.avatarUrl === 'string' ? rawBody.avatarUrl : undefined\n  };\n\n  // Loại bỏ các trường undefined\n  Object.keys(safeUpdateData).forEach(\n    key => (safeUpdateData as any)[key] === undefined && delete (safeUpdateData as any)[key]\n  );\n\n  const updatedUser = await db.users.update({\n    where: { id: currentUserId },\n    data: safeUpdateData\n  });\n\n  return res.json({ success: true, data: updatedUser });\n});",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Truyền thẳng `req.body` vào lệnh `prisma.user.update({ data: req.body })` gây lỗ hổng Mass Assignment nghiêm trọng.",
+      "Tin tưởng API chỉ dùng nội bộ (private API) cho Mobile nên không gắn Rate Limiter, dẫn đến việc bị reverse-engineer và tấn công cạn kiệt tài nguyên.",
+      "Expose quá nhiều thuộc tính nhạy cảm (như password hash, secret keys) trong JSON response và dựa vào frontend để filter."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "BOPLA (Broken Object Property Level Authorization) kết hợp giữa Mass Assignment và Excessive Data Exposure như thế nào?",
+      "Làm sao tự động validate schema bằng Zod hoặc Joi ở API Gateway để ngăn chặn Mass Assignment trước khi payload vào controller?"
     ]
   },
   {
@@ -289,18 +485,32 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "Các cạm bẫy bảo mật với JWT: Lỗi thuật toán `none`, secret key yếu, và rủi ro lưu thông tin nhạy cảm trong Payload?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["jwt", "thu", "none", "secret", "key"],
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu sâu về cơ chế ký số, xác thực và các lỗi bảo mật chết người khi triển khai JSON Web Token.",
+    "contextOrScenario": "Triển khai hệ thống Single Sign-On (SSO) sử dụng JWT giữa Web App, Mobile App và Microservices.",
+    "expectedKeywords": [
+      "jwt",
+      "alg: none",
+      "algorithm confusion",
+      "rs256",
+      "hs256",
+      "payload base64url",
+      "secret entropy",
+      "token revocation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Các cạm bẫy bảo mật với JWT: Lỗi thuật toán `none`, secret key yếu, và rủi ro lưu thông tin nhạy cảm trong Payload?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "JWT có 3 cạm bẫy kinh điển: (1) Thuật toán 'none' cho phép kẻ tấn công sửa header thành `{\"alg\":\"none\"}` và xóa chữ ký để mạo danh bất kỳ ai nếu server không ép thuật toán; (2) Lưu thông tin nhạy cảm (mật khẩu, CCCD, thẻ) trong payload mà quên rằng Base64Url là công khai; (3) Algorithm Confusion: Server dùng public key của RS256 làm secret key cho HS256.",
+      "deepDive": "Chi tiết các cạm bẫy: (1) Algorithm Confusion Attack xảy ra khi server hỗ trợ cả asymmetric (RS256) và symmetric (HS256). Hacker lấy RSA Public Key công khai của server, ký token với thuật toán HS256 dùng chính public key đó làm secret HMAC. Khi server parse token và thấy alg=HS256, server lấy public key ra verify HMAC và pass thành công! Để khắc phục, luôn chỉ định rõ ràng mảng `algorithms: ['RS256']`. (2) Vấn đề thu hồi (Revocation): JWT là stateless, không thể thu hồi tức thì nếu bị lộ trước khi expire. Giải pháp sản xuất: Access Token ngắn hạn (10-15 phút) kết hợp Refresh Token có lưu trong Redis để rotate và blacklist khi cần.",
+      "codeExample": "import jwt from 'jsonwebtoken';\n\n// 1. Tuyệt đối KHÔNG lưu PII hay Secret trong Payload (Payload chỉ được Base64Url encode, KHÔNG mã hóa!)\nexport interface SafeJwtPayload {\n  sub: string;     // User ID\n  tenantId: string;\n  roles: string[];\n  iss: string;     // Issuer\n  aud: string;     // Audience\n}\n\n// 2. Xác thực JWT an toàn: Chống thuật toán 'none' và 'Algorithm Confusion attack'\nexport function verifyJwtSecurely(token: string): SafeJwtPayload {\n  const publicKey = process.env.JWT_RSA_PUBLIC_KEY!;\n\n  return jwt.verify(token, publicKey, {\n    // BẮT BUỘC: Khóa cứng danh sách thuật toán được phép (chặn hacker đổi sang 'none' hoặc 'HS256')\n    algorithms: ['RS256'],\n    issuer: 'https://auth.mycompany.com',\n    audience: 'https://api.mycompany.com',\n    clockTolerance: 5 // Cho phép lệch tối đa 5 giây\n  }) as SafeJwtPayload;\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Không chỉ định tùy chọn `algorithms: ['RS256']` khi verify, khiến thư viện tự động tin tưởng `alg` trong header do client gửi lên.",
+      "Lưu secret key yếu (như 'secret123') cho HS256, khiến hacker dễ dàng dùng `hashcat` crack offline trong vài giây.",
+      "Lưu mật khẩu, số thẻ ngân hàng hoặc dữ liệu nhạy cảm vào payload JWT vì nghĩ rằng JWT đã được 'mã hóa'."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm thế nào để thu hồi ngay lập tức (instant revocation) một JWT Access Token khi tài khoản bị khóa mà không làm mất đi tính stateless của hệ thống?",
+      "Sự khác biệt giữa JWS (JSON Web Signature - có chữ ký) và JWE (JSON Web Encryption - có mã hóa nội dung) là gì?"
     ]
   },
   {
@@ -308,18 +518,31 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "Bảo vệ chống Brute-Force và Credential Stuffing: Tích hợp CAPTCHA, IP-based rate limiting và Account lockout policy?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["brute-force", "credential", "stuffing", "captcha", "ip-based"],
+    "interviewerIntent": "Đánh giá chiến lược bảo vệ bề mặt xác thực (Authentication Surface) chống lại botnet và tấn công vét cạn tự động.",
+    "contextOrScenario": "Endpoint `/api/auth/login` bị botnet tấn công Credential Stuffing với hàng triệu cặp user/pass rò rỉ từ các vụ lộ lọt dữ liệu khác.",
+    "expectedKeywords": [
+      "credential stuffing",
+      "brute-force",
+      "rate limiting",
+      "sliding window",
+      "redis",
+      "account lockout",
+      "captcha"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Bảo vệ chống Brute-Force và Credential Stuffing: Tích hợp CAPTCHA, IP-based rate limiting và Account lockout policy?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Chiến lược phòng chống Brute-force & Credential Stuffing nhiều tầng: (1) Rate Limiting đa chiều (theo cả IP và theo Username/Email) trên Redis; (2) Progressive Delay / Exponential Backoff tăng thời gian chờ sau mỗi lần gõ sai; (3) Kích hoạt CAPTCHA vô hình (Cloudflare Turnstile / reCAPTCHA v3) khi phát hiện điểm số rủi ro cao; (4) Khóa tạm thời tài khoản và gửi email thông báo bảo mật.",
+      "deepDive": "Credential Stuffing dùng botnet phân tán hàng chục nghìn IP sạch (residential proxies), nên IP-based rate limiting đơn lẻ sẽ bị vô hiệu hóa. Do đó bắt buộc phải kết hợp: (1) Rate limit theo Account/Email: dù request đến từ IP nào, nếu email đó bị thử sai 5 lần thì phải bắt nhập CAPTCHA hoặc khóa tạm; (2) Thiết bị định danh (Device Fingerprinting) và phân tích hành vi (User-Agent, TLS fingerprint / JA3 hash); (3) Tích hợp API kiểm tra rò rỉ dữ liệu (HaveIBeenPwned API) để từ chối các mật khẩu đã bị lộ công khai; (4) Khuyến khích hoặc bắt buộc xác thực 2 bước (2FA / WebAuthn / Passkeys).",
+      "codeExample": "import Redis from 'ioredis';\nimport { Request, Response, NextFunction } from 'express';\n\nconst redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');\n\nexport class LoginRateLimiter {\n  // Rate limiting theo IP và theo Email để chống cả brute-force đơn lẻ lẫn botnet phân tán\n  static async checkAttempt(ip: string, email: string): Promise<{ allowed: boolean; remainingAttempts: number }> {\n    const ipKey = `rate:login:ip:${ip}`;\n    const accountLockKey = `lock:account:${email.toLowerCase()}`;\n\n    // 1. Kiểm tra tài khoản có đang bị tạm khóa (Account Lockout) không\n    const isLocked = await redis.get(accountLockKey);\n    if (isLocked) {\n      return { allowed: false, remainingAttempts: 0 };\n    }\n\n    // 2. Sliding window hoặc Fixed window limit: tối đa 5 lần thử sai trong 15 phút\n    const attempts = await redis.incr(ipKey);\n    if (attempts === 1) {\n      await redis.expire(ipKey, 900); // 15 phút\n    }\n\n    if (attempts > 5) {\n      return { allowed: false, remainingAttempts: 0 };\n    }\n\n    return { allowed: true, remainingAttempts: 5 - attempts };\n  }\n\n  // Khi login sai nhiều lần, kích hoạt progressive delay hoặc khóa tạm thời\n  static async recordFailedAttempt(email: string) {\n    const failKey = `fail:login:${email.toLowerCase()}`;\n    const fails = await redis.incr(failKey);\n    if (fails === 1) await redis.expire(failKey, 900);\n\n    if (fails >= 5) {\n      // Khóa tài khoản tạm thời 30 phút, đồng thời kích hoạt gửi email cảnh báo cho chủ tài khoản\n      await redis.set(`lock:account:${email.toLowerCase()}`, '1', 'EX', 1800);\n      console.warn(`Tài khoản ${email} đã bị tạm khóa 30 phút do login sai quá 5 lần`);\n    }\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Chỉ rate limit theo IP, khiến botnet xoay vòng hàng triệu residential IP bypass hoàn toàn hệ thống kiểm soát.",
+      "Áp dụng Account Lockout vĩnh viễn (Permanent Lock) khi nhập sai pass, tạo cơ hội cho hacker thực hiện DoS khóa sạch tài khoản của người dùng hợp lệ.",
+      "Trả về thông báo lỗi phân biệt giữa 'Tài khoản không tồn tại' và 'Mật khẩu không đúng', tạo kịch bản User Enumeration cho hacker."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao thông báo đăng nhập luôn phải trả về chung một câu 'Email hoặc mật khẩu không chính xác' thay vì thông báo tài khoản có tồn tại hay không?",
+      "WebAuthn / Passkeys loại bỏ hoàn toàn nguy cơ của Brute-force và Credential Stuffing như thế nào?"
     ]
   },
   {
@@ -327,18 +550,33 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "DevSecOps: Khái niệm và vị trí của SAST (SonarQube), DAST (OWASP ZAP) và SCA (Trivy/Snyk) trong CI/CD pipeline?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["devsecops", "sast", "sonarqube", "dast", "owasp"],
+    "interviewerIntent": "Đánh giá khả năng tích hợp công cụ kiểm thử bảo mật tự động vào quy trình phân phối phần mềm (Shift-Left Security).",
+    "contextOrScenario": "Thiết kế Quality Gate và Security Gate trong CI/CD pipeline tự động chặn các bản build có lỗ hổng Critical/High.",
+    "expectedKeywords": [
+      "devsecops",
+      "sast",
+      "dast",
+      "sca",
+      "trivy",
+      "sonarqube",
+      "owasp zap",
+      "shift left",
+      "security gate"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'DevSecOps: Khái niệm và vị trí của SAST (SonarQube), DAST (OWASP ZAP) và SCA (Trivy/Snyk) trong CI/CD pipeline?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "DevSecOps đưa bảo mật vào mọi bước của chu kỳ phát triển (Shift-Left). SAST (kiểm thử tĩnh) quét trực tiếp source code khi viết code/PR. SCA quét lỗ hổng trong thư viện phụ thuộc (open-source dependencies/Docker base image). DAST (kiểm thử động) chạy kiểm thử hộp đen từ bên ngoài trên môi trường staging/runtime đang hoạt động.",
+      "deepDive": "Vị trí trong Pipeline: (1) Pre-commit / IDE: Linter, Gitleaks quét hardcoded secret; (2) CI Pipeline (Build & Test): SCA (Trivy, Snyk) phân tích `package-lock.json` và container image; SAST (SonarQube, Semgrep, CodeQL) phân tích taint analysis trên source code xem user input có chảy vào database/shell sink không; (3) Staging / CD: DAST (OWASP ZAP, StackHawk) mô phỏng hacker tấn công app đang chạy để tìm CSRF, CORS misconfiguration, runtime auth issues. Trade-off: SAST cho kết quả nhanh nhưng tỷ lệ False Positive cao; DAST ít false positive hơn nhưng chạy chậm và cần môi trường hoàn chỉnh.",
+      "codeExample": "# GitHub Actions Pipeline: Tích hợp DevSecOps đa tầng (SCA, SAST, DAST)\nname: DevSecOps Security Pipeline\n\non:\n  push:\n    branches: [ main ]\n  pull_request:\n\njobs:\n  # 1. SCA (Software Composition Analysis): Quét lỗ hổng trong third-party dependencies\n  sca-scan:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: Run Trivy SCA scan on dependencies\n        uses: aquasecurity/trivy-action@master\n        with:\n          scan-type: 'fs'\n          severity: 'CRITICAL,HIGH'\n          exit-code: '1' # Fails pipeline nếu có CVE Critical\n\n  # 2. SAST (Static Application Security Testing): Phân tích mã nguồn tìm lỗi bảo mật\n  sast-scan:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - name: SonarQube / Semgrep Static Analysis\n        uses: semgrep/semgrep-action@v1\n        with:\n          config: p/owasp-top-10\n\n  # 3. Container Image Scan: Quét OS packages & misconfigurations trước khi push\n  container-scan:\n    needs: [sca-scan, sast-scan]\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - run: docker build -t myapp:${{ github.sha }} .\n      - name: Scan Docker Image\n        uses: aquasecurity/trivy-action@master\n        with:\n          image-ref: 'myapp:${{ github.sha }}'\n          severity: 'CRITICAL'\n          exit-code: '1'",
+      "codeLanguage": "yaml"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Cấu hình Security Gate quá chặt chẽ (chặn ngay cả Medium/Low CVE) trong tuần đầu tiên, làm tê liệt quy trình phát hành phần mềm của team dev.",
+      "Chỉ quét SCA trên dependencies mà không quét Docker Base Image (nơi chứa các CVE hệ điều hành như OpenSSL, curl, glibc).",
+      "Chạy DAST trực tiếp trên môi trường Production gây rò rỉ dữ liệu hoặc làm hỏng dữ liệu khách hàng."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Taint Analysis trong SAST hoạt động như thế nào để phát hiện luồng dữ liệu độc hại từ Source sang Sink?",
+      "Làm thế nào để xử lý các False Positive trong SonarQube mà không làm giảm mức độ tin cậy của Security Gate?"
     ]
   },
   {
@@ -346,18 +584,31 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "Subresource Integrity (SRI): Thẻ `<script integrity=\"...\">` bảo vệ website khỏi việc CDN bên thứ ba bị hack ra sao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["subresource", "integrity", "sri", "script", "..."],
+    "interviewerIntent": "Hiểu rõ cơ chế bảo vệ tính toàn vẹn của mã nguồn client trước tấn công Compromised CDN / Supply Chain.",
+    "contextOrScenario": "Tải thư viện jQuery hoặc Bootstrap từ CDN công cộng `https://cdnjs.cloudflare.com` trên trang web ngân hàng trực tuyến.",
+    "expectedKeywords": [
+      "subresource integrity",
+      "sri",
+      "sha384",
+      "base64",
+      "hash verification",
+      "compromised cdn",
+      "cors"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Subresource Integrity (SRI): Thẻ `<script integrity=\"...\">` bảo vệ website khỏi việc CDN bên thứ ba bị hack ra sao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Subresource Integrity (SRI) là tính năng bảo mật cho phép trình duyệt xác minh rằng file tài nguyên (JS/CSS) được tải về từ CDN của bên thứ ba không bị chỉnh sửa hay chèn mã độc. Bạn tính mã băm cryptographic (SHA-256/384/512) của file và gán vào thuộc tính `integrity`. Trình duyệt tải file về, tính hash và chỉ thực thi nếu hash khớp hoàn toàn.",
+      "deepDive": "Nếu CDN bị kẻ tấn công chiếm quyền kiểm soát (Compromised Third-Party CDN) và chèn mã độc đánh cắp thẻ tín dụng (Magecart Attack), toàn bộ người dùng tải thư viện đó về sẽ bị dính mã độc. Khi có SRI: (1) Trình duyệt kiểm tra thuộc tính `crossorigin=\"anonymous\"` (bắt buộc để tải resource cross-origin có SRI); (2) Tải file JS về RAM; (3) Tính mã băm SHA-384; (4) So sánh với chuỗi trong `integrity`. Nếu không khớp (dù chỉ lệch 1 byte), trình duyệt ngay lập tức chặn thực thi file và báo lỗi trong console `Failed to find a valid digest in the 'integrity' attribute`.",
+      "codeExample": "#!/usr/bin/env bash\n# Tạo mã băm SRI (Subresource Integrity) chuẩn SHA-384 cho file thư viện\nset -euo pipefail\n\nLIBRARY_URL=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js\"\n\necho \"==> 1. Tải file thư viện từ nguồn chính thức:\"\ncurl -sL \"$LIBRARY_URL\" -o /tmp/library.js\n\necho \"==> 2. Tính toán mã băm SHA-384 và mã hóa Base64 chuẩn SRI:\"\nSRI_HASH=$(openssl dgst -sha384 -binary /tmp/library.js | openssl base64 -A)\n\necho \"==> 3. Thẻ HTML sản xuất chuẩn bảo vệ tính toàn vẹn (SRI Tag):\"\ncat << HTML\n<script \n  src=\"${LIBRARY_URL}\" \n  integrity=\"sha384-${SRI_HASH}\" \n  crossorigin=\"anonymous\">\n</script>\nHTML\n\necho -e \"\n==> Giải thích: Nếu hacker xâm nhập CDN và chèn keylogger vào library.js,\"\necho \"trình duyệt sẽ tính hash thấy sai lệch và TỪ CHỐI THỰC THI file này!\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Quên thuộc tính `crossorigin=\"anonymous\"` trên thẻ script, khiến trình duyệt bỏ qua việc kiểm tra SRI khi file nằm ở cross-origin domain.",
+      "Dùng link CDN dạng dynamic version (như `@latest`), khi thư viện tự động update thì mã băm SRI cũ không khớp làm toàn bộ website bị chết chức năng.",
+      "Tính toán SRI trên file cục bộ chưa qua bước nén/minified, dẫn đến sai lệch hash khi CDN phục vụ phiên bản minified."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao thuộc tính `crossorigin=\"anonymous\"` là điều kiện bắt buộc để SRI hoạt động trên các tài nguyên khác origin?",
+      "Làm thế nào để các bundler như Webpack/Vite tự động tạo thẻ SRI cho các file static assets trong quá trình build production?"
     ]
   },
   {
@@ -365,18 +616,31 @@
     "category": "cybersecurity",
     "level": "middle",
     "question": "Clickjacking là gì? Header `X-Frame-Options` và CSP directive `frame-ancestors` ngăn chặn như thế nào?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ MIDDLE.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["clickjacking", "header", "x-frame-options", "csp", "directive"],
+    "interviewerIntent": "Đánh giá hiểu biết về kỹ thuật lừa đảo giao diện (UI Redress Attack) và cách cấu hình header phòng vệ hiện đại.",
+    "contextOrScenario": "Kẻ lừa đảo nhúng website ngân hàng của bạn vào một thẻ `<iframe>` trong suốt trên trang web chơi game có nút 'Nhận thưởng miễn phí'.",
+    "expectedKeywords": [
+      "clickjacking",
+      "ui redress",
+      "x-frame-options",
+      "deny",
+      "sameorigin",
+      "csp frame-ancestors",
+      "iframe"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Clickjacking là gì? Header `X-Frame-Options` và CSP directive `frame-ancestors` ngăn chặn như thế nào?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ MIDDLE cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Clickjacking (UI Redressing) là kỹ thuật tấn công trong đó kẻ xấu nhúng website mục tiêu vào một `<iframe>` vô hình (opacity: 0) nằm đè lên giao diện dụ dỗ (ví dụ nút bấm trúng thưởng). Khi người dùng click vào nút giả, họ thực chất đang click vào nút thực thi giao dịch trên trang nạn nhân. Header `X-Frame-Options: DENY` và CSP `frame-ancestors 'none'` chặn hoàn toàn trình duyệt render trang trong iframe.",
+      "deepDive": "Sự tiến hóa của phòng thủ: Trước đây người ta dùng JS frame-busting (`if (top !== self) top.location = self.location;`), nhưng dễ dàng bị bypass bởi thuộc tính HTML5 `<iframe sandbox=\"allow-forms allow-scripts\">`. Giải pháp chuẩn mực tầng HTTP: (1) `X-Frame-Options` hỗ trợ `DENY` (cấm hoàn toàn) hoặc `SAMEORIGIN` (chỉ cho phép cùng origin nhúng); (2) Nhược điểm của `X-Frame-Options` là không hỗ trợ cho phép nhiều domain cụ thể (whitelist multi-domains). Do đó CSP Level 2 giới thiệu `frame-ancestors 'self' https://partner1.com https://partner2.com` linh hoạt hơn rất nhiều. Khi cả 2 header cùng xuất hiện, trình duyệt hiện đại ưu tiên thực thi CSP `frame-ancestors`.",
+      "codeExample": "import express, { Request, Response, NextFunction } from 'express';\nimport helmet from 'helmet';\n\nconst app = express();\n\n// 1. Phòng thủ Clickjacking toàn diện bằng Helmet\napp.use(\n  helmet({\n    // Cấu hình truyền thống: X-Frame-Options (cho trình duyệt cũ)\n    xFrameOptions: { action: 'deny' },\n    \n    // Cấu hình hiện đại: CSP Level 2/3 frame-ancestors (thay thế và mạnh mẽ hơn X-Frame-Options)\n    contentSecurityPolicy: {\n      directives: {\n        // Cấm tuyệt đối mọi website (kể cả chính nó) nhúng trang này vào iframe\n        frameAncestors: [\"'none'\"]\n        \n        // Hoặc chỉ cho phép các domain đối tác tin cậy nhúng:\n        // frameAncestors: [\"'self'\", 'https://trusted-partner.com']\n      }\n    }\n  })\n);\n\n// Middleware thuần không dùng Helmet để minh họa header HTTP gốc\nexport const customFrameGuard = (req: Request, res: Response, next: NextFunction) => {\n  res.setHeader('X-Frame-Options', 'DENY');\n  res.setHeader('Content-Security-Policy', \"frame-ancestors 'none';\");\n  next();\n};",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Dùng JS Frame-busting script thay vì HTTP header, bị bypass dễ dàng bằng thuộc tính HTML5 iframe sandbox.",
+      "Cấu hình `X-Frame-Options: ALLOW-FROM https://domain.com` — chỉ thị này đã bị W3C khai tử và hầu hết các trình duyệt hiện đại đều không hỗ trợ.",
+      "Chỉ bảo vệ các trang thanh toán mà quên đặt header trên các trang settings, đổi mật khẩu hoặc xóa tài khoản."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao CSP `frame-ancestors` được đánh giá cao hơn hẳn `X-Frame-Options` trong các mô hình SaaS có tích hợp nhúng widget?",
+      "Cơ chế nào của trình duyệt quyết định hành vi khi máy chủ gửi cả hai header `X-Frame-Options: DENY` và `frame-ancestors 'self'`?"
     ]
   },
   {
@@ -384,18 +648,31 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "OAuth 2.0 Authorization Code Flow kết hợp PKCE (Proof Key for Code Exchange): Tại sao PKCE bắt buộc cho Mobile và SPA?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["oauth", "2.0", "authorization", "code", "flow"],
+    "interviewerIntent": "Đánh giá chuyên sâu về giao thức phân quyền OAuth 2.0, các rủi ro của Public Client và cơ chế chống Authorization Code Interception.",
+    "contextOrScenario": "Thiết kế luồng xác thực đăng nhập Single Sign-On (SSO) cho React Native Mobile App và Next.js SPA.",
+    "expectedKeywords": [
+      "oauth 2.0",
+      "pkce",
+      "code verifier",
+      "code challenge",
+      "public client",
+      "authorization code interception",
+      "s256"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'OAuth 2.0 Authorization Code Flow kết hợp PKCE (Proof Key for Code Exchange): Tại sao PKCE bắt buộc cho Mobile và SPA?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Mobile App và SPA là các 'Public Client' — không thể giấu bí mật `client_secret` (hacker dễ dàng decompile APK hoặc xem JavaScript bundle). Khi chuyển hướng redirect qua custom URI scheme trên mobile, app độc hại có thể bắt trộm `authorization_code`. PKCE giải quyết bằng cách sinh ra cặp `code_verifier` và `code_challenge` một lần (one-time dynamic secret), đảm bảo chỉ ai sở hữu verifier ban đầu mới đổi được token.",
+      "deepDive": "Luồng hoạt động của PKCE (RFC 7636): (1) Client tạo ngẫu nhiên chuỗi bí mật `code_verifier` lưu trong RAM, rồi băm SHA-256 tạo `code_challenge`; (2) Client gửi `code_challenge` cùng request xin authorization code; (3) Server lưu lại challenge và trả về code; (4) Ngay cả khi hacker bắt trộm được authorization code (qua Custom URI scheme hoặc browser history), hắn KHÔNG THỂ đổi lấy Access Token vì bước trao đổi token yêu cầu gửi kèm `code_verifier` gốc; (5) Server tính SHA-256(`code_verifier`) nhận được và so sánh với `code_challenge` đã lưu ở bước 2. Vì tính bảo mật vượt trội, chuẩn OAuth 2.1 hiện nay bắt buộc PKCE cho MỌI loại client (cả Confidential Server-side Client).",
+      "codeExample": "import crypto from 'crypto';\n\nexport class OAuthPKCEHelper {\n  // 1. Tạo ngẫu nhiên một Code Verifier có độ entropy cao (43 - 128 ký tự base64url)\n  static generateCodeVerifier(): string {\n    return crypto.randomBytes(32)\n      .toString('base64url'); // Tự động format URL-safe không có +, /, =\n  }\n\n  // 2. Tạo Code Challenge bằng thuật toán S256: BASE64URL-ENCODE(SHA256(CodeVerifier))\n  static generateCodeChallenge(codeVerifier: string): string {\n    return crypto.createHash('sha256')\n      .update(codeVerifier)\n      .digest('base64url');\n  }\n\n  // 3. Khởi tạo URL chuyển hướng đến Authorization Server\n  static buildAuthorizeUrl(codeChallenge: string): string {\n    const authEndpoint = 'https://auth.company.com/oauth/authorize';\n    const params = new URLSearchParams({\n      response_type: 'code',\n      client_id: 'mobile-app-client-id', // Public Client: không có client_secret!\n      redirect_uri: 'com.company.app://oauth/callback',\n      scope: 'openid profile email',\n      code_challenge: codeChallenge,\n      code_challenge_method: 'S256',     // Bắt buộc S256, cấm dùng 'plain'\n      state: crypto.randomBytes(16).toString('hex') // Chống CSRF\n    });\n\n    return `${authEndpoint}?${params.toString()}`;\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Hardcode `client_secret` trong mã nguồn ứng dụng Mobile hoặc React/Vue SPA vì nghĩ rằng đã dùng code obfuscator.",
+      "Sử dụng `code_challenge_method: 'plain'` thay vì `'S256'`, làm mất tác dụng bảo vệ vì verifier bị gửi lộ ngay từ bước 1.",
+      "Không validate tham số `state` để chống tấn công CSRF trong quá trình nhận Authorization Code."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao OAuth 2.1 loại bỏ hoàn toàn Implicit Flow và Resource Owner Password Credentials Grant?",
+      "Làm thế nào để lưu trữ Refresh Token an toàn trên Mobile (Keychain/Keystore) so với trên trình duyệt SPA?"
     ]
   },
   {
@@ -403,18 +680,32 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "Kiến trúc Zero Trust (Zero Trust Architecture): Triết lý \"Never Trust, Always Verify\" áp dụng trong mTLS giữa các microservices ra sao?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["zero", "trust", "architecture", "tri", "never"],
+    "interviewerIntent": "Đánh giá tư duy kiến trúc bảo mật cấp doanh nghiệp, từ bỏ mô hình bảo mật vành đai (Perimeter Security) truyền thống.",
+    "contextOrScenario": "Cụm Kubernetes chạy hàng trăm microservices giao tiếp qua Service Mesh (Istio / Linkerd) trong môi trường Hybrid Cloud.",
+    "expectedKeywords": [
+      "zero trust",
+      "never trust always verify",
+      "mtls",
+      "mutual tls",
+      "service mesh",
+      "spiffe",
+      "x.509",
+      "istio"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Kiến trúc Zero Trust (Zero Trust Architecture): Triết lý \"Never Trust, Always Verify\" áp dụng trong mTLS giữa các microservices ra sao?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Mô hình vành đai truyền thống (Castle-and-Moat) coi bên trong mạng nội bộ là an toàn. Zero Trust phá bỏ giả định này với triết lý: Coi mạng nội bộ cũng nguy hiểm như Internet công cộng (Assume Breach). Mọi request giữa các microservices đều phải: (1) Được mã hóa và chứng minh danh tính 2 chiều bằng mTLS; (2) Ủy quyền tối thiểu (Least Privilege); (3) Ghi nhận log và đánh giá rủi ro liên tục.",
+      "deepDive": "Triển khai mTLS trong Kubernetes Service Mesh (như Istio / Linkerd): (1) Mỗi Pod được cấp một danh tính định dạng SPIFFE ID (ví dụ: `spiffe://cluster.local/ns/prod/sa/payment-sa`) gắn với Service Account; (2) Sidecar Proxy (Envoy) tự động xin chứng chỉ số X.509 ngắn hạn từ Control Plane (Istio Citadel/Istiod); (3) Khi Service A gọi Service B qua Envoy, 2 bên thực hiện TLS Handshake trao đổi chứng chỉ của nhau (Mutual Authentication); (4) Envoy mã hóa toàn bộ payload trên đường truyền (chống nghe lén ARP Spoofing / Packet Sniffing trong cluster); (5) Áp dụng AuthorizationPolicy kiểm soát service nào được gọi endpoint nào.",
+      "codeExample": "import https from 'https';\nimport fs from 'fs';\nimport express from 'express';\n\n// Triển khai Server mTLS (Mutual TLS): Xác thực danh tính 2 chiều bằng chứng chỉ X.509\nexport function createMtlsServer() {\n  const app = express();\n\n  const options: https.ServerOptions = {\n    key: fs.readFileSync('/etc/certs/service-key.pem'),   // Private key của server\n    cert: fs.readFileSync('/etc/certs/service-cert.pem'), // Certificate của server\n    ca: [fs.readFileSync('/etc/certs/internal-ca.pem')],  // Root CA nội bộ dùng để ký chứng chỉ cho các client microservices\n    \n    // YÊU CẦU BẮT BUỘC: Client phải trình chứng chỉ hợp lệ do internal CA cấp\n    requestCert: true,\n    rejectUnauthorized: true\n  };\n\n  app.get('/api/internal/orders', (req, res) => {\n    // Trích xuất danh tính client từ chứng chỉ (SPIFFE ID hoặc Subject CN)\n    const clientCert = (req.socket as any).getPeerCertificate();\n    const clientSubject = clientCert.subject.CN;\n    console.log(`Authenticated peer microservice: ${clientSubject}`);\n\n    // Zero Trust: Ngay cả khi trong mạng nội bộ, vẫn xác thực danh tính từng request\n    if (clientSubject !== 'payment-service.prod') {\n      return res.status(403).json({ error: 'Zero Trust: Client service not authorized' });\n    }\n\n    res.json({ message: 'Order data accessed via authenticated mTLS channel' });\n  });\n\n  return https.createServer(options, app);\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Tin tưởng rằng lưu lượng mạng trong VPC nội bộ hoặc trong cụm Kubernetes là an toàn nên để plain HTTP không mã hóa.",
+      "Tự quản lý chứng chỉ mTLS bằng tay hoặc cấp chứng chỉ có thời hạn 5-10 năm thay vì dùng Service Mesh tự động xoay vòng cert mỗi 24h.",
+      "Chỉ mã hóa lưu lượng mạng mà không kiểm tra quyền hạn (Authorization) ở mức ứng dụng (Authenticated ≠ Authorized)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "SPIFFE/SPIRE đóng vai trò gì trong việc chuẩn hóa danh tính máy (Workload Identity) trong kiến trúc Zero Trust đa nền tảng?",
+      "Chi phí CPU và Network Latency của mTLS là bao nhiêu và cách tối ưu hóa bằng TLS Session Resumption trong Envoy?"
     ]
   },
   {
@@ -422,18 +713,31 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "Session Hijacking và Session Fixation: Kịch bản tấn công và cơ chế bảo vệ (Token rotation, Device fingerprinting)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["session", "hijacking", "fixation", "token", "rotation"],
+    "interviewerIntent": "Đánh giá sự am hiểu về trạng thái phiên làm việc (Session Lifecycle), các kỹ thuật chiếm quyền và phòng chống chiếm đoạt tài khoản.",
+    "contextOrScenario": "Phát hiện người dùng bị chiếm đoạt phiên làm việc dù mật khẩu không bị thay đổi trong hệ thống ngân hàng trực tuyến.",
+    "expectedKeywords": [
+      "session hijacking",
+      "session fixation",
+      "session rotation",
+      "httponly",
+      "device fingerprinting",
+      "ip binding",
+      "refresh token rotation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Session Hijacking và Session Fixation: Kịch bản tấn công và cơ chế bảo vệ (Token rotation, Device fingerprinting)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Session Fixation: Kẻ tấn công gài một Session ID đã biết trước cho nạn nhân, sau khi nạn nhân đăng nhập, hacker dùng ID đó để vào tài khoản. Session Hijacking: Kẻ tấn công đánh cắp Session ID hợp lệ của nạn nhân (qua XSS, nghe lén wifi, sniffing). Phòng vệ: Luôn regenerate Session ID sau khi đăng nhập, dùng cookie HttpOnly Secure SameSite, và kiểm tra Device Fingerprint/Token Rotation.",
+      "deepDive": "Quy trình Session Fixation: Hacker truy cập web lấy session cookie `SESS=123`, gửi link `https://bank.com/?session=123` cho nạn nhân. Nạn nhân đăng nhập, server giữ nguyên cookie đó. Lúc này hacker chỉ việc dùng `SESS=123` để truy cập. Phòng thủ tuyệt đối là gọi `req.session.regenerate()` ngay khi user nhập đúng user/pass. Để chống Session Hijacking: (1) Cookie bảo vệ 3 cờ: `HttpOnly` (chống XSS), `Secure` (chỉ HTTPS), `SameSite=Lax/Strict` (chống CSRF); (2) Refresh Token Rotation: Mỗi lần đổi Access Token mới, Refresh Token cũ bị hủy ngay và cấp Refresh Token mới. Nếu Refresh Token cũ bị dùng lại lần 2, hệ thống phát hiện hành vi trộm cắp và hủy toàn bộ chuỗi token của user.",
+      "codeExample": "import { Request, Response } from 'express';\nimport crypto from 'crypto';\n\nexport class SessionSecurityManager {\n  // Phòng chống Session Fixation: LUÔN HỦY VÀ TẠO MỚI Session ID ngay khi Authentication thành công\n  static async onLoginSuccess(req: Request, res: Response, userId: string) {\n    // 1. Huỷ session cũ được cấp khi còn là anonymous user\n    await new Promise<void>((resolve, reject) => {\n      req.session.regenerate((err) => (err ? reject(err) : resolve()));\n    });\n\n    // 2. Tính toán Device Fingerprint hiện tại để gán vào session\n    const currentFingerprint = this.computeDeviceFingerprint(req);\n\n    // 3. Khởi tạo session mới với định danh user và fingerprint\n    req.session.userId = userId;\n    req.session.deviceFingerprint = currentFingerprint;\n    req.session.createdAt = Date.now();\n  }\n\n  // Phòng chống Session Hijacking: Kiểm tra tính bất biến của Device Context ở mỗi request\n  static validateSessionIntegrity(req: Request): boolean {\n    if (!req.session?.userId) return false;\n\n    const currentFingerprint = this.computeDeviceFingerprint(req);\n    if (req.session.deviceFingerprint !== currentFingerprint) {\n      console.warn(`Phát hiện Session Hijacking nghi vấn trên user ${req.session.userId}`);\n      // Hủy session ngay lập tức và ép người dùng xác thực lại\n      req.session.destroy(() => {});\n      return false;\n    }\n\n    return true;\n  }\n\n  private static computeDeviceFingerprint(req: Request): string {\n    const userAgent = req.headers['user-agent'] || '';\n    const acceptLanguage = req.headers['accept-language'] || '';\n    return crypto.createHash('sha256').update(`${userAgent}-${acceptLanguage}`).digest('hex');\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Giữ nguyên Session ID trước và sau khi đăng nhập thành công, tạo lỗ hổng Session Fixation kinh điển.",
+      "Khóa chặt session vào IP người dùng (IP Binding) mà không cân nhắc việc mạng 4G/5G của điện thoại liên tục nhảy IP, gây logout hàng loạt khách hàng hợp lệ.",
+      "Không hỗ trợ tính năng 'Đăng xuất khỏi tất cả các thiết bị' (Revoke all active sessions) khi người dùng đổi mật khẩu."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao kiểm tra IP address của client thường không đáng tin cậy trong môi trường di động và cách kết hợp JA3 TLS fingerprinting để phát hiện hijacking?",
+      "Cơ chế Automatic Reuse Detection trong Refresh Token Rotation hoạt động như thế nào để bảo vệ người dùng khi token bị đánh cắp?"
     ]
   },
   {
@@ -441,18 +745,32 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "Mã hoá bất đối xứng trong thanh toán: Phân biệt Public Key, Private Key, Chữ ký số (Digital Signature) và Chứng chỉ số (X.509)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["thanh", "public", "key", "private", "digital"],
+    "interviewerIntent": "Đánh giá kiến thức nền tảng về mật mã học khóa công khai (PKI), đảm bảo tính toàn vẹn và chống chối bỏ trong các giao dịch tài chính.",
+    "contextOrScenario": "Tích hợp cổng thanh toán trực tuyến (VNPAY, MoMo, Stripe) với yêu cầu ký số dữ liệu đơn hàng trước khi gửi đi.",
+    "expectedKeywords": [
+      "asymmetric encryption",
+      "public key",
+      "private key",
+      "digital signature",
+      "x.509",
+      "pki",
+      "rsa",
+      "ecdsa"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Mã hoá bất đối xứng trong thanh toán: Phân biệt Public Key, Private Key, Chữ ký số (Digital Signature) và Chứng chỉ số (X.509)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Mã hóa bất đối xứng sử dụng một cặp khóa: Public Key (công khai cho mọi người) và Private Key (giữ bí mật tuyệt đối). Digital Signature được tạo bằng cách băm dữ liệu và mã hóa hash đó bằng Private Key — ai có Public Key cũng xác minh được tính toàn vẹn và nguồn gốc của dữ liệu. Chứng chỉ số X.509 là file điện tử gắn kết Public Key với danh tính thực tế của một tổ chức do bên thứ ba uy tín (Certificate Authority - CA) ký nhận thực.",
+      "deepDive": "Trong thanh toán điện tử: (1) Bảo mật dữ liệu truyền (Confidentiality): Bên gửi mã hóa bằng Public Key của bên nhận -> Chỉ bên nhận có Private Key mới giải mã được; (2) Chữ ký số (Integrity & Non-repudiation): Merchant dùng Private Key của mình ký lên đơn hàng gồm `amount`, `orderId`. Ngân hàng dùng Public Key của Merchant để verify. Nếu đơn hàng bị sửa dù 1 đồng, chữ ký sẽ sai ngay lập tức; đồng thời Merchant không thể chối bỏ rằng mình không gửi lệnh này; (3) Vấn đề 'Man-in-the-Middle giả mạo Public Key': Làm sao biết Public Key đó thực sự là của ngân hàng chứ không phải của hacker? Chứng chỉ X.509 giải quyết vấn đề này qua chuỗi tin cậy (Chain of Trust) từ Root CA -> Intermediate CA.",
+      "codeExample": "import crypto from 'crypto';\n\nexport class PaymentCryptoService {\n  // 1. Tạo Digital Signature (Chữ ký số): Ký bằng Private Key của Merchant\n  static signPaymentPayload(payload: object, privateKeyPem: string): string {\n    const dataString = JSON.stringify(payload);\n    const sign = crypto.createSign('SHA256');\n    sign.update(dataString);\n    sign.end();\n\n    // Chữ ký đảm bảo: Tính toàn vẹn (Integrity) và Chống chối bỏ (Non-repudiation)\n    return sign.sign(privateKeyPem, 'base64');\n  }\n\n  // 2. Xác thực Digital Signature: Cổng thanh toán dùng Public Key của Merchant để kiểm tra\n  static verifyPaymentSignature(payload: object, signatureBase64: string, publicKeyPem: string): boolean {\n    const dataString = JSON.stringify(payload);\n    const verify = crypto.createVerify('SHA256');\n    verify.update(dataString);\n    verify.end();\n\n    return verify.verify(publicKeyPem, signatureBase64, 'base64');\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Lưu trữ Private Key trên server web dưới dạng plaintext không mã hóa hoặc hardcode trong file git repository.",
+      "Không sắp xếp thứ tự các trường (alphabetical canonical sort) trước khi serialize JSON để ký, dẫn đến chữ ký bị lệch giữa các ngôn ngữ lập trình khác nhau.",
+      "Sử dụng thuật toán ký đã lỗi thời như SHA-1 hoặc RSA key size dưới 2048-bit (chuẩn hiện nay yêu cầu RSA >= 2048 hoặc ECC secp256r1)."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Elliptic Curve Cryptography (ECDSA/Ed25519) đang dần thay thế RSA trong các hệ thống thanh toán hiện đại?",
+      "Canonicalization (chuẩn hóa dữ liệu JSON/XML) có vai trò quyết định như thế nào trong việc đảm bảo tính bất biến của chữ ký số?"
     ]
   },
   {
@@ -460,18 +778,31 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "Tấn công Replay Attack: Thiết kế cơ chế phòng vệ bằng Timestamp, Nonce và Request Signing (HMAC-SHA256)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["replay", "attack", "thi", "timestamp", "nonce"],
+    "interviewerIntent": "Đánh giá năng lực thiết kế API bảo mật cao cho dịch vụ tài chính, chống kẻ tấn công chụp gói tin và gửi lại nhiều lần.",
+    "contextOrScenario": "Bảo vệ API trừ tiền người dùng `POST /api/wallet/deduct` khỏi việc kẻ nghe lén chụp được HTTP request và replay hàng trăm lần để rút sạch tài khoản.",
+    "expectedKeywords": [
+      "replay attack",
+      "nonce",
+      "timestamp",
+      "request signing",
+      "hmac-sha256",
+      "redis",
+      "time drift"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Tấn công Replay Attack: Thiết kế cơ chế phòng vệ bằng Timestamp, Nonce và Request Signing (HMAC-SHA256)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Replay Attack xảy ra khi kẻ tấn công chụp trộm một gói tin request hợp lệ và gửi lại nguyên vẹn lên server để lặp lại thao tác. Cơ chế phòng thủ hoàn chỉnh kết hợp 3 yếu tố: (1) Timestamp giới hạn thời hạn sống của request trong một cửa sổ ngắn (ví dụ 5 phút); (2) Nonce (chuỗi ngẫu nhiên chỉ dùng 1 lần) lưu trong Redis với TTL bằng cửa sổ thời gian; (3) HMAC Request Signing trói chặt Nonce và Timestamp vào nội dung gói tin.",
+      "deepDive": "Nếu chỉ dùng Timestamp, hacker vẫn kịp replay request trong khoảng thời gian cửa sổ (ví dụ 5 phút). Nếu chỉ dùng Nonce mà không có Timestamp, server sẽ phải lưu trữ Nonce vĩnh viễn trong RAM dẫn đến cạn kiệt bộ nhớ. Sự kết hợp hoàn hảo: Timestamp thu hẹp thời gian lưu trữ Nonce trong Redis xuống đúng 5 phút (`SET nonce:xxx 1 PX 300000 NX`). Sau 5 phút, request tự động bị từ chối bởi kiểm tra Timestamp mà không cần tra cứu Redis. HMAC Signature đảm bảo kẻ tấn công không thể sửa Timestamp hoặc Nonce để lừa server.",
+      "codeExample": "import crypto from 'crypto';\nimport Redis from 'ioredis';\nimport { Request, Response, NextFunction } from 'express';\n\nconst redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');\n\nexport const verifySignedRequest = async (req: Request, res: Response, next: NextFunction) => {\n  const signature = req.headers['x-signature'] as string;\n  const timestamp = parseInt(req.headers['x-timestamp'] as string, 10);\n  const nonce = req.headers['x-nonce'] as string;\n\n  if (!signature || !timestamp || !nonce) {\n    return res.status(400).json({ error: 'Thiếu headers xác thực chữ ký (Signature, Timestamp, Nonce)' });\n  }\n\n  // 1. Kiểm tra Timestamp: Chặn các request quá cũ hoặc đến từ tương lai quá xa (cửa sổ 5 phút)\n  const now = Date.now();\n  const WINDOW_MS = 5 * 60 * 1000;\n  if (Math.abs(now - timestamp) > WINDOW_MS) {\n    return res.status(400).json({ error: 'Request đã hết hạn hoặc lệch đồng hồ quá 5 phút' });\n  }\n\n  // 2. Kiểm tra Nonce (Number Used Once) trong Redis để phát hiện Replay\n  const nonceKey = `nonce:${nonce}`;\n  const isSet = await redis.set(nonceKey, '1', 'PX', WINDOW_MS, 'NX');\n  if (!isSet) {\n    // Nonce đã tồn tại trong Redis -> Đây là cuộc tấn công Replay Attack!\n    return res.status(403).json({ error: 'Phát hiện Replay Attack: Nonce đã được sử dụng trước đó' });\n  }\n\n  // 3. Xác thực HMAC Signature trên toàn bộ body + headers\n  const secretKey = process.env.API_PARTNER_SECRET!;\n  const payloadToSign = `${req.method}|${req.originalUrl}|${timestamp}|${nonce}|${JSON.stringify(req.body)}`;\n  const expectedSignature = crypto.createHmac('sha256', secretKey).update(payloadToSign).digest('hex');\n\n  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {\n    return res.status(401).json({ error: 'Chữ ký không hợp lệ' });\n  }\n\n  next();\n};",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Chỉ kiểm tra Nonce mà không đưa vào chuỗi ký HMAC, khiến hacker chỉ cần đổi Nonce ngẫu nhiên là bypass được.",
+      "Không đồng bộ đồng hồ hệ thống bằng NTP, dẫn đến việc các server phân tán từ chối oan request của client do lệch thời gian (Clock Drift).",
+      "Lưu Nonce trong bộ nhớ RAM của một tiến trình Node đơn lẻ thay vì dùng CSDL phân tán như Redis, khiến hacker có thể replay request sang các instance khác trong cluster."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Làm thế nào để xử lý độ lệch thời gian (Clock Drift) giữa client di động và backend server trong kiểm tra Timestamp?",
+      "Idempotency-Key trong thanh toán trực tuyến giải quyết bài toán trùng lặp thanh toán khác gì với cơ chế Nonce chống Replay?"
     ]
   },
   {
@@ -479,18 +810,31 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "Timing Attack trong việc so sánh chuỗi (String Comparison): Tại sao cần dùng hàm so sánh thời gian không đổi (Constant-time comparison)?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["timing", "attack", "chu", "string", "comparison"],
+    "interviewerIntent": "Đánh giá hiểu biết sâu về lỗ hổng kênh kề (Side-Channel Attack) và cách tối ưu hóa của CPU/V8 Engine ảnh hưởng đến an ninh.",
+    "contextOrScenario": "Xác thực API Key, Webhook Secret hoặc HMAC Signature trong dịch vụ xác thực tài khoản ngân hàng.",
+    "expectedKeywords": [
+      "timing attack",
+      "side-channel",
+      "constant-time comparison",
+      "crypto.timingsafeequal",
+      "v8 engine",
+      "early return",
+      "hmac"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Timing Attack trong việc so sánh chuỗi (String Comparison): Tại sao cần dùng hàm so sánh thời gian không đổi (Constant-time comparison)?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Các toán tử so sánh chuỗi thông thường (`===`) sử dụng kỹ thuật 'Early Return' — thoát và trả về `false` ngay khi gặp ký tự đầu tiên bị lệch. Kẻ tấn công có thể gửi hàng nghìn request, đo độ trễ nano/micro-giây và suy luận được chính xác từng ký tự của Secret Key. Constant-time comparison (`crypto.timingSafeEqual`) duyệt qua toàn bộ các byte mà không dừng sớm, loại bỏ hoàn toàn dấu vết thời gian.",
+      "deepDive": "Toán tử `===` so sánh byte theo byte: nếu ký tự đầu tiên sai, nó mất 1 chu kỳ máy; nếu đúng 5 ký tự đầu rồi mới sai ở ký tự thứ 6, nó mất 6 chu kỳ máy. Dù độ lệch chỉ vài chục nanosecond, qua mạng LAN hoặc với kỹ thuật phân tích thống kê đo lường hàng chục nghìn lần request (Statistical Timing Analysis), hacker có thể lần lượt đoán ra từng byte của Secret Key từ trái sang phải. `crypto.timingSafeEqual` duyệt qua mọi byte bằng toán tử bitwise XOR (`acc |= a[i] ^ b[i]`) và chỉ kiểm tra kết quả `acc === 0` ở byte cuối cùng, do đó thời gian chạy hoàn toàn không phụ thuộc vào vị trí sai lệch.",
+      "codeExample": "import crypto from 'crypto';\n\nexport class SecurityComparator {\n  // ❌ NGUY HIỂM CHẾT NGƯỜI: Toán tử '===' hoặc '==' tối ưu bằng cách return false ngay ở ký tự sai đầu tiên\n  // Kẻ tấn công có thể đo thời gian phản hồi bằng microsecond để đoán từng ký tự một (Timing Attack)\n  static vulnerableCompare(userApiKey: string, secretApiKey: string): boolean {\n    return userApiKey === secretApiKey;\n  }\n\n  // ✅ AN TOÀN TUYỆT ĐỐI: Constant-Time Comparison (Thời gian thực thi luôn bằng nhau bất kể chuỗi giống hay khác)\n  static secureCompare(userApiKey: string, secretApiKey: string): boolean {\n    const userBuf = Buffer.from(userApiKey, 'utf8');\n    const secretBuf = Buffer.from(secretApiKey, 'utf8');\n\n    // 1. Nếu độ dài khác nhau, vẫn băm HMAC để giữ thời gian thực thi đồng nhất trước khi reject\n    if (userBuf.length !== secretBuf.length) {\n      // Chạy một phép toán giả để chống rò rỉ độ dài chuỗi qua timing\n      crypto.timingSafeEqual(secretBuf, secretBuf);\n      return false;\n    }\n\n    // 2. crypto.timingSafeEqual duyệt qua toàn bộ mảng byte bằng phép toán XOR (b1 ^ b2) không có early return\n    return crypto.timingSafeEqual(userBuf, secretBuf);\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Dùng `userString === secretString` để so sánh Webhook Signature của Stripe hoặc GitHub.",
+      "Gọi `crypto.timingSafeEqual(bufA, bufB)` khi hai buffer khác độ dài mà không bắt ngoại lệ (hàm của Node sẽ ném lỗi crash server).",
+      "Nghĩ rằng độ trễ mạng Internet (Network Jitter) ngẫu nhiên sẽ xóa nhòa Timing Attack, trong khi hacker dùng phân tích thống kê (Box Plot / T-test) có thể lọc nhiễu mạng rất dễ dàng."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao `crypto.timingSafeEqual` sẽ crash nếu truyền vào 2 Buffer có độ dài khác nhau và làm sao xử lý so sánh an toàn hai chuỗi có thể khác độ dài?",
+      "Bleichenbacher Attack trên RSA PKCS#1 v1.5 đã khai thác lỗ hổng Timing Attack ở mức giải mã mật mã như thế nào?"
     ]
   },
   {
@@ -498,18 +842,31 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "Tấn công XML External Entity (XXE) và Insecure Deserialization: Cơ chế khai thác và cấu hình parser an toàn?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["xml", "external", "entity", "xxe", "insecure"],
+    "interviewerIntent": "Đánh giá mức độ thấu hiểu về lỗ hổng phân tích dữ liệu phức tạp (Data Parsing Vulnerabilities) dẫn đến đọc trộm file hệ thống hoặc RCE.",
+    "contextOrScenario": "Xử lý hóa đơn điện tử định dạng XML và tiếp nhận session object tuần tự hóa từ Redis/Memcached.",
+    "expectedKeywords": [
+      "xxe",
+      "xml external entity",
+      "dtd",
+      "insecure deserialization",
+      "rce",
+      "billion laughs",
+      "safe parser"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Tấn công XML External Entity (XXE) và Insecure Deserialization: Cơ chế khai thác và cấu hình parser an toàn?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "XXE xảy ra khi XML Parser được cấu hình cho phép phân giải các thực thể bên ngoài (External DTD / Entities). Kẻ tấn công chèn `SYSTEM \"file:///etc/passwd\"` để đọc trộm file trên server hoặc quét cổng nội bộ (SSRF). Insecure Deserialization xảy ra khi ứng dụng chuyển đổi dữ liệu nhị phân/chuỗi thành Object có chứa mã thực thi mà không kiểm tra, dẫn thẳng tới Remote Code Execution (RCE).",
+      "deepDive": "Các dạng XXE: (1) Local File Disclosure đọc trộm `/etc/shadow`, AWS credentials; (2) Billion Laughs Attack (XML Bomb) làm tràn RAM CPU DoS bằng cách mở rộng entity đệ quy (`&lol9;`). Khắc phục triệt để XXE là tắt tính năng `resolveExternalEntities`, tắt DTD processing trong parser (ví dụ `libxml_disable_entity_loader(true)` trong PHP hoặc `disallow-doctype-decl` trong Java). Đối với Deserialization: Tuyệt đối không dùng các định dạng hỗ trợ serialize mã nguồn/function như Python `pickle`, Java Native Serialization, PHP `unserialize()`, hay thư viện `node-serialize`. Luôn sử dụng định dạng dữ liệu thuần (Pure Data Format) như JSON/Protocol Buffers kết hợp Data Schema Validation.",
+      "codeExample": "import { XMLParser } from 'fast-xml-parser';\n\n// 1. Phòng chống XML External Entity (XXE) Attack\n// Payload độc hại: <!DOCTYPE foo [ <!ENTITY xxe SYSTEM \"file:///etc/passwd\"> ]>\nexport class SecureXmlProcessor {\n  private static parser = new XMLParser({\n    // VÔ HIỆU HÓA TOÀN BỘ các tính năng DTD và Entity Expansion nguy hiểm\n    allowBooleanAttributes: false,\n    processEntities: false,  // Không xử lý entity tham chiếu ra ngoài\n    htmlEntities: false,\n    ignoreAttributes: false\n  });\n\n  static parseXmlSafely(rawXmlString: string) {\n    // Kiểm tra sơ bộ chặn các từ khóa DTD nguy hiểm\n    if (rawXmlString.includes('<!DOCTYPE') || rawXmlString.includes('<!ENTITY')) {\n      throw new Error('Từ chối XML chứa DOCTYPE hoặc DTD Entity (Nguy cơ XXE)');\n    }\n\n    return this.parser.parse(rawXmlString);\n  }\n}\n\n// 2. Phòng chống Insecure Deserialization\nexport class SerializationSecurity {\n  // ❌ NGUY HIỂM: Dùng eval() hoặc node-serialize / python pickle trên untrusted data dẫn tới RCE\n  // ✅ AN TOÀN: Chỉ dùng JSON schema chặt chẽ (JSON.parse không chứa hàm thực thi)\n  static safeDeserialize<T>(jsonStr: string): T {\n    const parsed = JSON.parse(jsonStr);\n    // Luôn validate lại cấu trúc object bằng schema (Zod / Joi) sau khi parse\n    return parsed as T;\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Để parser XML ở cấu hình mặc định (nhiều thư viện Java/C# mặc định bật hỗ trợ DTD bên ngoài).",
+      "Sử dụng Python `pickle.loads()` hoặc `node-serialize` để đọc session từ cookie hoặc Redis, hacker gửi gadget chain thực thi shell ngay lập tức.",
+      "Chỉ lọc chuỗi `SYSTEM` trong XML bằng Regex thay vì tắt tính năng DTD ở mức cấu hình parser."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Out-of-band XXE (OOB-XXE) là gì và hacker làm thế nào để rút trích dữ liệu khi ứng dụng không trả về kết quả XML ra màn hình?",
+      "Gadget Chain là gì trong khai thác Insecure Deserialization trên nền tảng Java hoặc Node.js?"
     ]
   },
   {
@@ -517,18 +874,32 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "Supply Chain Attack trong phát triển phần mềm: Nguy cơ từ NPM/PyPI dependency poisoning và cách phòng chống bằng lockfile & SBOM?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["supply", "chain", "attack", "tri", "nguy"],
+    "interviewerIntent": "Đánh giá tư duy phòng vệ chuỗi cung ứng phần mềm (Software Supply Chain Security) — mối nguy hàng đầu của các doanh nghiệp công nghệ.",
+    "contextOrScenario": "Một thư viện NPM phổ biến (ví dụ `event-stream` hoặc `colors.js`) bị tác giả/hacker chèn mã độc đánh cắp Bitcoin wallet hoặc gửi biến môi trường về server lạ.",
+    "expectedKeywords": [
+      "supply chain attack",
+      "sbom",
+      "lockfile",
+      "npm audit",
+      "trivy",
+      "cosign",
+      "typosquatting",
+      "dependency confusion"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Supply Chain Attack trong phát triển phần mềm: Nguy cơ từ NPM/PyPI dependency poisoning và cách phòng chống bằng lockfile & SBOM?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Supply Chain Attack tấn công vào các mắt xích yếu bên thứ ba (thư viện NPM/PyPI, CI/CD runners, build plugins) để gián tiếp xâm nhập vào sản phẩm cuối cùng. Các phương pháp tấn công gồm: Typosquatting (đặt tên gần giống), Dependency Confusion (đăng package trùng tên nội bộ lên public registry), và Compromised Maintainer. Phòng vệ: Sử dụng `npm ci` kiểm tra hash lockfile, tắt `ignore-scripts`, tạo SBOM và quét SCA liên tục.",
+      "deepDive": "Các kỹ thuật tấn công: (1) Compromised Maintainer Account: Hacker chiếm tài khoản tác giả package uy tín rồi phát hành version mới chứa mã độc trích xuất `.env`; (2) Postinstall Hook Injection: Mã độc tự chạy ngay khi lập trình viên gõ `npm install`. Chiến lược phòng thủ toàn diện: (1) Cấm dùng `npm install` trên production/CI, bắt buộc dùng `npm ci` với `package-lock.json` có kiểm tra SHA-512 integrity hash; (2) Chạy `npm install --ignore-scripts` để vô hiệu hóa mã độc chạy từ install hooks; (3) Tạo và quản lý Software Bill of Materials (SBOM) bằng Syft/CycloneDX để có danh mục chính xác mọi thành phần trong phần mềm; (4) Sử dụng Private Package Registry (Artifactory, Verdaccio) có scoped package (`@mycompany/pkg`) để chặn Dependency Confusion.",
+      "codeExample": "#!/usr/bin/env bash\n# Quy trình tự động bảo vệ Software Supply Chain trong CI/CD Pipeline\nset -euo pipefail\n\necho \"==> 1. Bắt buộc cài đặt chính xác theo Lockfile (không tự động tải minor/patch mới)\"\n# 'npm ci' dùng chính xác các phiên bản và kiểm tra integrity hash trong package-lock.json\nnpm ci --ignore-scripts # Tắt thực thi lifecycle scripts (preinstall, postinstall) độc hại!\n\necho \"==> 2. Quét lỗ hổng đã biết trong cây phụ thuộc (SCA Scan)\"\nnpm audit --audit-level=high\n\necho \"==> 3. Sinh Software Bill of Materials (SBOM) định dạng chuẩn quốc tế SPDX\"\nsyft dir:. -o spdx-json > sbom.spdx.json\n\necho \"==> 4. Quét lỗ hổng trực tiếp trên file SBOM\"\ngrype sbom:./sbom.spdx.json --fail-on high\n\necho \"==> Pipeline hoàn tất: Cây phụ thuộc an toàn và đã có chứng chỉ SBOM!\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Không commit `package-lock.json` hoặc `yarn.lock` vào Git repo, khiến mỗi lần build server lại tải phiên bản mới nhất chưa qua kiểm định.",
+      "Cho phép npm chạy lifecycle scripts mặc định trong Dockerfile build, tạo cơ hội cho postinstall script đánh cắp SSH keys.",
+      "Dùng package nội bộ không có `@scope`, dẫn tới việc hacker đăng ký cùng tên trên npmjs.com với version 99.9.9 để server tự kéo package của hacker."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "SLSA (Supply-chain Levels for Software Artifacts) framework phân cấp bảo mật quy trình build phần mềm như thế nào từ cấp 1 đến cấp 4?",
+      "Cosign / Sigstore giải quyết bài toán ký số và chứng thực nguồn gốc của Container Image & Artifact như thế nào?"
     ]
   },
   {
@@ -536,18 +907,32 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "Triển khai Certificate Pinning (SSL Pinning) trên Mobile App: Lợi ích chống MitM và rủi ro sập app khi chứng chỉ hết hạn?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["tri", "khai", "certificate", "pinning", "ssl"],
+    "interviewerIntent": "Đánh giá sự am hiểu về kỹ thuật bảo vệ kết nối client-to-server cao cấp và quản trị vòng đời chứng chỉ (Certificate Lifecycle).",
+    "contextOrScenario": "Ứng dụng ngân hàng số trên iOS/Android cần chống các hacker dùng phần mềm proxy như Charles Proxy, Burp Suite, hay cài Root CA độc hại vào máy để đọc trộm API.",
+    "expectedKeywords": [
+      "certificate pinning",
+      "public key pinning",
+      "spki",
+      "mitm",
+      "burp suite",
+      "frida",
+      "backup pin",
+      "certificate rotation"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Triển khai Certificate Pinning (SSL Pinning) trên Mobile App: Lợi ích chống MitM và rủi ro sập app khi chứng chỉ hết hạn?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Certificate Pinning là kỹ thuật mà ứng dụng di động hardcode sẵn mã băm của Chứng chỉ số hoặc Public Key của máy chủ. Thay vì tin tưởng hơn 100 Root CA cài sẵn trong hệ điều hành (nơi hacker có thể cài CA giả để nghe lén qua Burp Suite), app chỉ chấp nhận duy nhất chứng chỉ đã được ghim. Rủi ro lớn nhất: Nếu chứng chỉ hết hạn hoặc server đổi cert mà app chưa kịp update, toàn bộ app sẽ bị mất kết nối và 'chết lâm sàng'.",
+      "deepDive": "Có 2 cách Pin: (1) Pin cả Certificate X.509: Dễ triển khai nhưng cert có ngày hết hạn cố định (thường 90 ngày hoặc 1 năm), đến hạn đổi cert là app cũ sẽ hỏng ngay lập tức; (2) Pin Public Key (SPKI Pinning - khuyến nghị): Chỉ ghim Subject Public Key Info. Khi gia hạn chứng chỉ mới (Renew Certificate), bạn vẫn dùng cặp Private/Public Key cũ (CSR cũ) thì mã Pin giữ nguyên không đổi, app cũ vẫn hoạt động trơn tru. Chiến lược an toàn: Luôn ghim kèm Backup Pin (một cặp key dự phòng chưa dùng đến được cất trong HSM/Offline). Nếu Private key chính bị lộ, DevOps có thể lập tức chuyển sang dùng Backup Key mà app người dùng không bị gián đoạn.",
+      "codeExample": "import https from 'https';\nimport crypto from 'crypto';\nimport tls from 'tls';\n\n// Triển khai Public Key Pinning (SPKI Pinning) cho Client Connection\nexport class SecurePinnedHttpClient {\n  // Danh sách SHA-256 hash của Subject Public Key Info (SPKI)\n  // LUÔN LUÔN cấu hình ít nhất 1 mã Pin chính và 1 mã Pin dự phòng (Backup Pin)!\n  private static readonly PINNED_SPKI_HASHES = [\n    '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=', // Current Production Public Key\n    'd6qzRu9zOECb90Uez27xWltNsj0eQ8jodZF97A6vUUM='  // Backup Key (Lưu an toàn trong két sắt)\n  ];\n\n  static verifyPeerCertificate(tlsSocket: tls.TLSSocket): boolean {\n    const cert = tlsSocket.getPeerCertificate();\n    if (!cert || !cert.pubkey) return false;\n\n    // Tính toán SHA-256 hash của Subject Public Key Info (SPKI)\n    const publicKeyHash = crypto.createHash('sha256').update(cert.pubkey).digest('base64');\n\n    const isMatch = this.PINNED_SPKI_HASHES.includes(publicKeyHash);\n    if (!isMatch) {\n      console.error('SSL PINNING VIOLATION: Phát hiện máy chủ lạ hoặc tấn công Man-in-the-Middle!');\n      tlsSocket.destroy(new Error('SSL Pinning validation failed'));\n      return false;\n    }\n\n    return true;\n  }\n}",
+      "codeLanguage": "typescript"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Ghim toàn bộ Certificate và quên cập nhật app trước ngày chứng chỉ hết hạn, khiến hàng triệu khách hàng không thể mở app.",
+      "Chỉ ghim 1 key duy nhất mà không có Backup Pin trong cấu hình app.",
+      "Tin rằng SSL Pinning là bức tường bất khả xâm phạm trên thiết bị của hacker, trong khi trên máy Jailbreak/Rooted, hacker dùng Frida script hook vào hàm verify để bypass trong 5 giây."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao Google Chrome và W3C đã khai tử chuẩn HPKP (HTTP Public Key Pinning) trên trình duyệt web?",
+      "Hacker sử dụng Frida hook và Objection để bypass SSL Pinning trên Android/iOS như thế nào và lập trình viên chống lại bằng cách nào (Anti-tampering / Root detection)?"
     ]
   },
   {
@@ -555,18 +940,32 @@
     "category": "cybersecurity",
     "level": "senior",
     "question": "Quy trình ứng phó sự cố an ninh thông tin (Security Incident Response): Triage, Containment, Eradication, Recovery và Post-Incident Review?",
-    "interviewerIntent": "Đánh giá năng lực hiểu bản chất, khả năng phân tích nguyên lý và giải quyết bài toán thực tế liên quan đến Cybersecurity & AppSec ở cấp độ SENIOR.",
-    "contextOrScenario": "Triển khai, tối ưu và xử lý sự cố trong dự án thực tế khi áp dụng Cybersecurity & AppSec.",
-    "expectedKeywords": ["quy", "ninh", "tin", "security", "incident"],
+    "interviewerIntent": "Đánh giá năng lực lãnh đạo xử lý sự cố an ninh thực chiến, khống chế thiệt hại và phục hồi hệ thống sản xuất tuân thủ khung chuẩn NIST SP 800-61.",
+    "contextOrScenario": "Phát hiện hệ thống sản xuất bị hacker thâm nhập, đang thực hiện quét dữ liệu và cài đặt webshell trên một cụm máy chủ.",
+    "expectedKeywords": [
+      "incident response",
+      "nist sp 800-61",
+      "triage",
+      "containment",
+      "eradication",
+      "recovery",
+      "post-mortem",
+      "forensics"
+    ],
     "seniorAnswer": {
-      "summary": "Câu hỏi làm rõ bản chất kỹ thuật của: 'Quy trình ứng phó sự cố an ninh thông tin (Security Incident Response): Triage, Containment, Eradication, Recovery và Post-Incident Review?'. Câu trả lời cần đi thẳng vào định nghĩa cốt lõi, cơ chế hoạt động bên dưới và tình huống áp dụng tối ưu.",
-      "deepDive": "Trong môi trường sản xuất (production), chủ đề này quyết định độ ổn định, hiệu năng và khả năng bảo trì của hệ thống. Lập trình viên cấp độ SENIOR cần nắm vững quy trình vận hành nội bộ, các rủi ro kỹ thuật (trade-offs) và phương án xử lý lỗi tương ứng."
+      "summary": "Quy trình ứng phó sự cố chuẩn NIST SP 800-61 gồm 5 pha: (1) Triage / Detection: Phát hiện, thẩm định mức độ nghiêm trọng và phân loại sự cố; (2) Containment: Khống chế, cô lập hệ thống bị nhiễm để ngăn lây lan mà vẫn bảo toàn bằng chứng số; (3) Eradication: Xóa bỏ mã độc, thu hồi tài khoản bị lộ và vá lỗ hổng gốc; (4) Recovery: Khôi phục dịch vụ từ bản backup sạch và giám sát chặt chẽ; (5) Post-Incident Review: Họp rút kinh nghiệm (Post-mortem), cải tiến quy trình phòng thủ.",
+      "deepDive": "Chi tiết các pha hành động: (1) Triage: Xác định Blast Radius (những service/database nào đã bị truy cập); (2) Containment: Tuyệt đối KHÔNG reboot ngay (sẽ làm mất dữ liệu RAM, network connections, fileless malware). Cô lập qua Security Group/VLAN, tạo snapshot EBS/VM để phục vụ điều tra Forensics; (3) Eradication: Phải tìm ra nguyên nhân gốc rễ (Root Cause - ví dụ 1 lỗ hổng Log4j hoặc rò rỉ credential). Xoay vòng toàn bộ Secret/Database Password/API Keys, patch lỗ hổng, rebuild container/server từ base image sạch thay vì sửa thủ công; (4) Recovery: Khôi phục dữ liệu từ backup sạch đã xác minh, mở lại traffic dần dần kèm alert giám sát đặc biệt; (5) Post-Mortem: Lập báo cáo Blameless Post-Mortem, thông báo cho cơ quan chức năng hoặc khách hàng nếu có rò rỉ dữ liệu (GDPR/Luật An ninh mạng).",
+      "codeExample": "#!/usr/bin/env bash\n# Script phản ứng khẩn cấp giai đoạn Containment (Cô lập máy chủ bị xâm nhập)\nset -euo pipefail\n\necho \"=== GIAI ĐOẠN 2: CONTAINMENT - CÔ LẬP KHẨN CẤP ===\"\n\nEVIDENCE_DIR=\"/tmp/forensics_$(date +%s)\"\nmkdir -p \"$EVIDENCE_DIR\"\n\necho \"1. Thu thập bằng chứng số khả biến (Volatile Artifacts) trước khi ngắt mạng:\"\n# Lưu trạng thái kết nối mạng hiện tại\nss -tulpn > \"$EVIDENCE_DIR/open_sockets.txt\"\n# Lưu danh sách tiến trình đang chạy và lệnh khởi động\nps auxwwf > \"$EVIDENCE_DIR/process_tree.txt\"\n# Dump danh sách user đang login\nw > \"$EVIDENCE_DIR/logged_in_users.txt\"\n# Lưu lịch sử bash command gần nhất\nhistory -a && cp ~/.bash_history \"$EVIDENCE_DIR/\" 2>/dev/null || true\n\necho \"2. Cô lập mạng (Network Isolation) bằng IPTables (Chỉ giữ lại cổng SSH quản trị từ IP SOC an toàn):\"\nSOC_ADMIN_IP=\"10.200.0.50\"\niptables -F\niptables -P INPUT DROP\niptables -P FORWARD DROP\niptables -P OUTPUT DROP\n\n# Chỉ cho phép luồng SSH điều tra từ SOC IP\niptables -A INPUT -p tcp -s \"$SOC_ADMIN_IP\" --dport 22 -j ACCEPT\niptables -A OUTPUT -p tcp -d \"$SOC_ADMIN_IP\" --sport 22 -j ACCEPT\n\necho \"==> ĐÃ HOÀN TẤT CÔ LẬP MÁY CHỦ! Tiếp tục chuyển sang bước Eradication.\"",
+      "codeLanguage": "bash"
     },
     "pitfalls": [
-      "Áp dụng lý thuyết máy móc mà không cân nhắc bối cảnh thực tế hoặc bỏ qua các trường hợp biên (edge cases) liên quan đến Cybersecurity & AppSec."
+      "Hoảng loạn vội vàng format ổ cứng hoặc restart máy chủ làm xóa sạch dấu vết trong RAM cần thiết cho điều tra Forensics.",
+      "Khôi phục hệ thống từ bản backup nhưng không vá lỗ hổng ban đầu, khiến kẻ tấn công quay lại chiếm quyền ngay trong vài phút.",
+      "Giấu nhẹm sự cố hoặc không có kênh liên lạc dự phòng (Out-of-band communication), để lộ kế hoạch phản ứng cho hacker đang nằm vùng trong hệ thống email công ty."
     ],
     "followUpQuestions": [
-      "Làm thế nào để đo lường, giám sát và kiểm chứng giải pháp này trong môi trường production?"
+      "Tại sao việc thu thập Volatile Data (RAM dump, active network connections) phải tuân thủ 'Order of Volatility' (Thứ tự khả biến)?",
+      "Làm thế nào để thiết lập kênh liên lạc khẩn cấp (Out-of-band communication) khi nghi ngờ toàn bộ hệ thống email và Slack nội bộ đã bị giám sát?"
     ]
   }
 ]

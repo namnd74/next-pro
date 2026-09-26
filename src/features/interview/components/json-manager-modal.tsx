@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useInterviewStore } from '../stores/use-interview-store';
 import { MOCK_INTERVIEW_QUESTIONS } from '../data/mock-interview-bank';
-import { validateQuestionBankJson } from '../data/json-loader';
+import { validateQuestionBankJson, loadAllQuestionBanks } from '../data/json-loader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -25,6 +25,7 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
   const { customQuestions, importQuestionsFromJson, resetInterviewProgress } =
     useInterviewStore();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
 
   const [importStatus, setImportStatus] = React.useState<{
     type: 'success' | 'error' | null;
@@ -35,19 +36,30 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
 
   const allActiveQuestions = [...MOCK_INTERVIEW_QUESTIONS, ...customQuestions];
 
-  const handleExportCurrentBank = () => {
-    const dataStr =
-      'data:text/json;charset=utf-8,' +
-      encodeURIComponent(JSON.stringify(allActiveQuestions, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute('href', dataStr);
-    downloadAnchor.setAttribute(
-      'download',
-      `nextpro-interview-bank-${new Date().toISOString().slice(0, 10)}.json`
-    );
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
+  const handleExportCurrentBank = async () => {
+    setIsExporting(true);
+    try {
+      const allBanks = await loadAllQuestionBanks();
+      const map = new Map<string, typeof allBanks[number]>();
+      for (const q of allBanks) map.set(q.id, q);
+      for (const q of customQuestions) map.set(q.id, q);
+      const exportData = Array.from(map.values());
+
+      const dataStr =
+        'data:text/json;charset=utf-8,' +
+        encodeURIComponent(JSON.stringify(exportData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute(
+        'download',
+        `nextpro-interview-bank-${new Date().toISOString().slice(0, 10)}.json`
+      );
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleDownloadTemplate = () => {
@@ -179,10 +191,15 @@ export function JSONManagerModal({ isOpen, onClose }: JSONManagerModalProps) {
           <Button
             onClick={handleExportCurrentBank}
             variant="outline"
+            disabled={isExporting}
             className="w-full justify-center gap-2 text-xs leading-tight font-semibold whitespace-normal"
           >
-            <Download className="h-4 w-4 text-emerald-500" />
-            <span>Xuất JSON ({allActiveQuestions.length} câu)</span>
+            {isExporting ? (
+              <RefreshCw className="h-4 w-4 animate-spin text-emerald-500" />
+            ) : (
+              <Download className="h-4 w-4 text-emerald-500" />
+            )}
+            <span>{isExporting ? 'Đang tải & xuất JSON...' : `Xuất Toàn Bộ JSON`}</span>
           </Button>
 
           <Button
