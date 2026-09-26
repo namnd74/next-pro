@@ -6,7 +6,17 @@
     "question": "Vai trò của Data Engineer là gì? Phân biệt giữa Data Engineer, Data Analyst và Data Scientist?",
     "interviewerIntent": "Kiểm tra hiểu biết về vai trò và trách nhiệm trong hệ sinh thái dữ liệu, khả năng phân biệt rõ ranh giới công việc để tránh scope creep.",
     "contextOrScenario": "Bạn gia nhập một startup fintech đang xây dựng team data từ đầu. CTO hỏi bạn nên tuyển Data Engineer hay Data Scientist trước?",
-    "expectedKeywords": ["ETL", "pipeline", "data warehouse", "ELT", "orchestration", "Airflow", "Spark", "schema design", "data quality"],
+    "expectedKeywords": [
+      "ETL",
+      "pipeline",
+      "data warehouse",
+      "ELT",
+      "orchestration",
+      "Airflow",
+      "Spark",
+      "schema design",
+      "data quality"
+    ],
     "seniorAnswer": {
       "summary": "Data Engineer xây dựng và vận hành hạ tầng dữ liệu — pipelines ETL/ELT, data warehouse, orchestration. Data Analyst khai thác dữ liệu sẵn có để trả lời câu hỏi kinh doanh (SQL, BI tools). Data Scientist xây dựng mô hình thống kê và ML để dự đoán. Trong một startup, Data Engineer nên được tuyển trước vì không có hạ tầng dữ liệu sạch thì DS/DA cũng không làm được gì.",
       "deepDive": "Data Engineer sở hữu toàn bộ data stack: ingestion (Kafka, Debezium CDC), transformation (dbt, Spark), storage (Delta Lake, BigQuery), orchestration (Airflow DAG). Họ đảm bảo data lineage, schema evolution, SLA cho pipeline. Sự khác biệt về tooling: DE dùng Python/Scala/SQL thuần về infrastructure; DA dùng SQL + Tableau/Looker để phân tích; DS dùng Python (pandas, scikit-learn, PyTorch) để model. Trên cloud hiện đại, ranh giới mờ hơn — Analytics Engineer (dbt) là vai trò cầu nối DE/DA. Trade-off khi không có DE: DS phải tự clean data (tốn 80% thời gian), pipeline brittle, không có observability.",
@@ -30,12 +40,96 @@
     "question": "Phân biệt mô hình ETL (Extract - Transform - Load) và ELT (Extract - Load - Transform)? Khi nào nên chọn ELT?",
     "interviewerIntent": "Đánh giá khả năng chọn kiến trúc pipeline phù hợp với hạ tầng cloud hiện đại và volume dữ liệu.",
     "contextOrScenario": "Team đang migrate từ on-premise Oracle warehouse sang BigQuery. Bạn đề xuất ETL hay ELT?",
-    "expectedKeywords": ["ETL", "ELT", "dbt", "BigQuery", "Snowflake", "transformation", "raw layer", "compute-on-read", "data warehouse"],
+    "expectedKeywords": [
+      "ETL",
+      "ELT",
+      "dbt",
+      "BigQuery",
+      "Snowflake",
+      "transformation",
+      "raw layer",
+      "compute-on-read",
+      "data warehouse"
+    ],
     "seniorAnswer": {
       "summary": "ETL transform data trước khi load vào warehouse — phù hợp on-premise khi compute của warehouse đắt. ELT load raw data trước, transform trong warehouse bằng SQL/dbt — phù hợp cloud DWH (BigQuery, Snowflake) vì compute rẻ, linh hoạt re-transform. Với BigQuery, chọn ELT vì cost per-query, storage rẻ, và dbt quản lý transformation rất tốt.",
       "deepDive": "ETL truyền thống: transform trên intermediate server (Spark, Informatica) rồi mới load structured data vào DWH. Ưu điểm: DWH chỉ chứa clean data, query nhanh. Nhược: thiếu raw data cho re-processing, transformation logic bị lock trong ETL tool. ELT: load raw ngay (Bronze layer), sau đó transform dần (Silver → Gold, Medallion architecture). dbt compile SQL transformation, version control được, test được. Trade-off: storage tăng (raw + transformed), cần DWH mạnh. Cloud cost model thay đổi cuộc chơi — BigQuery charge per-TB scanned, không phải per-hour compute idle. Với 100TB+ data, ELT + columnar storage (Parquet, ORC) + partition pruning tiết kiệm hơn 10x so với ETL on-premise.",
       "codeExample": "# ELT với dbt: Transform raw transactions thành gold layer\n# models/silver/stg_transactions.sql\n{{ config(\n    materialized='incremental',\n    unique_key='transaction_id',\n    partition_by={'field': 'transaction_date', 'data_type': 'date'},\n    cluster_by=['merchant_id', 'user_id'],\n    on_schema_change='append_new_columns'\n) }}\n\nSELECT\n    t.transaction_id,\n    t.user_id,\n    t.merchant_id,\n    CAST(t.amount AS NUMERIC) AS amount_usd,\n    t.currency,\n    -- Normalize currency về USD\n    CAST(t.amount AS NUMERIC) * COALESCE(fx.rate_to_usd, 1.0) AS amount_normalized_usd,\n    DATE(t.created_at) AS transaction_date,\n    t.created_at AS transaction_ts,\n    t.status,\n    -- SCD Type 2 tracking\n    CURRENT_TIMESTAMP() AS dbt_updated_at\nFROM {{ source('raw', 'transactions') }} t\nLEFT JOIN {{ ref('fx_rates') }} fx\n    ON t.currency = fx.currency_code\n    AND DATE(t.created_at) = fx.rate_date\nWHERE t.status IN ('COMPLETED', 'REFUNDED')\n{% if is_incremental() %}\n    -- Chỉ process partition hôm nay khi incremental run\n    AND DATE(t.created_at) >= DATE_SUB(CURRENT_DATE(), INTERVAL 3 DAY)\n{% endif %}\n\n-- dbt test: schema.yml\n# - name: stg_transactions\n#   columns:\n#     - name: transaction_id\n#       tests: [unique, not_null]\n#     - name: amount_usd\n#       tests: [{dbt_utils.accepted_range: {min_value: 0}}]",
-      "codeLanguage": "python"
+      "codeLanguage": "python",
+      "diagram": {
+        "type": "mermaid",
+        "title": "So Sánh Kiến Trúc Pipeline Dữ Liệu: ETL vs ELT",
+        "caption": "ETL biến đổi dữ liệu trước khi nạp; ELT tận dụng sức mạnh tính toán MPP của Modern Cloud Data Warehouses (Snowflake/BigQuery)",
+        "code": "flowchart TD\n    subgraph ETL [\"Mô Hình ETL Truyền Thống (Extract - Transform - Load)\"]\n        Source1[\"Nguồn Dữ Liệu Thô (DB, Logs)\"] -->|\"1. Trích xuất (Extract)\"| Srv[\"Máy Chủ Xử Lý Trung Gian (Informatica / Spark Cluster)\"]\n        Srv -->|\"2. Biến đổi dữ liệu nặng (Transform)\"| Srv\n        Srv -->|\"3. Nạp dữ liệu sạch vào (Load)\"| DWH1[(\"Data Warehouse Cổ Điển\")]\n    end\n\n    subgraph ELT [\"Mô Hình ELT Hiện Đại (Extract - Load - Transform)\"]\n        Source2[\"Nguồn Dữ Liệu Thô\"] -->|\"1. Trích xuất (Extract)\"| Fivetran[\"Fivetran / Airbyte\"]\n        Fivetran -->|\"2. Nạp dữ liệu thô thẳng vào (Load)\"| CloudDWH[(\"Cloud Data Warehouse (Snowflake / BigQuery)\")]\n        CloudDWH -->|\"3. Biến đổi trực tiếp bằng SQL/dbt (Transform)\"| Marts[(\"Data Marts (Tận dụng CPU phân tán)\")]\n    end"
+      },
+      "benchmark": {
+        "title": "Đánh Giá: ETL Truyền Thống vs ELT Đám Mây Hiện Đại",
+        "caption": "So sánh tốc độ đưa dữ liệu vào hệ thống (Data Freshness), độ linh hoạt và chi phí vận hành",
+        "options": [
+          {
+            "name": "ELT (Extract - Load - Transform với dbt/Snowflake)",
+            "badge": "Chuẩn Hiện Đại 2026",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tốc độ nạp dữ liệu ban đầu",
+                "value": 98,
+                "displayValue": "Gần thời gian thực",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ linh hoạt thay đổi logic",
+                "value": 95,
+                "displayValue": "Chỉ cần sửa SQL dbt",
+                "color": "emerald"
+              },
+              {
+                "label": "Chi phí bảo trì hạ tầng trung gian",
+                "value": 90,
+                "displayValue": "Zero Serverless",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Lưu trữ toàn bộ dữ liệu thô nguyên bản (Raw Data) trong Data Lake, không sợ mất mát",
+              "Cho phép các Data Analyst tự viết SQL để transform theo nhu cầu mới mà không cần sửa pipeline code"
+            ],
+            "cons": [
+              "Chi phí tính toán trên Cloud Data Warehouse có thể tăng nếu viết truy vấn SQL không tối ưu"
+            ]
+          },
+          {
+            "name": "ETL (Extract - Transform - Load)",
+            "badge": "Legacy On-premise",
+            "metrics": [
+              {
+                "label": "Tốc độ nạp dữ liệu ban đầu",
+                "value": 40,
+                "displayValue": "Chạy theo Batch ban đêm",
+                "color": "amber"
+              },
+              {
+                "label": "Độ linh hoạt thay đổi logic",
+                "value": 30,
+                "displayValue": "Phải build lại pipeline",
+                "color": "rose"
+              },
+              {
+                "label": "Chi phí bảo trì hạ tầng",
+                "value": 35,
+                "displayValue": "Duy trì cụm Server riêng",
+                "color": "rose"
+              }
+            ],
+            "pros": [
+              "Dữ liệu được làm sạch và ẩn danh (Anonymized) bảo mật trước khi ra khỏi mạng nội bộ"
+            ],
+            "cons": [
+              "Nút thắt cổ chai tại máy chủ Transform: Nếu máy chủ này quá tải, dữ liệu trong kho sẽ bị trễ hàng giờ"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Nhầm ELT = không cần data quality — raw layer vẫn cần schema validation, nhưng cleaning xảy ra ở Silver layer.",
@@ -54,7 +148,17 @@
     "question": "Dữ liệu có cấu trúc (Structured), Bán cấu trúc (Semi-structured) và Phi cấu trúc (Unstructured) là gì?",
     "interviewerIntent": "Đánh giá kiến thức nền về phân loại dữ liệu, ảnh hưởng đến lựa chọn storage và processing tool.",
     "contextOrScenario": "Team nhận log từ 3 nguồn: RDBMS (PostgreSQL), API JSON, và ảnh chụp hóa đơn. Bạn thiết kế ingestion strategy như thế nào?",
-    "expectedKeywords": ["structured", "semi-structured", "unstructured", "Parquet", "JSON", "schema-on-read", "schema-on-write", "S3", "Delta Lake"],
+    "expectedKeywords": [
+      "structured",
+      "semi-structured",
+      "unstructured",
+      "Parquet",
+      "JSON",
+      "schema-on-read",
+      "schema-on-write",
+      "S3",
+      "Delta Lake"
+    ],
     "seniorAnswer": {
       "summary": "Structured: schema cố định, hàng/cột rõ ràng (PostgreSQL, CSV). Semi-structured: có schema nhưng flexible (JSON, XML, Avro — giá trị có thể nest, optional). Unstructured: không có schema định sẵn (ảnh, video, PDF, text). Ingestion strategy: structured → JDBC → Silver trực tiếp; semi-structured → S3 raw → parse với Spark; unstructured → object storage → ML pipeline.",
       "deepDive": "Schema-on-write (Structured/RDBMS): schema phải định nghĩa trước, insert fail nếu sai type — đảm bảo data integrity cao, query O(1) với index. Schema-on-read (Data Lake): load raw bytes, parse khi query — linh hoạt nhưng query chậm hơn, risk garbage data. Semi-structured với JSON trong BigQuery: dùng JSON_EXTRACT hoặc unnest ARRAY/STRUCT — tốn compute hơn columnar Parquet. Best practice: semi-structured → parse → flatten → lưu Parquet với proper types. Unstructured: metadata (filename, size, timestamp) lưu Delta Lake; bytes lưu S3/GCS với content-addressed storage (SHA256 hash). Processing unstructured: OCR với Tesseract/AWS Textract, embedding với sentence-transformers.",
@@ -78,7 +182,18 @@
     "question": "Data Warehouse, Data Lake và Data Lakehouse khác nhau như thế nào về kiến trúc và mục đích lưu trữ?",
     "interviewerIntent": "Kiểm tra khả năng chọn kiến trúc storage phù hợp với nhu cầu analytics và ML của tổ chức.",
     "contextOrScenario": "Công ty bạn có 50TB transactional data và muốn vừa chạy BI dashboard (Looker) vừa train ML model. Chọn kiến trúc nào?",
-    "expectedKeywords": ["Data Warehouse", "Data Lake", "Data Lakehouse", "Delta Lake", "Apache Iceberg", "ACID", "schema-on-read", "medallion", "BigQuery", "Snowflake"],
+    "expectedKeywords": [
+      "Data Warehouse",
+      "Data Lake",
+      "Data Lakehouse",
+      "Delta Lake",
+      "Apache Iceberg",
+      "ACID",
+      "schema-on-read",
+      "medallion",
+      "BigQuery",
+      "Snowflake"
+    ],
     "seniorAnswer": {
       "summary": "Data Warehouse: structured data, schema-on-write, tối ưu OLAP query (Snowflake, BigQuery). Data Lake: raw data mọi format, schema-on-read, rẻ nhưng query chậm và dễ thành data swamp. Data Lakehouse = tốt nhất cả hai: ACID transactions + schema enforcement + open format (Delta Lake/Iceberg) + query engine hiệu năng cao. Với 50TB cần cả BI lẫn ML: Lakehouse với Medallion architecture là optimal.",
       "deepDive": "Data Warehouse (Redshift, BigQuery, Snowflake): columnar storage, compute-storage separation, MPP query engine. Optimal cho structured analytics. Không hỗ trợ tốt unstructured data, ML training cần export raw. Data Lake (S3 + Hive Metastore): cheap storage, flexible format, nhưng không có ACID — concurrent writes gây corruption, no schema enforcement → data swamp. Data Lakehouse với Delta Lake: B-tree transaction log JSON → ACID (Atomicity/Consistency/Isolation/Durability), time travel (SELECT * AS OF VERSION AS OF 10), Z-ordering for data skipping. Apache Iceberg: open-source format, hidden partitioning, metadata tree (snapshot → manifest list → manifest file → data files). So sánh: Delta tích hợp sâu Spark/Databricks; Iceberg vendor-neutral, Snowflake/BigQuery cũng đọc được. Với 50TB: Bronze (raw S3/GCS, Delta) → Silver (cleaned, partitioned) → Gold (aggregated cho BI).",
@@ -102,7 +217,18 @@
     "question": "Các định dạng file lưu trữ Big Data: Parquet, ORC, Avro khác gì CSV/JSON về nén và tốc độ truy vấn?",
     "interviewerIntent": "Đánh giá hiểu biết về columnar storage — là kiến thức nền tảng của mọi Big Data pipeline.",
     "contextOrScenario": "Pipeline hiện tại lưu 500GB/ngày dạng JSON. Query Spark đang rất chậm và tốn kém trên BigQuery. Bạn sẽ optimize thế nào?",
-    "expectedKeywords": ["Parquet", "ORC", "Avro", "columnar", "row-based", "predicate pushdown", "dictionary encoding", "Snappy", "Zstandard", "projection pushdown"],
+    "expectedKeywords": [
+      "Parquet",
+      "ORC",
+      "Avro",
+      "columnar",
+      "row-based",
+      "predicate pushdown",
+      "dictionary encoding",
+      "Snappy",
+      "Zstandard",
+      "projection pushdown"
+    ],
     "seniorAnswer": {
       "summary": "CSV/JSON: row-based, không nén, không type-aware — tốt cho human-readable, tệ cho analytics. Parquet/ORC: columnar storage — chỉ đọc columns cần thiết (projection pushdown), filter tại storage level (predicate pushdown), nén 5-10x. Avro: row-based nhưng binary với schema evolution — tốt cho streaming (Kafka). Rule of thumb: batch analytics → Parquet; streaming/Kafka → Avro; Hive/ORC ecosystem → ORC.",
       "deepDive": "Columnar storage internals: data được group theo column, không theo row. Query 'SELECT sum(revenue) WHERE region=VN' chỉ đọc 2 columns thay vì toàn bộ row — I/O giảm 95%. Dictionary encoding: nếu cột có cardinality thấp (e.g., 'country' = 200 giá trị), mã hóa thành integer → nén tự nhiên. Run-Length Encoding (RLE): 'VN, VN, VN, US, US' → '(VN×3), (US×2)'. Parquet dùng hybrid: RLE + Bit Packing + Dictionary. Compression codec: Snappy (nén nhanh, ratio thấp) vs Zstandard (ratio cao hơn, được dùng trong production BigQuery). Predicate pushdown: Parquet lưu min/max statistics per row group — Spark đọc metadata để skip row groups không thỏa điều kiện. Bloom filter trong Parquet 2.0: O(1) lookup cho high-cardinality columns. CSV không có bất kỳ optimization nào này.",
@@ -126,7 +252,17 @@
     "question": "Apache Kafka là gì? Giải thích kiến trúc Topic, Partition, Consumer Group và cách đảm bảo thứ tự message?",
     "interviewerIntent": "Kiểm tra hiểu biết về distributed messaging — foundation của modern data streaming pipelines.",
     "contextOrScenario": "Bạn cần stream 1 triệu transaction events/giây từ payment service vào data lake mà không mất event nào.",
-    "expectedKeywords": ["Kafka", "topic", "partition", "consumer group", "offset", "replication factor", "partition key", "at-least-once", "exactly-once"],
+    "expectedKeywords": [
+      "Kafka",
+      "topic",
+      "partition",
+      "consumer group",
+      "offset",
+      "replication factor",
+      "partition key",
+      "at-least-once",
+      "exactly-once"
+    ],
     "seniorAnswer": {
       "summary": "Kafka là distributed event streaming platform. Topic = named stream of records, chia thành Partitions để parallelize. Consumer Group = nhóm consumer share load — mỗi partition chỉ được consume bởi 1 consumer trong group (exclusive assignment). Thứ tự message được đảm bảo within partition, không across partitions. Để đảm bảo thứ tự cho 1 entity (e.g., user_id), hash partition key.",
       "deepDive": "Kafka architecture: Leader-Follower replication per partition. Producer → Leader → Follower replication → ACK. `acks=all` đảm bảo message không mất khi leader fail (ISR - In-Sync Replicas). Offset management: consumer commit offset sau khi xử lý thành công → at-least-once delivery. Exactly-once với Kafka Transactions: idempotent producer (sequence number) + transactional consumer-produce. Consumer Group rebalancing: khi add/remove consumer → partition reassignment (Eager vs Cooperative Incremental rebalance). Partition count quyết định max parallelism — 1 consumer per partition. Performance: `linger.ms=10` để batch message, `compression.type=lz4` giảm bandwidth. Retention: message lưu theo time (7 ngày) hoặc size (1TB), không phải per-consume — cho phép replay.",
@@ -150,7 +286,17 @@
     "question": "Apache Airflow là gì? Giải thích DAG, Task, Operator và Scheduler hoạt động như thế nào?",
     "interviewerIntent": "Kiểm tra hiểu biết về workflow orchestration — công cụ cốt lõi của Data Engineer.",
     "contextOrScenario": "Bạn có 20 pipeline ETL chạy phụ thuộc nhau, một số chạy hàng giờ, một số hàng ngày. Làm sao quản lý và monitor chúng?",
-    "expectedKeywords": ["DAG", "Operator", "Scheduler", "Executor", "XCom", "task dependency", "trigger_rule", "backfill", "SLA"],
+    "expectedKeywords": [
+      "DAG",
+      "Operator",
+      "Scheduler",
+      "Executor",
+      "XCom",
+      "task dependency",
+      "trigger_rule",
+      "backfill",
+      "SLA"
+    ],
     "seniorAnswer": {
       "summary": "Airflow orchestrate pipelines dưới dạng DAG (Directed Acyclic Graph). DAG = tập hợp Tasks có thứ tự phụ thuộc, không có cycle. Operator = template cho task (PythonOperator, SparkSubmitOperator, PostgresOperator). Scheduler quét DAG files, tạo DAG Runs theo schedule, đẩy tasks vào Executor queue. Executor (Celery/K8s) thực thi tasks song song.",
       "deepDive": "Airflow architecture: Scheduler (parse DAGs, schedule), Webserver (UI), Executor (Celery/K8s Pod), Metadata DB (PostgreSQL — lưu DAG runs, task states). Scheduler loop: mỗi ~5s, check DAG files → tạo DagRun nếu đến schedule → check task dependencies → submit ready tasks vào queue. Task dependency: `task_a >> task_b` = task_b chờ task_a success. Trigger rules: `ALL_SUCCESS` (default), `ALL_FAILED`, `ONE_SUCCESS` — dùng ONE_SUCCESS cho notification task. XCom: truyền nhỏ data giữa tasks (không dùng cho large data — max 48KB trong Metadata DB). Dynamic DAGs: tạo tasks từ DB query → linh hoạt nhưng Scheduler phải re-parse mỗi lần. Backfill: chạy lại DAG cho date range cụ thể — phải idempotent. SLA Miss: alert khi task không hoàn thành trong thời gian quy định. CeleryExecutor vs KubernetesExecutor: Celery cần maintain worker pool (static), K8s spawn Pod per task (elastic nhưng overhead cold start).",
@@ -174,7 +320,18 @@
     "question": "Apache Spark là gì? Giải thích khái niệm RDD, DataFrame và Dataset? Tại sao DataFrame được ưu tiên hơn RDD?",
     "interviewerIntent": "Kiểm tra hiểu biết về cốt lõi Spark — công cụ xử lý dữ liệu phổ biến nhất trong data engineering.",
     "contextOrScenario": "Bạn có legacy Spark job dùng RDD API. Tech Lead yêu cầu rewrite sang DataFrame API. Tại sao?",
-    "expectedKeywords": ["RDD", "DataFrame", "Dataset", "Catalyst optimizer", "Tungsten", "lazy evaluation", "DAG", "shuffle", "partition", "schema"],
+    "expectedKeywords": [
+      "RDD",
+      "DataFrame",
+      "Dataset",
+      "Catalyst optimizer",
+      "Tungsten",
+      "lazy evaluation",
+      "DAG",
+      "shuffle",
+      "partition",
+      "schema"
+    ],
     "seniorAnswer": {
       "summary": "RDD (Resilient Distributed Dataset): low-level distributed collection, type-safe, không có schema, Spark không thể optimize. DataFrame: distributed table có schema, optimized bởi Catalyst query optimizer — như SQL table. Dataset: type-safe DataFrame (JVM only). DataFrame ưu tiên hơn RDD vì Catalyst optimizer generate optimal physical plan, Tungsten engine nén dữ liệu binary off-heap.",
       "deepDive": "RDD: fault-tolerant nhờ lineage graph (biết cách rebuild từ đầu nếu partition fail). Transformation (map, filter, flatMap) = lazy, Action (collect, count, save) = trigger execution. DataFrame: dùng Catalyst optimizer để generate logical plan → optimize → physical plan → code generation. Catalyst tree rules: predicate pushdown (filter sớm nhất), projection pruning, join reordering, constant folding. Tungsten: binary off-heap storage → tránh GC pressure, SIMD CPU operations. DataFrame 10-100x nhanh hơn RDD cho cùng workload vì optimization. Shuffle: expensive operation khi groupBy, join, repartition — data move across network. Shuffle spill: khi executor memory không đủ → write to disk → rất chậm. Broadcast join: nếu 1 bảng nhỏ (<= 10MB), Spark broadcast toàn bộ sang mỗi executor → tránh shuffle hoàn toàn.",
@@ -198,7 +355,16 @@
     "question": "Partition trong Apache Spark: Tại sao partition count quan trọng? Cách tính số partitions tối ưu?",
     "interviewerIntent": "Kiểm tra kiến thức sâu về Spark parallelism — key factor ảnh hưởng performance nhất.",
     "contextOrScenario": "Spark job chạy mất 4 giờ trên 100GB data với 200 executor cores. YARN UI cho thấy 80% task < 1 giây, 20% task > 10 phút.",
-    "expectedKeywords": ["partition", "parallelism", "shuffle partition", "repartition", "coalesce", "data skew", "spark.sql.shuffle.partitions", "AQE"],
+    "expectedKeywords": [
+      "partition",
+      "parallelism",
+      "shuffle partition",
+      "repartition",
+      "coalesce",
+      "data skew",
+      "spark.sql.shuffle.partitions",
+      "AQE"
+    ],
     "seniorAnswer": {
       "summary": "Partition = unit of parallelism trong Spark. Quá ít partition → underutilize CPU, task quá lớn OOM. Quá nhiều partition → scheduling overhead, nhiều small tasks. Rule: target 128-256MB per partition. Với shuffle, mặc định 200 partitions (spark.sql.shuffle.partitions) — quá ít nếu data lớn. Symptom mô tả (80% task nhanh, 20% chậm) là data skew — 1 partition key có quá nhiều data.",
       "deepDive": "Input partition: Spark đọc HDFS/S3 tạo 1 partition per HDFS block (128MB default). Nhiều small files = nhiều tiny partition → overhead. Shuffle partition: sau groupBy/join, data redistribute theo hash(key) % shuffle_partition_count. Data skew: nếu 'user_id=null' chiếm 30% data → 1 partition nhận 30% load. Giải pháp skew: (1) Filter null trước join, process riêng. (2) Salting: thêm random suffix vào key → phân tán. (3) Spark 3.x AQE: tự detect skew partition và split. Optimal partition count: target_partition_size = 128MB, n_partitions = total_data_size_mb / 128. Với 100GB = 100,000MB: n = 100,000/128 ≈ 800 partitions. 200 cores → mỗi core xử lý 4 tasks tuần tự. Coalesce vs Repartition: coalesce giảm partition không shuffle (nhưng có thể không đều), repartition full shuffle đảm bảo đều.",
@@ -222,7 +388,16 @@
     "question": "Airflow XCom và Task Dependencies nâng cao: Cách truyền data giữa tasks và xử lý conditional branching?",
     "interviewerIntent": "Đánh giá kỹ năng thiết kế DAG phức tạp với conditional logic và data flow giữa tasks.",
     "contextOrScenario": "Pipeline cần: extract → validate (nếu fail → alert và stop, nếu pass → transform) → load → notify. Triển khai thế nào?",
-    "expectedKeywords": ["XCom", "push", "pull", "BranchPythonOperator", "trigger_rule", "TaskGroup", "DagRun", "dynamic task mapping"],
+    "expectedKeywords": [
+      "XCom",
+      "push",
+      "pull",
+      "BranchPythonOperator",
+      "trigger_rule",
+      "TaskGroup",
+      "DagRun",
+      "dynamic task mapping"
+    ],
     "seniorAnswer": {
       "summary": "XCom (Cross-communication): mechanism để task push/pull small values (string, dict, int) qua Airflow Metadata DB. Giới hạn ~48KB (SQLite) hoặc 1GB (PostgreSQL LOB). Không dùng XCom cho DataFrames — lưu S3 và truyền S3 path. BranchPythonOperator: return task_id string để quyết định nhánh chạy tiếp. Trigger rule ALL_DONE trên notify task để chạy dù branch nào.",
       "deepDive": "XCom storage: Airflow 2.x lưu XCom trong XCOM table của Metadata DB. Với PostgreSQL, có thể lưu binary LOB lên đến 1GB nhưng không nên. Best practice: task return S3 path (string nhỏ), downstream task đọc S3. TaskFlow API (@task decorator): automatically push return value vào XCom và pull argument từ XCom — code clean hơn nhiều. BranchPythonOperator: downstream tasks không được branch phải có trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS hoặc TriggerRule.ALL_DONE để không bị skip. Dynamic Task Mapping (Airflow 2.3+): tạo N tasks từ list — thay thế cho dynamic DAG generation. Sensor: task block và poll cho đến khi condition thỏa (S3KeySensor, ExternalTaskSensor). Timeout sensor với poke_interval và timeout để tránh slot leak.",
@@ -246,7 +421,16 @@
     "question": "Thiết kế một data pipeline idempotent: Tại sao idempotency quan trọng? Kỹ thuật đảm bảo idempotency là gì?",
     "interviewerIntent": "Đánh giá khả năng thiết kế pipeline production-grade có thể retry an toàn — critical skill của senior DE.",
     "contextOrScenario": "Pipeline của bạn fail ở bước load sau khi đã transform xong. Khi retry, làm sao đảm bảo data không bị duplicate?",
-    "expectedKeywords": ["idempotent", "MERGE UPSERT", "partition overwrite", "unique key", "Delta MERGE", "deduplication", "exactly-once", "checkpointing"],
+    "expectedKeywords": [
+      "idempotent",
+      "MERGE UPSERT",
+      "partition overwrite",
+      "unique key",
+      "Delta MERGE",
+      "deduplication",
+      "exactly-once",
+      "checkpointing"
+    ],
     "seniorAnswer": {
       "summary": "Idempotent pipeline: chạy N lần với cùng input cho cùng kết quả — an toàn để retry và backfill. Không idempotent: mỗi retry insert thêm rows → duplicate data. Kỹ thuật: (1) INSERT OVERWRITE partition thay vì INSERT APPEND. (2) MERGE/UPSERT với unique key. (3) Deduplication bằng window function trước write. (4) Spark Structured Streaming checkpointing.",
       "deepDive": "Non-idempotent pipeline: append data vào table, retry → duplicate. Kỹ thuật đảm bảo: (1) Partition overwrite: `INSERT OVERWRITE PARTITION(date='2024-01-15')` — tự nhiên idempotent, overwrite toàn bộ partition. (2) Delta MERGE: match trên surrogate key, update nếu tồn tại, insert nếu chưa — O(N log N) với Z-order. (3) Write-then-rename (atomic rename): write to temp location, rename là atomic operation trên HDFS/GCS. (4) Idempotency token: lưu (dag_run_id, task_id, record_id) → skip nếu đã tồn tại. (5) Structured Streaming checkpoint: lưu offset → resume từ chỗ dừng. Trade-off: MERGE expensive hơn INSERT (scan target table để match). Partition overwrite nhanh nhưng xóa toàn bộ partition — không phù hợp nếu partition được write bởi nhiều pipelines.",
@@ -270,7 +454,18 @@
     "question": "dbt (data build tool) là gì? Models, Tests, Sources, Seeds và Snapshots trong dbt hoạt động thế nào?",
     "interviewerIntent": "Kiểm tra thực hành với dbt — analytics engineering standard tool.",
     "contextOrScenario": "Team data analyst muốn self-serve transform data mà không cần DE viết Spark job cho mỗi yêu cầu. Giải pháp là gì?",
-    "expectedKeywords": ["dbt", "model", "test", "source", "snapshot", "SCD Type 2", "ref", "lineage", "materialization", "jinja"],
+    "expectedKeywords": [
+      "dbt",
+      "model",
+      "test",
+      "source",
+      "snapshot",
+      "SCD Type 2",
+      "ref",
+      "lineage",
+      "materialization",
+      "jinja"
+    ],
     "seniorAnswer": {
       "summary": "dbt là transformation layer của ELT stack — compile SQL models thành DDL/DML chạy trong DWH. Model = SQL file sinh ra view/table. Source = khai báo raw table ngoài dbt quản lý. Test = assertions (not_null, unique, accepted_values). Snapshot = SCD Type 2 tracking. Dùng `ref()` để build DAG lineage tự động. dbt giúp analyst self-serve transformation với SQL, version control, CI/CD.",
       "deepDive": "dbt compilation: Jinja template → SQL → DDL trong DWH. `{{ ref('stg_orders') }}` resolve thành schema-qualified table name theo target environment. Materialization strategies: view (không lưu data, query cost mỗi lần), table (lưu data, query nhanh), incremental (chỉ process new data), ephemeral (CTE, không tạo object trong DWH). dbt test: generic tests (unique, not_null, accepted_values, relationships) và singular tests (custom SQL assertions). dbt docs generate: tự động build data catalog từ schema.yml + model SQL. Snapshot (SCD Type 2): dbt thêm dbt_valid_from, dbt_valid_to, dbt_scd_id — track historical changes. dbt Cloud: managed scheduling, CI/CD, Slim CI (chỉ test models bị changed). Package ecosystem: dbt_utils (utility macros), dbt_expectations (Great Expectations port).",
@@ -294,7 +489,17 @@
     "question": "Data Quality trong pipelines: Great Expectations và các chiến lược kiểm tra chất lượng dữ liệu trong production?",
     "interviewerIntent": "Đánh giá khả năng implement data quality gates — ngăn chặn garbage data đi vào downstream.",
     "contextOrScenario": "ML model của bạn bắt đầu đưa ra prediction sai. Root cause: upstream pipeline load data với 15% null values trong feature columns. Làm sao phòng tránh lần sau?",
-    "expectedKeywords": ["Great Expectations", "expectation", "validation", "data contract", "anomaly detection", "SLA", "data freshness", "Monte Carlo", "dbt test"],
+    "expectedKeywords": [
+      "Great Expectations",
+      "expectation",
+      "validation",
+      "data contract",
+      "anomaly detection",
+      "SLA",
+      "data freshness",
+      "Monte Carlo",
+      "dbt test"
+    ],
     "seniorAnswer": {
       "summary": "Data Quality đảm bảo data đúng (correctness), đầy đủ (completeness), kịp thời (freshness), nhất quán (consistency). Great Expectations: framework define 'expectations' (assertions về data), validate và generate HTML reports. Trong pipeline: validate tại ingestion point (fail fast) và tại DWH layer trước khi downstream consume. Data Contract: formal agreement về schema và quality giữa producer và consumer.",
       "deepDive": "Great Expectations architecture: Expectation Suite → Checkpoint → Data Docs. Expectation Suite: tập assertions (expect_column_values_to_not_be_null, expect_column_mean_to_be_between). Profiling: auto-generate expectation suite từ sample data (95% confidence intervals). Checkpoint: kết nối expectation suite với data source, trigger validation, publish results. Integration với Airflow: chạy GE checkpoint như một task, fail DAG nếu validation fail. Data Contract (emerging pattern): OpenAPI-style schema definition giữa teams. Serde contract: Avro schema registry enforce schema tại Kafka producer/consumer level. Statistical anomaly detection: so sánh metrics (mean, stddev, null rate) với historical baseline — Z-score hoặc IQR. Monte Carlo, Anomalo: commercial data observability platforms. dbt tests: complement GE — test tại SQL transform level. Trade-off: GE tests tốn compute (scan data), cần sample testing cho petabyte-scale.",
@@ -318,7 +523,17 @@
     "question": "Slowly Changing Dimensions (SCD): Các Type 1, 2, 3 khác nhau thế nào? Implement SCD Type 2 trong data warehouse?",
     "interviewerIntent": "Kiểm tra kiến thức về dimensional modeling — core concept của data warehousing.",
     "contextOrScenario": "Bảng dim_customer cần track lịch sử thay đổi địa chỉ và segment của customer. Chọn SCD type nào?",
-    "expectedKeywords": ["SCD Type 1", "SCD Type 2", "SCD Type 3", "surrogate key", "effective_date", "expiry_date", "is_current", "MERGE", "dbt snapshot"],
+    "expectedKeywords": [
+      "SCD Type 1",
+      "SCD Type 2",
+      "SCD Type 3",
+      "surrogate key",
+      "effective_date",
+      "expiry_date",
+      "is_current",
+      "MERGE",
+      "dbt snapshot"
+    ],
     "seniorAnswer": {
       "summary": "SCD Type 1: overwrite — không giữ lịch sử, đơn giản nhất. SCD Type 2: thêm row mới với surrogate key khác, đánh dấu row cũ expired — giữ toàn bộ lịch sử, phức tạp nhất. SCD Type 3: thêm column 'previous_value' — giữ 1 version trước. Với yêu cầu track lịch sử địa chỉ và segment: SCD Type 2 là lựa chọn đúng vì cần join facts với dimension tại điểm thời gian giao dịch.",
       "deepDive": "SCD Type 2 internals: mỗi customer có nhiều rows, phân biệt bởi surrogate_key (UUID/sequence). Natural key (customer_id) vẫn giữ nguyên. Columns cần thiết: surrogate_key (PK), natural_key, attribute columns, effective_date, expiry_date (NULL = current), is_current (boolean). Khi customer update address: MERGE — close current row (set expiry_date = now, is_current = false), insert new row (effective_date = now, expiry_date = NULL, is_current = true). Query tại point-in-time: WHERE transaction_date BETWEEN effective_date AND COALESCE(expiry_date, '9999-12-31'). Performance: index trên (natural_key, is_current) cho lookup current record, index trên (natural_key, effective_date, expiry_date) cho point-in-time. dbt snapshot automates SCD Type 2 với `check` strategy. Late arriving dimension changes: nếu transaction arrive trước dimension change, có thể cần correction logic.",
@@ -342,7 +557,18 @@
     "question": "Data Lineage là gì? Cách implement và tầm quan trọng trong compliance (GDPR, CCPA)?",
     "interviewerIntent": "Đánh giá hiểu biết về metadata management và audit trail — quan trọng trong enterprise data governance.",
     "contextOrScenario": "DPO (Data Protection Officer) yêu cầu: 'Dữ liệu PII của user X đang ở đâu trong hệ thống của chúng ta?' Bạn trả lời thế nào?",
-    "expectedKeywords": ["data lineage", "OpenLineage", "Marquez", "data catalog", "Amundsen", "DataHub", "GDPR", "right to erasure", "PII", "metadata"],
+    "expectedKeywords": [
+      "data lineage",
+      "OpenLineage",
+      "Marquez",
+      "data catalog",
+      "Amundsen",
+      "DataHub",
+      "GDPR",
+      "right to erasure",
+      "PII",
+      "metadata"
+    ],
     "seniorAnswer": {
       "summary": "Data Lineage = khả năng trace nguồn gốc và hành trình của data từ source → transformations → destinations. Quan trọng cho: impact analysis (thay đổi upstream ảnh hưởng downstream nào?), root cause analysis (data sai từ đâu?), GDPR compliance (right to erasure — xóa PII ở mọi nơi nó tồn tại). OpenLineage là open standard, Marquez/DataHub là lineage catalog.",
       "deepDive": "Column-level lineage: trace không chỉ table mà từng column — biết `revenue` trong gold table được tính từ `amount * fx_rate` từ tables nào. dbt: tự generate lineage graph qua `ref()` và `source()` — expose qua dbt docs. OpenLineage: Airflow 2.x tích hợp native, emit lineage events khi task chạy. DataHub: ingest metadata từ dbt, Airflow, Kafka, Spark — build unified catalog. GDPR right to erasure: cần biết PII tồn tại ở Bronze/Silver/Gold layers, snapshots, backup. Không có lineage = phải manual scan toàn bộ database. PII tagging trong schema: tag column `email`, `phone` trong data catalog → tự động detect khi moving. Data masking: PII columns trong non-prod → mask hoặc tokenize (format-preserving encryption). Pseudonymization: thay thế PII bằng surrogate ID, lưu mapping riêng biệt có access control.",
@@ -366,7 +592,18 @@
     "question": "Thiết kế một Batch Data Pipeline hoàn chỉnh: Từ ingestion đến serving, xử lý lỗi và monitoring?",
     "interviewerIntent": "Đánh giá tư duy system design cho data pipeline — thách thức thực tế trong production.",
     "contextOrScenario": "Thiết kế pipeline daily batch: ingest 50GB từ 5 nguồn khác nhau, transform, load vào BigQuery, phục vụ BI dashboard. SLA: data sẵn sàng trước 7AM.",
-    "expectedKeywords": ["ingestion", "Airflow", "Spark", "BigQuery", "Medallion", "SLA", "monitoring", "alerting", "retry", "dead letter queue"],
+    "expectedKeywords": [
+      "ingestion",
+      "Airflow",
+      "Spark",
+      "BigQuery",
+      "Medallion",
+      "SLA",
+      "monitoring",
+      "alerting",
+      "retry",
+      "dead letter queue"
+    ],
     "seniorAnswer": {
       "summary": "Pipeline architecture: Source → Ingest (Airbyte/custom) → Bronze (S3/GCS) → Spark Transform → Silver → dbt → Gold (BigQuery) → Looker. Orchestration: Airflow DAG với SLA và retry. Monitoring: Datadog/Prometheus metrics, Slack alerts on failure. Error handling: dead letter queue cho bad records, circuit breaker cho source down.",
       "deepDive": "Ingestion layer: Airbyte cho standard connectors (Postgres, Salesforce), custom Python cho proprietary APIs. Idempotent design: partition by date, overwrite. Bronze: raw files S3 Parquet, partition by source/date. Spark Silver: schema validation, deduplication, PII masking, data quality checks (GE). Gold (dbt): business logic SQL, test assertions. BigQuery: partitioned tables (date), clustered by high-cardinality join columns. Monitoring: (1) Pipeline health — DAG run duration P90, task failure rate. (2) Data freshness — alert nếu Gold table không update sau 6AM. (3) Data quality — row count anomaly (< 80% of 7-day average). (4) Cost — BigQuery slot usage, S3 storage growth. Incident response: PagerDuty for P1 (SLA breach), Slack for P2. Runbook: auto-retry 3 times → manual intervention. Dead letter: records failing validation → DLQ S3 prefix → manual review → correct → replay.",
@@ -390,7 +627,17 @@
     "question": "Kafka Schema Registry là gì? Avro, Protobuf trong event streaming? Tại sao cần Schema Registry?",
     "interviewerIntent": "Kiểm tra hiểu biết về schema management trong event-driven architectures — critical để tránh breaking changes.",
     "contextOrScenario": "Producer team đổi tên field `amount` thành `total_amount` trong JSON event. Tất cả consumer downstream bị crash. Làm sao phòng tránh?",
-    "expectedKeywords": ["Schema Registry", "Avro", "Protobuf", "backward compatibility", "forward compatibility", "schema evolution", "Confluent", "subject", "magic byte"],
+    "expectedKeywords": [
+      "Schema Registry",
+      "Avro",
+      "Protobuf",
+      "backward compatibility",
+      "forward compatibility",
+      "schema evolution",
+      "Confluent",
+      "subject",
+      "magic byte"
+    ],
     "seniorAnswer": {
       "summary": "Schema Registry: centralized service lưu và validate schemas cho Kafka messages. Producer serialize với schema, gửi schema ID (4 bytes) kèm message. Consumer deserialize bằng schema ID — không cần biết full schema mỗi message. Schema evolution rules: BACKWARD (consumer mới đọc được message cũ), FORWARD (consumer cũ đọc được message mới). Giải pháp: dùng Avro với Schema Registry, enforce compatibility rules trước deploy.",
       "deepDive": "Avro wire format: [magic byte 0x00][schema_id int32][avro bytes]. Consumer lookup schema_id từ Registry → deserialize. Schema evolution compatibility: BACKWARD = add optional fields with defaults (consumer v2 đọc được message từ producer v1); FORWARD = remove optional fields (consumer v1 đọc được message từ producer v2); FULL = both BACKWARD và FORWARD. Protobuf: field numbers thay vì names → rename không breaking change (khác Avro). JSON Schema: flexible nhưng validation overhead, không có efficient binary serialization. Schema Registry prevents producer from publishing incompatible schema — fail at publish time, not at consume time. Subject naming: topic-value (per-topic), record-name (global reuse). Confluent Schema Registry: REST API, multiple formats (Avro/JSON/Protobuf), authentication, subject aliases.",
@@ -414,7 +661,17 @@
     "question": "Spark Structured Streaming: Thiết kế micro-batch pipeline từ Kafka đến Delta Lake với exactly-once semantics?",
     "interviewerIntent": "Đánh giá khả năng xây dựng near-real-time pipeline production-grade.",
     "contextOrScenario": "Bạn cần ingest payment events từ Kafka, process trong < 30 giây, và lưu vào Delta Lake cho real-time dashboard.",
-    "expectedKeywords": ["Structured Streaming", "micro-batch", "trigger", "checkpoint", "watermark", "exactly-once", "foreachBatch", "output mode", "stateful"],
+    "expectedKeywords": [
+      "Structured Streaming",
+      "micro-batch",
+      "trigger",
+      "checkpoint",
+      "watermark",
+      "exactly-once",
+      "foreachBatch",
+      "output mode",
+      "stateful"
+    ],
     "seniorAnswer": {
       "summary": "Spark Structured Streaming: continuous query trên streaming data, xử lý dưới dạng micro-batches. Checkpoint lưu offset Kafka → exactly-once với Delta Lake sink (idempotent write). Watermark xử lý late data — discard records đến trễ quá threshold. `foreachBatch` cho custom sink logic (Delta MERGE cho dedup). Trigger.ProcessingTime('30 seconds') = micro-batch mỗi 30s.",
       "deepDive": "Structured Streaming execution model: incremental query — Spark chỉ process records mới từ Kafka offset checkpoint. Checkpoint directory: lưu Kafka offsets + query metadata → restart từ đúng chỗ, không miss/duplicate. Exactly-once = idempotent sink + offset tracking. Output modes: append (chỉ add mới, không update), update (chỉ emit rows thay đổi), complete (toàn bộ result mỗi batch — chỉ dùng cho aggregation nhỏ). Stateful operations: groupBy + window (trạng thái lưu trong state store — RocksDB). Watermark: nếu watermark là 1 giờ, records đến muộn > 1 giờ bị discard. Late data threshold phải balance giữa correctness và latency. Delta sink: Structured Streaming native support, checkpointed write → exactly-once. foreachBatch: nhận DataFrame per micro-batch → custom MERGE logic → handle deduplication.",
@@ -438,7 +695,17 @@
     "question": "Thiết kế Feature Store cho Machine Learning: Vấn đề Training-Serving Skew và cách giải quyết?",
     "interviewerIntent": "Đánh giá khả năng thiết kế data infrastructure cho ML — bridge giữa Data Engineering và MLOps.",
     "contextOrScenario": "ML team complain: model train offline F1=0.92 nhưng online chỉ đạt F1=0.71. Root cause nghi ngờ là training-serving skew. Analyze và fix.",
-    "expectedKeywords": ["Feature Store", "training-serving skew", "online store", "offline store", "point-in-time correctness", "Feast", "Tecton", "feature drift", "backfill"],
+    "expectedKeywords": [
+      "Feature Store",
+      "training-serving skew",
+      "online store",
+      "offline store",
+      "point-in-time correctness",
+      "Feast",
+      "Tecton",
+      "feature drift",
+      "backfill"
+    ],
     "seniorAnswer": {
       "summary": "Training-serving skew: feature computation logic khác nhau giữa training (batch, Python/Spark) và serving (online, Go/Java). Feature Store giải quyết bằng cách centralize feature computation — 1 definition, dùng ở cả offline (training) và online (serving). Feast: offline store (Delta Lake/BigQuery) + online store (Redis) với point-in-time correct feature retrieval cho training.",
       "deepDive": "Root causes của training-serving skew: (1) Feature transform logic viết 2 lần (Python/Spark offline, REST service online) → subtle difference. (2) Preprocessing pipeline khác nhau (fillna strategy, scaling params). (3) Feature leakage: training dùng future data (sai timestamp join). (4) Schema drift: feature distribution thay đổi theo thời gian. Feature Store architecture: Feature Definition (Python) → compute → Offline Store (point-in-time correct historical values) → train. Realtime: event → compute → write Online Store (Redis) → serve. Point-in-time correct join: historical training data join feature values AS OF timestamp của training example — không dùng feature value sau event. Feast generate training dataset với `get_historical_features(entity_df, feature_views)` — automatically handles point-in-time join. Online serving: `get_online_features(entity_ids, feature_refs)` — < 10ms latency từ Redis. Feature monitoring: data distribution drift (KL divergence, PSI) giữa training set và serving window.",
@@ -462,7 +729,17 @@
     "question": "Lakehouse Transaction Log và ACID: Delta Lake transaction log hoạt động thế nào bên trong?",
     "interviewerIntent": "Đánh giá hiểu biết sâu về internals của Delta Lake — differentiator giữa senior và mid-level DE.",
     "contextOrScenario": "Concurrent Spark jobs đang write vào cùng Delta table, đôi khi bị conflict error. Giải thích nguyên nhân và cách Delta ACID hoạt động.",
-    "expectedKeywords": ["Delta Lake", "transaction log", "_delta_log", "optimistic concurrency", "checkpoint", "snapshot isolation", "time travel", "Write-Ahead Log", "MVCC"],
+    "expectedKeywords": [
+      "Delta Lake",
+      "transaction log",
+      "_delta_log",
+      "optimistic concurrency",
+      "checkpoint",
+      "snapshot isolation",
+      "time travel",
+      "Write-Ahead Log",
+      "MVCC"
+    ],
     "seniorAnswer": {
       "summary": "Delta Lake ACID thông qua Write-Ahead Log (WAL) JSON files trong `_delta_log/`. Mỗi write tạo 1 atomic JSON commit file (000000.json, 000001.json...). Optimistic concurrency control: multiple writers proceed concurrently, commit-time conflict detection — nếu 2 writers conflict (cùng sửa cùng partition), 1 thành công, 1 fail và retry. Checkpoint (Parquet) mỗi 10 commits để tránh đọc quá nhiều JSON files.",
       "deepDive": "Delta transaction log structure: `_delta_log/00000000000000000000.json` → chứa Add/Remove actions, metadata, commitInfo. Add action: path file Parquet mới, statistics (min/max per column), partition values. Remove action: đánh dấu file cũ không còn valid (logical delete). Snapshot = tập hợp tất cả Add actions chưa có Remove → current state của table. Time travel: đọc log đến version N → reconstruct snapshot tại version N. Optimistic concurrency: (1) Reader đọc snapshot version X. (2) Writer bắt đầu transaction. (3) Writer ghi data files vào S3. (4) Writer cố gắng commit version X+1 bằng cách write `_delta_log/X+1.json`. (5) Nếu X+1 đã tồn tại (concurrent writer đã commit) → conflict → retry với resolving logic. Isolation level: Serializable cho metadata operations, Snapshot Isolation cho reads. Checkpoint: mỗi 10 commits, Spark đọc tất cả JSON commits → aggregate → write Parquet checkpoint (compact). Sau đó, chỉ cần đọc checkpoint mới nhất + JSON files sau checkpoint.",
@@ -486,7 +763,18 @@
     "question": "Xử lý dòng dữ liệu với Apache Flink hoặc Spark Structured Streaming: Khái niệm Event Time, Processing Time và Watermarks?",
     "interviewerIntent": "Đánh giá kiến thức sâu về stream processing semantics — phân biệt senior DE với mid-level.",
     "contextOrScenario": "Dashboard fraud detection hiển thị số transaction mỗi phút bị sai vì mobile app đôi khi gửi events muộn 30 phút do network issue.",
-    "expectedKeywords": ["event time", "processing time", "watermark", "late data", "out-of-order", "window", "trigger", "allowedLateness", "Flink", "Structured Streaming"],
+    "expectedKeywords": [
+      "event time",
+      "processing time",
+      "watermark",
+      "late data",
+      "out-of-order",
+      "window",
+      "trigger",
+      "allowedLateness",
+      "Flink",
+      "Structured Streaming"
+    ],
     "seniorAnswer": {
       "summary": "Event Time: thời điểm event xảy ra thực tế (trong mobile app). Processing Time: thời điểm Spark/Flink nhận được event. Network delay → event đến muộn → Processing Time >> Event Time. Dùng Event Time cho correct windowed aggregation. Watermark: dấu mốc thời gian tối thiểu Spark tin là đã nhận đủ events — nếu watermark = now - 30min, window 14:00-14:01 finalize sau khi watermark pass 14:01. Trade-off: watermark lớn → late data đúng hơn nhưng latency cao hơn.",
       "deepDive": "Out-of-order events: event từ mobile arrive sau 30 phút vì offline. Nếu dùng Processing Time: window 14:00-14:01 chỉ có 80% events (20% arrive muộn) → wrong aggregation. Event Time + Watermark: Spark track max event_time seen - watermark_delay = watermark. Window closes chỉ khi watermark passes window_end. Late data after window close: `allowedLateness` (Flink) cho phép update window sau khi đã emit early result. Flink advantages over Spark Streaming: true continuous processing (không phải micro-batch), native event time support, more flexible late data handling. Spark Watermark: `.withWatermark('event_timestamp', '30 minutes')` → window `[14:00, 14:01)` finalize sau khi max(event_timestamp) > 14:31. Side output (Flink): route late events sang separate stream thay vì discard. Idle source problem: nếu 1 Kafka partition không có event → watermark không advance → other windows không close. Flink WatermarkStrategy.withIdleness() giải quyết.",
@@ -510,7 +798,16 @@
     "question": "Windowing trong Stream Processing: Phân biệt Tumbling Window, Sliding Window và Session Window.",
     "interviewerIntent": "Kiểm tra hiểu biết về stream aggregation patterns — critical knowledge cho real-time analytics.",
     "contextOrScenario": "Bạn cần: (1) Đếm transactions mỗi 5 phút không overlap. (2) Tính moving average 15 phút, update mỗi 5 phút. (3) Nhóm click events trong cùng user session. Window nào phù hợp từng yêu cầu?",
-    "expectedKeywords": ["tumbling window", "sliding window", "session window", "gap duration", "overlap", "event time", "state store", "late data"],
+    "expectedKeywords": [
+      "tumbling window",
+      "sliding window",
+      "session window",
+      "gap duration",
+      "overlap",
+      "event time",
+      "state store",
+      "late data"
+    ],
     "seniorAnswer": {
       "summary": "Tumbling Window: cố định size, không overlap — `[0-5min, 5-10min, ...]`. Sliding Window: cố định size nhưng advance theo step nhỏ hơn — `[0-15min, 5-20min, 10-25min]` (overlap). Session Window: dynamic size, đóng khi không có event trong gap duration — phù hợp user session. Cho 3 yêu cầu: (1) Tumbling 5min, (2) Sliding 15min/5min, (3) Session với gap=30min.",
       "deepDive": "Tumbling Window: mỗi event thuộc đúng 1 window. State per window: O(W) where W = window count. Sliding Window: mỗi event thuộc nhiều windows (15min window, slide 5min → mỗi event ở 3 windows). Memory: O(W * window_size/slide_step). Session Window: per-user state, gap-based merging — nếu 2 consecutive events cách nhau < gap, same session. Merge sessions: khi event arrives, check if it extends existing session or creates new one. State size: per user, không có bound (session có thể kéo dài vô tận nếu user active). Flink native: SessionWindows.withGap(Time.minutes(30)), EventTimeSessionWindows. Spark Structured Streaming: không support session window natively — phải implement với stateful flatMapGroupsWithState. Performance: Session window cần per-user state → stateful operation → RocksDB state store → disk I/O, checkpoint overhead.",
@@ -534,7 +831,16 @@
     "question": "Exactly-Once Semantics (EOS) trong Kafka và Flink: Hai giai đoạn commit (Two-phase commit) đảm bảo không mất và không trùng lặp dữ liệu ra sao?",
     "interviewerIntent": "Kiểm tra hiểu biết sâu về distributed transaction semantics — kiến thức phân biệt senior DE.",
     "contextOrScenario": "Pipeline: Kafka → Flink → Kafka sink. Producer bị crash giữa chừng. Làm sao đảm bảo không mất và không duplicate record?",
-    "expectedKeywords": ["exactly-once", "two-phase commit", "idempotent producer", "transactional API", "checkpoint", "TwoPhaseCommitSinkFunction", "KafkaSink", "Flink checkpoint"],
+    "expectedKeywords": [
+      "exactly-once",
+      "two-phase commit",
+      "idempotent producer",
+      "transactional API",
+      "checkpoint",
+      "TwoPhaseCommitSinkFunction",
+      "KafkaSink",
+      "Flink checkpoint"
+    ],
     "seniorAnswer": {
       "summary": "Kafka EOS = Idempotent Producer (sequence number) + Transactional API (atomic write across partitions). Flink + Kafka Exactly-Once = Flink Checkpoint + Two-Phase Commit (2PC): checkpoint trigger → Flink pause consumer, flush pre-commit to Kafka transaction → barrier complete → commit transaction. Nếu crash trước commit: transaction abort → Kafka consumer retry từ checkpoint offset → không duplicate.",
       "deepDive": "Idempotent Producer: producer sequence number per partition → broker detect và deduplicate retries. Enable with `enable.idempotence=true`. Transactional API: begin transaction → produce to multiple partitions → commit atomically OR abort. Consumer với `isolation.level=read_committed` chỉ đọc committed transactions. Flink 2PC với TwoPhaseCommitSinkFunction: (1) `beginTransaction()`: open Kafka transaction. (2) Normal processing: produce messages trong transaction (không visible đến consumers). (3) Checkpoint barrier: `preCommit()` → flush to Kafka, lưu transaction handle vào checkpoint state. (4) Checkpoint complete: `commit()` → commit Kafka transaction → messages visible. (5) If crash before commit: `recoverAndAbort()` → abort pending transactions → restart from checkpoint. Overhead: Kafka transactions have 1 transaction per checkpoint interval (default 1s) overhead. Exactly-once end-to-end: Kafka source (checkpoint offset) + Flink processing (stateful, checkpointed) + Kafka sink (transactional). Limitation: cannot guarantee exactly-once for external systems without transactional support.",
@@ -558,7 +864,18 @@
     "question": "Kiến trúc Medallion (Bronze - Silver - Gold) với Delta Lake / Apache Iceberg / Apache Hudi?",
     "interviewerIntent": "Đánh giá khả năng thiết kế Lakehouse architecture chuẩn production.",
     "contextOrScenario": "Công ty có 500TB dữ liệu từ 20 nguồn khác nhau. Thiết kế Medallion architecture để phục vụ cả real-time dashboard lẫn batch ML training.",
-    "expectedKeywords": ["Bronze", "Silver", "Gold", "Medallion", "Delta Lake", "Iceberg", "Hudi", "ACID", "schema evolution", "data quality"],
+    "expectedKeywords": [
+      "Bronze",
+      "Silver",
+      "Gold",
+      "Medallion",
+      "Delta Lake",
+      "Iceberg",
+      "Hudi",
+      "ACID",
+      "schema evolution",
+      "data quality"
+    ],
     "seniorAnswer": {
       "summary": "Medallion = 3-tier data quality pattern: Bronze (raw, immutable ingestion), Silver (cleaned, validated, deduplicated, conformed schema), Gold (business-aggregated, query-optimized cho BI/ML). Delta Lake/Iceberg/Hudi thêm ACID + schema evolution + time travel cho từng layer. Bronze không xóa data gốc, Silver apply quality rules, Gold denormalize để query nhanh nhất.",
       "deepDive": "Bronze Layer: raw data, gần như exact copy của source. Immutable append-only (hoặc insert-only). Schema-on-read. Partition by ingestion_date. Giữ 7-30 ngày rolling window (hoặc indefinitely cho audit/compliance). Silver Layer: schema enforcement, casting types, NULL handling, deduplication (surrogate key + MERGE), standardize timestamps (UTC), PII tokenization. Partition by event_date. Bronze → Silver SLA: < 30 min. Gold Layer: denormalized aggregates, pre-joined tables, ready for Looker/Tableau. OPTIMIZE + ZORDER cho BI query patterns. Vacuum Silver/Bronze thường xuyên. Table format comparison: Delta Lake (Databricks ecosystem, Spark-native), Apache Iceberg (open, multi-engine — Spark/Trino/Flink/Snowflake, hidden partitioning), Apache Hudi (Netflix, upsert-optimized, Merge-On-Read vs Copy-On-Write). Iceberg hidden partitioning: `PARTITIONED BY DAY(event_time)` — không cần đặt partition trong query, Iceberg tự prune. Hudi Merge-On-Read: writes faster (log files), reads merge on-the-fly (slower) — good for frequent updates.",
@@ -582,7 +899,17 @@
     "question": "Change Data Capture (CDC): Tích hợp Debezium với Kafka để bắt transaction log từ Postgres/MySQL đẩy vào Data Lake real-time?",
     "interviewerIntent": "Kiểm tra khả năng thiết kế real-time data sync từ OLTP sang analytics — rất phổ biến trong production.",
     "contextOrScenario": "Bạn cần sync real-time dữ liệu từ PostgreSQL production (1M writes/ngày) vào BigQuery để analysts có thể query data chỉ trễ 5 phút. Không được query trực tiếp production DB.",
-    "expectedKeywords": ["CDC", "Debezium", "WAL", "logical replication", "replication slot", "Kafka Connect", "outbox pattern", "at-least-once", "tombstone"],
+    "expectedKeywords": [
+      "CDC",
+      "Debezium",
+      "WAL",
+      "logical replication",
+      "replication slot",
+      "Kafka Connect",
+      "outbox pattern",
+      "at-least-once",
+      "tombstone"
+    ],
     "seniorAnswer": {
       "summary": "CDC: bắt data changes (INSERT/UPDATE/DELETE) bằng cách đọc database WAL (Write-Ahead Log) thay vì polling. Debezium connector đọc PostgreSQL replication slot → publish change events vào Kafka topics → Spark Structured Streaming hoặc Flink consume → write Delta Lake. Latency < 5s, không load production DB.",
       "deepDive": "PostgreSQL WAL (Write-Ahead Log): mọi transaction ghi vào WAL trước khi commit → disk durability. Logical Replication: Debezium tạo replication slot → PostgreSQL stream decoded WAL events. Debezium event format: `op` field ('c'=create, 'u'=update, 'd'=delete, 'r'=snapshot read), `before`/`after` payloads. DELETE event: after=null, before=old row. Kafka topic naming: `<server>.<schema>.<table>` (e.g., `mydb.public.orders`). Snapshot mode: khi connector mới start, full snapshot của existing data, sau đó switch to streaming. Replication slot accumulate WAL nếu consumer lag → disk full! Monitor slot lag cẩn thận. Outbox Pattern: thay vì đọc application tables, service ghi vào `outbox` table cùng transaction → Debezium bắt outbox events → đảm bảo transactional atomicity với event publishing. Idempotent consumer: Debezium at-least-once → consumer phải MERGE với primary key. Schema Registry với Debezium Avro converter → schemas auto-register.",
@@ -606,7 +933,18 @@
     "question": "Tối ưu hóa chi phí và hiệu năng lưu trữ trên Cloud Data Warehouse (Snowflake Micro-partitions, BigQuery slot management)?",
     "interviewerIntent": "Đánh giá kiến thức về cost optimization — critical khi cloud DWH bill lên đến $100K+/tháng.",
     "contextOrScenario": "BigQuery bill tháng này là $80,000 — 3x tháng trước. CEO hỏi tại sao. Bạn phân tích và optimize như thế nào?",
-    "expectedKeywords": ["BigQuery", "slot", "partition pruning", "clustering", "materialized view", "query cost", "INFORMATION_SCHEMA", "Snowflake", "micro-partition", "result cache"],
+    "expectedKeywords": [
+      "BigQuery",
+      "slot",
+      "partition pruning",
+      "clustering",
+      "materialized view",
+      "query cost",
+      "INFORMATION_SCHEMA",
+      "Snowflake",
+      "micro-partition",
+      "result cache"
+    ],
     "seniorAnswer": {
       "summary": "BigQuery charge theo TB scanned, không phải compute time. Tối ưu: (1) Partition tables (date/integer) → predicate pushdown giảm scanned TB. (2) Cluster by high-cardinality columns → data skipping. (3) Materialized Views cho heavy aggregations. (4) Query audit: tìm expensive queries trong INFORMATION_SCHEMA. Snowflake: suspend warehouse khi idle, caching (result cache, local disk cache), cluster keys.",
       "deepDive": "BigQuery pricing: $5/TB scanned (on-demand) hoặc flat-rate slots. Common cost drivers: SELECT * on large tables (scans all columns), no partition filter (full table scan), repeated expensive queries, Looker/BI tools without caching. Optimization arsenal: (1) Columnar projection: `SELECT col1, col2` thay vì `SELECT *` — cost proportional to columns. (2) Partition filter: `WHERE _PARTITIONDATE = '2024-01-15'` — BQ không charge rows pruned. (3) Clustering: BQ sắp xếp data theo cluster columns → block-level pruning for range filters. (4) Materialized Views: pre-compute heavy aggregations, auto-refresh, query rewrite. (5) BI Engine: in-memory acceleration cho Looker. (6) Reservation (slots): predictable cost. Snowflake micro-partition: automatic clustering, query optimizer prune micro-partitions based on metadata (min/max per column). Snowflake result cache: 24h TTL, exact same query → free. Local disk cache: warm cache từ previous execution — multi-cluster warehouse chia sẻ cache. Cost monitoring: BigQuery INFORMATION_SCHEMA.JOBS_BY_PROJECT để tìm top expensive queries, INFORMATION_SCHEMA.TABLE_STORAGE cho storage cost.",
@@ -630,7 +968,16 @@
     "question": "Backfill dữ liệu lịch sử trong Data Pipeline: Thiết kế pipeline idempotent để chạy lại dữ liệu 3 năm trước mà không ghi đè sai dữ liệu hiện tại?",
     "interviewerIntent": "Đánh giá khả năng handle backfill — một trong những operations phức tạp nhất trong data engineering.",
     "contextOrScenario": "Business logic trong Gold layer sai từ 6 tháng trước. Bạn cần recompute lại toàn bộ Gold table từ Silver, đồng thời pipeline daily vẫn đang chạy.",
-    "expectedKeywords": ["backfill", "idempotent", "partition overwrite", "Airflow backfill", "parallel backfill", "date range", "catchup", "dry run"],
+    "expectedKeywords": [
+      "backfill",
+      "idempotent",
+      "partition overwrite",
+      "Airflow backfill",
+      "parallel backfill",
+      "date range",
+      "catchup",
+      "dry run"
+    ],
     "seniorAnswer": {
       "summary": "Backfill = chạy lại pipeline cho historical date range. Challenges: (1) Pipeline phải idempotent (partition overwrite, MERGE). (2) Không conflict với daily pipeline đang chạy. (3) Cost control — không cần chạy toàn bộ 3 năm nếu chỉ 6 tháng sai. (4) Parallelization với throttling để không overload upstream. Strategy: Airflow backfill command với date range, hoặc Spark job với date range parameter, max_active_dag_runs để control.",
       "deepDive": "Airflow backfill: `airflow dags backfill -s 2024-01-01 -e 2024-06-30 daily_pipeline` — tạo DagRuns cho từng execution_date. Nguy hiểm nếu DAG không idempotent hoặc catchup logic sai. Spark backfill: pass date range parameter, đọc Silver partition range, compute Gold, write với `replaceWhere` theo date range. Parallel backfill: tạo nhiều Spark jobs cho mỗi month range → parallel execution → nhanh hơn 12x nhưng cần resource planning. Conflict với daily pipeline: (1) Pause daily pipeline → backfill → resume (downtime). (2) Separate Gold table prefix `gold_backfill_v2` → validate → swap atomic rename. (3) Feature flag: daily pipeline write vào `gold_current`, backfill vào `gold_backfill_v2`, swap khi done. Dry run: trước backfill, chạy 1 sample date → validate output. Cost estimate: 6 months × daily data size × compute cost/run. Rate limiting: 5 parallel backfill jobs thay vì 180 → đủ nhanh mà không overload cluster.",
@@ -654,7 +1001,17 @@
     "question": "Schema Evolution trong Big Data: Làm thế nào để thêm/bớt cột mà không làm gãy các downstream streaming pipelines?",
     "interviewerIntent": "Đánh giá khả năng quản lý schema changes trong distributed systems — thách thức thực tế khi nhiều teams phụ thuộc vào cùng data.",
     "contextOrScenario": "Product team muốn thêm column `discount_amount` vào event schema. 5 downstream pipelines đang consume từ Kafka. Làm sao deploy mà không downtime?",
-    "expectedKeywords": ["schema evolution", "backward compatible", "forward compatible", "Schema Registry", "Avro", "additive change", "Spark schema merge", "on_schema_change", "deprecation"],
+    "expectedKeywords": [
+      "schema evolution",
+      "backward compatible",
+      "forward compatible",
+      "Schema Registry",
+      "Avro",
+      "additive change",
+      "Spark schema merge",
+      "on_schema_change",
+      "deprecation"
+    ],
     "seniorAnswer": {
       "summary": "Schema evolution là critical challenge trong distributed data systems. Additive changes (add column with default) = backward compatible = safe. Breaking changes (rename/remove/change type) phải handle cẩn thận. Strategy: dùng Avro + Schema Registry để enforce compatibility. Add column với default value → consumers cũ ignore field → safe. Remove column: deprecate 6 months → notify all consumers → remove. Never rename — add new + deprecate old.",
       "deepDive": "Schema compatibility matrix: BACKWARD (consumer v2 đọc được data từ producer v1), FORWARD (consumer v1 đọc được data từ producer v2), FULL (both). Safe schema changes: add optional field với default value, remove optional field với default (BACKWARD). Unsafe: add required field without default, change field type (int→string), rename field without alias. Spark Delta schema evolution: `mergeSchema=true` trong write option → tự động add new columns. Structured Streaming: schema mismatch → job fail. On_schema_change='add_new_columns' (dbt) hoặc explicit schema casting. Multiple version support: maintain v1 and v2 Kafka topics simultaneously during migration. Consumer migration: (1) Deploy consumer code that handles both old and new schema. (2) Producer switches to new schema. (3) After all old messages consumed, clean up old handling code. Deprecation timeline: 3-6 months notice, emit metrics for deprecated field usage, then remove.",
@@ -678,7 +1035,18 @@
     "question": "Tối ưu hoá bộ nhớ Apache Spark: Cấu hình Driver/Executor memory, Off-heap memory và Garbage Collection tuning?",
     "interviewerIntent": "Kiểm tra khả năng debug và optimize Spark performance ở mức deep — phân biệt senior DE.",
     "contextOrScenario": "Spark job xử lý 1TB data bị OOM với 'GC overhead limit exceeded'. Executor có 8GB RAM. Phân tích và fix.",
-    "expectedKeywords": ["executor memory", "driver memory", "memory fraction", "storage fraction", "off-heap", "GC", "G1GC", "broadcast join", "spill", "memory overhead"],
+    "expectedKeywords": [
+      "executor memory",
+      "driver memory",
+      "memory fraction",
+      "storage fraction",
+      "off-heap",
+      "GC",
+      "G1GC",
+      "broadcast join",
+      "spill",
+      "memory overhead"
+    ],
     "seniorAnswer": {
       "summary": "Spark executor memory chia làm: Execution (shuffle, sort, join) và Storage (cache, broadcast). Mặc định 60% tổng. OOM causes: (1) Data skew — 1 partition quá lớn. (2) Large broadcast table. (3) Python UDF memory leak. (4) Insufficient memory overhead (container OOM trước JVM OOM). Fix: tăng executor memory, enable off-heap, giảm memory pressure bằng AQE + proper partition count.",
       "deepDive": "Spark Unified Memory Model (Spark 2.0+): `spark.executor.memory` (JVM heap) + `spark.executor.memoryOverhead` (container overhead, default 10%). Trong JVM heap: Reserved (300MB) + User Memory (1 - spark.memory.fraction) + Spark Memory (spark.memory.fraction = 0.6). Spark Memory: Storage (cache) 50% + Execution (sort/join/shuffle) 50% — dynamic sharing. OOM scenarios: (1) Execution OOM: join/sort task exceed memory → spill to disk → slow. Fix: increase executor memory hoặc reduce partition size. (2) Storage OOM: too much cache → evict execution → spill. Fix: reduce cache hoặc increase executor. (3) Driver OOM: collect() large dataset, broadcast large table. Fix: never collect() large data. GC tuning: G1GC default Spark 3.x. Large heap (> 32GB) → GC pause seconds. Fix: multiple smaller executors vs 1 large. Off-heap: `spark.memory.offHeap.enabled=true` — serialize objects natively, bypass GC. Python UDF: data serializes/deserializes Python ↔ JVM via Pickle → overhead. Prefer Pandas UDF (Arrow) hoặc native Spark functions.",
@@ -702,7 +1070,18 @@
     "question": "Xây dựng Real-time Feature Store cho Machine Learning (như Feast): Kết nối luồng dữ liệu online (Redis) và offline (Data Lake)?",
     "interviewerIntent": "Kiểm tra khả năng architect data infrastructure phức tạp kết nối streaming và batch — advanced DE + MLOps.",
     "contextOrScenario": "Fraud detection model cần features real-time: user spending trong 5 phút qua, 1 giờ qua, 24 giờ qua. Latency < 20ms. Thiết kế data pipeline.",
-    "expectedKeywords": ["Feature Store", "Redis", "online store", "offline store", "Flink", "feature pipeline", "materialization", "point-in-time", "feature freshness", "TTL"],
+    "expectedKeywords": [
+      "Feature Store",
+      "Redis",
+      "online store",
+      "offline store",
+      "Flink",
+      "feature pipeline",
+      "materialization",
+      "point-in-time",
+      "feature freshness",
+      "TTL"
+    ],
     "seniorAnswer": {
       "summary": "Real-time Feature Store = Online Store (Redis: < 10ms lookup) + Offline Store (Delta Lake: training data). Streaming feature pipeline: Kafka → Flink → compute rolling aggregations (5min, 1h, 24h) → write Redis (online) và Delta Lake (offline point-in-time snapshot). Training: read offline store với point-in-time correct join. Serving: model gọi Redis để get features < 20ms.",
       "deepDive": "Architecture: Event (Kafka) → Flink Stateful Stream Processing → compute window features → dual write: Redis (online, TTL=25h) + Delta Lake (offline, append-only snapshots every 5min). Redis data model: Hash per entity. Key = `feature:user_stats:{user_id}`, field = `spend_5m`, `spend_1h`, `spend_24h`. TTL = max window + buffer (25h). Flink stateful aggregation: per-user state (RocksDB) maintain rolling windows. ValueState cho 24h sliding window — append new events, expire old events > 24h. Dual write atomicity: not possible across Redis + Delta — accept eventual consistency with TTL guard. Online serving: `HGETALL feature:user_stats:{user_id}` → sub-millisecond. Batch offline read: Feast get_historical_features() với entity_df + feature_refs → automatically point-in-time join from Delta Lake. Feature freshness SLA: Redis updated < 5s after event (Flink processing lag). Monitor: track lag between Kafka event_time và Redis write_time. Cold start: new user → no Redis key → fallback to global average features.",

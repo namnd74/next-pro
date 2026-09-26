@@ -172,7 +172,13 @@
       "summary": "Activity Lifecycle là tập hợp các trạng thái mà một Activity trải qua từ khi khởi tạo đến khi bị hủy bởi hệ thống hoặc người dùng. Các cặp callback đối ứng đại diện cho từng tầng hiển thị: Khởi tạo/Hủy toàn bộ (`onCreate` - `onDestroy`), Hiển thị với người dùng (`onStart` - `onStop`), và Có tương tác tiêu điểm Focus (`onResume` - `onPause`).",
       "deepDive": "Chi tiết từng giai đoạn:\n1. `onCreate()`: Khởi tạo view, tiêm phụ thuộc DI (Hilt), lắng nghe ViewModel. Chỉ chạy 1 lần khi activity được cấp phát.\n2. `onStart()`: Activity hiển thị trên màn hình nhưng chưa có tiêu điểm tương tác. Cặp với `onStop()`: Bắt đầu/dừng kết nối UI (như camera preview hoặc GPS tracking nhẹ).\n3. `onResume()`: Activity nổi lên trên cùng (foreground) và nhận touch/input events. Cặp với `onPause()`: Dừng animation, giải phóng cảm biến nặng hoặc dừng âm thanh.\n4. `onStop()`: Activity bị che khuất hoàn toàn (app vào background hoặc mở Activity khác). Quá trình giải phóng bộ nhớ lớn nên diễn ra ở đây.\n5. `onDestroy()`: Activity bị hủy hoàn toàn do user bấm Back/finish() hoặc do Configuration Change. Cần hủy các listener, RxJava disposable để chống leak.\nHiện đại hóa: Senior không viết logic giải phóng thủ công rải rác trong Activity, mà sử dụng `DefaultLifecycleObserver` gắn vào `lifecycleOwner` để đạt tính đóng gói cao.",
       "codeLanguage": "kotlin",
-      "codeExample": "import androidx.activity.ComponentActivity\nimport androidx.lifecycle.DefaultLifecycleObserver\nimport androidx.lifecycle.LifecycleOwner\nimport android.os.Bundle\n\nclass LocationTrackingObserver : DefaultLifecycleObserver {\n    override fun onStart(owner: LifecycleOwner) {\n        // Bắt đầu lắng nghe vị trí khi UI hiển thị\n    }\n\n    override fun onStop(owner: LifecycleOwner) {\n        // Tự động ngắt kết nối khi Activity bị che khuất để tiết kiệm pin\n    }\n}\n\nclass MainActivity : ComponentActivity() {\n    private val locationObserver = LocationTrackingObserver()\n\n    override fun onCreate(savedInstanceState: Bundle?) {\n        super.onCreate(savedInstanceState)\n        // Đăng ký lifecycle-aware component theo chuẩn Jetpack\n        lifecycle.addObserver(locationObserver)\n    }\n}"
+      "codeExample": "import androidx.activity.ComponentActivity\nimport androidx.lifecycle.DefaultLifecycleObserver\nimport androidx.lifecycle.LifecycleOwner\nimport android.os.Bundle\n\nclass LocationTrackingObserver : DefaultLifecycleObserver {\n    override fun onStart(owner: LifecycleOwner) {\n        // Bắt đầu lắng nghe vị trí khi UI hiển thị\n    }\n\n    override fun onStop(owner: LifecycleOwner) {\n        // Tự động ngắt kết nối khi Activity bị che khuất để tiết kiệm pin\n    }\n}\n\nclass MainActivity : ComponentActivity() {\n    private val locationObserver = LocationTrackingObserver()\n\n    override fun onCreate(savedInstanceState: Bundle?) {\n        super.onCreate(savedInstanceState)\n        // Đăng ký lifecycle-aware component theo chuẩn Jetpack\n        lifecycle.addObserver(locationObserver)\n    }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Máy Trạng Thái Vòng Đời Android Activity (Activity Lifecycle State Machine)",
+        "caption": "Sự chuyển dịch giữa các trạng thái khi người dùng mở app, chuyển app, nhận cuộc gọi và xoay màn hình",
+        "code": "stateDiagram-v2\n    [*] --> onCreate : Khởi tạo Activity / SetContentView\n    onCreate --> onStart : Activity hiển thị lên màn hình (Chưa tương tác được)\n    onStart --> onResume : Activity sẵn sàng tương tác với người dùng (In Focus)\n\n    onResume --> onPause : Bị che khuất một phần (Hộp thoại Dialog / Cuộc gọi đến)\n    onPause --> onResume : Người dùng quay lại ứng dụng\n    onPause --> onStop : Bị che khuất hoàn toàn (Chuyển sang app khác)\n\n    onStop --> onRestart : Người dùng mở lại app từ danh sách đa nhiệm\n    onRestart --> onStart\n\n    onStop --> onDestroy : Activity bị hủy vĩnh viễn (Bấm Back / finish() / Xoay màn hình)\n    onDestroy --> [*]"
+      }
     },
     "pitfalls": [
       "Khởi chạy các tác vụ async không gắn với lifecycle (như GlobalScope coroutine), dẫn đến leak Activity context khi màn hình xoay.",
@@ -326,7 +332,76 @@
       "summary": "Jetpack Compose là bộ công cụ (toolkit) hiện đại của Android dùng để xây dựng giao diện người dùng theo mô hình Declarative (Khai báo) thuần Kotlin. Thay vì quản lý trạng thái View thủ công qua findViewById, getters/setters và file XML rời rạc, Compose cho phép mô tả UI là một hàm nhận trạng thái (State) làm đầu vào: `UI = f(State)`. Khi State thay đổi, Compose tự động cập nhật lại các phần UI bị ảnh hưởng thông qua quá trình Recomposition.",
       "deepDive": "Ưu điểm vượt trội khiến Compose thay thế hoàn toàn XML:\n1. Loại bỏ phân mảnh mã nguồn: Viết 100% bằng Kotlin, loại bỏ sự cồng kềnh của XML, View Binding, Data Binding, và Custom Views kế thừa `ViewGroup` phức tạp.\n2. Tránh mất đồng bộ trạng thái (State Inconsistency): Trong XML View, trạng thái nằm rải rác bên trong chính View (ví dụ `checkbox.isChecked = true`). Trong Compose, UI hoàn toàn thụ động (Stateless), tuân thủ Unidirectional Data Flow (UDF).\n3. Hiệu năng & Tối ưu Recomposition: Compose compiler plugin phân tích AST code, sinh ra cấu trúc SlotTable quản lý vị trí và bỏ qua (skip) các Composable không có dữ liệu thay đổi, loại bỏ chi phí traverse và measure/layout nhiều vòng của View hierarchy cũ.",
       "codeLanguage": "kotlin",
-      "codeExample": "import androidx.compose.foundation.layout.Column\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.Text\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.getValue\nimport androidx.compose.runtime.mutableIntStateOf\nimport androidx.compose.runtime.remember\nimport androidx.compose.runtime.setValue\n\n// Trong Compose: UI phản ánh trực tiếp State hiện tại\n@Composable\nfun ClickCounterScreen() {\n    // State là Single Source of Truth\n    var count by remember { mutableIntStateOf(0) }\n\n    Column {\n        Text(text = \"Số lần bấm: $count\")\n        Button(onClick = { count++ }) {\n            Text(\"Tăng giá trị\")\n        }\n    }\n}"
+      "codeExample": "import androidx.compose.foundation.layout.Column\nimport androidx.compose.material3.Button\nimport androidx.compose.material3.Text\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.getValue\nimport androidx.compose.runtime.mutableIntStateOf\nimport androidx.compose.runtime.remember\nimport androidx.compose.runtime.setValue\n\n// Trong Compose: UI phản ánh trực tiếp State hiện tại\n@Composable\nfun ClickCounterScreen() {\n    // State là Single Source of Truth\n    var count by remember { mutableIntStateOf(0) }\n\n    Column {\n        Text(text = \"Số lần bấm: $count\")\n        Button(onClick = { count++ }) {\n            Text(\"Tăng giá trị\")\n        }\n    }\n}",
+      "benchmark": {
+        "title": "So Sánh: Jetpack Compose (Declarative) vs XML Layouts (Imperative)",
+        "caption": "Đánh giá tốc độ phát triển, số dòng mã boilerplate và hiệu năng render cây giao diện",
+        "options": [
+          {
+            "name": "Jetpack Compose",
+            "badge": "Chuẩn Android Hiện Đại",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tốc độ phát triển UI",
+                "value": 95,
+                "displayValue": "Nhanh gấp 2 lần",
+                "color": "emerald"
+              },
+              {
+                "label": "Lượng mã nguồn Boilerplate",
+                "value": 90,
+                "displayValue": "Giảm 60% code",
+                "color": "emerald"
+              },
+              {
+                "label": "Tối ưu Recomposition",
+                "value": 92,
+                "displayValue": "Chỉ vẽ lại node đổi state",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "100% bằng Kotlin, không cần chuyển đổi qua lại giữa XML và Java/Kotlin",
+              "Tự động đồng bộ UI với State, loại bỏ hoàn toàn findViewById và ViewBinding"
+            ],
+            "cons": [
+              "Cần hiểu sâu về Recomposition để tránh recompose thừa các hàm Composable"
+            ]
+          },
+          {
+            "name": "Traditional XML Layouts",
+            "badge": "Legacy System",
+            "metrics": [
+              {
+                "label": "Tốc độ phát triển UI",
+                "value": 45,
+                "displayValue": "Tốn thời gian nối ID",
+                "color": "rose"
+              },
+              {
+                "label": "Lượng mã nguồn Boilerplate",
+                "value": 30,
+                "displayValue": "Quá nhiều file XML",
+                "color": "rose"
+              },
+              {
+                "label": "Tối ưu Recomposition",
+                "value": 60,
+                "displayValue": "Thủ công qua View hierarchy",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Công cụ kéo thả Layout Preview trong Android Studio rất hoàn thiện cho người mới"
+            ],
+            "cons": [
+              "Dễ bị lỗi NullPointerException khi ánh xạ sai ID giữa XML và Kotlin",
+              "Cây View quá sâu gây lag giật khi đo đạc kích thước (onMeasure/onLayout pass)"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Mang tư duy mệnh lệnh từ View cũ vào Compose (ví dụ: cố gắng tìm một reference đến Composable để gọi hàm `update()`).",
@@ -1117,7 +1192,13 @@
       "summary": "MVVM (Model-View-ViewModel) là mẫu kiến trúc tách biệt ứng dụng thành 3 thành phần độc lập: **View** (Activity/Fragment/Composable - hiển thị UI và lắng nghe sự kiện người dùng), **ViewModel** (lưu trữ trạng thái UI, xử lý logic hiển thị và giao tiếp với tầng dữ liệu), và **Model** (Business Logic, Repository, Data Sources). Luồng dữ liệu tuân theo nguyên tắc bất đối xứng một chiều (UDF): View gửi User Events lên ViewModel; ViewModel xử lý và phát State bất biến xuống để View lắng nghe và vẽ lại.",
       "deepDive": "Trách nhiệm phân cấp chi tiết:\n1. View: Hoàn toàn 'ngu ngơ' (Dumb UI), không chứa bất kỳ business logic nào, chỉ làm nhiệm vụ observe State từ ViewModel và chuyển tiếp user click thành Intent/Action.\n2. ViewModel: Sống độc lập với UI lifecycle, không bao giờ import các class `android.view.*` hoặc giữ tham chiếu `Context` (để tránh memory leak). Chuyển đổi dữ liệu từ Repository thành `UiState` thích hợp cho View.\n3. Model: Đóng gói toàn bộ logic truy vấn dữ liệu từ Network, Room Database, DataStore thông qua Repository Pattern.\nLợi ích: Dễ dàng viết Unit Test cho toàn bộ nghiệp vụ trong ViewModel trên JVM thuần túy mà không cần thiết bị giả lập Android (No Android dependencies).",
       "codeLanguage": "kotlin",
-      "codeExample": "import androidx.lifecycle.ViewModel\nimport androidx.lifecycle.viewModelScope\nimport kotlinx.coroutines.flow.*\nimport kotlinx.coroutines.launch\n\ndata class WalletUiState(val balance: Long = 0L, val isLoading: Boolean = false)\n\nclass WalletViewModel(private val repository: WalletRepository) : ViewModel() {\n    private val _uiState = MutableStateFlow(WalletUiState(isLoading = true))\n    val uiState: StateFlow<WalletUiState> = _uiState.asStateFlow()\n\n    init { fetchBalance() }\n\n    fun onDepositClicked(amount: Long) {\n        viewModelScope.launch {\n            _uiState.update { it.copy(isLoading = true) }\n            repository.deposit(amount)\n            fetchBalance()\n        }\n    }\n\n    private fun fetchBalance() {\n        viewModelScope.launch {\n            val balance = repository.getBalance()\n            _uiState.update { it.copy(balance = balance, isLoading = false) }\n        }\n    }\n}\ninterface WalletRepository { suspend fun getBalance(): Long; suspend fun deposit(amt: Long) }"
+      "codeExample": "import androidx.lifecycle.ViewModel\nimport androidx.lifecycle.viewModelScope\nimport kotlinx.coroutines.flow.*\nimport kotlinx.coroutines.launch\n\ndata class WalletUiState(val balance: Long = 0L, val isLoading: Boolean = false)\n\nclass WalletViewModel(private val repository: WalletRepository) : ViewModel() {\n    private val _uiState = MutableStateFlow(WalletUiState(isLoading = true))\n    val uiState: StateFlow<WalletUiState> = _uiState.asStateFlow()\n\n    init { fetchBalance() }\n\n    fun onDepositClicked(amount: Long) {\n        viewModelScope.launch {\n            _uiState.update { it.copy(isLoading = true) }\n            repository.deposit(amount)\n            fetchBalance()\n        }\n    }\n\n    private fun fetchBalance() {\n        viewModelScope.launch {\n            val balance = repository.getBalance()\n            _uiState.update { it.copy(balance = balance, isLoading = false) }\n        }\n    }\n}\ninterface WalletRepository { suspend fun getBalance(): Long; suspend fun deposit(amt: Long) }",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Android Hiện Đại: MVVM + Unidirectional Data Flow (UDF)",
+        "caption": "Sự kiện người dùng đi lên (User Events Up), trạng thái luồng dữ liệu bất biến đi xuống (State Down)",
+        "code": "flowchart TD\n    subgraph UI [\"UI Layer (Jetpack Compose / Activity)\"]\n        View[\"Compose Screen (Thuần túy hiển thị)\"]\n    end\n\n    subgraph VM [\"ViewModel Layer\"]\n        ViewModel[\"MainViewModel (Sống sót qua Configuration Change / Xoay màn hình)\"]\n        State[\"uiState: StateFlow<UiState>\"]\n    end\n\n    subgraph Data [\"Data Layer (Repository Pattern)\"]\n        Repo[\"UserRepository (Single Source of Truth)\"]\n        Local[(\"Room Database (Offline-first Cache)\")]\n        Remote[\"Retrofit REST API (Network Data)\"]\n    end\n\n    View -->|\"1. User Events (Click, Input) gửi lên\"| ViewModel\n    ViewModel -->|\"2. Gọi hàm nghiệp vụ\"| Repo\n    Repo <===>|\"3. Đọc/Ghi dữ liệu offline\"| Local\n    Repo <===>|\"4. Fetch dữ liệu mới từ Server\"| Remote\n    Repo -->|\"5. Trả về Flow dữ liệu\"| ViewModel\n    ViewModel -->|\"6. State Down: Cập nhật StateFlow\"| State\n    State ===>|\"7. Render lại giao diện tự động\"| View"
+      }
     },
     "pitfalls": [
       "Đặt logic điều hướng (Navigation) hoặc hiển thị Toast/Dialog trực tiếp bên trong ViewModel bằng cách inject Activity Context.",

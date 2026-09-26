@@ -18,7 +18,42 @@
       "summary": "Lighthouse là công cụ mã nguồn mở tự động hóa của Google dùng để kiểm tra hiệu năng, khả năng tiếp cận (Accessibility), SEO và Best Practices của website trong môi trường giả lập (Lab Data). Để cải thiện điểm Performance: loại bỏ tài nguyên chặn render (CSS/JS), nén và chuyển định dạng ảnh sang WebP/AVIF, chia nhỏ bundle (Code Splitting), và tối ưu TTFB của server.",
       "deepDive": "Điểm Performance của Lighthouse là điểm số có trọng số tính từ các chỉ số đo lường: FCP (10%), SI (10%), LCP (25%), TBT (30%), và CLS (25%). Lighthouse đo trong môi trường Lab (mô phỏng CPU chậm gấp 4 lần và mạng 4G throttling), do đó điểm số có thể dao động giữa các lần chạy. Để tăng điểm bền vững: 1) Giảm Total Blocking Time (TBT) bằng cách cắt nhỏ các Long Task JavaScript; 2) Tối ưu Largest Contentful Paint (LCP) bằng cách nén ảnh banner chính và preload; 3) Loại bỏ CLS bằng cách set cố định kích thước ảnh/banner quảng cáo; 4) Sử dụng HTTP caching lâu dài cho static assets.",
       "codeExample": "// next.config.js - Cấu hình tối ưu hóa tự động tăng điểm Lighthouse\n/** @type {import('next').NextConfig} */\nconst nextConfig = {\n  compress: true, // Kích hoạt nén Gzip/Brotli cho static text và HTML\n  images: {\n    formats: ['image/avif', 'image/webp'], // Tự động phục vụ ảnh định dạng hiện đại\n    deviceSizes: [640, 750, 828, 1080, 1200],\n  },\n  // Loại bỏ console.log trong production để giảm TBT và bundle size\n  compiler: {\n    removeConsole: process.env.NODE_ENV === 'production',\n  },\n};\n\nmodule.exports = nextConfig;",
-      "codeLanguage": "javascript"
+      "codeLanguage": "javascript",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Pipeline Tối Ưu Hóa Bộ Ba Chỉ Số Core Web Vitals (LCP, INP, CLS)",
+        "caption": "Quy trình chuẩn kỹ thuật nâng điểm trải nghiệm người dùng và xếp hạng tìm kiếm Google",
+        "stages": [
+          {
+            "name": "1. Largest Contentful Paint (LCP < 2.5s)",
+            "tool": "next/image + Preload Hero",
+            "icon": "Zap",
+            "description": "Tối ưu ảnh lớn nhất: Chuyển đổi định dạng AVIF/WebP, nạp thuộc tính priority và đặt kích thước cố định.",
+            "metric": "< 2.5s"
+          },
+          {
+            "name": "2. Interaction to Next Paint (INP < 200ms)",
+            "tool": "Web Workers & scheduler.yield()",
+            "icon": "Cpu",
+            "description": "Giải phóng Main Thread: Chia nhỏ Long Tasks, chuyển tác vụ tính toán nặng sang Web Worker, ưu tiên phản hồi phím gõ và click.",
+            "metric": "< 200ms"
+          },
+          {
+            "name": "3. Cumulative Layout Shift (CLS < 0.1)",
+            "tool": "aspect-ratio & Font Fallback",
+            "icon": "Maximize",
+            "description": "Chống giật layout: Dự trữ khung kích thước (aspect-ratio) cho banner quảng cáo và ảnh động, cấu hình font-display: optional.",
+            "metric": "< 0.1 CLS"
+          },
+          {
+            "name": "4. Giám Sát Real User Metrics (RUM)",
+            "tool": "Chrome UX Report (CrUX)",
+            "icon": "CheckCircle",
+            "description": "Thu thập số liệu đo lường thực tế từ 75% người dùng thực tế trên mọi thiết bị và tốc độ mạng.",
+            "metric": "P75 Target"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Nhầm lẫn điểm số Lighthouse (Lab Data) với trải nghiệm người dùng thực tế (Field Data/CrUX), tối ưu mẹo chỉ để 'qua mặt' bot Lighthouse nhưng app vẫn giật lag trên thiết bị thật.",

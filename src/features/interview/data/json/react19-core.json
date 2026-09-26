@@ -16,7 +16,13 @@
     "seniorAnswer": {
       "summary": "useOptimistic tạo ra một state tạm thời hiển thị ngay lập tức giá trị kỳ vọng trong khi async action đang thực thi, và tự động khôi phục (rollback) về state thật nếu server trả về lỗi.",
       "deepDive": "useOptimistic nhận [passthroughState, updateFn]. Khi được kích hoạt bên trong một Transition hoặc Form Action, React sẽ render giá trị optimistic. Khi Server Action hoàn thành, React tự đồng bộ với state thật từ server mà không cần code try/catch rollback thủ công phức tạp.",
-      "codeExample": "const [optimisticCount, setOptimisticCount] = useOptimistic(\n  actualCount,\n  (current, increment: number) => current + increment\n);\n\nasync function handleLike() {\n  startTransition(async () => {\n    setOptimisticCount(1);\n    await likePostServerAction(postId);\n  });\n}"
+      "codeExample": "const [optimisticCount, setOptimisticCount] = useOptimistic(\n  actualCount,\n  (current, increment: number) => current + increment\n);\n\nasync function handleLike() {\n  startTransition(async () => {\n    setOptimisticCount(1);\n    await likePostServerAction(postId);\n  });\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cơ Chế useOptimistic Trong React 19: Phản Hồi Tức Thì Không Chờ Mạng",
+        "caption": "Cập nhật giao diện ngay lập tức trong 0ms và tự động hoàn tác (Rollback) nếu Server Action trả về lỗi",
+        "code": "flowchart TD\n    User[\"Người dùng bấm Thích (Like)\"] --> OptUpdate[\"useOptimistic cập nhật UI ngay lập tức: 42 -> 43 Likes (0ms)\"]\n    OptUpdate --> ServerCall[\"Gửi request ngầm lên Server Action\"]\n\n    ServerCall --> CheckResult{\"Kết Quả Server\"}\n\n    CheckResult -->|\"Thành Công (200 OK)\"| Confirm[\"Cố định State chính thức: 43 Likes\"]\n    CheckResult -->|\"Thất Bại (Mạng đứt / 500 Error)\"| Rollback[\"React tự động Rollback về trạng thái cũ: 42 Likes + Hiện thông báo lỗi\"]"
+      }
     },
     "pitfalls": [
       "Không biết rằng useOptimistic chỉ có tác dụng trong khi có startTransition hoặc Form Action đang pending.",
@@ -122,7 +128,49 @@
     "seniorAnswer": {
       "summary": "`useActionState` (trước đây là `useFormState`) nhận một Action function và initialState, trả về `[state, formAction, isPending]`. Nó tự động hóa hoàn toàn việc cập nhật state từ kết quả của Server Action và quản lý trạng thái pending.",
       "deepDive": "Luồng hoạt động: Khi form kích hoạt `formAction`, `isPending` chuyển thành `true`. Server Action chạy trên server, trả về dữ liệu mới hoặc lỗi `{ error: 'Email đã tồn tại' }`. Khi hoàn thành, `isPending` chuyển thành `false` và `state` được cập nhật vào component.",
-      "codeExample": "// action.ts\n'use server';\nexport async function updateEmail(prevState: any, formData: FormData) {\n  const email = formData.get('email');\n  if (!email) return { error: 'Email không được để trống' };\n  return { success: true };\n}\n\n// component.tsx\nfunction EmailForm() {\n  const [state, formAction, isPending] = useActionState(updateEmail, null);\n  return (\n    <form action={formAction}>\n      <input name=\"email\" />\n      {state?.error && <p className=\"text-red-500\">{state.error}</p>}\n      <button disabled={isPending}>{isPending ? 'Đang gửi...' : 'Cập nhật'}</button>\n    </form>\n  );\n}"
+      "codeExample": "// action.ts\n'use server';\nexport async function updateEmail(prevState: any, formData: FormData) {\n  const email = formData.get('email');\n  if (!email) return { error: 'Email không được để trống' };\n  return { success: true };\n}\n\n// component.tsx\nfunction EmailForm() {\n  const [state, formAction, isPending] = useActionState(updateEmail, null);\n  return (\n    <form action={formAction}>\n      <input name=\"email\" />\n      {state?.error && <p className=\"text-red-500\">{state.error}</p>}\n      <button disabled={isPending}>{isPending ? 'Đang gửi...' : 'Cập nhật'}</button>\n    </form>\n  );\n}",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Vòng Đời Thực Thi Server Actions & useActionState trong React 19",
+        "caption": "Luồng gửi Form, thực thi hàm bất đồng bộ trên Server và tự động làm mới giao diện (RSC Revalidation)",
+        "stages": [
+          {
+            "name": "1. Form Submit / Trigger",
+            "tool": "Browser DOM",
+            "icon": "Send",
+            "description": "Người dùng submit form hoặc gọi action. useActionState thiết lập cờ isPending = true và kích hoạt Optimistic UI nếu có.",
+            "metric": "isPending = true"
+          },
+          {
+            "name": "2. RPC POST Request",
+            "tool": "Fetch / Next.js Runtime",
+            "icon": "Radio",
+            "description": "Trình duyệt tự động đóng gói FormData và gửi HTTP POST request ngầm tới Server Action endpoint.",
+            "metric": "Multipart/form"
+          },
+          {
+            "name": "3. Server Execution",
+            "tool": "Node.js / Edge Runtime",
+            "icon": "Cpu",
+            "description": "Hàm \"use server\" thực thi: Xác thực người dùng, validate Zod schema, gọi Database mutation trong 1 transaction an toàn.",
+            "metric": "DB Mutation"
+          },
+          {
+            "name": "4. Revalidation & RSC Stream",
+            "tool": "React Server Components",
+            "icon": "RefreshCw",
+            "description": "Server kích hoạt revalidatePath() hoặc revalidateTag(). Render lại các Server Components bị ảnh hưởng và stream payload JSON về client.",
+            "metric": "Zero Bundle"
+          },
+          {
+            "name": "5. UI Update & Reconciliation",
+            "tool": "useActionState Hook",
+            "icon": "CheckCircle",
+            "description": "Client nhận payload mới, tự động cập nhật state kết quả [state, formAction, isPending], tắt cờ loading và render UI mới.",
+            "metric": "Smooth Transition"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Quên tham số `prevState` ở vị trí đầu tiên của Action function khi dùng với `useActionState`."

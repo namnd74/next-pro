@@ -211,7 +211,13 @@
       "summary": "Retain cycle (chu trình giữ tham chiếu) xảy ra khi hai hoặc nhiều đối tượng giữ strong reference lẫn nhau, khiến reference count không bao giờ giảm về 0 và gây rò rỉ bộ nhớ vĩnh viễn (memory leak). 'Strong' tăng strong RC. 'Weak' không tăng strong RC, tự động chuyển thành `nil` khi đối tượng bị giải phóng (zeroing weak reference, luôn là Optional). 'Unowned' không tăng strong RC, giả định đối tượng luôn tồn tại và sẽ crash (fatal error) nếu truy cập khi đối tượng đã chết.",
       "deepDive": "Về mặt runtime, việc gán `weak` cho một đối tượng sẽ chuyển đổi inline reference count sang một cấu trúc ngoại biên gọi là 'Side Table'. Khi đối tượng chính dealloc, bộ nhớ đối tượng được thu hồi nhưng Side Table vẫn tồn tại cho đến khi tất cả weak references bị giải phóng hoặc truy cập lại để zero hóa con trỏ. `unowned` tối ưu hơn weak vì không tạo Side Table mà chỉ tăng unowned reference count trong inline header, nhưng nếu đối tượng deinit mà vẫn gọi unowned, Swift runtime sẽ phát hiện dangling pointer và throw SIGTRAP.",
       "codeLanguage": "swift",
-      "codeExample": "final class Department {\n    let name: String\n    var manager: Employee?\n    init(name: String) { self.name = name }\n    deinit { print(\"Department \\(name) deallocated\") }\n}\n\nfinal class Employee {\n    let name: String\n    // Sử dụng weak để phá vỡ retain cycle giữa 2 chiều\n    weak var department: Department?\n    \n    init(name: String) { self.name = name }\n    deinit { print(\"Employee \\(name) deallocated\") }\n}\n\ndo {\n    let dept = Department(name: \"Mobile Engineering\")\n    let emp = Employee(name: \"John Doe\")\n    dept.manager = emp\n    emp.department = dept // Không tạo retain cycle nhờ weak\n}\n// Cả dept và emp đều được in deallocated thành công!"
+      "codeExample": "final class Department {\n    let name: String\n    var manager: Employee?\n    init(name: String) { self.name = name }\n    deinit { print(\"Department \\(name) deallocated\") }\n}\n\nfinal class Employee {\n    let name: String\n    // Sử dụng weak để phá vỡ retain cycle giữa 2 chiều\n    weak var department: Department?\n    \n    init(name: String) { self.name = name }\n    deinit { print(\"Employee \\(name) deallocated\") }\n}\n\ndo {\n    let dept = Department(name: \"Mobile Engineering\")\n    let emp = Employee(name: \"John Doe\")\n    dept.manager = emp\n    emp.department = dept // Không tạo retain cycle nhờ weak\n}\n// Cả dept và emp đều được in deallocated thành công!",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cơ Chế Quản Lý Bộ Nhớ ARC (Automatic Reference Counting) & Retain Cycle",
+        "caption": "Giải quyết vòng lặp tham chiếu giữ chéo (Strong Retain Cycle) bằng [weak self] để tránh rò rỉ RAM",
+        "code": "flowchart LR\n    subgraph RetainCycle [\"VÒNG LẶP RÒ RỈ BỘ NHỚ (Strong Retain Cycle)\"]\n        VC1[\"ViewController (RC = 1)\"] ===>|\"strong reference (Sở hữu closure)\"| Closure1[\"Closure Task\"]\n        Closure1 ===>|\"strong reference (Capture con trỏ self)\"| VC1\n        Note1[\"⚠️ Hậu quả: Khi đóng màn hình, Reference Count của cả 2 vẫn = 1 -> RÒ RỈ RAM VĨNH VIỄN!\"]\n    end\n\n    subgraph SafeARC [\"GIẢI PHÁP AN TOÀN VỚI [weak self]\"]\n        VC2[\"ViewController (RC = 1)\"] ===>|\"strong reference\"| Closure2[\"Closure Task\"]\n        Closure2 -.->|\"[weak self] reference (Không tăng RC)\"| VC2\n        Note2[\"✅ Khi đóng màn hình: VC2 giải phóng -> Closure2 giải phóng sạch sẽ 100%!\"]\n    end"
+      }
     },
     "pitfalls": [
       "Sử dụng `unowned` bất cẩn cho các đối tượng có vòng đời không đồng nhất (như asynchronous network callbacks), gây crash app bất ngờ.",
@@ -339,7 +345,13 @@
       "summary": "Vòng đời UIViewController gồm các giai đoạn tuần tự: `loadView` (tạo root view hierarchy), `viewDidLoad` (view đã nạp vào bộ nhớ, chỉ chạy 1 lần), `viewWillAppear` (view chuẩn bị hiển thị trên màn hình, chạy nhiều lần), `viewDidAppear` (view đã hiển thị hoàn toàn, sẵn sàng cho animation/tracking), `viewWillDisappear` (view chuẩn bị ẩn đi), và `viewDidDisappear` (view đã biến mất).",
       "deepDive": "Thời điểm thực thi quyết định tính đúng đắn của ứng dụng: `viewDidLoad` lý tưởng cho việc khởi tạo UI một lần, cấu hình Auto Layout và bind ViewModel. Không nên tính toán kích thước hình học (frame/bounds) tại `viewDidLoad` vì layout pass chưa chạy (bounds lúc này vẫn là kích thước mặc định). Frame chỉ thực sự chuẩn xác từ `viewDidLayoutSubviews`. `viewWillAppear` thích hợp để refresh dữ liệu nhẹ hoặc đăng ký NotificationCenter; `viewDidAppear` dùng để khởi chạy các animation phức tạp hoặc đo lường telemetry. Các observer/timer cần được hủy tại `viewWillDisappear` hoặc `deinit`.",
       "codeLanguage": "swift",
-      "codeExample": "import UIKit\n\nfinal class DashboardViewController: UIViewController {\n    override func viewDidLoad() {\n        super.viewDidLoad()\n        setupSubviews() // Chỉ tạo UI subviews và add constraints 1 lần duy nhất\n        bindViewModel() // Bắt đầu lắng nghe state\n    }\n    \n    override func viewWillAppear(_ animated: Bool) {\n        super.viewWillAppear(animated)\n        navigationController?.setNavigationBarHidden(true, animated: animated)\n        // Refresh trạng thái mỗi lần màn hình xuất hiện trở lại\n    }\n    \n    override func viewDidLayoutSubviews() {\n        super.viewDidLayoutSubviews()\n        // Kích thước view.bounds đã được AutoLayout tính toán chính xác\n        // Thích hợp để cập nhật CAShapeLayer hoặc GradientLayer frame\n    }\n    \n    override func viewWillDisappear(_ animated: Bool) {\n        super.viewWillDisappear(animated)\n        // Tắt bàn phím, tạm dừng video playback hoặc hủy network polling\n        view.endEditing(true)\n    }\n    \n    private func setupSubviews() { /* Add subviews logic */ }\n    private func bindViewModel() { /* Binding logic */ }\n}"
+      "codeExample": "import UIKit\n\nfinal class DashboardViewController: UIViewController {\n    override func viewDidLoad() {\n        super.viewDidLoad()\n        setupSubviews() // Chỉ tạo UI subviews và add constraints 1 lần duy nhất\n        bindViewModel() // Bắt đầu lắng nghe state\n    }\n    \n    override func viewWillAppear(_ animated: Bool) {\n        super.viewWillAppear(animated)\n        navigationController?.setNavigationBarHidden(true, animated: animated)\n        // Refresh trạng thái mỗi lần màn hình xuất hiện trở lại\n    }\n    \n    override func viewDidLayoutSubviews() {\n        super.viewDidLayoutSubviews()\n        // Kích thước view.bounds đã được AutoLayout tính toán chính xác\n        // Thích hợp để cập nhật CAShapeLayer hoặc GradientLayer frame\n    }\n    \n    override func viewWillDisappear(_ animated: Bool) {\n        super.viewWillDisappear(animated)\n        // Tắt bàn phím, tạm dừng video playback hoặc hủy network polling\n        view.endEditing(true)\n    }\n    \n    private func setupSubviews() { /* Add subviews logic */ }\n    private func bindViewModel() { /* Binding logic */ }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Vòng Đời UIViewController Trong UIKit (View Lifecycle Flow)",
+        "caption": "Thứ tự gọi các callback từ khi khởi tạo view, hiển thị lên màn hình đến khi biến mất hoàn toàn",
+        "code": "flowchart TD\n    Init[\"Khởi tạo: init(coder:) / init(nibName:)\"] --> Load[\"loadView() (Tạo View hierarchy gốc nếu không dùng Storyboard)\"]\n    Load --> DidLoad[\"viewDidLoad() (Chỉ gọi DUY NHẤT 1 lần: Setup UI ban đầu, bind dữ liệu)\"]\n    \n    DidLoad --> WillApp[\"viewWillAppear() (Gọi mỗi khi màn hình sắp xuất hiện: Refresh dữ liệu, đăng ký notifications)\"]\n    WillApp --> DidApp[\"viewDidAppear() (Màn hình đã hiển thị trọn vẹn: Kích hoạt animations, bắt đầu quay video)\"]\n\n    DidApp --> WillDis[\"viewWillDisappear() (Sắp bị che/rời đi: Ẩn bàn phím, tạm dừng tác vụ nặng)\"]\n    WillDis --> DidDis[\"viewDidDisappear() (Đã biến mất hoàn toàn: Dừng nghe sensors, hủy observers)\"]\n\n    DidDis --> Deinit[\"deinit (Bộ nhớ ViewController được ARC giải phóng khi pop khỏi NavigationStack)\"]"
+      }
     },
     "pitfalls": [
       "Gọi API heavy hoặc tính toán layout frames bên trong `viewDidLoad` khi kích thước bounds chưa được render chính xác.",
@@ -371,7 +383,75 @@
       "summary": "UIKit là mô hình Imperative (mệnh lệnh): lập trình viên tự tay khởi tạo, cấu hình, thêm vào cây view và trực tiếp mutate trạng thái của từng `UIView` khi dữ liệu thay đổi. SwiftUI là mô hình Declarative (khai báo): lập trình viên mô tả giao diện sẽ trông như thế nào tương ứng với từng trạng thái cụ thể (`UI = f(State)`). Khi State thay đổi, SwiftUI tự động tính toán sự khác biệt (diffing) và chỉ cập nhật những phần tử UI bị ảnh hưởng.",
       "deepDive": "Trong UIKit, `UIView` là các reference type nặng nề nằm trên Heap, quản lý bởi CALayer và giữ toàn bộ trạng thái hiển thị nội bộ, dễ dẫn đến lỗi out-of-sync giữa Model và View. Trong SwiftUI, `View` chỉ là các lightweight struct đại diện cho bản vẽ mô tả (blueprint) được tạo và huỷ liên tục trên Stack với chi phí gần bằng 0. SwiftUI runtime xây dựng một cây phụ thuộc nội bộ gọi là 'AttributeGraph' để lưu trữ state thực sự và tối ưu hóa việc vẽ lại màn hình mà không cần can thiệp thủ công.",
       "codeLanguage": "swift",
-      "codeExample": "import SwiftUI\n\n// 1. SwiftUI (Declarative): UI được khai báo tự động đồng bộ theo State\nstruct CounterSwiftUIView: View {\n    @State private var count: Int = 0\n    \n    var body: some View {\n        VStack(spacing: 16) {\n            Text(\"Tapped: \\(count) times\")\n            Button(\"Increment\") {\n                count += 1 // SwiftUI tự động tính diff và re-render Text\n            }\n        }\n    }\n}\n\n// 2. UIKit Tương đương (Imperative): Phải tự quản lý view instance và mutate thuộc tính\nimport UIKit\nfinal class CounterUIKitViewController: UIViewController {\n    private var count = 0\n    private let label = UILabel()\n    \n    @objc private func handleTap() {\n        count += 1\n        label.text = \"Tapped: \\(count) times\" // Lập trình viên phải tự đồng bộ UI bằng tay\n    }\n}"
+      "codeExample": "import SwiftUI\n\n// 1. SwiftUI (Declarative): UI được khai báo tự động đồng bộ theo State\nstruct CounterSwiftUIView: View {\n    @State private var count: Int = 0\n    \n    var body: some View {\n        VStack(spacing: 16) {\n            Text(\"Tapped: \\(count) times\")\n            Button(\"Increment\") {\n                count += 1 // SwiftUI tự động tính diff và re-render Text\n            }\n        }\n    }\n}\n\n// 2. UIKit Tương đương (Imperative): Phải tự quản lý view instance và mutate thuộc tính\nimport UIKit\nfinal class CounterUIKitViewController: UIViewController {\n    private var count = 0\n    private let label = UILabel()\n    \n    @objc private func handleTap() {\n        count += 1\n        label.text = \"Tapped: \\(count) times\" // Lập trình viên phải tự đồng bộ UI bằng tay\n    }\n}",
+      "benchmark": {
+        "title": "So Sánh Nền Tảng UI iOS: SwiftUI (Declarative) vs UIKit (Imperative)",
+        "caption": "Đánh giá tính hiện đại, độ ổn định và khả năng tương thích ngược của ứng dụng iOS",
+        "options": [
+          {
+            "name": "SwiftUI (iOS 16+)",
+            "badge": "Tương Lai Của Apple",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tốc độ viết code giao diện",
+                "value": 95,
+                "displayValue": "Nhanh hơn 50%",
+                "color": "emerald"
+              },
+              {
+                "label": "Loại bỏ lỗi State Mismatch",
+                "value": 100,
+                "displayValue": "Single Source of Truth",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ ổn định cho ứng dụng phức tạp",
+                "value": 80,
+                "displayValue": "Rất tốt từ iOS 16+",
+                "color": "blue"
+              }
+            ],
+            "pros": [
+              "Cú pháp Declarative thanh thoát, hỗ trợ xem trước Preview canvas trực tiếp",
+              "Đa nền tảng chia sẻ code cho iOS, iPadOS, macOS, watchOS, visionOS"
+            ],
+            "cons": [
+              "Yêu cầu phiên bản iOS tối thiểu cao (thường từ iOS 16 trở lên để chạy trơn tru)"
+            ]
+          },
+          {
+            "name": "UIKit (AutoLayout & ViewControllers)",
+            "badge": "Nền Tảng Cổ Điển",
+            "metrics": [
+              {
+                "label": "Tốc độ viết code giao diện",
+                "value": 50,
+                "displayValue": "Tốn công AutoLayout",
+                "color": "amber"
+              },
+              {
+                "label": "Khả năng tùy biến low-level",
+                "value": 100,
+                "displayValue": "Không giới hạn",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ ổn định",
+                "value": 99,
+                "displayValue": "> 15 năm hoàn thiện",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Kiểm soát tuyệt đối từng pixel và vòng đời view, dễ dàng nhúng vào bất kỳ thư viện C/Objective-C nào"
+            ],
+            "cons": [
+              "Mã nguồn AutoLayout dài dòng, quản lý delegate và datasource cồng kềnh"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Áp đặt tư duy UIKit vào SwiftUI (cố gắng giữ con trỏ reference tới một View struct hoặc tìm cách gọi hàm kiểu `myView.update()`).",
