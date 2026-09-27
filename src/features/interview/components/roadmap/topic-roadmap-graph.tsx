@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useInterviewStore } from '../../stores/use-interview-store';
 import type { TopicRoadmapSpec, RoadmapStageSpec } from '../../types/roadmap';
+import type { InterviewQuestion } from '../../types';
 import {
   ZoomIn,
   ZoomOut,
@@ -21,6 +22,7 @@ interface TopicRoadmapGraphProps {
   activeStageId: string | null;
   onSelectStage: (stageId: string | null) => void;
   onOpenStageDrawer: (stage: RoadmapStageSpec) => void;
+  allQuestions?: InterviewQuestion[];
 }
 
 interface TreeNodeLayout {
@@ -38,11 +40,16 @@ export function TopicRoadmapGraph({
   activeStageId,
   onSelectStage,
   onOpenStageDrawer,
+  allQuestions = [],
 }: TopicRoadmapGraphProps) {
   const [zoomLevel, setZoomLevel] = React.useState(1);
   const masteredQuestionIds = useInterviewStore(
     (s) => s.masteredQuestionIds || []
   );
+
+  const questionMap = React.useMemo(() => {
+    return new Map(allQuestions.map((q) => [q.id, q]));
+  }, [allQuestions]);
 
   // Compute total topic progress
   const allTopicQuestionIds = React.useMemo(() => {
@@ -364,6 +371,16 @@ export function TopicRoadmapGraph({
               totalCount > 0 ? Math.round((masteredCount / totalCount) * 100) : 0;
             const isCompleted = totalCount > 0 && masteredCount === totalCount;
 
+            // Compute exact level distribution within this knowledge stage
+            const stageQuestions = node.stage.questionIds
+              .map((id) => questionMap.get(id))
+              .filter(Boolean);
+            const juniorCount = stageQuestions.filter((q) => q?.level === 'junior').length;
+            const middleCount = stageQuestions.filter((q) => q?.level === 'middle').length;
+            const seniorCount = stageQuestions.filter(
+              (q) => q?.level === 'senior' || q?.level === 'lead'
+            ).length;
+
             return (
               <div
                 key={node.id}
@@ -386,7 +403,7 @@ export function TopicRoadmapGraph({
                       : 'border-border/80 bg-card/95 hover:border-primary/50 hover:bg-card dark:bg-zinc-900/90'
                   )}
                 >
-                  {/* Top Row: Pill number + Level + Mastered badge */}
+                  {/* Top Row: Pill number + Multi-Level Distribution (Junior / Middle / Senior) */}
                   <div className="flex items-center justify-between gap-1.5">
                     <div className="flex items-center gap-1.5">
                       <span
@@ -402,7 +419,7 @@ export function TopicRoadmapGraph({
                         {isCompleted ? '✓' : node.stage.stepNumber}
                       </span>
                       <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">
-                        Trạm {node.stage.stepNumber}
+                        Chủ Điểm #{node.stage.stepNumber}
                       </span>
                     </div>
 
@@ -412,12 +429,32 @@ export function TopicRoadmapGraph({
                           ✓ Đã xong
                         </Badge>
                       ) : (
-                        <Badge
-                          variant={isActive ? 'default' : 'secondary'}
-                          className="h-4 px-1.5 text-[9px] font-semibold uppercase tracking-wider"
-                        >
-                          {node.stage.targetLevel}
-                        </Badge>
+                        <div className="flex items-center gap-1 font-mono text-[9px]">
+                          {juniorCount > 0 && (
+                            <span
+                              className="rounded bg-emerald-500/15 px-1 py-0.2 font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                              title={`${juniorCount} câu hỏi mức độ Junior`}
+                            >
+                              {juniorCount} Jr
+                            </span>
+                          )}
+                          {middleCount > 0 && (
+                            <span
+                              className="rounded bg-amber-500/15 px-1 py-0.2 font-bold text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                              title={`${middleCount} câu hỏi mức độ Middle`}
+                            >
+                              {middleCount} Mid
+                            </span>
+                          )}
+                          {seniorCount > 0 && (
+                            <span
+                              className="rounded bg-rose-500/15 px-1 py-0.2 font-bold text-rose-600 dark:text-rose-400 border border-rose-500/30"
+                              title={`${seniorCount} câu hỏi mức độ Senior`}
+                            >
+                              {seniorCount} Sr
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

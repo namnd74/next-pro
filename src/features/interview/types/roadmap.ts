@@ -4,7 +4,8 @@ export interface RoadmapStageSpec {
   title: string;
   shortGoal: string;
   iconName?: string;
-  targetLevel: 'junior' | 'middle' | 'senior';
+  targetLevel?: 'junior' | 'middle' | 'senior' | 'mixed';
+  knowledgeDomain?: string;
   visualAnchorQuestionId?: string;
   questionIds: string[];
   prerequisiteStageIds?: string[];
