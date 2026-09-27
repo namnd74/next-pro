@@ -13,3 +13,5 @@ export * from './components/virtual-question-list';
 export * from './components/interview-page-view';
 export * from './config/categories.config';
 export * from './hooks/use-interview-filter';
+export * from './components/roadmap';
+export * from './data/roadmaps';

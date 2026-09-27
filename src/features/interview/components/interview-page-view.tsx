@@ -21,6 +21,8 @@ import {
   InterviewCategory,
   JSONManagerModal,
   CreateQuestionModal,
+  TopicRoadmapStepper,
+  getTopicRoadmap,
 } from '@/features/interview';
 import { CATEGORY_ITEMS } from '../config/categories.config';
 import { useInterviewFilter } from '../hooks/use-interview-filter';
@@ -50,6 +52,54 @@ export function InterviewPageView() {
     filteredQuestions,
     bookmarkedQuestionIds,
   } = useInterviewFilter();
+
+  const [selectedStageId, setSelectedStageId] = React.useState<string | null>(null);
+
+  // Reset stage selection when category changes
+  React.useEffect(() => {
+    setSelectedStageId(null);
+  }, [selectedCategory]);
+
+  const currentRoadmap = React.useMemo(() => {
+    return getTopicRoadmap(selectedCategory);
+  }, [selectedCategory]);
+
+  const displayedQuestions = React.useMemo(() => {
+    if (!currentRoadmap || !selectedStageId) {
+      return filteredQuestions;
+    }
+    const stage = currentRoadmap.stages.find((s) => s.id === selectedStageId);
+    if (!stage) return filteredQuestions;
+
+    const bookmarkSet = onlyBookmarked ? new Set(bookmarkedQuestionIds) : null;
+    const query = searchQuery.trim().toLowerCase();
+    const stageQuestionMap = new Map(allQuestions.map((q) => [q.id, q]));
+    const stageQuestions = [];
+
+    for (const qId of stage.questionIds) {
+      const q = stageQuestionMap.get(qId);
+      if (!q) continue;
+      if (bookmarkSet && !bookmarkSet.has(q.id)) continue;
+      if (query) {
+        const matchSearch =
+          q.question.toLowerCase().includes(query) ||
+          q.interviewerIntent.toLowerCase().includes(query) ||
+          q.seniorAnswer.summary.toLowerCase().includes(query) ||
+          q.expectedKeywords.some((kw) => kw.toLowerCase().includes(query));
+        if (!matchSearch) continue;
+      }
+      stageQuestions.push(q);
+    }
+    return stageQuestions;
+  }, [
+    filteredQuestions,
+    currentRoadmap,
+    selectedStageId,
+    allQuestions,
+    searchQuery,
+    onlyBookmarked,
+    bookmarkedQuestionIds,
+  ]);
 
   return (
     <div className="space-y-10">
@@ -238,13 +288,23 @@ export function InterviewPageView() {
               </div>
             </Card>
 
+            {/* Roadmap Stepper for topic if available */}
+            {currentRoadmap && (
+              <TopicRoadmapStepper
+                roadmap={currentRoadmap}
+                activeStageId={selectedStageId}
+                onSelectStage={setSelectedStageId}
+                totalCategoryQuestions={filteredQuestions.length}
+              />
+            )}
+
             {/* Questions list with Virtual Windowing */}
-            {filteredQuestions.length === 0 ? (
+            {displayedQuestions.length === 0 ? (
               <Card className="glass-card text-muted-foreground p-8 text-center text-sm">
                 Không tìm thấy câu hỏi nào phù hợp với từ khóa hoặc bộ lọc hiện tại.
               </Card>
             ) : (
-              <VirtualQuestionList questions={filteredQuestions} />
+              <VirtualQuestionList questions={displayedQuestions} />
             )}
           </TabsContent>
 
