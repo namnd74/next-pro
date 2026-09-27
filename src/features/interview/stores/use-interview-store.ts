@@ -4,12 +4,14 @@ import { MockInterviewResult, InterviewQuestion } from '../types';
 
 interface InterviewStoreState {
   bookmarkedQuestionIds: string[];
+  masteredQuestionIds: string[];
   completedBugHuntIds: string[];
   mockSessionHistory: MockInterviewResult[];
   customQuestions: InterviewQuestion[];
 
   // Actions
   toggleBookmark: (id: string) => void;
+  toggleMasteredQuestion: (id: string) => void;
   markBugHuntSolved: (id: string) => void;
   saveMockResult: (result: MockInterviewResult) => void;
   addCustomQuestion: (question: InterviewQuestion) => void;
@@ -21,6 +23,7 @@ export const useInterviewStore = create<InterviewStoreState>()(
   persist(
     (set) => ({
       bookmarkedQuestionIds: [],
+      masteredQuestionIds: [],
       completedBugHuntIds: [],
       mockSessionHistory: [],
       customQuestions: [],
@@ -30,6 +33,13 @@ export const useInterviewStore = create<InterviewStoreState>()(
           bookmarkedQuestionIds: state.bookmarkedQuestionIds.includes(id)
             ? state.bookmarkedQuestionIds.filter((qId) => qId !== id)
             : [...state.bookmarkedQuestionIds, id],
+        })),
+
+      toggleMasteredQuestion: (id) =>
+        set((state) => ({
+          masteredQuestionIds: (state.masteredQuestionIds || []).includes(id)
+            ? (state.masteredQuestionIds || []).filter((qId) => qId !== id)
+            : [...(state.masteredQuestionIds || []), id],
         })),
 
       markBugHuntSolved: (id) =>
@@ -59,6 +69,7 @@ export const useInterviewStore = create<InterviewStoreState>()(
       resetInterviewProgress: () =>
         set({
           bookmarkedQuestionIds: [],
+          masteredQuestionIds: [],
           completedBugHuntIds: [],
           mockSessionHistory: [],
           customQuestions: [],

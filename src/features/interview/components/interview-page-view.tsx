@@ -10,6 +10,7 @@ import {
   Bookmark,
   FileJson,
   PlusCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { SearchInput, FilterChipGroup } from '@/components/shared';
 import {
@@ -23,6 +24,7 @@ import {
   CreateQuestionModal,
   TopicRoadmapStepper,
   getTopicRoadmap,
+  useInterviewStore,
 } from '@/features/interview';
 import { CATEGORY_ITEMS } from '../config/categories.config';
 import { useInterviewFilter } from '../hooks/use-interview-filter';
@@ -31,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { TechIcon } from '@/components/common/tech-icon';
+import { cn } from '@/lib/utils';
 
 export function InterviewPageView() {
   const [isJsonModalOpen, setIsJsonModalOpen] = React.useState(false);
@@ -54,6 +57,10 @@ export function InterviewPageView() {
   } = useInterviewFilter();
 
   const [selectedStageId, setSelectedStageId] = React.useState<string | null>(null);
+  const [onlyMastered, setOnlyMastered] = React.useState(false);
+  const masteredQuestionIds = useInterviewStore(
+    (s) => s.masteredQuestionIds || []
+  );
 
   // Reset stage selection when category changes
   React.useEffect(() => {
@@ -65,14 +72,18 @@ export function InterviewPageView() {
   }, [selectedCategory]);
 
   const displayedQuestions = React.useMemo(() => {
+    const bookmarkSet = onlyBookmarked ? new Set(bookmarkedQuestionIds) : null;
+    const masteredSet = onlyMastered ? new Set(masteredQuestionIds) : null;
+    const query = searchQuery.trim().toLowerCase();
+
     if (!currentRoadmap || !selectedStageId) {
-      return filteredQuestions;
+      if (!onlyMastered) return filteredQuestions;
+      return filteredQuestions.filter((q) => masteredSet?.has(q.id));
     }
+
     const stage = currentRoadmap.stages.find((s) => s.id === selectedStageId);
     if (!stage) return filteredQuestions;
 
-    const bookmarkSet = onlyBookmarked ? new Set(bookmarkedQuestionIds) : null;
-    const query = searchQuery.trim().toLowerCase();
     const stageQuestionMap = new Map(allQuestions.map((q) => [q.id, q]));
     const stageQuestions = [];
 
@@ -80,6 +91,7 @@ export function InterviewPageView() {
       const q = stageQuestionMap.get(qId);
       if (!q) continue;
       if (bookmarkSet && !bookmarkSet.has(q.id)) continue;
+      if (masteredSet && !masteredSet.has(q.id)) continue;
       if (query) {
         const matchSearch =
           q.question.toLowerCase().includes(query) ||
@@ -98,7 +110,9 @@ export function InterviewPageView() {
     allQuestions,
     searchQuery,
     onlyBookmarked,
+    onlyMastered,
     bookmarkedQuestionIds,
+    masteredQuestionIds,
   ]);
 
   return (
@@ -276,15 +290,30 @@ export function InterviewPageView() {
                   />
                 </div>
 
-                <Button
-                  variant={onlyBookmarked ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setOnlyBookmarked(!onlyBookmarked)}
-                  className="w-full gap-1.5 text-xs sm:w-auto"
-                >
-                  <Bookmark className="h-3.5 w-3.5" />
-                  <span>Đã Bookmark ({bookmarkedQuestionIds.length})</span>
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant={onlyMastered ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setOnlyMastered(!onlyMastered)}
+                    className={cn(
+                      'w-full gap-1.5 text-xs sm:w-auto',
+                      onlyMastered && 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    )}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    <span>Đã Nắm Vững ({masteredQuestionIds.length})</span>
+                  </Button>
+
+                  <Button
+                    variant={onlyBookmarked ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setOnlyBookmarked(!onlyBookmarked)}
+                    className="w-full gap-1.5 text-xs sm:w-auto"
+                  >
+                    <Bookmark className="h-3.5 w-3.5" />
+                    <span>Đã Bookmark ({bookmarkedQuestionIds.length})</span>
+                  </Button>
+                </div>
               </div>
             </Card>
 
@@ -295,6 +324,7 @@ export function InterviewPageView() {
                 activeStageId={selectedStageId}
                 onSelectStage={setSelectedStageId}
                 totalCategoryQuestions={filteredQuestions.length}
+                allQuestions={allQuestions}
               />
             )}
 

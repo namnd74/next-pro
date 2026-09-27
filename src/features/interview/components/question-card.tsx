@@ -1,7 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { Bookmark, ChevronDown, Sparkles, AlertTriangle, HelpCircle } from 'lucide-react';
+import {
+  Bookmark,
+  ChevronDown,
+  Sparkles,
+  AlertTriangle,
+  HelpCircle,
+  CheckCircle2,
+  Circle,
+} from 'lucide-react';
 import { InterviewQuestion } from '../types';
 import { useInterviewStore } from '../stores/use-interview-store';
 import { Card } from '@/components/ui/card';
@@ -42,9 +50,14 @@ export const QuestionCard = React.memo(function QuestionCard({
   onToggleExpand,
 }: QuestionCardProps) {
   const isBookmarked = useInterviewStore(
-    React.useCallback((s) => s.bookmarkedQuestionIds.includes(question.id), [question.id])
+    React.useCallback((s) => (s.bookmarkedQuestionIds || []).includes(question.id), [question.id])
   );
   const toggleBookmark = useInterviewStore((s) => s.toggleBookmark);
+
+  const isMastered = useInterviewStore(
+    React.useCallback((s) => (s.masteredQuestionIds || []).includes(question.id), [question.id])
+  );
+  const toggleMasteredQuestion = useInterviewStore((s) => s.toggleMasteredQuestion);
   const [internalExpanded, setInternalExpanded] = React.useState(false);
   const [revealedFollowUps, setRevealedFollowUps] = React.useState<Set<number>>(
     new Set()
@@ -105,7 +118,13 @@ export const QuestionCard = React.memo(function QuestionCard({
   };
 
   return (
-    <Card className="glass-card glass-card-hover overflow-hidden p-4 transition-all sm:p-5">
+    <Card
+      className={cn(
+        'glass-card glass-card-hover overflow-hidden p-4 transition-all sm:p-5',
+        isMastered &&
+          'border-emerald-500/40 bg-gradient-to-br from-emerald-500/[0.04] to-transparent dark:border-emerald-500/30'
+      )}
+    >
       {/* Clickable Header Area */}
       <div
         role="button"
@@ -138,6 +157,15 @@ export const QuestionCard = React.memo(function QuestionCard({
                 )}
                 <span>{categoryMeta.label}</span>
               </Badge>
+              {isMastered && (
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-emerald-500/30 bg-emerald-500/10 py-0 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                >
+                  <CheckCircle2 className="h-2.5 w-2.5" />
+                  <span>Đã nắm vững</span>
+                </Badge>
+              )}
             </div>
 
             <h3 className="text-foreground group-hover:text-primary text-base leading-snug font-bold break-words transition-colors">
@@ -156,6 +184,32 @@ export const QuestionCard = React.memo(function QuestionCard({
             className="flex shrink-0 items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Mastered / Solved Button (NeetCode Style) */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleMasteredQuestion(question.id);
+              }}
+              className={`h-8 w-8 rounded-lg p-0 transition-transform active:scale-90 ${
+                isMastered
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : 'text-muted-foreground hover:text-emerald-500'
+              }`}
+              title={
+                isMastered
+                  ? 'Đã nắm vững (Click để bỏ đánh dấu)'
+                  : 'Đánh dấu đã nắm vững (Mastered)'
+              }
+            >
+              {isMastered ? (
+                <CheckCircle2 className="h-4 w-4 fill-emerald-500/20 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Circle className="h-4 w-4" />
+              )}
+            </Button>
+
             <Button
               variant="ghost"
               size="sm"

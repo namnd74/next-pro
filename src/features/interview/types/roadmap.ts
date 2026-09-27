@@ -7,6 +7,14 @@ export interface RoadmapStageSpec {
   targetLevel: 'junior' | 'middle' | 'senior';
   visualAnchorQuestionId?: string;
   questionIds: string[];
+  prerequisiteStageIds?: string[];
+  layoutPosition?: { x: number; y: number };
+}
+
+export interface RoadmapEdgeSpec {
+  from: string;
+  to: string;
+  label?: string;
 }
 
 export interface TopicRoadmapSpec {
@@ -15,4 +23,6 @@ export interface TopicRoadmapSpec {
   tagline: string;
   mindmapCode: string;
   stages: RoadmapStageSpec[];
+  edges?: RoadmapEdgeSpec[];
 }
+
