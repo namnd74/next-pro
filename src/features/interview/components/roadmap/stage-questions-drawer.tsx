@@ -37,7 +37,6 @@ export function StageQuestionsDrawer({
   onOpenQuestionDetail,
 }: StageQuestionsDrawerProps) {
   const [searchFilter, setSearchFilter] = React.useState('');
-  const [levelFilter, setLevelFilter] = React.useState<'all' | 'junior' | 'middle' | 'senior'>('all');
   const [expandedQuestionId, setExpandedQuestionId] = React.useState<string | null>(null);
 
   const masteredQuestionIds = useInterviewStore(
@@ -67,7 +66,6 @@ export function StageQuestionsDrawer({
     } else {
       document.body.style.overflow = '';
       setSearchFilter('');
-      setLevelFilter('all');
       setExpandedQuestionId(null);
     }
     return () => {
@@ -86,39 +84,17 @@ export function StageQuestionsDrawer({
     return result;
   }, [stage, allQuestions]);
 
-  const juniorQuestions = React.useMemo(
-    () => stageQuestions.filter((q) => q.level === 'junior'),
-    [stageQuestions]
-  );
-  const middleQuestions = React.useMemo(
-    () => stageQuestions.filter((q) => q.level === 'middle'),
-    [stageQuestions]
-  );
-  const seniorQuestions = React.useMemo(
-    () => stageQuestions.filter((q) => q.level === 'senior' || q.level === 'lead'),
-    [stageQuestions]
-  );
-
   const filteredStageQuestions = React.useMemo(() => {
     const query = searchFilter.trim().toLowerCase();
+    if (!query) return stageQuestions;
     return stageQuestions.filter((q) => {
-      const matchLevel =
-        levelFilter === 'all'
-          ? true
-          : levelFilter === 'senior'
-          ? q.level === 'senior' || q.level === 'lead'
-          : q.level === levelFilter;
-
-      if (!matchLevel) return false;
-
-      if (!query) return true;
       return (
         q.question.toLowerCase().includes(query) ||
         q.seniorAnswer.summary.toLowerCase().includes(query) ||
         q.expectedKeywords.some((kw) => kw.toLowerCase().includes(query))
       );
     });
-  }, [stageQuestions, searchFilter, levelFilter]);
+  }, [stageQuestions, searchFilter]);
 
   if (!isOpen || !stage) return null;
 
@@ -160,24 +136,10 @@ export function StageQuestionsDrawer({
               {stage.shortGoal}
             </p>
 
-            {/* Level Spectrum Badge Row */}
             <div className="flex items-center gap-1.5 pt-1">
-              <span className="text-[10px] text-muted-foreground font-medium">Bao gồm:</span>
-              {juniorQuestions.length > 0 && (
-                <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
-                  🟢 {juniorQuestions.length} Junior
-                </span>
-              )}
-              {middleQuestions.length > 0 && (
-                <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 border border-amber-500/25">
-                  🟡 {middleQuestions.length} Middle
-                </span>
-              )}
-              {seniorQuestions.length > 0 && (
-                <span className="rounded bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-bold text-rose-600 dark:text-rose-400 border border-rose-500/25">
-                  🔴 {seniorQuestions.length} Senior
-                </span>
-              )}
+              <Badge variant="outline" className="border-border/80 text-[10px] font-semibold text-muted-foreground">
+                {stageQuestions.length} câu hỏi trọng tâm
+              </Badge>
             </div>
           </div>
 
@@ -218,65 +180,6 @@ export function StageQuestionsDrawer({
                 : 'from-indigo-500 to-purple-500'
             }
           />
-        </div>
-
-        {/* Filter by Level Tabs inside this Knowledge Stage */}
-        <div className="mb-2 flex flex-wrap items-center gap-1.5 border-b border-border/40 pb-2">
-          <span className="text-[10px] font-bold text-muted-foreground mr-1">Lọc theo độ khó:</span>
-          <button
-            type="button"
-            onClick={() => setLevelFilter('all')}
-            className={cn(
-              'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
-              levelFilter === 'all'
-                ? 'bg-primary text-primary-foreground shadow-xs'
-                : 'bg-muted/70 text-muted-foreground hover:bg-muted'
-            )}
-          >
-            Tất cả ({stageQuestions.length})
-          </button>
-          {juniorQuestions.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setLevelFilter('junior')}
-              className={cn(
-                'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
-                levelFilter === 'junior'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-muted/70 text-emerald-600 dark:text-emerald-400 hover:bg-muted'
-              )}
-            >
-              🟢 Junior ({juniorQuestions.length})
-            </button>
-          )}
-          {middleQuestions.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setLevelFilter('middle')}
-              className={cn(
-                'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
-                levelFilter === 'middle'
-                  ? 'bg-amber-600 text-white shadow-xs'
-                  : 'bg-muted/70 text-amber-600 dark:text-amber-400 hover:bg-muted'
-              )}
-            >
-              🟡 Middle ({middleQuestions.length})
-            </button>
-          )}
-          {seniorQuestions.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setLevelFilter('senior')}
-              className={cn(
-                'rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all',
-                levelFilter === 'senior'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'bg-muted/70 text-rose-600 dark:text-rose-400 hover:bg-muted'
-              )}
-            >
-              🔴 Senior ({seniorQuestions.length})
-            </button>
-          )}
         </div>
 
         {/* Quick Filter Search inside Drawer */}
@@ -338,17 +241,9 @@ export function StageQuestionsDrawer({
                         <span className="text-[10px] font-mono font-bold text-muted-foreground">
                           #{idx + 1}
                         </span>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            'h-4 px-1.5 text-[9px] uppercase tracking-wider font-semibold',
-                            q.level === 'junior' && 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
-                            q.level === 'middle' && 'border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10',
-                            (q.level === 'senior' || q.level === 'lead') && 'border-rose-500/30 text-rose-600 dark:text-rose-400 bg-rose-500/10'
-                          )}
-                        >
-                          {q.level}
-                        </Badge>
+                        <span className="font-mono text-[9px] text-muted-foreground/80 rounded bg-muted px-1.5 py-0.5">
+                          {q.id}
+                        </span>
                         {isMastered && (
                           <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
                             ✓ Đã nắm vững
