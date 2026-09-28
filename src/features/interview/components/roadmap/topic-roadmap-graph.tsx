@@ -172,7 +172,7 @@ export function TopicRoadmapGraph({
               </Badge>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Các trạm liên kết theo điều kiện tiên quyết. Click vào trạm để lọc câu hỏi hoặc mở bảng bài tập.
+              Các trạm liên kết theo điều kiện tiên quyết. Click vào trạm để lọc hoặc xem danh sách câu hỏi phỏng vấn.
             </p>
           </div>
         </div>
@@ -474,10 +474,10 @@ export function TopicRoadmapGraph({
                         onOpenStageDrawer(node.stage);
                       }}
                       className="inline-flex items-center gap-1 font-semibold text-primary hover:underline cursor-pointer"
-                      title="Mở danh sách bài tập trạm này"
+                      title="Mở danh sách câu hỏi phỏng vấn của trạm này"
                     >
                       <ListTodo className="h-3 w-3" />
-                      <span>Bài tập</span>
+                      <span>Chi tiết trạm</span>
                       <ArrowRight className="h-2.5 w-2.5" />
                     </span>
 

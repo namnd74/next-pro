@@ -11,8 +11,6 @@ import { StageQuestionsDrawer } from './stage-questions-drawer';
 import {
   Compass,
   RotateCcw,
-  Sparkles,
-  ListTodo,
 } from 'lucide-react';
 
 interface TopicRoadmapStepperProps {
@@ -33,11 +31,6 @@ export function TopicRoadmapStepper({
   onOpenQuestionDetail,
 }: TopicRoadmapStepperProps) {
   const [drawerStage, setDrawerStage] = React.useState<RoadmapStageSpec | null>(null);
-
-  const activeStage = React.useMemo<RoadmapStageSpec | undefined>(() => {
-    if (!activeStageId) return undefined;
-    return roadmap.stages.find((s) => s.id === activeStageId);
-  }, [roadmap.stages, activeStageId]);
 
   return (
     <Card className="glass-card relative overflow-hidden border-indigo-500/20 bg-gradient-to-br from-indigo-500/5 via-background to-purple-500/5 p-4 shadow-sm sm:p-5">
@@ -90,56 +83,6 @@ export function TopicRoadmapStepper({
           onOpenStageDrawer={(stg) => setDrawerStage(stg)}
         />
       </div>
-
-      {/* Active Stage Detail Goal Box (Shows when a stage is active) */}
-      {activeStage && (
-        <div className="animate-in fade-in-50 mt-4 flex flex-col gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between shadow-xs">
-          <div className="flex items-start gap-2.5">
-            <Sparkles className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-            <div className="space-y-1 text-xs">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-bold text-foreground">
-                  Chủ Điểm #{activeStage.stepNumber}: {activeStage.title}
-                </span>
-                <Badge
-                  variant="outline"
-                  className="border-primary/30 text-primary text-[10px] font-semibold"
-                >
-                  {activeStage.questionIds.length} câu hỏi trọng tâm
-                </Badge>
-              </div>
-              <p className="text-muted-foreground leading-relaxed">
-                {activeStage.shortGoal}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2 self-end sm:self-center">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDrawerStage(activeStage)}
-              className="h-7 gap-1.5 text-[11px] font-semibold border-primary/30 text-primary hover:bg-primary/10"
-            >
-              <ListTodo className="h-3.5 w-3.5" />
-              <span>Bảng Bài Tập ({activeStage.questionIds.length})</span>
-            </Button>
-
-            <Badge variant="default" className="text-[10px]">
-              Đang lọc {activeStage.questionIds.length} câu hỏi
-            </Badge>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onSelectStage(null)}
-              className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              ✕ Bỏ lọc
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Quick Stage Questions Drawer */}
       <StageQuestionsDrawer
