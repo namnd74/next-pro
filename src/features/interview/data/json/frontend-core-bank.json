@@ -1564,7 +1564,49 @@
       "summary": "Trình duyệt render trang qua 5 bước: 1) Parse HTML dựng DOM Tree và parse CSS dựng CSSOM Tree. 2) Kết hợp thành Render Tree (loại bỏ phần tử ẩn). 3) Layout/Reflow (tính toán tọa độ hình học x, y, width, height của từng node). 4) Paint (tô màu pixel, viền, bóng, chữ lên các layer). 5) Composite (ghép các layer lại và hiển thị lên màn hình GPU).",
       "deepDive": "Reflow (Layout) là thao tác đắt đỏ nhất vì khi 1 node đổi kích thước, toàn bộ các node con và lân cận cũng phải tính toán lại hình học. Repaint rẻ hơn (đổi màu, background không đổi kích thước). Rẻ nhất và tối ưu nhất là Composite (chỉ đổi `transform` và `opacity` trực tiếp trên GPU). Cạm bẫy Layout Thrashing: khi bạn đọc thuộc tính hình học (`element.offsetWidth`) ngay sau khi vừa ghi style (`element.style.width = '...'`) liên tục trong vòng lặp; trình duyệt bị ép buộc phải ngắt quy trình gom lô (batching) để chạy ngay một Forced Synchronous Reflow. Giải pháp: gom tất cả các lệnh đọc (Reads) lên trước, sau đó mới gom các lệnh ghi (Writes).",
       "codeLanguage": "typescript",
-      "codeExample": "// ANTIPATTERN: LAYOUT THRASHING (Gây giật lag 10fps vì ép Reflow liên tục)\nexport function badResizeElements(elements: HTMLElement[]) {\n  elements.forEach((el) => {\n    // ĐỌC (Ép Forced Reflow)\n    const currentWidth = el.offsetWidth;\n    // GHI (Làm bẩn Layout)\n    el.style.width = `${currentWidth + 10}px`;\n  });\n}\n\n// BEST PRACTICE: Gom nhóm thao tác Đọc trước, Ghi sau (Batching)\nexport function optimizedResizeElements(elements: HTMLElement[]) {\n  // Bước 1: Đọc toàn bộ kích thước trong 1 lần duy nhất\n  const widths = elements.map((el) => el.offsetWidth);\n\n  // Bước 2: Ghi toàn bộ thay đổi cùng lúc (Trình duyệt chỉ cần 1 lần Reflow duy nhất)\n  requestAnimationFrame(() => {\n    elements.forEach((el, index) => {\n      el.style.width = `${widths[index] + 10}px`;\n    });\n  });\n}"
+      "codeExample": "// ANTIPATTERN: LAYOUT THRASHING (Gây giật lag 10fps vì ép Reflow liên tục)\nexport function badResizeElements(elements: HTMLElement[]) {\n  elements.forEach((el) => {\n    // ĐỌC (Ép Forced Reflow)\n    const currentWidth = el.offsetWidth;\n    // GHI (Làm bẩn Layout)\n    el.style.width = `${currentWidth + 10}px`;\n  });\n}\n\n// BEST PRACTICE: Gom nhóm thao tác Đọc trước, Ghi sau (Batching)\nexport function optimizedResizeElements(elements: HTMLElement[]) {\n  // Bước 1: Đọc toàn bộ kích thước trong 1 lần duy nhất\n  const widths = elements.map((el) => el.offsetWidth);\n\n  // Bước 2: Ghi toàn bộ thay đổi cùng lúc (Trình duyệt chỉ cần 1 lần Reflow duy nhất)\n  requestAnimationFrame(() => {\n    elements.forEach((el, index) => {\n      el.style.width = `${widths[index] + 10}px`;\n    });\n  });\n}",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Quy Trình Hiển Thị Của Trình Duyệt (Critical Rendering Path)",
+        "caption": "Từ mã nguồn HTML thô đến từng điểm ảnh hiển thị trên màn hình với sự hỗ trợ của GPU Composite",
+        "stages": [
+          {
+            "name": "1. Parse DOM & CSSOM",
+            "tool": "HTML / CSS Parser",
+            "icon": "FileText",
+            "description": "Trình duyệt chuyển đổi thẻ HTML thành DOM Tree và CSS Rules thành CSSOM Tree độc lập.",
+            "metric": "< 20ms"
+          },
+          {
+            "name": "2. Render Tree Generation",
+            "tool": "Layout Engine",
+            "icon": "Cpu",
+            "description": "Kết hợp DOM và CSSOM. Bỏ qua các phần tử display: none, chỉ giữ lại các node thực sự hiển thị.",
+            "metric": "Tree Merge"
+          },
+          {
+            "name": "3. Layout (Reflow)",
+            "tool": "Geometry Calculation",
+            "icon": "Maximize",
+            "description": "Tính toán chính xác tọa độ (X, Y) và kích thước (Width, Height) của từng khối trên viewport.",
+            "metric": "Box Model"
+          },
+          {
+            "name": "4. Paint (Rasterization)",
+            "tool": "Color & Texture Paint",
+            "icon": "Feather",
+            "description": "Điền màu sắc, đường viền, bóng đổ và hình ảnh thành các bitmap điểm ảnh.",
+            "metric": "Raster Ops"
+          },
+          {
+            "name": "5. Composite Layers",
+            "tool": "GPU Compositor",
+            "icon": "Zap",
+            "description": "Tổng hợp các layer độc lập (transform, opacity) lên GPU để hiển thị với tốc độ 60-120 FPS mượt mà.",
+            "metric": "< 16.6ms"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Đọc các thuộc tính kích hoạt layout (`offsetWidth`, `clientHeight`, `scrollTop`, `getComputedStyle`) ngay giữa các câu lệnh gán style trong vòng lặp.",
@@ -1940,7 +1982,13 @@
       "summary": "Virtual DOM là một cây đối tượng JavaScript biểu diễn cấu trúc của Real DOM trong bộ nhớ. Quá trình Reconciliation là thuật toán so sánh cây Virtual DOM cũ và mới để tìm ra tập hợp các thay đổi tối thiểu; trải qua 2 pha: Render Phase (tính toán diffing, có thể tạm dừng/hủy bỏ trong Concurrent Mode) và Commit Phase (thực thi ghi các thay đổi lên Real DOM đồng bộ).",
       "deepDive": "Thuật toán diffing thông thường của cây có độ phức tạp $O(N^3)$, React giảm xuống $O(N)$ nhờ 2 giả định kinh nghiệm (Heuristics): 1) Hai phần tử khác loại (type) nhau (ví dụ `<div>` đổi thành `<span>`) sẽ sinh ra 2 cây hoàn toàn khác nhau -> React hủy bỏ cây cũ và tạo mới từ đầu. 2) Lập trình viên có thể chỉ định phần tử nào được giữ nguyên qua các lần render bằng prop `key`. Kiến trúc React Fiber biến mỗi React Element thành một 'Fiber Node' dạng danh sách liên kết đơn (Singly-linked list). Kỹ thuật Double Buffering (Current Fiber vs WorkInProgress Fiber) cho phép React chuẩn bị sẵn giao diện ngầm và chỉ tráo đổi con trỏ trong Commit Phase để tránh chớp nháy UI.",
       "codeLanguage": "typescript",
-      "codeExample": "/**\n * MINH HỌA CẤU TRÚC ĐỐI TƯỢNG VIRTUAL DOM (REACT ELEMENT) & FIBER\n */\n\n// 1. Khi viết JSX: <button className=\"btn-primary\">Lưu</button>\n// Trình biên dịch chuyển đổi thành đối tượng React Element:\nconst vdomNode = {\n  $$typeof: Symbol.for('react.element'),\n  type: 'button',\n  key: null,\n  props: {\n    className: 'btn-primary',\n    children: 'Lưu'\n  }\n};\n\n// 2. Minh họa quy tắc Diffing Heuristic:\n// Render 1: <div className=\"box\">Nội dung</div>\n// Render 2: <span className=\"box\">Nội dung</span>\n// -> React thấy type thay đổi từ 'div' sang 'span':\n// -> HỦY TOÀN BỘ node div cũ và unmount toàn bộ con, tạo mới span từ đầu!"
+      "codeExample": "/**\n * MINH HỌA CẤU TRÚC ĐỐI TƯỢNG VIRTUAL DOM (REACT ELEMENT) & FIBER\n */\n\n// 1. Khi viết JSX: <button className=\"btn-primary\">Lưu</button>\n// Trình biên dịch chuyển đổi thành đối tượng React Element:\nconst vdomNode = {\n  $$typeof: Symbol.for('react.element'),\n  type: 'button',\n  key: null,\n  props: {\n    className: 'btn-primary',\n    children: 'Lưu'\n  }\n};\n\n// 2. Minh họa quy tắc Diffing Heuristic:\n// Render 1: <div className=\"box\">Nội dung</div>\n// Render 2: <span className=\"box\">Nội dung</span>\n// -> React thấy type thay đổi từ 'div' sang 'span':\n// -> HỦY TOÀN BỘ node div cũ và unmount toàn bộ con, tạo mới span từ đầu!",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc React Fiber Reconciliation: Render Phase vs Commit Phase",
+        "caption": "Render phase có thể tạm dừng (Interruptible) để ưu tiên tương tác người dùng; Commit phase thực thi DOM một lần đồng bộ",
+        "code": "flowchart TD\n    subgraph RenderPhase [\"1. Render / Reconciliation Phase (Có thể hoãn/ngắt - Pure, No Side-effects)\"]\n        Trigger[\"State Update (setState / props change)\"] --> WorkLoop[\"Fiber Work Loop (Duyệt cây Fiber dạng LinkedList)\"]\n        WorkLoop --> Diff[\"Tính toán Diff: Gắn cờ Placement, Update, Deletion\"]\n        Diff --> YieldCheck{\"Có tác vụ tương tác người dùng gấp không?\"}\n        YieldCheck -->|\"Có (High Priority Input)\"| Pause[\"Nhường main thread cho trình duyệt\"]\n        Pause --> WorkLoop\n    end\n\n    subgraph CommitPhase [\"2. Commit Phase (Đồng bộ - Không thể ngắt)\"]\n        FinishWork[\"Kết thúc tính toán Diff\"] --> DOMMutation[\"Thực thi cập nhật DOM thực tế (DOM Mutation)\"]\n        DOMMutation --> LayoutEff[\"Chạy useLayoutEffect\"]\n        LayoutEff --> Paint[\"Trình duyệt vẽ lên màn hình\"]\n        Paint --> PassEff[\"Chạy useEffect bất đồng bộ\"]\n    end\n\n    YieldCheck -->|\"Không có\"| FinishWork"
+      }
     },
     "pitfalls": [
       "Khai báo một component con bên trong thân hàm của component cha, khiến mỗi lần cha re-render thì type của con lại mang một tham chiếu hàm hoàn toàn mới -> con bị unmount và remount mất sạch state!",

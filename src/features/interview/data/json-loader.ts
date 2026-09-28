@@ -188,6 +188,12 @@ export function validateQuestionBankJson(data: unknown): {
         };
       }
     }
+    if (answer.diagram !== undefined && (typeof answer.diagram !== 'object' || answer.diagram === null)) {
+      return {
+        valid: false,
+        error: `Câu hỏi id "${item.id}" có "seniorAnswer.diagram" không hợp lệ.`,
+      };
+    }
     if (item.evaluationRubric !== undefined) {
       const rubric = item.evaluationRubric as Record<string, unknown>;
       if (

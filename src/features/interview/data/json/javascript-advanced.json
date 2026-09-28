@@ -38,7 +38,13 @@
         "Theo dõi p75/p95 INP, total processing time và số task bị abort theo release; không chỉ đo average trên máy developer.",
         "Thêm test dùng fake workload và AbortController để bảo đảm batch dừng, không commit partial state ngoài contract.",
         "So sánh chunking với Worker trên dữ liệu thật vì serialization có thể lớn hơn phần CPU tiết kiệm được."
-      ]
+      ],
+      "diagram": {
+        "type": "mermaid",
+        "title": "Hiện Tượng Nghẽn Luồng Giao Diện Khi Microtask Bị Vòng Lặp Vô Hạn (Microtask Starvation)",
+        "caption": "Đệ quy Promise hoặc queueMicrotask() liên tục sẽ giam cầm Event Loop, ngăn chặn hoàn toàn việc Render giao diện 60 FPS",
+        "code": "flowchart TD\n    Stack[\"Call Stack\"] --> P[\"Chạy microtask: Promise.resolve().then(...)\"]\n    P -->|\"Lại tiếp tục sinh microtask mới trong callback\"| P\n    P -.->|\"Event Loop không bao giờ thoát ra được!\"| Trap[\"Khóa chặt trong Microtask Queue\"]\n    \n    Trap -.-x|\"BỊ CHẶN HOÀN TOÀN: Trình duyệt không thể chèn khung hình Render (16.6ms)\"| Screen[\"Màn hình bị đơ cứng (Frozen UI / ANR)\"]"
+      }
     },
     "evaluationRubric": {
       "baseline": [
@@ -62,7 +68,10 @@
         "title": "HTML Standard — Event loops and microtask checkpoints",
         "url": "https://html.spec.whatwg.org/multipage/webappapis.html#event-loops"
       },
-      { "title": "W3C Long Tasks API", "url": "https://w3c.github.io/longtasks/" }
+      {
+        "title": "W3C Long Tasks API",
+        "url": "https://w3c.github.io/longtasks/"
+      }
     ],
     "pitfalls": [
       "Khẳng định Promise luôn chạy trước mọi API browser mà không xét task source và event loop.",

@@ -225,7 +225,63 @@
     "seniorAnswer": {
       "summary": "Request lifecycle trong NestJS là chuỗi xử lý tuần tự có trật tự xác định: Incoming Request → Middleware → Guards → Interceptors (Pre) → Pipes → Controller Handler → Interceptors (Post / RxJS tap, map) → Exception Filters (nếu có lỗi bất kỳ).",
       "deepDive": "Thứ tự thực thi chi tiết: 1) Middleware: chạy đầu tiên theo chuẩn Express/Fastify (thao tác header, cors, morgan logging); 2) Guards: kiểm tra quyền truy cập (AuthN, AuthZ), có thể đọc metadata; 3) Interceptors (Pointcut trước): thực thi trước khi handler chạy (start timer latency, cache check); 4) Pipes: validate và biến đổi kiểu dữ liệu payload (@Body, @Query); 5) Controller Handler: thực thi nghiệp vụ; 6) Interceptors (Pointcut sau): can thiệp stream Observable trả về (transform payload, enrich metadata, log execution time); 7) Exception Filters: nếu bất kỳ tầng nào quăng Exception, filter tương ứng sẽ bắt và format JSON response.",
-      "codeExample": "// Chuỗi lifecycle thể hiện qua Decorator xếp chồng:\n@UseGuards(JwtAuthGuard, RolesGuard)\n@UseInterceptors(LoggingInterceptor, TransformInterceptor)\n@Controller('users')\nexport class UserController {\n  @Post()\n  @UsePipes(new ValidationPipe({ transform: true }))\n  createUser(@Body() dto: CreateUserDto) {\n    return this.userService.create(dto);\n  }\n}"
+      "codeExample": "// Chuỗi lifecycle thể hiện qua Decorator xếp chồng:\n@UseGuards(JwtAuthGuard, RolesGuard)\n@UseInterceptors(LoggingInterceptor, TransformInterceptor)\n@Controller('users')\nexport class UserController {\n  @Post()\n  @UsePipes(new ValidationPipe({ transform: true }))\n  createUser(@Body() dto: CreateUserDto) {\n    return this.userService.create(dto);\n  }\n}",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Quy Trình Xử Lý Request Hoàn Chỉnh Trong NestJS (Request Lifecycle Pipeline)",
+        "caption": "Thứ tự ưu tiên nghiêm ngặt từ khi Request chạm vào Server tới khi Response được trả về",
+        "stages": [
+          {
+            "name": "1. Global & Route Middleware",
+            "tool": "Express / Fastify Middleware",
+            "icon": "Layers",
+            "description": "Xử lý tiền kỳ: ghi log request, phân tích header thô, kiểm tra CORS hoặc gắn correlation ID.",
+            "metric": "Pre-routing"
+          },
+          {
+            "name": "2. Guards (Bảo Vệ Xác Thực & Phân Quyền)",
+            "tool": "AuthGuard / RolesGuard",
+            "icon": "Shield",
+            "description": "Kiểm tra token JWT và quyền hạn @Roles(). Nếu canActivate() trả về false, chặn đứng ngay với lỗi 403 Forbidden.",
+            "metric": "Auth Check"
+          },
+          {
+            "name": "3. Interceptors (Tiền Kỳ - Pre)",
+            "tool": "LoggingInterceptor",
+            "icon": "Cpu",
+            "description": "Ghi nhận thời gian bắt đầu thực thi, biến đổi luồng dữ liệu trước khi vào Controller.",
+            "metric": "Trace Start"
+          },
+          {
+            "name": "4. Pipes (Kiểm Tra & Ép Kiểu)",
+            "tool": "ValidationPipe / ParseIntPipe",
+            "icon": "CheckCircle",
+            "description": "Kiểm tra dữ liệu Body/Query bằng class-validator (DTO). Báo lỗi 400 Bad Request ngay nếu sai kiểu dữ liệu.",
+            "metric": "Zod/ClassValidator"
+          },
+          {
+            "name": "5. Controller & Service Handler",
+            "tool": "Business Route Method",
+            "icon": "Zap",
+            "description": "Thực thi nghiệp vụ chính, truy vấn database và trả về dữ liệu thô.",
+            "metric": "Core Business"
+          },
+          {
+            "name": "6. Interceptors (Hậu Kỳ - Post)",
+            "tool": "TransformInterceptor",
+            "icon": "RefreshCw",
+            "description": "Bọc dữ liệu trả về theo chuẩn công ty: { success: true, data: result, timestamp: ... }.",
+            "metric": "Format Response"
+          },
+          {
+            "name": "7. Exception Filters",
+            "tool": "HttpExceptionFilter",
+            "icon": "AlertTriangle",
+            "description": "Bắt mọi ngoại lệ chưa được xử lý, chuyển thành mã lỗi HTTP JSON rõ ràng cho người dùng.",
+            "metric": "Error Boundary"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Đặt logic xác thực phân quyền vào Middleware thay vì Guard, dẫn đến việc không thể truy cập ExecutionContext và Reflector metadata của handler.",

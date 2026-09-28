@@ -49,7 +49,13 @@
       "summary": "'use client' là một directive đánh dấu 'Client Boundary' giữa Server và Client module graph. Nó chỉ bắt buộc khi component cần tương tác người dùng (onClick, onChange), React state/effects (useState, useEffect), hoặc browser APIs (window, localStorage). Client Components vẫn được prerender thành HTML trên server ở lần tải đầu tiên.",
       "deepDive": "Trong App Router, mọi component mặc định là React Server Components (RSC). Khi đặt `'use client'` ở đầu file, bạn báo cho bundler rằng file này và toàn bộ các module được import bởi nó thuộc về Client Bundle. Điều này không có nghĩa là nó không chạy trên server: ở initial request, Client Components vẫn được server thực thi để render ra HTML tĩnh (HTML preview), sau đó browser tải bundle JavaScript về và tiến hành Hydration để gắn event listeners. Do đó, nguyên tắc kiến trúc là đẩy 'use client' xuống các leaf node (nhánh con cùng) của component tree để giảm thiểu JS bundle gửi xuống client.",
       "codeExample": "// components/counter-button.tsx\n'use client';\n\nimport { useState } from 'react';\n\nexport function CounterButton() {\n  const [count, setCount] = useState(0);\n  return (\n    <button \n      type=\"button\"\n      onClick={() => setCount((prev) => prev + 1)}\n      className=\"px-4 py-2 bg-blue-600 text-white rounded\"\n    >\n      Clicked {count} times\n    </button>\n  );\n}",
-      "codeLanguage": "tsx"
+      "codeLanguage": "tsx",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Ranh Giới Kiến Trúc \"use client\" Trong Next.js App Router",
+        "caption": "\"use client\" không biến toàn bộ component thành chạy ở browser; nó tạo ranh giới phân tách mã nguồn đóng gói vào Client Bundle",
+        "code": "flowchart TD\n    subgraph ServerOnly [\"Server Component Tree (Zero JavaScript Bundle cho Client)\"]\n        Layout[\"RootLayout (Server Component)\n- Đọc Database trực tiếp\n- Đọc cookies / headers\"]\n        Page[\"ProductPage (Server Component)\n- Fetch API bí mật bằng API Key nội bộ\"]\n        Layout --> Page\n    end\n\n    subgraph Boundary [\"'use client' Boundary\"]\n        Page -->|\"Truyền dữ liệu JSON props qua ranh giới\"| ClientWrapper[\"AddToCartButton ('use client')\n- Chứa onClick handler\n- Sử dụng useState, useEffect\n- Bundle mã nguồn JS xuống Browser\"]\n    end\n\n    subgraph ClientChildren [\"Lồng Server Component vào Client Component làm Children\"]\n        ClientWrapper -.->|\"Lồng dạng {children}\"| ServerDetail[\"ProductDetail (Server Component vẫn giữ nguyên Zero JS!)\"]\n    end"
+      }
     },
     "pitfalls": [
       "Tưởng rằng 'use client' làm component không chạy trên server, dẫn tới truy cập `window` trực tiếp trong thân component gây hydration mismatch hoặc server crash.",
@@ -111,7 +117,75 @@
       "summary": "SSR (Server-Side Rendering) là kỹ thuật mà Next.js render mã React thành HTML hoàn chỉnh trên server tại thời điểm nhận được request từ client (request-time). Trong App Router, SSR tương ứng với Dynamic Rendering, xảy ra khi route sử dụng dynamic functions (cookies, headers) hoặc fetch dữ liệu không cache.",
       "deepDive": "Trong Pages Router truyền thống, SSR được kích hoạt rõ ràng thông qua `export const getServerSideProps`. Mỗi khi có request, server chạy hàm này, lấy data và render HTML gửi về browser. Trong App Router, khái niệm này được trừu tượng hóa thành 'Dynamic Rendering'. Route tự động chuyển sang dynamic rendering khi gặp dynamic functions (`cookies()`, `headers()`, `searchParams`) hoặc data fetch có `cache: 'no-store'` / `revalidate: 0`. Lợi ích lớn nhất của SSR là người dùng và search engine bot nhận được HTML có sẵn nội dung cá nhân hóa ngay lập tức. Tuy nhiên, đánh đổi là TTFB (Time to First Byte) cao hơn SSG vì server phải đợi data và render trước khi stream về client.",
       "codeExample": "// app/dashboard/page.tsx (App Router - Dynamic SSR)\nimport { cookies } from 'next/headers';\n\nexport default async function DashboardPage() {\n  const cookieStore = await cookies();\n  const token = cookieStore.get('auth_token')?.value;\n  \n  // Route này tự động trở thành Dynamic SSR vì dùng cookies()\n  const account = await fetch('https://api.example.com/me', {\n    headers: { Authorization: `Bearer ${token}` },\n    cache: 'no-store',\n  }).then(res => res.json());\n\n  return (\n    <main>\n      <h1>Xin chào, {account.userName}</h1>\n      <p>Số dư ví: {account.balance} VND</p>\n    </main>\n  );\n}",
-      "codeLanguage": "tsx"
+      "codeLanguage": "tsx",
+      "benchmark": {
+        "title": "Ma trận So Sánh Các Chiến Lược Rendering Trong Next.js",
+        "caption": "Đánh giá đánh đổi giữa tốc độ TTFB, tải chịu đựng của Server và độ tươi mới của dữ liệu",
+        "options": [
+          {
+            "name": "Static Site Generation (SSG / Pre-rendering)",
+            "badge": "Siêu tốc độ TTFB",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Tốc độ phản hồi TTFB",
+                "value": 99,
+                "displayValue": "< 10ms (CDN Edge)",
+                "color": "emerald"
+              },
+              {
+                "label": "Tải Server Database",
+                "value": 100,
+                "displayValue": "Zero DB Load",
+                "color": "emerald"
+              },
+              {
+                "label": "Độ tươi mới của dữ liệu",
+                "value": 40,
+                "displayValue": "Cần Revalidate (ISR)",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Phục vụ từ CDN toàn cầu với chi phí hạ tầng tối thiểu",
+              "Không bao giờ sập khi hàng triệu người cùng vào đọc trang bài viết"
+            ],
+            "cons": [
+              "Dữ liệu không thể cá nhân hóa theo từng tài khoản đăng nhập"
+            ]
+          },
+          {
+            "name": "Server-Side Rendering (SSR / Dynamic Rendering)",
+            "badge": "Dữ liệu thời gian thực",
+            "metrics": [
+              {
+                "label": "Tốc độ phản hồi TTFB",
+                "value": 65,
+                "displayValue": "~150-300ms",
+                "color": "amber"
+              },
+              {
+                "label": "Tải Server Database",
+                "value": 30,
+                "displayValue": "Truy vấn mỗi request",
+                "color": "rose"
+              },
+              {
+                "label": "Độ tươi mới của dữ liệu",
+                "value": 100,
+                "displayValue": "Thời gian thực 100%",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Dữ liệu luôn mới nhất, đọc được cookie và hiển thị giao diện cá nhân hóa theo user"
+            ],
+            "cons": [
+              "Server Node.js phải tính toán render lại HTML cho mọi request, tiêu tốn CPU"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Lạm dụng SSR cho các trang dữ liệu tĩnh dẫn đến quá tải server và TTFB chậm không đáng có.",
