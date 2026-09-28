@@ -18,7 +18,81 @@
       "summary": "Vite là build tool frontend thế hệ mới gồm hai phần: dev server tận dụng Native ES Modules (ESM) của trình duyệt để nạp code theo nhu cầu (on-demand), kết hợp với Rollup cho production build. Vite khởi động nhanh hơn Webpack vì không phải crawl và gom (bundle) toàn bộ mã nguồn trước khi khởi chạy.",
       "deepDive": "Trong Webpack Dev Server, bundler phải phân tích toàn bộ cây phụ thuộc (dependency graph) và gom tất cả modules vào bộ nhớ trước khi dev server có thể phục vụ request đầu tiên. Khi codebase phình to, thời gian này tăng tuyến tính (O(n)). Ngược lại, Vite chia module thành hai loại: dependencies (ít thay đổi) được pre-bundle bằng Go-based `esbuild` (nhanh gấp 10-100 lần JS bundlers); và source code (thường xuyên sửa) được trình duyệt yêu cầu qua Native ESM HTTP request. Vite chỉ transpile module thực sự được route hiện tại import. Do đó, thời gian khởi động của Vite gần như hằng số (O(1)) bất kể kích thước ứng dụng.",
       "codeExample": "// vite.config.ts\nimport { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  // Tối ưu hóa pre-bundling cho các dependency lớn hoặc CommonJS\n  optimizeDeps: {\n    include: ['lodash-es', 'date-fns', 'axios'],\n    exclude: ['@my-company/internal-ui-esm']\n  },\n  server: {\n    port: 3000,\n    open: true,\n    warmup: {\n      // Chủ động compile trước các routes trọng yếu để loại bỏ độ trễ cold-request\n      clientFiles: ['./src/routes/Dashboard.tsx', './src/routes/Checkout.tsx']\n    }\n  }\n});",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Vite On-Demand Native ESM vs Webpack Bundler Truyền Thống",
+        "caption": "Webpack phải gom toàn bộ mã nguồn trước khi khởi động; Vite sử dụng native ESM trên trình duyệt và esbuild siêu tốc",
+        "code": "flowchart LR\n    subgraph WebpackDev [\"Webpack Dev Server (Gom gói toàn bộ trước - Khởi động chậm)\"]\n        Entry[\"Entry File\"] --> ParseAll[\"Phân tích toàn bộ Dependency Graph (Hàng nghìn files)\"]\n        ParseAll --> Bundle[\"Tạo file Bundle khổng lồ trong RAM\"]\n        Bundle --> Server1[\"Server Sẵn Sàng (Mất 30s - 2 phút)\"]\n    end\n\n    subgraph ViteDev [\"Vite Dev Server (Native ESM - Khởi động tức thì < 200ms)\"]\n        Server2[\"Server Sẵn Sàng Ngay Lập Tức\"] --> BrowserReq[\"Trình duyệt cần file nào mới gửi request file đó qua Native ESM\"]\n        BrowserReq --> OnDemand[\"Chuyển đổi file đơn lẻ on-demand bằng esbuild (Viết bằng Golang siêu nhanh)\"]\n    end"
+      },
+      "benchmark": {
+        "title": "So sánh Tốc Độ: Vite vs Webpack Trong Dự Án Quy Mô Lớn",
+        "caption": "Đo lường thời gian khởi động Cold Start và thời gian Hot Module Replacement (HMR)",
+        "options": [
+          {
+            "name": "Vite (Native ESM + esbuild + Rollup)",
+            "badge": "Chuẩn Modern Frontend",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Thời gian Cold Start Dev Server",
+                "value": 99,
+                "displayValue": "< 300ms",
+                "color": "emerald"
+              },
+              {
+                "label": "Tốc độ cập nhật HMR",
+                "value": 98,
+                "displayValue": "< 50ms (Độc lập kích thước app)",
+                "color": "emerald"
+              },
+              {
+                "label": "Thời gian Build Production",
+                "value": 90,
+                "displayValue": "Nhanh hơn 3-5 lần",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Khởi động server gần như tức thì bất kể project có 100 hay 10,000 components",
+              "Cấu hình đơn giản và tích hợp sẵn TypeScript, JSX, CSS modules"
+            ],
+            "cons": [
+              "Khi dev có thể sinh ra hàng trăm HTTP requests nhỏ lẻ trên tab Network"
+            ]
+          },
+          {
+            "name": "Webpack 5 (Classic Bundler)",
+            "badge": "Cấu hình linh hoạt cao",
+            "metrics": [
+              {
+                "label": "Thời gian Cold Start Dev Server",
+                "value": 25,
+                "displayValue": "~45-90 giây",
+                "color": "rose"
+              },
+              {
+                "label": "Tốc độ cập nhật HMR",
+                "value": 50,
+                "displayValue": "~500ms - 2s",
+                "color": "amber"
+              },
+              {
+                "label": "Hệ sinh thái Plugin & Loader",
+                "value": 100,
+                "displayValue": "Phong phú nhất",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Khả năng tùy biến sâu không giới hạn, xử lý được mọi case legacy kỳ lạ nhất"
+            ],
+            "cons": [
+              "Thời gian khởi động ban đầu rất lâu do phải phân tích toàn bộ cây phụ thuộc"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Nhầm lẫn rằng Vite dùng esbuild cho cả production. Thực tế Vite dùng Rollup cho production build nhằm tận dụng tree-shaking và plugin ecosystem hoàn chỉnh hơn.",

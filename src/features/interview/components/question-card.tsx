@@ -1,7 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { Bookmark, ChevronDown, Sparkles, AlertTriangle, HelpCircle } from 'lucide-react';
+import {
+  Bookmark,
+  ChevronDown,
+  Sparkles,
+  AlertTriangle,
+  HelpCircle,
+  CheckCircle2,
+  Circle,
+} from 'lucide-react';
 import { InterviewQuestion } from '../types';
 import { useInterviewStore } from '../stores/use-interview-store';
 import { Card } from '@/components/ui/card';
@@ -10,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CodeBlock } from '@/components/ui/code-block';
 import { TechIcon } from '@/components/common/tech-icon';
+import { MermaidViewer, PipelineTracker, BenchmarkMatrix, CodeDiffViewer } from './visual';
 import { resolveFollowUp } from '../data/followup-resolver';
 import { getCategoryBadge } from '../config/categories.config';
 import { cn } from '@/lib/utils';
@@ -41,9 +50,14 @@ export const QuestionCard = React.memo(function QuestionCard({
   onToggleExpand,
 }: QuestionCardProps) {
   const isBookmarked = useInterviewStore(
-    React.useCallback((s) => s.bookmarkedQuestionIds.includes(question.id), [question.id])
+    React.useCallback((s) => (s.bookmarkedQuestionIds || []).includes(question.id), [question.id])
   );
   const toggleBookmark = useInterviewStore((s) => s.toggleBookmark);
+
+  const isMastered = useInterviewStore(
+    React.useCallback((s) => (s.masteredQuestionIds || []).includes(question.id), [question.id])
+  );
+  const toggleMasteredQuestion = useInterviewStore((s) => s.toggleMasteredQuestion);
   const [internalExpanded, setInternalExpanded] = React.useState(false);
   const [revealedFollowUps, setRevealedFollowUps] = React.useState<Set<number>>(
     new Set()
@@ -70,6 +84,27 @@ export const QuestionCard = React.memo(function QuestionCard({
   const hasRubric = Boolean(question.evaluationRubric);
   const categoryMeta = getCategoryBadge(question.category);
 
+  const diagramSpec = question.seniorAnswer.diagram;
+  const isMermaidCode = Boolean(
+    question.seniorAnswer.codeLanguage === 'mermaid' ||
+      (question.seniorAnswer.codeExample &&
+        /(sequenceDiagram|flowchart|graph\s+(TD|LR|TB|RL)|erDiagram|stateDiagram|classDiagram)/i.test(
+          question.seniorAnswer.codeExample
+        ))
+  );
+  const hasDiagram = Boolean(diagramSpec || isMermaidCode);
+  const diagramCode =
+    diagramSpec?.code || (isMermaidCode ? question.seniorAnswer.codeExample : undefined);
+
+  const gridColsClass = React.useMemo(() => {
+    let count = 3;
+    if (hasDiagram) count++;
+    if (hasRubric) count++;
+    if (count === 3) return 'max-w-md grid-cols-3';
+    if (count === 4) return 'max-w-xl grid-cols-2 sm:grid-cols-4';
+    return 'max-w-2xl grid-cols-2 sm:grid-cols-5';
+  }, [hasDiagram, hasRubric]);
+
   const toggleFollowUp = (idx: number) => {
     setRevealedFollowUps((prev) => {
       const next = new Set(prev);
@@ -83,7 +118,13 @@ export const QuestionCard = React.memo(function QuestionCard({
   };
 
   return (
-    <Card className="glass-card glass-card-hover overflow-hidden p-4 transition-all sm:p-5">
+    <Card
+      className={cn(
+        'glass-card glass-card-hover overflow-hidden p-4 transition-all sm:p-5',
+        isMastered &&
+          'border-emerald-500/40 bg-gradient-to-br from-emerald-500/[0.04] to-transparent dark:border-emerald-500/30'
+      )}
+    >
       {/* Clickable Header Area */}
       <div
         role="button"
@@ -116,6 +157,15 @@ export const QuestionCard = React.memo(function QuestionCard({
                 )}
                 <span>{categoryMeta.label}</span>
               </Badge>
+              {isMastered && (
+                <Badge
+                  variant="outline"
+                  className="gap-1 border-emerald-500/30 bg-emerald-500/10 py-0 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                >
+                  <CheckCircle2 className="h-2.5 w-2.5" />
+                  <span>Đã nắm vững</span>
+                </Badge>
+              )}
             </div>
 
             <h3 className="text-foreground group-hover:text-primary text-base leading-snug font-bold break-words transition-colors">
@@ -134,6 +184,32 @@ export const QuestionCard = React.memo(function QuestionCard({
             className="flex shrink-0 items-center gap-1"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Mastered / Solved Button (NeetCode Style) */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleMasteredQuestion(question.id);
+              }}
+              className={`h-8 w-8 rounded-lg p-0 transition-transform active:scale-90 ${
+                isMastered
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : 'text-muted-foreground hover:text-emerald-500'
+              }`}
+              title={
+                isMastered
+                  ? 'Đã nắm vững (Click để bỏ đánh dấu)'
+                  : 'Đánh dấu đã nắm vững (Mastered)'
+              }
+            >
+              {isMastered ? (
+                <CheckCircle2 className="h-4 w-4 fill-emerald-500/20 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Circle className="h-4 w-4" />
+              )}
+            </Button>
+
             <Button
               variant="ghost"
               size="sm"
@@ -196,12 +272,15 @@ export const QuestionCard = React.memo(function QuestionCard({
         <div className="accordion-overflow">
           {hasBeenExpanded && (
             <Tabs defaultValue="answer" className="w-full">
-              <TabsList
-                className={`grid w-full ${hasRubric ? 'max-w-xl grid-cols-2 sm:grid-cols-4' : 'max-w-md grid-cols-3'}`}
-              >
+              <TabsList className={`grid w-full ${gridColsClass}`}>
                 <TabsTrigger value="answer" className="text-xs">
                   💡 <span className="hidden sm:inline">Deep </span>Answer
                 </TabsTrigger>
+                {hasDiagram && (
+                  <TabsTrigger value="diagram" className="text-xs">
+                    📊 <span className="hidden sm:inline">Kiến trúc / </span>Sơ đồ
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="pitfalls" className="text-xs">
                   ⚠️ <span className="hidden sm:inline">Pitfalls &amp; </span>Traps
                 </TabsTrigger>
@@ -279,11 +358,62 @@ export const QuestionCard = React.memo(function QuestionCard({
                   </div>
                 )}
 
+                {/* Quantitative Benchmark & Trade-off Matrix */}
+                {question.seniorAnswer.benchmark && (
+                  <div className="mt-2">
+                    <BenchmarkMatrix
+                      title={question.seniorAnswer.benchmark.title}
+                      caption={question.seniorAnswer.benchmark.caption}
+                      options={question.seniorAnswer.benchmark.options}
+                    />
+                  </div>
+                )}
+
+                {/* Visual Pipeline or Mermaid diagram if defined */}
+                {diagramSpec?.type === 'pipeline' && diagramSpec.stages && (
+                  <div className="mt-2">
+                    <PipelineTracker
+                      stages={diagramSpec.stages}
+                      title={diagramSpec.title}
+                    />
+                  </div>
+                )}
+
+                {diagramCode && !isMermaidCode && (
+                  <div className="mt-2">
+                    <MermaidViewer
+                      code={diagramCode}
+                      title={diagramSpec?.title}
+                      caption={diagramSpec?.caption}
+                    />
+                  </div>
+                )}
+
                 {question.seniorAnswer.codeExample && (
                   <div className="mt-2">
-                    <CodeBlock
-                      code={question.seniorAnswer.codeExample}
-                      language={question.seniorAnswer.codeLanguage ?? 'tsx'}
+                    {isMermaidCode ? (
+                      <MermaidViewer
+                        code={question.seniorAnswer.codeExample}
+                        title={diagramSpec?.title || 'Sơ đồ luồng xử lý (Mermaid Diagram)'}
+                        caption={diagramSpec?.caption}
+                      />
+                    ) : (
+                      <CodeBlock
+                        code={question.seniorAnswer.codeExample}
+                        language={question.seniorAnswer.codeLanguage ?? 'tsx'}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* Side-by-Side Code Diff: Anti-pattern vs Senior Fix */}
+                {question.seniorAnswer.codeDiff && (
+                  <div className="mt-2">
+                    <CodeDiffViewer
+                      title={question.seniorAnswer.codeDiff.title}
+                      language={question.seniorAnswer.codeDiff.language}
+                      antiPattern={question.seniorAnswer.codeDiff.antiPattern}
+                      seniorSolution={question.seniorAnswer.codeDiff.seniorSolution}
                     />
                   </div>
                 )}
@@ -326,6 +456,24 @@ export const QuestionCard = React.memo(function QuestionCard({
                   </div>
                 )}
               </TabsContent>
+
+              {/* Dedicated Diagram Tab */}
+              {hasDiagram && (
+                <TabsContent value="diagram" className="space-y-3 pt-2">
+                  {diagramSpec?.type === 'pipeline' && diagramSpec.stages ? (
+                    <PipelineTracker
+                      stages={diagramSpec.stages}
+                      title={diagramSpec.title}
+                    />
+                  ) : diagramCode ? (
+                    <MermaidViewer
+                      code={diagramCode}
+                      title={diagramSpec?.title || 'Sơ đồ luồng kiến trúc (Architecture Diagram)'}
+                      caption={diagramSpec?.caption}
+                    />
+                  ) : null}
+                </TabsContent>
+              )}
 
               {/* Pitfalls Tab */}
               <TabsContent value="pitfalls" className="space-y-2 pt-2">

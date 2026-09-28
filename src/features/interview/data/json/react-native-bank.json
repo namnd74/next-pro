@@ -439,7 +439,80 @@
       "summary": "Bridge cũ là cơ chế giao tiếp giữa JavaScript Thread và Native Platform Thread (iOS/Android). Nó có 3 đặc tính cố hữu gây thắt cổ chai: Bất đồng bộ (Asynchronous), Tuần tự hóa JSON (Serialized JSON strings) và Chia sẻ dữ liệu gián tiếp qua hàng đợi (Batched MessageQueue). Từ 2024+, React Native thay thế hoàn toàn Bridge bằng JSI (JavaScript Interface) - một lớp trừu tượng C++ cho phép JavaScript nắm giữ trực tiếp con trỏ bộ nhớ tới các Native Host Objects và gọi hàm native đồng bộ (synchronous) mà không cần serialize JSON.",
       "deepDive": "Trong kiến trúc cũ, khi JS gọi một hàm native (hoặc native gửi sự kiện touch về JS), dữ liệu phải đi qua các bước: `JS Object -> JSON String -> Bridge C++ Queue -> Native Object` và ngược lại. Khi người dùng vuốt ngón tay với tần số 120Hz hoặc cuộn danh sách lớn, lượng dữ liệu JSON khổng lồ tràn ngập MessageQueue, gây ra tình trạng 'Bridge Congestion' (nghẽn cầu) - giao diện bị đóng băng dù CPU máy vẫn còn trống. Với JSI, JavaScript Engine (Hermes) tiếp xúc trực tiếp với C++. Đối tượng C++ được phơi bày (exposed) vào môi trường JS như một Host Object thông thường, giúp tốc độ gọi hàm tiệm cận native.",
       "codeExample": "// Minh hoạ mô hình gọi hàm: Bridge cũ (bất đồng bộ qua hàng đợi) vs JSI (đồng bộ trực tiếp qua C++ con trỏ)\n\n// 1. KIẾN TRÚC CŨ: Phải thông qua NativeModules bất đồng bộ\n// import { NativeModules } from 'react-native';\n// NativeModules.MyOldBridgeModule.calculateHash(data, (result) => {\n//   console.log('Phải chờ vòng lặp MessageQueue:', result);\n// });\n\n// 2. KIẾN TRÚC MỚI (JSI): Gọi trực tiếp synchronous như hàm JS thuần qua HostObject C++\ninterface JSIFastStorageHostObject {\n  getStringSync(key: string): string | null;\n  setBytesSync(key: string, value: ArrayBuffer): boolean;\n}\n\ndeclare const global: {\n  __FastStorageJSI?: JSIFastStorageHostObject;\n};\n\nexport class JSIStorageClient {\n  private static instance = global.__FastStorageJSI;\n\n  public static get(key: string): string | null {\n    if (!this.instance) {\n      throw new Error('JSI HostObject chưa được bind vào JS Global runtime!');\n    }\n    // Lệnh này thực thi đồng bộ lập tức ở tầng C++ trong thời gian nano-giây, ZERO JSON overhead\n    return this.instance.getStringSync(key);\n  }\n}",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc React Native: Bridge Cũ (JSON Queue) vs New Architecture (JSI)",
+        "caption": "JSI cho phép JavaScript gọi trực tiếp C++ Native Host Object mà không cần mã hóa/giải mã chuỗi JSON",
+        "code": "flowchart TD\n    subgraph OldBridge [\"Kiến Trúc Cũ: The Bridge (Bất Đồng Bộ & Nghẽn Cổ Chai)\"]\n        JS1[\"JavaScript Thread\"] -->|\"Serialize sang JSON string\"| Q1[\"Bridge Message Queue\"]\n        Q1 -->|\"Chờ luân chuyển theo đợt\"| Q2[\"Native Queue\"]\n        Q2 -->|\"Deserialize JSON string\"| Nat1[\"Native Thread (iOS/Android)\"]\n    end\n\n    subgraph NewArch [\"Kiến Trúc Mới: JavaScript Interface (JSI & Fabric)\"]\n        JS2[\"JavaScript Engine (Hermes)\"] <===>|\"Gọi hàm đồng bộ C++ trực tiếp (Direct C++ Host Objects)\"| Nat2[\"Native Runtime (iOS/Android C++)\"]\n        Nat2 --> Yoga[\"Yoga Layout Engine\"]\n        Yoga --> View[\"Native Host Views (Fabric)\"]\n    end"
+      },
+      "benchmark": {
+        "title": "So sánh Hiệu Năng: Cầu Nối Cũ (Bridge) vs JSI Mới",
+        "caption": "Đo lường độ trễ tương tác cử chỉ (Gestures) và tốc độ trao đổi dữ liệu",
+        "options": [
+          {
+            "name": "New Architecture (JSI + Fabric + TurboModules)",
+            "badge": "Chuẩn 2026 Mặc Định",
+            "isRecommended": true,
+            "metrics": [
+              {
+                "label": "Độ trễ truyền dữ liệu (Overhead)",
+                "value": 99,
+                "displayValue": "Gần như bằng 0 (Zero-copy)",
+                "color": "emerald"
+              },
+              {
+                "label": "Tương tác cuộn 120 FPS",
+                "value": 98,
+                "displayValue": "Mượt mà không drop frame",
+                "color": "emerald"
+              },
+              {
+                "label": "Khởi động ứng dụng (Hermes Bytecode)",
+                "value": 90,
+                "displayValue": "Nhanh hơn 50%",
+                "color": "emerald"
+              }
+            ],
+            "pros": [
+              "Gọi hàm Native đồng bộ trực tiếp trong 1 frame duy nhất",
+              "Hỗ trợ React 19 Concurrent Features và Suspense mượt mà"
+            ],
+            "cons": [
+              "Yêu cầu thư viện bên thứ 3 phải viết hỗ trợ C++ Codegen"
+            ]
+          },
+          {
+            "name": "Legacy Bridge (JSON Serialization)",
+            "metrics": [
+              {
+                "label": "Độ trễ truyền dữ liệu",
+                "value": 40,
+                "displayValue": "Nghẽn khi truyền data lớn",
+                "color": "rose"
+              },
+              {
+                "label": "Tương tác cuộn 120 FPS",
+                "value": 50,
+                "displayValue": "Dễ bị giật trắng màn hình",
+                "color": "amber"
+              },
+              {
+                "label": "Khởi động ứng dụng",
+                "value": 60,
+                "displayValue": "Tốn thời gian parse JS",
+                "color": "amber"
+              }
+            ],
+            "pros": [
+              "Tương thích với các thư viện cũ không duy trì"
+            ],
+            "cons": [
+              "Hiện tượng \"White Blank Screen\" khi cuộn danh sách nhanh do JSON Bridge bị quá tải hàng đợi"
+            ]
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Hiểu lầm rằng JSI chỉ dành cho TurboModules mà không biết rằng nó là nền tảng cốt lõi cho cả Fabric Renderer và Reanimated.",
@@ -1859,7 +1932,42 @@
       "summary": "Fabric Renderer là hệ thống kết xuất mới thay thế hoàn toàn UIManager cũ. Khác biệt lớn nhất: UIManager cũ quản lý cây giao diện phân mảnh và gửi các lệnh vẽ (createView, updateView) bất đồng bộ qua Bridge gây ra hiện tượng nhảy giật layout (layout flickering). Fabric chuyển toàn bộ cây Shadow Tree xuống tầng **C++ cốt lõi** với các node bất biến (**Immutable Shadow Nodes**), hỗ trợ render đồng bộ (Synchronous Mounting) và tương thích hoàn hảo với các tính năng Concurrent Mode của React 18/19.",
       "deepDive": "Quy trình của Fabric gồm 3 pha độc lập: 1) **Render**: React tạo cây Element trên JS; 2) **Commit**: Tạo C++ Shadow Tree bất biến và tính toán layout qua Yoga trực tiếp trong C++; 3) **Mount**: Biến đổi cây C++ thành Native Views trên màn hình. Vì Shadow Tree là bất biến (immutable), Fabric có thể tính toán layout đa luồng (multi-threaded layout calculation) mà không lo ngại xung đột dữ liệu. Khi có sự kiện người dùng ưu tiên cao (như gõ phím), Fabric có thể dừng tác vụ render dở dang và ưu tiên commit ngay lập tức giao diện lên màn hình.",
       "codeExample": "/**\n * Mô phỏng máy trạng thái 3 giai đoạn của Fabric Renderer Pipeline (Render -> Commit -> Mount)\n */\nexport type FabricPhase = 'RENDER_JS' | 'COMMIT_SHADOW_TREE_CPP' | 'MOUNT_NATIVE_VIEWS';\n\nexport interface FabricCommitEvent {\n  phase: FabricPhase;\n  timestamp: number;\n  treeRevision: number;\n  isSynchronous: boolean;\n}\n\nexport class FabricPipelineMonitor {\n  private static currentRevision = 0;\n\n  public static traceCommit(isHighPriorityInput: boolean): FabricCommitEvent {\n    this.currentRevision++;\n    const event: FabricCommitEvent = {\n      phase: 'COMMIT_SHADOW_TREE_CPP',\n      timestamp: performance.now(),\n      treeRevision: this.currentRevision,\n      // Nếu là tương tác người dùng ưu tiên cao, Fabric ép Render đồng bộ tức thì\n      isSynchronous: isHighPriorityInput,\n    };\n\n    console.log(`[Fabric Commit] Revision #${event.treeRevision} | Sync: ${event.isSynchronous}`);\n    return event;\n  }\n}",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Quy Trình Kết Xuất Fabric Renderer (New Architecture Rendering Pipeline)",
+        "caption": "Ba pha xử lý giao diện tối ưu: Render (JS) -> Prerender/Layout (C++ Shadow Tree) -> Mount (Native Host Platform)",
+        "stages": [
+          {
+            "name": "1. React Render Phase",
+            "tool": "Hermes Engine",
+            "icon": "Layers",
+            "description": "React thực thi mã nguồn JSX và sinh ra cấu trúc React Element Tree trong môi trường JavaScript.",
+            "metric": "JS Thread"
+          },
+          {
+            "name": "2. C++ Shadow Tree Cloning",
+            "tool": "Fabric Core (C++)",
+            "icon": "Cpu",
+            "description": "Tạo cây Shadow Node bất biến (Immutable C++ Shadow Tree) đại diện cho giao diện thông qua JSI.",
+            "metric": "Zero-Copy"
+          },
+          {
+            "name": "3. Yoga Layout Calculation",
+            "tool": "Yoga Engine (Flexbox)",
+            "icon": "Maximize",
+            "description": "Tính toán chính xác kích thước và tọa độ cho từng phần tử giao diện bằng thuật toán Flexbox viết bằng C++.",
+            "metric": "< 2ms"
+          },
+          {
+            "name": "4. Native Mount Phase",
+            "tool": "UIKit / Android Views",
+            "icon": "Zap",
+            "description": "Cập nhật trực tiếp lên các thành phần UIView (iOS) hoặc ViewGroup (Android) trên Main UI Thread.",
+            "metric": "60/120 FPS"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Hiểu sai rằng Fabric loại bỏ hoàn toàn vai trò của Yoga, trong khi Yoga vẫn là engine tính toán toạ độ Flexbox cốt lõi bên trong Fabric Shadow Tree.",

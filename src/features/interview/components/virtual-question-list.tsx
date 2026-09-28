@@ -10,6 +10,7 @@ interface VirtualQuestionListProps {
   questions: InterviewQuestion[];
   overscan?: number;
   estimatedItemHeight?: number;
+  expandedQuestionId?: string | null;
 }
 
 // 195px closely matches real collapsed question card height (prevents measurement shift)
@@ -21,6 +22,7 @@ export function VirtualQuestionList({
   questions,
   overscan = DEFAULT_OVERSCAN,
   estimatedItemHeight = DEFAULT_ESTIMATED_HEIGHT,
+  expandedQuestionId,
 }: VirtualQuestionListProps) {
   const listRef = React.useRef<HTMLDivElement | null>(null);
   const [scrollMargin, setScrollMargin] = React.useState(0);
@@ -28,6 +30,17 @@ export function VirtualQuestionList({
 
   // Persistent expanded state across virtual unmounts
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
+
+  // Auto-expand and scroll to target question if requested
+  React.useEffect(() => {
+    if (expandedQuestionId) {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        next.add(expandedQuestionId);
+        return next;
+      });
+    }
+  }, [expandedQuestionId]);
 
   const toggleExpand = React.useCallback((id: string) => {
     setExpandedIds((prev) => {

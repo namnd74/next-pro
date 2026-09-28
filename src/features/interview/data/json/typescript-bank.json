@@ -74,7 +74,27 @@
     "seniorAnswer": {
       "summary": "`any` tắt hoàn toàn type checking (bỏ qua an toàn). `unknown` là type-safe top-type: chấp nhận mọi giá trị nhưng bắt buộc phải type narrowing/type guard trước khi thao tác. `never` là bottom-type đại diện cho giá trị không bao giờ xảy ra (hàm throw error vô tận hoặc nhánh type đã bị loại trừ hết).",
       "deepDive": "`any` vừa là top type vừa là bottom type, gây thủng hệ thống type (unsoundness). `unknown` là giải pháp thay thế chuẩn cho `any` khi xử lý dynamic data (JSON parse, catch error), buộc lập trình viên phải chứng minh kiểu trước khi truy cập thuộc tính. `never` là tập rỗng trong tập hợp kiểu, thường dùng để implement exhaustive checking trong exhaustive switch-case.",
-      "codeExample": "// 1. any: Không an toàn, lọt lỗi runtime\nconst a: any = 'hello';\na.nonExistentMethod(); // Biên dịch bình thường nhưng crash runtime!\n\n// 2. unknown: Bắt buộc narrow trước khi dùng\nconst u: unknown = 'hello';\n// u.toUpperCase(); // Error: 'u' is of type 'unknown'\nif (typeof u === 'string') {\n  console.log(u.toUpperCase()); // Safe\n}\n\n// 3. never: Unreachable hoặc Exhaustive Check\nfunction assertNever(x: never): never {\n  throw new Error(`Unexpected object: ${x}`);\n}"
+      "codeExample": "// 1. any: Không an toàn, lọt lỗi runtime\nconst a: any = 'hello';\na.nonExistentMethod(); // Biên dịch bình thường nhưng crash runtime!\n\n// 2. unknown: Bắt buộc narrow trước khi dùng\nconst u: unknown = 'hello';\n// u.toUpperCase(); // Error: 'u' is of type 'unknown'\nif (typeof u === 'string') {\n  console.log(u.toUpperCase()); // Safe\n}\n\n// 3. never: Unreachable hoặc Exhaustive Check\nfunction assertNever(x: never): never {\n  throw new Error(`Unexpected object: ${x}`);\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cây Phân Cấp Kiểu Dữ Liệu TypeScript: any vs unknown vs never",
+        "caption": "any làm vô hiệu hóa trình biên dịch; unknown là Top Type an toàn; never là Bottom Type không thể chứa giá trị",
+        "code": "flowchart TD\n    Top[\"Top Types (Bao quát mọi giá trị)\"]\n    Top --> Unknown[\"unknown (An toàn tuyệt đối - Bắt buộc type narrowing)\"]\n    Top --> Any[\"any (Vô hiệu hóa Type-Checker - Nguồn gốc gây crash runtime)\"]\n\n    Unknown --> Primitive[\"Kiểu cụ thể: string | number | boolean | object\"]\n    Any -.->|\"Bỏ qua mọi kiểm tra\"| Primitive\n\n    Primitive --> Never[\"never (Bottom Type - Không thể gán giá trị, dùng cho Exhaustive Check)\"]"
+      },
+      "codeDiff": {
+        "title": "Sử Dụng any Cẩu Thả vs Kỷ Luật unknown Chuẩn Matt Pocock",
+        "language": "typescript",
+        "antiPattern": {
+          "title": "❌ Anti-Pattern: Dùng any để bypass lỗi linter (Gây sập ứng dụng production)",
+          "code": "// NGUY HIỂM: any che giấu lỗi, gọi hàm không tồn tại vẫn pass typecheck!\nasync function fetchUserData(url: string): Promise<any> {\n  const res = await fetch(url);\n  return await res.json();\n}\n\nconst user = await fetchUserData('/api/profile');\n// SẬP RUNTIME TRÊN PRODUCTION: user.getAge is not a function!\nconsole.log(user.getAge().toUpperCase());",
+          "explanation": "Từ khóa `any` thông báo với TypeScript trình biên dịch hãy \"nhắm mắt làm ngơ\". Không có bất kỳ cảnh báo nào được đưa ra khi bạn gõ sai tên thuộc tính hoặc gọi hàm không tồn tại."
+        },
+        "seniorSolution": {
+          "title": "✅ Senior Solution: Dùng unknown kết hợp Type Narrowing (hoặc Zod Validation)",
+          "code": "// CHUẨN SENIOR (Matt Pocock): unknown ép buộc lập trình viên phải kiểm tra trước khi dùng\ninterface User {\n  id: string;\n  name: string;\n}\n\nfunction isUser(data: unknown): data is User {\n  return typeof data === 'object' && data !== null && 'id' in data && 'name' in data;\n}\n\nconst raw: unknown = await (await fetch('/api/profile')).json();\n\nif (isUser(raw)) {\n  // TypeScript tự động suy luận an toàn 100% trong block này:\n  console.log(raw.name.toUpperCase());\n} else {\n  throw new Error('Dữ liệu API trả về không đúng định dạng User!');\n}",
+          "explanation": "Kiểu `unknown` bảo vệ hệ thống tuyệt đối. TypeScript sẽ từ chối biên dịch nếu bạn cố tình truy cập thuộc tính trên một biến `unknown` mà chưa thu hẹp kiểu (Type Narrowing) bằng Type Guard."
+        }
+      }
     },
     "pitfalls": [
       "Dùng `any` trong catch block (`catch (err: any)`) thay vì `catch (err: unknown)` kèm type guard `instanceof Error`.",
@@ -102,7 +122,13 @@
     "seniorAnswer": {
       "summary": "Union types (`A | B`) biểu diễn mối quan hệ 'HOẶC' (tập hợp hợp), giá trị có thể thuộc kiểu A hoặc kiểu B. Intersection types (`A & B`) biểu diễn mối quan hệ 'VÀ' (tập hợp giao), giá trị phải thỏa mãn đồng thời tất cả các thuộc tính của cả A và B.",
       "deepDive": "Với Union (`A | B`), bạn chỉ có thể truy cập an toàn các thuộc tính chung (common properties) của cả hai trước khi thực hiện Type Narrowing. Với Intersection (`A & B`), type kết quả chứa gộp mọi thuộc tính của cả hai; nếu hai type có chung một thuộc tính nhưng kiểu nguyên thủy xung đột (ví dụ string vs number), thuộc tính đó sẽ biến thành `never`.",
-      "codeExample": "// Union: Hoặc là Success hoặc là Error\ntype ApiResponse =\n  | { status: 'success'; data: string[] }\n  | { status: 'error'; message: string };\n\n// Intersection: Kết hợp User và Timestamps\ntype Identifiable = { id: string };\ntype Auditable = { createdAt: Date; updatedAt: Date };\ntype Entity = Identifiable & Auditable;\n\nconst record: Entity = {\n  id: 'usr-1',\n  createdAt: new Date(),\n  updatedAt: new Date()\n};"
+      "codeExample": "// Union: Hoặc là Success hoặc là Error\ntype ApiResponse =\n  | { status: 'success'; data: string[] }\n  | { status: 'error'; message: string };\n\n// Intersection: Kết hợp User và Timestamps\ntype Identifiable = { id: string };\ntype Auditable = { createdAt: Date; updatedAt: Date };\ntype Entity = Identifiable & Auditable;\n\nconst record: Entity = {\n  id: 'usr-1',\n  createdAt: new Date(),\n  updatedAt: new Date()\n};",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mẫu Thiết Kế Discriminated Unions & Type Narrowing Trong TypeScript",
+        "caption": "Sử dụng trường phân biệt duy nhất (ví dụ: type hoặc status) để trình biên dịch tự động suy luận kiểu an toàn",
+        "code": "flowchart TD\n    Event[\"Kiểu Union: AppState = LoadingState | SuccessState | ErrorState\"] --> Switch{\"switch (state.status)\"}\n\n    Switch -->|\"case 'loading'\"| L[\"TypeScript biết: state là LoadingState\n(Chỉ có: { status: 'loading' })\"]\n    Switch -->|\"case 'success'\"| S[\"TypeScript biết: state là SuccessState\n(Có thêm trường data: User[])\"]\n    Switch -->|\"case 'error'\"| E[\"TypeScript biết: state là ErrorState\n(Có thêm trường message: string)\"]\n    Switch -->|\"default\"| N[\"Exhaustive Check: const _check: never = state\"]"
+      }
     },
     "pitfalls": [
       "Cố truy cập thuộc tính riêng lẻ của một variant trong union mà không thực hiện type guard trước.",
@@ -345,7 +371,13 @@
     "question": "Pick<T, K> và Omit<T, K> là gì?",
     "interviewerIntent": "Đánh giá việc tinh chỉnh và tái sử dụng object types bằng cách chọn lọc hoặc loại bỏ các thuộc tính.",
     "contextOrScenario": "Tạo form input tạo mới người dùng từ `User` model của Database nhưng cần bỏ qua `id`, `createdAt`, `passwordHash`.",
-    "expectedKeywords": ["Pick<T, K>", "Omit<T, K>", "keyof", "Exclude", "DRY principle"],
+    "expectedKeywords": [
+      "Pick<T, K>",
+      "Omit<T, K>",
+      "keyof",
+      "Exclude",
+      "DRY principle"
+    ],
     "seniorAnswer": {
       "summary": "`Pick<T, K>` trích xuất một tập hợp con các thuộc tính từ kiểu `T` dựa trên danh sách keys `K`. Ngược lại, `Omit<T, K>` loại bỏ các thuộc tính `K` khỏi kiểu `T` và giữ lại tất cả các thuộc tính còn lại.",
       "deepDive": "`Pick<T, K>` an toàn hơn về mặt type check vì `K extends keyof T` - nếu bạn gõ sai tên thuộc tính, TypeScript sẽ báo lỗi ngay. Ngược lại, `Omit<T, K>` định nghĩa qua `Pick<T, Exclude<keyof T, K>>` nên `K` chỉ là `any key`, nếu bạn gõ nhầm tên key không tồn tại trong `T`, TypeScript có thể không báo lỗi.",

@@ -950,7 +950,56 @@
       "summary": "Vòng đời của Bean trong Spring trải qua các bước: Instantiation (tạo object) -> Populate Properties (inject dependencies) -> Aware Callbacks -> BeanPostProcessor Before Initialization -> Initialization (`@PostConstruct`) -> BeanPostProcessor After Initialization (tạo AOP Proxy) -> Bean Ready -> Destruction (`@PreDestroy`). `@PostConstruct` dùng để thực thi logic khởi tạo ngay sau khi mọi phụ thuộc đã được inject an toàn (như chuẩn bị cache, mở socket); `@PreDestroy` dùng để dọn dẹp tài nguyên (đóng connection, flush buffer ra disk, ngắt thread) trước khi bean bị hủy.",
       "deepDive": "`@PostConstruct` và `@PreDestroy` là các annotation chuẩn của Jakarta EE được kích hoạt bởi `CommonAnnotationBeanPostProcessor`. Cần lưu ý rằng tại thời điểm `@PostConstruct` thực thi, AOP Proxy của bean (như `@Transactional` hay `@Async`) THƯỜNG CHƯA HOÀN THIỆN vì bước `postProcessAfterInitialization` diễn ra sau đó. Do đó, việc gọi một method `@Transactional` nội bộ từ `@PostConstruct` sẽ không có tác dụng giao dịch. Khi ApplicationContext đóng lại (do SIGTERM), `DisposableBeanAdapter` sẽ duyệt qua các singleton và gọi `@PreDestroy` trước khi ngắt kết nối database.",
       "codeLanguage": "java",
-      "codeExample": "package com.bank.lifecycle;\n\nimport jakarta.annotation.PostConstruct;\nimport jakarta.annotation.PreDestroy;\nimport org.slf4j.Logger;\nimport org.slf4j.LoggerFactory;\nimport org.springframework.stereotype.Component;\nimport java.util.concurrent.ExecutorService;\nimport java.util.concurrent.Executors;\n\n@Component\npublic class PersistentSocketClient {\n    private static final Logger log = LoggerFactory.getLogger(PersistentSocketClient.class);\n    private ExecutorService workerPool;\n\n    @PostConstruct\n    public void initialize() {\n        log.info(\"1. Dependencies injected. Initializing worker thread pool...\");\n        this.workerPool = Executors.newFixedThreadPool(4);\n    }\n\n    @PreDestroy\n    public void cleanUp() {\n        log.info(\"2. Container shutting down. Terminating worker pool cleanly...\");\n        if (workerPool != null && !workerPool.isShutdown()) {\n            workerPool.shutdown();\n        }\n    }\n}"
+      "codeExample": "package com.bank.lifecycle;\n\nimport jakarta.annotation.PostConstruct;\nimport jakarta.annotation.PreDestroy;\nimport org.slf4j.Logger;\nimport org.slf4j.LoggerFactory;\nimport org.springframework.stereotype.Component;\nimport java.util.concurrent.ExecutorService;\nimport java.util.concurrent.Executors;\n\n@Component\npublic class PersistentSocketClient {\n    private static final Logger log = LoggerFactory.getLogger(PersistentSocketClient.class);\n    private ExecutorService workerPool;\n\n    @PostConstruct\n    public void initialize() {\n        log.info(\"1. Dependencies injected. Initializing worker thread pool...\");\n        this.workerPool = Executors.newFixedThreadPool(4);\n    }\n\n    @PreDestroy\n    public void cleanUp() {\n        log.info(\"2. Container shutting down. Terminating worker pool cleanly...\");\n        if (workerPool != null && !workerPool.isShutdown()) {\n            workerPool.shutdown();\n        }\n    }\n}",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Vòng Đời Hoàn Chỉnh Của Một Spring Bean (Bean Lifecycle Pipeline)",
+        "caption": "Quá trình khởi tạo, tiêm phụ thuộc, xử lý hậu kỳ (BPP) và giải phóng tài nguyên trong Spring IoC Container",
+        "stages": [
+          {
+            "name": "1. Khởi Tạo Instance",
+            "tool": "JVM Reflection",
+            "icon": "Layers",
+            "description": "Spring Container gọi constructor mặc định hoặc factory method để nạp instance vào bộ nhớ.",
+            "metric": "Step 1"
+          },
+          {
+            "name": "2. Tiêm Phụ Thuộc (DI)",
+            "tool": "@Autowired / setter",
+            "icon": "Zap",
+            "description": "Cung cấp các dependency và gán các thuộc tính cấu hình từ ApplicationContext.",
+            "metric": "Step 2"
+          },
+          {
+            "name": "3. Aware Interfaces",
+            "tool": "BeanNameAware, BeanFactoryAware",
+            "icon": "Radio",
+            "description": "Spring gọi các phương thức để thông báo cho bean biết tên của nó và tham chiếu tới Container.",
+            "metric": "Step 3"
+          },
+          {
+            "name": "4. BeanPostProcessor (Before)",
+            "tool": "postProcessBeforeInitialization",
+            "icon": "Shield",
+            "description": "Thực thi các logic can thiệp trước khi khởi tạo (ví dụ xử lý AOP annotation proxy).",
+            "metric": "Step 4"
+          },
+          {
+            "name": "5. Khởi Tạo Nghiệp Vụ",
+            "tool": "@PostConstruct / InitializingBean",
+            "icon": "CheckCircle",
+            "description": "Thực thi hàm khởi tạo dữ liệu, kết nối tài nguyên hoặc pre-warm cache.",
+            "metric": "Step 5"
+          },
+          {
+            "name": "6. Bean Sẵn Sàng Phục Vụ & Hủy",
+            "tool": "In Service -> @PreDestroy",
+            "icon": "RefreshCw",
+            "description": "Bean phục vụ request. Khi container shutdown, gọi @PreDestroy để đóng database connection.",
+            "metric": "Step 6"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Gọi method có `@Async` hoặc `@Transactional` của chính bean đó bên trong method `@PostConstruct`, dẫn đến việc các aspect AOP bị bỏ qua do proxy chưa được bọc hoàn tất.",
@@ -1229,7 +1278,13 @@
       "summary": "Spring Security Filter Chain là một chuỗi các Servlet Filters chuyên trách được Spring Security sử dụng để chặn và xử lý mọi HTTP request trước khi chúng chạm tới `DispatcherServlet`. Cơ chế hoạt động dựa trên cầu nối `DelegatingFilterProxy` trong Servlet Container: nó ủy quyền toàn bộ việc lọc cho bean `FilterChainProxy` của Spring. `FilterChainProxy` quản lý một hoặc nhiều `SecurityFilterChain`, khớp request URL với chain tương ứng và duyệt qua các filter theo thứ tự nghiêm ngặt (như xác thực context, CORS, CSRF, trích xuất token, và kiểm tra phân quyền).",
       "deepDive": "Kiến trúc gồm 3 tầng: (1) `DelegatingFilterProxy` là chuẩn javax/jakarta Filter đăng ký với Tomcat; (2) `FilterChainProxy` là Spring Bean chứa danh sách `SecurityFilterChain`. Khi request đến, `FilterChainProxy` kiểm tra các `RequestMatcher` để chọn đúng chain; (3) Bên trong mỗi chain là danh sách các filter có thứ tự xác định: `DisableEncodeUrlFilter` -> `SecurityContextHolderFilter` (khôi phục SecurityContext từ session/token) -> `CorsFilter` -> `CsrfFilter` -> `AuthenticationFilter` (xác thực danh tính) -> `AuthorizationFilter` (chặn 403 ở cuối chuỗi). Ta có thể thêm custom filter vào trước, sau, hoặc tại vị trí của một filter chuẩn bằng `http.addFilterBefore()` / `addFilterAfter()`.",
       "codeLanguage": "java",
-      "codeExample": "package com.bank.security.chain;\n\nimport jakarta.servlet.*;\nimport jakarta.servlet.http.HttpServletRequest;\nimport org.springframework.context.annotation.Bean;\nimport org.springframework.context.annotation.Configuration;\nimport org.springframework.security.config.annotation.web.builders.HttpSecurity;\nimport org.springframework.security.web.SecurityFilterChain;\nimport org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;\nimport java.io.IOException;\n\n// Custom Security Filter đơn giản\nclass ApiKeyHeaderFilter extends GenericFilter {\n    @Override\n    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {\n        HttpServletRequest req = (HttpServletRequest) request;\n        String apiKey = req.getHeader(\"X-API-KEY\");\n        // Xác thực API Key...\n        chain.doFilter(request, response); // Tiếp tục chuỗi filter\n    }\n}\n\n@Configuration\npublic class FilterChainConfig {\n    @Bean\n    public SecurityFilterChain customFilterChain(HttpSecurity http) throws Exception {\n        return http\n            // Chèn Custom Filter vào ngay TRƯỚC UsernamePasswordAuthenticationFilter trong chain\n            .addFilterBefore(new ApiKeyHeaderFilter(), UsernamePasswordAuthenticationFilter.class)\n            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())\n            .build();\n    }\n}"
+      "codeExample": "package com.bank.security.chain;\n\nimport jakarta.servlet.*;\nimport jakarta.servlet.http.HttpServletRequest;\nimport org.springframework.context.annotation.Bean;\nimport org.springframework.context.annotation.Configuration;\nimport org.springframework.security.config.annotation.web.builders.HttpSecurity;\nimport org.springframework.security.web.SecurityFilterChain;\nimport org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;\nimport java.io.IOException;\n\n// Custom Security Filter đơn giản\nclass ApiKeyHeaderFilter extends GenericFilter {\n    @Override\n    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {\n        HttpServletRequest req = (HttpServletRequest) request;\n        String apiKey = req.getHeader(\"X-API-KEY\");\n        // Xác thực API Key...\n        chain.doFilter(request, response); // Tiếp tục chuỗi filter\n    }\n}\n\n@Configuration\npublic class FilterChainConfig {\n    @Bean\n    public SecurityFilterChain customFilterChain(HttpSecurity http) throws Exception {\n        return http\n            // Chèn Custom Filter vào ngay TRƯỚC UsernamePasswordAuthenticationFilter trong chain\n            .addFilterBefore(new ApiKeyHeaderFilter(), UsernamePasswordAuthenticationFilter.class)\n            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())\n            .build();\n    }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Luồng Xử Lý Của Spring Security Filter Chain (Security Architecture)",
+        "caption": "Mọi request HTTP đều phải đi qua chuỗi Filter bảo mật nghiêm ngặt trước khi chạm tới Controller",
+        "code": "flowchart TD\n    Client[\"Client HTTP Request\"] --> F1[\"SecurityContextPersistenceFilter\n(Nạp SecurityContext từ Session/Redis)\"]\n    F1 --> F2[\"CorsFilter & CsrfFilter\n(Kiểm tra Origin & CSRF Token)\"]\n    F2 --> F3[\"JwtAuthenticationFilter / UsernamePasswordAuthFilter\n(Giải mã Token, nạp Authentication vào Context)\"]\n    F3 --> F4[\"ExceptionTranslationFilter\n(Bắt lỗi 401 Unauthorized / 403 Forbidden)\"]\n    F4 --> F5[\"AuthorizationFilter / FilterSecurityInterceptor\n(Kiểm tra quyền hạn hasRole / @PreAuthorize)\"]\n    F5 --> Dispatcher[\"DispatcherServlet -> RestController\"]"
+      }
     },
     "pitfalls": [
       "Đăng ký custom security filter dưới dạng một `@Bean` hoặc `@Component` thông thường mà không hiểu rằng Spring Boot sẽ tự động đăng ký nó thêm một lần nữa vào Servlet Container gốc, khiến filter bị chạy hai lần liên tiếp.",
@@ -2004,7 +2059,27 @@
       "summary": "`@Transactional` Self-Invocation Problem là hiện tượng khi một method trong Spring Bean gọi một method khác trong CÙNG MỘT CLASS (sử dụng con trỏ `this`). Vì Spring AOP quản lý giao dịch bằng cách tạo ra một đối tượng Proxy bọc quanh bean thật, lời gọi nội bộ `this.methodB()` sẽ thực thi trực tiếp trên instance gốc và hoàn toàn BỎ QUA Proxy. Kết quả là toàn bộ các aspect như `@Transactional`, `@Async`, `@Cacheable` trên `methodB()` bị vô hiệu hóa 100% một cách âm thầm mà không hề ném ra cảnh báo nào.",
       "deepDive": "Khi caller bên ngoài gọi `bean.methodA()`, lời gọi đi qua `CGLIB Proxy` -> `TransactionInterceptor` -> `Target Instance.methodA()`. Nhưng khi bên trong `methodA()` gọi `this.methodB()`, con trỏ `this` trỏ thẳng tới Target Instance chứ không phải Proxy. Các giải pháp xử lý của Senior Architect: (1) **Tách Bean (Khuyến nghị chuẩn mực)**: Chuyển `methodB()` sang một Service hoặc Helper Bean độc lập để cuộc gọi luôn đi qua proxy; (2) **Dùng `TransactionTemplate`**: Quản lý giao dịch bằng lập trình thay vì declarative annotation; (3) **Tự Inject chính mình**: Inject `@Lazy private MyService self` (giải pháp tình thế).",
       "codeLanguage": "java",
-      "codeExample": "package com.bank.transaction.selfinvocation;\n\nimport org.springframework.stereotype.Service;\nimport org.springframework.transaction.annotation.Propagation;\nimport org.springframework.transaction.annotation.Transactional;\n\n@Service\npublic class OrderBatchProcessingService {\n    // GIẢI PHÁP CHUẨN: Inject một Service chuyên biệt riêng để lời gọi luôn qua AOP Proxy\n    private final SingleOrderTransactionService singleOrderService;\n\n    public OrderBatchProcessingService(SingleOrderTransactionService singleOrderService) {\n        this.singleOrderService = singleOrderService;\n    }\n\n    public void processAllOrders() {\n        for (int i = 0; i < 10; i++) {\n            // Đi qua Proxy của SingleOrderTransactionService -> REQUIRES_NEW hoạt động hoàn hảo!\n            singleOrderService.processSingleOrder(i);\n        }\n    }\n}\n\n@Service\nclass SingleOrderTransactionService {\n    @Transactional(propagation = Propagation.REQUIRES_NEW)\n    public void processSingleOrder(int orderId) {\n        // Mỗi order có một physical transaction độc lập\n        System.out.println(\"Order processed in isolated transaction: \" + orderId);\n    }\n}"
+      "codeExample": "package com.bank.transaction.selfinvocation;\n\nimport org.springframework.stereotype.Service;\nimport org.springframework.transaction.annotation.Propagation;\nimport org.springframework.transaction.annotation.Transactional;\n\n@Service\npublic class OrderBatchProcessingService {\n    // GIẢI PHÁP CHUẨN: Inject một Service chuyên biệt riêng để lời gọi luôn qua AOP Proxy\n    private final SingleOrderTransactionService singleOrderService;\n\n    public OrderBatchProcessingService(SingleOrderTransactionService singleOrderService) {\n        this.singleOrderService = singleOrderService;\n    }\n\n    public void processAllOrders() {\n        for (int i = 0; i < 10; i++) {\n            // Đi qua Proxy của SingleOrderTransactionService -> REQUIRES_NEW hoạt động hoàn hảo!\n            singleOrderService.processSingleOrder(i);\n        }\n    }\n}\n\n@Service\nclass SingleOrderTransactionService {\n    @Transactional(propagation = Propagation.REQUIRES_NEW)\n    public void processSingleOrder(int orderId) {\n        // Mỗi order có một physical transaction độc lập\n        System.out.println(\"Order processed in isolated transaction: \" + orderId);\n    }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Lỗi Self-Invocation Trong Spring AOP và @Transactional",
+        "caption": "Gọi phương thức nội bộ trong cùng một Class làm bỏ qua Dynamic Proxy, khiến @Transactional mất tác dụng",
+        "code": "flowchart TD\n    Client[\"Client gọi API\"] --> Proxy[\"CGLIB / JDK Dynamic Proxy\"]\n    Proxy -->|\"Can thiệp: Bắt đầu DB Transaction\"| Target[\"UserService Instance (Target)\"]\n    \n    subgraph InsideClass [\"Bên Trong Cùng Class UserService\"]\n        Target -->|\"Gọi nội bộ: this.doInternalTransaction()\"| Internal[\"Method doInternalTransaction()\n[@Transactional]\"]\n    end\n\n    Note[\"⚠️ THẢM HỌA: this.call() đi thẳng trong instance nội bộ,\nhoàn toàn BỎ QUA Proxy -> Không có Transaction nào được mở!\"]"
+      },
+      "codeDiff": {
+        "title": "Anti-pattern Self-Invocation vs Giải Pháp Chuẩn Kiến Trúc Spring",
+        "language": "java",
+        "antiPattern": {
+          "title": "❌ Anti-Pattern: Gọi method @Transactional trong cùng một class bằng this",
+          "code": "@Service\npublic class OrderService {\n    public void processOrder(Order order) {\n        // LỖI: Gọi nội bộ làm mất tác dụng của Transaction Proxy!\n        this.saveOrderWithTx(order);\n    }\n\n    @Transactional\n    public void saveOrderWithTx(Order order) {\n        orderRepo.save(order);\n        paymentRepo.charge(order); // Nếu dòng này ném lỗi, save() KHÔNG HỀ BỊ ROLLBACK!\n    }\n}",
+          "explanation": "Spring AOP sử dụng Proxy Pattern. Khi gọi `this.saveOrderWithTx()`, con trỏ `this` trỏ thẳng tới target instance thay vì proxy wrapper, do đó TransactionInterceptor không bao giờ được kích hoạt."
+        },
+        "seniorSolution": {
+          "title": "✅ Senior Solution: Tách Class nghiệp vụ hoặc Inject chính proxy qua Bean con",
+          "code": "@Service\n@RequiredArgsConstructor\npublic class OrderService {\n    private final OrderTxService orderTxService; // Tách hẳn sang service chuyên trách Tx\n\n    public void processOrder(Order order) {\n        // GỌI QUA PROXY ĐƯỢC INJECT: Transaction hoạt động chính xác 100%\n        orderTxService.saveOrderWithTx(order);\n    }\n}\n\n@Service\npublic class OrderTxService {\n    @Transactional(rollbackFor = Exception.class)\n    public void saveOrderWithTx(Order order) {\n        orderRepo.save(order);\n        paymentRepo.charge(order);\n    }\n}",
+          "explanation": "Bằng cách phân tách trách nhiệm sang một Spring Bean độc lập (`OrderTxService`), Spring Container sẽ wrap bean này bằng CGLIB Proxy và kích hoạt cơ chế Rollback trơn tru khi có Exception."
+        }
+      }
     },
     "pitfalls": [
       "Sử dụng `AopContext.currentProxy()` để khắc phục self-invocation mà quên bật cờ `exposeProxy = true` trong cấu hình, dẫn đến `IllegalStateException` khi chạy.",
