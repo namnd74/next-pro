@@ -1,7 +1,7 @@
-import type { TopicRoadmapSpec } from '../../types/roadmap';
+import type { TopicRoadmapSpec, RoadmapStageSpec } from '../../types/roadmap';
 import type { InterviewQuestion } from '../../types';
 import { DEFAULT_JSON_QUESTION_BANKS } from '../json-loader';
-import { buildAutoTopicRoadmap } from './auto-roadmap-builder';
+import { buildAutoTopicRoadmap, matchesCategory } from './auto-roadmap-builder';
 import { TOPIC_METADATA } from './topic-metadata';
 
 export const TOPIC_ROADMAPS: Record<string, TopicRoadmapSpec> = {
@@ -797,7 +797,37 @@ const TOPIC_ALIASES: Record<string, string> = {
   'performance-optimization': 'performance',
 };
 
-// In-memory cache for dynamically generated topic roadmaps
+// Helper to enrich a curated roadmap with the full question pool for its topic
+function enrichCuratedRoadmap(
+  curated: TopicRoadmapSpec,
+  matchingQuestions: InterviewQuestion[]
+): TopicRoadmapSpec {
+  if (matchingQuestions.length === 0) return curated;
+
+  const questionIds = matchingQuestions.map((q) => q.id);
+  const total = questionIds.length;
+  const countPerStage = Math.max(1, Math.floor(total / 5));
+
+  const stages: RoadmapStageSpec[] = curated.stages.map((stage, idx) => {
+    const step = stage.stepNumber || idx + 1;
+    const start = (step - 1) * countPerStage;
+    const end = step === 5 ? total : step * countPerStage;
+    const stageQuestionIds = questionIds.slice(start, end);
+
+    return {
+      ...stage,
+      visualAnchorQuestionId: stage.visualAnchorQuestionId || stageQuestionIds[0],
+      questionIds: stageQuestionIds,
+    };
+  });
+
+  return {
+    ...curated,
+    stages,
+  };
+}
+
+// In-memory cache for generated topic roadmaps
 const DYNAMIC_ROADMAP_CACHE = new Map<string, TopicRoadmapSpec>();
 
 export function getTopicRoadmap(
@@ -809,23 +839,29 @@ export function getTopicRoadmap(
   // 1. Resolve alias if present
   const resolvedTopicId = TOPIC_ALIASES[topicId] || topicId;
 
-  // 2. Check if a curated roadmap is available
-  if (TOPIC_ROADMAPS[resolvedTopicId]) {
-    return TOPIC_ROADMAPS[resolvedTopicId];
-  }
-
-  // 3. Check dynamic cache
-  if (DYNAMIC_ROADMAP_CACHE.has(resolvedTopicId)) {
-    return DYNAMIC_ROADMAP_CACHE.get(resolvedTopicId);
-  }
-
-  // 4. Synthesize roadmap from questions (provided or default bank)
+  // 2. Question pool to use
   const questionPool =
     allQuestions && allQuestions.length > 0 ? allQuestions : DEFAULT_JSON_QUESTION_BANKS;
 
+  // 3. Check dynamic cache (keyed by resolvedTopicId and pool length)
+  const cacheKey = `${resolvedTopicId}_${questionPool.length}`;
+  if (DYNAMIC_ROADMAP_CACHE.has(cacheKey)) {
+    return DYNAMIC_ROADMAP_CACHE.get(cacheKey);
+  }
+
+  // 4. If a curated roadmap is available, enrich it with all matching questions
+  const curated = TOPIC_ROADMAPS[resolvedTopicId];
+  if (curated) {
+    const matchingQuestions = questionPool.filter((q) => matchesCategory(q, resolvedTopicId));
+    const enriched = enrichCuratedRoadmap(curated, matchingQuestions);
+    DYNAMIC_ROADMAP_CACHE.set(cacheKey, enriched);
+    return enriched;
+  }
+
+  // 5. Synthesize roadmap from questions using auto builder
   const generated = buildAutoTopicRoadmap(resolvedTopicId, questionPool);
   if (generated) {
-    DYNAMIC_ROADMAP_CACHE.set(resolvedTopicId, generated);
+    DYNAMIC_ROADMAP_CACHE.set(cacheKey, generated);
     return generated;
   }
 

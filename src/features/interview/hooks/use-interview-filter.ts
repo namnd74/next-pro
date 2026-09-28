@@ -64,6 +64,9 @@ export function useInterviewFilter(): UseInterviewFilterReturn {
       if (q.category === 'browser-runtime-workers') {
         counts['javascript'] = (counts['javascript'] || 0) + 1;
       }
+      if ((q.category as string) === 'qa-testing') {
+        counts['testing-qa'] = (counts['testing-qa'] || 0) + 1;
+      }
     }
     return counts;
   }, [allQuestions]);
@@ -92,6 +95,8 @@ export function useInterviewFilter(): UseInterviewFilterReturn {
         return (
           q.category === 'performance' || q.category === 'performance-optimization'
         );
+      if (category === 'testing-qa')
+        return q.category === 'testing-qa' || (q.category as string) === 'qa-testing';
       return q.category === category;
     },
     []
