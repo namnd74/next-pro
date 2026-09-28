@@ -68,7 +68,13 @@
     "seniorAnswer": {
       "summary": "DRY: Tránh lặp lại tri thức/logic nghiệp vụ. KISS: Giữ giải pháp đơn giản nhất có thể. YAGNI: Không lập trình cho những tính năng 'có thể tương lai sẽ cần'.",
       "deepDive": "Sandi Metz có câu châm ngôn kinh điển: 'Duplication is far cheaper than the wrong abstraction' (Lặp code rẻ hơn nhiều so với việc trừu tượng hóa sai). Tuân thủ 'Rule of Three': Chỉ trừu tượng hóa khi logic đó lặp lại từ lần thứ 3 trở lên.",
-      "codeExample": "// Tránh over-engineering theo YAGNI:\n// Không viết dynamic query builder đa năng phức tạp khi chỉ cần 1 câu query cố định."
+      "codeExample": "// Tránh over-engineering theo YAGNI:\n// Không viết dynamic query builder đa năng phức tạp khi chỉ cần 1 câu query cố định.",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mẫu Thiết Kế Factory Method (Factory Method Pattern Architecture)",
+        "caption": "Đóng gói logic khởi tạo đối tượng phức tạp, tách rời client khỏi concrete implementation",
+        "code": "classDiagram\n    class NotificationFactory {\n        <<abstract>>\n        +createNotification()* Notification\n        +send(message: string)\n    }\n    class EmailNotificationFactory {\n        +createNotification() Notification\n    }\n    class SMSNotificationFactory {\n        +createNotification() Notification\n    }\n    class Notification {\n        <<interface>>\n        +deliver(msg: string)*\n    }\n    class EmailNotification {\n        +deliver(msg: string)\n    }\n    class SMSNotification {\n        +deliver(msg: string)\n    }\n\n    NotificationFactory <|-- EmailNotificationFactory\n    NotificationFactory <|-- SMSNotificationFactory\n    Notification <|.. EmailNotification\n    Notification <|.. SMSNotification\n    NotificationFactory ..> Notification : \"creates\""
+      }
     },
     "pitfalls": [
       "Áp dụng DRY mù quáng bằng cách gom 2 đoạn code nhìn giống nhau về cú pháp nhưng khác nhau hoàn toàn về mục đích nghiệp vụ (Accidental Duplication)."
@@ -169,7 +175,13 @@
     "seniorAnswer": {
       "summary": "Có 2 cách xử lý chuẩn: (1) Trong TypeScript/JS: Dùng **Parameter Object (Options Pattern)** với destructuring và default values; (2) Trong OOP cổ điển: Áp dụng **Builder Pattern** với fluent interface (chaining methods).",
       "deepDive": "Parameter Object là cách thanh thoát và chuẩn nhất trong TypeScript: vừa có Type-safety, vừa tự document tên tham số tại nơi gọi (named arguments), vừa không lo sai thứ tự tham số.",
-      "codeExample": "interface UserProfileOptions {\n  name: string;\n  email: string;\n  age?: number;\n  isVip?: boolean;\n}\nclass UserProfile {\n  constructor(options: UserProfileOptions) {}\n}\n// Gọi gọn gàng:\nnew UserProfile({ name: 'Nam', email: 'nam@test.com', isVip: true });"
+      "codeExample": "interface UserProfileOptions {\n  name: string;\n  email: string;\n  age?: number;\n  isVip?: boolean;\n}\nclass UserProfile {\n  constructor(options: UserProfileOptions) {}\n}\n// Gọi gọn gàng:\nnew UserProfile({ name: 'Nam', email: 'nam@test.com', isVip: true });",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mẫu Thiết Kế Adapter (Adapter Pattern: Cầu Nối Cổng Thanh Toán)",
+        "caption": "Chuyển đổi giao diện của bên thứ ba không tương thích thành giao diện chuẩn mực của hệ thống",
+        "code": "flowchart LR\n    Client[\"Checkout Service (Client)\"] -->|\"Dùng interface chuẩn: pay(amount)\"| Target[\"PaymentProcessor Interface\"]\n    Target <|.. Adapter[\"StripePaymentAdapter\"]\n    Adapter -->|\"Map sang API cũ của vendor: chargeCustomer()\"| Adaptee[\"Stripe SDK Legacy / Third-party\"]"
+      }
     },
     "pitfalls": [
       "Dùng Builder pattern quá phức tạp khi chỉ cần 1 plain interface object trong TypeScript."
@@ -252,7 +264,13 @@
     "seniorAnswer": {
       "summary": "LSP quy định: 'Các đối tượng của lớp con phải có khả năng thay thế lớp cha mà không làm thay đổi tính đúng đắn của chương trình'. Vi phạm xảy ra khi class con làm hẹp điều kiện đầu ra, nới lỏng điều kiện đầu vào, hoặc ném exception ở phương thức của class cha.",
       "deepDive": "Ví dụ kinh điển: Class `Square` kế thừa `Rectangle`. Khi gán `setWidth(5)` và `setHeight(4)`, diện tích hình chữ nhật là 20 nhưng Square ép cả 2 cạnh thành 4 (diện tích = 16), phá vỡ kỳ vọng của caller. Vi phạm thứ hai là Override hàm nhưng ném lỗi `throw new Error('Not implemented')`.",
-      "codeExample": "class ReadOnlyRepository extends BaseRepository {\n  save(data: any) {\n    throw new Error('Read-only: cannot save!'); // ❌ Phá vỡ hợp đồng của lớp cha\n  }\n}"
+      "codeExample": "class ReadOnlyRepository extends BaseRepository {\n  save(data: any) {\n    throw new Error('Read-only: cannot save!'); // ❌ Phá vỡ hợp đồng của lớp cha\n  }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mẫu Thiết Kế Decorator (Decorator / Middleware Pipeline)",
+        "caption": "Bổ sung hành vi động (Logging, Caching, Auth) cho đối tượng mà không can thiệp vào lớp cơ sở",
+        "code": "flowchart TD\n    Req[\"Request\"] --> Logging[\"LoggingDecorator (Ghi nhận thời gian bắt đầu)\"]\n    Logging --> Auth[\"AuthDecorator (Kiểm tra Token & Phân quyền)\"]\n    Auth --> Cache[\"CachingDecorator (Kiểm tra Redis Hit/Miss)\"]\n    Cache --> Core[\"CoreRequestHandler (Xử lý nghiệp vụ chính)\"]\n    Core --> Cache\n    Cache --> Auth\n    Auth --> Logging\n    Logging --> Res[\"Response + Metrics\"]"
+      }
     },
     "pitfalls": [
       "Cố tình dùng kế thừa chỉ để tái sử dụng một vài hàm của class cha nhưng lại vô hiệu hóa các hàm còn lại."
@@ -382,7 +400,13 @@
     "seniorAnswer": {
       "summary": "Simple Factory là 1 class duy nhất có hàm nhận tham số và trả về object tương ứng qua switch/case. Factory Method định nghĩa một method trừu tượng trong class cha, nhường quyền quyết định khởi tạo instance cụ thể cho các class con.",
       "deepDive": "Factory Method tuân thủ OCP: Khi có sản phẩm mới, ta tạo class con mới kế thừa Creator mà không sửa đổi class Creator cũ. Simple Factory vi phạm OCP vì mỗi lần thêm sản phẩm phải vào sửa switch/case.",
-      "codeExample": "abstract class ReportGenerator {\n  abstract createDocument(): Document; // Factory Method\n  generate() {\n    const doc = this.createDocument();\n    doc.export();\n  }\n}\nclass PdfReportGenerator extends ReportGenerator {\n  createDocument() { return new PdfDocument(); }\n}"
+      "codeExample": "abstract class ReportGenerator {\n  abstract createDocument(): Document; // Factory Method\n  generate() {\n    const doc = this.createDocument();\n    doc.export();\n  }\n}\nclass PdfReportGenerator extends ReportGenerator {\n  createDocument() { return new PdfDocument(); }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mẫu Thiết Kế Strategy (Strategy Pattern: Đa Dạng Chiến Lược Tính Giá)",
+        "caption": "Đóng gói các thuật toán tính toán có thể hoán đổi linh hoạt tại runtime mà không dùng if/else lồng nhau",
+        "code": "classDiagram\n    class PricingContext {\n        -pricingStrategy: IPricingStrategy\n        +setStrategy(strategy: IPricingStrategy)\n        +calculateTotal(cart: Cart): number\n    }\n    class IPricingStrategy {\n        <<interface>>\n        +calculate(cart: Cart)*: number\n    }\n    class NormalPricingStrategy {\n        +calculate(cart: Cart): number\n    }\n    class BlackFridayPricingStrategy {\n        +calculate(cart: Cart): number\n    }\n    class VIPMemberPricingStrategy {\n        +calculate(cart: Cart): number\n    }\n\n    PricingContext o-- IPricingStrategy : \"delegates to\"\n    IPricingStrategy <|.. NormalPricingStrategy\n    IPricingStrategy <|.. BlackFridayPricingStrategy\n    IPricingStrategy <|.. VIPMemberPricingStrategy"
+      }
     },
     "pitfalls": [
       "Gọi nhầm bất kỳ hàm nào trả về object là Factory Method."
@@ -512,7 +536,13 @@
     "seniorAnswer": {
       "summary": "DI là một design pattern trong đó một đối tượng nhận các phụ thuộc của nó từ bên ngoài thay vì tự tạo ra chúng. Có 3 loại DI chính: (1) Constructor Injection (khuyên dùng nhất); (2) Setter/Property Injection; (3) Interface/Method Injection.",
       "deepDive": "DI Container (như trong NestJS, InversifyJS, Angular) sử dụng Reflection và Metadata Decorators (`reflect-metadata`) để tự động phân tích cây phụ thuộc, khởi tạo Singleton/Transient instance và inject vào class khi khởi động.",
-      "codeExample": "@Injectable()\nexport class OrderService {\n  constructor(private readonly paymentService: PaymentService) {} // Constructor Injection trong NestJS\n}"
+      "codeExample": "@Injectable()\nexport class OrderService {\n  constructor(private readonly paymentService: PaymentService) {} // Constructor Injection trong NestJS\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mẫu Thiết Kế State (Order Lifecycle State Machine)",
+        "caption": "Đối tượng thay đổi hành vi tương ứng khi trạng thái nội tại thay đổi, loại bỏ switch-case cồng kềnh",
+        "code": "stateDiagram-v2\n    [*] --> PendingPayment : Khởi tạo đơn hàng\n    PendingPayment --> Paid : Thanh toán thành công (Webhook IPN)\n    PendingPayment --> Cancelled : Hết hạn thanh toán (TTL 15m)\n    Paid --> Processing : Điều phối kho vận (Warehouse Assigned)\n    Processing --> Shipping : Xuất kho & Bàn giao Shipper\n    Shipping --> Delivered : Giao hàng thành công (POD Signed)\n    Shipping --> Returned : Giao thất bại 3 lần (RTO)\n    Delivered --> [*]\n    Cancelled --> [*]\n    Returned --> [*]"
+      }
     },
     "pitfalls": [
       "Circular Dependency (Phụ thuộc vòng tròn: A cần B, B cần A) làm sập quá trình khởi động IoC Container."

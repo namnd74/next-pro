@@ -17,7 +17,13 @@
     "seniorAnswer": {
       "summary": "Kiến trúc 3 lớp an toàn: (1) Lưu Session/JWT trong HttpOnly Secure SameSite Cookie; (2) Next.js Middleware kiểm tra session hợp lệ và tenant routing ở edge; (3) Bắt buộc phân quyền RBAC và tenant isolation tại từng Server Action / Data Access Layer.",
       "deepDive": "Không bao giờ tin tưởng chỉ kiểm tra auth ở Middleware vì Server Actions có thể bị gọi độc lập. Nguyên tắc 'Defense in Depth': Tạo hàm bọc `withAuth(action, allowedRoles)` để kiểm tra session và role ở Data Access Layer trước khi thực thi truy vấn DB.",
-      "codeExample": "// auth/safe-action.ts\nexport async function authenticatedAction<T>(\n  allowedRoles: Role[],\n  actionFn: (user: User) => Promise<T>\n) {\n  const session = await getSession();\n  if (!session?.user) throw new Error('Unauthorized');\n  if (!allowedRoles.includes(session.user.role)) throw new Error('Forbidden');\n  \n  return await actionFn(session.user);\n}"
+      "codeExample": "// auth/safe-action.ts\nexport async function authenticatedAction<T>(\n  allowedRoles: Role[],\n  actionFn: (user: User) => Promise<T>\n) {\n  const session = await getSession();\n  if (!session?.user) throw new Error('Unauthorized');\n  if (!allowedRoles.includes(session.user.role)) throw new Error('Forbidden');\n  \n  return await actionFn(session.user);\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Xác Thực & Phân Quyền Multi-Tenant 3 Lớp (Defense-in-Depth)",
+        "caption": "Quy trình xác thực an toàn: Edge Middleware -> Data Access Layer (DAL) -> Tenant Isolation DB",
+        "code": "flowchart TD\n    Client[\"Client (Browser)\"] -->|\"Request + HttpOnly Secure Cookie (JWT Session)\"| Edge[\"Next.js Edge Middleware\"]\n    \n    subgraph Layer1 [\"Lớp 1: Edge Validation\"]\n      Edge -->|\"1. Giải mã & kiểm tra chữ ký JWT\"| EdgeCheck{\"Session Hợp lệ?\"}\n      EdgeCheck -- \"Hết hạn / Không có\" --> RedirectAuth[\"Chuyển hướng /login\"]\n      EdgeCheck -- \"Hợp lệ\" --> Routing[\"Phân luồng Tenant Subdomain (tenant.app.com)\"]\n    end\n\n    Routing --> ServerAction[\"Next.js Server Action / Route Handler\"]\n\n    subgraph Layer2 [\"Lớp 2: Data Access Layer (withAuth)\"]\n      ServerAction -->|\"2. withAuth(action, allowedRoles)\"| RBACCheck{\"Kiểm tra Role (Admin/Editor)\"}\n      RBACCheck -- \"Không đủ quyền\" --> Throw403[\"Throw 403 Forbidden\"]\n      RBACCheck -- \"Đạt quyền\" --> InjectContext[\"Tiêm TenantContext (tenant_id, user_id)\"]\n    end\n\n    subgraph Layer3 [\"Lớp 3: Database Isolation\"]\n      InjectContext -->|\"3. Row-Level Security / Tenant Schema\"| DB[(Database Cluster)]\n      DB -->|\"WHERE tenant_id = current_tenant\"| IsolatedData[\"Dữ liệu Tenant an toàn (Zero Leak)\"]\n    end"
+      }
     },
     "pitfalls": [
       "Lưu JWT access token trong LocalStorage (dễ bị XSS đánh cắp).",
@@ -80,7 +86,13 @@
     "seniorAnswer": {
       "summary": "Kiến trúc Local-First: Mọi thao tác ghi (Write) đều lưu trực tiếp xuống IndexedDB trước (0ms latency), sau đó đưa vào Mutation Queue. Khi online, Service Worker Background Sync gửi từng mutation lên server. Xử lý xung đột bằng Last-Write-Wins (dựa trên server-assigned version) hoặc CRDTs cho rich text.",
       "deepDive": "Mutation Queue phải là hàng đợi tuần tự (Sequential FIFO). Mỗi mutation mang `clientId`, `mutationId`, `timestamp`, `baseVersion`. Nếu server phát hiện `baseVersion !== currentServerVersion`, kích hoạt Conflict Resolver: Merge tự động theo trường (field-level merging) hoặc thông báo cho người dùng chọn phiên bản.",
-      "codeExample": "// Sync Worker\nasync function syncQueue() {\n  const queue = await idb.getAll('mutation_queue');\n  for (const item of queue) {\n    try {\n      const res = await api.sync(item);\n      await idb.delete('mutation_queue', item.id);\n    } catch (err) {\n      if (err.status === 409) resolveConflict(item, err.serverData);\n      break; // Dừng để bảo toàn thứ tự mutation\n    }\n  }\n}"
+      "codeExample": "// Sync Worker\nasync function syncQueue() {\n  const queue = await idb.getAll('mutation_queue');\n  for (const item of queue) {\n    try {\n      const res = await api.sync(item);\n      await idb.delete('mutation_queue', item.id);\n    } catch (err) {\n      if (err.status === 409) resolveConflict(item, err.serverData);\n      break; // Dừng để bảo toàn thứ tự mutation\n    }\n  }\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Đồng Bộ Dữ Liệu Offline-First (Local-First Sync Engine)",
+        "caption": "Mọi thao tác ghi xuống IndexedDB trước (0ms latency), hàng đợi Mutation Queue tự động sync khi online",
+        "code": "flowchart LR\n    UI[\"Giao diện Người dùng (UI)\"] -->|\"1. Thao tác Ghi (0ms Latency)\"| IDB[\"IndexedDB (Local Store)\"]\n    UI -->|\"2. Đẩy Mutation\"| Queue[\"Mutation Queue (FIFO)\"]\n\n    subgraph ClientSyncEngine [\"Client Sync Engine (Service Worker)\"]\n      Queue -->|\"3. Kiểm tra kết nối\"| NetworkCheck{\"Network Online?\"}\n      NetworkCheck -- \"Offline\" --> Idle[\"Lưu trữ cục bộ & Chờ sự kiện online\"]\n      NetworkCheck -- \"Online\" --> Worker[\"Background Sync Worker\"]\n    end\n\n    Worker -->|\"4. Gửi tuần tự (clientId, mutationId, version)\"| ServerAPI[\"Server API Gateway\"]\n\n    subgraph BackendSync [\"Server Conflict Resolution\"]\n      ServerAPI --> VersionCheck{\"Version Khớp?\"}\n      VersionCheck -- \"Khớp\" --> ApplyDB[\"Áp dụng DB & Cập nhật Version mới\"]\n      VersionCheck -- \"Xung đột (Conflict 409)\" --> ConflictResolver[\"Conflict Resolver: Field-level Merge / CRDT\"]\n    end\n\n    ApplyDB -->|\"5. Sync Ack + New Version\"| Queue\n    Queue -->|\"Xóa mutation đã sync thành công\"| IDB"
+      }
     },
     "pitfalls": [
       "Dùng LocalStorage thay vì IndexedDB (LocalStorage là synchronous, giới hạn 5MB và block Main Thread).",
@@ -107,7 +119,13 @@
     "seniorAnswer": {
       "summary": "Tách biệt 2 kênh truyền: (1) Kênh Trạng thái tạm thời (Ephemeral / Presence) truyền vị trí con trỏ chuột, selections qua WebSocket/WebRTC (tần số cao 60Hz, mất gói tin không sao); (2) Kênh Dữ liệu tài liệu (Persistent Data) dùng thư viện CRDT (Yjs) đồng bộ qua WebSocket đảm bảo tính hội tụ (Convergence).",
       "deepDive": "Giải quyết Undo/Redo phân tán: Người dùng chỉ được hoàn tác những thao tác do CHÍNH HỌ tạo ra mà không làm mất các thay đổi của người khác cùng lúc. Yjs hỗ trợ `UndoManager` theo dõi transaction origins. Với Canvas, dùng Canvas/WebGL layer riêng cho con trỏ multiplayer để không re-render cây DOM chính.",
-      "codeExample": "// Yjs doc + WebSocket provider\nconst ydoc = new Y.Doc();\nconst provider = new WebsocketProvider('wss://collab.server', 'room-101', ydoc);\nconst yelements = ydoc.getArray('elements');\n\n// Lắng nghe thay đổi từ đồng nghiệp\nyelements.observe(event => {\n  canvas.updateElements(yelements.toArray());\n});"
+      "codeExample": "// Yjs doc + WebSocket provider\nconst ydoc = new Y.Doc();\nconst provider = new WebsocketProvider('wss://collab.server', 'room-101', ydoc);\nconst yelements = ydoc.getArray('elements');\n\n// Lắng nghe thay đổi từ đồng nghiệp\nyelements.observe(event => {\n  canvas.updateElements(yelements.toArray());\n});",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Cộng Tác Thời Gian Thực 2 Kênh (Real-time Multiplayer Architecture)",
+        "caption": "Tách biệt kênh Ephemeral tần số cao (Cursor, Selection) và kênh Persistent CRDT (Tài liệu hội tụ)",
+        "code": "flowchart TD\n    subgraph ClientA [\"Người dùng A (Collaborator A)\"]\n      CursorA[\"Con trỏ chuột (Cursor 60fps)\"]\n      DocA[\"Tài liệu Yjs CRDT (Local State)\"]\n    end\n\n    subgraph TransportLayers [\"Hai Kênh Truyền Tải Riêng Biệt (WebSocket Multiplexing)\"]\n      subgraph EphemeralChannel [\"Kênh Tạm Thời (Presence / Awareness)\"]\n        WS1[\"Tần số cao (60Hz) - Gói tin nhẹ, chấp nhận mất mát\"]\n      end\n      subgraph PersistentChannel [\"Kênh Dữ Liệu Bền Vững (CRDT Updates)\"]\n        WS2[\"Bảo đảm thứ tự & hội tụ toán học (State Vectors)\"]\n      end\n    end\n\n    subgraph ClientB [\"Người dùng B (Collaborator B)\"]\n      CursorB[\"Vẽ con trỏ A lên Canvas riêng\"]\n      DocB[\"Tự động Merge không xung đột (CRDT Convergence)\"]\n    end\n\n    CursorA --> WS1 --> CursorB\n    DocA -->|\"Update vector\"| WS2 -->|\"Broadcast diff\"| DocB"
+      }
     },
     "pitfalls": [
       "Gửi toàn bộ tài liệu qua WebSocket mỗi khi người dùng thay đổi 1 ký tự (gây nghẽn băng thông nghiêm trọng)."
@@ -133,7 +151,13 @@
     "seniorAnswer": {
       "summary": "Kiến trúc Single Connection per Browser: (1) Dùng `SharedWorker` (hoặc bầu chọn 1 Tab làm Leader qua `BroadcastChannel`) để chỉ mở DUY NHẤT 1 kết nối WebSocket tới server; (2) Tab Leader nhận thông báo và phân phối tới các tab khác qua `BroadcastChannel`; (3) Khi user đọc thông báo ở tab bất kỳ, broadcast event `NOTIFICATION_READ` để 4 tab còn lại cập nhật UI ngay lập tức.",
       "deepDive": "Nếu mỗi tab mở 1 kết nối WebSocket riêng, 1 người mở 10 tab sẽ tiêu tốn 10 connections ở backend. Cơ chế Tab Leader Election: Các tab sử dụng `navigator.locks` API hoặc heartbeat timestamp trong `localStorage` để tự bầu leader. Nếu tab leader bị đóng, tab khác tự động lên thay.",
-      "codeExample": "// BroadcastChannel sync giữa các tab\nconst channel = new BroadcastChannel('notifications_bus');\n\nchannel.onmessage = (event) => {\n  if (event.data.type === 'MARK_READ') {\n    setBadgeCount(prev => Math.max(0, prev - 1));\n  }\n};\n\nfunction markAsRead(id: string) {\n  api.markRead(id);\n  channel.postMessage({ type: 'MARK_READ', id });\n}"
+      "codeExample": "// BroadcastChannel sync giữa các tab\nconst channel = new BroadcastChannel('notifications_bus');\n\nchannel.onmessage = (event) => {\n  if (event.data.type === 'MARK_READ') {\n    setBadgeCount(prev => Math.max(0, prev - 1));\n  }\n};\n\nfunction markAsRead(id: string) {\n  api.markRead(id);\n  channel.postMessage({ type: 'MARK_READ', id });\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Đồng Bộ Đa Tab & Đơn Kết Nối (Single Connection per Browser)",
+        "caption": "Bầu chọn Tab Leader qua BroadcastChannel để chỉ duy trì 1 kết nối WebSocket duy nhất tới Server",
+        "code": "flowchart TD\n    Server[\"Notification Server (WebSocket Cluster)\"] <-->|\"1 Duy nhất 1 kết nối WebSocket\"| TabLeader[\"Tab 1 (Leader Tab)\"]\n\n    subgraph BrowserEnvironment [\"Trình Duyệt Người Dùng (Cùng 1 User)\"]\n      TabLeader <-->|\"BroadcastChannel Bus\"| Tab2[\"Tab 2 (Follower Tab)\"]\n      TabLeader <-->|\"BroadcastChannel Bus\"| Tab3[\"Tab 3 (Follower Tab)\"]\n      TabLeader <-->|\"BroadcastChannel Bus\"| Tab4[\"Tab 4 (Follower Tab)\"]\n    end\n\n    UserAction[\"User bấm Đã Đọc trên Tab 3\"] -->|\"Phát event NOTIFICATION_READ\"| TabLeader\n    TabLeader -->|\"Đồng bộ badge -1 cho tất cả các Tab\"| Tab2\n    TabLeader -->|\"Đồng bộ badge -1 cho tất cả các Tab\"| Tab4\n    TabLeader -->|\"Gửi ACK lên Server\"| Server"
+      }
     },
     "pitfalls": [
       "Mỗi tab trình duyệt tự mở 1 WebSocket connection riêng biệt làm server bị cạn kiệt socket ports."
@@ -159,13 +183,55 @@
     "seniorAnswer": {
       "summary": "Thiết kế SDK gồm 3 module: (1) Metrics Collector sử dụng `PerformanceObserver` bắt các sự kiện LCP, INP, CLS và Long Tasks (>50ms); (2) Error Listener bắt `window.onerror` và `unhandledrejection`; (3) Transport Engine gom dữ liệu vào hàng đợi (Buffer 30s) và gửi bằng `navigator.sendBeacon()` để đảm bảo dữ liệu không bị mất khi người dùng đóng trình duyệt đột ngột.",
       "deepDive": "Không bao giờ dùng `fetch()` thông thường trong sự kiện `beforeunload/pagehide` vì trình duyệt sẽ hủy request khi trang đóng. `navigator.sendBeacon()` đẩy việc gửi gói tin xuống tầng OS network stack, đảm bảo gói tin 100% được gửi đi ngay cả khi tab đã đóng hoàn toàn.",
-      "codeExample": "// Đăng ký đo INP qua PerformanceObserver\nconst observer = new PerformanceObserver((list) => {\n  for (const entry of list.getEntries()) {\n    if (entry.duration > 200) {\n      telemetryQueue.push({ type: 'INP_VIOLATION', duration: entry.duration, name: entry.name });\n    }\n  }\n});\nobserver.observe({ type: 'first-input', buffered: true });\n\n// Gửi an toàn khi rời trang\nwindow.addEventListener('pagehide', () => {\n  navigator.sendBeacon('/api/telemetry', JSON.stringify(telemetryQueue));\n});"
+      "codeExample": "// Đăng ký đo INP qua PerformanceObserver\nconst observer = new PerformanceObserver((list) => {\n  for (const entry of list.getEntries()) {\n    if (entry.duration > 200) {\n      telemetryQueue.push({ type: 'INP_VIOLATION', duration: entry.duration, name: entry.name });\n    }\n  }\n});\nobserver.observe({ type: 'first-input', buffered: true });\n\n// Gửi an toàn khi rời trang\nwindow.addEventListener('pagehide', () => {\n  navigator.sendBeacon('/api/telemetry', JSON.stringify(telemetryQueue));\n});",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Client-Side Telemetry SDK & Real User Monitoring (RUM)",
+        "caption": "Thu thập Core Web Vitals (LCP, INP, CLS) và gửi an toàn qua sendBeacon không block Main Thread",
+        "code": "flowchart LR\n    subgraph BrowserEngine [\"Trình Duyệt & Trải Nghiệm Người Dùng\"]\n      Obs[\"PerformanceObserver API (LCP, INP, CLS)\"]\n      Err[\"Global Error Listener (window.onerror)\"]\n    end\n\n    subgraph TelemetrySDK [\"Telemetry RUM SDK (Zero Impact)\"]\n      Obs -->|\"Metrics\"| Buffer[\"In-Memory Ring Buffer (Tối đa 100 events)\"]\n      Err -->|\"Stack traces\"| Buffer\n      Buffer -->|\"Batching định kỳ 30s\"| Dispatcher{\"Điều Kiện Gửi\"}\n    end\n\n    subgraph TransportTier [\"Tầng Truyền Tải An Toàn\"]\n      Dispatcher -- \"Chạy bình thường\" --> FetchReq[\"fetch() keepalive\"]\n      Dispatcher -- \"Người dùng đóng tab / chuyển trang\" --> Beacon[\"navigator.sendBeacon() (OS Network Queue)\"]\n    end\n\n    FetchReq --> Collector[\"Telemetry Ingestion Gateway\"]\n    Beacon --> Collector"
+      }
     },
     "pitfalls": [
       "SDK theo dõi hiệu năng nhưng chính bản thân SDK lại gây nghẽn Main Thread do tính toán nặng và gửi HTTP request quá thường xuyên."
     ],
     "followUpQuestions": [
       "Làm thế nào để lấy được Call Stack và Source Map chính xác của lỗi JS trên Production bằng SDK này?"
+    ]
+  },
+  {
+    "id": "fsd-06",
+    "category": "frontend-system-design",
+    "level": "lead",
+    "question": "Thiết kế Kiến Trúc Design System Quy Mô Doanh Nghiệp (Multi-Brand, Multi-Theme, Design Tokens & CVA Component Architecture)?",
+    "interviewerIntent": "Đánh giá tư duy thiết kế hệ thống Design System cấp độ Staff/Architect: Phân cấp Design Tokens, Headless UI Primitives, Multi-theme Dark/Light, Package Distribution và Zero-Runtime Overhead.",
+    "contextOrScenario": "Doanh nghiệp sở hữu nhiều nhãn hàng (Multi-Brand: Fintech, E-commerce, Logistics) cần một Design System duy nhất, dễ dàng thay đổi thương hiệu, màu sắc, typography mà không phải code lại từ đầu các component phức tạp.",
+    "expectedKeywords": [
+      "design tokens",
+      "style dictionary",
+      "global vs semantic vs component tokens",
+      "cva (class-variance-authority)",
+      "headless ui primitives",
+      "multi-brand theming",
+      "css variables architecture",
+      "monorepo packaging"
+    ],
+    "seniorAnswer": {
+      "summary": "Kiến trúc Design System 4 tầng mở rộng: (1) Token Tier phân cấp 3 lớp (Global Tokens -> Semantic Tokens -> Component Tokens) biên dịch tự động qua Style Dictionary; (2) Primitive Tier sử dụng Headless UI (Radix UI / React Aria) phụ trách Accessibility (ARIA, Keyboard Navigation); (3) Styled Tier bọc bằng CVA (Class Variance Authority) định nghĩa các biến thể (variants, sizes, states); (4) Theme Engine can thiệp vào CSS Variables runtime cho phép chuyển đổi Brand/Theme tức thì với 0ms rebuild.",
+      "deepDive": "Phân cấp Design Tokens là chìa khóa chống vỡ kiến trúc: Tuyệt đối không để Component tham chiếu trực tiếp Global Token (như color-blue-500). Thay vào đó: Global (blue-500: #3b82f6) -> Semantic (action-primary: var(--color-blue-500)) -> Component (button-bg: var(--action-primary)). Nhờ vậy, khi một Brand khác sử dụng màu xanh ngọc, ta chỉ cần thay đổi Semantic Mapping ở tầng Root mà không làm sửa đổi bất kỳ dòng code nào trong 100+ components.",
+      "codeExample": "// design-system/components/button.tsx\nimport * as React from 'react';\nimport { cva, type VariantProps } from 'class-variance-authority';\n\nexport const buttonVariants = cva(\n  'inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50',\n  {\n    variants: {\n      variant: {\n        primary: 'bg-[var(--token-action-primary)] text-white hover:bg-[var(--token-action-primary-hover)]',\n        secondary: 'bg-[var(--token-surface-subtle)] text-[var(--token-text-primary)] hover:bg-[var(--token-surface-hover)]',\n        outline: 'border border-[var(--token-border-strong)] bg-transparent hover:bg-[var(--token-surface-subtle)]',\n        destructive: 'bg-[var(--token-feedback-danger)] text-white hover:opacity-90',\n      },\n      size: {\n        sm: 'h-8 px-3 text-xs rounded-[var(--token-radius-sm)]',\n        md: 'h-10 px-4 text-sm rounded-[var(--token-radius-md)]',\n        lg: 'h-12 px-6 text-base rounded-[var(--token-radius-lg)]',\n      },\n    },\n    defaultVariants: {\n      variant: 'primary',\n      size: 'md',\n    },\n  }\n);",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Design System Doanh Nghiệp 4 Tầng (Enterprise Design System Engine)",
+        "caption": "Phân cấp token 3 tầng qua Style Dictionary, kết hợp Headless UI Primitives và CVA Styling Variants",
+        "code": "flowchart TD\n    subgraph TokenSource [\"1. Nguồn Thiết Kế & Tokens\"]\n      Figma[\"Figma Tokens (Designers)\"] -->|\"Export JSON\"| StyleDict[\"Style Dictionary Build Pipeline\"]\n    end\n\n    subgraph TokenHierarchy [\"2. Phân Cấp Design Tokens 3 Lớp\"]\n      StyleDict --> Global[\"Global Tokens (Màu thô: blue-500, gray-900, 16px)\"]\n      Global --> Semantic[\"Semantic Tokens (Ý nghĩa: action-primary, surface-bg, text-muted)\"]\n      Semantic --> ComponentTok[\"Component Tokens (button-bg, modal-radius, card-border)\"]\n    end\n\n    subgraph RuntimeEngine [\"3. Theme Engine & Runtime CSS Variables\"]\n      ComponentTok --> BrandA[\"Brand A Theme (:root[data-brand='fintech'])\"]\n      ComponentTok --> BrandB[\"Brand B Theme (:root[data-brand='retail'])\"]\n      ComponentTok --> DarkMode[\"Dark Mode Overrides (.dark)\"]\n    end\n\n    subgraph ComponentTier [\"4. Kiến Trúc Component (Headless + CVA)\"]\n      Headless[\"Headless UI Primitives (Radix / React Aria: ARIA & Keyboard Nav)\"]\n      CVA[\"CVA: Class Variance Authority (Variants: primary/outline, Sizes: sm/md/lg)\"]\n      Headless & CVA --> Components[\"Thư Viện Component (Button, Dialog, Select, Table)\"]\n    end\n\n    RuntimeEngine --> Components\n    Components --> Consumers[\"Ứng Dụng Web / Mobile Khách Hàng\"]"
+      }
+    },
+    "pitfalls": [
+      "Gắn chặt giá trị màu hex trực tiếp vào component khiến không thể đổi theme động.",
+      "Bỏ qua khả năng truy cập (A11y - Accessibility) khi tự build component từ thẻ div thay vì dùng Headless Primitives."
+    ],
+    "followUpQuestions": [
+      "Làm thế nào để versioning và publish thư viện Design System dạng multi-package monorepo (Core, Tokens, Icons, React) với Changesets?"
     ]
   }
 ]
