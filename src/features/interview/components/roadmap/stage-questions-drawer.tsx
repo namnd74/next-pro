@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Sparkles,
   Search,
+  ExternalLink,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -300,6 +301,21 @@ export function StageQuestionsDrawer({
 
                     {/* Action buttons */}
                     <div className="flex shrink-0 items-center gap-0.5">
+                      {onOpenQuestionDetail && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            onOpenQuestionDetail(q.id);
+                            onClose();
+                          }}
+                          className="h-7 w-7 rounded-md p-0 text-muted-foreground hover:text-primary"
+                          title="Xem lời giải & code đầy đủ"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+
                       <Button
                         variant="ghost"
                         size="sm"

@@ -487,7 +487,7 @@ export function TopicRoadmapGraph({
                         isActive ? 'font-bold text-primary' : 'text-muted-foreground'
                       )}
                     >
-                      {isActive ? '● Đang lọc' : 'Click để lọc'}
+                      {isActive ? '● Đang lọc' : 'Xem câu hỏi ↓'}
                     </span>
                   </div>
                 </div>
