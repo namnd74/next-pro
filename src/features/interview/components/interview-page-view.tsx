@@ -68,8 +68,8 @@ export function InterviewPageView() {
   }, [selectedCategory]);
 
   const currentRoadmap = React.useMemo(() => {
-    return getTopicRoadmap(selectedCategory);
-  }, [selectedCategory]);
+    return getTopicRoadmap(selectedCategory, allQuestions);
+  }, [selectedCategory, allQuestions]);
 
   const displayedQuestions = React.useMemo(() => {
     const bookmarkSet = onlyBookmarked ? new Set(bookmarkedQuestionIds) : null;
