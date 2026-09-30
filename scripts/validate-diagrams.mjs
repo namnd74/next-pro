@@ -1,6 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Initialize DOMPurify stub for Node.js environment
+const dp = (await import('dompurify')).default;
+dp.addHook = () => {};
+dp.sanitize = (s) => s;
+
+const mermaid = (await import('mermaid')).default;
+mermaid.initialize({ startOnLoad: false, suppressErrorRendering: true });
+
 const jsonDir = path.resolve('src/features/interview/data/json');
 
 if (!fs.existsSync(jsonDir)) {
@@ -51,6 +59,12 @@ for (const file of files) {
       if (diag.type === 'mermaid') {
         if (!diag.code || typeof diag.code !== 'string' || diag.code.trim().length === 0) {
           errors.push(`[${bankName}:${q.id}] Diagram type 'mermaid' missing valid 'code' string.`);
+        } else {
+          try {
+            await mermaid.parse(diag.code);
+          } catch (err) {
+            errors.push(`[${bankName}:${q.id}] Mermaid Syntax Error: ${err.message}`);
+          }
         }
       }
 
