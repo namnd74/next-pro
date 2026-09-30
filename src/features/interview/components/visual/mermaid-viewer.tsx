@@ -7,11 +7,13 @@ import {
   Copy,
   Check,
   Maximize2,
+  Minimize2,
   ZoomIn,
   ZoomOut,
   RotateCcw,
   AlertTriangle,
   Sparkles,
+  Move,
   X,
 } from 'lucide-react';
 
@@ -22,24 +24,41 @@ interface MermaidViewerProps {
   className?: string;
 }
 
-export function MermaidViewer({ code, title, caption, className = '' }: MermaidViewerProps) {
+export function MermaidViewer({
+  code,
+  title,
+  caption,
+  className = '',
+}: MermaidViewerProps) {
   const { resolvedTheme } = useTheme();
   const [svgContent, setSvgContent] = React.useState<string>('');
   const [error, setError] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
   const [copied, setCopied] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const [zoom, setZoom] = React.useState(1);
   const [mounted, setMounted] = React.useState(false);
+
+  // Pan & Zoom state
+  const [zoom, setZoom] = React.useState(1);
+  const [pan, setPan] = React.useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
+
+  // Tracking references for dragging & pinch gesture
+  const dragStartRef = React.useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const panStartRef = React.useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const initialPinchDistRef = React.useRef<number | null>(null);
+  const initialPinchZoomRef = React.useRef<number>(1);
+  const canvasRef = React.useRef<HTMLDivElement>(null);
+  const fullscreenCanvasRef = React.useRef<HTMLDivElement>(null);
+
+  // Generate deterministic container ID
+  const containerId = React.useId().replace(/:/g, '_');
 
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Generate deterministic/unique container ID
-  const containerId = React.useId().replace(/:/g, '_');
-
-  // Clean code string: handle cases where code might be wrapped in ```mermaid ... ```
+  // Clean code string: handle cases where code is wrapped in ```mermaid ... ``` or comments
   const cleanCode = React.useMemo(() => {
     let raw = code.trim();
     if (raw.startsWith('```mermaid')) {
@@ -47,11 +66,9 @@ export function MermaidViewer({ code, title, caption, className = '' }: MermaidV
     } else if (raw.startsWith('```')) {
       raw = raw.replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/, '');
     }
-    // Also strip JS/TS multi-line comment markers if embedded in codeExample
     if (raw.startsWith('/*') && raw.endsWith('*/')) {
       raw = raw.slice(2, -2).trim();
     }
-    // Strip leading single-line comments if any
     return raw.replace(/^\/\/[^\n]*\n/gm, '').trim();
   }, [code]);
 
@@ -71,7 +88,6 @@ export function MermaidViewer({ code, title, caption, className = '' }: MermaidV
           theme: isDark ? 'dark' : 'neutral',
           themeVariables: isDark
             ? {
-                fontSize: '14px',
                 primaryColor: '#1e293b',
                 primaryTextColor: '#f8fafc',
                 primaryBorderColor: '#3b82f6',
@@ -80,7 +96,6 @@ export function MermaidViewer({ code, title, caption, className = '' }: MermaidV
                 tertiaryColor: '#1e1b4b',
               }
             : {
-                fontSize: '14px',
                 primaryColor: '#f1f5f9',
                 primaryTextColor: '#0f172a',
                 primaryBorderColor: '#2563eb',
@@ -89,19 +104,14 @@ export function MermaidViewer({ code, title, caption, className = '' }: MermaidV
                 tertiaryColor: '#eff6ff',
               },
           securityLevel: 'loose',
-          fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          fontFamily: 'inherit',
         });
 
         const uniqueId = `mermaid_${containerId}_${Date.now()}`;
         const { svg } = await mermaid.render(uniqueId, cleanCode);
 
         if (isMounted) {
-          // Remove restrictive inline max-width from Mermaid output to allow responsive scaling
-          const responsiveSvg = svg
-            .replace(/style="max-width:[^"]*"/i, 'style="width: 100%; height: auto;"')
-            .replace(/height="[0-9]+"/i, '');
-
-          setSvgContent(responsiveSvg);
+          setSvgContent(svg);
           setIsLoading(false);
         }
       } catch (err: unknown) {
@@ -120,6 +130,20 @@ export function MermaidViewer({ code, title, caption, className = '' }: MermaidV
     };
   }, [cleanCode, resolvedTheme, containerId]);
 
+  // Zoom controls
+  const handleZoomIn = React.useCallback(() => {
+    setZoom((z) => Math.min(3, Math.round((z + 0.2) * 100) / 100));
+  }, []);
+
+  const handleZoomOut = React.useCallback(() => {
+    setZoom((z) => Math.max(0.3, Math.round((z - 0.2) * 100) / 100));
+  }, []);
+
+  const handleResetZoomAndPan = React.useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(cleanCode);
@@ -130,147 +154,239 @@ export function MermaidViewer({ code, title, caption, className = '' }: MermaidV
     }
   };
 
-  const handleZoomIn = () => setZoom((z) => Math.min(2.5, Math.round((z + 0.15) * 100) / 100));
-  const handleZoomOut = () => setZoom((z) => Math.max(0.4, Math.round((z - 0.15) * 100) / 100));
-  const handleResetZoom = () => setZoom(1);
-
-  // Native Fullscreen & Viewport Portal Toggle
-  const handleToggleFullscreen = React.useCallback(async () => {
-    if (!isFullscreen) {
-      setIsFullscreen(true);
-      setZoom(1.2); // Comfortable spacious view in fullscreen
-      try {
-        if (typeof document !== 'undefined' && !document.fullscreenElement) {
-          await document.documentElement.requestFullscreen?.();
-        }
-      } catch {
-        // Fallback to portal modal if native requestFullscreen is denied
-      }
-    } else {
-      setIsFullscreen(false);
-      setZoom(1);
-      try {
-        if (typeof document !== 'undefined' && document.fullscreenElement) {
-          await document.exitFullscreen?.();
-        }
-      } catch {
-        // Ignore
-      }
-    }
-  }, [isFullscreen]);
-
-  // Sync native fullscreen changes (e.g. user presses ESC in browser)
+  // Keyboard shortcut for Escape to exit fullscreen, and +/-/0 for zoom
   React.useEffect(() => {
-    if (!mounted) return;
-
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && isFullscreen) {
-        setIsFullscreen(false);
-        setZoom(1);
-      }
-    };
+    if (!isFullscreen) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        handleToggleFullscreen();
+      if (e.key === 'Escape') {
+        setIsFullscreen(false);
+      } else if (e.key === '+' || e.key === '=') {
+        handleZoomIn();
+      } else if (e.key === '-') {
+        handleZoomOut();
+      } else if (e.key === '0') {
+        handleResetZoomAndPan();
       }
     };
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, handleZoomIn, handleZoomOut, handleResetZoomAndPan]);
 
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isFullscreen, mounted, handleToggleFullscreen]);
+  // Mouse pan handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only drag with primary mouse button (0) or middle mouse button (1)
+    if (e.button !== 0 && e.button !== 1) return;
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    panStartRef.current = { ...pan };
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    setPan({
+      x: Math.round(panStartRef.current.x + dx),
+      y: Math.round(panStartRef.current.y + dy),
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Touch pan & pinch-to-zoom handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      dragStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      panStartRef.current = { ...pan };
+      initialPinchDistRef.current = null;
+    } else if (e.touches.length === 2) {
+      setIsDragging(false);
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      initialPinchDistRef.current = dist;
+      initialPinchZoomRef.current = zoom;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 1 && isDragging) {
+      const dx = e.touches[0].clientX - dragStartRef.current.x;
+      const dy = e.touches[0].clientY - dragStartRef.current.y;
+      setPan({
+        x: Math.round(panStartRef.current.x + dx),
+        y: Math.round(panStartRef.current.y + dy),
+      });
+    } else if (e.touches.length === 2 && initialPinchDistRef.current !== null) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scaleFactor = dist / initialPinchDistRef.current;
+      const newZoom = Math.min(
+        3,
+        Math.max(0.3, initialPinchZoomRef.current * scaleFactor)
+      );
+      setZoom(Math.round(newZoom * 100) / 100);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    initialPinchDistRef.current = null;
+  };
+
+  // Wheel zoom / pan handler
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      // Pinch on trackpad or Ctrl+Wheel -> Smooth Zoom
+      e.preventDefault();
+      const zoomFactor = -e.deltaY * 0.003;
+      setZoom((prev) =>
+        Math.min(3, Math.max(0.3, Math.round((prev + zoomFactor) * 100) / 100))
+      );
+    } else {
+      // Normal scroll or trackpad pan -> Pan the canvas
+      setPan((prev) => ({
+        x: Math.round(prev.x - e.deltaX),
+        y: Math.round(prev.y - e.deltaY),
+      }));
+    }
+  };
+
+  // Render Controls Component
+  const renderControls = (inFullscreen: boolean) => (
+    <div className="flex items-center gap-1">
+      {/* Zoom controls */}
+      <button
+        type="button"
+        onClick={handleZoomOut}
+        title="Thu nhỏ (-)"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground rounded p-1 transition active:scale-95"
+      >
+        <ZoomOut className="h-3.5 w-3.5" />
+      </button>
+
+      <button
+        type="button"
+        onClick={handleResetZoomAndPan}
+        title="Bấm để khôi phục 100% & giữa màn hình"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold transition"
+      >
+        {Math.round(zoom * 100)}%
+      </button>
+
+      <button
+        type="button"
+        onClick={handleZoomIn}
+        title="Phóng to (+)"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground rounded p-1 transition active:scale-95"
+      >
+        <ZoomIn className="h-3.5 w-3.5" />
+      </button>
+
+      <button
+        type="button"
+        onClick={handleResetZoomAndPan}
+        title="Khôi phục vị trí & tỉ lệ gốc (Reset)"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground rounded p-1 transition active:scale-95"
+      >
+        <RotateCcw className="h-3.5 w-3.5" />
+      </button>
+
+      <div className="bg-border/60 mx-1 h-3.5 w-px" />
+
+      {/* Copy DSL */}
+      <button
+        type="button"
+        onClick={handleCopy}
+        title="Sao chép mã Mermaid DSL"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground flex items-center gap-1 rounded px-2 py-1 text-[11px] transition"
+      >
+        {copied ? (
+          <>
+            <Check className="h-3.5 w-3.5 text-emerald-500" />
+            <span className="font-semibold text-emerald-500">Đã chép</span>
+          </>
+        ) : (
+          <>
+            <Copy className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Copy DSL</span>
+          </>
+        )}
+      </button>
+
+      {/* Fullscreen toggle button */}
+      <button
+        type="button"
+        onClick={() => {
+          setIsFullscreen((f) => !f);
+        }}
+        title={inFullscreen ? 'Thoát toàn màn hình (ESC)' : 'Mở rộng toàn màn hình'}
+        className={`flex items-center gap-1 rounded px-2 py-1 text-[11px] font-semibold transition active:scale-95 ${
+          inFullscreen
+            ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400'
+            : 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:text-blue-400'
+        }`}
+      >
+        {inFullscreen ? (
+          <>
+            <Minimize2 className="h-3.5 w-3.5" />
+            <span>Thu nhỏ (ESC)</span>
+          </>
+        ) : (
+          <>
+            <Maximize2 className="h-3.5 w-3.5" />
+            <span>Toàn màn hình</span>
+          </>
+        )}
+      </button>
+    </div>
+  );
 
   return (
     <>
-      {/* Standard Inline Card View */}
+      {/* Inline Standard Diagram Card */}
       <div
-        className={`relative overflow-hidden rounded-xl border border-blue-500/25 bg-slate-50/70 dark:border-blue-500/20 dark:bg-slate-950/70 shadow-xs ${className}`}
+        className={`relative overflow-hidden rounded-xl border border-blue-500/20 bg-slate-50/50 shadow-sm dark:border-blue-500/15 dark:bg-slate-950/60 ${className}`}
       >
         {/* Header bar */}
-        <div className="flex items-center justify-between border-b border-border/50 bg-muted/40 px-3.5 py-2 text-xs">
-          <div className="flex items-center gap-2 font-medium text-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-blue-500" />
-            <span>{title || 'Sơ đồ luồng kiến trúc (Interactive Diagram)'}</span>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {/* Zoom controls */}
-            <button
-              type="button"
-              onClick={handleZoomOut}
-              title="Thu nhỏ (-)"
-              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition"
-            >
-              <ZoomOut className="h-3.5 w-3.5" />
-            </button>
-            <span className="min-w-[42px] text-center font-mono text-[10px] text-muted-foreground">
-              {Math.round(zoom * 100)}%
+        <div className="border-border/50 bg-muted/40 flex items-center justify-between border-b px-3.5 py-2 text-xs">
+          <div className="text-foreground flex min-w-0 items-center gap-2 pr-2 font-medium">
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+            <span className="truncate">
+              {title || 'Sơ đồ luồng kiến trúc (Interactive Diagram)'}
             </span>
-            <button
-              type="button"
-              onClick={handleZoomIn}
-              title="Phóng to (+)"
-              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition"
-            >
-              <ZoomIn className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={handleResetZoom}
-              title="Khôi phục 100%"
-              className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-
-            <div className="mx-1 h-3.5 w-px bg-border" />
-
-            {/* Copy DSL */}
-            <button
-              type="button"
-              onClick={handleCopy}
-              title="Sao chép mã Mermaid DSL"
-              className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-emerald-500" />
-                  <span className="text-emerald-500 font-semibold">Đã chép</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  <span>Copy DSL</span>
-                </>
-              )}
-            </button>
-
-            {/* Fullscreen Button */}
-            <button
-              type="button"
-              onClick={handleToggleFullscreen}
-              title="Xem toàn màn hình thật (Fullscreen)"
-              className="flex items-center gap-1 rounded bg-blue-500/10 px-2 py-1 text-[11px] font-semibold text-blue-600 hover:bg-blue-500/20 dark:text-blue-400 transition"
-            >
-              <Maximize2 className="h-3.5 w-3.5" />
-              <span>Toàn màn hình</span>
-            </button>
           </div>
+
+          {renderControls(false)}
         </div>
 
-        {/* Diagram Canvas Body */}
-        <div className="relative flex min-h-[260px] max-h-[620px] w-full items-center justify-center overflow-auto p-4 transition-all scrollbar-thin">
+        {/* Pan & Drag Canvas Body */}
+        <div
+          ref={canvasRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onWheel={handleWheel}
+          className={`relative flex max-h-[560px] min-h-[220px] w-full items-center justify-center overflow-hidden p-4 select-none ${
+            isDragging ? 'cursor-grabbing' : 'cursor-grab'
+          }`}
+        >
           {isLoading && (
-            <div className="flex flex-col items-center justify-center gap-2 py-12 text-xs text-muted-foreground">
+            <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 py-10 text-xs">
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-              <span>Đang khởi tạo sơ đồ trực quan...</span>
+              <span>Đang render sơ đồ kiến trúc...</span>
             </div>
           )}
 
@@ -288,91 +404,112 @@ export function MermaidViewer({ code, title, caption, className = '' }: MermaidV
 
           {!isLoading && !error && svgContent && (
             <div
-              className="flex items-center justify-center transition-transform duration-150 ease-out select-none [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-[1050px] [&_svg]:min-w-[550px]"
-              style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
+              className={`flex items-center justify-center will-change-transform [&_svg]:pointer-events-none [&_svg]:max-w-none ${
+                isDragging ? '' : 'transition-transform duration-150 ease-out'
+              }`}
+              style={{
+                transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                transformOrigin: 'center center',
+              }}
               dangerouslySetInnerHTML={{ __html: svgContent }}
             />
+          )}
+
+          {/* Interactive Pan Helper Badge */}
+          {!isLoading && !error && (
+            <div className="border-border/50 bg-background/80 text-muted-foreground pointer-events-none absolute bottom-2 left-2.5 flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] opacity-70 backdrop-blur-sm transition-opacity hover:opacity-100">
+              <Move className="h-3 w-3 text-blue-500" />
+              <span>Kéo chuột để di chuyển • Cuộn để phóng to</span>
+            </div>
           )}
         </div>
 
         {/* Caption footer if provided */}
         {caption && (
-          <div className="border-t border-border/40 bg-muted/20 px-3.5 py-1.5 text-[11px] text-muted-foreground italic">
+          <div className="border-border/40 bg-muted/20 text-muted-foreground border-t px-3.5 py-1.5 text-[11px] italic">
             💡 {caption}
           </div>
         )}
       </div>
 
-      {/* True Fullscreen Modal Portaled to Document Body */}
+      {/* High-Performance Fullscreen Modal Portal */}
       {isFullscreen &&
         mounted &&
         typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed inset-0 z-[99999] flex flex-col bg-slate-950/98 text-slate-100 backdrop-blur-2xl animate-in fade-in duration-200">
-            {/* Fullscreen Header Bar */}
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/90 px-6 py-3.5 shadow-lg">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+          <div className="animate-in fade-in fixed inset-0 z-[99999] flex flex-col bg-slate-950/95 text-slate-100 backdrop-blur-xl duration-150">
+            {/* Fullscreen Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900/90 px-4 py-3 shadow-md sm:px-6">
+              <div className="flex min-w-0 items-center gap-2.5 pr-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-blue-500/30 bg-blue-500/20 text-blue-400">
                   <Sparkles className="h-4 w-4" />
                 </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-white">
+                <div className="min-w-0">
+                  <h3 className="truncate text-xs font-bold text-white sm:text-sm">
                     {title || 'Sơ đồ luồng kiến trúc (Interactive Diagram)'}
                   </h3>
                   {caption && (
-                    <p className="text-xs text-slate-400 line-clamp-1">{caption}</p>
+                    <p className="hidden truncate text-[11px] text-slate-400 sm:block">
+                      {caption}
+                    </p>
                   )}
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Fullscreen Zoom Controls */}
+                {/* Fullscreen controls */}
                 <div className="flex items-center rounded-lg border border-slate-700 bg-slate-800/80 p-0.5">
                   <button
                     type="button"
                     onClick={handleZoomOut}
-                    className="rounded p-1.5 text-slate-300 hover:bg-slate-700 hover:text-white"
+                    className="rounded p-1.5 text-slate-300 transition hover:bg-slate-700 hover:text-white active:scale-95"
                     title="Thu nhỏ (-)"
                   >
                     <ZoomOut className="h-4 w-4" />
                   </button>
-                  <span className="min-w-[50px] text-center font-mono text-xs font-semibold text-white">
+                  <button
+                    type="button"
+                    onClick={handleResetZoomAndPan}
+                    className="min-w-[48px] px-1 text-center font-mono text-xs font-semibold text-white transition hover:text-blue-400"
+                    title="Khôi phục 100%"
+                  >
                     {Math.round(zoom * 100)}%
-                  </span>
+                  </button>
                   <button
                     type="button"
                     onClick={handleZoomIn}
-                    className="rounded p-1.5 text-slate-300 hover:bg-slate-700 hover:text-white"
+                    className="rounded p-1.5 text-slate-300 transition hover:bg-slate-700 hover:text-white active:scale-95"
                     title="Phóng to (+)"
                   >
                     <ZoomIn className="h-4 w-4" />
                   </button>
                   <button
                     type="button"
-                    onClick={handleResetZoom}
-                    className="rounded px-2.5 py-1 text-xs font-medium text-slate-300 hover:bg-slate-700 hover:text-white"
-                    title="Tỉ lệ 100%"
+                    onClick={handleResetZoomAndPan}
+                    className="rounded px-2 py-1 text-xs font-medium text-slate-300 transition hover:bg-slate-700 hover:text-white"
+                    title="Khôi phục vị trí ban đầu"
                   >
-                    <RotateCcw className="h-3 w-3 mr-1 inline" />
-                    100%
+                    <RotateCcw className="mr-1 inline h-3 w-3" />
+                    Reset
                   </button>
                 </div>
 
-                {/* Copy DSL */}
+                {/* Copy button */}
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 hover:text-white transition"
+                  className="hidden items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-xs text-slate-300 transition hover:bg-slate-700 hover:text-white sm:flex"
+                  title="Copy Mermaid Code"
                 >
                   {copied ? (
                     <>
                       <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      <span className="text-emerald-400 font-semibold">Đã chép</span>
+                      <span className="font-semibold text-emerald-400">Đã chép</span>
                     </>
                   ) : (
                     <>
                       <Copy className="h-3.5 w-3.5" />
-                      <span>Copy DSL</span>
+                      <span>Copy</span>
                     </>
                   )}
                 </button>
@@ -380,28 +517,57 @@ export function MermaidViewer({ code, title, caption, className = '' }: MermaidV
                 {/* Close Fullscreen */}
                 <button
                   type="button"
-                  onClick={handleToggleFullscreen}
-                  className="flex items-center gap-1.5 rounded-lg bg-red-500/20 border border-red-500/40 px-3.5 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/30 hover:text-white transition"
+                  onClick={() => setIsFullscreen(false)}
+                  className="flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/30 hover:text-white active:scale-95"
                   title="Thoát toàn màn hình (ESC)"
                 >
                   <X className="h-4 w-4" />
-                  <span>Đóng (ESC)</span>
+                  <span className="hidden sm:inline">Đóng (ESC)</span>
                 </button>
               </div>
             </div>
 
-            {/* Fullscreen Diagram Viewport */}
-            <div className="relative flex-1 overflow-auto p-8 flex items-center justify-center">
-              <div
-                className="flex items-center justify-center transition-transform duration-150 ease-out select-none [&_svg]:w-full [&_svg]:h-auto [&_svg]:max-w-[1600px] [&_svg]:max-h-[85vh] [&_svg]:drop-shadow-2xl"
-                style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
-                dangerouslySetInnerHTML={{ __html: svgContent }}
-              />
+            {/* Fullscreen Pan & Zoom Canvas */}
+            <div
+              ref={fullscreenCanvasRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onWheel={handleWheel}
+              className={`relative flex w-full flex-1 items-center justify-center overflow-hidden p-6 select-none ${
+                isDragging ? 'cursor-grabbing' : 'cursor-grab'
+              }`}
+            >
+              {!isLoading && !error && svgContent && (
+                <div
+                  className={`flex items-center justify-center will-change-transform [&_svg]:pointer-events-none [&_svg]:max-w-none [&_svg]:drop-shadow-2xl ${
+                    isDragging ? '' : 'transition-transform duration-150 ease-out'
+                  }`}
+                  style={{
+                    transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`,
+                    transformOrigin: 'center center',
+                  }}
+                  dangerouslySetInnerHTML={{ __html: svgContent }}
+                />
+              )}
+
+              {/* Helper Bar In Fullscreen */}
+              <div className="pointer-events-none absolute bottom-4 left-6 flex items-center gap-2 rounded-full border border-slate-700/80 bg-slate-900/90 px-3.5 py-1.5 text-xs text-slate-300 shadow-xl backdrop-blur-md">
+                <Move className="h-3.5 w-3.5 text-blue-400" />
+                <span>
+                  Kéo chuột để xem toàn bộ sơ đồ • Cuộn hoặc phím +/- để phóng to • ESC để
+                  đóng
+                </span>
+              </div>
             </div>
 
             {/* Fullscreen Footer */}
             {caption && (
-              <div className="border-t border-slate-800 bg-slate-900/60 px-6 py-2.5 text-xs text-slate-400">
+              <div className="border-t border-slate-800 bg-slate-900/80 px-6 py-2 text-xs text-slate-400">
                 💡 {caption}
               </div>
             )}
