@@ -169,9 +169,7 @@
               "Chỉ chèn đúng node mới vào DOM",
               "Không bị lỗi nhảy state giữa các hàng trong bảng"
             ],
-            "cons": [
-              "Dữ liệu backend bắt buộc phải cung cấp ID duy nhất"
-            ]
+            "cons": ["Dữ liệu backend bắt buộc phải cung cấp ID duy nhất"]
           },
           {
             "name": "Dùng Array Index làm Key",
@@ -196,9 +194,7 @@
                 "color": "rose"
               }
             ],
-            "pros": [
-              "Tiện lợi khi viết nhanh component tĩnh"
-            ],
+            "pros": ["Tiện lợi khi viết nhanh component tĩnh"],
             "cons": [
               "Làm React re-render lại toàn bộ 1,000 phần tử phía sau",
               "Gây lỗi bug tráo đổi dữ liệu người dùng đang gõ dở trong input"
@@ -1081,7 +1077,13 @@
     "seniorAnswer": {
       "summary": "Mounting là giai đoạn component được tạo ra lần đầu và chèn (insert) vào DOM thật. Updating là giai đoạn component tính toán lại (re-render) và cập nhật DOM khi props, state hoặc context thay đổi. Unmounting là giai đoạn component bị gỡ bỏ (remove) hoàn toàn khỏi DOM và hủy khỏi bộ nhớ cây Fiber.",
       "deepDive": "Chi tiết từng pha: (1) **Mount**: Fiber node được tạo mới, hàm component chạy lần đầu (Render), DOM node được tạo và gắn vào cây DOM trình duyệt (Commit), các hook `useLayoutEffect` chạy đồng bộ rồi đến `useEffect` chạy sau paint; (2) **Update**: State/props thay đổi kích hoạt re-render, React diffing cây Fiber cũ và mới (Render), chỉ mutate những chỗ khác biệt trên DOM (Commit), cleanup của effect cũ chạy rồi effect mới chạy; (3) **Unmount**: React gọi các cleanup functions của `useEffect`/`useLayoutEffect`, ngắt kết nối DOM node và chuẩn bị cho Garbage Collector thu hồi bộ nhớ.",
-      "codeExample": "function LifecycleDemo() {\n  useEffect(() => {\n    // 1. MOUNT: Chạy 1 lần khi component sinh ra và gắn vào DOM\n    console.log('Component mounted');\n\n    // 3. UNMOUNT: Hàm return chạy khi component bị gỡ khỏi DOM\n    return () => {\n      console.log('Component unmounted');\n    };\n  }, []);\n\n  useEffect(() => {\n    // 2. UPDATE: Chạy mỗi khi count thay đổi\n    console.log('Component updated count:', count);\n  }, [count]);\n\n  return <div>Lifecycle</div>;\n}"
+      "codeExample": "function LifecycleDemo() {\n  useEffect(() => {\n    // 1. MOUNT: Chạy 1 lần khi component sinh ra và gắn vào DOM\n    console.log('Component mounted');\n\n    // 3. UNMOUNT: Hàm return chạy khi component bị gỡ khỏi DOM\n    return () => {\n      console.log('Component unmounted');\n    };\n  }, []);\n\n  useEffect(() => {\n    // 2. UPDATE: Chạy mỗi khi count thay đổi\n    console.log('Component updated count:', count);\n  }, [count]);\n\n  return <div>Lifecycle</div>;\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Ba Giai Đoạn Vòng Đời Của React Component: Mount, Update và Unmount",
+        "caption": "Mô hình hóa quá trình chuyển dịch trạng thái và kích hoạt hooks tương ứng",
+        "code": "flowchart LR\n    Mount[\"<b>1. Giai Đoạn MOUNT (Gắn Vào DOM)</b><br>• Khởi tạo State & Props<br>• Render JSX thành DOM ảo<br>• useEffect(() => {}, []) kích hoạt\"]\n    \n    Mount --> Update[\"<b>2. Giai Đoạn UPDATE (Tái Render)</b><br>• State thay đổi (setState)<br>• Props mới từ component cha<br>• useEffect(() => {}, [deps]) kích hoạt\"]\n    \n    Update --> Unmount[\"<b>3. Giai Đoạn UNMOUNT (Gỡ Bỏ)</b><br>• Component bị xóa khỏi DOM<br>• Cleanup function trong useEffect kích hoạt để hủy timer/listener\"]"
+      }
     },
     "pitfalls": [
       "Nhầm lẫn giữa render và mount: render diễn ra nhiều lần, nhưng mount chỉ diễn ra 1 lần duy nhất trong toàn bộ chu kỳ sống của một instance component.",
@@ -1338,7 +1340,34 @@
     "seniorAnswer": {
       "summary": "Thứ tự các phương thức vòng đời diễn ra theo 3 giai đoạn: (1) **Mounting**: `constructor` -> `static getDerivedStateFromProps` -> `render` -> (React updates DOM) -> `componentDidMount`; (2) **Updating**: `static getDerivedStateFromProps` -> `shouldComponentUpdate` -> `render` -> `getSnapshotBeforeUpdate` -> (React updates DOM) -> `componentDidUpdate`; (3) **Unmounting**: `componentWillUnmount`.",
       "deepDive": "Sự phân chia theo Phase của React Fiber: Các hàm `constructor`, `getDerivedStateFromProps`, `shouldComponentUpdate`, và `render` thuộc **Render Phase** (chạy thuần túy trong bộ nhớ, có thể bị gọi lại nhiều lần trong Concurrent Mode). Sau khi React tính toán xong diff và chạm vào DOM thật, quá trình bước sang **Pre-Commit Phase** (`getSnapshotBeforeUpdate` đọc DOM trước khi đổi) và cuối cùng là **Commit Phase** (`componentDidMount`, `componentDidUpdate`, `componentWillUnmount`), nơi các side effects và DOM manipulations được phép thực thi an toàn.",
-      "codeExample": "// Sơ đồ chuỗi thực thi khi UPDATE:\n// 1. static getDerivedStateFromProps(props, state)\n// 2. shouldComponentUpdate(nextProps, nextState) -> return boolean\n// 3. render() -> Tính toán Virtual DOM\n// 4. getSnapshotBeforeUpdate(prevProps, prevState) -> return snapshot\n// [REACT MUTATES DOM THẬT TẠI ĐÂY]\n// 5. componentDidUpdate(prevProps, prevState, snapshot)"
+      "codeExample": "// Sơ đồ chuỗi thực thi khi UPDATE:\n// 1. static getDerivedStateFromProps(props, state)\n// 2. shouldComponentUpdate(nextProps, nextState) -> return boolean\n// 3. render() -> Tính toán Virtual DOM\n// 4. getSnapshotBeforeUpdate(prevProps, prevState) -> return snapshot\n// [REACT MUTATES DOM THẬT TẠI ĐÂY]\n// 5. componentDidUpdate(prevProps, prevState, snapshot)",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Thứ Tự Thực Thi Render & Commit Phase Trong React Component",
+        "caption": "Phân tách giữa giai đoạn thuần túy không tác dụng phụ (Render) và giai đoạn can thiệp DOM thực tế (Commit)",
+        "stages": [
+          {
+            "name": "1. Render Phase (Pure)",
+            "description": "Chạy function component, tính toán JSX, so sánh Virtual DOM Diffing. Không được gây side effect!",
+            "duration": "Render Phase"
+          },
+          {
+            "name": "2. Pre-Commit DOM",
+            "description": "React cập nhật các node DOM thực tế trên trình duyệt",
+            "duration": "Commit Phase"
+          },
+          {
+            "name": "3. useLayoutEffect",
+            "description": "Kích hoạt đồng bộ ngay sau khi DOM cập nhật nhưng TRƯỚC KHI trình duyệt vẽ màn hình (đo đạc layout)",
+            "duration": "Layout Phase"
+          },
+          {
+            "name": "4. Browser Paint & useEffect",
+            "description": "Trình duyệt vẽ màn hình xong (60fps); React kích hoạt bất đồng bộ các hàm useEffect()",
+            "duration": "Passive Effect"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Thực hiện side-effects (gọi API, setState) trong `constructor` hoặc `render`.",
@@ -2709,7 +2738,13 @@
     "seniorAnswer": {
       "summary": "Trong React 17 trở về trước, batching chỉ hoạt động trong các React event handlers gốc. React 18 giới thiệu **Automatic Batching**: Mọi cập nhật state nằm trong Promises, `setTimeout`, hoặc native event listeners đều được tự động gom nhóm lại thành một lần re-render duy nhất vào cuối microtask.",
       "deepDive": "Khi nào cần dùng `flushSync()`? Dùng khi bạn BẮT BUỘC phải đọc DOM ngay lập tức sau khi cập nhật state (ví dụ: cần cuộn xuống cuối danh sách tin nhắn ngay sau khi thêm tin nhắn mới, hoặc đo kích thước DOM vừa thay đổi). `flushSync` ép React thoát khỏi batching và cập nhật DOM đồng bộ ngay lập tức.",
-      "codeExample": "import { flushSync } from 'react-dom';\n\nfunction handleAddMessage() {\n  // Ép React cập nhật DOM đồng bộ\n  flushSync(() => {\n    setMessages(prev => [...prev, newMsg]);\n  });\n  // Đọc DOM ngay lập tức sau khi flushSync xong\n  chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;\n}"
+      "codeExample": "import { flushSync } from 'react-dom';\n\nfunction handleAddMessage() {\n  // Ép React cập nhật DOM đồng bộ\n  flushSync(() => {\n    setMessages(prev => [...prev, newMsg]);\n  });\n  // Đọc DOM ngay lập tức sau khi flushSync xong\n  chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;\n}",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cơ Chế Gom Nhóm Tự Động (Automatic Batching) Trong React 18",
+        "caption": "React 18 tự động gom mọi lệnh setState bên trong setTimeout, Promise và Event Listeners thành 1 lần re-render duy nhất",
+        "code": "flowchart TD\n    subgraph React17Old [\"React 17 Cũ (Không Batching Trong Async Callback)\"]\n        AsyncCall1[\"setTimeout(() => {<br>  setCount(c + 1); // Render Lần 1!<br>  setFlag(true);   // Render Lần 2!<br>})\"]\n        Note17[\"⚠️ Gây ra 2 lần re-render thừa liên tiếp, UI có thể bị giật hình nhấp nháy!\"]\n    end\n\n    subgraph React18New [\"React 18 Hiện Đại (Automatic Batching Toàn Diện)\"]\n        AsyncCall2[\"setTimeout(() => {<br>  setCount(c + 1);<br>  setFlag(true);<br>})\"] --> MicrotaskBatch[\"React đưa vào Batch Queue ở cuối lượt Event Loop\"]\n        MicrotaskBatch --> SingleRender[\"Chỉ Re-render ĐÚNG 1 LẦN DUY NHẤT (< 16ms)\"]\n    end"
+      }
     },
     "pitfalls": [
       "Lạm dụng `flushSync` làm mất đi lợi ích tối ưu hiệu năng của Automatic Batching và gây nghẽn Main Thread."

@@ -537,7 +537,34 @@
       "summary": "Trong Composition API, các lifecycle hooks được import trực tiếp từ 'vue' với tiền tố `on` (ví dụ: `onMounted`, `onUpdated`, `onUnmounted`). Điểm khác biệt lớn nhất so với Options API là hai hook `beforeCreate` và `created` được thay thế hoàn toàn bằng chính thân hàm `<script setup>` (chạy đồng bộ tại thời điểm khởi tạo instance). Vue cho phép gọi cùng một hook nhiều lần trong nhiều composable khác nhau để phục vụ các mối quan tâm độc lập.",
       "deepDive": "Trật tự thực thi vòng đời:\n1. Khởi tạo: Thân `<script setup>` chạy -> Khởi tạo reactive state và props (thay thế created).\n2. Gắn kết DOM: `onBeforeMount()` -> Render VNode lần đầu -> DOM thật được tạo -> `onMounted()` (DOM sẵn sàng, an toàn để truy cập template refs, đo đạc kích thước hoặc khởi tạo thư viện bên ngoài như Chart.js).\n3. Cập nhật state: State thay đổi -> `onBeforeUpdate()` -> Virtual DOM re-render & patch -> `onUpdated()` (DOM mới đã được cập nhật).\n4. Hủy component: `onBeforeUnmount()` -> `onUnmounted()` (Dọn dẹp setInterval, hủy event listener, ngắt kết nối WebSocket).\nLưu ý: Không bao giờ thực hiện state mutation bên trong `onUpdated()` vì sẽ kích hoạt vòng lặp re-render vô tận.",
       "codeExample": "<script setup lang=\"ts\">\nimport { ref, onMounted, onUpdated, onBeforeUnmount } from 'vue';\n\nconst timerId = ref<number | null>(null);\nconst containerRef = ref<HTMLElement | null>(null);\n\n// 1. Setup scope: Chạy ngay khi component instance được khởi tạo\nconsole.log('1. Setup initialized (thay thế created)');\n\n// 2. onMounted: DOM thật đã xuất hiện\nonMounted(() => {\n  console.log('2. Mounted: DOM chiều rộng =', containerRef.value?.offsetWidth);\n  timerId.value = window.setInterval(() => {\n    console.log('Heartbeat ping...');\n  }, 5000);\n});\n\n// 3. onBeforeUnmount: Dọn dẹp tài nguyên trước khi DOM bị hủy\nonBeforeUnmount(() => {\n  if (timerId.value) {\n    clearInterval(timerId.value);\n    console.log('3. Cleared interval, ngăn ngừa memory leak');\n  }\n});\n</script>\n\n<template>\n  <div ref=\"containerRef\" class=\"box\">\n    <p>Lifecycle Demo</p>\n  </div>\n</template>",
-      "codeLanguage": "vue"
+      "codeLanguage": "vue",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Vòng Đời Component Trong Vue 3 Composition API",
+        "caption": "Sự thay thế của setup() cho beforeCreate/created và các lifecycle hooks tương ứng",
+        "stages": [
+          {
+            "name": "1. setup() / `<script setup>`",
+            "description": "Chạy trước mọi Options API hooks, nơi khởi tạo Reactivity (ref, reactive, computed)",
+            "duration": "Khởi tạo"
+          },
+          {
+            "name": "2. onBeforeMount & onMounted",
+            "description": "Kích hoạt ngay khi Component được render lần đầu vào DOM (thích hợp gọi API, gắn DOM listener)",
+            "duration": "Mounting"
+          },
+          {
+            "name": "3. onBeforeUpdate & onUpdated",
+            "description": "Kích hoạt khi reactive state thay đổi và DOM ảo tiến hành tái cấu trúc",
+            "duration": "Updating"
+          },
+          {
+            "name": "4. onBeforeUnmount & onUnmounted",
+            "description": "Dọn dẹp tài nguyên, hủy Interval timer, đóng WebSocket để tránh rò rỉ bộ nhớ",
+            "duration": "Unmounting"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Truy cập Template Ref (DOM element) ngay trong thân `<script setup>` trước khi `onMounted` chạy (kết quả sẽ là `null` hoặc `undefined`).",

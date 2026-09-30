@@ -502,7 +502,44 @@
       "summary": "Trật tự thực thi Lifecycle Hooks trong Angular:\n1. `ngOnChanges`: Chạy đầu tiên (và mỗi khi `@Input()` thay đổi tham chiếu).\n2. `ngOnInit`: Chạy 1 lần duy nhất sau `ngOnChanges` đầu tiên (khởi tạo nghiệp vụ, gọi API).\n3. `ngDoCheck`: Chạy khi có chu kỳ Change Detection (tự kiểm tra thủ công).\n4. `ngAfterContentInit` & `ngAfterContentChecked`: Sau khi nội dung chiếu (`ng-content`) được nạp.\n5. `ngAfterViewInit` & `ngAfterViewChecked`: Sau khi toàn bộ View và Component con được render (an toàn để truy cập DOM, `@ViewChild`).\n6. `ngOnDestroy`: Chạy trước khi component bị tiêu hủy khỏi DOM (dọn dẹp subscription, timers).",
       "deepDive": "Quy tắc kiến trúc quan trọng cho từng Hook:\n- `ngOnInit`: Dành cho logic gọi API và khởi tạo state dựa trên Input.\n- `ngAfterViewInit`: Chỉ tại thời điểm này, các phần tử truy xuất qua `@ViewChild` hoặc Template Refs mới sẵn sàng. Lưu ý: TUYỆT ĐỐI KHÔNG làm thay đổi reactive state đồng bộ trong `ngAfterViewInit` vì sẽ gây lỗi kinh điển `ExpressionChangedAfterItHasBeenCheckedError`.\n- `ngOnDestroy`: Bắt buộc phải hủy bỏ các interval, event listener hoặc RxJS subscription dài hạn (bằng `takeUntilDestroyed`).\n- Thay đổi trong thời đại Signals: Với Signal Inputs và `computed()`, nhu cầu sử dụng `ngOnChanges` và `ngOnInit` giảm đi đáng kể do tính năng phản ứng diễn ra tự nhiên theo đồ hình phụ thuộc.",
       "codeExample": "import { Component, OnInit, AfterViewInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';\n\n@Component({\n  selector: 'app-lifecycle-demo',\n  standalone: true,\n  template: `<div #chartCanvas class=\"canvas-container\">Biểu đồ Canvas</div>`\n})\nexport class LifecycleDemoComponent implements OnInit, AfterViewInit, OnDestroy {\n  @ViewChild('chartCanvas') canvasRef!: ElementRef<HTMLDivElement>;\n  private timerId?: number;\n\n  ngOnInit(): void {\n    console.log('1. ngOnInit: Khởi tạo dữ liệu');\n    this.timerId = window.setInterval(() => console.log('Polling...'), 10000);\n  }\n\n  ngAfterViewInit(): void {\n    // 2. ngAfterViewInit: DOM view đã sẵn sàng, canvasRef không còn undefined\n    console.log('2. ngAfterViewInit: Kích thước DOM =', this.canvasRef.nativeElement.offsetWidth);\n  }\n\n  ngOnDestroy(): void {\n    // 3. ngOnDestroy: Dọn dẹp tài nguyên ngăn memory leak\n    if (this.timerId) {\n      clearInterval(this.timerId);\n      console.log('3. ngOnDestroy: Dọn dẹp timer thành công');\n    }\n  }\n}",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Trình Tự Thực Thi Lifecycle Hooks Trong Angular Component",
+        "caption": "Vòng đời hoàn chỉnh từ lúc khởi tạo `@Input()` đến khi Component bị tiêu hủy khỏi DOM",
+        "stages": [
+          {
+            "name": "1. ngOnChanges",
+            "description": "Kích hoạt đầu tiên và mỗi khi giá trị `@Input()` thay đổi",
+            "duration": "Bước 1"
+          },
+          {
+            "name": "2. ngOnInit",
+            "description": "Chạy duy nhất 1 lần sau ngOnChanges đầu tiên, nơi lý tưởng để fetch API",
+            "duration": "Bước 2"
+          },
+          {
+            "name": "3. ngDoCheck",
+            "description": "Chạy trong mỗi chu kỳ Change Detection để phát hiện thay đổi thủ công",
+            "duration": "Bước 3"
+          },
+          {
+            "name": "4. ngAfterContentInit / Checked",
+            "description": "Khởi tạo và kiểm tra nội dung được chiếu vào qua `<ng-content>`",
+            "duration": "Bước 4"
+          },
+          {
+            "name": "5. ngAfterViewInit / Checked",
+            "description": "Hoàn tất render View của Component và các View con `@ViewChild`",
+            "duration": "Bước 5"
+          },
+          {
+            "name": "6. ngOnDestroy",
+            "description": "Dọn dẹp tài nguyên, unsubscribe RxJS Observables chống rò rỉ bộ nhớ",
+            "duration": "Bước 6"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Truy cập `@ViewChild` element trong `ngOnInit` (kết quả luôn là `undefined` vì View chưa được khởi tạo cho tới `ngAfterViewInit`).",
@@ -2013,7 +2050,13 @@
       "summary": "Khi nhiều request đồng thời gặp lỗi 401, nếu không có cơ chế khóa, interceptor sẽ gửi nhiều yêu cầu Refresh Token cùng lúc, dẫn đến việc Refresh Token bị hủy bỏ (do cơ chế Rotation) và người dùng bị đăng xuất oan. Giải pháp kiến trúc chuẩn: Sử dụng mẫu thiết kế Khóa Mutex kết hợp Hàng đợi bằng RxJS:\n1) Dùng cờ `isRefreshing` để đảm bảo CHỈ CÓ DUY NHẤT một request đầu tiên được phép gọi API refresh token;\n2) Dùng một `BehaviorSubject<string | null>(null)` làm hàng đợi khóa. Toàn bộ các request 401 đến sau sẽ tạm dừng chờ đợi bằng toán tử `filter(token => token !== null).pipe(take(1), switchMap(...))` cho đến khi token mới được phát ra;\n3) Khi có token mới, emit vào Subject để giải phóng toàn bộ các request đang chờ cùng lúc.",
       "deepDive": "Quy trình xử lý từng bước chi tiết:\n- Request A (đến đầu tiên): Bắt lỗi 401. Kiểm tra `isRefreshing === false` -> Đặt `isRefreshing = true`, đặt `refreshTokenSubject.next(null)`. Gửi API `/auth/refresh`.\n- Requests B, C, D (đến sau trong khi A đang chạy): Thấy `isRefreshing === true` -> Không gọi API refresh nữa. Chuyển sang lắng nghe `refreshTokenSubject`:\n  `refreshTokenSubject.pipe(filter(t => t !== null), take(1), switchMap(newToken => next(req.clone({ setHeaders: { Authorization: 'Bearer ' + newToken } }))))`.\n- Khi API `/auth/refresh` thành công:\n  + Lưu token mới vào bộ nhớ.\n  + Đặt `isRefreshing = false`.\n  + Gọi `refreshTokenSubject.next(newToken)` -> TẤT CẢ các request B, C, D lập tức được giải phóng, tự động gắn token mới và gửi lại server.\n- Nếu API refresh thất bại: Lập tức gọi `authService.logout()` và chuyển hướng về trang `/login`.",
       "codeExample": "import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';\nimport { inject } from '@angular/core';\nimport { AuthService } from '../services/auth.service';\nimport { BehaviorSubject, catchError, filter, switchMap, take, throwError } from 'rxjs';\n\n// Các biến trạng thái hàng đợi ở tầng module\nlet isRefreshing = false;\nconst refreshTokenSubject = new BehaviorSubject<string | null>(null);\n\nexport const authRefreshInterceptor: HttpInterceptorFn = (req, next) => {\n  const authService = inject(AuthService);\n\n  return next(req).pipe(\n    catchError((error: HttpErrorResponse) => {\n      // Chỉ xử lý nếu gặp 401 và không phải chính request refresh token\n      if (error.status === 401 && !req.url.includes('/auth/refresh')) {\n        if (!isRefreshing) {\n          // REQUEST ĐẦU TIÊN: Đóng khóa và gọi API lấy token mới\n          isRefreshing = true;\n          refreshTokenSubject.next(null);\n\n          return authService.refreshToken().pipe(\n            switchMap((newToken: string) => {\n              isRefreshing = false;\n              refreshTokenSubject.next(newToken); // Giải phóng toàn bộ hàng đợi đang chờ\n              // Thử lại chính request đầu tiên với token mới\n              return next(req.clone({ setHeaders: { Authorization: `Bearer ${newToken}` } }));\n            }),\n            catchError((refreshErr) => {\n              isRefreshing = false;\n              authService.logout(); // Refresh hỏng -> Ép đăng xuất\n              return throwError(() => refreshErr);\n            })\n          );\n        } else {\n          // CÁC REQUEST ĐẾN SAU: Xếp hàng chờ token mới được phát ra\n          return refreshTokenSubject.pipe(\n            filter((token): token is string => token !== null),\n            take(1),\n            switchMap((newToken: string) => {\n              // Thử lại request với token mới\n              return next(req.clone({ setHeaders: { Authorization: `Bearer ${newToken}` } }));\n            })\n          );\n        }\n      }\n      return throwError(() => error);\n    })\n  );\n};",
-      "codeLanguage": "typescript"
+      "codeLanguage": "typescript",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Luồng Tự Động Làm Mới Token (Silent Refresh Token) Bằng Angular HTTP Interceptor",
+        "caption": "Khóa hàng đợi (Mutex Queue) đảm bảo khi có nhiều request dính 401 đồng thời chỉ gọi Refresh Token 1 lần duy nhất",
+        "code": "sequenceDiagram\n    autonumber\n    participant UI as Component\n    participant Interceptor as HTTP Auth Interceptor\n    participant Backend as Backend Server\n    participant Auth as Auth Refresh Endpoint\n\n    UI->>Interceptor: Gọi GET /api/orders (Token đã hết hạn!)\n    Interceptor->>Backend: Forward request\n    Backend-->>Interceptor: ❌ HTTP 401 Unauthorized\n    \n    Note over Interceptor: KÍCH HOẠT MUTEX: isRefreshing = true\n    Interceptor->>Auth: POST /auth/refresh (Gửi HttpOnly Cookie)\n    \n    Note over UI,Interceptor: Các request khác gửi tới lúc này (GET /profile, GET /cart) sẽ được ĐƯA VÀO HÀNG ĐỢI CHỜ\n    \n    Auth-->>Interceptor: ✅ 200 OK (Cấp Access Token mới)\n    Note over Interceptor: MỞ KHÓA MUTEX: isRefreshing = false\n    \n    Interceptor->>Backend: Thử lại GET /api/orders với Token mới\n    Backend-->>Interceptor: 200 OK (Thành công)\n    Interceptor-->>UI: Dữ liệu đơn hàng hợp lệ"
+      }
     },
     "pitfalls": [
       "Không kiểm tra `!req.url.includes('/auth/refresh')`, dẫn đến vòng lặp 401 vô tận nếu chính request refresh token bị từ chối.",

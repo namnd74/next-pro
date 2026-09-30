@@ -109,7 +109,13 @@
       "summary": "Vòng đời của component cơ bản trong React Native (mount, update, unmount, hooks) hoàn toàn giống React web vì chia sẻ chung React Core. Tuy nhiên, môi trường mobile bổ sung 3 vòng đời đặc thù bắt buộc phải xử lý: 1) Vòng đời ứng dụng toàn cục (AppState: active, background, inactive); 2) Vòng đời màn hình trong Navigation Stack (focus, blur); 3) Vòng đời tương tác phần cứng (Hardware BackHandler).",
       "deepDive": "Khi người dùng chuyển sang app khác, React component KHÔNG tự động unmount mà tiếp tục nằm trong bộ nhớ RAM. Nếu không lắng nghe sự kiện `AppState.addEventListener('change')`, các timer, video player, location tracking và kết nối WebSocket sẽ tiếp tục chạy, dẫn đến việc hệ điều hành gắn cờ tiêu tốn pin quá mức và tiến hành kill process ngầm (OOM crash). Ngoài ra, với React Navigation, khi push màn hình B đè lên màn hình A, màn hình A vẫn giữ nguyên trạng thái mounted chứ không unmount, do đó cần dùng `useFocusEffect` thay cho `useEffect`.",
       "codeExample": "import React, { useEffect, useRef, useState, useCallback } from 'react';\nimport { Text, View, StyleSheet, AppState, type AppStateStatus, BackHandler } from 'react-native';\n\nexport const LifecycleAwareScreen: React.FC = () => {\n  const [appStatus, setAppStatus] = useState<AppStateStatus>(AppState.currentState);\n  const appStateRef = useRef<AppStateStatus>(appStatus);\n  const syncTimerRef = useRef<NodeJS.Timeout | null>(null);\n\n  const startSync = useCallback(() => {\n    if (syncTimerRef.current) return;\n    console.log('[Sync] Khởi động đồng bộ dữ liệu ngầm.');\n    syncTimerRef.current = setInterval(() => {\n      console.log('[Sync] Đang ping server...');\n    }, 5000);\n  }, []);\n\n  const stopSync = useCallback(() => {\n    if (syncTimerRef.current) {\n      console.log('[Sync] Dừng đồng bộ để tiết kiệm pin.');\n      clearInterval(syncTimerRef.current);\n      syncTimerRef.current = null;\n    }\n  }, []);\n\n  useEffect(() => {\n    startSync();\n\n    // 1. Quản lý AppState toàn cục\n    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {\n      if (\n        appStateRef.current.match(/inactive|background/) &&\n        nextAppState === 'active'\n      ) {\n        console.log('[Lifecycle] Ứng dụng đã quay lại Foreground!');\n        startSync();\n      } else if (nextAppState.match(/inactive|background/)) {\n        console.log('[Lifecycle] Ứng dụng chuyển sang Background/Inactive.');\n        stopSync();\n      }\n      appStateRef.current = nextAppState;\n      setAppStatus(nextAppState);\n    });\n\n    // 2. Xử lý nút Back phần cứng của Android\n    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {\n      console.log('[BackHandler] Chặn back vật lý hoặc hiển thị xác nhận thoát.');\n      return false; // Trả về true nếu muốn tự xử lý và chặn hành động back mặc định\n    });\n\n    return () => {\n      stopSync();\n      subscription.remove();\n      backHandler.remove();\n    };\n  }, [startSync, stopSync]);\n\n  return (\n    <View style={styles.container}>\n      <Text style={styles.statusText}>Trạng thái ứng dụng: {appStatus}</Text>\n    </View>\n  );\n};\n\nconst styles = StyleSheet.create({\n  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },\n  statusText: { fontSize: 16, fontWeight: '600' },\n});",
-      "codeLanguage": "tsx"
+      "codeLanguage": "tsx",
+      "diagram": {
+        "type": "mermaid",
+        "title": "So Sánh Vòng Đời Component: React Native vs React Web",
+        "caption": "React Native không gắn vào HTML DOM mà liên kết trực tiếp với Native Views (UIView / android.view.View)",
+        "code": "flowchart LR\n    subgraph ReactWeb [\"React Web\"]\n        R_Web[\"React Component\"] --> VDOM[\"Virtual DOM Diffing\"] --> HTMLDOM[\"HTML DOM Element: `<div>`, `<p>`\"]\n    end\n\n    subgraph ReactNative [\"React Native (New Architecture - Fabric Engine)\"]\n        RN_Comp[\"React Native Component\"] --> ShadowTree[\"C++ Shadow Tree (Tính toán Yoga Layout)\"]\n        ShadowTree --> NativeView[\"Native Views:<br>• iOS: UIView / RCTView<br>• Android: ViewGroup / ReactViewGroup\"]\n    end"
+      }
     },
     "pitfalls": [
       "Cho rằng khi người dùng điều hướng sang màn hình mới thì màn hình cũ unmount và tự dọn dẹp interval/listener.",
@@ -478,9 +484,7 @@
               "Gọi hàm Native đồng bộ trực tiếp trong 1 frame duy nhất",
               "Hỗ trợ React 19 Concurrent Features và Suspense mượt mà"
             ],
-            "cons": [
-              "Yêu cầu thư viện bên thứ 3 phải viết hỗ trợ C++ Codegen"
-            ]
+            "cons": ["Yêu cầu thư viện bên thứ 3 phải viết hỗ trợ C++ Codegen"]
           },
           {
             "name": "Legacy Bridge (JSON Serialization)",
@@ -504,9 +508,7 @@
                 "color": "amber"
               }
             ],
-            "pros": [
-              "Tương thích với các thư viện cũ không duy trì"
-            ],
+            "pros": ["Tương thích với các thư viện cũ không duy trì"],
             "cons": [
               "Hiện tượng \"White Blank Screen\" khi cuộn danh sách nhanh do JSON Bridge bị quá tải hàng đợi"
             ]

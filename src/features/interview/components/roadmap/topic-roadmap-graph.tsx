@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Workflow,
   ListTodo,
+  Maximize2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +41,7 @@ export function TopicRoadmapGraph({
   onOpenStageDrawer,
 }: TopicRoadmapGraphProps) {
   const [zoomLevel, setZoomLevel] = React.useState(1);
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const masteredQuestionIds = useInterviewStore(
     (s) => s.masteredQuestionIds || []
   );
@@ -66,12 +68,13 @@ export function TopicRoadmapGraph({
         )
       : 0;
 
-  // Fixed virtual canvas dimensions for a beautiful hierarchical tree
-  // Center X = 440px. Canvas Width = 880px, Height = 560px
-  const canvasWidth = 880;
-  const canvasHeight = 560;
-  const nodeWidth = 260;
-  const nodeHeight = 100;
+  // Fixed virtual canvas dimensions for a spacious, beautiful hierarchical tree
+  // Center X = 570px. Canvas Width = 1140px, Height = 880px
+  // Node width = 280px, height = 142px
+  const canvasWidth = 1140;
+  const canvasHeight = 880;
+  const nodeWidth = 280;
+  const nodeHeight = 142;
 
   // Hierarchical Tree Positions (NeetCode Style Branching DAG)
   // Stage 1: Top Center (Root Foundations)
@@ -79,23 +82,24 @@ export function TopicRoadmapGraph({
   // Stage 3: Right Branch (State & Concurrency)
   // Stage 4: Center Convergence (Architecture & Scale)
   // Stage 5: Bottom Center (Production Traps & Mastery)
+  // Spacing: 80px vertical gap between levels, 80px horizontal clearance from center line.
   const treeNodes = React.useMemo<TreeNodeLayout[]>(() => {
     const stages = roadmap.stages;
     const layouts: TreeNodeLayout[] = [];
 
-    // Tree positions mapped to hierarchical levels
+    // Tree positions mapped to hierarchical levels with generous breathing room
     const treePositions = [
-      { x: (canvasWidth - nodeWidth) / 2, y: 25, level: 0 }, // Root: (310, 25)
-      { x: 120, y: 160, level: 1 },                          // Left Branch: (120, 160)
-      { x: canvasWidth - nodeWidth - 120, y: 160, level: 1 },// Right Branch: (500, 160)
-      { x: (canvasWidth - nodeWidth) / 2, y: 300, level: 2 }, // Hub: (310, 300)
-      { x: (canvasWidth - nodeWidth) / 2, y: 435, level: 3 }, // Capstone: (310, 435)
+      { x: (canvasWidth - nodeWidth) / 2, y: 35, level: 0 },  // Root: (430, 35) -> bottom=177
+      { x: 70, y: 257, level: 1 },                           // Left Branch: (70, 257) -> bottom=399
+      { x: canvasWidth - nodeWidth - 70, y: 257, level: 1 }, // Right Branch: (790, 257) -> bottom=399
+      { x: (canvasWidth - nodeWidth) / 2, y: 479, level: 2 }, // Hub: (430, 479) -> bottom=621
+      { x: (canvasWidth - nodeWidth) / 2, y: 701, level: 3 }, // Capstone: (430, 701) -> bottom=843
     ];
 
     stages.forEach((stage, idx) => {
       const pos = treePositions[idx] || {
         x: (canvasWidth - nodeWidth) / 2,
-        y: 25 + idx * 110,
+        y: 35 + idx * (nodeHeight + 80),
         level: idx,
       };
 
@@ -135,16 +139,24 @@ export function TopicRoadmapGraph({
       edges.push({
         from: roadmap.stages[i].id,
         to: roadmap.stages[i + 1].id,
-        label: `Bước ${i + 1}`,
+        label: `Chặng ${i + 2}`,
       });
     }
     return edges;
   }, [roadmap.stages]);
 
   // Zoom handlers
-  const handleZoomIn = () => setZoomLevel((z) => Math.min(z + 0.15, 1.4));
-  const handleZoomOut = () => setZoomLevel((z) => Math.max(z - 0.15, 0.7));
+  const handleZoomIn = () => setZoomLevel((z) => Math.min(Math.round((z + 0.1) * 10) / 10, 1.4));
+  const handleZoomOut = () => setZoomLevel((z) => Math.max(Math.round((z - 0.1) * 10) / 10, 0.5));
   const handleResetZoom = () => setZoomLevel(1);
+
+  const handleFitZoom = React.useCallback(() => {
+    if (containerRef.current) {
+      const containerWidth = containerRef.current.clientWidth - 48;
+      const fit = Math.max(0.5, Math.min(1, containerWidth / canvasWidth));
+      setZoomLevel(Math.round(fit * 100) / 100);
+    }
+  }, [canvasWidth]);
 
   return (
     <div className="space-y-3">
@@ -211,19 +223,32 @@ export function TopicRoadmapGraph({
               <RotateCcw className="h-3 w-3 mr-1" />
               <span>100%</span>
             </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleFitZoom}
+              className="h-7 px-2 text-[10px] font-medium text-muted-foreground hover:text-foreground border-l border-border/50 ml-0.5"
+              title="Tự động thu phóng vừa chiều rộng màn hình"
+            >
+              <Maximize2 className="h-3 w-3 mr-1" />
+              <span>Vừa khung</span>
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Tree Canvas Wrapper with Blueprint Dot Pattern */}
-      <div className="relative overflow-x-auto rounded-2xl border border-border/80 bg-zinc-50/80 p-4 shadow-inner dark:bg-zinc-950/80">
+      <div
+        ref={containerRef}
+        className="relative overflow-x-auto rounded-2xl border border-border/80 bg-zinc-50/80 p-4 shadow-inner dark:bg-zinc-950/80"
+      >
         {/* Subtle grid pattern background */}
         <div
           className="absolute inset-0 pointer-events-none opacity-40 dark:opacity-25"
           style={{
             backgroundImage:
               'radial-gradient(circle, rgba(99, 102, 241, 0.25) 1px, transparent 1px)',
-            backgroundSize: '20px 20px',
+            backgroundSize: '24px 24px',
           }}
         />
 
@@ -233,6 +258,10 @@ export function TopicRoadmapGraph({
             width: canvasWidth,
             height: canvasHeight,
             transform: `scale(${zoomLevel})`,
+            marginBottom:
+              zoomLevel !== 1
+                ? `${Math.round(canvasHeight * (zoomLevel - 1))}px`
+                : undefined,
           }}
         >
           {/* SVG Connectors Layer */}
@@ -291,15 +320,18 @@ export function TopicRoadmapGraph({
               // Source: bottom-center of fromNode
               // Target: top-center of toNode
               const startX = fromNode.x + fromNode.width / 2;
-              const startY = fromNode.y + fromNode.height;
+              const startY = fromNode.y + fromNode.height + 2;
               const endX = toNode.x + toNode.width / 2;
-              const endY = toNode.y;
+              const endY = toNode.y - 4;
 
               // Smooth vertical S-curve
               const deltaY = endY - startY;
-              const controlPointY1 = startY + deltaY * 0.55;
-              const controlPointY2 = startY + deltaY * 0.45;
+              const controlPointY1 = startY + deltaY * 0.5;
+              const controlPointY2 = startY + deltaY * 0.5;
               const pathD = `M ${startX} ${startY} C ${startX} ${controlPointY1}, ${endX} ${controlPointY2}, ${endX} ${endY}`;
+
+              const midX = (startX + endX) / 2;
+              const midY = (startY + endY) / 2;
 
               const fromMastered = fromNode.stage.questionIds.every((id) =>
                 masteredQuestionIds.includes(id)
@@ -317,7 +349,7 @@ export function TopicRoadmapGraph({
                   <path
                     d={pathD}
                     fill="none"
-                    strokeWidth={isPathMastered || isPathActive ? 5 : 3}
+                    strokeWidth={isPathMastered || isPathActive ? 6 : 4}
                     className={cn(
                       'transition-all duration-300',
                       isPathMastered
@@ -348,6 +380,40 @@ export function TopicRoadmapGraph({
                         : 'url(#tree-arrow-default)'
                     }
                   />
+
+                  {/* Midpoint Pill Badge */}
+                  <g transform={`translate(${midX}, ${midY})`} className="pointer-events-none">
+                    <rect
+                      x="-30"
+                      y="-10"
+                      width="60"
+                      height="20"
+                      rx="10"
+                      className={cn(
+                        'transition-colors duration-300',
+                        isPathMastered
+                          ? 'fill-emerald-50 stroke-emerald-500/60 dark:fill-emerald-950 dark:stroke-emerald-500'
+                          : isPathActive
+                          ? 'fill-primary/10 stroke-primary/60 dark:fill-primary/20 dark:stroke-primary'
+                          : 'fill-card/95 stroke-border/80 dark:fill-zinc-900/95 dark:stroke-zinc-700'
+                      )}
+                      strokeWidth="1"
+                    />
+                    <text
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      className={cn(
+                        'text-[10px] font-bold select-none',
+                        isPathMastered
+                          ? 'fill-emerald-600 dark:fill-emerald-400'
+                          : isPathActive
+                          ? 'fill-primary'
+                          : 'fill-muted-foreground'
+                      )}
+                    >
+                      {edge.label}
+                    </text>
+                  </g>
                 </g>
               );
             })}
@@ -372,13 +438,14 @@ export function TopicRoadmapGraph({
                   left: node.x,
                   top: node.y,
                   width: node.width,
+                  height: node.height,
                 }}
                 className="select-none"
               >
                 <div
                   onClick={() => onSelectStage(isActive ? null : node.id)}
                   className={cn(
-                    'relative cursor-pointer rounded-2xl border p-3.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg',
+                    'relative h-[142px] flex flex-col justify-between cursor-pointer rounded-2xl border p-3.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg',
                     isCompleted
                       ? 'border-emerald-500 bg-emerald-500/[0.08] dark:bg-emerald-950/40 ring-1 ring-emerald-500/40 shadow-emerald-500/10'
                       : isActive
@@ -386,109 +453,114 @@ export function TopicRoadmapGraph({
                       : 'border-border/80 bg-card/95 hover:border-primary/50 hover:bg-card dark:bg-zinc-900/90'
                   )}
                 >
-                  {/* Top Row: Pill number + Total Question Counter / Mastered Badge */}
-                  <div className="flex items-center justify-between gap-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={cn(
-                          'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-extrabold',
-                          isCompleted
-                            ? 'bg-emerald-600 text-white'
-                            : isActive
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground'
-                        )}
-                      >
-                        {isCompleted ? '✓' : node.stage.stepNumber}
-                      </span>
-                      <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">
-                        Chủ Điểm #{node.stage.stepNumber}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      {isCompleted ? (
-                        <Badge className="h-4.5 bg-emerald-600 px-1.5 text-[9px] font-bold text-white hover:bg-emerald-700 uppercase tracking-wide">
-                          ✓ Đã xong
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="secondary"
-                          className="h-4.5 px-1.5 font-mono text-[9px] font-semibold text-muted-foreground bg-muted/80"
+                  {/* Top Section */}
+                  <div>
+                    <div className="flex items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={cn(
+                            'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-extrabold',
+                            isCompleted
+                              ? 'bg-emerald-600 text-white'
+                              : isActive
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted text-muted-foreground'
+                          )}
                         >
-                          {totalCount} câu hỏi
-                        </Badge>
-                      )}
+                          {isCompleted ? '✓' : node.stage.stepNumber}
+                        </span>
+                        <span className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground">
+                          Chủ Điểm #{node.stage.stepNumber}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {isCompleted ? (
+                          <Badge className="h-4.5 bg-emerald-600 px-1.5 text-[9px] font-bold text-white hover:bg-emerald-700 uppercase tracking-wide">
+                            ✓ Đã xong
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="secondary"
+                            className="h-4.5 px-1.5 font-mono text-[9px] font-semibold text-muted-foreground bg-muted/80"
+                          >
+                            {totalCount} câu hỏi
+                          </Badge>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Node Title */}
+                    <h4
+                      className={cn(
+                        'mt-2 line-clamp-1 text-xs font-bold transition-colors',
+                        isCompleted
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : isActive
+                          ? 'text-primary'
+                          : 'text-foreground'
+                      )}
+                      title={node.stage.title}
+                    >
+                      {node.stage.title.replace(/^Trạm \d+: /, '')}
+                    </h4>
                   </div>
 
-                  {/* Node Title */}
-                  <h4
-                    className={cn(
-                      'mt-2 line-clamp-1 text-xs font-bold transition-colors',
-                      isCompleted
-                        ? 'text-emerald-700 dark:text-emerald-300'
-                        : isActive
-                        ? 'text-primary'
-                        : 'text-foreground'
-                    )}
-                    title={node.stage.title}
-                  >
-                    {node.stage.title.replace(/^Trạm \d+: /, '')}
-                  </h4>
+                  {/* Bottom Section */}
+                  <div className="space-y-2">
+                    {/* NeetCode Style Progress Bar inside Node */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-muted-foreground">
+                          {masteredCount}/{totalCount} câu
+                        </span>
+                        <span
+                          className={cn(
+                            'font-mono font-bold',
+                            isCompleted
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : 'text-muted-foreground'
+                          )}
+                        >
+                          {percent}%
+                        </span>
+                      </div>
+                      <Progress
+                        value={masteredCount}
+                        max={totalCount}
+                        className="h-1.5 bg-muted/60"
+                        indicatorClassName={
+                          isCompleted
+                            ? 'bg-emerald-500 from-emerald-500 to-teal-400'
+                            : 'from-indigo-500 to-purple-500'
+                        }
+                      />
+                    </div>
 
-                  {/* NeetCode Style Progress Bar inside Node */}
-                  <div className="mt-2.5 space-y-1">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-muted-foreground">
-                        {masteredCount}/{totalCount} câu
+                    {/* Bottom Action Footer */}
+                    <div className="flex items-center justify-between border-t border-border/40 pt-1.5 text-[10px]">
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenStageDrawer(node.stage);
+                        }}
+                        className="inline-flex items-center gap-1 font-semibold text-primary hover:underline cursor-pointer"
+                        title="Mở danh sách câu hỏi phỏng vấn của trạm này"
+                      >
+                        <ListTodo className="h-3 w-3" />
+                        <span>Chi tiết trạm</span>
+                        <ArrowRight className="h-2.5 w-2.5" />
                       </span>
+
                       <span
                         className={cn(
-                          'font-mono font-bold',
-                          isCompleted
-                            ? 'text-emerald-600 dark:text-emerald-400'
-                            : 'text-muted-foreground'
+                          'text-[10px]',
+                          isActive ? 'font-bold text-primary' : 'text-muted-foreground'
                         )}
                       >
-                        {percent}%
+                        {isActive ? '● Đang lọc' : 'Xem câu hỏi ↓'}
                       </span>
                     </div>
-                    <Progress
-                      value={masteredCount}
-                      max={totalCount}
-                      className="h-1.5 bg-muted/60"
-                      indicatorClassName={
-                        isCompleted
-                          ? 'bg-emerald-500 from-emerald-500 to-teal-400'
-                          : 'from-indigo-500 to-purple-500'
-                      }
-                    />
-                  </div>
-
-                  {/* Bottom Action Footer */}
-                  <div className="mt-2.5 flex items-center justify-between border-t border-border/40 pt-1.5 text-[10px]">
-                    <span
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenStageDrawer(node.stage);
-                      }}
-                      className="inline-flex items-center gap-1 font-semibold text-primary hover:underline cursor-pointer"
-                      title="Mở danh sách câu hỏi phỏng vấn của trạm này"
-                    >
-                      <ListTodo className="h-3 w-3" />
-                      <span>Chi tiết trạm</span>
-                      <ArrowRight className="h-2.5 w-2.5" />
-                    </span>
-
-                    <span
-                      className={cn(
-                        'text-[10px]',
-                        isActive ? 'font-bold text-primary' : 'text-muted-foreground'
-                      )}
-                    >
-                      {isActive ? '● Đang lọc' : 'Xem câu hỏi ↓'}
-                    </span>
                   </div>
                 </div>
               </div>

@@ -17,7 +17,13 @@
     "seniorAnswer": {
       "summary": "Microtask Queue (Promise.then, queueMicrotask, process.nextTick) ĐƯỢC ƯU TIÊN XỬ LÝ TOÀN BỘ cho đến khi cạn sạch (empty) trước khi Event Loop chuyển sang lấy tác vụ tiếp theo trong Macrotask Queue (setTimeout, setInterval, setImmediate).",
       "deepDive": "Nếu một Microtask lại liên tục đẩy thêm Microtask mới vào hàng chờ (recursive microtask), Event Loop sẽ bị kẹt vĩnh viễn ở Microtask phase và KHÔNG BAO GIỜ chuyển tới Macrotask hay Render phase, gây ra tình trạng đơ UI (Main Thread blocking).",
-      "codeExample": "console.log('1');\nsetTimeout(() => console.log('2 (Macrotask)'), 0);\nPromise.resolve().then(() => console.log('3 (Microtask)'));\nconsole.log('4');\n// Output theo thứ tự: 1 -> 4 -> 3 -> 2"
+      "codeExample": "console.log('1');\nsetTimeout(() => console.log('2 (Macrotask)'), 0);\nPromise.resolve().then(() => console.log('3 (Microtask)'));\nconsole.log('4');\n// Output theo thứ tự: 1 -> 4 -> 3 -> 2",
+      "diagram": {
+        "type": "mermaid",
+        "title": "So Sánh Event Loop: Trình Duyệt (Browser) vs Node.js (Libuv)",
+        "caption": "Sự khác biệt cốt lõi về thứ tự xả Microtask và các pha xử lý I/O",
+        "code": "flowchart TD\n    subgraph BrowserLoop [\"Event Loop Trình Duyệt (HTML5 Spec)\"]\n        B1[\"Call Stack\"] --> B2[\"Xả Toàn Bộ Microtasks (Promise)\"]\n        B2 --> B3[\"Render Pipeline (nếu tới nhịp 60Hz)\"]\n        B3 --> B4[\"Lấy 1 Macrotask duy nhất (setTimeout)\"]\n        B4 --> B1\n    end\n\n    subgraph NodeLoop [\"Event Loop Node.js (Libuv Phases)\"]\n        N1[\"1. Timers (setTimeout, setInterval)\"] --> N_Micro1[\"Xả process.nextTick() & Microtasks\"]\n        N_Micro1 --> N2[\"2. Pending Callbacks (I/O)\"]\n        N2 --> N_Micro2[\"Xả Microtasks\"]\n        N_Micro2 --> N3[\"3. Poll Phase (Nhận kết nối I/O mới)\"]\n        N3 --> N_Micro3[\"Xả Microtasks\"]\n        N_Micro3 --> N4[\"4. Check Phase (setImmediate)\"]\n        N4 --> N1\n    end"
+      }
     },
     "pitfalls": [
       "Nghĩ rằng setTimeout(fn, 0) sẽ chạy ngay lập tức trước Promise.",

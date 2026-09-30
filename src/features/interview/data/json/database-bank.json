@@ -770,9 +770,7 @@
               "Tránh Table Full Scan hàng triệu dòng",
               "Hỗ trợ sắp xếp ORDER BY và lọc WHERE cực nhanh"
             ],
-            "cons": [
-              "Chiếm dụng thêm dung lượng lưu trữ trên SSD"
-            ]
+            "cons": ["Chiếm dụng thêm dung lượng lưu trữ trên SSD"]
           },
           {
             "name": "Chi Phí Ghi Khi Có Quá Nhiều Index (Over-indexing)",
@@ -797,9 +795,7 @@
                 "color": "rose"
               }
             ],
-            "pros": [
-              "Không có ưu điểm cho thao tác INSERT/UPDATE"
-            ],
+            "pros": ["Không có ưu điểm cho thao tác INSERT/UPDATE"],
             "cons": [
               "Mỗi lệnh INSERT buộc DB phải cập nhật đồng thời vào N cây B-Tree",
               "Gây phân mảnh trang đĩa (Index Fragmentation)"
@@ -2656,7 +2652,13 @@
       "summary": "Quy tắc quyết định chuẩn mực của Senior Architect: 1) CHỌN SQL (RDBMS) KHI: Dữ liệu có cấu trúc quan hệ chặt chẽ giữa các thực thể; đòi hỏi tính toàn vẹn giao dịch ACID tuyệt đối (Tài chính, Ngân hàng, E-commerce Checkout, Sổ cái, Đặt vé); cần thực hiện các truy vấn phân tích, báo cáo tổng hợp phức tạp (Complex Analytics, Ad-hoc queries); dữ liệu có thể mở rộng tốt trên 1 máy chủ lớn hoặc cụm Read Replica; 2) CHỌN NoSQL KHI: Dữ liệu không có cấu trúc cố định hoặc thay đổi liên tục theo thời gian; yêu cầu tốc độ ghi dữ liệu khổng lồ hàng trăm nghìn events/giây vượt quá khả năng của 1 node SQL (IoT metrics, Big Data, Logging); yêu cầu mở rộng ngang (Horizontal Sharding) phân tán trên nhiều vùng địa lý toàn cầu; hoặc mô hình dữ liệu khớp hoàn hảo với 1 dạng NoSQL đặc thù (Redis cho Cache, Neo4j cho Mạng xã hội).",
       "deepDive": "Triết lý \"Mặc định chọn SQL\" (SQL as Default): Với 85% ứng dụng kinh doanh thông thường, PostgreSQL là sự lựa chọn mặc định an toàn và tối ưu nhất. Lý do: Postgres cực kỳ trưởng thành, ổn định, hỗ trợ ACID toàn vẹn, và có thể xử lý cả dữ liệu JSONB cực nhanh. Bạn chỉ nên đưa thêm NoSQL vào kiến trúc khi hệ thống chạm phải các ranh giới kỹ thuật rõ ràng (Bottlenecks) mà RDBMS không thể giải quyết hiệu quả (ví dụ tách phần Session/Cache sang Redis, tách phần Full-text search sang Elasticsearch).",
       "codeExample": "// Ma trận quyết định lựa chọn công nghệ lưu trữ\n/*\n+------------------------+---------------------+-------------------------------+\n| YÊU CẦU NGHIỆP VỤ      | LỰA CHỌN TỐI ƯU     | CÔNG NGHỆ KHUYẾN NGHỊ         |\n+------------------------+---------------------+-------------------------------+\n| Giao dịch tài chính    | SQL (ACID)          | PostgreSQL, MySQL InnoDB      |\n| Quản trị người dùng    | SQL (Relational)    | PostgreSQL                    |\n| Caching, Phiên đăng nhập| NoSQL (Key-Value)   | Redis                         |\n| Đồ thị quan hệ bạn bè  | NoSQL (Graph)       | Neo4j                         |\n| Dữ liệu Log, IoT Sensor| NoSQL (Wide-Column) | Cassandra, TimescaleDB        |\n| Tìm kiếm văn bản mờ    | Search Engine       | Elasticsearch, Meilisearch    |\n+------------------------+---------------------+-------------------------------+\n*/",
-      "codeLanguage": "sql"
+      "codeLanguage": "sql",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Cây Quyết Định Kiến Trúc: Lựa Chọn SQL (RDBMS) vs NoSQL",
+        "caption": "Hướng dẫn lựa chọn công nghệ lưu trữ dữ liệu dựa trên mô hình dữ liệu và đặc tính giao dịch",
+        "code": "flowchart TD\n    Start{\"Yêu cầu cốt lõi về dữ liệu là gì?\"}\n    \n    Start -->|\"Giao dịch tiền tệ, ACID nghiêm ngặt, JOIN phức tạp\"| SQL[\"<b>RDBMS (SQL)</b><br>• PostgreSQL, MySQL<br>• Dữ liệu có cấu trúc bảng chặt chẽ\"]\n    \n    Start -->|\"Tốc độ đọc/ghi siêu lớn, schema động linh hoạt\"| NoSQLCheck{\"Kiểu dữ liệu NoSQL nào phù hợp?\"}\n    \n    NoSQLCheck -->|\"Lưu tài liệu JSON, E-Commerce Catalog\"| Doc[\"<b>Document Store</b><br>• MongoDB, Couchbase\"]\n    NoSQLCheck -->|\"Caching, Session, Leaderboard, Token\"| KV[\"<b>Key-Value Store</b><br>• Redis, AWS DynamoDB\"]\n    NoSQLCheck -->|\"Time-Series, Log, IoT hàng tỷ bản ghi\"| Col[\"<b>Wide-Column Store</b><br>• Apache Cassandra, ScyllaDB\"]\n    NoSQLCheck -->|\"Mạng xã hội, Fraud Detection, Graph RAG\"| Graph[\"<b>Graph Database</b><br>• Neo4j, Amazon Neptune\"]"
+      }
     },
     "codeExample": "// Ma trận quyết định lựa chọn công nghệ lưu trữ\n/*\n+------------------------+---------------------+-------------------------------+\n| YÊU CẦU NGHIỆP VỤ      | LỰA CHỌN TỐI ƯU     | CÔNG NGHỆ KHUYẾN NGHỊ         |\n+------------------------+---------------------+-------------------------------+\n| Giao dịch tài chính    | SQL (ACID)          | PostgreSQL, MySQL InnoDB      |\n| Quản trị người dùng    | SQL (Relational)    | PostgreSQL                    |\n| Caching, Phiên đăng nhập| NoSQL (Key-Value)   | Redis                         |\n| Đồ thị quan hệ bạn bè  | NoSQL (Graph)       | Neo4j                         |\n| Dữ liệu Log, IoT Sensor| NoSQL (Wide-Column) | Cassandra, TimescaleDB        |\n| Tìm kiếm văn bản mờ    | Search Engine       | Elasticsearch, Meilisearch    |\n+------------------------+---------------------+-------------------------------+\n*/",
     "codeLanguage": "sql",
@@ -3789,7 +3791,13 @@
       "summary": "Các CSDL NewSQL hiện đại (CockroachDB, TiDB) sử dụng Thuật toán Đồng thuận Raft kết hợp kiến trúc Multi-Raft để đảm bảo tính nhất quán phân tán mạnh mẽ (Linearizable / Strict Consistency): 1) `Phân mảnh dữ liệu thành các Ranges`: Toàn bộ không gian dữ liệu được cắt thành hàng triệu dải dữ liệu nhỏ liền kề (gọi là Ranges trong CockroachDB hoặc Regions trong TiDB, dung lượng ~64MB mỗi range); 2) `Multi-Raft Group`: Mỗi Range được sao chép thành 3 hoặc 5 bản sao (Replicas) nằm trên các nodes vật lý khác nhau, và các bản sao này tạo thành MỘT NHÓM RAFT ĐỘC LẬP (Raft Group); 3) `Nguyên lý Quorum Commit`: Mỗi Raft Group tự bầu chọn một Leader. Mọi thao tác Ghi trên Range đó đều đi qua Raft Leader. Leader ghi vào Raft Log và gửi sang các Followers. Chỉ cần ĐA SỐ CÁC NODES (Quorum: 2/3 hoặc 3/5 nodes) xác nhận đã ghi log, giao dịch được coi là THÀNH CÔNG VÀ KHÔNG THỂ BỊ HỦY BỎ.",
       "deepDive": "Tại sao Multi-Raft lại vượt trội so với Raft đơn lẻ? Nếu cả hệ thống 1000 nodes chỉ chạy 1 nhóm Raft duy nhất, toàn bộ thông lượng ghi sẽ bị nghẽn tại 1 Leader duy nhất. Bằng cách chia thành hàng triệu nhóm Raft độc lập (Multi-Raft), tải ghi được phân bổ đều ra hàng nghìn Leaders khác nhau trên toàn cụm. Nếu 1 node bị chết, chỉ có các Raft Groups có replica trên node đó mới tiến hành bầu lại Leader mới cho riêng Range của mình, 99% các Ranges còn lại trong hệ thống hoàn toàn không bị ảnh hưởng một mili-giây nào!",
       "codeExample": "// Minh họa kiến trúc Multi-Raft trong CSDL NewSQL (CockroachDB / TiDB)\n/*\nNode 1                     Node 2                     Node 3\n+-----------------------+  +-----------------------+  +-----------------------+\n| [Range 1 - LEADER]    |==| [Range 1 - Follower]  |==| [Range 1 - Follower]  | -> Raft Group 1 (Quorum: 2/3)\n| [Range 2 - Follower]  |==| [Range 2 - LEADER]    |==| [Range 2 - Follower]  | -> Raft Group 2 (Quorum: 2/3)\n| [Range 3 - Follower]  |==| [Range 3 - Follower]  |==| [Range 3 - LEADER]    | -> Raft Group 3 (Quorum: 2/3)\n+-----------------------+  +-----------------------+  +-----------------------+\n\nLUỒNG GHI GIAO DỊCH QUA RAFT:\n1. Client gửi request: Ghi dữ liệu vào khóa \"customer_9901\"\n2. Hệ thống định tuyến tới Node 1 (Đang là Leader của Range 1)\n3. Leader Node 1 ghi vào Local Raft Log và bắn RPC đề xuất sang Node 2 và Node 3\n4. Node 2 xác nhận đã nhận log (ACK). (Đã đủ 2/3 nodes = Quorum!)\n5. Leader Node 1 COMMIT thay đổi, áp dụng vào RocksDB/Pebble Storage Engine\n6. Leader phản hồi thành công về cho Client!\n*/",
-      "codeLanguage": "sql"
+      "codeLanguage": "sql",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Đồng Thuận Phân Tán Bằng Thuật Toán Raft Consensus Trong Distributed DB",
+        "caption": "Cơ chế Leader Election và Log Replication đảm bảo tính nhất quán mạnh mẽ (Quorum >= (N/2) + 1)",
+        "code": "sequenceDiagram\n    autonumber\n    participant Client\n    participant Leader as Leader (Node 1)\n    participant F1 as Follower (Node 2)\n    participant F2 as Follower (Node 3)\n\n    Client->>Leader: Write(key=\"balance\", val=100)\n    Note over Leader: Ghi Append-only Log (Uncommitted)\n    \n    par Gửi AppendEntries RPC song song\n        Leader->>F1: AppendEntries(key=\"balance\", val=100)\n        Leader->>F2: AppendEntries(key=\"balance\", val=100)\n    end\n    \n    F1-->>Leader: ACK (Đã ghi Log thành công)\n    Note over Leader: Đã đủ Quorum đa số (2/3 Nodes đồng thuận)!\n    Leader->>Leader: Commit Log & Áp dụng State Machine\n    Leader-->>Client: 200 OK (Ghi thành công)\n    \n    par Báo Commit nền\n        Leader->>F1: Heartbeat (CommitIndex = 1)\n        Leader->>F2: Heartbeat (CommitIndex = 1)\n    end"
+      }
     },
     "codeExample": "// Minh họa kiến trúc Multi-Raft trong CSDL NewSQL (CockroachDB / TiDB)\n/*\nNode 1                     Node 2                     Node 3\n+-----------------------+  +-----------------------+  +-----------------------+\n| [Range 1 - LEADER]    |==| [Range 1 - Follower]  |==| [Range 1 - Follower]  | -> Raft Group 1 (Quorum: 2/3)\n| [Range 2 - Follower]  |==| [Range 2 - LEADER]    |==| [Range 2 - Follower]  | -> Raft Group 2 (Quorum: 2/3)\n| [Range 3 - Follower]  |==| [Range 3 - Follower]  |==| [Range 3 - LEADER]    | -> Raft Group 3 (Quorum: 2/3)\n+-----------------------+  +-----------------------+  +-----------------------+\n\nLUỒNG GHI GIAO DỊCH QUA RAFT:\n1. Client gửi request: Ghi dữ liệu vào khóa \"customer_9901\"\n2. Hệ thống định tuyến tới Node 1 (Đang là Leader của Range 1)\n3. Leader Node 1 ghi vào Local Raft Log và bắn RPC đề xuất sang Node 2 và Node 3\n4. Node 2 xác nhận đã nhận log (ACK). (Đã đủ 2/3 nodes = Quorum!)\n5. Leader Node 1 COMMIT thay đổi, áp dụng vào RocksDB/Pebble Storage Engine\n6. Leader phản hồi thành công về cho Client!\n*/",
     "codeLanguage": "sql",

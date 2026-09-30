@@ -411,9 +411,7 @@
                 "color": "emerald"
               }
             ],
-            "pros": [
-              "Thiết lập đơn giản, chi phí hạ tầng thấp"
-            ],
+            "pros": ["Thiết lập đơn giản, chi phí hạ tầng thấp"],
             "cons": [
               "Thường xuyên lấy nhầm tài liệu khi người dùng tìm kiếm theo tên riêng, số điện thoại, hoặc mã định danh kỹ thuật"
             ]
@@ -903,7 +901,13 @@
       "summary": "Kiến trúc Transformer nguyên bản gồm 2 khối: Encoder (nén chuỗi nguồn) và Decoder (sinh chuỗi đích). Mỗi khối gồm các lớp: (1) Multi-Head Self-Attention (tính toán mối liên hệ giữa các token); (2) Feed-Forward Network (FFN - biến đổi phi tuyến từng vị trí); (3) Residual Connections (kết nối tắt chống tiêu biến gradient) kèm Layer Normalization (RMSNorm). Các LLM hiện đại (như GPT-4, Llama-3, Mistral) đã chuyển sang kiến trúc Decoder-only với Masked Multi-Head Attention.",
       "deepDive": "Sự tiến hóa trong các LLM hiện đại: (1) Thay thế Absolute Positional Encoding bằng Rotary Position Embedding (RoPE) giúp mô hình suy luận tốt hơn trên các ngữ cảnh dài; (2) Thay thế Multi-Head Attention (MHA) truyền thống bằng Grouped-Query Attention (GQA - chia sẻ K/V heads) giúp giảm 4-8 lần kích thước bộ nhớ KV Cache trong VRAM khi chạy inference; (3) Thay thế LayerNorm bằng RMSNorm (loại bỏ bước tính mean, chỉ chuẩn hóa theo root mean square để tăng 15% tốc độ GPU); (4) Sử dụng hàm kích hoạt SwiGLU thay cho ReLU/GELU cũ.",
       "codeExample": "import torch\nimport torch.nn as nn\nimport math\n\nclass MinimalSelfAttention(nn.Module):\n    \"\"\"Mô phỏng cơ chế Scaled Dot-Product Attention cốt lõi của Transformer.\"\"\"\n    def __init__(self, d_model: int = 512, n_heads: int = 8):\n        super().__init__()\n        self.d_model = d_model\n        self.n_heads = n_heads\n        self.head_dim = d_model // n_heads\n        \n        self.q_proj = nn.Linear(d_model, d_model)\n        self.k_proj = nn.Linear(d_model, d_model)\n        self.v_proj = nn.Linear(d_model, d_model)\n        self.out_proj = nn.Linear(d_model, d_model)\n\n    def forward(self, x: torch.Tensor, mask: torch.Tensor = None) -> torch.Tensor:\n        batch_size, seq_len, _ = x.shape\n        # Q, K, V Projection\n        Q = self.q_proj(x).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)\n        K = self.k_proj(x).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)\n        V = self.v_proj(x).view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2)\n\n        # Scaled Dot-Product Attention: Attention(Q, K, V) = softmax(Q * K^T / sqrt(d_k)) * V\n        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(self.head_dim)\n        if mask is not None:\n            scores = scores.masked_fill(mask == 0, float(\"-inf\"))\n            \n        attn_weights = torch.softmax(scores, dim=-1)\n        context = torch.matmul(attn_weights, V)\n        \n        # Concat heads và chiếu đầu ra\n        context = context.transpose(1, 2).contiguous().view(batch_size, seq_len, self.d_model)\n        return self.out_proj(context)",
-      "codeLanguage": "python"
+      "codeLanguage": "python",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Transformer Gốc (Attention Is All You Need - Encoder & Decoder)",
+        "caption": "Cấu trúc khối Multi-Head Self-Attention, Positional Encoding và Feed-Forward Networks",
+        "code": "flowchart TD\n    subgraph EncoderBlock [\"Encoder (Bộ Mã Hóa)\"]\n        InTokens[\"Input Tokens (Từ ngữ đầu vào)\"] --> InEmbed[\"Input Embedding + Positional Encoding\"]\n        InEmbed --> MHA1[\"Multi-Head Self-Attention\"]\n        MHA1 --> AddNorm1[\"Add & Layer Normalization (Residual)\"]\n        AddNorm1 --> FFN1[\"Feed Forward Neural Network\"]\n        FFN1 --> AddNorm2[\"Add & Layer Normalization\"]\n    end\n\n    subgraph DecoderBlock [\"Decoder (Bộ Giải Mã)\"]\n        OutTokens[\"Output Tokens (Shifted Right)\"] --> OutEmbed[\"Output Embedding + Positional Encoding\"]\n        OutEmbed --> MaskedMHA[\"Masked Multi-Head Self-Attention\"]\n        MaskedMHA --> AddNorm3[\"Add & Layer Norm\"]\n        AddNorm3 --> CrossMHA[\"Cross Multi-Head Attention (Nhận Context từ Encoder)\"]\n        AddNorm2 -.-> CrossMHA\n        CrossMHA --> AddNorm4[\"Add & Layer Norm\"]\n        AddNorm4 --> FFN2[\"Feed Forward Network\"]\n        FFN2 --> AddNorm5[\"Add & Layer Norm\"]\n        AddNorm5 --> LinearOutput[\"Linear Layer + Softmax -> Token Dự Đoán Tiếp Theo\"]\n    end"
+      }
     },
     "pitfalls": [
       "Nhầm lẫn rằng GPT sử dụng cấu trúc cả Encoder và Decoder (GPT là Decoder-only; BERT là Encoder-only; T5 mới là Encoder-Decoder).",
@@ -1796,7 +1800,13 @@
       "summary": "Pipeline RAG cơ bản gồm 3 bước cốt lõi: (1) Ingestion/Embedding: Đổi các đoạn văn bản (chunks) thành vector đặc trưng bằng Embedding Model; (2) Retrieval: Khi user gửi câu hỏi, embed query và tính độ tương đồng hình học (Cosine Similarity) với kho vector để lấy Top-k đoạn gần nhất; (3) Generation: Định dạng Top-k văn bản này thành 'Context' trong System Prompt và yêu cầu LLM tổng hợp câu trả lời dựa trên context.",
       "deepDive": "Tại tầng toán học, phép đo tương đồng thông dụng nhất là Cosine Similarity: `dot(A, B) / (norm(A) * norm(B))`. Khi các embedding vectors đã được L2-normalized sẵn (chuẩn hóa độ dài vector về 1, như mô hình `text-embedding-3-small`), phép tính cosine similarity suy biến thành tích vô hướng (Dot Product `np.dot(matrix, query)`), giúp giảm tải tính toán từ O(N*D) với căn bậc hai xuống một phép nhân ma trận cực nhanh. Sau khi lấy top-k chỉ số có điểm tương đồng cao nhất, ghép nối nội dung vào context và giới hạn LLM không suy diễn ngoài phạm vi context được cung cấp.",
       "codeExample": "import numpy as np\nfrom openai import OpenAI\n\nclient = OpenAI()\n\nclass MinimalRAG:\n    def __init__(self, documents: list[str]):\n        self.documents = documents\n        self.embeddings = self._embed(documents)\n\n    def _embed(self, texts: list[str]) -> np.ndarray:\n        response = client.embeddings.create(\n            model=\"text-embedding-3-small\",\n            input=texts\n        )\n        vecs = np.array([item.embedding for item in response.data], dtype=np.float32)\n        # Chuẩn hóa L2 để chuyển cosine similarity thành tích vô hướng (Dot Product)\n        norms = np.linalg.norm(vecs, axis=1, keepdims=True)\n        return vecs / np.maximum(norms, 1e-12)\n\n    def search(self, query: str, top_k: int = 2) -> list[str]:\n        q_vec = self._embed([query])[0]\n        # Dot product giữa ma trận embedding và vector query (kích thước N)\n        scores = np.dot(self.embeddings, q_vec)\n        top_indices = np.argsort(scores)[::-1][:top_k]\n        return [self.documents[idx] for idx in top_indices]\n\n    def ask(self, query: str) -> str:\n        relevant_docs = self.search(query, top_k=2)\n        context_str = \"\\n---\\n\".join(relevant_docs)\n        \n        prompt = f\"Dựa vào thông tin sau đây để trả lời:\\n{context_str}\\n\\nCâu hỏi: {query}\"\n        completion = client.chat.completions.create(\n            model=\"gpt-4o-mini\",\n            messages=[\n                {\"role\": \"system\", \"content\": \"Bạn là trợ lý chính xác. Chỉ trả lời dựa trên context được cấp.\"},\n                {\"role\": \"user\", \"content\": prompt}\n            ],\n            temperature=0.0\n        )\n        return completion.choices[0].message.content",
-      "codeLanguage": "python"
+      "codeLanguage": "python",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Quy Trình Hoạt Động Của RAG Pipeline (Retrieval-Augmented Generation)",
+        "caption": "Kết hợp tri thức doanh nghiệp từ Vector Database với khả năng tạo sinh của LLM",
+        "code": "flowchart TD\n    subgraph IngestionPhase [\"1. Giai Đoạn Nạp Dữ Liệu (Ingestion Pipeline)\"]\n        Doc[\"Tài Liệu PDF / Notion / Markdown\"] --> Chunking[\"Chia Nhỏ Thành Các Chunk (500 tokens, 10% overlap)\"]\n        Chunking --> EmbedModel[\"Embedding Model (text-embedding-3-small)\"]\n        EmbedModel --> VectorDB[(\"Vector Database (Qdrant / Milvus / Pinecone)\")]\n    end\n\n    subgraph QueryPhase [\"2. Giai Đoạn Truy Vấn (Query & Generation)\"]\n        UserQuery[\"Câu hỏi của người dùng\"] --> QueryEmbed[\"Vector hóa câu hỏi\"]\n        QueryEmbed --> SimilaritySearch[\"Cosine Similarity Search Top-K\"]\n        VectorDB <--> SimilaritySearch\n        SimilaritySearch --> Context[\"Top 5 đoạn văn bản liên quan nhất\"]\n        Context & UserQuery --> PromptEngineer[\"Tạo Prompt: 'Chỉ dựa vào context sau để trả lời...'\"]\n        PromptEngineer --> LLM[\"Mô Hình Ngôn Ngữ Lớn (LLM: GPT-4o / Claude 3.5)\"]\n        LLM --> FinalAnswer[\"Câu Trả Lời Chính Xác, Có Trích Dẫn Nguồn\"]\n    end"
+      }
     },
     "pitfalls": [
       "Quên chuẩn hóa L2 trước khi dùng Dot Product dẫn đến sai lệch xếp hạng độ tương đồng.",
@@ -3509,9 +3519,7 @@
               "Loại bỏ hoàn toàn phân mảnh bộ nhớ KV Cache, cho phép chạy batch size lớn hơn 4-8 lần",
               "Chia sẻ bộ nhớ tức thì cho kỹ thuật Parallel Sampling và Beam Search"
             ],
-            "cons": [
-              "Cần GPU hỗ trợ CUDA kiến trúc Ampere trở lên để đạt tốc độ tối đa"
-            ]
+            "cons": ["Cần GPU hỗ trợ CUDA kiến trúc Ampere trở lên để đạt tốc độ tối đa"]
           },
           {
             "name": "HuggingFace Transformers Native",
@@ -3535,9 +3543,7 @@
                 "color": "rose"
               }
             ],
-            "pros": [
-              "Dễ cài đặt thử nghiệm nhanh với thư viện chuẩn PyTorch"
-            ],
+            "pros": ["Dễ cài đặt thử nghiệm nhanh với thư viện chuẩn PyTorch"],
             "cons": [
               "Phải cấp phát trước bộ nhớ liên tục cho độ dài tối đa max_seq_len, gây cạn kiệt VRAM (OOM) nhanh chóng"
             ]
@@ -3987,7 +3993,13 @@
       "summary": "Kiến trúc MoE (Mixture of Experts) thay thế các tầng Feed-Forward Network (FFN) dày đặc truyền thống bằng nhiều mạng 'chuyên gia' độc lập (ví dụ 8 hoặc 64 Experts) kèm một mạng định tuyến (Router/Gating Network). Với mỗi token đầu vào, Router tính toán phân phối xác suất và CHỈ KÍCH HOẠT Top-k chuyên gia phù hợp nhất (thường là Top-2). Điều này mang lại sức chứa tri thức khổng lồ của một mô hình lớn nhưng chi phí tính toán (FLOPs) và tốc độ sinh token chỉ tương đương một mô hình nhỏ.",
       "deepDive": "Cơ chế kỹ thuật chi tiết: (1) Gating Formulation: Cho token biểu diễn `x`, router tính vector điểm `H(x) = x * W_gate`. Áp dụng hàm Softmax trên Top-k giá trị lớn nhất để lấy trọng số `G(x)`; đầu ra là tổng có trọng số: `y = sum_{i in Top-k} G(x)_i * E_i(x)`; (2) Vấn đề 'Winner-Takes-All' và Cân bằng tải (Load Balancing): Mạng Router có xu hướng bị sập vào việc liên tục gửi tất cả token cho 1 vài expert quen thuộc, khiến các expert còn lại bị bỏ đói. Để khắc phục, hàm mất mát huấn luyện bắt buộc phải có thêm số hạng phạt phụ trợ (Auxiliary Load Balancing Loss) ép các token phân bổ đều qua mọi expert; (3) Đánh đổi phần cứng: Mô hình MoE yêu cầu VRAM để chứa TOÀN BỘ trọng số (ví dụ Mixtral 8x7B cần ~90GB VRAM để chứa trọn 47B params), nhưng mỗi token chỉ tốn tính toán của 13B params, giúp tăng tốc độ inference cực lớn.",
       "codeExample": "# Cài đặt tầng Sparse MoE Layer với Top-2 Gating Router bằng PyTorch thuần túy\nimport torch\nimport torch.nn as nn\nimport torch.nn.functional as F\n\nclass SimpleExpert(nn.Module):\n    def __init__(self, d_model: int, d_ff: int):\n        super().__init__()\n        self.net = nn.Sequential(\n            nn.Linear(d_model, d_ff),\n            nn.GELU(),\n            nn.Linear(d_ff, d_model)\n        )\n    def forward(self, x):\n        return self.net(x)\n\nclass SparseMoELayer(nn.Module):\n    def __init__(self, d_model: int, d_ff: int, num_experts: int = 8, top_k: int = 2):\n        super().__init__()\n        self.num_experts = num_experts\n        self.top_k = top_k\n        self.router = nn.Linear(d_model, num_experts, bias=False)\n        self.experts = nn.ModuleList([SimpleExpert(d_model, d_ff) for _ in range(num_experts)])\n\n    def forward(self, x: torch.Tensor) -> torch.Tensor:\n        # x: [batch_size, seq_len, d_model]\n        orig_shape = x.shape\n        x_flat = x.view(-1, orig_shape[-1])  # [N_tokens, d_model]\n        \n        # 1. Router tính toán logits cho từng chuyên gia\n        gate_logits = self.router(x_flat)  # [N_tokens, num_experts]\n        \n        # 2. Chọn Top-k chuyên gia có điểm số cao nhất\n        weights, selected_experts = torch.topk(gate_logits, self.top_k, dim=-1)\n        weights = F.softmax(weights, dim=-1)  # Chuẩn hóa trọng số của Top-k\n        \n        final_output = torch.zeros_like(x_flat)\n        # 3. Phân bổ token và tính tổng kết quả có trọng số\n        for k in range(self.top_k):\n            for exp_idx in range(self.num_experts):\n                # Mặt nạ các token được chỉ định cho chuyên gia exp_idx\n                mask = (selected_experts[:, k] == exp_idx)\n                if mask.any():\n                    token_inputs = x_flat[mask]\n                    expert_out = self.experts[exp_idx](token_inputs)\n                    final_output[mask] += weights[mask, k:k+1] * expert_out\n                    \n        return final_output.view(*orig_shape)",
-      "codeLanguage": "python"
+      "codeLanguage": "python",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Kiến Trúc Mixture of Experts (MoE) Trong Mixtral & DeepSeek",
+        "caption": "Router Gate tính toán xác suất và phân bổ mỗi token tới Top-K Chuyên gia (Experts)",
+        "code": "flowchart TD\n    InputToken[\"Input Token (vd: 'def calculate_tax():')\"] --> RouterGate{\"Router Gate (Softmax Top-2 Gating)\"}\n    \n    subgraph ExpertPool [\"Cụm Chuyên Gia Nơ-ron Độc Lập (Experts)\"]\n        RouterGate -->|\"Xác suất 65%\"| Expert1[\"Expert 1: Lập Trình & Logic (Active)\"]\n        RouterGate -->|\"Xác suất 25%\"| Expert2[\"Expert 2: Toán & Kế Toán (Active)\"]\n        RouterGate -.->|\"Bỏ qua (0%)\"| Expert3[\"Expert 3: Thơ ca & Văn học (Inactive)\"]\n        RouterGate -.->|\"Bỏ qua (0%)\"| Expert4[\"Expert 4: Ngôn ngữ học (Inactive)\"]\n    end\n\n    Expert1 --> WeightedSum[\"Tổng Hợp Trọng Số: 0.65 * E1 + 0.25 * E2\"]\n    Expert2 --> WeightedSum\n    WeightedSum --> NextLayer[\"Chuyển Sang Lớp Transformer Kế Tiếp\"]"
+      }
     },
     "pitfalls": [
       "Nhầm lẫn giữa Kích thước Mô hình (Total Parameters) và Kích thước Kích hoạt (Activated Parameters) khi tính toán phần cứng: mua GPU chỉ đủ chứa số tham số kích hoạt dẫn đến không thể nạp mô hình vào VRAM.",
