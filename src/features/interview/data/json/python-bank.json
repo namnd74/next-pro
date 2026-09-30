@@ -35,14 +35,7 @@
     "question": "list, tuple, set, dict — khi nào dùng cái nào?",
     "interviewerIntent": "Kiểm tra kiến thức cấu trúc dữ liệu tích hợp sẵn (built-in data structures), độ phức tạp thời gian (time complexity) và khả năng chọn data structure tối ưu theo use-case.",
     "contextOrScenario": "Lựa chọn cấu trúc dữ liệu lưu cache in-memory, xử lý deduplication danh sách user ID, hoặc định nghĩa constant/metadata trong API backend.",
-    "expectedKeywords": [
-      "list",
-      "tuple",
-      "set",
-      "dict",
-      "hash table",
-      "O(1) lookup"
-    ],
+    "expectedKeywords": ["list", "tuple", "set", "dict", "hash table", "O(1) lookup"],
     "seniorAnswer": {
       "summary": "Dùng list khi cần mảng có thứ tự, cho phép trùng lặp và cần append/mutate; tuple cho dữ liệu cố định không đổi hoặc nhóm giá trị liên quan (nhẹ hơn list); set khi cần loại trừ trùng lặp và tra cứu O(1); dict khi cần ánh xạ key-value với O(1) average lookup/insert.",
       "deepDive": "List là dynamic array (con trỏ các PyObject*), tốn thêm capacity over-allocation để hỗ trợ amortized O(1) append. Tuple có fixed size, CPython tối ưu bộ nhớ bằng freelist nhỏ. Dict và set dùng Hash Table với open addressing và perturbation indexing, lookup O(1) nhưng tốn ram hơn 3-4 lần so với tuple/list và đòi hỏi key phải hashable. Dict từ Python 3.7+ bảo đảm giữ nguyên thứ tự chèn (insertion order).",
@@ -923,9 +916,7 @@
                 "color": "emerald"
               }
             ],
-            "pros": [
-              "Vượt qua hoàn toàn rào cản GIL, tận dụng trọn vẹn 32/64 CPU Cores"
-            ],
+            "pros": ["Vượt qua hoàn toàn rào cản GIL, tận dụng trọn vẹn 32/64 CPU Cores"],
             "cons": [
               "Chi phí khởi tạo process cao và truyền dữ liệu qua IPC (Pipes/Queues) tốn kém serialization"
             ]
@@ -989,7 +980,13 @@
     "seniorAnswer": {
       "summary": "`async def` định nghĩa một Coroutine. Khi gọi, nó không chạy ngay mà trả về một coroutine object. Event Loop là một vòng lặp sự kiện liên tục kiểm tra và điều phối các Task sẵn sàng thực thi: khi một task gặp lệnh `await`, nó tạm dừng và nhường quyền điều khiển (yield control) lại cho Event Loop để xử lý các task khác trong khi chờ I/O hoàn tất.",
       "deepDive": "Dưới tầng hệ điều hành, Event Loop (sử dụng `selectors`, `epoll` trên Linux hoặc `kqueue` trên macOS) đăng ký socket descriptor với OS kernel. Khi gọi `await asyncio.sleep()` hoặc `await async_client.get()`, coroutine tạo ra một `Future` và đăng ký callback với loop. Luồng chính không bao giờ bị block; khi kernel thông báo socket có dữ liệu sẵn sàng, Event Loop kích hoạt callback để đánh thức coroutine tiếp tục chạy từ điểm dừng.",
-      "codeExample": "import asyncio\n\nasync def fetch_user(user_id: int) -> dict:\n    # Nhường quyền điều khiển cho Event Loop trong 1s\n    await asyncio.sleep(0.1)\n    return {'user_id': user_id, 'name': 'Nam'}\n\nasync def main():\n    # Chạy đồng thời 2 coroutine\n    task1 = asyncio.create_task(fetch_user(1))\n    task2 = asyncio.create_task(fetch_user(2))\n    users = await asyncio.gather(task1, task2)\n    print(users)\n\n# Chạy event loop\n# asyncio.run(main())"
+      "codeExample": "import asyncio\n\nasync def fetch_user(user_id: int) -> dict:\n    # Nhường quyền điều khiển cho Event Loop trong 1s\n    await asyncio.sleep(0.1)\n    return {'user_id': user_id, 'name': 'Nam'}\n\nasync def main():\n    # Chạy đồng thời 2 coroutine\n    task1 = asyncio.create_task(fetch_user(1))\n    task2 = asyncio.create_task(fetch_user(2))\n    users = await asyncio.gather(task1, task2)\n    print(users)\n\n# Chạy event loop\n# asyncio.run(main())",
+      "diagram": {
+        "type": "mermaid",
+        "title": "Mô Hình Bất Đồng Bộ async/await Và Event Loop Trong Python (asyncio)",
+        "caption": "Cơ chế hoán đổi quyền điều khiển (Yielding Control) qua Coroutines và Tasks",
+        "code": "flowchart TD\n    MainCoro[\"Coro A: fetch_data()\"] --> Await[\"await client.get('https://api.com')\"]\n    \n    Await --> YieldToLoop[\"Nhường Quyền Điều Khiển Lại Cho Event Loop (Yield Control)\"]\n    \n    subgraph PythonEventLoop [\"asyncio Event Loop\"]\n        YieldToLoop --> SelectTask[\"Event Loop kiểm tra Task nào khác đang sẵn sàng?\"]\n        SelectTask --> RunCoroB[\"Chạy Coroutine B: process_cache()\"]\n    end\n\n    IO_Done[\"I/O Mạng Hoàn Tất (HTTP Response 200)\"] --> LoopNotify[\"Báo cho Event Loop\"]\n    LoopNotify --> ResumeA[\"Đánh thức Coroutine A tiếp tục chạy dòng code sau lệnh await\"]"
+      }
     },
     "pitfalls": [
       "Gọi hàm `time.sleep()` thay vì `await asyncio.sleep()` bên trong hàm async, khiến toàn bộ Event Loop bị đông cứng.",

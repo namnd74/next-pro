@@ -892,7 +892,34 @@
     "seniorAnswer": {
       "summary": "Vòng đời request: 1) Web server (Nginx -> Gunicorn) chuyển WSGI environ sang Django; 2) `WSGIHandler` tạo `HttpRequest`; 3) Chạy qua danh sách Middleware (Request Phase - từ trên xuống); 4) URLconf phân giải route tìm view tương ứng; 5) Chạy `process_view` hooks; 6) Thực thi View logic; 7) Chạy ngược qua Middleware (Response Phase - từ dưới lên); 8) Trả `HttpResponse` về web server.",
       "deepDive": "Nếu có ngoại lệ xảy ra trong view, Django sẽ kích hoạt các hook `process_exception` của middleware theo chiều từ dưới lên trên. Nếu không middleware nào giải quyết được exception, Django sẽ chuyển sang default handler (`handler500`). Cuối cùng, tín hiệu `request_finished` được phát ra để dọn dẹp tài nguyên (như đóng kết nối database connection nếu `CONN_MAX_AGE=0`).",
-      "codeExample": "# Sơ đồ tuần tự tóm tắt:\n# Client -> Web Server -> WSGIHandler\n#   -> Middleware Top-Down (Security -> Session -> Auth -> CSRF)\n#     -> URL Dispatcher (match path -> view function)\n#       -> View Execution (Query ORM, Business Logic)\n#   -> Middleware Bottom-Up (Add headers, compress gzip, set cookies)\n# -> WSGIHandler -> Client"
+      "codeExample": "# Sơ đồ tuần tự tóm tắt:\n# Client -> Web Server -> WSGIHandler\n#   -> Middleware Top-Down (Security -> Session -> Auth -> CSRF)\n#     -> URL Dispatcher (match path -> view function)\n#       -> View Execution (Query ORM, Business Logic)\n#   -> Middleware Bottom-Up (Add headers, compress gzip, set cookies)\n# -> WSGIHandler -> Client",
+      "diagram": {
+        "type": "pipeline",
+        "title": "Vòng Đời Hoàn Chỉnh Của Một HTTP Request Đi Qua Django Framework",
+        "caption": "Từ máy chủ WSGI/ASGI, xuyên qua chuỗi Middleware, định tuyến URLconf đến View và Template",
+        "stages": [
+          {
+            "name": "1. WSGI / ASGI Handler",
+            "description": "Web server (Gunicorn/Uvicorn) nhận socket và chuyển đổi thành HttpRequest object",
+            "duration": "Bước 1"
+          },
+          {
+            "name": "2. Middleware Request & View",
+            "description": "Chạy chuỗi middleware theo chiều xuôi: Security, Session, Authentication, CsrfViewMiddleware",
+            "duration": "Bước 2"
+          },
+          {
+            "name": "3. URLconf & View Execution",
+            "description": "Khớp URL regex/path, gọi View logic (CBV/FBV), thực thi ORM queries lấy dữ liệu",
+            "duration": "Bước 3"
+          },
+          {
+            "name": "4. Middleware Response & Render",
+            "description": "Render Template hoặc trả về JsonResponse; chạy chuỗi middleware theo chiều ngược lại để nén Gzip, set Cookie",
+            "duration": "Bước 4"
+          }
+        ]
+      }
     },
     "pitfalls": [
       "Thực hiện các thao tác tốn thời gian (như query DB nặng) trong giai đoạn middleware request phase khiến tất cả các route đều bị ảnh hưởng.",
