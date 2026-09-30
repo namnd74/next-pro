@@ -81,10 +81,14 @@ const nextPlaygroundCode = fs.readFileSync(
   './src/features/playground/components/next-playground.tsx',
   'utf-8'
 );
+const initialFilesCode = fs.readFileSync(
+  './src/features/playground/templates/nextjs/initial-files.ts',
+  'utf-8'
+);
 if (
-  !nextPlaygroundCode.includes("next: '15.4.1'") ||
-  !nextPlaygroundCode.includes("dev: 'next dev'") ||
-  nextPlaygroundCode.includes("dev: 'next dev --webpack'") ||
+  !initialFilesCode.includes("next: '15.4.1'") ||
+  !initialFilesCode.includes("dev: 'next dev'") ||
+  initialFilesCode.includes("dev: 'next dev --webpack'") ||
   !nextPlaygroundCode.includes('Next 15.4 Runtime + React 19')
 ) {
   console.error('  ✗ Next playground starter or runtime disclosure drifted from the compatibility contract');

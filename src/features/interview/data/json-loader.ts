@@ -1,6 +1,6 @@
 import { InterviewCategory, InterviewQuestion } from '../types';
 
-// Core Question Banks
+// Core Question Banks (Initial Bundle ~2.7MB raw instead of 13MB)
 import reactBankQuestions from './json/react-bank.json';
 import nextjsBankQuestions from './json/nextjs-bank.json';
 import typescriptBankQuestions from './json/typescript-bank.json';
@@ -16,50 +16,75 @@ import perfQuestions from './json/web-performance-security.json';
 import htmlBankQuestions from './json/html-bank.json';
 import cssBankQuestions from './json/css-bank.json';
 import systemDesignBankQuestions from './json/system-design-bank.json';
-import designPatternsBankQuestions from './json/design-patterns-bank.json';
-import microFrontendBankQuestions from './json/micro-frontend-bank.json';
-import businessAnalystBankQuestions from './json/business-analyst-bank.json';
-import aiBankQuestions from './json/ai-bank.json';
-import databaseBankQuestions from './json/database-bank.json';
-import devopsBankQuestions from './json/devops-bank.json';
-import iosBankQuestions from './json/ios-bank.json';
-import qaTestingBankQuestions from './json/qa-testing-bank.json';
-import dsaBankQuestions from './json/dsa-bank.json';
-import csFundamentalsBankQuestions from './json/cs-fundamentals-bank.json';
-import dataEngineeringBankQuestions from './json/data-engineering-bank.json';
-import cybersecurityBankQuestions from './json/cybersecurity-bank.json';
-import behavioralBankQuestions from './json/behavioral-bank.json';
-import rustBankQuestions from './json/rust-bank.json';
-import shellLinuxBankQuestions from './json/shell-linux-bank.json';
-import vueBankQuestions from './json/vue-bank.json';
-import angularBankQuestions from './json/angular-bank.json';
-import javaBankQuestions from './json/java-bank.json';
-import springBankQuestions from './json/spring-bank.json';
-import csharpBankQuestions from './json/csharp-bank.json';
-import phpBankQuestions from './json/php-bank.json';
-import laravelBankQuestions from './json/laravel-bank.json';
-import rubyBankQuestions from './json/ruby-bank.json';
-import railsBankQuestions from './json/rails-bank.json';
-import cppBankQuestions from './json/cpp-bank.json';
-import flutterBankQuestions from './json/flutter-bank.json';
-import androidBankQuestions from './json/android-bank.json';
-import reactNativeBankQuestions from './json/react-native-bank.json';
-import graphqlBankQuestions from './json/graphql-bank.json';
-import fastapiBankQuestions from './json/fastapi-bank.json';
-import stateManagementBankQuestions from './json/state-management-bank.json';
-import performanceBankQuestions from './json/performance-bank.json';
-import buildToolsBankQuestions from './json/build-tools-bank.json';
-import seoBankQuestions from './json/seo-bank.json';
-import backendApiBankQuestions from './json/backend-api-bank.json';
 import frontendCoreBankQuestions from './json/frontend-core-bank.json';
-import backendCoreBankQuestions from './json/backend-core-bank.json';
-import goBankQuestions from './json/go-bank.json';
-import nestjsBankQuestions from './json/nestjs-bank.json';
-import nodejsBankQuestions from './json/nodejs-bank.json';
-import pythonBankQuestions from './json/python-bank.json';
-import djangoBankQuestions from './json/django-bank.json';
 
-export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
+/**
+ * Precomputed exact question counts across all 57 question banks (3,329 questions).
+ * Allows instant, zero-latency rendering of category filter badges without loading 13MB of JSON upfront.
+ */
+export const STATIC_CATEGORY_COUNTS: Record<string, number> = {
+  all: 3329,
+  react: 107,
+  'react-19': 7,
+  nextjs: 100,
+  'next-app-router': 8,
+  typescript: 82,
+  javascript: 112,
+  'javascript-typescript': 7,
+  'browser-runtime-workers': 5,
+  html: 78,
+  css: 100,
+  'system-design': 109,
+  'frontend-system-design': 9,
+  'frontend-core': 100,
+  'design-patterns': 56,
+  'micro-frontend': 22,
+  go: 99,
+  nestjs: 59,
+  nodejs: 89,
+  python: 83,
+  django: 84,
+  'business-analyst': 100,
+  ai: 120,
+  database: 115,
+  devops: 95,
+  'devops-cloud': 95,
+  ios: 50,
+  android: 71,
+  'react-native': 74,
+  flutter: 81,
+  'qa-testing': 40,
+  'testing-qa': 40,
+  dsa: 45,
+  'cs-fundamentals': 35,
+  'data-engineering': 30,
+  cybersecurity: 30,
+  behavioral: 25,
+  'behavioral-hr': 25,
+  rust: 25,
+  'shell-linux': 20,
+  vue: 64,
+  angular: 67,
+  java: 100,
+  spring: 100,
+  csharp: 100,
+  php: 43,
+  laravel: 55,
+  ruby: 61,
+  rails: 71,
+  cpp: 57,
+  graphql: 40,
+  fastapi: 54,
+  'state-management': 75,
+  performance: 37,
+  'performance-optimization': 3,
+  'build-tools': 15,
+  seo: 24,
+  'backend-api': 137,
+  'backend-core': 100,
+};
+
+export const CORE_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(reactBankQuestions as InterviewQuestion[]),
   ...(nextjsBankQuestions as InterviewQuestion[]),
   ...(typescriptBankQuestions as InterviewQuestion[]),
@@ -67,48 +92,7 @@ export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(htmlBankQuestions as InterviewQuestion[]),
   ...(cssBankQuestions as InterviewQuestion[]),
   ...(systemDesignBankQuestions as InterviewQuestion[]),
-  ...(designPatternsBankQuestions as InterviewQuestion[]),
-  ...(microFrontendBankQuestions as InterviewQuestion[]),
-  ...(goBankQuestions as InterviewQuestion[]),
-  ...(nestjsBankQuestions as InterviewQuestion[]),
-  ...(nodejsBankQuestions as InterviewQuestion[]),
-  ...(pythonBankQuestions as InterviewQuestion[]),
-  ...(djangoBankQuestions as InterviewQuestion[]),
-  ...(businessAnalystBankQuestions as InterviewQuestion[]),
-  ...(aiBankQuestions as InterviewQuestion[]),
-  ...(databaseBankQuestions as InterviewQuestion[]),
-  ...(devopsBankQuestions as InterviewQuestion[]),
-  ...(iosBankQuestions as InterviewQuestion[]),
-  ...(qaTestingBankQuestions as InterviewQuestion[]),
-  ...(dsaBankQuestions as InterviewQuestion[]),
-  ...(csFundamentalsBankQuestions as InterviewQuestion[]),
-  ...(dataEngineeringBankQuestions as InterviewQuestion[]),
-  ...(cybersecurityBankQuestions as InterviewQuestion[]),
-  ...(behavioralBankQuestions as InterviewQuestion[]),
-  ...(rustBankQuestions as InterviewQuestion[]),
-  ...(shellLinuxBankQuestions as InterviewQuestion[]),
-  ...(vueBankQuestions as InterviewQuestion[]),
-  ...(angularBankQuestions as InterviewQuestion[]),
-  ...(javaBankQuestions as InterviewQuestion[]),
-  ...(springBankQuestions as InterviewQuestion[]),
-  ...(csharpBankQuestions as InterviewQuestion[]),
-  ...(phpBankQuestions as InterviewQuestion[]),
-  ...(laravelBankQuestions as InterviewQuestion[]),
-  ...(rubyBankQuestions as InterviewQuestion[]),
-  ...(railsBankQuestions as InterviewQuestion[]),
-  ...(cppBankQuestions as InterviewQuestion[]),
-  ...(flutterBankQuestions as InterviewQuestion[]),
-  ...(androidBankQuestions as InterviewQuestion[]),
-  ...(reactNativeBankQuestions as InterviewQuestion[]),
-  ...(graphqlBankQuestions as InterviewQuestion[]),
-  ...(fastapiBankQuestions as InterviewQuestion[]),
-  ...(stateManagementBankQuestions as InterviewQuestion[]),
-  ...(performanceBankQuestions as InterviewQuestion[]),
-  ...(buildToolsBankQuestions as InterviewQuestion[]),
-  ...(seoBankQuestions as InterviewQuestion[]),
-  ...(backendApiBankQuestions as InterviewQuestion[]),
   ...(frontendCoreBankQuestions as InterviewQuestion[]),
-  ...(backendCoreBankQuestions as InterviewQuestion[]),
   ...(nextjsQuestions as InterviewQuestion[]),
   ...(react19Questions as InterviewQuestion[]),
   ...(jsTsQuestions as InterviewQuestion[]),
@@ -119,23 +103,143 @@ export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = [
   ...(perfQuestions as InterviewQuestion[]),
 ];
 
-export const CORE_JSON_QUESTION_BANKS: InterviewQuestion[] = DEFAULT_JSON_QUESTION_BANKS;
+export const DEFAULT_JSON_QUESTION_BANKS: InterviewQuestion[] = CORE_JSON_QUESTION_BANKS;
 
 /**
- * Helper to get questions for category synchronously or asynchronously
+ * Dynamic on-demand loaders for 41 specialized domain question banks.
+ * Webpack splits each into its own independent chunk, downloaded only when the category is selected.
+ */
+export const DOMAIN_BANK_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
+  ai: () => import('./json/ai-bank.json'),
+  android: () => import('./json/android-bank.json'),
+  angular: () => import('./json/angular-bank.json'),
+  'backend-api': () => import('./json/backend-api-bank.json'),
+  'backend-core': () => import('./json/backend-core-bank.json'),
+  behavioral: () => import('./json/behavioral-bank.json'),
+  'behavioral-hr': () => import('./json/behavioral-bank.json'),
+  'build-tools': () => import('./json/build-tools-bank.json'),
+  'business-analyst': () => import('./json/business-analyst-bank.json'),
+  cpp: () => import('./json/cpp-bank.json'),
+  'cs-fundamentals': () => import('./json/cs-fundamentals-bank.json'),
+  csharp: () => import('./json/csharp-bank.json'),
+  cybersecurity: () => import('./json/cybersecurity-bank.json'),
+  'data-engineering': () => import('./json/data-engineering-bank.json'),
+  database: () => import('./json/database-bank.json'),
+  'design-patterns': () => import('./json/design-patterns-bank.json'),
+  devops: () => import('./json/devops-bank.json'),
+  'devops-cloud': () => import('./json/devops-bank.json'),
+  django: () => import('./json/django-bank.json'),
+  dsa: () => import('./json/dsa-bank.json'),
+  fastapi: () => import('./json/fastapi-bank.json'),
+  flutter: () => import('./json/flutter-bank.json'),
+  go: () => import('./json/go-bank.json'),
+  graphql: () => import('./json/graphql-bank.json'),
+  ios: () => import('./json/ios-bank.json'),
+  java: () => import('./json/java-bank.json'),
+  laravel: () => import('./json/laravel-bank.json'),
+  'micro-frontend': () => import('./json/micro-frontend-bank.json'),
+  nestjs: () => import('./json/nestjs-bank.json'),
+  nodejs: () => import('./json/nodejs-bank.json'),
+  performance: () => import('./json/performance-bank.json'),
+  'performance-optimization': () => import('./json/performance-bank.json'),
+  php: () => import('./json/php-bank.json'),
+  python: () => import('./json/python-bank.json'),
+  'qa-testing': () => import('./json/qa-testing-bank.json'),
+  'testing-qa': () => import('./json/qa-testing-bank.json'),
+  rails: () => import('./json/rails-bank.json'),
+  'react-native': () => import('./json/react-native-bank.json'),
+  ruby: () => import('./json/ruby-bank.json'),
+  rust: () => import('./json/rust-bank.json'),
+  seo: () => import('./json/seo-bank.json'),
+  'shell-linux': () => import('./json/shell-linux-bank.json'),
+  spring: () => import('./json/spring-bank.json'),
+  'state-management': () => import('./json/state-management-bank.json'),
+  vue: () => import('./json/vue-bank.json'),
+};
+
+const LOADED_CHUNKS_CACHE = new Map<string, InterviewQuestion[]>();
+
+/**
+ * Asynchronously load questions for a specific category on-demand
  */
 export async function loadCategoryQuestions(
   category: InterviewCategory | string
 ): Promise<InterviewQuestion[]> {
-  if (category === 'all') return DEFAULT_JSON_QUESTION_BANKS;
-  return DEFAULT_JSON_QUESTION_BANKS.filter((q) => q.category === category);
+  if (category === 'all') {
+    return CORE_JSON_QUESTION_BANKS;
+  }
+
+  // 1. Check in-memory cache
+  if (LOADED_CHUNKS_CACHE.has(category)) {
+    return LOADED_CHUNKS_CACHE.get(category)!;
+  }
+
+  // 2. Check if already in core banks
+  const coreMatches = CORE_JSON_QUESTION_BANKS.filter(
+    (q) => q.category === category || (category === 'react' && q.category === 'react-19')
+  );
+  if (coreMatches.length > 0) {
+    return coreMatches;
+  }
+
+  // 3. Load dynamic chunk
+  const loader = DOMAIN_BANK_LOADERS[category];
+  if (loader) {
+    try {
+      const bankMod = await loader();
+      const questions = bankMod.default as InterviewQuestion[];
+      LOADED_CHUNKS_CACHE.set(category, questions);
+      return questions;
+    } catch (err) {
+      console.error(
+        `Failed to dynamic-load question bank for category "${category}":`,
+        err
+      );
+      return [];
+    }
+  }
+
+  return [];
 }
 
 /**
- * Helper to get all question banks (e.g. for full JSON export in json-manager-modal)
+ * Loads all question banks (Core + all 41 Domain chunks) on-demand (e.g. for full JSON export)
  */
 export async function loadAllQuestionBanks(): Promise<InterviewQuestion[]> {
-  return DEFAULT_JSON_QUESTION_BANKS;
+  const allLoaded = [...CORE_JSON_QUESTION_BANKS];
+  const uniqueLoaders = new Map<string, () => Promise<{ default: unknown }>>();
+
+  for (const [key, loader] of Object.entries(DOMAIN_BANK_LOADERS)) {
+    if (!uniqueLoaders.has(loader.toString())) {
+      uniqueLoaders.set(key, loader);
+    }
+  }
+
+  const results = await Promise.allSettled(
+    Array.from(uniqueLoaders.entries()).map(async ([cat, loader]) => {
+      if (LOADED_CHUNKS_CACHE.has(cat)) {
+        return LOADED_CHUNKS_CACHE.get(cat)!;
+      }
+      const mod = await loader();
+      const questions = mod.default as InterviewQuestion[];
+      LOADED_CHUNKS_CACHE.set(cat, questions);
+      return questions;
+    })
+  );
+
+  const seenIds = new Set(allLoaded.map((q) => q.id));
+  for (const res of results) {
+    if (res.status === 'fulfilled') {
+      for (const q of res.value) {
+        if (!seenIds.has(q.id)) {
+          seenIds.add(q.id);
+          allLoaded.push(q);
+        }
+      }
+    }
+  }
+
+  return allLoaded;
 }
 
 /**
@@ -188,7 +292,10 @@ export function validateQuestionBankJson(data: unknown): {
         };
       }
     }
-    if (answer.diagram !== undefined && (typeof answer.diagram !== 'object' || answer.diagram === null)) {
+    if (
+      answer.diagram !== undefined &&
+      (typeof answer.diagram !== 'object' || answer.diagram === null)
+    ) {
       return {
         valid: false,
         error: `Câu hỏi id "${item.id}" có "seniorAnswer.diagram" không hợp lệ.`,

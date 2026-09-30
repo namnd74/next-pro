@@ -107,7 +107,7 @@ import { Sparkles, Terminal, Cpu } from 'lucide-react';
 
 export default function ClientDemo() {
   const [count, setCount] = useState(0);
-  const [apiData, setApiData] = useState<any>(null);
+  const [apiData, setApiData] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchHealth = async () => {
@@ -116,8 +116,9 @@ export default function ClientDemo() {
       const res = await fetch('/api/health');
       const data = await res.json();
       setApiData(data);
-    } catch (err: any) {
-      setApiData({ error: err.message });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setApiData({ error: message });
     } finally {
       setLoading(false);
     }

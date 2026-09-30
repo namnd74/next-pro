@@ -4,10 +4,8 @@ import * as React from 'react';
 import { Bookmark, ShieldCheck, Sparkles, Trophy, Bug } from 'lucide-react';
 import { TechIcon } from '@/components/common/tech-icon';
 import { useInterviewStore } from '../stores/use-interview-store';
-import {
-  MOCK_INTERVIEW_QUESTIONS,
-  MOCK_BUG_HUNT_CHALLENGES,
-} from '../data/mock-interview-bank';
+import { MOCK_BUG_HUNT_CHALLENGES } from '../data/mock-interview-bank';
+import { STATIC_CATEGORY_COUNTS } from '../data/json-loader';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 
@@ -20,7 +18,7 @@ export function InterviewStats() {
     setMounted(true);
   }, []);
 
-  const totalQuestions = MOCK_INTERVIEW_QUESTIONS.length;
+  const totalQuestions = STATIC_CATEGORY_COUNTS.all;
   const totalBugHunts = MOCK_BUG_HUNT_CHALLENGES.length;
 
   const averageMockScore = React.useMemo(() => {
@@ -40,21 +38,20 @@ export function InterviewStats() {
   }, [solvedBugCount, totalBugHunts, averageMockScore, mounted]);
 
   const languageBreakdown = React.useMemo(() => {
-    const react = MOCK_INTERVIEW_QUESTIONS.filter(
-      (q) => q.category === 'react' || q.category === 'react-19'
-    ).length;
-    const nextjs = MOCK_INTERVIEW_QUESTIONS.filter(
-      (q) => q.category === 'nextjs' || q.category === 'next-app-router'
-    ).length;
-    const ts = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'typescript').length;
-    const js = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'javascript').length;
-    const go = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'go').length;
-    const nestjs = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'nestjs').length;
-    const nodejs = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'nodejs').length;
-    const python = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'python').length;
-    const django = MOCK_INTERVIEW_QUESTIONS.filter((q) => q.category === 'django').length;
+    const react =
+      (STATIC_CATEGORY_COUNTS.react || 0) + (STATIC_CATEGORY_COUNTS['react-19'] || 0);
+    const nextjs =
+      (STATIC_CATEGORY_COUNTS.nextjs || 0) +
+      (STATIC_CATEGORY_COUNTS['next-app-router'] || 0);
+    const ts = STATIC_CATEGORY_COUNTS.typescript || 0;
+    const js = STATIC_CATEGORY_COUNTS.javascript || 0;
+    const go = STATIC_CATEGORY_COUNTS.go || 0;
+    const nestjs = STATIC_CATEGORY_COUNTS.nestjs || 0;
+    const nodejs = STATIC_CATEGORY_COUNTS.nodejs || 0;
+    const python = STATIC_CATEGORY_COUNTS.python || 0;
+    const django = STATIC_CATEGORY_COUNTS.django || 0;
     const others =
-      MOCK_INTERVIEW_QUESTIONS.length -
+      STATIC_CATEGORY_COUNTS.all -
       (react + nextjs + ts + js + go + nestjs + nodejs + python + django);
     return { react, nextjs, ts, js, go, nestjs, nodejs, python, django, others };
   }, []);

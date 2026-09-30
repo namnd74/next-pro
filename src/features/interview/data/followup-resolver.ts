@@ -5,6 +5,7 @@ export interface ResolvedFollowUp {
   answer: string;
   codeExample?: string;
   codeLanguage?: string;
+  isCurated?: boolean;
 }
 
 /**
@@ -250,7 +251,7 @@ export const metadata: Metadata = {
       '`Object.freeze(obj)` chỉ đóng băng nông (shallow freeze) các thuộc tính tầng 1; nếu object chứa object lồng nhau thì các thuộc tính con vẫn có thể bị mutate.\n\n**Để tạo object thực sự immutable 100%:**\n1. **Deep Freeze đệ quy**: Viết hàm duyệt qua toàn bộ keys và gọi `Object.freeze` cho mọi nested object/array.\n2. **Sử dụng thư viện chuyên dụng**: Dùng `Immer.js` (dựa trên Proxy) hoặc `Immutable.js` để đảm bảo structural sharing và hiệu năng cao mà không tốn công clone dữ liệu thủ công.',
     codeExample: `function deepFreeze<T extends object>(obj: T): Readonly<T> {
   Object.keys(obj).forEach((prop) => {
-    const value = (obj as any)[prop];
+    const value = Reflect.get(obj, prop);
     if (value && typeof value === 'object' && !Object.isFrozen(value)) {
       deepFreeze(value);
     }
@@ -262,6 +263,83 @@ const config = deepFreeze({ api: { endpoint: 'https://devpro.io', timeout: 5000 
 // config.api.timeout = 10000; // ❌ TypeError: Cannot assign to read only property in strict mode`,
     codeLanguage: 'typescript',
   },
+
+  'từ react 17, việc chuyển event delegation từ `document` về root container giải quyết bài toán gì?':
+    {
+      answer:
+        'Thay đổi này giải quyết triệt để bài toán **nhúng đồng thời nhiều phiên bản React trên cùng một trang** (Micro-Frontends & Multi-Version React Coexistence):\n\n- **Ở React 16 và cũ hơn**: Toàn bộ Synthetic Events được ủy quyền (delegated) tại `document`. Khi một ứng dụng React cũ nằm lồng trong một ứng dụng React mới, sự kiện `e.stopPropagation()` ở app con không thể ngăn chặn sự kiện nổi lên `document` của app cha, gây xung đột sự kiện trầm trọng.\n- **Từ React 17+**: Sự kiện được lắng nghe tại chính DOM Node gốc mà bạn mount app (`rootNode = ReactDOM.createRoot(container)`). Nhờ đó, hai ứng dụng React khác nhau trên cùng một trang có event tree hoàn toàn cô lập, không còn can thiệp lẫn nhau.',
+      codeLanguage: 'tsx',
+    },
+
+  'cơ chế event pooling trong react 16 hoạt động ra sao và tại sao đã bị loại bỏ ở react 17?':
+    {
+      answer:
+        '**Event Pooling (React 16)**: Nhằm tiết kiệm bộ nhớ trên các trình duyệt cũ, React tái sử dụng một đối tượng `SyntheticEvent` duy nhất cho nhiều sự kiện. Sau khi event handler chạy xong, toàn bộ thuộc tính của event object bị xóa về `null`. Nếu bạn cần đọc `e.target` trong một tác vụ bất đồng bộ (như `setTimeout` hay `fetch`), bạn bắt buộc phải gọi `e.persist()`.\n\n**Lý do loại bỏ ở React 17**: Trình thu gom rác (Garbage Collector) của các trình duyệt hiện đại đã cực kỳ tối ưu, chi phí cấp phát object không còn là nút thắt cổ chai. Việc giữ Event Pooling gây bẫy bug kinh điển cho developer khi xử lý async code. Do đó React 17 gỡ bỏ pooling hoàn toàn để code tự nhiên và dễ dự đoán.',
+      codeLanguage: 'tsx',
+    },
+
+  'tại sao kỹ thuật nâng component con thành `children` lại giúp tối ưu hóa re-render tốt hơn dùng react.memo?':
+    {
+      answer:
+        'Đây là kỹ thuật kiến trúc **"Component Composition as Performance Optimization"** (Same-Element Reference Bailout):\n\n- Khi một component con được truyền qua prop `children`, đối tượng React Element của nó được khởi tạo ở component cha bên ngoài, KHÔNG nằm trong scope render của component wrapper.\n- Khi component wrapper thay đổi state nội bộ và re-render, prop `children` của nó vẫn giữ nguyên tham chiếu object cũ (`prevProps.children === nextProps.children`).\n- React tự động nhận biết tham chiếu không đổi và **bỏ qua re-render cây con (bailout)** mà KHÔNG CẦN tốn chi phí so sánh nông (shallow comparison) props qua `React.memo`!',
+      codeExample: `// ✅ Component con KHÔNG bị re-render khi count thay đổi:
+export function ScrollTrackerWrapper({ children }: { children: React.ReactNode }) {
+  const [scrollY, setScrollY] = useState(0);
+
+  return (
+    <div onScroll={(e) => setScrollY(e.currentTarget.scrollTop)}>
+      <div className="status-bar">Vị trí cuộn: {scrollY}px</div>
+      {/* children giữ nguyên tham chiếu cũ -> React bỏ qua render cây con: */}
+      {children}
+    </div>
+  );
+}`,
+      codeLanguage: 'tsx',
+    },
+
+  'khi nào nên dùng interface và khi nào nên dùng type alias?': {
+    answer:
+      'Quy chuẩn TypeScript Senior:\n\n1. **Dùng `interface` khi**:\n- Định nghĩa hình dạng (shape) của Object, Class implementation (`implements`), hoặc Service contract.\n- Viết thư viện (Libraries/SDKs) cần tính năng **Declaration Merging** để người dùng có thể mở rộng interface sau này.\n\n2. **Dùng `type` khi**:\n- Định nghĩa Union Types (`"pending" | "success" | "error"`) hoặc Primitive Aliases.\n- Khai báo Tuples, Mapped Types, Conditional Types (`T extends U ? A : B`).\n- Sử dụng Utility Types phức tạp (`Pick`, `Omit`, `ReturnType`).',
+    codeExample: `// Interface: Declaration Merging
+interface AppConfig {
+  apiUrl: string;
+}
+interface AppConfig {
+  timeout: number; // Tự động gộp thành { apiUrl: string; timeout: number }
+}
+
+// Type: Hỗ trợ Union và Mapped Type
+type AsyncState<T> = 
+  | { status: 'loading'; data?: undefined; error?: undefined }
+  | { status: 'success'; data: T; error?: undefined }
+  | { status: 'error'; data?: undefined; error: Error };`,
+    codeLanguage: 'typescript',
+  },
+
+  'any và unknown khác nhau như thế nào trong type narrowing?': {
+    answer:
+      'Khác biệt cốt lõi về độ an toàn kiểu (Type Safety):\n\n- **`any` (Tắt kiểm tra kiểu)**: Bỏ qua hoàn toàn hệ thống kiểm tra kiểu của TypeScript. Cho phép bạn gọi bất kỳ hàm nào hoặc truy cập bất kỳ thuộc tính nào mà không có cảnh báo compile-time, là nguồn gốc hàng đầu của lỗi `TypeError: Cannot read property of undefined` ở runtime.\n- **`unknown` (Top Type an toàn)**: Đại diện cho giá trị chưa rõ kiểu dữ liệu. TypeScript CẤM TUYỆT ĐỐI việc thực hiện bất kỳ thao tác nào (gọi hàm, truy cập property, gán cho biến khác) cho đến khi bạn thực hiện **Type Narrowing** (kiểm tra kiểu bằng `typeof`, `instanceof`, hoặc schema parser như Zod).',
+    codeExample: `// ❌ any: Nguy cơ crash runtime không báo trước
+function processBad(data: any) {
+  return data.toUpperCase(); // Nếu data là number -> TypeError tại runtime!
+}
+
+// ✅ unknown: An toàn tuyệt đối, bắt buộc narrowing
+function processGood(data: unknown): string {
+  if (typeof data === 'string') {
+    return data.toUpperCase(); // TypeScript cho phép vì đã thu hẹp thành string!
+  }
+  return String(data);
+}`,
+    codeLanguage: 'typescript',
+  },
+
+  'thư viện dataloader của facebook giải quyết bài toán n+1 trong graphql bằng cơ chế batching qua nodejs event loop tick như thế nào?':
+    {
+      answer:
+        'Cơ chế hoạt động của DataLoader dựa trên **Tick Scheduling** trong NodeJS Event Loop:\n\n1. **Enqueue**: Khi các GraphQL resolvers chạy song song và gọi `loader.load(userId)`, DataLoader không bắn câu truy vấn SQL ngay mà xếp `userId` đó vào một hàng đợi (queue) nội bộ và trả về một Pending Promise.\n2. **Batching**: DataLoader lên lịch thực thi hàm nạp mảng qua `process.nextTick()` (hoặc microtask). Sau khi toàn bộ các resolver đồng bộ trong tick hiện tại đăng ký ID xong, DataLoader gom toàn bộ mảng IDs lại và bắn đúng **1 câu query duy nhất**: `SELECT * FROM users WHERE id IN (1, 2, 3, ...)`;\n3. **Dispatch & Cache**: Khi có kết quả, DataLoader phân phối lại từng object tương ứng để resolve từng Promise độc lập, đồng thời lưu cache trong phạm vi request đó.',
+      codeLanguage: 'typescript',
+    },
 };
 
 /**
@@ -273,11 +351,17 @@ function normalizeQuery(q: string): string {
 
 /**
  * Resolves a high-quality technical answer for a given follow-up question.
+ *
+ * Rules:
+ * 1. Curated follow-up items provide dedicated answers and specific code examples.
+ * 2. Non-curated drill inquiries provide distinct, structured Interview Angles (Interviewer Mindset & Defense Strategy)
+ *    WITHOUT copying the parent question's code example or regurgitating parent summary/deep-dive text.
+ * 3. Follow-up #1, #2, #3 within the same question receive distinct, non-overlapping perspectives.
  */
 export function resolveFollowUp(
   parentQuestion: InterviewQuestion,
   followUp: InterviewFollowUp,
-  _index?: number
+  index = 0
 ): ResolvedFollowUp {
   // Case 1: Already structured object with explicit answer
   if (typeof followUp === 'object' && followUp !== null && followUp.answer) {
@@ -286,6 +370,7 @@ export function resolveFollowUp(
       answer: followUp.answer,
       codeExample: followUp.codeExample,
       codeLanguage: followUp.codeLanguage || 'tsx',
+      isCurated: true,
     };
   }
 
@@ -300,6 +385,7 @@ export function resolveFollowUp(
       answer: curated.answer,
       codeExample: curated.codeExample,
       codeLanguage: curated.codeLanguage || 'tsx',
+      isCurated: true,
     };
   }
 
@@ -311,53 +397,83 @@ export function resolveFollowUp(
         answer: val.answer,
         codeExample: val.codeExample,
         codeLanguage: val.codeLanguage || 'tsx',
+        isCurated: true,
       };
     }
   }
 
-  // Case 4: Intelligent, contextual technical breakdown
-  const summary = parentQuestion.seniorAnswer?.summary || '';
-  const deepDive = parentQuestion.seniorAnswer?.deepDive || '';
-  const keywords = parentQuestion.expectedKeywords || [];
-  const primaryPitfall = parentQuestion.pitfalls?.[0] || '';
+  // Case 4: Contextual Interview Drill & Key Defense Angles
+  // NEVER copy parent question's codeExample or verbatim summary/deep-dive.
+  const keywords = (parentQuestion.expectedKeywords || []).slice(0, 4);
+  const keywordBadge =
+    keywords.length > 0 ? keywords.join(' · ') : parentQuestion.category;
 
-  // Extract core technical premise from question
-  let answerContent = '';
+  let interviewerIntent = '';
+  let keyDefensePoints = '';
+  let seniorAdvice = '';
 
-  if (/có thể .* không|được không|nên .* không/i.test(questionText)) {
-    answerContent =
-      `**Đánh giá kỹ thuật & Quyết định kiến trúc:**\n` +
-      `Câu trả lời phụ thuộc vào mục tiêu tối ưu cụ thể, nhưng về mặt thiết kế hệ thống:\n` +
-      `- Cần kiểm soát chặt chẽ ranh giới trách nhiệm (Separation of Concerns). ` +
-      `Liên hệ trực tiếp với cơ chế: **${keywords.slice(0, 3).join(', ')}**.\n` +
-      `- Bản chất giải pháp: ${summary}\n\n` +
-      `**Khuyến nghị thực thi & Rủi ro:**\n` +
-      `${deepDive.slice(0, 260)}...\n\n` +
-      (primaryPitfall ? `⚠️ **Cạm bẫy cần tránh:** ${primaryPitfall}` : '');
-  } else if (/tại sao|nguyên nhân|vì sao/i.test(questionText)) {
-    answerContent =
-      `**Cơ chế nền tảng (Underlying Mechanism):**\n` +
-      `Nguyên nhân gốc rễ liên quan mật thiết đến cách runtime và compiler xử lý dữ liệu:\n` +
-      `- ${summary}\n\n` +
-      `**Phân tích sâu:**\n` +
-      `- Khi thao tác với **${keywords.slice(0, 3).join(', ')}**, hệ thống cần đảm bảo tính nhất quán (consistency) và tối ưu hóa tài nguyên.\n` +
-      `- ${deepDive.slice(0, 240)}...\n\n` +
-      (primaryPitfall ? `⚠️ **Lưu ý trong Production:** ${primaryPitfall}` : '');
+  // Differentiate angle based on question text patterns and index
+  if (/có thể .* không|được không|nên .* không|khi nào nên/i.test(questionText)) {
+    interviewerIntent =
+      'Kiểm tra năng lực **Cân nhắc Đánh đổi (Trade-off Analysis)** và tư duy ra quyết định kiến trúc: Liệu bạn có biết khi nào giải pháp này phản tác dụng (anti-pattern) hay không.';
+    if (index === 0) {
+      keyDefensePoints =
+        `- **Ranh giới áp dụng**: Xác định rõ điều kiện tiên quyết khi áp dụng phương án này (dựa trên quy mô dữ liệu, tần suất truy cập và chi phí bảo trì).\n` +
+        `- **Đánh đổi trực tiếp**: So sánh chi phí tài nguyên (CPU/RAM/Network overhead) so với lợi ích thu được. Tránh tối ưu hóa sớm (premature optimization).`;
+      seniorAdvice =
+        'Trả lời theo công thức: *"Về mặt lý thuyết là có thể, nhưng trong thực tế tôi sẽ cân nhắc dựa trên 2 yếu tố chính: tính đóng gói của component và độ phức tạp khi debug."*';
+    } else {
+      keyDefensePoints =
+        `- **Trường hợp biên (Edge Cases)**: Phân tích kịch bản khi hệ thống tải cao đột biến hoặc dữ liệu không đồng nhất.\n` +
+        `- **Phương án thay thế (Alternatives)**: Đề xuất ít nhất 1 phương án dự phòng chuẩn mực hơn trong hệ sinh thái hiện đại.`;
+      seniorAdvice =
+        'Nhấn mạnh vào khả năng kiểm soát nợ kỹ thuật (Technical Debt) và tính dễ đọc của mã nguồn cho đồng đội.';
+    }
+  } else if (/tại sao|nguyên nhân|vì sao|khác gì|khác nhau/i.test(questionText)) {
+    interviewerIntent =
+      'Đánh giá độ sâu hiểu biết về **Cơ chế nội tại bên dưới (Underlying Runtime/Engine Mechanism)** thay vì chỉ thuộc lòng cú pháp bề nổi.';
+    if (index === 0) {
+      keyDefensePoints =
+        `- **Cơ chế tầng sâu**: Bóc tách nguyên nhân bắt nguồn từ quy chuẩn ngôn ngữ, cấu trúc bộ nhớ heap, hoặc luồng xử lý của compiler/runtime engine.\n` +
+        `- **Tính nhất quán dữ liệu**: Giải thích cách cơ chế này bảo vệ ứng dụng khỏi các lỗi bất đồng bộ hoặc trạng thái không hợp lệ.`;
+      seniorAdvice =
+        'Bắt đầu bằng một nhận định ngắn gọn về bản chất (1 câu cốt lõi), sau đó mới đi vào chi tiết kỹ thuật 2-3 luận điểm.';
+    } else {
+      keyDefensePoints =
+        `- **Tác động hiệu năng thực tế**: Chỉ ra sự khác biệt về độ trễ, số chu kỳ CPU hoặc lưu lượng truyền tải mạng giữa các cách tiếp cận.\n` +
+        `- **Rủi ro hồi quy (Regression Risks)**: Cảnh báo những lỗi tiềm ẩn có thể phát sinh nếu hiểu sai bản chất của cơ chế này.`;
+      seniorAdvice =
+        'Đưa ra ví dụ so sánh trực quan hoặc đối chiếu với một tình huống lỗi thực tế bạn từng gặp trong dự án production.';
+    }
   } else {
-    answerContent =
-      `**Phân tích kỹ thuật chuyên sâu:**\n` +
-      `Để xử lý hiệu quả yêu cầu này trong môi trường dự án lớn:\n` +
-      `- **Cơ chế áp dụng:** ${summary}\n` +
-      `- **Điểm mấu chốt:** Nắm vững các khái niệm cốt lõi bao gồm **${keywords.slice(0, 4).join(', ')}** để đưa ra quyết định cân đối giữa hiệu năng và tính bảo trì.\n\n` +
-      `**Ngữ cảnh áp dụng thực tế:**\n` +
-      `${deepDive.slice(0, 250)}...\n\n` +
-      (primaryPitfall ? `⚠️ **Cạm bẫy thường gặp:** ${primaryPitfall}` : '');
+    interviewerIntent =
+      'Kiểm tra kinh nghiệm thực chiến về **Quy trình triển khai, Đo lường & Best Practices** trong môi trường doanh nghiệp quy mô lớn.';
+    if (index === 0) {
+      keyDefensePoints =
+        `- **Quy trình chuẩn 3 bước**: Nhận diện vấn đề -> Đo lường định lượng bằng công cụ (Profiling/Monitoring) -> Áp dụng giải pháp bền vững.\n` +
+        `- **Nguyên lý thiết kế**: Đảm bảo giải pháp tuân thủ nguyên tắc Single Responsibility và Separation of Concerns.`;
+      seniorAdvice =
+        'Luôn nhấn mạnh việc đo lường số liệu thực tế trước khi đưa ra kết luận hoặc quyết định refactor.';
+    } else {
+      keyDefensePoints =
+        `- **Khả năng quan sát & Giám sát (Observability)**: Cách thiết lập metrics, logs, hoặc cảnh báo để phát hiện lỗi từ sớm trên production.\n` +
+        `- **Khả năng mở rộng (Scalability)**: Giải pháp hoạt động ra sao khi lượng người dùng hoặc dữ liệu tăng gấp 10-100 lần.`;
+      seniorAdvice =
+        'Thể hiện góc nhìn của Senior Engineer: không chỉ giải quyết bài toán hiện tại mà còn dự liệu khả năng mở rộng trong tương lai.';
+    }
   }
+
+  const answerContent =
+    `**🎯 Mục tiêu đánh giá của Người phỏng vấn:**\n${interviewerIntent}\n\n` +
+    `**💡 Luận điểm then chốt cần trình bày:**\n${keyDefensePoints}\n\n` +
+    `**⚡ Trọng tâm phản xạ:** ${seniorAdvice}\n\n` +
+    `📌 *Từ khóa then chốt:* **${keywordBadge}**`;
 
   return {
     questionText,
     answer: answerContent,
-    codeExample: parentQuestion.seniorAnswer?.codeExample,
-    codeLanguage: parentQuestion.seniorAnswer?.codeLanguage || 'tsx',
+    codeExample: undefined, // Never reuse parent's codeExample!
+    codeLanguage: undefined,
+    isCurated: false,
   };
 }
