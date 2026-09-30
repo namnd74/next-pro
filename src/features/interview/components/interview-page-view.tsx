@@ -8,8 +8,6 @@ import {
   Bug,
   Filter,
   Bookmark,
-  FileJson,
-  PlusCircle,
   CheckCircle2,
 } from 'lucide-react';
 import { SearchInput, FilterChipGroup } from '@/components/shared';
@@ -20,8 +18,6 @@ import {
   BugHunter,
   InterviewStats,
   InterviewCategory,
-  JSONManagerModal,
-  CreateQuestionModal,
   TopicRoadmapStepper,
   getTopicRoadmap,
   useInterviewStore,
@@ -36,9 +32,6 @@ import { TechIcon } from '@/components/common/tech-icon';
 import { cn } from '@/lib/utils';
 
 export function InterviewPageView() {
-  const [isJsonModalOpen, setIsJsonModalOpen] = React.useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false);
-
   const {
     selectedCategory,
     setSelectedCategory,
@@ -58,12 +51,12 @@ export function InterviewPageView() {
 
   const [selectedStageId, setSelectedStageId] = React.useState<string | null>(null);
   const [onlyMastered, setOnlyMastered] = React.useState(false);
-  const masteredQuestionIds = useInterviewStore(
-    (s) => s.masteredQuestionIds || []
-  );
+  const masteredQuestionIds = useInterviewStore((s) => s.masteredQuestionIds || []);
 
   const questionsSectionRef = React.useRef<HTMLDivElement | null>(null);
-  const [targetExpandedQuestionId, setTargetExpandedQuestionId] = React.useState<string | null>(null);
+  const [targetExpandedQuestionId, setTargetExpandedQuestionId] = React.useState<
+    string | null
+  >(null);
 
   // Reset stage selection when category changes
   React.useEffect(() => {
@@ -79,7 +72,10 @@ export function InterviewPageView() {
     setSelectedStageId(stageId);
     if (stageId && questionsSectionRef.current) {
       setTimeout(() => {
-        questionsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        questionsSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
       }, 60);
     }
   }, []);
@@ -87,7 +83,9 @@ export function InterviewPageView() {
   const handleOpenQuestionDetail = React.useCallback(
     (questionId: string) => {
       if (currentRoadmap) {
-        const stage = currentRoadmap.stages.find((s) => s.questionIds.includes(questionId));
+        const stage = currentRoadmap.stages.find((s) =>
+          s.questionIds.includes(questionId)
+        );
         if (stage) {
           setSelectedStageId(stage.id);
         }
@@ -95,7 +93,10 @@ export function InterviewPageView() {
       setTargetExpandedQuestionId(questionId);
       if (questionsSectionRef.current) {
         setTimeout(() => {
-          questionsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          questionsSectionRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
         }, 60);
       }
     },
@@ -131,43 +132,19 @@ export function InterviewPageView() {
   return (
     <div className="space-y-10">
       {/* Header Banner */}
-      <section className="flex flex-col gap-4 text-center sm:flex-row sm:items-center sm:justify-between sm:text-left">
-        <div className="space-y-3">
-          <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
-            <Briefcase className="h-4 w-4" />
-            <span>Senior Technical Interview Hub</span>
-          </div>
-
-          <h1 className="text-foreground text-3xl font-extrabold tracking-tight sm:text-4xl">
-            Luyện Phỏng Vấn Kỹ Thuật Chuyên Sâu
-          </h1>
-          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed sm:text-base">
-            Mô phỏng phỏng vấn kỹ thuật thực tế với bộ câu hỏi Senior, bẫy tuyển dụng
-            (Pitfalls), chấm điểm tự động và các thử thách bắt lỗi bug kiến trúc.
-          </p>
+      <section className="space-y-3 text-center sm:text-left">
+        <div className="border-primary/20 bg-primary/10 text-primary inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
+          <Briefcase className="h-4 w-4" />
+          <span>Senior Technical Interview Hub</span>
         </div>
 
-        {/* Action Header Buttons */}
-        <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 sm:justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsJsonModalOpen(true)}
-            className="gap-1.5 text-xs font-semibold"
-          >
-            <FileJson className="text-primary h-4 w-4" />
-            <span>Import / Export JSON</span>
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="gap-1.5 text-xs font-semibold shadow-sm"
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>Thêm Câu Hỏi Mới</span>
-          </Button>
-        </div>
+        <h1 className="text-foreground text-3xl font-extrabold tracking-tight sm:text-4xl">
+          Luyện Phỏng Vấn Kỹ Thuật Chuyên Sâu
+        </h1>
+        <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed sm:text-base">
+          Mô phỏng phỏng vấn kỹ thuật thực tế với bộ câu hỏi Senior, bẫy tuyển dụng
+          (Pitfalls), chấm điểm tự động và các thử thách bắt lỗi bug kiến trúc.
+        </p>
       </section>
 
       {/* Stats Summary */}
@@ -219,11 +196,11 @@ export function InterviewPageView() {
             {/* 1. Category Classification Quick Filter Bar */}
             <Card className="glass-card relative z-20 space-y-2.5 p-3.5 sm:p-4">
               <div className="flex flex-wrap items-center justify-between gap-2 pb-1 text-xs">
-                <span className="text-muted-foreground font-semibold flex items-center gap-1.5">
+                <span className="text-muted-foreground flex items-center gap-1.5 font-semibold">
                   <Filter className="h-3.5 w-3.5" />
                   <span>Chọn chủ đề kỹ thuật ({CATEGORY_ITEMS.length} chủ đề):</span>
                 </span>
-                <span className="font-mono text-[11px] text-muted-foreground">
+                <span className="text-muted-foreground font-mono text-[11px]">
                   Tổng {allQuestions.length} câu hỏi
                 </span>
               </div>
@@ -251,7 +228,14 @@ export function InterviewPageView() {
                         <TechIcon name={item.iconName} className="h-3.5 w-3.5" />
                       )}
                       <span>{item.label}</span>
-                      <span className="bg-background/40 py-0.2 rounded-full px-1.5 text-[10px]">
+                      <span
+                        className={cn(
+                          'py-0.2 rounded-full px-1.5 font-mono text-[10px] transition-colors',
+                          isSelected
+                            ? 'bg-background/80 text-foreground font-bold shadow-xs'
+                            : 'bg-background/40 text-muted-foreground'
+                        )}
+                      >
                         {count}
                       </span>
                     </button>
@@ -272,54 +256,9 @@ export function InterviewPageView() {
               />
             )}
 
-            {/* 3. Search and Filter Controls ("Filter dưới" đồng bộ chặt chẽ với DAG) */}
+            {/* 3. Search and Filter Controls */}
             <div ref={questionsSectionRef} className="space-y-4">
-              <Card className="glass-card relative z-20 space-y-3.5 p-4 border-primary/20 shadow-sm">
-                {/* Synchronized Stage Filter Chips */}
-                {currentRoadmap && (
-                  <div className="flex flex-wrap items-center gap-1.5 border-b border-border/40 pb-2.5">
-                    <span className="text-muted-foreground mr-1 text-[11px] font-bold uppercase tracking-wider">
-                      Trạm Tri Thức:
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectStage(null)}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all',
-                        !selectedStageId
-                          ? 'bg-primary text-primary-foreground shadow-xs'
-                          : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                      )}
-                    >
-                      <span>Tất cả các trạm</span>
-                      <span className="rounded-full bg-background/30 px-1.5 py-0.2 text-[10px]">
-                        {currentRoadmap.stages.reduce((acc, s) => acc + s.questionIds.length, 0)}
-                      </span>
-                    </button>
-                    {currentRoadmap.stages.map((stg) => {
-                      const isSelected = selectedStageId === stg.id;
-                      return (
-                        <button
-                          key={stg.id}
-                          type="button"
-                          onClick={() => handleSelectStage(isSelected ? null : stg.id)}
-                          className={cn(
-                            'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all',
-                            isSelected
-                              ? 'bg-primary text-primary-foreground shadow-xs ring-1 ring-primary/40'
-                              : 'border-border/50 bg-muted/70 hover:bg-muted text-muted-foreground hover:text-foreground border'
-                          )}
-                        >
-                          <span>Trạm #{stg.stepNumber}</span>
-                          <span className="rounded-full bg-background/30 px-1.5 py-0.2 text-[10px]">
-                            {stg.questionIds.length}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
+              <Card className="glass-card border-primary/20 relative z-20 space-y-3.5 p-4 shadow-sm">
                 {/* Level Classification Quick Filter Pills */}
                 <div className="flex flex-wrap items-center gap-1.5 pb-1">
                   <span className="text-muted-foreground mr-1 text-[11px] font-semibold">
@@ -350,7 +289,9 @@ export function InterviewPageView() {
 
                     <Select
                       value={selectedCategory}
-                      onValueChange={(val) => setSelectedCategory(val as InterviewCategory)}
+                      onValueChange={(val) =>
+                        setSelectedCategory(val as InterviewCategory)
+                      }
                       options={CATEGORY_ITEMS.map((item) => ({
                         value: item.id,
                         label: `${item.label} (${categoryCounts[item.id] || 0})`,
@@ -361,7 +302,9 @@ export function InterviewPageView() {
                     {currentRoadmap && (
                       <Select
                         value={selectedStageId || 'all'}
-                        onValueChange={(val) => handleSelectStage(val === 'all' ? null : val)}
+                        onValueChange={(val) =>
+                          handleSelectStage(val === 'all' ? null : val)
+                        }
                         options={[
                           {
                             value: 'all',
@@ -437,17 +380,6 @@ export function InterviewPageView() {
           </TabsContent>
         </Tabs>
       </section>
-
-      {/* Modals */}
-      <JSONManagerModal
-        isOpen={isJsonModalOpen}
-        onClose={() => setIsJsonModalOpen(false)}
-      />
-
-      <CreateQuestionModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-      />
     </div>
   );
 }

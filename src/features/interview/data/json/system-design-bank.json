@@ -1800,7 +1800,7 @@
         "type": "mermaid",
         "title": "Saga Pattern: Choreography vs Orchestration Trong Microservices",
         "caption": "Giải quyết bài toán giao dịch phân tán xuyên qua nhiều cơ sở dữ liệu độc lập",
-        "code": "flowchart TD\n    subgraph Orchestration [\"Mô hình Saga Orchestrator (Khuyên dùng cho quy trình phức tạp)\"]\n        Client[\"Khách đặt hàng\"] --> Orch[\"Order Saga Orchestrator\"]\n        Orch -->|\"1. Hold Inventory\"| SvcStock[\"Stock Service\"]\n        SvcStock -->>|\"Stock OK\"| Orch\n        Orch -->|\"2. Charge Card\"| SvcPay[\"Payment Service\"]\n        SvcPay -->>|\"Payment Failed!\"| Orch\n        Orch -->|\"3. Compensating Tx: Release Stock\"| SvcStock\n    end"
+        "code": "flowchart TD\n    subgraph Orchestration [\"Mô hình Saga Orchestrator (Khuyên dùng cho quy trình phức tạp)\"]\n        Client[\"Khách đặt hàng\"] --> Orch[\"Order Saga Orchestrator\"]\n        Orch -->|\"1. Hold Inventory\"| SvcStock[\"Stock Service\"]\n        SvcStock -->|\"Stock OK\"| Orch\n        Orch -->|\"2. Charge Card\"| SvcPay[\"Payment Service\"]\n        SvcPay -->|\"Payment Failed!\"| Orch\n        Orch -->|\"3. Compensating Tx: Release Stock\"| SvcStock\n    end"
       },
       "benchmark": {
         "title": "So sánh: Saga Choreography vs Saga Orchestration",
@@ -3016,7 +3016,7 @@
         "type": "mermaid",
         "title": "Khắc Phục Lỗi Vừa Ghi Xong Không Đọc Được Do Độ Trễ Sao Chép (Replication Lag)",
         "caption": "Cơ chế Read-After-Write Consistency: Ghim phiên người dùng đọc từ Master trong khoảng thời gian an toàn",
-        "code": "sequenceDiagram\n    autonumber\n    participant U as Người Dùng\n    participant API as Backend API\n    participant Master as PostgreSQL Primary (Ghi)\n    participant Replica as PostgreSQL Read Replica (Đọc)\n\n    U->>API: 1. POST /profile/update (Đổi tên thành \"Nam Nguyễn\")\n    API->>Master: UPDATE users SET name = 'Nam Nguyễn'\n    Master-->>API: 200 OK\n    API-->>U: Cập nhật thành công + Set Cookie \"recently_updated=true; Max-Age=5\"\n\n    Note over Master,Replica: ⚠️ Dữ liệu đang đồng bộ ngầm sang Replica (mất khoảng 1-2 giây)\n    \n    U->>API: 2. GET /profile (Tải lại trang ngay lập tức)\n    alt Có Cookie \"recently_updated\"\n        API->>Master: Đọc trực tiếp từ Master DB!\n        Master-->>API: Trả về \"Nam Nguyễn\" (Mới nhất)\n    else Không có Cookie (Đọc thông thường)\n        API->>Replica: Đọc từ Read Replica\n    end\n    API-->>U: Hiển thị đúng dữ liệu vừa lưu"
+        "code": "sequenceDiagram\n    autonumber\n    participant U as Người Dùng\n    participant API as Backend API\n    participant Master as PostgreSQL Primary (Ghi)\n    participant Replica as PostgreSQL Read Replica (Đọc)\n\n    U->>API: 1. POST /profile/update (Đổi tên thành Nam Nguyễn)\n    API->>Master: UPDATE users SET name = 'Nam Nguyễn'\n    Master-->>API: 200 OK\n    API-->>U: Cập nhật thành công + Set Cookie recently_updated=true (Max-Age=5s)\n\n    Note over Master,Replica: ⚠️ Dữ liệu đang đồng bộ ngầm sang Replica (mất khoảng 1-2 giây)\n    \n    U->>API: 2. GET /profile (Tải lại trang ngay lập tức)\n    alt Có Cookie recently_updated\n        API->>Master: Đọc trực tiếp từ Master DB!\n        Master-->>API: Trả về Nam Nguyễn (Mới nhất)\n    else Không có Cookie (Đọc thông thường)\n        API->>Replica: Đọc từ Read Replica\n    end\n    API-->>U: Hiển thị đúng dữ liệu vừa lưu"
       }
     },
     "pitfalls": [

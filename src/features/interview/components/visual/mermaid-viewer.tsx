@@ -105,6 +105,7 @@ export function MermaidViewer({
               },
           securityLevel: 'loose',
           fontFamily: 'inherit',
+          suppressErrorRendering: true,
         });
 
         const uniqueId = `mermaid_${containerId}_${Date.now()}`;
