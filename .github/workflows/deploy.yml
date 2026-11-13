@@ -24,9 +24,19 @@ jobs:
   # Build job
   build:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_CCA_API_URL: ${{ vars.NEXT_PUBLIC_CCA_API_URL }}
+      NEXT_PUBLIC_BASE_PATH: ${{ vars.NEXT_PUBLIC_BASE_PATH }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Validate CCA API configuration
+        run: |
+          if [ -z "$NEXT_PUBLIC_CCA_API_URL" ]; then
+            echo "::error::Set NEXT_PUBLIC_CCA_API_URL in repository Settings > Secrets and variables > Actions > Variables."
+            exit 1
+          fi
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -58,8 +68,6 @@ jobs:
       - name: Build and Export with Next.js
         env:
           NEXT_TELEMETRY_DISABLED: 1
-          NEXT_PUBLIC_BASE_PATH: ''
-          NEXT_PUBLIC_CCA_API_URL: ${{ vars.NEXT_PUBLIC_CCA_API_URL || 'https://cca.dev-pro.online' }}
         run: npm run build
 
       - name: Upload artifact

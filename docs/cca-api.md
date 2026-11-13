@@ -6,7 +6,7 @@ Frontend gọi trực tiếp API `/api/v1` của `next-pro-cca-admin`.
 - Development hiện có: FE `http://localhost:3000`, BE `http://localhost:3001`; `.env.local` của FE đặt `NEXT_PUBLIC_CCA_API_URL=http://localhost:3001`.
 - URL có thể là origin hoặc base đầy đủ `/api/v1`; frontend thêm `/api/v1` đúng một lần và bỏ dấu `/` cuối.
 - Không cấu hình thì mặc định `https://cca.dev-pro.online/api/v1`.
-- Workflow GitHub Pages đọc repository variable `NEXT_PUBLIC_CCA_API_URL`, mặc định `https://cca.dev-pro.online`. Next.js nhúng URL vào bundle lúc build; đổi biến cần restart dev hoặc rebuild/redeploy frontend.
+- Workflow GitHub Pages bắt buộc đọc repository variable `NEXT_PUBLIC_CCA_API_URL`; không chứa URL API cố định trong YAML. Vào GitHub repository → Settings → Secrets and variables → Actions → Variables, tạo `NEXT_PUBLIC_CCA_API_URL` bằng origin backend production. Nếu thiếu biến, workflow dừng với thông báo cấu hình. `NEXT_PUBLIC_BASE_PATH` là biến tùy chọn, để trống khi dùng custom domain. Next.js nhúng URL vào bundle lúc build; đổi biến cần restart dev hoặc rebuild/redeploy frontend.
 - Backend local hiện cho phép origin `http://localhost:3000`. Dùng FE cùng hostname `localhost` để cookie `SameSite=Lax` hoạt động; không trộn `127.0.0.1` với `localhost` khi kiểm thử thật.
 
 Nếu production trả HTML 404 tại `/api/v1/auth/session`, cần kiểm tra bản triển khai hoặc domain backend; không thay đường dẫn API vốn đã được khai báo trong source backend để né lỗi này.
