@@ -14,6 +14,7 @@ import {
   X,
   Code2,
   ExternalLink,
+  GraduationCap,
 } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { DevProLogo } from './devpro-logo';
@@ -42,6 +43,12 @@ const navLinks: NavLinkItem[] = [
     label: 'Phỏng Vấn',
     icon: Briefcase,
     desc: 'Ngân hàng câu hỏi kỹ thuật & phỏng vấn',
+  },
+  {
+    href: '/login',
+    label: 'Thi Claude',
+    icon: GraduationCap,
+    desc: 'Ba chứng chỉ · 10 đề mỗi chủ đề',
   },
   {
     href: '/ai',
@@ -94,6 +101,8 @@ export function Header() {
   const isLinkActive = (link: (typeof navLinks)[number]) => {
     if (link.comingSoon) return false;
     if (link.href === '/') return pathname === '/';
+    if (link.href === '/login')
+      return ['/cca', '/login', '/setup-password', '/account'].includes(pathname);
     return pathname.startsWith(link.href);
   };
 

@@ -13,6 +13,7 @@ export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const isHome = pathname === '/';
+  const isCcaAuth = pathname === '/login' || pathname === '/setup-password';
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -37,7 +38,14 @@ export function AppShell({ children }: AppShellProps) {
           ) ||
           (window.innerWidth > 0 && window.innerWidth < 768);
 
-        if (isMobile && !pathname.startsWith('/interview')) {
+        if (
+          isMobile &&
+          !pathname.startsWith('/interview') &&
+          !pathname.startsWith('/cca') &&
+          pathname !== '/setup-password' &&
+          pathname !== '/login' &&
+          pathname !== '/account'
+        ) {
           router.replace('/interview');
         }
       } catch {
@@ -101,7 +109,9 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="relative z-10 flex min-h-screen flex-col">
+    <div
+      className={`relative z-10 flex min-h-screen flex-col ${isCcaAuth ? 'cca-auth-theme' : ''}`}
+    >
       <Header />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
       {footer}
