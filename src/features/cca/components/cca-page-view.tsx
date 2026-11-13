@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BookOpenCheck, GraduationCap, Layers3, LogOut, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { apiUrl, examApi, ExamApiError } from '../api';
 import {
@@ -17,6 +18,7 @@ import { CandidateForm } from './candidate-form';
 import { TopicDashboard } from './topic-dashboard';
 import { ExamRoom } from './exam-room';
 import { ExamResult } from './exam-result';
+import { CcaReview } from './cca-review';
 
 type Screen =
   | { kind: 'loading' }
@@ -314,63 +316,80 @@ export function CcaPageView({
             </div>
           ))}
         </div>
-        <div className="grid gap-4 md:grid-cols-3" aria-label="Chọn chủ đề thi">
-          {topics.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-label={`Chọn ${item.id.toUpperCase()}`}
-              aria-pressed={selected === item.id}
+        <Tabs defaultValue="exam" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="exam" className="gap-2">
+              <GraduationCap className="size-4" /> Thi thử
+            </TabsTrigger>
+            <TabsTrigger value="review" className="gap-2">
+              <BookOpenCheck className="size-4" /> Ôn tập
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="review">
+            <CcaReview />
+          </TabsContent>
+          <TabsContent value="exam" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3" aria-label="Chọn chủ đề thi">
+              {topics.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-label={`Chọn ${item.id.toUpperCase()}`}
+                  aria-pressed={selected === item.id}
+                  onClick={() => {
+                    setSelected(item.id);
+                    setError('');
+                  }}
+                  className={cn(
+                    'glass-card focus-visible:ring-ring flex cursor-pointer flex-col gap-3 rounded-2xl border p-5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none',
+                    selected === item.id
+                      ? 'border-primary/60 bg-primary/5 ring-primary/10 ring-2'
+                      : 'border-border hover:border-primary/30'
+                  )}
+                >
+                  <span className="text-primary text-sm font-extrabold tracking-wider">
+                    {item.id.toUpperCase()}
+                  </span>
+                  <h2 className="font-bold">{item.title}</h2>
+                  <p className="text-muted-foreground min-h-10 text-xs leading-5">
+                    {descriptions[item.id]}
+                  </p>
+                  <p className="border-border/50 text-muted-foreground mt-auto w-full border-t pt-3 text-xs">
+                    {item.questionsPerExam} câu / đề · {item.questionCount} câu trong ngân
+                    hàng
+                  </p>
+                </button>
+              ))}
+            </div>
+            <TopicDashboard
+              key={selected}
+              topic={topic}
+              results={results}
+              usedForms={
+                cycles.find((cycle) => cycle.topicId === selected)?.usedForms ?? []
+              }
+              busy={busy}
+              onStart={(form) => void start(form)}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
               onClick={() => {
-                setSelected(item.id);
-                setError('');
+                setBusy(true);
+                void verified(screen.session)
+                  .catch((error: unknown) =>
+                    setError(
+                      error instanceof Error ? error.message : 'Chưa tải được danh sách.'
+                    )
+                  )
+                  .finally(() => setBusy(false));
               }}
-              className={cn(
-                'glass-card focus-visible:ring-ring flex cursor-pointer flex-col gap-3 rounded-2xl border p-5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none',
-                selected === item.id
-                  ? 'border-primary/60 bg-primary/5 ring-primary/10 ring-2'
-                  : 'border-border hover:border-primary/30'
-              )}
             >
-              <span className="text-primary text-sm font-extrabold tracking-wider">
-                {item.id.toUpperCase()}
-              </span>
-              <h2 className="font-bold">{item.title}</h2>
-              <p className="text-muted-foreground min-h-10 text-xs leading-5">
-                {descriptions[item.id]}
-              </p>
-              <p className="border-border/50 text-muted-foreground mt-auto w-full border-t pt-3 text-xs">
-                {item.questionsPerExam} câu / đề · {item.questionCount} câu trong ngân
-                hàng
-              </p>
-            </button>
-          ))}
-        </div>
-        <TopicDashboard
-          key={selected}
-          topic={topic}
-          results={results}
-          usedForms={cycles.find((cycle) => cycle.topicId === selected)?.usedForms ?? []}
-          busy={busy}
-          onStart={(form) => void start(form)}
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={busy}
-          onClick={() => {
-            setBusy(true);
-            void verified(screen.session)
-              .catch((error: unknown) =>
-                setError(
-                  error instanceof Error ? error.message : 'Chưa tải được danh sách.'
-                )
-              )
-              .finally(() => setBusy(false));
-          }}
-        >
-          Tải lại danh sách đề
-        </Button>
+              Tải lại danh sách đề
+            </Button>
+          </TabsContent>
+        </Tabs>
       </>
       <p className="text-muted-foreground text-center text-xs leading-5">
         Bộ luyện tập độc lập. Điểm mô phỏng không thay thế kết quả chứng chỉ chính thức.
