@@ -76,8 +76,18 @@ export async function safeRequest<T>(
   try {
     const response = await apiClient.request<T>(config);
     return { success: true, data: response.data };
-  } catch (err) {
-    const error = err as ApiError;
+  } catch (err: unknown) {
+    const error: ApiError =
+      typeof err === 'object' && err !== null && 'message' in err
+        ? {
+            message: String((err as Record<string, unknown>).message),
+            statusCode:
+              typeof (err as Record<string, unknown>).statusCode === 'number'
+                ? ((err as Record<string, unknown>).statusCode as number)
+                : undefined,
+            errors: (err as Record<string, unknown>).errors as ApiError['errors'],
+          }
+        : { message: 'An unexpected error occurred' };
     return { success: false, error };
   }
 }

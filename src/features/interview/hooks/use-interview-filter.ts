@@ -4,6 +4,7 @@ import * as React from 'react';
 import type { InterviewCategory, InterviewQuestion } from '../types';
 import { useInterviewStore } from '../stores/use-interview-store';
 import { MOCK_INTERVIEW_QUESTIONS } from '../data/mock-interview-bank';
+import { STATIC_CATEGORY_COUNTS, loadCategoryQuestions } from '../data/json-loader';
 import type { FilterChipItem } from '@/components/shared';
 
 export interface UseInterviewFilterReturn {
@@ -16,6 +17,7 @@ export interface UseInterviewFilterReturn {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   isPendingSearch: boolean;
+  isLoadingCategory: boolean;
   allQuestions: InterviewQuestion[];
   categoryCounts: Record<string, number>;
   levelCounts: { all: number; junior: number; middle: number; senior: number };
@@ -35,46 +37,57 @@ export function useInterviewFilter(): UseInterviewFilterReturn {
   const deferredSearchQuery = React.useDeferredValue(searchQuery);
   const isPendingSearch = searchQuery !== deferredSearchQuery;
 
+  const [loadedQuestions, setLoadedQuestions] = React.useState<InterviewQuestion[]>(
+    MOCK_INTERVIEW_QUESTIONS
+  );
+  const [isLoadingCategory, setIsLoadingCategory] = React.useState(false);
+
+  // Load domain question bank on-demand when user selects a category
+  React.useEffect(() => {
+    if (selectedCategory === 'all') return;
+    let active = true;
+    setIsLoadingCategory(true);
+
+    loadCategoryQuestions(selectedCategory)
+      .then((questions) => {
+        if (!active || !questions || questions.length === 0) return;
+        setLoadedQuestions((prev) => {
+          const existingIds = new Set(prev.map((q) => q.id));
+          const toAdd = questions.filter((q) => !existingIds.has(q.id));
+          if (toAdd.length === 0) return prev;
+          return [...prev, ...toAdd];
+        });
+      })
+      .finally(() => {
+        if (active) setIsLoadingCategory(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedCategory]);
+
   const allQuestions = React.useMemo(() => {
     const map = new Map<string, InterviewQuestion>();
-    for (const q of MOCK_INTERVIEW_QUESTIONS) map.set(q.id, q);
+    for (const q of loadedQuestions) map.set(q.id, q);
     for (const q of customQuestions) map.set(q.id, q);
     return Array.from(map.values());
-  }, [customQuestions]);
+  }, [loadedQuestions, customQuestions]);
 
   const categoryCounts = React.useMemo(() => {
-    const counts: Record<string, number> = { all: allQuestions.length };
-    for (const q of allQuestions) {
+    const counts: Record<string, number> = { ...STATIC_CATEGORY_COUNTS };
+    for (const q of customQuestions) {
+      counts.all = (counts.all || 0) + 1;
       counts[q.category] = (counts[q.category] || 0) + 1;
-      if (q.category === 'react-19') counts.react = (counts.react || 0) + 1;
-      if (q.category === 'next-app-router') counts.nextjs = (counts.nextjs || 0) + 1;
-      if (q.category === 'javascript-typescript') {
-        counts.typescript = (counts.typescript || 0) + 1;
-        counts.javascript = (counts.javascript || 0) + 1;
-      }
-      if (q.category === 'frontend-system-design') {
-        counts['system-design'] = (counts['system-design'] || 0) + 1;
-      }
-      if (q.category === 'backend-core') {
-        counts['backend-api'] = (counts['backend-api'] || 0) + 1;
-      }
-      if (q.category === 'performance-optimization') {
-        counts['performance'] = (counts['performance'] || 0) + 1;
-      }
-      if (q.category === 'browser-runtime-workers') {
-        counts['javascript'] = (counts['javascript'] || 0) + 1;
-      }
-      if ((q.category as string) === 'qa-testing') {
-        counts['testing-qa'] = (counts['testing-qa'] || 0) + 1;
-      }
     }
     return counts;
-  }, [allQuestions]);
+  }, [customQuestions]);
 
   const matchesCategory = React.useCallback(
     (q: InterviewQuestion, category: InterviewCategory): boolean => {
       if (category === 'all') return true;
-      if (category === 'react') return q.category === 'react' || q.category === 'react-19';
+      if (category === 'react')
+        return q.category === 'react' || q.category === 'react-19';
       if (category === 'nextjs')
         return q.category === 'nextjs' || q.category === 'next-app-router';
       if (category === 'typescript')
@@ -86,15 +99,11 @@ export function useInterviewFilter(): UseInterviewFilterReturn {
           q.category === 'browser-runtime-workers'
         );
       if (category === 'system-design')
-        return (
-          q.category === 'system-design' || q.category === 'frontend-system-design'
-        );
+        return q.category === 'system-design' || q.category === 'frontend-system-design';
       if (category === 'backend-api')
         return q.category === 'backend-api' || q.category === 'backend-core';
       if (category === 'performance')
-        return (
-          q.category === 'performance' || q.category === 'performance-optimization'
-        );
+        return q.category === 'performance' || q.category === 'performance-optimization';
       if (category === 'testing-qa')
         return q.category === 'testing-qa' || (q.category as string) === 'qa-testing';
       return q.category === category;
@@ -176,6 +185,7 @@ export function useInterviewFilter(): UseInterviewFilterReturn {
     searchQuery,
     setSearchQuery,
     isPendingSearch,
+    isLoadingCategory,
     allQuestions,
     categoryCounts,
     levelCounts,

@@ -18,7 +18,12 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { CodeBlock } from '@/components/ui/code-block';
 import { TechIcon } from '@/components/common/tech-icon';
-import { MermaidViewer, PipelineTracker, BenchmarkMatrix, CodeDiffViewer } from './visual';
+import {
+  MermaidViewer,
+  PipelineTracker,
+  BenchmarkMatrix,
+  CodeDiffViewer,
+} from './visual';
 import { resolveFollowUp } from '../data/followup-resolver';
 import { getCategoryBadge } from '../config/categories.config';
 import { cn } from '@/lib/utils';
@@ -50,12 +55,18 @@ export const QuestionCard = React.memo(function QuestionCard({
   onToggleExpand,
 }: QuestionCardProps) {
   const isBookmarked = useInterviewStore(
-    React.useCallback((s) => (s.bookmarkedQuestionIds || []).includes(question.id), [question.id])
+    React.useCallback(
+      (s) => (s.bookmarkedQuestionIds || []).includes(question.id),
+      [question.id]
+    )
   );
   const toggleBookmark = useInterviewStore((s) => s.toggleBookmark);
 
   const isMastered = useInterviewStore(
-    React.useCallback((s) => (s.masteredQuestionIds || []).includes(question.id), [question.id])
+    React.useCallback(
+      (s) => (s.masteredQuestionIds || []).includes(question.id),
+      [question.id]
+    )
   );
   const toggleMasteredQuestion = useInterviewStore((s) => s.toggleMasteredQuestion);
   const [internalExpanded, setInternalExpanded] = React.useState(false);
@@ -87,10 +98,10 @@ export const QuestionCard = React.memo(function QuestionCard({
   const diagramSpec = question.seniorAnswer.diagram;
   const isMermaidCode = Boolean(
     question.seniorAnswer.codeLanguage === 'mermaid' ||
-      (question.seniorAnswer.codeExample &&
-        /(sequenceDiagram|flowchart|graph\s+(TD|LR|TB|RL)|erDiagram|stateDiagram|classDiagram)/i.test(
-          question.seniorAnswer.codeExample
-        ))
+    (question.seniorAnswer.codeExample &&
+      /(sequenceDiagram|flowchart|graph\s+(TD|LR|TB|RL)|erDiagram|stateDiagram|classDiagram)/i.test(
+        question.seniorAnswer.codeExample
+      ))
   );
   const hasDiagram = Boolean(diagramSpec || isMermaidCode);
   const diagramCode =
@@ -394,7 +405,9 @@ export const QuestionCard = React.memo(function QuestionCard({
                     {isMermaidCode ? (
                       <MermaidViewer
                         code={question.seniorAnswer.codeExample}
-                        title={diagramSpec?.title || 'Sơ đồ luồng xử lý (Mermaid Diagram)'}
+                        title={
+                          diagramSpec?.title || 'Sơ đồ luồng xử lý (Mermaid Diagram)'
+                        }
                         caption={diagramSpec?.caption}
                       />
                     ) : (
@@ -468,7 +481,10 @@ export const QuestionCard = React.memo(function QuestionCard({
                   ) : diagramCode ? (
                     <MermaidViewer
                       code={diagramCode}
-                      title={diagramSpec?.title || 'Sơ đồ luồng kiến trúc (Architecture Diagram)'}
+                      title={
+                        diagramSpec?.title ||
+                        'Sơ đồ luồng kiến trúc (Architecture Diagram)'
+                      }
                       caption={diagramSpec?.caption}
                     />
                   ) : null}
@@ -547,28 +563,43 @@ export const QuestionCard = React.memo(function QuestionCard({
 
                           {isRevealed && (
                             <div className="bg-background/80 animate-in fade-in-50 space-y-3 border-t border-indigo-500/20 p-4 text-xs duration-200">
-                              <div className="flex items-center gap-1.5 font-bold text-indigo-600 dark:text-indigo-300">
-                                <span>🎯</span>
-                                <span>
-                                  Đáp án & Phân tích kỹ thuật chuyên sâu (Senior Focus):
-                                </span>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5 font-bold text-indigo-600 dark:text-indigo-300">
+                                  <span>🎯</span>
+                                  <span>
+                                    {resolved.isCurated
+                                      ? 'Đáp án & Phân tích kỹ thuật chuyên sâu (Curated Senior Focus):'
+                                      : 'Định hướng phản xạ & Luận điểm trả lời (Interviewer Drill):'}
+                                  </span>
+                                </div>
+                                {resolved.isCurated ? (
+                                  <span className="shrink-0 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                    Đáp án chuyên sâu
+                                  </span>
+                                ) : (
+                                  <span className="shrink-0 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-600 dark:text-indigo-400">
+                                    Khung phản xạ
+                                  </span>
+                                )}
                               </div>
 
                               <div className="bg-secondary/40 border-border/50 text-foreground space-y-2.5 rounded-lg border p-3.5 text-xs leading-relaxed font-normal whitespace-pre-line">
                                 {resolved.answer}
                               </div>
 
-                              {resolved.codeExample && (
-                                <div className="space-y-1.5 pt-1">
-                                  <span className="text-muted-foreground flex items-center gap-1 text-[11px] font-semibold">
-                                    <span>💻</span> Ví dụ minh họa kỹ thuật:
-                                  </span>
-                                  <CodeBlock
-                                    code={resolved.codeExample}
-                                    language={resolved.codeLanguage || 'tsx'}
-                                  />
-                                </div>
-                              )}
+                              {resolved.codeExample &&
+                                resolved.codeExample !==
+                                  question.seniorAnswer?.codeExample && (
+                                  <div className="space-y-1.5 pt-1">
+                                    <span className="text-muted-foreground flex items-center gap-1 text-[11px] font-semibold">
+                                      <span>💻</span> Ví dụ minh họa kỹ thuật độc lập:
+                                    </span>
+                                    <CodeBlock
+                                      code={resolved.codeExample}
+                                      language={resolved.codeLanguage || 'tsx'}
+                                    />
+                                  </div>
+                                )}
                             </div>
                           )}
                         </div>

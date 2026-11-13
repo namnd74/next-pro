@@ -9,70 +9,54 @@ const IPHONE_14 = {
   hasTouch: true,
 };
 
-test.describe('Mobile Device Redirection & Guard to /interview', () => {
+test.describe('Mobile Viewport Direct Navigation (Unrestricted Mobile UX)', () => {
   test.use(IPHONE_14);
 
-  test('1. Mobile cold-load on "/" redirects to "/interview"', async ({ page }) => {
+  test('1. Mobile cold-load on "/" stays on "/" without redirect', async ({ page }) => {
     await page.goto('/');
-    await page.waitForURL('**/interview');
-    expect(page.url()).toContain('/interview');
+    await page.waitForLoadState('networkidle');
+    expect(page.url()).not.toContain('/interview');
+    await expect(page.locator('h1')).toContainText(/Làm chủ/i);
   });
 
-  test('2. Mobile cold-load on "/learn" redirects to "/interview"', async ({ page }) => {
+  test('2. Mobile cold-load on "/learn" stays on "/learn"', async ({ page }) => {
     await page.goto('/learn');
-    await page.waitForURL('**/interview');
-    expect(page.url()).toContain('/interview');
+    await page.waitForLoadState('networkidle');
+    expect(page.url()).toContain('/learn');
+    expect(page.url()).not.toContain('/interview');
   });
 
   test('3. Mobile visit to "/interview" stays on "/interview"', async ({ page }) => {
     await page.goto('/interview');
     await page.waitForLoadState('networkidle');
     expect(page.url()).toContain('/interview');
-    // Verify interview page content is rendered
     await expect(page.locator('h1')).toContainText(/Phỏng Vấn/i);
-
-    // Save screenshot of the mobile interview page
-    await page.screenshot({
-      path: 'test-results/mobile_interview_page_verified.png',
-    });
   });
 
-  test('4. Mobile with "?desktop=true" allows viewing desktop homepage', async ({
-    page,
-  }) => {
-    await page.goto('/?desktop=true');
+  test('4. Mobile visit to "/ai" stays on "/ai"', async ({ page }) => {
+    await page.goto('/ai');
     await page.waitForLoadState('networkidle');
-    expect(page.url()).toContain('desktop=true');
+    expect(page.url()).toContain('/ai');
     expect(page.url()).not.toContain('/interview');
   });
 
-  test('5. Mobile drawer menu highlights /interview as Mobile Ready', async ({
+  test('5. Mobile drawer menu allows direct navigation to all platform sections', async ({
     page,
   }) => {
-    await page.goto('/interview');
+    await page.goto('/');
     await page.waitForLoadState('networkidle');
 
     const hamburger = page.locator('button[aria-label="Mở menu"]');
     await hamburger.click();
 
-    // Verify mobile banner
-    await expect(
-      page.locator('text=Chế độ Mobile: Tối ưu trang Phỏng Vấn')
-    ).toBeVisible();
+    // Verify all primary navigation links are present and accessible
+    await expect(page.locator('nav[aria-label="Mobile Main Navigation"]')).toBeVisible();
+    await expect(page.locator('text=Lộ Trình Học')).toBeVisible();
+    await expect(page.locator('text=Phỏng Vấn')).toBeVisible();
+    await expect(page.locator('text=AI System')).toBeVisible();
 
-    // Verify interview has Mobile Ready badge
-    await expect(page.locator('text=Mobile Ready')).toBeVisible();
-
-    // Verify other links have Desktop badge
-    await expect(page.locator('text=Desktop').first()).toBeVisible();
-
-    // Verify fast review section
-    await expect(page.locator('text=Luyện Phỏng Vấn Nhanh')).toBeVisible();
-
-    // Save screenshot of the mobile drawer
-    await page.screenshot({
-      path: 'test-results/mobile_drawer_verified.png',
-    });
+    // Verify quick access section
+    await expect(page.locator('text=Truy Cập Nhanh')).toBeVisible();
   });
 });
 
