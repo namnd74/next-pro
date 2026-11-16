@@ -24,6 +24,7 @@ Contract frontend sử dụng:
 - Auth: `POST /api/v1/auth/login`, `POST /api/v1/auth/setup-password`, `GET /api/v1/auth/session`, `POST /api/v1/auth/logout`.
 - Exam: `GET /api/v1/exams/catalog`, `GET /api/v1/exams/dashboard`, `POST /api/v1/exams/attempts`.
 - Attempt: `GET /api/v1/exams/attempts/:id`, `PUT /api/v1/exams/attempts/:id/answers`, `POST /api/v1/exams/attempts/:id/submit`, `POST /api/v1/exams/attempts/:id/abandon`.
+- Review: `GET /api/v1/review/topics`, `GET /api/v1/review/topics/:topicId/questions` (trả về `studyGuide` gồm `promptVi`, `choicesVi`, `questionKeywords`, `answerKeywords`, `explanationVi`).
 
 Đăng nhập dùng username, mật khẩu cá nhân và HttpOnly cookie. Không còn OTP/mã phòng.
 
