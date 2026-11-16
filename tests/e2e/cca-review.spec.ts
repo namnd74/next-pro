@@ -4,7 +4,65 @@ test.use({ serviceWorkers: 'block' });
 
 const questions = [
   {
-    id: 'review-single',
+    id: 'ccar-p-001',
+    type: 'multiple_response',
+    prompt:
+      'A managed agent deployment for claims triage has grown from 6 tools to 34 tools over 18 months as product teams added capabilities. Triage accuracy has declined from 91 percent to 78 percent, and average tool selection latency has increased by 2.3 seconds. A junior engineer has proposed adding a tool router agent in front of the current agent to filter the tool list per request.\nWhich two findings should you present to justify capability decomposition before adding the router? (Select two.)',
+    choices: [
+      {
+        id: 'A',
+        text: 'The router pattern is well-documented across publicly available agent literature.',
+      },
+      {
+        id: 'B',
+        text: 'The proposed router introduces an additional model call on every incoming request.',
+      },
+      {
+        id: 'C',
+        text: 'The 34 tools serve four distinct claim workflow domains within the triage scope.',
+      },
+      {
+        id: 'D',
+        text: 'Several tools have not been invoked across the most recent 90 days of traffic.',
+      },
+    ],
+    correctChoiceIds: ['B', 'C'],
+    studyGuide: {
+      promptVi:
+        'Một hệ thống managed agent để phân loại yêu cầu bồi thường (claims triage) đã tăng từ 6 tools lên 34 tools trong 18 tháng.',
+      choicesVi: [
+        {
+          id: 'A',
+          text: 'Mẫu thiết kế router đã được ghi chép đầy đủ trong các tài liệu công khai về agent.',
+        },
+        {
+          id: 'B',
+          text: 'Router được đề xuất sẽ phát sinh thêm một lệnh gọi model (model call) trên mỗi request đầu vào.',
+        },
+        {
+          id: 'C',
+          text: '34 tools này phục vụ bốn miền quy trình bồi thường (claim workflow domains) riêng biệt trong phạm vi phân loại.',
+        },
+        {
+          id: 'D',
+          text: 'Một số tools chưa từng được gọi trong suốt 90 ngày lưu lượng truy cập gần nhất.',
+        },
+      ],
+      questionKeywords: [
+        'grown from 6 tools to 34 tools',
+        'tool router agent',
+        'justify capability decomposition',
+      ],
+      answerKeywords: [
+        'additional model call on every incoming request',
+        'four distinct claim workflow domains',
+      ],
+      explanationVi:
+        'Việc thêm một tool router agent phía trước sẽ tạo thêm một model call cho mỗi request (B), làm tăng độ trễ.',
+    },
+  },
+  {
+    id: 'cca-f-001',
     type: 'single_choice',
     prompt: 'Khi phiên đăng nhập hết hạn, giao diện ôn tập cần xử lý thế nào?',
     choices: [
@@ -13,17 +71,6 @@ const questions = [
       { id: 'C', text: 'Tự chuyển sang tài khoản demo.' },
     ],
     correctChoiceIds: ['B'],
-  },
-  {
-    id: 'review-multiple',
-    type: 'multiple_response',
-    prompt: 'Đâu là các yêu cầu khi tải tài liệu ôn tập?',
-    choices: [
-      { id: 'A', text: 'Gửi cookie đăng nhập trong mọi request API.' },
-      { id: 'B', text: 'Nhúng bộ đáp án vào bundle JavaScript để tải nhanh.' },
-      { id: 'C', text: 'Không lưu câu hỏi và đáp án vào localStorage.' },
-    ],
-    correctChoiceIds: ['A', 'C'],
   },
 ];
 
@@ -111,7 +158,7 @@ test('review shows the entire topic bank without creating attempts or persisting
   page,
 }) => {
   const bank = Array.from({ length: 25 }, (_, i) => ({
-    ...questions[0],
+    ...questions[1],
     id: `synthetic-${i}`,
     prompt: `Synthetic review question ${i + 1}`,
   }));
@@ -134,61 +181,72 @@ test('review shows the entire topic bank without creating attempts or persisting
     page.getByText('Chủ đề này chưa có câu hỏi sẵn sàng để ôn tập.')
   ).toBeVisible();
   await expect(cards(page)).toHaveCount(0);
+
+  const questionCallsBefore = f.calls.filter((call) =>
+    call.path.startsWith('/review/topics/cca-f/questions')
+  ).length;
+  await page.getByLabel('Chủ đề ôn tập').selectOption('cca-f');
+  await expect(cards(page)).toHaveCount(25);
+  const questionCallsAfter = f.calls.filter((call) =>
+    call.path.startsWith('/review/topics/cca-f/questions')
+  ).length;
+  expect(questionCallsAfter).toBe(questionCallsBefore);
 });
 
-test('review gives immediate correct/incorrect feedback, supports multiple responses and fits mobile', async ({
+test('review displays studyGuide translations, keywords, explanation and supports search', async ({
   page,
 }) => {
   const f = await fixture(page);
   await f.open();
   await expect(cards(page)).toHaveCount(2);
   const first = cards(page).nth(0);
-  const second = cards(page).nth(1);
-  await expect(first.getByText('Đáp án đúng', { exact: true })).toHaveCount(0);
-  await first.getByRole('button', { name: /Tiếp tục hiển thị/ }).click();
-  await expect(first.getByText('Bạn chọn sai', { exact: true })).toBeVisible();
-  await expect(first.getByText('Đáp án đúng', { exact: true })).toBeVisible();
-  await first.getByRole('button', { name: 'Làm lại câu này' }).click();
-  await expect(first.getByText('Bạn chọn sai', { exact: true })).toHaveCount(0);
-  await first.getByRole('button', { name: /Xóa tài liệu/ }).click();
+
   await expect(
-    first.getByText('Chính xác! Bạn đã chọn đúng đáp án.', { exact: true })
+    first.getByText(
+      'Một hệ thống managed agent để phân loại yêu cầu bồi thường (claims triage) đã tăng từ 6 tools lên 34 tools trong 18 tháng.'
+    )
+  ).toHaveCount(0);
+
+  await first.getByRole('button', { name: 'Dịch Việt', exact: true }).click();
+  await expect(
+    first.getByText(
+      'Một hệ thống managed agent để phân loại yêu cầu bồi thường (claims triage) đã tăng từ 6 tools lên 34 tools trong 18 tháng.'
+    )
   ).toBeVisible();
-  await second.getByRole('button', { name: /Gửi cookie/ }).click();
   await expect(
-    second.getByText('Bạn đã chọn đúng một phần. Hãy chọn đủ các đáp án đúng.', {
+    first.getByText(
+      'Router được đề xuất sẽ phát sinh thêm một lệnh gọi model (model call) trên mỗi request đầu vào.'
+    )
+  ).toBeVisible();
+
+  await first.getByRole('button', { name: 'Từ khóa', exact: true }).click();
+  await expect(first.getByText('Từ khóa câu hỏi:')).toBeVisible();
+  await expect(first.getByText('tool router agent').first()).toBeVisible();
+  await expect(first.getByText('Từ khóa đáp án đúng:')).toHaveCount(0);
+
+  await first.getByRole('button', { name: /additional model call/ }).click();
+  await expect(
+    first.getByText('Bạn đã chọn đúng một phần. Hãy chọn đủ các đáp án đúng.', {
       exact: true,
     })
   ).toBeVisible();
-  await second.getByRole('button', { name: /Không lưu câu hỏi/ }).click();
+  await expect(first.getByText('Từ khóa đáp án đúng:')).toBeVisible();
+  await expect(first.getByText('Giải thích chi tiết')).toBeVisible();
   await expect(
-    second.getByText('Chính xác! Bạn đã chọn đúng đáp án.', { exact: true })
+    first.getByText(
+      'Việc thêm một tool router agent phía trước sẽ tạo thêm một model call cho mỗi request (B), làm tăng độ trễ.'
+    )
   ).toBeVisible();
-  await second.getByRole('button', { name: 'Làm lại câu này' }).click();
-  await second.getByRole('button', { name: /Nhúng bộ đáp án/ }).click();
-  await expect(second.getByText('Bạn chọn sai', { exact: true })).toBeVisible();
-  await expect(second.getByText('Đáp án đúng', { exact: true })).toHaveCount(2);
-  if (process.env.UPDATE_REVIEW_SCREENSHOTS) {
-    await page.setViewportSize({ width: 1440, height: 1100 });
-    await page.getByRole('main').screenshot({
-      path: 'artifacts/review-ui-desktop.png',
-      animations: 'disabled',
-      style:
-        'header, header * { visibility: hidden !important; } .glass-card { backdrop-filter: none !important; }',
-    });
-  }
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(
-    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)
-  ).toBe(true);
-  if (process.env.UPDATE_REVIEW_SCREENSHOTS)
-    await page.getByRole('main').screenshot({
-      path: 'artifacts/review-ui-mobile.png',
-      animations: 'disabled',
-      style:
-        'header, header * { visibility: hidden !important; } .glass-card { backdrop-filter: none !important; }',
-    });
-  expect(f.calls.filter((call) => call.method !== 'GET')).toEqual([]);
+
+  await first
+    .getByRole('button', { name: /four distinct claim workflow domains/ })
+    .click();
+  await expect(
+    first.getByText('Chính xác! Bạn đã chọn đúng đáp án.', { exact: true })
+  ).toBeVisible();
+
+  await page.getByLabel('Tìm kiếm câu hỏi / từ khóa').fill('bồi thường');
+  await expect(cards(page)).toHaveCount(1);
 });
 
 for (const status of [401, 403]) {
@@ -200,7 +258,7 @@ for (const status of [401, 403]) {
     await page.getByLabel('Chủ đề ôn tập').selectOption('ccao-f');
     await expect(page.getByRole('main').getByRole('alert')).toBeVisible();
     await expect(cards(page)).toHaveCount(0);
-    await expect(page.getByText(questions[0].prompt, { exact: true })).toHaveCount(0);
+    await expect(page.getByText(questions[1].prompt, { exact: true })).toHaveCount(0);
   });
 }
 

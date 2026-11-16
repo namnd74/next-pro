@@ -14,21 +14,30 @@ async function request(path: string, signal: AbortSignal): Promise<unknown> {
     signal,
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => null);
-    throw Object.assign(
-      new Error(
-        body?.error?.message || 'Không tải được tài liệu ôn tập. Vui lòng thử lại.'
-      ),
-      {
-        statusCode: response.status,
-      }
-    );
+    const body: unknown = await response.json().catch(() => null);
+    const errorMessage =
+      body &&
+      typeof body === 'object' &&
+      'error' in body &&
+      body.error &&
+      typeof body.error === 'object' &&
+      'message' in body.error &&
+      typeof body.error.message === 'string'
+        ? body.error.message
+        : 'Không tải được tài liệu ôn tập. Vui lòng thử lại.';
+    throw Object.assign(new Error(errorMessage), {
+      statusCode: response.status,
+    });
   }
   return response.json();
 }
 
 export async function getReviewSession(signal: AbortSignal) {
-  return parseReviewSession(await request('/auth/session', signal));
+  const session = parseReviewSession(await request('/auth/session', signal));
+  if (session?.kind === 'authenticated' && Date.parse(session.expiresAt) <= Date.now()) {
+    return null;
+  }
+  return session;
 }
 
 export async function getReviewTopics(signal: AbortSignal) {

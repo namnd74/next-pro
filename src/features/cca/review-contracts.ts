@@ -4,12 +4,26 @@ export interface ReviewTopic {
   questionCount: number;
 }
 
+export interface ReviewChoice {
+  id: string;
+  text: string;
+}
+
+export interface QuestionStudyGuide {
+  promptVi: string;
+  choicesVi: ReviewChoice[];
+  questionKeywords: string[];
+  answerKeywords: string[];
+  explanationVi: string;
+}
+
 export interface ReviewQuestion {
   id: string;
   type: 'single_choice' | 'multiple_response';
   prompt: string;
-  choices: { id: string; text: string }[];
+  choices: ReviewChoice[];
   correctChoiceIds: string[];
+  studyGuide?: QuestionStudyGuide;
 }
 
 export type ReviewSession =
@@ -39,6 +53,50 @@ function text(value: unknown): string {
     throw new Error('Dữ liệu API ôn tập thiếu nội dung bắt buộc.');
   }
   return value;
+}
+
+function textArray(value: unknown, label: string): string[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`Dữ liệu ${label} không đúng định dạng.`);
+  }
+  return value.map(text);
+}
+
+function parseChoices(value: unknown, label: string): ReviewChoice[] {
+  if (!Array.isArray(value) || !value.length) {
+    throw new Error(label);
+  }
+  return value.map((item) => {
+    const choice = record(item);
+    return { id: text(choice.id), text: text(choice.text) };
+  });
+}
+
+function parseStudyGuide(
+  value: unknown,
+  choiceIds: Set<string>
+): QuestionStudyGuide | undefined {
+  if (value === undefined || value === null) return undefined;
+  const guide = record(value);
+  const choicesVi = parseChoices(
+    guide.choicesVi,
+    'Dữ liệu bản dịch lựa chọn (choicesVi) bị thiếu.'
+  );
+  const choiceViIds = new Set(choicesVi.map((choice) => choice.id));
+  if (
+    choicesVi.length !== choiceIds.size ||
+    choiceViIds.size !== choiceIds.size ||
+    choicesVi.some((choice) => !choiceIds.has(choice.id))
+  ) {
+    throw new Error('Danh sách lựa chọn tiếng Việt không khớp với câu hỏi gốc.');
+  }
+  return {
+    promptVi: text(guide.promptVi),
+    choicesVi,
+    questionKeywords: textArray(guide.questionKeywords, 'từ khóa câu hỏi'),
+    answerKeywords: textArray(guide.answerKeywords, 'từ khóa đáp án'),
+    explanationVi: text(guide.explanationVi),
+  };
 }
 
 export function parseReviewSession(payload: unknown): ReviewSession {
@@ -82,13 +140,7 @@ export function parseReviewQuestions(payload: unknown): ReviewQuestion[] {
     if (question.type !== 'single_choice' && question.type !== 'multiple_response') {
       throw new Error('Loại câu hỏi ôn tập không hợp lệ.');
     }
-    if (!Array.isArray(question.choices) || !question.choices.length) {
-      throw new Error('Câu hỏi ôn tập thiếu lựa chọn.');
-    }
-    const choices = question.choices.map((value) => {
-      const choice = record(value);
-      return { id: text(choice.id), text: text(choice.text) };
-    });
+    const choices = parseChoices(question.choices, 'Câu hỏi ôn tập thiếu lựa chọn.');
     const choiceIds = new Set(choices.map((choice) => choice.id));
     if (choiceIds.size !== choices.length) throw new Error('Mã lựa chọn bị trùng.');
     if (!Array.isArray(question.correctChoiceIds) || !question.correctChoiceIds.length) {
@@ -101,12 +153,14 @@ export function parseReviewQuestions(payload: unknown): ReviewQuestion[] {
     if (question.type === 'single_choice' && correctChoiceIds.length !== 1) {
       throw new Error('Câu hỏi một đáp án có dữ liệu đáp án không hợp lệ.');
     }
+    const studyGuide = parseStudyGuide(question.studyGuide, choiceIds);
     return {
       id: text(question.id),
       type: question.type,
       prompt: text(question.prompt),
       choices,
       correctChoiceIds,
+      ...(studyGuide ? { studyGuide } : {}),
     };
   });
 }

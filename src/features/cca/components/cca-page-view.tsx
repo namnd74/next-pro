@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { BookOpenCheck, GraduationCap, Layers3, LogOut, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -18,7 +19,7 @@ import { CandidateForm } from './candidate-form';
 import { TopicDashboard } from './topic-dashboard';
 import { ExamRoom } from './exam-room';
 import { ExamResult } from './exam-result';
-import { CcaReview } from './cca-review';
+import { CcaReview, REVIEW_QUERY_KEY } from './cca-review';
 
 type Screen =
   | { kind: 'loading' }
@@ -34,12 +35,16 @@ const descriptions: Record<TopicId, string> = {
   'ccar-p': 'Thiết kế, tích hợp và vận hành giải pháp Claude trong doanh nghiệp.',
 };
 
+export const EXAM_CATALOG_QUERY_KEY = ['cca-exam', 'catalog'] as const;
+export const EXAM_DASHBOARD_QUERY_KEY = ['cca-exam', 'dashboard'] as const;
+
 export function CcaPageView({
   mode = 'account',
 }: {
   mode?: 'login' | 'setup' | 'account' | 'redirect';
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [screen, setScreen] = useState<Screen>({ kind: 'loading' });
   const [topics, setTopics] = useState(TOPICS);
   const [cycles, setCycles] = useState<Cycle[]>([]);
@@ -57,18 +62,38 @@ export function CcaPageView({
         : 'Trình duyệt không lưu được lịch sử. Kết quả vẫn được giữ tại phòng thi.'
     );
   }
+
+  async function loadExamPortal() {
+    const [catalog, initial] = await Promise.all([
+      queryClient.fetchQuery({
+        queryKey: EXAM_CATALOG_QUERY_KEY,
+        queryFn: () => examApi.catalog(),
+        staleTime: Infinity,
+      }),
+      queryClient.fetchQuery({
+        queryKey: EXAM_DASHBOARD_QUERY_KEY,
+        queryFn: () => examApi.dashboard(),
+        staleTime: 0,
+      }),
+    ]);
+    // A new page has no active room state: reload/closed-page attempts are consumed.
+    if (initial.activeAttemptId) await examApi.finish(initial.activeAttemptId, 'abandon');
+    const dashboard = initial.activeAttemptId
+      ? await queryClient.fetchQuery({
+          queryKey: EXAM_DASHBOARD_QUERY_KEY,
+          queryFn: () => examApi.dashboard(),
+          staleTime: 0,
+        })
+      : initial;
+    return { catalog, dashboard };
+  }
+
   async function verified(session: Session) {
     if (mode !== 'account') {
       router.replace('/account');
       return;
     }
-    const [catalog, initial] = await Promise.all([
-      examApi.catalog(),
-      examApi.dashboard(),
-    ]);
-    // A new page has no active room state: reload/closed-page attempts are consumed.
-    if (initial.activeAttemptId) await examApi.finish(initial.activeAttemptId, 'abandon');
-    const dashboard = initial.activeAttemptId ? await examApi.dashboard() : initial;
+    const { catalog, dashboard } = await loadExamPortal();
     setTopics(catalog);
     setCycles(dashboard.cycles);
     persist(dashboard.results);
@@ -107,14 +132,8 @@ export function CcaPageView({
           setScreen({ kind: 'auth', ...(session ? { setup: session } : {}) });
           return;
         }
-        const [catalog, initial] = await Promise.all([
-          examApi.catalog(),
-          examApi.dashboard(),
-        ]);
+        const { catalog, dashboard } = await loadExamPortal();
         if (canceled) return;
-        if (initial.activeAttemptId)
-          await examApi.finish(initial.activeAttemptId, 'abandon');
-        const dashboard = initial.activeAttemptId ? await examApi.dashboard() : initial;
         if (!canceled) {
           setTopics(catalog);
           setCycles(dashboard.cycles);
@@ -133,7 +152,8 @@ export function CcaPageView({
     return () => {
       canceled = true;
     };
-  }, [router, mode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, mode, queryClient]);
 
   async function start(form: number) {
     if (screen.kind !== 'dashboard') return;
@@ -168,6 +188,8 @@ export function CcaPageView({
     setError('');
     try {
       await examApi.logout();
+      queryClient.removeQueries({ queryKey: REVIEW_QUERY_KEY });
+      queryClient.removeQueries({ queryKey: ['cca-exam'] });
       persist([]);
       setCycles([]);
       setScreen({ kind: 'loading' });

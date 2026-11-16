@@ -9,9 +9,9 @@ import {
 test('reads topic counts from the review API', () => {
   assert.deepEqual(
     parseReviewTopics({
-      topics: [{ id: 'react', name: 'React', questionCount: 12 }],
+      topics: [{ id: 'cca-f', name: 'Architect · Foundations', questionCount: 162 }],
     }),
-    [{ id: 'react', name: 'React', questionCount: 12 }]
+    [{ id: 'cca-f', name: 'Architect · Foundations', questionCount: 162 }]
   );
 });
 
@@ -26,10 +26,116 @@ test('keeps the full question set and resolves the correct option', () => {
     ],
     correctChoiceIds: ['B'],
   }));
-  const result = parseReviewQuestions({ topicId: 'react', total: 25, questions });
+  const result = parseReviewQuestions({ topicId: 'cca-f', total: 25, questions });
   assert.equal(result.length, 25);
   assert.deepEqual(result[24].correctChoiceIds, ['B']);
   assert.equal(result[24].prompt, 'Question 24');
+});
+
+test('parses question studyGuide contract including promptVi, choicesVi, keywords, and explanationVi', () => {
+  const payload = {
+    topicId: 'ccar-p',
+    total: 1,
+    questions: [
+      {
+        id: 'ccar-p-001',
+        type: 'multiple_response',
+        prompt:
+          'A managed agent deployment for claims triage has grown from 6 tools to 34 tools over 18 months as product teams added capabilities.',
+        choices: [
+          {
+            id: 'A',
+            text: 'The router pattern is well-documented across publicly available agent literature.',
+          },
+          {
+            id: 'B',
+            text: 'The proposed router introduces an additional model call on every incoming request.',
+          },
+          {
+            id: 'C',
+            text: 'The 34 tools serve four distinct claim workflow domains within the triage scope.',
+          },
+        ],
+        correctChoiceIds: ['B', 'C'],
+        studyGuide: {
+          promptVi:
+            'Một hệ thống managed agent để phân loại yêu cầu bồi thường (claims triage) đã tăng từ 6 tools lên 34 tools...',
+          choicesVi: [
+            {
+              id: 'A',
+              text: 'Mẫu thiết kế router đã được ghi chép đầy đủ trong các tài liệu công khai về agent.',
+            },
+            {
+              id: 'B',
+              text: 'Router được đề xuất sẽ phát sinh thêm một lệnh gọi model (model call) trên mỗi request đầu vào.',
+            },
+            {
+              id: 'C',
+              text: '34 tools này phục vụ bốn miền quy trình bồi thường (claim workflow domains) riêng biệt trong phạm vi phân loại.',
+            },
+          ],
+          questionKeywords: [
+            'grown from 6 tools to 34 tools',
+            'tool router agent',
+            'justify capability decomposition',
+          ],
+          answerKeywords: [
+            'additional model call on every incoming request',
+            'four distinct claim workflow domains',
+          ],
+          explanationVi:
+            'Việc thêm một tool router agent phía trước sẽ tạo thêm một model call cho mỗi request (B)...',
+        },
+      },
+    ],
+  };
+
+  const result = parseReviewQuestions(payload);
+  assert.equal(result.length, 1);
+  assert.ok(result[0].studyGuide);
+  assert.equal(
+    result[0].studyGuide.promptVi,
+    'Một hệ thống managed agent để phân loại yêu cầu bồi thường (claims triage) đã tăng từ 6 tools lên 34 tools...'
+  );
+  assert.equal(result[0].studyGuide.choicesVi.length, 3);
+  assert.deepEqual(result[0].studyGuide.questionKeywords, [
+    'grown from 6 tools to 34 tools',
+    'tool router agent',
+    'justify capability decomposition',
+  ]);
+  assert.deepEqual(result[0].studyGuide.answerKeywords, [
+    'additional model call on every incoming request',
+    'four distinct claim workflow domains',
+  ]);
+  assert.ok(result[0].studyGuide.explanationVi.startsWith('Việc thêm một tool router'));
+});
+
+test('rejects studyGuide when choicesVi do not match question choices', () => {
+  assert.throws(() =>
+    parseReviewQuestions({
+      topicId: 'ccar-p',
+      total: 1,
+      questions: [
+        {
+          id: 'q1',
+          type: 'single_choice',
+          prompt: 'Choose',
+          choices: [
+            { id: 'A', text: 'One' },
+            { id: 'B', text: 'Two' },
+          ],
+          correctChoiceIds: ['A'],
+          studyGuide: {
+            promptVi: 'Chọn',
+            choicesVi: [{ id: 'A', text: 'Một' }],
+            questionKeywords: ['Choose'],
+            answerKeywords: ['One'],
+            explanationVi: 'Giải thích',
+          },
+        },
+      ],
+    })
+  );
 });
 
 test('preserves all correct answers for multiple response questions', () => {
