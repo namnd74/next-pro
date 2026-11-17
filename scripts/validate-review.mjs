@@ -85,6 +85,19 @@ test('parses question studyGuide contract including promptVi, choicesVi, keyword
           ],
           explanationVi:
             'Việc thêm một tool router agent phía trước sẽ tạo thêm một model call cho mỗi request (B)...',
+          quickFormulaVi:
+            '[Đề có: "grown from 6 tools to 34 tools"] ➔ Chọn B ("additional model call") — Router thêm model call làm tăng trễ.',
+          keywordMappings: [
+            {
+              choiceId: 'B',
+              questionKeywords: ['grown from 6 tools to 34 tools', 'tool router agent'],
+              answerKeyword: 'additional model call on every incoming request',
+              choiceTextVi:
+                'Router được đề xuất sẽ phát sinh thêm một lệnh gọi model (model call) trên mỗi request đầu vào.',
+              whyVi:
+                'Việc thêm một tool router agent phía trước sẽ tạo thêm một model call cho mỗi request (B), làm tăng thêm độ trễ thay vì giải quyết tận gốc vấn đề.',
+            },
+          ],
         },
       },
     ],
@@ -107,7 +120,97 @@ test('parses question studyGuide contract including promptVi, choicesVi, keyword
     'additional model call on every incoming request',
     'four distinct claim workflow domains',
   ]);
+  assert.equal(
+    result[0].studyGuide.quickFormulaVi,
+    '[Đề có: "grown from 6 tools to 34 tools"] ➔ Chọn B ("additional model call") — Router thêm model call làm tăng trễ.'
+  );
+  assert.equal(result[0].studyGuide.keywordMappings?.length, 1);
+  assert.deepEqual(result[0].studyGuide.keywordMappings?.[0], {
+    choiceId: 'B',
+    questionKeywords: ['grown from 6 tools to 34 tools', 'tool router agent'],
+    answerKeyword: 'additional model call on every incoming request',
+    choiceTextVi:
+      'Router được đề xuất sẽ phát sinh thêm một lệnh gọi model (model call) trên mỗi request đầu vào.',
+    whyVi:
+      'Việc thêm một tool router agent phía trước sẽ tạo thêm một model call cho mỗi request (B), làm tăng thêm độ trễ thay vì giải quyết tận gốc vấn đề.',
+  });
   assert.ok(result[0].studyGuide.explanationVi.startsWith('Việc thêm một tool router'));
+});
+
+test('rejects studyGuide when keywordMappings has invalid choiceId or empty keywords', () => {
+  assert.throws(() =>
+    parseReviewQuestions({
+      total: 1,
+      questions: [
+        {
+          id: 'q1',
+          type: 'single_choice',
+          prompt: 'Choose',
+          choices: [
+            { id: 'A', text: 'One' },
+            { id: 'B', text: 'Two' },
+          ],
+          correctChoiceIds: ['A'],
+          studyGuide: {
+            promptVi: 'Chọn',
+            choicesVi: [
+              { id: 'A', text: 'Một' },
+              { id: 'B', text: 'Hai' },
+            ],
+            questionKeywords: ['Choose'],
+            answerKeywords: ['One'],
+            explanationVi: 'Giải thích',
+            keywordMappings: [
+              {
+                choiceId: 'Z',
+                questionKeywords: ['Choose'],
+                answerKeyword: 'One',
+                choiceTextVi: 'Một',
+                whyVi: 'Lý do',
+              },
+            ],
+          },
+        },
+      ],
+    })
+  );
+
+  assert.throws(() =>
+    parseReviewQuestions({
+      total: 1,
+      questions: [
+        {
+          id: 'q1',
+          type: 'single_choice',
+          prompt: 'Choose',
+          choices: [
+            { id: 'A', text: 'One' },
+            { id: 'B', text: 'Two' },
+          ],
+          correctChoiceIds: ['A'],
+          studyGuide: {
+            promptVi: 'Chọn',
+            choicesVi: [
+              { id: 'A', text: 'Một' },
+              { id: 'B', text: 'Hai' },
+            ],
+            questionKeywords: ['Choose'],
+            answerKeywords: ['One'],
+            explanationVi: 'Giải thích',
+            keywordMappings: [
+              {
+                choiceId: 'A',
+                questionKeywords: [],
+                answerKeyword: 'One',
+                choiceTextVi: 'Một',
+                whyVi: 'Lý do',
+              },
+            ],
+          },
+        },
+      ],
+    })
+  );
 });
 
 test('rejects studyGuide when choicesVi do not match question choices', () => {

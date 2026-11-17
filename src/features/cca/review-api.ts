@@ -44,8 +44,17 @@ export async function getReviewTopics(signal: AbortSignal) {
   return parseReviewTopics(await request('/review/topics', signal));
 }
 
-export async function getReviewQuestions(topicId: string, signal: AbortSignal) {
+export async function getReviewQuestions(
+  topicId: string,
+  signal: AbortSignal,
+  query?: string
+) {
+  const q = query?.trim();
+  const search = q ? `?q=${encodeURIComponent(q)}` : '';
   return parseReviewQuestions(
-    await request(`/review/topics/${encodeURIComponent(topicId)}/questions`, signal)
+    await request(
+      `/review/topics/${encodeURIComponent(topicId)}/questions${search}`,
+      signal
+    )
   );
 }

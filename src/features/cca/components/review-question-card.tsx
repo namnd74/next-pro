@@ -10,6 +10,7 @@ import {
   RotateCcw,
   Sparkles,
   XCircle,
+  Zap,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -174,11 +175,31 @@ export function ReviewQuestionCard({
       {showKeywords &&
         studyGuide &&
         (studyGuide.questionKeywords.length > 0 ||
-          (revealed && studyGuide.answerKeywords.length > 0)) && (
+          (revealed && studyGuide.answerKeywords.length > 0) ||
+          studyGuide.quickFormulaVi ||
+          Boolean(studyGuide.keywordMappings?.length)) && (
           <div
-            className="border-border/70 bg-muted/30 space-y-2.5 rounded-xl border p-3.5 text-xs"
+            className="border-border/70 bg-muted/30 space-y-3 rounded-xl border p-3.5 text-xs"
             aria-label="Từ khóa trọng tâm"
           >
+            {studyGuide.quickFormulaVi && (
+              <div
+                lang="vi"
+                className="border-amber-500/30 bg-amber-500/10 dark:bg-amber-500/15 text-foreground flex items-start gap-2.5 rounded-lg border p-2.5 text-xs leading-relaxed"
+                aria-label="Công thức phản xạ nhanh"
+              >
+                <Zap className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="space-y-0.5">
+                  <span className="font-bold text-amber-700 dark:text-amber-400 mr-1.5 inline-block">
+                    Công thức phản xạ nhanh:
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {studyGuide.quickFormulaVi}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {studyGuide.questionKeywords.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-foreground mr-1 inline-flex items-center gap-1 font-semibold">
@@ -192,6 +213,7 @@ export function ReviewQuestionCard({
                 ))}
               </div>
             )}
+
             {revealed && studyGuide.answerKeywords.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-foreground mr-1 inline-flex items-center gap-1 font-semibold">
@@ -205,6 +227,53 @@ export function ReviewQuestionCard({
                 ))}
               </div>
             )}
+
+            {studyGuide.keywordMappings &&
+              studyGuide.keywordMappings.length > 0 &&
+              (revealed || showKeywords) && (
+                <div className="border-border/60 space-y-2 border-t pt-2.5">
+                  <span className="text-foreground inline-flex items-center gap-1 font-semibold">
+                    <Sparkles className="text-primary size-3.5" />
+                    Ánh xạ từ khóa &amp; phản xạ:
+                  </span>
+                  <div className="space-y-2">
+                    {studyGuide.keywordMappings.map((km) => (
+                      <div
+                        key={km.choiceId}
+                        className="border-border/80 bg-background/70 space-y-1.5 rounded-lg border p-2.5"
+                      >
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge variant="default" className="text-[11px] font-bold">
+                            Chọn {km.choiceId}
+                          </Badge>
+                          <span className="text-foreground font-medium">
+                            &ldquo;{km.answerKeyword}&rdquo;
+                          </span>
+                          <span className="text-muted-foreground text-[11px]">
+                            ({km.choiceTextVi})
+                          </span>
+                        </div>
+                        <div className="text-muted-foreground flex flex-wrap items-center gap-1 text-[11px]">
+                          <span className="text-foreground font-medium">Đề có:</span>
+                          {km.questionKeywords.map((kw) => (
+                            <Badge
+                              key={kw}
+                              variant="warning"
+                              className="font-mono text-[10px]"
+                            >
+                              {kw}
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-muted-foreground text-[11px] leading-relaxed">
+                          <span className="text-foreground font-medium">Lý do: </span>
+                          {km.whyVi}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
           </div>
         )}
 

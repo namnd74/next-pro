@@ -9,11 +9,21 @@ export interface ReviewChoice {
   text: string;
 }
 
+export interface QuestionKeywordMapping {
+  choiceId: string;
+  questionKeywords: string[];
+  answerKeyword: string;
+  choiceTextVi: string;
+  whyVi: string;
+}
+
 export interface QuestionStudyGuide {
   promptVi: string;
   choicesVi: ReviewChoice[];
   questionKeywords: string[];
   answerKeywords: string[];
+  quickFormulaVi?: string;
+  keywordMappings?: QuestionKeywordMapping[];
   explanationVi: string;
 }
 
@@ -72,6 +82,39 @@ function parseChoices(value: unknown, label: string): ReviewChoice[] {
   });
 }
 
+function parseKeywordMappings(
+  value: unknown,
+  choiceIds: Set<string>
+): QuestionKeywordMapping[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value) || !value.length) {
+    throw new Error('Dữ liệu ánh xạ từ khóa (keywordMappings) không đúng định dạng.');
+  }
+  return value.map((item) => {
+    const entry = record(item);
+    const choiceId = text(entry.choiceId);
+    if (!choiceIds.has(choiceId)) {
+      throw new Error(
+        `Mã lựa chọn ${choiceId} trong keywordMappings không tồn tại trong câu hỏi.`
+      );
+    }
+    const questionKeywords = textArray(
+      entry.questionKeywords,
+      'từ khóa câu hỏi trong keywordMappings'
+    );
+    if (!questionKeywords.length) {
+      throw new Error('keywordMappings thiếu từ khóa câu hỏi.');
+    }
+    return {
+      choiceId,
+      questionKeywords,
+      answerKeyword: text(entry.answerKeyword),
+      choiceTextVi: text(entry.choiceTextVi),
+      whyVi: text(entry.whyVi),
+    };
+  });
+}
+
 function parseStudyGuide(
   value: unknown,
   choiceIds: Set<string>
@@ -90,11 +133,18 @@ function parseStudyGuide(
   ) {
     throw new Error('Danh sách lựa chọn tiếng Việt không khớp với câu hỏi gốc.');
   }
+  const quickFormulaVi =
+    guide.quickFormulaVi !== undefined && guide.quickFormulaVi !== null
+      ? text(guide.quickFormulaVi)
+      : undefined;
+  const keywordMappings = parseKeywordMappings(guide.keywordMappings, choiceIds);
   return {
     promptVi: text(guide.promptVi),
     choicesVi,
     questionKeywords: textArray(guide.questionKeywords, 'từ khóa câu hỏi'),
     answerKeywords: textArray(guide.answerKeywords, 'từ khóa đáp án'),
+    ...(quickFormulaVi ? { quickFormulaVi } : {}),
+    ...(keywordMappings ? { keywordMappings } : {}),
     explanationVi: text(guide.explanationVi),
   };
 }
