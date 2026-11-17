@@ -57,6 +57,19 @@ const questions = [
         'additional model call on every incoming request',
         'four distinct claim workflow domains',
       ],
+      quickFormulaVi:
+        '[Đề có: "grown from 6 tools to 34 tools"] ➔ Chọn B ("additional model call") — Router thêm model call làm tăng trễ.',
+      keywordMappings: [
+        {
+          choiceId: 'B',
+          questionKeywords: ['grown from 6 tools to 34 tools', 'tool router agent'],
+          answerKeyword: 'additional model call on every incoming request',
+          choiceTextVi:
+            'Router được đề xuất sẽ phát sinh thêm một lệnh gọi model (model call) trên mỗi request đầu vào.',
+          whyVi:
+            'Việc thêm một tool router agent phía trước sẽ tạo thêm một model call cho mỗi request (B), làm tăng thêm độ trễ thay vì giải quyết tận gốc vấn đề.',
+        },
+      ],
       explanationVi:
         'Việc thêm một tool router agent phía trước sẽ tạo thêm một model call cho mỗi request (B), làm tăng độ trễ.',
     },
@@ -220,8 +233,15 @@ test('review displays studyGuide translations, keywords, explanation and support
   ).toBeVisible();
 
   await first.getByRole('button', { name: 'Từ khóa', exact: true }).click();
+  await expect(first.getByText('Công thức phản xạ nhanh:')).toBeVisible();
+  await expect(
+    first.getByText(
+      '[Đề có: "grown from 6 tools to 34 tools"] ➔ Chọn B ("additional model call") — Router thêm model call làm tăng trễ.'
+    )
+  ).toBeVisible();
   await expect(first.getByText('Từ khóa câu hỏi:')).toBeVisible();
   await expect(first.getByText('tool router agent').first()).toBeVisible();
+  await expect(first.getByText('Ánh xạ từ khóa & phản xạ:')).toBeVisible();
   await expect(first.getByText('Từ khóa đáp án đúng:')).toHaveCount(0);
 
   await first.getByRole('button', { name: /additional model call/ }).click();

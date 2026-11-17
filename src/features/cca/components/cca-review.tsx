@@ -123,9 +123,20 @@ export function CcaReview() {
       return (
         guide.promptVi.toLowerCase().includes(normalizedQuery) ||
         guide.explanationVi.toLowerCase().includes(normalizedQuery) ||
+        (guide.quickFormulaVi &&
+          guide.quickFormulaVi.toLowerCase().includes(normalizedQuery)) ||
         guide.choicesVi.some((c) => c.text.toLowerCase().includes(normalizedQuery)) ||
         guide.questionKeywords.some((kw) => kw.toLowerCase().includes(normalizedQuery)) ||
-        guide.answerKeywords.some((kw) => kw.toLowerCase().includes(normalizedQuery))
+        guide.answerKeywords.some((kw) => kw.toLowerCase().includes(normalizedQuery)) ||
+        (guide.keywordMappings &&
+          guide.keywordMappings.some(
+            (km) =>
+              km.choiceId.toLowerCase().includes(normalizedQuery) ||
+              km.answerKeyword.toLowerCase().includes(normalizedQuery) ||
+              km.choiceTextVi.toLowerCase().includes(normalizedQuery) ||
+              km.whyVi.toLowerCase().includes(normalizedQuery) ||
+              km.questionKeywords.some((kw) => kw.toLowerCase().includes(normalizedQuery))
+          ))
       );
     });
   }, [questions, normalizedQuery]);
